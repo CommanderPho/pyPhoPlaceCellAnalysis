@@ -5138,11 +5138,13 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
             # ImageItem uses (x, y) where x is columns and y is rows
             # We need to flip vertically (pyqtgraph's ImageItem has origin at top-left, but we want bottom-left)
             # and scale to the correct extent
-            scale_x = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1]
-            scale_y = -(overlay_ymax - overlay_ymin) / overlay_mask.shape[0]  # Negative to flip vertically
-            translate_x = overlay_xmin
-            translate_y = overlay_ymax  # Start from top (ymax) since we're flipping
-            overlay_img.setTransform(pg.QtGui.QTransform().scale(scale_x, scale_y).translate(translate_x, translate_y))
+            # Transform order: translate first, then scale (like the existing code pattern)
+            scale_x = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1] if overlay_mask.shape[1] > 0 else 1.0
+            scale_y = -(overlay_ymax - overlay_ymin) / overlay_mask.shape[0] if overlay_mask.shape[0] > 0 else 1.0  # Negative to flip vertically
+            tr = pg.QtGui.QTransform()
+            tr.translate(overlay_xmin, overlay_ymax)  # Position top-left corner at (xmin, ymax)
+            tr.scale(scale_x, scale_y)  # Scale (negative y-scale flips vertically)
+            overlay_img.setTransform(tr)
             plot_item.addItem(overlay_img)
     
     # Return based on return_widget parameter
