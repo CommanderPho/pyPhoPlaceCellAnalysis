@@ -940,7 +940,7 @@ class PositionLikePosteriorScoring:
 
         if (np.ndim(flat_p_x_given_n_list) > 3):
             ## split by epoch
-            assert normalization_across_epochs_epoch_names is not None
+            assert (normalization_across_epochs_epoch_names is not None), f"we must have the epoch_names to build the dictionary when passed a pseudo3D posterior"
             ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
             p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=normalization_across_epochs_epoch_names)
 
