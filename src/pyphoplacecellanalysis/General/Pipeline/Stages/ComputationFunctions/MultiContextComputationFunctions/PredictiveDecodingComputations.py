@@ -1182,7 +1182,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     @classmethod
     def _recompute_relevant_pos_epoch_position_df_index_column(cls, a_matching_pos_epochs_df: pd.DataFrame, relevant_positions_df: pd.DataFrame, epoch_id_key_name='matching_found_relevant_pos_epoch', drop_non_epoch_events: bool = True) -> pd.DataFrame:
-        """ add the final detected a_matching_pos_epochs_df indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch'] and return the modified `relevant_positions_df`
+        """ add the final detected `a_matching_pos_epochs_df` indicies to the decoded positions as the column ['matching_found_relevant_pos_epoch'] and return the modified `relevant_positions_df`
         
         Usage:
             ## INPUTS: a_matching_pos_epochs_df, relevant_positions_df
@@ -1211,6 +1211,10 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                                                             epoch_label_column_name='label', no_interval_fill_value=-1,
                                                             should_replace_existing_column=True, drop_non_epoch_events=drop_non_epoch_events,
                                                             overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH) ## #TODO 2026-01-15 06:13: - [ ] KeyError: "None of [Index(['start', 'stop'], dtype='object')] are in the [columns]"
+        
+
+        # TODO:_custom_build_sequential_position_epochs
+
         return relevant_positions_df
     
 
@@ -1337,7 +1341,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['FIXED', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-15 09:50', related_items=[])
     @classmethod
-    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
+    def _custom_build_sequential_position_epochs(cls, matching_past_positions_df: pd.DataFrame, col_name: str = 'past_future_matching_pos_epoch_id', EPSILON_GAP_SIZE_SEC: float = 1e-9, disable_segmentation: bool = False) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
         """ builds the epochs_df from the positions_df for a single epoch by merging consecutive time bins into epochs.
 
         Identifies consecutive sequences of time bins (gaps <= dt_max) and returns epochs spanning each sequence.
@@ -1370,7 +1374,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
 
         ## Segment trajectories
-        a_curr_matching_positions_df = a_curr_matching_positions_df.position.adding_segmented_trajectories_columns()
+        a_curr_matching_positions_df = a_curr_matching_positions_df.position.adding_segmented_trajectories_columns(disable_segmentation=disable_segmentation)
 
         curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
 
@@ -2215,7 +2219,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         measured_positions_df_copy.loc[(measured_positions_df_copy['t'] < curr_epoch_start_t), 'is_included'] = True ## only do past/future, not present
         measured_positions_df_copy.loc[(measured_positions_df_copy['t'] > curr_epoch_stop_t), 'is_included'] = True ## only do past/future, not present        
 
-        # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
         ## found all matching events, now see whether these events are in the path or the future:
