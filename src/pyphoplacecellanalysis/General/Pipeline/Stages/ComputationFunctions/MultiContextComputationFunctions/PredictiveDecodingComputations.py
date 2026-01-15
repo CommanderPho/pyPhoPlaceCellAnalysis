@@ -2885,7 +2885,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                                                                             enable_updating_instance_states=True, **kwargs,
                                                                          )
                 # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
-                epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                 # masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
                 masked_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
 
@@ -3146,8 +3146,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
             **kwargs, # use_parallel=True, max_workers=2, 
         )
-        epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _an_out_tuple
-        
+        epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
         
 
         ## OUTPUTS: non_local_PBE_non_moving_epochs_df, epoch_matching_past_future_positions, matching_pos_dfs_list, matching_pos_epochs_dfs_list, decoding_locality
@@ -3171,7 +3170,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 self.predictive_decoding.matching_pos_epochs_dfs_list = matching_pos_epochs_dfs_list
 
 
-        return epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list #(ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
+        return epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict #(ratio_past, ratio_future, n_total_past, n_total_future) # , epoch_high_prob_pos_masks
 
 
 
@@ -3517,7 +3516,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     # active_epochs_df
                     # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
                     _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
-                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                     global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
