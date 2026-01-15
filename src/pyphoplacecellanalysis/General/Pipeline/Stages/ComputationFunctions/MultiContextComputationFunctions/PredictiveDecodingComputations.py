@@ -1296,12 +1296,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         Compute matching position epochs DataFrame from position matches and time filters.
         
         Args:
-            measured_positions_df: DataFrame with position data
-            pos_matches_epoch_mask: Indices of positions that match the epoch mask
-            is_relevant_past_times: Boolean mask for past times in relevant positions
-            is_relevant_future_times: Boolean mask for future times in relevant positions
-            curr_epoch_start_t: Start time of the current epoch
-            curr_epoch_stop_t: Stop time of the current epoch
+            measured_positions_df: DataFrame with position data. Should already be filtered to only include past/future positions (not present positions).
             merging_adjacent_max_separation_sec: Maximum separation in seconds for merging adjacent epochs
             minimum_epoch_duration: Minimum duration for detected epochs
             
@@ -1313,7 +1308,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # assert 'is_included' in measured_positions_df_copy
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)        
-        a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df[measured_positions_df['is_included']]) ## filter inline here to only get the 'is_included' ones.
+        a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df) ## dataframe is already filtered to past/future positions before being passed
 
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
         if merging_adjacent_max_separation_sec is not None:
@@ -2208,15 +2203,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         ## use relevant_positions_df directly since it's already filtered to epoch mask positions
         # measured_positions_df_copy = relevant_positions_df.copy()
-        measured_positions_df_copy = measured_positions_df.copy() # Do the full dataframe due to how the consequtive epoch detection function works better with a full df:
-        # measured_positions_df_copy = relevant_positions_df
-        measured_positions_df_copy['is_included'] = False
-        ## mark past and future positions as included (not present)
-        measured_positions_df_copy.loc[(measured_positions_df_copy['t'] < curr_epoch_start_t), 'is_included'] = True ## only do past/future, not present
-        measured_positions_df_copy.loc[(measured_positions_df_copy['t'] > curr_epoch_stop_t), 'is_included'] = True ## only do past/future, not present        
+        # Create boolean mask directly (single vectorized operation) for past/future positions
+        is_included_mask = (measured_positions_df['t'] < curr_epoch_start_t) | (measured_positions_df['t'] > curr_epoch_stop_t)
+        # Filter once before passing to function (only copy the filtered subset, not the entire dataframe)
+        filtered_positions_df = measured_positions_df[is_included_mask].copy()
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
-        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
+        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=filtered_positions_df, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         
         ## found all matching events, now see whether these events are in the path or the future:
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
