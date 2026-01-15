@@ -3240,8 +3240,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         input_requires=['DirectionalDecodersDecoded', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['PredictiveDecoding'], uses=['PredictiveDecodingComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
-    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=90, extant_decoded_time_bin_size: Optional[float]=None,
-                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42):
+    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None,
+                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42, 
+                should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -3461,7 +3462,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
             print(f'\t[PredictiveDecoding] computing via .compute(sigma={sigma})...')
             # Compute predictive decoding outputs
-            moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma)
+            moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma) ## This line might be the slow one
             print('\tdone computing!')
             
             # print(f'[PredictiveDecoding] Checking computed properties: has gaussian_volume={hasattr(predictive_decoding, "gaussian_volume")}, has p_x_given_n_dict={hasattr(predictive_decoding, "p_x_given_n_dict")}')
@@ -3484,37 +3485,38 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         if include_includelist is None:
             include_includelist = ['roam'] # , 'sprinkle'
         epoch_names: List[str] = include_includelist 
-
-
         print(f'\t processing will occur for epoch_names: {epoch_names}')
-        for an_epoch_name in epoch_names:    
-            try:
-                print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
-                if an_epoch_name not in global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict:
-                    global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
-                # active_epochs_df
-                # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
-                global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
-            except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
-                print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
-                pass
-            except Exception as e:
-                raise e
-            
-        ## END for an_epoch_name in epoch_names...
 
-        enable_filter_and_final_result_processing: bool = False
+
+        # compute_future_and_past_analysis ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if should_perform_first_pass_compute_future_and_past_analysis:
+            for an_epoch_name in epoch_names:    
+                try:
+                    print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
+                    if an_epoch_name not in global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict:
+                        global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
+                    # active_epochs_df
+                    # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
+                    _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory
+                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
+                    global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
+                except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
+                    print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
+                    pass
+                except Exception as e:
+                    raise
+                
+            ## END for an_epoch_name in epoch_names...
+        else:
+            print(f'should_perform_first_pass_compute_future_and_past_analysis == False, so skipping those comps.')
+        
         
         if enable_filter_and_final_result_processing:
             # Validate container exists
             container = global_computation_results.computed_data.get('PredictiveDecoding', None)
             assert container is not None
 
-            masked_container = container.build_masked_container(curr_active_pipeline=owning_pipeline_reference,
-                should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
-            ) ## 3m now
+            masked_container = container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
             
             for an_epoch_name in epoch_names:    
                 try:
@@ -3527,8 +3529,11 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
                     pass
                 except Exception as e:
-                    raise e
+                    raise
             ## END for an_epoch_name in epoch_names...
+        else:
+            print(f'enable_filter_and_final_result_processing == False, so skipping those comps.')
+            
 
         ## Now filter
 
