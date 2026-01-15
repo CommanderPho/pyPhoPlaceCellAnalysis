@@ -31,6 +31,7 @@ from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 from neuropy.utils.misc import split_array
+from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
 
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder
@@ -2587,7 +2588,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
     Usage:
 
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import WCorrShuffle, PredictiveDecodingComputationsContainer
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingComputationsContainer
 
         wcorr_shuffle_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
         if wcorr_shuffle_results is not None:    
