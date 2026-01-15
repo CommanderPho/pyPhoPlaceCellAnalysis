@@ -5038,20 +5038,22 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         if rendering_mode == 'solid_colors':
             # Each trajectory gets a unique color
             traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-            pen = pg.mkPen(traj_color, width=1)
-            plot_item.plot(x_vals, y_vals, pen=pen)
+            traj_color.setAlphaF(0.4)  # Moderately low alpha
+            brush = pg.mkBrush(traj_color)
+            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
         
         elif rendering_mode == 'alpha_gradient':
             # Alpha gradient from 0.25 to 0.9 along the path
             base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
             n_points = len(x_vals)
-            for i in range(n_points - 1):
+            brushes = []
+            for i in range(n_points):
                 # Interpolate alpha from 0.25 to 0.9
                 alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
-                segment_color = pg.mkColor(base_color)
-                segment_color.setAlphaF(alpha)
-                pen = pg.mkPen(segment_color, width=1)
-                plot_item.plot([x_vals[i], x_vals[i+1]], [y_vals[i], y_vals[i+1]], pen=pen)
+                point_color = pg.mkColor(base_color)
+                point_color.setAlphaF(alpha)
+                brushes.append(pg.mkBrush(point_color))
+            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
         
         elif rendering_mode == 'time_diverging':
             # Diverging color palette based on normalized time (-1.0 to +1.0)
@@ -5066,10 +5068,9 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
                         normalized_t = np.zeros_like(t_vals)
                     
                     # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
-                    n_segments = len(x_vals) - 1
-                    for i in range(n_segments):
-                        # Interpolate normalized time for this segment
-                        seg_t = (normalized_t[i] + normalized_t[i+1]) / 2.0
+                    brushes = []
+                    for i in range(len(x_vals)):
+                        seg_t = normalized_t[i]
                         # Map from [-1.0, 1.0] to color
                         # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
                         if seg_t < 0:
@@ -5086,18 +5087,20 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
                             b = int(255 * (1 - intensity))
                         
                         seg_color = pg.mkColor(r, g, b, 200)
-                        pen = pg.mkPen(seg_color, width=1)
-                        plot_item.plot([x_vals[i], x_vals[i+1]], [y_vals[i], y_vals[i+1]], pen=pen)
+                        brushes.append(pg.mkBrush(seg_color))
+                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
                 else:
                     # Fallback to solid color if time data is invalid
                     traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                    pen = pg.mkPen(traj_color, width=1)
-                    plot_item.plot(x_vals, y_vals, pen=pen)
+                    traj_color.setAlphaF(0.4)  # Moderately low alpha
+                    brush = pg.mkBrush(traj_color)
+                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
             else:
                 # Fallback to solid color if no time column
                 traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                pen = pg.mkPen(traj_color, width=1)
-                plot_item.plot(x_vals, y_vals, pen=pen)
+                traj_color.setAlphaF(0.4)  # Moderately low alpha
+                brush = pg.mkBrush(traj_color)
+                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
         
         # Set x/y limits based on maze_extent if provided, otherwise auto-range
         if maze_extent is not None:
