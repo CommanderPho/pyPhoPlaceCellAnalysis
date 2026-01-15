@@ -1081,6 +1081,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     matching_past_positions_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False)
     matching_future_positions_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False)
     pos_segment_to_centroid_seq_segment_idx_map: Optional[Dict] = non_serialized_field(default=Factory(dict), is_computable=True, repr=False, metadata={'field_added':"2026.01.14_0"})
+    
 
     @property
     def matching_past_position_df_list(self) -> List[pd.DataFrame]:
@@ -1431,18 +1432,33 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     def __getstate__(self):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
-        # PredictiveDecoding has no non-serialized fields, so no exclusions needed
+        # Remove non-serialized fields
+        _non_pickled_fields = ['pos_segment_to_centroid_seq_segment_idx_map', 'a_centroids_search_segments_df'] # 'active_epochs_df',
+        for a_non_pickleable_field in _non_pickled_fields:
+            if a_non_pickleable_field in state:
+                del state[a_non_pickleable_field]
         return state
 
 
     def __setstate__(self, state):
+        """ 
+            ## remove from .set_state()
+            # ['pos_segment_to_centroid_seq_segment_idx_map', 'epoch_id_key_name', 'a_centroids_search_segments_df', 'centroids_df', 'centroids', 'relevant_future_times', 'relevant_past_times', 'epoch_t_bins_high_prob_pos_mask', 'decoded_epoch_result', ],
+            # ({}, 'matching_found_relevant_pos_epoch', {}, None, None, None, None, None, None, None) 
+
+        """
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
+        # Restore defaults for non-serialized fields
+        _non_pickled_field_restore_defaults = dict(zip(['pos_segment_to_centroid_seq_segment_idx_map', 'epoch_id_key_name', 'a_centroids_search_segments_df', 'centroids_df', 'centroids', 'relevant_future_times', 'relevant_past_times', 'epoch_t_bins_high_prob_pos_mask', 'decoded_epoch_result'], [{}, 'matching_found_relevant_pos_epoch', {}, None, None, None, None, None, None]))
+        for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
+            if a_field_name not in state:
+                state[a_field_name] = a_default_restore_value
+
         self.__dict__.update(state)
-        # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        # super(WCorrShuffle, self).__init__() # from
+
 
     def __repr__(self):
         """ 2024-01-11 - Renders only the fields and their sizes
@@ -2644,25 +2660,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             raise ValueError("Cannot set decoding_locality when predictive_decoding is None")
         self.predictive_decoding.locality_measures = value
 
-
-
-    # RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
-    # LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
-    # RL_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
-
-    # ripple_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
-    # laps_most_likely_result_tuple: Optional[DirectionalRankOrderResult] = serialized_field(default=None, repr=False)
-
-    # ripple_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
-    # ripple_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
-    # # ripple_n_valid_shuffles: Optional[int] = serialized_attribute_field(default=None, repr=False)
-
-    # laps_combined_epoch_stats_df: Optional[pd.DataFrame] = serialized_field(default=None, repr=False)
-    # laps_new_output_tuple: Optional[Tuple] = non_serialized_field(default=None, repr=False)
-
-    # minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0, repr=True)
-    # included_qclu_values: Optional[List] = serialized_attribute_field(default=None, repr=True)
-
     # @property
     # def decoding_locality(self) -> DecodingLocalityMeasures:
     #     """The decoding_locality property."""
@@ -3168,7 +3165,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
         state = self.__dict__.copy()
         # Remove non-serialized fields
-        _non_pickled_fields = ['debug_computed_dict', 'scoring_results_df']
+        _non_pickled_fields = ['debug_computed_dict', 'scoring_results_df'] # 'active_epochs_df',
         for a_non_pickleable_field in _non_pickled_fields:
             if a_non_pickleable_field in state:
                 del state[a_non_pickleable_field]
@@ -3181,7 +3178,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         self._VersionedResultMixin__setstate__(state)
 
         # Restore defaults for non-serialized fields
-        _non_pickled_field_restore_defaults = dict(zip(['debug_computed_dict', 'scoring_results_df'], [{}, None]))
+        _non_pickled_field_restore_defaults = dict(zip(['debug_computed_dict', 'scoring_results_df', 'active_epochs_df'], [{}, None, None]))
         for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
             if a_field_name not in state:
                 state[a_field_name] = a_default_restore_value
