@@ -341,7 +341,7 @@ class PosteriorMaskPostProcessing:
         centroids_df: pd.DataFrame = pd.DataFrame(a_centroids, columns=['x', 'y'])
         centroids_df['t'] = time_window_centers
         centroids_df = PosteriorMaskPostProcessing.add_angular_movement_dir(epoch_centroids=a_centroids, epoch_time_window_centers=time_window_centers)
-        centroids_df = centroids_df.position.adding_segmented_trajectories_columns()
+        centroids_df = centroids_df.position.adding_segmented_trajectories_columns(disable_segmentation=True)
         return centroids_df ## has ['dir_angle_binned', 'approx_dir_degrees']
 
 
@@ -508,7 +508,7 @@ class PosteriorMaskPostProcessing:
             num_found_pos_traj_dfs: int = len(added_pos_df_list)
             print(f'an_epoch_idx: {an_epoch_idx} - num_found_pos_traj_dfs: {num_found_pos_traj_dfs}, type: {type(added_pos_df_list)}')
             a_centroids_df: pd.DataFrame = centroids_dfs[an_epoch_idx]
-            a_centroids_df = a_centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+            a_centroids_df = a_centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=True)
             # Performed 5 aggregations grouped on column: 'segment_idx'
             a_centroids_segments_df = a_centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
             a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)

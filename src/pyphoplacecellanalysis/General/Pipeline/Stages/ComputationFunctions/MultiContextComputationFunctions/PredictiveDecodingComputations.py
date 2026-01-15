@@ -1426,7 +1426,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
 
-    def _recompute_high_prob_mask_centroids(self):
+    def _recompute_high_prob_mask_centroids(self, disable_segmentation: bool = True):
         """ recomputes the centroid masks for comparing position sequences to high-prob sweep sequences
             Needs to be ran on update:
                 self.epoch_t_bins_high_prob_pos_mask, self.relevant_future_times
@@ -1438,7 +1438,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         
         self.centroids = PosteriorMaskPostProcessing.centroids_from_binary_stack(self.epoch_t_bins_high_prob_pos_mask)
         self.centroids_df = PosteriorMaskPostProcessing.centroid_df_from_binary_stack(mask_stack=self.epoch_t_bins_high_prob_pos_mask, time_window_centers=self.decoded_epoch_result.time_window_centers)
-        self.centroids_df = self.centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=False)
+        self.centroids_df = self.centroids_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=disable_segmentation)
         # Performed 5 aggregations grouped on column: 'segment_idx'
         a_centroids_segments_df = self.centroids_df.groupby(['segment_idx']).agg(segment_dir_angle_binned_mean=('segment_dir_angle_binned', 'mean'), segment_Vp_scatteredness_mean=('segment_Vp_scatteredness', 'mean'), segment_Vp_deg_mean=('segment_Vp_deg', 'mean'), approx_head_dir_degrees_mean=('approx_dir_degrees', 'mean'), Vp_mean=('Vp', 'mean'), segment_Vp_deg_safe_mean=('segment_Vp_deg', PositionComputedDataMixin.circular_mean_deg)).reset_index()
         self.a_centroids_search_segments_df = a_centroids_segments_df.dropna(subset=['segment_dir_angle_binned_mean'], inplace=False)
@@ -1528,7 +1528,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     
 
     @function_attributes(short_name=None, tags=['traj', 'angle', 'direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 19:36', related_items=[])
-    def recompute_relevant_position_active_mask_centroid_traj_angle(self):
+    def recompute_relevant_position_active_mask_centroid_traj_angle(self, disable_segmentation: bool=True):
         """Recompute relevant position active mask centroid trajectory angle matching.
         
         This function processes positions within epochs to compute segmented trajectory columns
@@ -1547,13 +1547,14 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             tuple: (epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map) or (None, None)
         """
         #TODO 2026-01-14 17:53: - [ ] `PosteriorMaskPostProcessing` post processing positions to see which are aligned with the posterior:
-        if self.a_centroids_search_segments_df is None:
-            self._recompute_high_prob_mask_centroids()
-        if self.a_centroids_search_segments_df is not None:
+        if (self.a_centroids_search_segments_df is None):
+            self._recompute_high_prob_mask_centroids(disable_segmentation=disable_segmentation) ## try once to recompute
+        if (self.a_centroids_search_segments_df is not None):
             ## compute the matching position/angles:
             epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
-            epoch_only_relevant_positions_df = epoch_only_relevant_positions_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
-            
+            epoch_only_relevant_positions_df = epoch_only_relevant_positions_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=disable_segmentation)
+            # COULD do: `.position.adding_representitive_trajectories_angles_columns(...)` instead`
+
             # Assign the segmented trajectory columns from epoch_only_relevant_positions_df to self.relevant_positions_df
             segmented_traj_columns = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_dir_angle_binned', 'segment_Vp_scatteredness']
             for col in segmented_traj_columns:
@@ -1567,7 +1568,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                     # Update values from epoch_only_relevant_positions_df by matching on index
                     self.relevant_positions_df.loc[epoch_only_relevant_positions_df.index, col] = epoch_only_relevant_positions_df[col]
 
-            epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=epoch_only_relevant_positions_df, a_centroids_search_segments_df=self.a_centroids_search_segments_df)
+            epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=epoch_only_relevant_positions_df, a_centroids_search_segments_df=self.a_centroids_search_segments_df, disable_segmentation=disable_segmentation)
             
             if pos_segment_to_centroid_seq_segment_idx_map is not None:
                 self.pos_segment_to_centroid_seq_segment_idx_map = pos_segment_to_centroid_seq_segment_idx_map
@@ -1581,6 +1582,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
             return epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map
         else:
+            # INSERT_YOUR_CODE
+            import warnings
+            warnings.warn("Warning: `self.a_centroids_search_segments_df` is None. Computation of centroid/position matching skipped.", UserWarning)
             return None, None
 
 
@@ -1795,13 +1799,12 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
 
-
-    # HDFMixin Conformances ______________________________________________________________________________________________ #
-    def to_hdf(self, file_path, key: str, **kwargs):
-        """ Saves the object to key in the hdf5 file specified by file_path"""
-        super().to_hdf(file_path, key=key, **kwargs)
         
-
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, debug_print=False, enable_hdf_testing_mode:bool=False, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION:bool=None, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, debug_print=debug_print, enable_hdf_testing_mode=enable_hdf_testing_mode, OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION=OVERRIDE_ALLOW_GLOBAL_NESTED_EXPANSION, **kwargs)
+        
 
 
 
@@ -2570,6 +2573,17 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                     matching_pos_epochs_df=a_matching_pos_epochs_df, should_defer_extended_computations=should_defer_extended_computations)
     
 
+        # Post-process by calling .recompute_all() which actually makes the pos_epochs right: ________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+        print(f'performing .recompute_all() for epoch....')        
+        # num_pre_found_epochs: int = len(_out_obj.matching_pos_epochs_df)
+        # if (num_pre_found_epochs < 3): # def recompute, it's always 2 epochs when it's wrong
+        _out_obj.recompute_all() ## almost 30.0 seconds just for one epoch
+        # num_post_found_epochs: int = len(_out_obj.matching_pos_epochs_df)
+        # print(f"num_post_found_epochs: {num_post_found_epochs}")        
+        
+
+
         #TODO 2026-01-14 17:53: - [ ] `PosteriorMaskPostProcessing` post processing positions to see which are aligned with the posterior:
         # if _out_obj.a_centroids_search_segments_df is None:
         #     _out_obj._recompute_high_prob_mask_centroids()
@@ -2622,6 +2636,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             merged_epoch_mask = np.any(masks, axis=-1)
         
         elif (epoch_high_prob_masks_dict is not None):
+            ## else only have the single mask per the whole epoch
             an_epoch_custom_high_prob_mask: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any] = epoch_high_prob_masks_dict[a_slice_multiplier][i]
             Assert.same_shape(an_epoch_custom_high_prob_mask, curr_epoch_p_x_given_n[:, :, 0])
             is_high_prob_mask = np.tile(an_epoch_custom_high_prob_mask, (1, 1, n_epoch_time_bins))
@@ -2641,13 +2656,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             raise ValueError(f"is_high_prob_mask is None for epoch {i}")
         
         # Call static method from the same class (PredictiveDecoding)
-        any_t_bin_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+        any_t_bin_result: MatchingPastFuturePositionsResult = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=any_t_Bin_high_prob_pos_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
                                                                                      decoded_epoch_result=decoded_epoch_result, **kwargs)
         
         ## compute for `merged_epoch_mask` if it exists
         merged_epoch_mask_result = None
         if merged_epoch_mask is not None:
-            merged_epoch_mask_result = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+            merged_epoch_mask_result: MatchingPastFuturePositionsResult = PredictiveDecoding.detect_matching_past_future_positions(epoch_high_prob_mask=merged_epoch_mask, epoch_t_bins_high_prob_pos_mask=is_high_prob_mask, measured_positions_df=measured_positions_df, curr_epoch_start_t=curr_epoch_start_t, curr_epoch_stop_t=curr_epoch_stop_t, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
                                                                                                  decoded_epoch_result=decoded_epoch_result, **kwargs)
                                                                 
         
@@ -2666,7 +2681,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                                         merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, ## for merging detected future/past position dataframes
                                         progress_print: bool = True,
                                         use_parallel: bool = True, max_workers: Optional[int] = None,
-                                        should_defer_extended_computations: bool = True, **kwargs, 
+                                        should_defer_extended_computations: bool = True, disable_segmentation: bool = True, **kwargs, 
         ):
         """
         Compute future and past position analysis for decoded epochs.
@@ -2811,7 +2826,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = []
                 for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins, a_decoded_epoch_result in epoch_data_list:
-                    future = executor.submit(cls._process_single_epoch_future_past_analysis, i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs, decoded_epoch_result=a_decoded_epoch_result, should_defer_extended_computations=should_defer_extended_computations)
+                    future = executor.submit(cls._process_single_epoch_future_past_analysis, i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs, decoded_epoch_result=a_decoded_epoch_result, should_defer_extended_computations=should_defer_extended_computations, disable_segmentation=disable_segmentation)
                     futures.append(future)
                 
                 for future in as_completed(futures):
@@ -2825,7 +2840,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             
             results_list = []
             for i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins, a_decoded_epoch_result in epoch_data_list:
-                result = cls._process_single_epoch_future_past_analysis(i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs, decoded_epoch_result=a_decoded_epoch_result, should_defer_extended_computations=should_defer_extended_computations)
+                result = cls._process_single_epoch_future_past_analysis(i=i, curr_epoch_p_x_given_n=curr_epoch_p_x_given_n, curr_epoch_time_bin_centers=curr_epoch_time_bin_centers, curr_epoch_tbin_indicies=curr_epoch_tbin_indicies, gaussian_volume=gaussian_volume, measured_positions_df=measured_positions_df, top_v_percent=top_v_percent, epoch_t_bin_high_prob_masks_dict=epoch_t_bin_high_prob_masks_dict, epoch_high_prob_masks_dict=epoch_high_prob_masks_dict, a_slice_multiplier=a_slice_multiplier, n_epoch_time_bins=n_epoch_time_bins, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, progress_print=progress_print, n_total_epochs=n_total_epochs, decoded_epoch_result=a_decoded_epoch_result, should_defer_extended_computations=should_defer_extended_computations, disable_segmentation=disable_segmentation)
                 results_list.append(result)
         
         # Unpack results and populate output lists
@@ -3857,7 +3872,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     print(f'\ttrying `.masked_container._filter_single_epoch_result(...)` for an_epoch_name: "{an_epoch_name}"...')
                     if an_epoch_name not in masked_container.debug_computed_dict:
                         masked_container.debug_computed_dict[an_epoch_name] = {}
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
                     masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
