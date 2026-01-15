@@ -1087,7 +1087,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     @property
     def matching_past_position_df_list(self) -> List[pd.DataFrame]:
-        """The matching_past_position_df_list property."""
+        """The matching_past_position_df_list property. #TODO 2026-01-15 06:18: - [ ] WRONG """
         # epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df,
         #                                                                                                     drop_non_epoch_events=True, epoch_id_key_name=epoch_id_key_name) ## drop those that aren't in the epochs
         epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_past_positions_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
@@ -1097,7 +1097,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     
     @property
     def matching_future_position_df_list(self) -> List[pd.DataFrame]:
-        """The matching_future_position_df_list property."""
+        """The matching_future_position_df_list property. #TODO 2026-01-15 06:18: - [ ] WRONG """
         epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_future_positions_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
         unique_values, partitioned_dfs_list = epoch_only_relevant_positions_df.pho.partition_df(partitionColumn=self.epoch_id_key_name)
         return partitioned_dfs_list
@@ -1210,7 +1210,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                                                             # epoch_label_column_name='label', no_interval_fill_value=np.nan,
                                                             epoch_label_column_name='label', no_interval_fill_value=-1,
                                                             should_replace_existing_column=True, drop_non_epoch_events=drop_non_epoch_events,
-                                                            overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+                                                            overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH) ## #TODO 2026-01-15 06:13: - [ ] KeyError: "None of [Index(['start', 'stop'], dtype='object')] are in the [columns]"
         return relevant_positions_df
     
 
@@ -3541,7 +3541,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     print(f'\ttrying `.masked_container._filter_single_epoch_result(...)` for an_epoch_name: "{an_epoch_name}"...')
                     if an_epoch_name not in masked_container.debug_computed_dict:
                         masked_container.debug_computed_dict[an_epoch_name] = {}
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
                     masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the last part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
