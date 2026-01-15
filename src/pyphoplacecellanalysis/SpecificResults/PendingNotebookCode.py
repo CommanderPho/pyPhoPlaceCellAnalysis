@@ -391,7 +391,7 @@ class PosteriorMaskPostProcessing:
 
     @function_attributes(short_name=None, tags=['working'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 13:36', related_items=[])
     @classmethod
-    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', segments_compare_col_name: str = 'segment_Vp_deg_mean_safe', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True):
+    def _compare_centroid_and_pos_traj_angle(cls, a_pos_df: pd.DataFrame, a_centroids_search_segments_df: pd.DataFrame, centroid_angle_col: str='segment_Vp_deg_safe_mean', segments_compare_col_name: str = 'segment_Vp_deg_mean_safe', close_angle_deg: float=60.0, allow_antiparallel_matching: bool=True, disable_segmentation: bool = True):
         """ find any matching witin close_angle_deg degrees of one another
 
         a_pos_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=a_pos_df, a_centroids_search_segments_df=a_centroids_search_segments_df)
@@ -400,7 +400,7 @@ class PosteriorMaskPostProcessing:
             ['centroid_pos_traj_matching_angle_idx'] to `a_pos_df`
         
         """
-        a_pos_df = a_pos_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+        a_pos_df = a_pos_df.position.adding_segmented_trajectories_columns(overwrite_existing=True, disable_segmentation=disable_segmentation)
         a_centroids_search_segments_df = a_centroids_search_segments_df.dropna(subset=[centroid_angle_col], inplace=False)
 
         a_pos_df['centroid_pos_traj_matching_angle_idx'] = -1 ## None of the positions match to start

@@ -1,9 +1,9 @@
-from typing import Any, Callable, List, Dict, Optional, Union
+from typing import Any, Callable, List, Dict, Optional, Union, Tuple, get_type_hints, get_origin, get_args
 from types import ModuleType
 import dataclasses
 from dataclasses import dataclass
 import attrs
-from attrs import define, field, Factory, asdict, has
+from attrs import define, field, Factory, asdict, has, fields
 from datetime import datetime
 import pathlib
 from pathlib import Path
@@ -563,7 +563,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
 
 
 @function_attributes(short_name=None, tags=['load', 'pickle', 'split'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-14 08:00', related_items=['safeSaveSplitData'])
-def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -> Dict[str, Any]:
+def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, target_cls: Optional[type] = None, **kwargs) -> Union[Dict[str, Any], Any]:
     """Load data from split pickle files created by safeSaveSplitData.
 
     Reciprocal function to safeSaveSplitData. Loads all Split_*.pkl files from a split folder
@@ -573,13 +573,25 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -
         pkl_path: Path to the pickle file or directory. If a directory, uses default filename "computed_data.pkl".
                   If a file, uses that path directly. The split folder is determined by appending "_split" to the base filename.
         debug_print: If True, prints progress information.
+        target_cls: Optional class to automatically rebuild the loaded data into. If provided and the loaded data is a dict,
+                    it will be automatically rebuilt into an instance of this class with all nested objects also rebuilt.
         **kwargs: Additional arguments passed to loadData for loading individual files.
 
     Returns:
-        Dictionary mapping keys to loaded values. Values that were saved as tuples with type info
-        (v_dict, module_name, type_name) will be returned as dictionaries.
+        Dictionary mapping keys to loaded values, or an instance of target_cls if target_cls is provided.
+        Values that were saved as tuples with type info (v_dict, module_name, type_name) will be returned as dictionaries.
 
     Usage:
+
+        # A file saved with: _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveData, safeSaveSplitData
+
+        ## Pickle the result:
+        pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer.pkl')
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, container, debug_print=True)
+        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+
+        # Can be reciprocally loaded with: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadSplitData, safeSaveSplitData
 
         # Save split data
@@ -587,6 +599,38 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -
         
         # Load split data
         loaded_data = loadSplitData(pkl_path, debug_print=True)
+
+    Concrete Examples:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadSplitData
+        from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingComputationsContainer, PredictiveDecoding, DecodingLocalityMeasures
+
+        # Load split data (old manual approach)
+        split_save_folder: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer_split')
+        container = loadSplitData(split_save_folder, debug_print=True)
+        if isinstance(container, dict):
+            container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(container, subset_excludelist=['_VersionedResultMixin_version']))
+        
+        # Load split data with auto-rebuild (new convenient approach)
+        container = loadSplitData(split_save_folder, debug_print=True, target_cls=PredictiveDecodingComputationsContainer)
+        # Nested objects (predictive_decoding, locality_measures, etc.) are automatically rebuilt
+            
+    Example 2:
+
+        split_save_folder: Path = curr_active_pipeline.get_output_path().joinpath('2026-01-14_PredictiveDecodingComputationsContainer_masked')
+        # Old approach
+        masked_container = loadSplitData(split_save_folder, debug_print=True)
+        if isinstance(masked_container, dict):
+            masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(masked_container, subset_excludelist=['_VersionedResultMixin_version']))
+        
+        # New approach with auto-rebuild
+        masked_container = loadSplitData(split_save_folder, debug_print=True, target_cls=PredictiveDecodingComputationsContainer)
+        # All nested objects are automatically rebuilt
+
+        type(masked_container)
+
+
 
     """
     # Extract move_modules_list from kwargs with global_move_modules_list default (mirroring loadData)
@@ -639,12 +683,19 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -
     if debug_print:
         print(f'base_pickle_path: {base_pickle_path}')
     
-    # Determine the split folder (mirroring safeSaveSplitData logic)
-    split_save_folder_name: str = f'{base_pickle_path.stem}_split'
-    split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
-    
-    if debug_print:
-        print(f'split_save_folder to load from: {split_save_folder}')
+    # Check if pkl_path is already a split folder (exists and is a directory)
+    # If not, fall back to adding the _split suffix like usual
+    if pkl_path.exists() and pkl_path.is_dir():
+        # User passed the direct split folder path
+        split_save_folder = pkl_path
+        if debug_print:
+            print(f'Using provided split folder path: {split_save_folder}')
+    else:
+        # Determine the split folder (mirroring safeSaveSplitData logic)
+        split_save_folder_name: str = f'{base_pickle_path.stem}_split'
+        split_save_folder: Path = base_pickle_path.parent.joinpath(split_save_folder_name).resolve()
+        if debug_print:
+            print(f'split_save_folder to load from: {split_save_folder}')
     
     if not split_save_folder.exists():
         raise FileNotFoundError(f"Split folder does not exist: {split_save_folder}")
@@ -710,7 +761,310 @@ def loadSplitData(pkl_path: Union[str, Path], debug_print:bool=True, **kwargs) -
         if len(failed_loaded_keys) > 0:
             print(f'Failed to load {len(failed_loaded_keys)} keys: {list(failed_loaded_keys.keys())}')
     
+    # If target_cls is provided, automatically rebuild the loaded data
+    if target_cls is not None and isinstance(loaded_data, dict):
+        if debug_print:
+            print(f'Auto-rebuilding loaded data into {target_cls.__name__}...')
+        try:
+            rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(target_cls, loaded_data)
+            if debug_print:
+                print(f'Successfully rebuilt into {target_cls.__name__}')
+            return rebuilt_obj
+        except Exception as e:
+            if debug_print:
+                print(f'Warning: Failed to auto-rebuild into {target_cls.__name__}: {e}')
+                import traceback
+                traceback.print_exc()
+            # Return the dict if rebuilding fails
+            return loaded_data
+    
     return loaded_data
+
+
+
+def _is_attrs_class(cls_or_type: Any) -> bool:
+    """Check if a type is an attrs class.
+    
+    Args:
+        cls_or_type: A class or type to check
+        
+    Returns:
+        True if the type is an attrs class, False otherwise
+    """
+    if not isinstance(cls_or_type, type):
+        return False
+    try:
+        return has(cls_or_type)
+    except (TypeError, AttributeError):
+        return False
+
+
+def _extract_actual_type(annotated_type: Any) -> Tuple[Any, bool]:
+    """Extract the actual type from Optional, Dict, List, and other generic types.
+    
+    Args:
+        annotated_type: A type annotation (may be Optional[T], Dict[K, V], List[T], etc.)
+        
+    Returns:
+        Tuple of (actual_type, is_container) where:
+        - actual_type: The inner type to check/rebuild
+        - is_container: True if this is a container type (Dict, List, etc.) that needs special handling
+    """
+    origin = get_origin(annotated_type)
+    args = get_args(annotated_type)
+    
+    if origin is None:
+        # Not a generic type, return as-is
+        return annotated_type, False
+    
+    # Handle Optional[T] -> T
+    if origin is Union and len(args) == 2 and type(None) in args:
+        # Extract the non-None type
+        non_none_type = next(arg for arg in args if arg is not type(None))
+        return _extract_actual_type(non_none_type)
+    
+    # Handle Dict[K, V] -> V (the value type)
+    if origin is dict or origin is Dict:
+        if len(args) >= 2:
+            value_type = args[1]
+            return _extract_actual_type(value_type), True
+        return Any, True
+    
+    # Handle List[T] -> T (the element type)
+    if origin is list or origin is List:
+        if len(args) >= 1:
+            element_type = args[0]
+            return _extract_actual_type(element_type), True
+        return Any, True
+    
+    # Handle Tuple[T, ...] -> T
+    if origin is tuple or origin is Tuple:
+        if len(args) >= 1:
+            element_type = args[0]
+            return _extract_actual_type(element_type), True
+        return Any, True
+    
+    # For other generic types, try to extract the first argument
+    if args:
+        return _extract_actual_type(args[0]), True
+    
+    return annotated_type, False
+
+
+def _rebuild_nested_objects_from_dict(target_obj: Any, visited: Optional[set] = None, max_depth: int = 50, current_depth: int = 0) -> Any:
+    """Recursively rebuild nested objects from dicts based on type annotations.
+    
+    This function processes all fields of an attrs object and rebuilds nested objects
+    that are stored as dicts back into their proper types.
+    
+    Args:
+        target_obj: The object to process (must be an attrs instance)
+        visited: Set of object IDs already visited (to prevent circular references)
+        max_depth: Maximum recursion depth
+        current_depth: Current recursion depth
+        
+    Returns:
+        The object with nested dicts rebuilt into proper types
+    """
+    if visited is None:
+        visited = set()
+    
+    if current_depth >= max_depth:
+        return target_obj
+    
+    # Only process attrs objects
+    if not _is_attrs_class(type(target_obj)):
+        return target_obj
+    
+    # Prevent circular references
+    obj_id = id(target_obj)
+    if obj_id in visited:
+        return target_obj
+    visited.add(obj_id)
+    
+    try:
+        # Get type hints for the class
+        type_hints = get_type_hints(type(target_obj))
+    except (TypeError, AttributeError, NameError):
+        # If we can't get type hints, return as-is
+        return target_obj
+    
+    try:
+        # Get attrs fields
+        attrs_fields = fields(type(target_obj))
+    except (TypeError, AttributeError):
+        return target_obj
+    
+    # Process each field
+    for attr_field in attrs_fields:
+        field_name = attr_field.name
+        if not hasattr(target_obj, field_name):
+            continue
+        
+        field_value = getattr(target_obj, field_name)
+        
+        # Skip None values
+        if field_value is None:
+            continue
+        
+        # Get the type annotation for this field
+        field_type = type_hints.get(field_name, None)
+        if field_type is None:
+            continue
+        
+        # Extract the actual type (handling Optional, Dict, List, etc.)
+        actual_type, is_container = _extract_actual_type(field_type)
+        
+        if is_container:
+            # Handle container types (Dict, List, etc.)
+            origin = get_origin(field_type)
+            args = get_args(field_type)
+            
+            if (origin is dict or origin is Dict) and isinstance(field_value, dict):
+                # Dict[K, V] - rebuild values
+                if len(args) >= 2:
+                    value_type = args[1]
+                    value_actual_type, _ = _extract_actual_type(value_type)
+                    if _is_attrs_class(value_actual_type):
+                        rebuilt_dict = {}
+                        for k, v in field_value.items():
+                            if isinstance(v, dict):
+                                rebuilt_dict[k] = _helper_rebuild_obj_from_class_if_needed(value_actual_type, v)
+                                # Recursively rebuild nested objects in the rebuilt value
+                                rebuilt_dict[k] = _rebuild_nested_objects_from_dict(rebuilt_dict[k], visited, max_depth, current_depth + 1)
+                            else:
+                                rebuilt_dict[k] = v
+                        setattr(target_obj, field_name, rebuilt_dict)
+                # Also handle nested Dict types (e.g., Dict[str, Dict[str, T]])
+                elif len(args) >= 2:
+                    value_type = args[1]
+                    if get_origin(value_type) is dict or get_origin(value_type) is Dict:
+                        # Nested dict - recursively process
+                        rebuilt_dict = {}
+                        for k, v in field_value.items():
+                            if isinstance(v, dict):
+                                rebuilt_dict[k] = _rebuild_nested_dict_values(v, value_type, visited, max_depth, current_depth + 1)
+                            else:
+                                rebuilt_dict[k] = v
+                        setattr(target_obj, field_name, rebuilt_dict)
+            
+            elif (origin is list or origin is List) and isinstance(field_value, list):
+                # List[T] - rebuild elements
+                if len(args) >= 1:
+                    element_type = args[0]
+                    element_actual_type, _ = _extract_actual_type(element_type)
+                    if _is_attrs_class(element_actual_type):
+                        rebuilt_list = []
+                        for item in field_value:
+                            if isinstance(item, dict):
+                                rebuilt_item = _helper_rebuild_obj_from_class_if_needed(element_actual_type, item)
+                                rebuilt_item = _rebuild_nested_objects_from_dict(rebuilt_item, visited, max_depth, current_depth + 1)
+                                rebuilt_list.append(rebuilt_item)
+                            else:
+                                rebuilt_list.append(item)
+                        setattr(target_obj, field_name, rebuilt_list)
+        else:
+            # Handle direct type (not a container)
+            if isinstance(field_value, dict) and _is_attrs_class(actual_type):
+                # Rebuild the nested object
+                rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(actual_type, field_value)
+                # Recursively rebuild nested objects in the rebuilt object
+                rebuilt_obj = _rebuild_nested_objects_from_dict(rebuilt_obj, visited, max_depth, current_depth + 1)
+                setattr(target_obj, field_name, rebuilt_obj)
+    
+    return target_obj
+
+
+def _rebuild_nested_dict_values(nested_dict: Dict, dict_type: Any, visited: set, max_depth: int, current_depth: int) -> Dict:
+    """Helper to rebuild nested dict values recursively."""
+    args = get_args(dict_type)
+    if len(args) >= 2:
+        value_type = args[1]
+        value_actual_type, is_container = _extract_actual_type(value_type)
+        
+        rebuilt = {}
+        for k, v in nested_dict.items():
+            if isinstance(v, dict):
+                if is_container:
+                    rebuilt[k] = _rebuild_nested_dict_values(v, value_type, visited, max_depth, current_depth + 1)
+                elif _is_attrs_class(value_actual_type):
+                    rebuilt_obj = _helper_rebuild_obj_from_class_if_needed(value_actual_type, v)
+                    rebuilt_obj = _rebuild_nested_objects_from_dict(rebuilt_obj, visited, max_depth, current_depth + 1)
+                    rebuilt[k] = rebuilt_obj
+                else:
+                    rebuilt[k] = v
+            else:
+                rebuilt[k] = v
+        return rebuilt
+    return nested_dict
+
+
+@function_attributes(short_name=None, tags=['loading', 'split', 'helper', 'class'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 22:13', related_items=[])
+def _helper_rebuild_obj_from_class_if_needed(target_cls, a_possible_dict):
+    """ tries to rebuild the `a_possible_dict` instance/object as an instance of the class `target_cls`
+        Useful for rebuilding object instances from loaded dicts
+        
+
+    Example:
+        ## for an object `PredictiveDecodingComputationsContainer`
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import _helper_rebuild_obj_from_class_if_needed
+
+        # _helper_build_class
+        ## Example: to rebuild a `PredictiveDecodingComputationsContainer` type object `a_masked_container`
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+
+        ## INPUTS: a_masked_container = masked_container
+
+        if isinstance(a_masked_container, dict):
+            # a_masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(**get_dict_subset(a_masked_container, subset_excludelist=['_VersionedResultMixin_version']))
+            a_masked_container: PredictiveDecodingComputationsContainer = _helper_rebuild_obj_from_class_if_needed(PredictiveDecodingComputationsContainer, a_masked_container)
+            
+        if isinstance(a_masked_container.predictive_decoding, dict):
+            # a_masked_container.predictive_decoding = PredictiveDecoding(**get_dict_subset(a_masked_container.predictive_decoding, subset_excludelist=['_VersionedResultMixin_version']))
+            a_masked_container.predictive_decoding = _helper_rebuild_obj_from_class_if_needed(PredictiveDecoding, a_masked_container.predictive_decoding)
+            print(f'updated a_masked_container.predictive_decoding')
+
+        if isinstance(a_masked_container.predictive_decoding.locality_measures, dict):
+            # a_masked_container.predictive_decoding.locality_measures = DecodingLocalityMeasures(**get_dict_subset(a_masked_container.predictive_decoding.locality_measures, subset_excludelist=['_VersionedResultMixin_version', '_interpolator', 'locality_measures_df']))
+            a_masked_container.predictive_decoding.locality_measures = _helper_rebuild_obj_from_class_if_needed(DecodingLocalityMeasures, a_masked_container.predictive_decoding.locality_measures)
+            print(f'updated a_masked_container.predictive_decoding.locality_measures')
+
+
+        for a_t_bin_size, v in a_masked_container.epochs_decoded_result_cache_dict.items():
+            for an_epoch_name, a_masked_result in v.items():
+                a_masked_result = _helper_rebuild_obj_from_class_if_needed(DecodedFilterEpochsResult, a_masked_result)
+                # if isinstance(a_masked_result, dict):
+                #     a_masked_result: DecodedFilterEpochsResult = DecodedFilterEpochsResult(**get_dict_subset(a_masked_result, subset_excludelist=['_VersionedResultMixin_version'])) ## does this actually update the type of the embedded objects (in the dict)?
+
+
+
+        
+    """
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset, pop_dict_subset
+    
+    # Pop specific keys
+    if not isinstance(a_possible_dict, dict):
+        _cls_kwargs_dict = a_possible_dict.to_dict()
+    else:
+        _cls_kwargs_dict = a_possible_dict
+
+    _ignore_re_add_subset = ['_VersionedResultMixin_version']
+    _potential_subset_includelist = ['neuron_extended_ids', '_VersionedResultMixin_version', '_interpolator', 'locality_measures_df', 'time_bin_size', 'spikes_df', 'time_binning_container']
+    subset_includelist = [a_col for a_col in _potential_subset_includelist if a_col in _cls_kwargs_dict] ## only exclude real columns
+    popped_subset = pop_dict_subset(_cls_kwargs_dict, subset_includelist=subset_includelist)
+    ## INPUTS: active_peak_prominence_2d_results
+    an_obj = target_cls(**_cls_kwargs_dict)
+    ## add the invalid properties
+    for k, v in popped_subset.items():
+        if k not in _ignore_re_add_subset:
+            setattr(an_obj, k, v)
+
+    # Automatically rebuild nested objects from dicts based on type annotations
+    an_obj = _rebuild_nested_objects_from_dict(an_obj)
+
+    return an_obj
+
 
 
 
