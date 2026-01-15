@@ -2740,6 +2740,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # ==================================================================================================================================================================================================================================================================================== #
         masked_container: Optional[PredictiveDecodingComputationsContainer] = None
         
+        # epoch_names: List[str] = self.locality_measures.paradigm_epochs_df.label.to_list() # ['roam', 'sprinkle']
+        epoch_names: List[str] = self.locality_measures.epoch_names # ['roam', 'sprinkle']
+        
+        assert len(epoch_names) > 0
+        
         if use_full_recompute_method:
             should_filter_directional_decoders_decode_result = True ## UPDATES: directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict
             should_compute_future_and_past_analysis = True
@@ -2756,7 +2761,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
                     a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
                     a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
-                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, xbin=a_decoder.xbin, ybin=a_decoder.ybin,
+                                                                                                                                              position_like_score_cutoff=0.42, num_min_position_like_t_bins=3, normalization_across_epochs_epoch_names=epoch_names)
                     directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = filtered_decoded_local_epochs_result.get_result_for_epoch(0) ## get the single epoch, re-assign
                 ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoder...
 
