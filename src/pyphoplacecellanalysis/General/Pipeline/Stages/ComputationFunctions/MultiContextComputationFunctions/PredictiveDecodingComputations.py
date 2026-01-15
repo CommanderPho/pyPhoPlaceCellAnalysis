@@ -1106,7 +1106,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy()
         self._recompute_all_pos_dfs()
         self._recompute_high_prob_mask_centroids()
-        
+        self.recompute_relevant_position_active_mask_centroid_traj_angle()
+
+
 
     def _recompute_high_prob_mask_centroids(self):
         """ recomputes the centroid masks for comparing position sequences to high-prob sweep sequences
@@ -1127,8 +1129,19 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         """ Needs to be ran on update:
             self.relevant_past_times, self.relevant_future_times
         """
-        if 'centroid_pos_traj_matching_angle_idx' not in self.relevant_positions_df:
-            self.relevant_positions_df['centroid_pos_traj_matching_angle_idx'] = -1 ## initialize it
+        # Initialize all segmented trajectory and matching angle columns to their "no_value" defaults
+        if 'segment_idx' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['segment_idx'] = -1
+        if 'Vp' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['Vp'] = np.nan
+        if 'segment_Vp_deg' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['segment_Vp_deg'] = np.nan
+        if 'segment_dir_angle_binned' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['segment_dir_angle_binned'] = np.nan
+        if 'segment_Vp_scatteredness' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['segment_Vp_scatteredness'] = np.nan
+        if 'centroid_pos_traj_matching_angle_idx' not in self.relevant_positions_df.columns:
+            self.relevant_positions_df['centroid_pos_traj_matching_angle_idx'] = -1
 
         ## re-index:
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
@@ -1174,7 +1187,26 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                                                             overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
         return relevant_positions_df
     
+
+    @function_attributes(short_name=None, tags=['traj', 'angle', 'direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 19:36', related_items=[])
     def recompute_relevant_position_active_mask_centroid_traj_angle(self):
+        """Recompute relevant position active mask centroid trajectory angle matching.
+        
+        This function processes positions within epochs to compute segmented trajectory columns
+        and matches them to centroid search segments based on angle similarity. The computed
+        columns are then assigned to `self.relevant_positions_df`.
+        
+        Updates the following columns in `self.relevant_positions_df`:
+        - 'segment_idx': Segment index (initialized to -1 if not in epoch)
+        - 'Vp': Velocity magnitude
+        - 'segment_Vp_deg': Segment velocity direction in degrees
+        - 'segment_dir_angle_binned': Binned direction angle for segment
+        - 'segment_Vp_scatteredness': Velocity scatteredness measure for segment
+        - 'centroid_pos_traj_matching_angle_idx': Index of matching centroid segment (initialized to -1 if no match)
+        
+        Returns:
+            tuple: (epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map) or (None, None)
+        """
         #TODO 2026-01-14 17:53: - [ ] `PosteriorMaskPostProcessing` post processing positions to see which are aligned with the posterior:
         if self.a_centroids_search_segments_df is None:
             self._recompute_high_prob_mask_centroids()
@@ -1182,33 +1214,35 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             ## compute the matching position/angles:
             epoch_only_relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=True, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
             epoch_only_relevant_positions_df = epoch_only_relevant_positions_df.position.adding_segmented_trajectories_columns(overwrite_existing=True)
+            
+            # Assign the segmented trajectory columns from epoch_only_relevant_positions_df to self.relevant_positions_df
+            segmented_traj_columns = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_dir_angle_binned', 'segment_Vp_scatteredness']
+            for col in segmented_traj_columns:
+                if col in epoch_only_relevant_positions_df.columns:
+                    if col not in self.relevant_positions_df.columns:
+                        # Initialize with NaN for columns that might not exist, or appropriate default
+                        if col == 'segment_idx':
+                            self.relevant_positions_df[col] = -1
+                        else:
+                            self.relevant_positions_df[col] = np.nan
+                    # Update values from epoch_only_relevant_positions_df by matching on index
+                    self.relevant_positions_df.loc[epoch_only_relevant_positions_df.index, col] = epoch_only_relevant_positions_df[col]
 
             epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map = PosteriorMaskPostProcessing._compare_centroid_and_pos_traj_angle(a_pos_df=epoch_only_relevant_positions_df, a_centroids_search_segments_df=self.a_centroids_search_segments_df)
             
             if pos_segment_to_centroid_seq_segment_idx_map is not None:
                 self.pos_segment_to_centroid_seq_segment_idx_map = pos_segment_to_centroid_seq_segment_idx_map
 
-            # Assign the 'centroid_pos_traj_matching_angle_idx' column returned in the `epoch_only_relevant_positions_df` to the `self.matching_pos_epochs_df` __________________________________________________________________________________________________________________________________ #
-            # Aggregate centroid_pos_traj_matching_angle_idx by epoch and add to matching_pos_epochs_df
-            # For each epoch, take the first non-negative value (or -1 if all are -1)
-            epoch_centroid_idx_df = epoch_only_relevant_positions_df.groupby(self.epoch_id_key_name)['centroid_pos_traj_matching_angle_idx'].apply(lambda x: x[x >= 0].iloc[0] if (x >= 0).any() else -1).reset_index(name='centroid_pos_traj_matching_angle_idx')
-            # Merge into matching_pos_epochs_df using 'label' column (which corresponds to epoch index)
-            if 'label' not in self.matching_pos_epochs_df.columns:
-                self.matching_pos_epochs_df['label'] = self.matching_pos_epochs_df.index.astype(int)
-            # Drop the column if it already exists to avoid merge conflicts
-            if 'centroid_pos_traj_matching_angle_idx' in self.matching_pos_epochs_df.columns:
-                self.matching_pos_epochs_df = self.matching_pos_epochs_df.drop(columns=['centroid_pos_traj_matching_angle_idx'])
-            self.matching_pos_epochs_df = self.matching_pos_epochs_df.merge(epoch_centroid_idx_df, left_on='label', right_on=self.epoch_id_key_name, how='left')
-            # Fill NaN values with -1 for epochs that don't have matching positions
-            self.matching_pos_epochs_df['centroid_pos_traj_matching_angle_idx'] = self.matching_pos_epochs_df['centroid_pos_traj_matching_angle_idx'].fillna(-1)
-            # Drop the temporary merge key column if it was added
-            if self.epoch_id_key_name in self.matching_pos_epochs_df.columns and self.epoch_id_key_name != 'label':
-                self.matching_pos_epochs_df = self.matching_pos_epochs_df.drop(columns=[self.epoch_id_key_name])
-
+            # Assign the 'centroid_pos_traj_matching_angle_idx' column from epoch_only_relevant_positions_df to self.relevant_positions_df
+            # Initialize the column if it doesn't exist
+            if 'centroid_pos_traj_matching_angle_idx' not in self.relevant_positions_df.columns:
+                self.relevant_positions_df['centroid_pos_traj_matching_angle_idx'] = -1
+            # Update values from epoch_only_relevant_positions_df by matching on index
+            self.relevant_positions_df.loc[epoch_only_relevant_positions_df.index, 'centroid_pos_traj_matching_angle_idx'] = epoch_only_relevant_positions_df['centroid_pos_traj_matching_angle_idx']
 
             return epoch_only_relevant_positions_df, pos_segment_to_centroid_seq_segment_idx_map
-    else:
-        return None, None
+        else:
+            return None, None
 
 
     @property
@@ -1265,7 +1299,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
 
-
+    @function_attributes(short_name=None, tags=['WORKAROUND', 'interim', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 19:38', related_items=[])
     @classmethod
     def extract_final_position_epochs(cls, _out_epoch_flat_mask_future_past_result: List["MatchingPastFuturePositionsResult"]):
         """ ran post-hoc to recompute/extract the valid position epochs 
@@ -1412,7 +1446,6 @@ class MatchingPastFuturePositionsResult(ComputedResult):
                 attr_reprs.append(f"{a.name}: {attr_type}")
         content = ",\n\t".join(attr_reprs)
         return f"{type(self).__name__}({content}\n)"
-
 
 
     # HDFMixin Conformances ______________________________________________________________________________________________ #
