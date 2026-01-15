@@ -469,6 +469,17 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
 
 
     @property
+    def time_window_centers(self) -> List[NDArray]:
+        """ for compatibility """
+        return deepcopy(self.time_bin_container.centers)
+
+    @property
+    def flat_time_window_centers(self) -> NDArray:
+        """ for compatibility """
+        return self.time_window_centers ## a flat list of time_window_centers
+
+
+    @property
     def flat_p_x_given_n(self) -> NDArray:
         """The num_time_windows property."""
         return deepcopy(self.p_x_given_n).flatten()
