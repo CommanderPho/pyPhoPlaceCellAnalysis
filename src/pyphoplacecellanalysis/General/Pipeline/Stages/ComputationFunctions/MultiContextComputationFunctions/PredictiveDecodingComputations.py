@@ -2737,8 +2737,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # ==================================================================================================================================================================================================================================================================================== #
         masked_container: Optional[PredictiveDecodingComputationsContainer] = None
         
-        # epoch_names: List[str] = self.locality_measures.paradigm_epochs_df.label.to_list() # ['roam', 'sprinkle']
-        epoch_names: List[str] = self.locality_measures.epoch_names # ['roam', 'sprinkle']
+        if hasattr(self, 'locality_measures') and (self.locality_measures is not None):
+            # epoch_names: List[str] = self.locality_measures.paradigm_epochs_df.label.to_list() # ['roam', 'sprinkle']
+            epoch_names: List[str] = self.locality_measures.epoch_names # ['roam', 'sprinkle']
+        else:
+            epoch_names: List[str] = self.decoding_locality.epoch_names
         
         assert len(epoch_names) > 0
         
