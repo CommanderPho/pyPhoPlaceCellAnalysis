@@ -97,6 +97,10 @@ from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 
 
+# _debug_plot: bool = True
+_debug_plot: bool = False
+
+
 @define(slots=False, repr=False, eq=False)
 class EventEpochsDebugger:
     """High-performance visualizer for debugging position filtering steps and event epochs.
@@ -2478,20 +2482,21 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         pos_matches_epoch_mask = np.where([epoch_high_prob_mask[(a_pos.binned_x-1), (a_pos.binned_y-1)] for a_pos in relevant_positions_df.itertuples()])[0]
         relevant_positions_df: pd.DataFrame = relevant_positions_df.iloc[pos_matches_epoch_mask].copy()
         
-        # DEBUG: Visualize filtering stages (uncomment to enable)
-        # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import EventEpochsDebugger
-        # fig = EventEpochsDebugger.visualize_filtering_stages(
-        #     measured_positions_df=measured_positions_df,
-        #     relevant_positions_df_after_merge=relevant_positions_df_after_merge,
-        #     relevant_positions_df_final=relevant_positions_df,
-        #     epoch_high_prob_mask=epoch_high_prob_mask,
-        #     curr_epoch_start_t=curr_epoch_start_t,
-        #     curr_epoch_stop_t=curr_epoch_stop_t,
-        #     max_points_per_plot=5000,
-        #     merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec
-        # )
-        # import matplotlib.pyplot as plt
-        # plt.show()
+        # if _debug_plot:
+        #     # DEBUG: Visualize filtering stages (uncomment to enable)
+        #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import EventEpochsDebugger
+        #     fig = EventEpochsDebugger.visualize_filtering_stages(
+        #         measured_positions_df=measured_positions_df,
+        #         relevant_positions_df_after_merge=relevant_positions_df_after_merge,
+        #         relevant_positions_df_final=relevant_positions_df,
+        #         epoch_high_prob_mask=epoch_high_prob_mask,
+        #         curr_epoch_start_t=curr_epoch_start_t,
+        #         curr_epoch_stop_t=curr_epoch_stop_t,
+        #         max_points_per_plot=5000,
+        #         merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec
+        #     )
+        #     import matplotlib.pyplot as plt
+        #     plt.show()
 
         # Now divide the found positions into past/future categories _________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
