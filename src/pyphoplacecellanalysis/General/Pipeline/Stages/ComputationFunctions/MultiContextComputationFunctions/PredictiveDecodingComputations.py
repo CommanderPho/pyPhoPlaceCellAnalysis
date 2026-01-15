@@ -1151,11 +1151,18 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
 
         if self.relevant_past_times is not None:
-            self.matching_past_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_past_times).copy()
+            # self.matching_past_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_past_times).copy() # , t_column_names=['t']) ## AttributeError: Must have 'start' column.
+            # self.matching_past_positions_df = self.relevant_positions_df[np.isin(self.relevant_positions_df['t'], self.relevant_past_times)]
+            # self.matching_past_positions_df = self.relevant_positions_df[np.logical_and((self.relevant_positions_df['is_future_present_past'] == 'past'), (self.relevant_positions_df['is_included']))].copy()
+            self.matching_past_positions_df = self.relevant_positions_df[(self.relevant_positions_df['is_future_present_past'] == 'past')].copy()
+
         # self.matching_past_positions_df = self.relevant_positions_df[self.is_relevant_past_times].copy() # OLD
 
         if self.relevant_future_times is not None:
-            self.matching_future_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_future_times).copy()
+            # self.matching_future_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_future_times).copy()
+            # self.matching_future_positions_df = self.relevant_positions_df[np.logical_and((self.relevant_positions_df['is_future_present_past'] == 'future'), (self.relevant_positions_df['is_included']))].copy()
+            self.matching_future_positions_df = self.relevant_positions_df[(self.relevant_positions_df['is_future_present_past'] == 'future')].copy()
+
         # self.matching_future_positions_df = self.relevant_positions_df[self.is_relevant_future_times].copy() ## OLD
 
     @classmethod
@@ -2182,8 +2189,8 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # measured_positions_df_copy = relevant_positions_df
         measured_positions_df_copy['is_included'] = False
         ## mark past and future positions as included (not present)
-        measured_positions_df_copy.loc[is_relevant_past_times, 'is_included'] = True ## only do past/future, not present
-        measured_positions_df_copy.loc[is_relevant_future_times, 'is_included'] = True ## only do past/future, not present        
+        measured_positions_df_copy.loc[(measured_positions_df_copy['t'] < curr_epoch_start_t), 'is_included'] = True ## only do past/future, not present
+        measured_positions_df_copy.loc[(measured_positions_df_copy['t'] > curr_epoch_stop_t), 'is_included'] = True ## only do past/future, not present        
 
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
         a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=measured_positions_df_copy, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)
