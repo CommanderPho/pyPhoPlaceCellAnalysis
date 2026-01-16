@@ -4459,7 +4459,7 @@ class PredictiveDecodingDisplayWidget:
 
 
 
-    def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
+    def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False, should_use_flipped_images: Optional[bool]=None) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
         """Extract posterior data for epoch.
 
         
@@ -4470,7 +4470,7 @@ class PredictiveDecodingDisplayWidget:
         mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
         
         """
-        should_use_flipped_images: bool = self.should_use_flipped_images
+        should_use_flipped_images: bool = should_use_flipped_images or self.should_use_flipped_images ## use self.should_use_flpped_images if no override provided.
         
         should_get_posterior: bool = (not get_high_prob_mask_instead)
         get_high_prob_mask_instead = get_high_prob_mask_instead or (not self.disable_showing_epoch_high_prob_pos_masks)
@@ -4516,25 +4516,38 @@ class PredictiveDecodingDisplayWidget:
         else:
             ## Flipped Image/Extent:
             active_posterior = posterior_2d.T
-            time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx].T for t_bin_idx in range(num_time_bins_to_show)] ## flipped posteriors
+            # time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx].T for t_bin_idx in range(num_time_bins_to_show)] ## flipped posteriors
+            time_bin_posteriors = [time_bin_posteriors[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]  ## flipped posteriors
             
             # # Swap extent: (x_min, x_max, y_min, y_max) -> (y_min, y_max, x_min, x_max)
             # x_min, x_max, y_min, y_max = self.extent
             # swapped_extent = (y_min, y_max, x_min, x_max)
             # active_extent = swapped_extent
-        
 
         return active_posterior, time_bin_posteriors, num_time_bins_to_show
 
 
     def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int,
-                                        posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-3,
-                                        posterior_should_perform_reshape=False, # rotate_to_vertical,
-                                    ):
-        """Update posterior plot (extracted from nested function)."""        
+                                        posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=None,
+                                        posterior_should_perform_reshape=False, extent=None, overlay_posterior_2d: Optional[NDArray]=None, show_overlay=False, overlay_alpha = 0.08, debug_print=True, **kwargs):
+        """Update posterior plot with configurable parameters.
         
-
-
+        Args:
+            widget: The matplotlib widget to update
+            posterior_2d: 2D posterior array
+            time_bin_posteriors: Optional list of time bin posterior arrays
+            num_time_bins_to_show: Number of time bins to display
+            an_epoch_idx: Epoch index for title
+            posterior_alpha: Opacity for posterior heatmaps (default: 0.65)
+            posterior_cmap: Colormap name (default: 'Greens')
+            posterior_masking_value: Minimum value to display (default: 1e-3)
+            posterior_should_perform_reshape: Whether to reshape (default: False)
+            extent: Optional extent tuple, defaults to self.extent if None
+            show_overlay: Whether to show main posterior overlay on time bin heatmaps (default: True)
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib import gridspec
+        
         # Disable interactive mode to prevent temporary figures from appearing
         was_interactive = plt.isinteractive()
         plt.ioff()
@@ -4554,12 +4567,16 @@ class PredictiveDecodingDisplayWidget:
             
 
             ## where does self.extent come from? self.extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
-            posterior_extent = self.extent
-            posterior_should_use_flipped: bool = self.should_use_flipped_images
+            # Use provided extent or fall back to self.extent
+            posterior_extent = extent if (extent is not None) else self.extent
+            # posterior_should_use_flipped: bool = self.should_use_flipped_images
+            overlay_alpha = 0.5
+            overlay_cmap = kwargs.pop('overlay_cmap', 'Greens')
+
+            posterior_should_use_flipped: bool = False
             print(f'posterior_extent: {posterior_extent}')
             print(f'posterior_should_use_flipped: {posterior_should_use_flipped}')
             
-
             # Plot main posterior using _helper_add_heatmap
             heatmaps_main, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
                 an_ax=ax_main,
@@ -4567,14 +4584,40 @@ class PredictiveDecodingDisplayWidget:
                 ybin_centers=ybin_centers,
                 a_p_x_given_n=posterior_2d,
                 a_time_bin_centers=None,
-                rotate_to_vertical=self.should_use_flipped_images,
+                rotate_to_vertical=posterior_should_use_flipped,
                 custom_image_extent=posterior_extent,
                 time_cmap=posterior_cmap,
                 should_perform_reshape=posterior_should_perform_reshape,
                 posterior_masking_value=posterior_masking_value,
-                full_posterior_opacity=posterior_alpha
+                full_posterior_opacity=posterior_alpha,
+                debug_print=debug_print,
             )
             
+
+            # Add overlay of main posterior with low alpha (if enabled)
+            if show_overlay:
+                if overlay_posterior_2d is None:
+                    overlay_posterior_2d = posterior_2d ## use the posterior if none provided
+                    
+                if debug_print:
+                    print(f'posterior_2d.shape: {np.shape(posterior_2d)}')
+                    print(f'overlay_posterior_2d.shape: {np.shape(overlay_posterior_2d)}')
+                
+                heatmaps_overlay_main, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                    an_ax=ax_main,
+                    xbin_centers=xbin_centers,
+                    ybin_centers=ybin_centers,
+                    a_p_x_given_n=overlay_posterior_2d,
+                    a_time_bin_centers=None,
+                    rotate_to_vertical=posterior_should_use_flipped,
+                    custom_image_extent=posterior_extent,
+                    time_cmap=overlay_cmap,
+                    should_perform_reshape=posterior_should_perform_reshape,
+                    posterior_masking_value=None,
+                    full_posterior_opacity=overlay_alpha
+                )
+                
+
             ax_main.set_xlabel('X Position')
             ax_main.set_ylabel('Y Position')
             ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
@@ -4583,7 +4626,7 @@ class PredictiveDecodingDisplayWidget:
                 all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
                 vmin_shared = np.nanmin(all_time_bin_values)
                 vmax_shared = np.nanmax(all_time_bin_values)
-                overlay_alpha = 0.08
+                
                 
                 gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
                 
@@ -4597,8 +4640,8 @@ class PredictiveDecodingDisplayWidget:
                         ybin_centers=ybin_centers,
                         a_p_x_given_n=time_bin_posteriors[t_bin_idx],
                         a_time_bin_centers=None,
-                        rotate_to_vertical=self.should_use_flipped_images,
-                        custom_image_extent=self.extent,
+                        rotate_to_vertical=posterior_should_use_flipped,
+                        custom_image_extent=posterior_extent,
                         time_cmap=posterior_cmap,
                         should_perform_reshape=posterior_should_perform_reshape,
                         posterior_masking_value=posterior_masking_value,
@@ -4609,20 +4652,24 @@ class PredictiveDecodingDisplayWidget:
                     if heatmaps_tiny and len(heatmaps_tiny) > 0:
                         heatmaps_tiny[0].set_clim(vmin=vmin_shared, vmax=vmax_shared)
                     
-                    # Add overlay of main posterior with low alpha
-                    heatmaps_overlay, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-                        an_ax=ax_tiny,
-                        xbin_centers=xbin_centers,
-                        ybin_centers=ybin_centers,
-                        a_p_x_given_n=posterior_2d,
-                        a_time_bin_centers=None,
-                        rotate_to_vertical=self.should_use_flipped_images,
-                        custom_image_extent=self.extent,
-                        time_cmap=posterior_cmap,
-                        should_perform_reshape=posterior_should_perform_reshape,
-                        posterior_masking_value=posterior_masking_value,
-                        full_posterior_opacity=overlay_alpha
-                    )
+                    # Add overlay of main posterior with low alpha (if enabled)
+                    if show_overlay:
+                        if overlay_posterior_2d is None:
+                            overlay_posterior_2d = posterior_2d ## use the posterior if none provided                        
+
+                        heatmaps_overlay, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                            an_ax=ax_tiny,
+                            xbin_centers=xbin_centers,
+                            ybin_centers=ybin_centers,
+                            a_p_x_given_n=overlay_posterior_2d,
+                            a_time_bin_centers=None,
+                            rotate_to_vertical=posterior_should_use_flipped,
+                            custom_image_extent=posterior_extent,
+                            time_cmap=posterior_cmap,
+                            should_perform_reshape=posterior_should_perform_reshape,
+                            posterior_masking_value=None,
+                            full_posterior_opacity=overlay_alpha
+                        )
                     
                     ax_tiny.set_xticks([])
                     ax_tiny.set_yticks([])
@@ -4796,26 +4843,16 @@ class PredictiveDecodingDisplayWidget:
         if widget is None:
             return
         
-        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False)
-        
-        
-
+        override_should_use_flipped_images: bool = False
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False, should_use_flipped_images=override_should_use_flipped_images)
+        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
         
         try:
-            self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx)
+            self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, overlay_posterior_2d=mask_2d, posterior_cmap='Greens', posterior_alpha=0.95, show_overlay=True)
         except Exception as e:
             print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
             import traceback
             traceback.print_exc()
-
-        try:
-            mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
-            self._update_posterior_plot(widget, posterior_2d=mask_2d, time_bin_posteriors=time_bin_masks, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx)
-        except Exception as e:
-            print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
-            import traceback
-            traceback.print_exc()
-
 
 
 
@@ -5040,93 +5077,6 @@ class PredictiveDecodingDisplayWidget:
         # Check if we need to initialize (create new widget) or update existing one
         needed_init: bool = category_name not in self.dock_canvas_widgets
 
-        # Helper function to update the plot
-        def _subfn_update_posterior_plot(widget, posterior_2d, time_bin_posteriors, num_time_bins_to_show, an_epoch_idx, extent):
-            """Update the posterior plot with new data"""
-            import matplotlib.pyplot as plt
-            # Disable interactive mode to prevent temporary figures from appearing
-            was_interactive = plt.isinteractive()
-            plt.ioff()
-            try:
-                fig = widget.getFigure()
-                fig.clear()
-                from matplotlib import gridspec
-                
-                # Create GridSpec: 2 rows, 1 column, with height ratios [7, 2] for ~78%/22% split
-                if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                    gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[7, 2], hspace=0.1)
-                    ax_main = fig.add_subplot(gs[0, 0])
-                else:
-                    # If no time bins available, use single subplot
-                    ax_main = fig.add_subplot(111)
-                
-                # Use _helper_add_heatmap for consistent display with past/future panes
-                xbin_centers = self.xbin_centers if self.xbin_centers is not None else self.xbin
-                ybin_centers = self.ybin_centers if self.ybin_centers is not None else self.ybin
-                
-                # Plot main heatmap using _helper_add_heatmap
-                heatmaps_main, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-                    an_ax=ax_main,
-                    xbin_centers=xbin_centers,
-                    ybin_centers=ybin_centers,
-                    a_p_x_given_n=posterior_2d,
-                    a_time_bin_centers=None,
-                    rotate_to_vertical=self.should_use_flipped_images,
-                    custom_image_extent=extent,
-                    time_cmap='viridis',
-                    should_perform_reshape=False,
-                    posterior_masking_value=1e-3,
-                    full_posterior_opacity=1.0
-                )
-                
-                ax_main.set_xlabel('X Position')
-                ax_main.set_ylabel('Y Position')
-                ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-                
-                # Create tiny heatmaps row if time bin data is available
-                if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-                    # Calculate shared color scale for all tiny heatmaps
-                    all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-                    vmin_shared = np.nanmin(all_time_bin_values)
-                    vmax_shared = np.nanmax(all_time_bin_values)
-                    
-                    # Create GridSpec for individual tiny heatmaps within the top row
-                    gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
-                    
-                    for t_bin_idx in range(num_time_bins_to_show):
-                        ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                        
-                        # Plot tiny heatmap using _helper_add_heatmap
-                        heatmaps_tiny, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-                            an_ax=ax_tiny,
-                            xbin_centers=xbin_centers,
-                            ybin_centers=ybin_centers,
-                            a_p_x_given_n=time_bin_posteriors[t_bin_idx],
-                            a_time_bin_centers=None,
-                            rotate_to_vertical=self.should_use_flipped_images,
-                            custom_image_extent=extent,
-                            time_cmap='viridis',
-                            should_perform_reshape=False,
-                            posterior_masking_value=1e-3,
-                            full_posterior_opacity=1.0
-                        )
-                        
-                        # Apply shared color scale to time bin heatmap
-                        if heatmaps_tiny and len(heatmaps_tiny) > 0:
-                            heatmaps_tiny[0].set_clim(vmin=vmin_shared, vmax=vmax_shared)
-                        
-                        # Remove ticks and labels to save space
-                        ax_tiny.set_xticks([])
-                        ax_tiny.set_yticks([])
-                        # Add minimal label below
-                        ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-                
-                widget.draw()
-            finally:
-                # Restore previous interactive state
-                if was_interactive:
-                    plt.ion()
-
         if needed_init:
             # Create MatplotlibTimeSynchronizedWidget
             from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
@@ -5141,8 +5091,8 @@ class PredictiveDecodingDisplayWidget:
             # Calculate extent from bin edges (more accurate than using centers)
             extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
             
-            # Initial plot
-            _subfn_update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent)
+            # Initial plot using method with viridis colormap and full opacity (matching original nested function behavior)
+            self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent, posterior_alpha=1.0, posterior_cmap='viridis', show_overlay=False)
             
             # Embed the widget in the dock
             dock = self.dock_widgets.get(category_name)
@@ -5172,8 +5122,8 @@ class PredictiveDecodingDisplayWidget:
                     # Recalculate extent for update
                     extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
                     
-                    # Update plot with new data
-                    _subfn_update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent)
+                    # Update plot with new data using method with viridis colormap and full opacity (matching original nested function behavior)
+                    self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, extent=extent, posterior_alpha=1.0, posterior_cmap='viridis', show_overlay=False)
                 except Exception as e:
                     print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
                     import traceback
