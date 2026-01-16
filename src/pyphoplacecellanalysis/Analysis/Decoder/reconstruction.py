@@ -1298,6 +1298,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if not isinstance(subset.filter_epochs, pd.DataFrame):
             subset.filter_epochs = subset.filter_epochs.to_dataframe()
 
+        if 'original_epoch_idx' not in subset.filter_epochs.columns:
+            subset.filter_epochs['original_epoch_idx'] = subset.filter_epochs.index.to_numpy().astype(int) ## back up the original indicies if they haven't already been backed up. useful for later inverse mappings
+            
+
         ## Convert to the real-deal: pure indicies
         old_fashioned_indicies = np.array([subset.filter_epochs.index.get_loc(a_loc_idx) for a_loc_idx in included_epoch_indicies])
         if debug_print:
@@ -1665,7 +1669,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
+
         
+
         num_filter_epochs: int = a_decoded_result.num_filter_epochs
         
         # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
@@ -1756,7 +1762,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
                 a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
                 center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
-                
+                #TODO 2026-01-16 17:07: - [ ] I see some weirdnesses now, as the bins aren't evenly spaced anymore...
                 try:
                     a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) #
                     ## make whole new container
@@ -1776,7 +1782,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                         a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents) ## use the extents directly
                         ## make whole new container
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                
                     
                 except Exception as e:
                     raise e
