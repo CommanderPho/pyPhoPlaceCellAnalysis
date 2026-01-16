@@ -4527,8 +4527,14 @@ class PredictiveDecodingDisplayWidget:
         return active_posterior, time_bin_posteriors, num_time_bins_to_show
 
 
-    def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int):
+    def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int,
+                                        posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-3,
+                                        posterior_should_perform_reshape=False, # rotate_to_vertical,
+                                    ):
         """Update posterior plot (extracted from nested function)."""        
+        
+
+
         # Disable interactive mode to prevent temporary figures from appearing
         was_interactive = plt.isinteractive()
         plt.ioff()
@@ -4542,10 +4548,33 @@ class PredictiveDecodingDisplayWidget:
             else:
                 ax_main = fig.add_subplot(111)
             
-            active_posterior = posterior_2d
-            active_extent = self.extent
+            # Use _helper_add_heatmap for consistent display with past/future panes
+            xbin_centers = self.xbin_centers if self.xbin_centers is not None else self.xbin
+            ybin_centers = self.ybin_centers if self.ybin_centers is not None else self.ybin
+            
 
-            im = ax_main.imshow(active_posterior, aspect='equal', origin='lower', extent=active_extent, cmap='viridis', interpolation='none') # , interpolation='nearest'
+            ## where does self.extent come from? self.extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
+            posterior_extent = self.extent
+            posterior_should_use_flipped: bool = self.should_use_flipped_images
+            print(f'posterior_extent: {posterior_extent}')
+            print(f'posterior_should_use_flipped: {posterior_should_use_flipped}')
+            
+
+            # Plot main posterior using _helper_add_heatmap
+            heatmaps_main, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                an_ax=ax_main,
+                xbin_centers=xbin_centers,
+                ybin_centers=ybin_centers,
+                a_p_x_given_n=posterior_2d,
+                a_time_bin_centers=None,
+                rotate_to_vertical=self.should_use_flipped_images,
+                custom_image_extent=posterior_extent,
+                time_cmap=posterior_cmap,
+                should_perform_reshape=posterior_should_perform_reshape,
+                posterior_masking_value=posterior_masking_value,
+                full_posterior_opacity=posterior_alpha
+            )
+            
             ax_main.set_xlabel('X Position')
             ax_main.set_ylabel('Y Position')
             ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
@@ -4560,8 +4589,41 @@ class PredictiveDecodingDisplayWidget:
                 
                 for t_bin_idx in range(num_time_bins_to_show):
                     ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                    im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx].T, aspect='equal', origin='lower', extent=active_extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
-                    ax_tiny.imshow(active_posterior, aspect='equal', origin='lower', extent=active_extent, cmap='gray', interpolation='nearest', alpha=overlay_alpha)
+                    
+                    # Plot time bin posterior using _helper_add_heatmap
+                    heatmaps_tiny, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                        an_ax=ax_tiny,
+                        xbin_centers=xbin_centers,
+                        ybin_centers=ybin_centers,
+                        a_p_x_given_n=time_bin_posteriors[t_bin_idx],
+                        a_time_bin_centers=None,
+                        rotate_to_vertical=self.should_use_flipped_images,
+                        custom_image_extent=self.extent,
+                        time_cmap=posterior_cmap,
+                        should_perform_reshape=posterior_should_perform_reshape,
+                        posterior_masking_value=posterior_masking_value,
+                        full_posterior_opacity=posterior_alpha
+                    )
+                    
+                    # Apply shared color scale to time bin heatmap
+                    if heatmaps_tiny and len(heatmaps_tiny) > 0:
+                        heatmaps_tiny[0].set_clim(vmin=vmin_shared, vmax=vmax_shared)
+                    
+                    # Add overlay of main posterior with low alpha
+                    heatmaps_overlay, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                        an_ax=ax_tiny,
+                        xbin_centers=xbin_centers,
+                        ybin_centers=ybin_centers,
+                        a_p_x_given_n=posterior_2d,
+                        a_time_bin_centers=None,
+                        rotate_to_vertical=self.should_use_flipped_images,
+                        custom_image_extent=self.extent,
+                        time_cmap=posterior_cmap,
+                        should_perform_reshape=posterior_should_perform_reshape,
+                        posterior_masking_value=posterior_masking_value,
+                        full_posterior_opacity=overlay_alpha
+                    )
+                    
                     ax_tiny.set_xticks([])
                     ax_tiny.set_yticks([])
                     ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
@@ -4736,7 +4798,7 @@ class PredictiveDecodingDisplayWidget:
         
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False)
         
-        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
+        
 
         
         try:
@@ -4745,6 +4807,17 @@ class PredictiveDecodingDisplayWidget:
             print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
             import traceback
             traceback.print_exc()
+
+        try:
+            mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
+            self._update_posterior_plot(widget, posterior_2d=mask_2d, time_bin_posteriors=time_bin_masks, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx)
+        except Exception as e:
+            print(f"Error updating posterior plot for epoch {an_epoch_idx}: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+
 
 
     @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=[])
@@ -4987,8 +5060,25 @@ class PredictiveDecodingDisplayWidget:
                     # If no time bins available, use single subplot
                     ax_main = fig.add_subplot(111)
                 
-                # Plot main heatmap (make it square)
-                im = ax_main.imshow(posterior_2d, aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
+                # Use _helper_add_heatmap for consistent display with past/future panes
+                xbin_centers = self.xbin_centers if self.xbin_centers is not None else self.xbin
+                ybin_centers = self.ybin_centers if self.ybin_centers is not None else self.ybin
+                
+                # Plot main heatmap using _helper_add_heatmap
+                heatmaps_main, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                    an_ax=ax_main,
+                    xbin_centers=xbin_centers,
+                    ybin_centers=ybin_centers,
+                    a_p_x_given_n=posterior_2d,
+                    a_time_bin_centers=None,
+                    rotate_to_vertical=self.should_use_flipped_images,
+                    custom_image_extent=extent,
+                    time_cmap='viridis',
+                    should_perform_reshape=False,
+                    posterior_masking_value=1e-3,
+                    full_posterior_opacity=1.0
+                )
+                
                 ax_main.set_xlabel('X Position')
                 ax_main.set_ylabel('Y Position')
                 ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
@@ -5005,8 +5095,26 @@ class PredictiveDecodingDisplayWidget:
                     
                     for t_bin_idx in range(num_time_bins_to_show):
                         ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                        # Plot tiny heatmap (make them square)
-                        im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='equal', origin='lower', extent=extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                        
+                        # Plot tiny heatmap using _helper_add_heatmap
+                        heatmaps_tiny, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
+                            an_ax=ax_tiny,
+                            xbin_centers=xbin_centers,
+                            ybin_centers=ybin_centers,
+                            a_p_x_given_n=time_bin_posteriors[t_bin_idx],
+                            a_time_bin_centers=None,
+                            rotate_to_vertical=self.should_use_flipped_images,
+                            custom_image_extent=extent,
+                            time_cmap='viridis',
+                            should_perform_reshape=False,
+                            posterior_masking_value=1e-3,
+                            full_posterior_opacity=1.0
+                        )
+                        
+                        # Apply shared color scale to time bin heatmap
+                        if heatmaps_tiny and len(heatmaps_tiny) > 0:
+                            heatmaps_tiny[0].set_clim(vmin=vmin_shared, vmax=vmax_shared)
+                        
                         # Remove ticks and labels to save space
                         ax_tiny.set_xticks([])
                         ax_tiny.set_yticks([])
