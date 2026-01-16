@@ -3128,7 +3128,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                     # Build mapping from filtered epochs to original indices
                     filtered_to_original_idx = []
                     for _, row in active_epochs_df.iterrows():
-                        matching_original_idx = next((orig_idx for orig_idx, orig_row in original_active_epochs_df.iterrows()
+                        matching_original_idx = next((pos_idx for pos_idx, (_, orig_row) in enumerate(original_active_epochs_df.iterrows())
                             if (abs(row['start'] - orig_row['start']) < time_tolerance and abs(row['stop'] - orig_row['stop']) < time_tolerance) or
                             (row['start'] <= orig_row['stop'] and row['stop'] >= orig_row['start'])), None)
                         if matching_original_idx is not None:
@@ -3222,10 +3222,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 
                 if pred_dec.matching_pos_epochs_dfs_list and len(pred_dec.matching_pos_epochs_dfs_list) > 0:
                     for filtered_idx, df in enumerate(pred_dec.matching_pos_epochs_dfs_list):
-                        # Map filtered index to original index to look up epoch times
-                        original_idx = filtered_to_original_idx[filtered_idx] if (filtered_to_original_idx is not None and filtered_idx < len(filtered_to_original_idx)) else filtered_idx
-                        if original_idx in epoch_idx_to_actual_times:
-                            epoch_start, epoch_stop = epoch_idx_to_actual_times[original_idx]
+                        # Use filtered_idx directly since epoch_idx_to_actual_times is keyed by filtered indices
+                        if filtered_idx in epoch_idx_to_actual_times:
+                            epoch_start, epoch_stop = epoch_idx_to_actual_times[filtered_idx]
                             is_past = (df['stop'] < epoch_start)
                             is_future = (df['start'] > epoch_stop)
                             df['is_future_present_past'] = 'present'
@@ -3236,10 +3235,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 
                 if pred_dec.matching_pos_dfs_list and len(pred_dec.matching_pos_dfs_list) > 0:
                     for filtered_idx, df in enumerate(pred_dec.matching_pos_dfs_list):
-                        # Map filtered index to original index to look up epoch times
-                        original_idx = filtered_to_original_idx[filtered_idx] if (filtered_to_original_idx is not None and filtered_idx < len(filtered_to_original_idx)) else filtered_idx
-                        if original_idx in epoch_idx_to_actual_times:
-                            epoch_start, epoch_stop = epoch_idx_to_actual_times[original_idx]
+                        # Use filtered_idx directly since epoch_idx_to_actual_times is keyed by filtered indices
+                        if filtered_idx in epoch_idx_to_actual_times:
+                            epoch_start, epoch_stop = epoch_idx_to_actual_times[filtered_idx]
                             is_past = (df['t'] < epoch_start)
                             is_future = (df['t'] > epoch_stop)
                             df['is_future_present_past'] = 'present'
@@ -3415,6 +3413,10 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
     @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
     def _filter_single_epoch_result(self, curr_active_pipeline, decoding_time_bin_size = 0.025, an_epoch_name = 'roam') -> DecodedFilterEpochsResult:
         """
+        Seems to just do the whole set of computations again after the filtering/masking
+        
+        
+        
             decoding_time_bin_size = 0.025
             an_epoch_name = 'roam'
             masked_container = container.build_masked_container(curr_active_pipeline=curr_active_pipeline, a_t_bin_size=decoding_time_bin_size,
@@ -3736,6 +3738,65 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         super().to_hdf(file_path, key=key, **kwargs)
 
 
+@metadata_attributes(short_name=None, tags=['container'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-16 18:05', related_items=[])
+@define(slots=False, repr=False, eq=False)
+class PredictiveDecodingComputationsContainerContainer(ComputedResult):
+    """ Created as a solution to discarding the original container after masking the result 
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingComputationsContainerContainer
+
+        wcorr_shuffle_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
+        if wcorr_shuffle_results is not None:    
+            wcorr_ripple_shuffle: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
+            print(f'wcorr_ripple_shuffle.n_completed_shuffles: {wcorr_ripple_shuffle.n_completed_shuffles}')
+        else:
+            print(f'PredictiveDecoding is not computed.')
+            
+    """
+    _VersionedResultMixin_version: str = "2026.01.16_0" # to be updated in your IMPLEMENTOR to indicate its version
+    
+    container: Optional[PredictiveDecodingComputationsContainer] = serialized_field(default=None, repr=False)
+    masked_container: Optional[PredictiveDecodingComputationsContainer] = serialized_field(default=None, repr=False)
+
+
+    # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        return state
+
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., _mapping and _keys_at_init).
+        # For `VersionedResultMixin`
+        self._VersionedResultMixin__setstate__(state)
+        self.__dict__.update(state)
+
+
+    def __repr__(self):
+        """ 2024-01-11 - Renders only the fields and their sizes
+        """
+        from pyphocorehelpers.print_helpers import strip_type_str_to_classname
+        attr_reprs = []
+        for a in self.__attrs_attrs__:
+            attr_type = strip_type_str_to_classname(type(getattr(self, a.name)))
+            if 'shape' in a.metadata:
+                shape = ', '.join(a.metadata['shape'])  # this joins tuple elements with a comma, creating a string without quotes
+                attr_reprs.append(f"{a.name}: {attr_type} | shape ({shape})")  # enclose the shape string with parentheses
+            else:
+                attr_reprs.append(f"{a.name}: {attr_type}")
+        content = ",\n\t".join(attr_reprs)
+        return f"{type(self).__name__}({content}\n)"
+
+
+    # HDFMixin Conformances ______________________________________________________________________________________________ #
+    def to_hdf(self, file_path, key: str, **kwargs):
+        """ Saves the object to key in the hdf5 file specified by file_path"""
+        super().to_hdf(file_path, key=key, **kwargs)
+
+
 
 def validate_has_predictive_decoding_results(curr_active_pipeline, computation_filter_name='maze', minimum_inclusion_fr_Hz:Optional[float]=None):
     """ Returns True if the pipeline has a valid RankOrder results set of the latest version
@@ -3743,8 +3804,12 @@ def validate_has_predictive_decoding_results(curr_active_pipeline, computation_f
     TODO: make sure minimum can be passed. Actually, can get it from the pipeline.
 
     """
+    container_container: PredictiveDecodingComputationsContainerContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
+    if container_container is None:
+        return False
+    
     # Unpacking:
-    seq_results: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
+    seq_results: PredictiveDecodingComputationsContainer = container_container.container
     if seq_results is None:
         return False
     
@@ -3752,7 +3817,15 @@ def validate_has_predictive_decoding_results(curr_active_pipeline, computation_f
     if predictive_decoding is None:
         return False
     
-
+    # # masking
+    # mask_results: PredictiveDecodingComputationsContainer = container_container.masked_container
+    # if mask_results is None:
+    #     return False
+    
+    # mask_predictive_decoding = mask_results.predictive_decoding
+    # if predictive_decoding is None:
+    #     return False
+    
 
     # return True
 
@@ -3771,7 +3844,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None,
                 drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42, 
-                should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False):
+                enable_masked_filtered_container_before_any_comps: bool = True, should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -3781,6 +3854,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             global_computation_results.computed_data['PredictiveDecoding']
                 ['PredictiveDecoding'].predictive_decoding - PredictiveDecoding instance containing computed results
 
+                
+                
+            curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
                 
         Overall Process 2026-01-14:
         
@@ -3888,10 +3964,20 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         if ('PredictiveDecoding' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'PredictiveDecoding')):
             # initialize
-            global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
+            a_container = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
+            global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainerContainer(container=a_container, masked_container=None, is_global=True)
+            
+            # global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
+        elif isinstance(global_computation_results.computed_data['PredictiveDecoding'], PredictiveDecodingComputationsContainer):
+              ## upgraded to container container
+              print(f'upgrading from pre-2026-01-16 format with non-nested containers')
+              a_container = global_computation_results.computed_data['PredictiveDecoding'] ## get the original result
+              a_container_container: PredictiveDecodingComputationsContainerContainer = PredictiveDecodingComputationsContainerContainer(container=a_container, masked_container=None, is_global=True)
+              global_computation_results.computed_data['PredictiveDecoding'] = a_container_container
 
 
-        a_container: PredictiveDecodingComputationsContainer = global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
+        a_container_container: PredictiveDecodingComputationsContainerContainer = global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
+        a_container: PredictiveDecodingComputationsContainer = a_container_container.container # global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
 
         locality_measures = None
         try:
@@ -4010,12 +4096,32 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             raise
 
 
+        # container = global_computation_results.computed_data.get('PredictiveDecoding', None)
+        if (a_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'].container != a_container):
+            ## set the container from the pipeline, it should be the same object through
+            global_computation_results.computed_data['PredictiveDecoding'].container = a_container
+
+        # Validate container exists
+        assert a_container is not None
+
+        
+        
+        a_masked_container = None
+        if enable_masked_filtered_container_before_any_comps:
+            print(f'enable_masked_filtered_container_before_any_comps is True so pre-masking before second-half of `perform_predictive_decoding_analysis(...)`')
+            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
+            global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
+            a_container = a_masked_container ## change the target of a_container
+            
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Second half of `perform_predictive_decoding_analysis(...)`                                                                                                                                                                                                                           #
+        # ==================================================================================================================================================================================================================================================================================== #
 
         if include_includelist is None:
             include_includelist = ['roam'] # , 'sprinkle'
         epoch_names: List[str] = include_includelist 
         print(f'\t processing will occur for epoch_names: {epoch_names}')
-
 
         # compute_future_and_past_analysis ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         if should_perform_first_pass_compute_future_and_past_analysis:
@@ -4041,19 +4147,21 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         
         
         if enable_filter_and_final_result_processing:
-            # Validate container exists
-            container = global_computation_results.computed_data.get('PredictiveDecoding', None)
-            assert container is not None
-
-            masked_container = container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
+            if (a_masked_container is None):
+                # Validate container exists
+                a_container_container = global_computation_results.computed_data.get('PredictiveDecoding', None)
+                assert a_container_container is not None
+                a_container = a_container_container.container
+                assert a_container is not None
+                a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
             
             for an_epoch_name in epoch_names:    
                 try:
                     print(f'\ttrying `.masked_container._filter_single_epoch_result(...)` for an_epoch_name: "{an_epoch_name}"...')
-                    if an_epoch_name not in masked_container.debug_computed_dict:
-                        masked_container.debug_computed_dict[an_epoch_name] = {}
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
-                    masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
+                    if an_epoch_name not in a_masked_container.debug_computed_dict:
+                        a_masked_container.debug_computed_dict[an_epoch_name] = {}
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
+                    a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the `enable_filter_and_final_result_processing` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
                     pass
@@ -4065,19 +4173,36 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             
 
         ## Now filter
-        if (a_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'] != a_container):
+        if (a_container_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'] != a_container_container):
             ## set the container from the pipeline, it should be the same object through
-            global_computation_results.computed_data['PredictiveDecoding'] = a_container
+            global_computation_results.computed_data['PredictiveDecoding'] = a_container_container
         
+        if (a_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'].container != a_container):
+            ## set the container from the pipeline, it should be the same object through
+            global_computation_results.computed_data['PredictiveDecoding'].container = a_container
+            
+        if (a_masked_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'].masked_container != a_masked_container):
+            ## set the container from the pipeline, it should be the same object through
+            global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
+            
+
+
 
         print(f'done')
 
 
         """ Usage:
         
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer, PredictiveDecodingComputationsContainerContainer
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+        
+        container_container: PredictiveDecodingComputationsContainerContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
+        assert container_container is not None
+        container: PredictiveDecodingComputationsContainer = container_container.container
+        masked_container: PredictiveDecodingComputationsContainer = container_container.masked_container
 
+
+        ## OLD               
         container: PredictiveDecodingComputationsContainer = curr_active_pipeline.global_computation_results.computed_data.get('PredictiveDecoding', None)
         if container is not None:
             predictive_decoding: PredictiveDecoding = container.predictive_decoding
