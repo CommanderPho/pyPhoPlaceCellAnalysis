@@ -3381,8 +3381,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             for an_epoch_name in epoch_names:
                 if an_epoch_name not in masked_container.debug_computed_dict:
                     masked_container.debug_computed_dict[an_epoch_name] = {}
-                _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=a_t_bin_size, 
-                                                                            enable_updating_instance_states=True, **kwargs,
+
+                a_masked_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None) ## already masked in previously in `_subfn_update_internal_results`
+                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(an_epoch_name, None)
+                # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=a_t_bin_size, enable_updating_instance_states=True, 
+                                                                            override_included_analysis_epochs=a_masked_result.filter_epochs, ## is this right?
+                                                                             **kwargs,
                                                                          )
                 # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
                 epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
@@ -3812,12 +3817,12 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # MASK low-firing bins before using result                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
         # extant_decoded_time_bin_size = 0.250
-        
+
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
+        spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
+            
         if (should_filter_by_active_spikes or should_filter_by_position_like_posterior_bins):
             ## Masked result:
-            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
-            spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
-
             epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
             # a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
             a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
@@ -3857,12 +3862,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = a_masked_result.get_result_for_epoch(0) ## get the single epoch, re-assign
 
             ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuousl...
-
-        else:
-            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(global_computation_results.computed_data['DirectionalDecodersDecoded'])
-            spikes_df: pd.DataFrame = deepcopy(directional_decoders_decode_result.spikes_df)
-
-
+            
+        ## end if (should_filter...
+        
 
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         
@@ -3887,6 +3889,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         if ('PredictiveDecoding' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'PredictiveDecoding')):
             # initialize
             global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
+
+
+        a_container: PredictiveDecodingComputationsContainer = global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
 
         locality_measures = None
         try:
@@ -3916,7 +3921,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             # locality_measures.compute()
             # non_local_PBE_non_moving_epochs_df: pd.DataFrame = locality_measures.get_non_moving_PBE_non_local_epochs(owning_pipeline_reference.sess, merging_adjacent_max_separation_sec=0.5)
             if locality_measures is not None:
-                global_computation_results.computed_data['PredictiveDecoding'].locality_measures = locality_measures
+                a_container.locality_measures = locality_measures
 
 
         except Exception as e:
@@ -3931,7 +3936,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             # print(f'[PredictiveDecoding] Input validation: directional_decoders_decode_result type={type(directional_decoders_decode_result).__name__}, has continuously_decoded_pseudo2D_decoder_dict={hasattr(directional_decoders_decode_result, "continuously_decoded_pseudo2D_decoder_dict")}')
             
             if locality_measures is None:
-                locality_measures = global_computation_results.computed_data['PredictiveDecoding'].locality_measures
+                locality_measures = a_container.locality_measures
 
             assert locality_measures is not None
 
@@ -3997,7 +4002,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             
             if predictive_decoding is not None:
                 # Store the PredictiveDecoding instance in the container
-                global_computation_results.computed_data['PredictiveDecoding'].predictive_decoding = predictive_decoding
+                a_container.predictive_decoding = predictive_decoding
 
         except Exception as e:
             print(f'[PredictiveDecoding] error during computation: {e}')
@@ -4017,13 +4022,13 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             for an_epoch_name in epoch_names:    
                 try:
                     print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
-                    if an_epoch_name not in global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict:
-                        global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name] = {}
+                    if an_epoch_name not in a_container.debug_computed_dict:
+                        a_container.debug_computed_dict[an_epoch_name] = {}
                     # active_epochs_df
-                    # _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                    _out = global_computation_results.computed_data['PredictiveDecoding'].compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
+                    # _out = a_container.compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
+                    _out = a_container.compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
                     epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out ## too many to unpack?
-                    global_computation_results.computed_data['PredictiveDecoding'].debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
+                    a_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the `should_perform_first_pass_compute_future_and_past_analysis` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
                     pass
@@ -4060,6 +4065,10 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             
 
         ## Now filter
+        if (a_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'] != a_container):
+            ## set the container from the pipeline, it should be the same object through
+            global_computation_results.computed_data['PredictiveDecoding'] = a_container
+        
 
         print(f'done')
 
