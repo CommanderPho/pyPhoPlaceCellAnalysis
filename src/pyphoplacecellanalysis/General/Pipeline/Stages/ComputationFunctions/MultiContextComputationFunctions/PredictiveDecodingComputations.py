@@ -4578,10 +4578,11 @@ class PredictiveDecodingDisplayWidget:
         
         curr_matching_positions_df_dict = curr_matching_past_future_positions_df_dict[category_name]
         epoch_specific_position_dfs = list(curr_matching_positions_df_dict.values())
-        epoch_ids = np.array(list(curr_matching_positions_df_dict.keys()))
+        found_pos_segment_ids = np.array(list(curr_matching_positions_df_dict.keys())) # (0, 1, ...)
         
-        curr_num_subplots: int = self.max_subplots_per_category.get(category_name, min(20, len(epoch_ids)))
-        
+        curr_num_subplots: int = self.max_subplots_per_category.get(category_name, min(20, len(found_pos_segment_ids)))
+
+        ## Pad the end of the subplots to make them empty        
         if len(epoch_specific_position_dfs) < curr_num_subplots:
             num_to_pad = curr_num_subplots - len(epoch_specific_position_dfs)
             if len(epoch_specific_position_dfs) > 0:
@@ -4591,7 +4592,7 @@ class PredictiveDecodingDisplayWidget:
             else:
                 empty_df = pd.DataFrame([{'t': np.nan, 'x': np.nan, 'y': np.nan, 'binned_x': np.nan, 'binned_y': np.nan}])
             epoch_specific_position_dfs.extend([empty_df.copy() for _ in range(num_to_pad)])
-            epoch_ids = np.concatenate([epoch_ids, np.full(num_to_pad, -1, dtype=epoch_ids.dtype)])
+            found_pos_segment_ids = np.concatenate([found_pos_segment_ids, np.full(num_to_pad, -1, dtype=found_pos_segment_ids.dtype)])
         
         a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(category_name)
         if a_decoded_traj_plotter is None:
@@ -4612,8 +4613,10 @@ class PredictiveDecodingDisplayWidget:
                 for ax in a_decoded_traj_plotter.fig.get_axes():
                     ax.clear()
         
-        fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots,
-                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior,
+        ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
+        fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
+                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
+                                                                                    plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior,
                                                                                     )
         
         # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
@@ -4781,12 +4784,12 @@ class PredictiveDecodingDisplayWidget:
             # canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
             # if canvas is not None:
             #     existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
-
+            curr_posterior = None
             fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
                                                                                      fixed_columns = 4,
                                                                                      plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
                                                                                      #  plot_mode='line',
-                                                                                     plot_mode='scatter', c='red', cmap='Reds', alpha=0.65,
+                                                                                     plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, posteriors=curr_posterior,
                                                                                      )
             
             perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")

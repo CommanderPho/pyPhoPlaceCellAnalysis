@@ -3067,7 +3067,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     posterior_data = deepcopy(posterior_data).T
                 else:
                     posterior_data = deepcopy(posterior_data)
-                masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
+                    
+                if posterior_masking_value is not None:
+                    masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
+                else:
+                    masked_posterior = posterior_data
                 x_values = deepcopy(xbin_centers)
                 y_values = deepcopy(ybin_centers)
                 if self.rotate_to_vertical:
@@ -3127,6 +3131,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         ## INPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
         # num_laps = len(epoch_ids)
+        valid_only_epoch_ids = [v for v in epoch_ids if v > -1] # epoch_ids: array([ 0,  1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) -- here only the first 2 are valid
+        num_valid_epochs: int = len(valid_only_epoch_ids) ## exclude the -1 entries
+        
         # linear_lap_index = np.arange(num_laps)
         epochs_time_ranges = dict(zip(epoch_ids, epochs_time_range_list))
         epochs_position_traces = dict(zip(epoch_ids, epochs_position_traces_list))
@@ -3154,22 +3161,31 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 posteriors_by_epoch_id = posteriors
             elif isinstance(posteriors, (list, tuple)) and (len(posteriors) == len(epoch_ids)):
                 posteriors_by_epoch_id = dict(zip(epoch_ids, posteriors))
-            elif isinstance(posteriors, np.ndarray) and (np.ndim(posteriors) >= 3) and (len(posteriors) == len(epoch_ids)):
-                posteriors_by_epoch_id = dict(zip(epoch_ids, list(posteriors)))
+            elif isinstance(posteriors, np.ndarray):
+                if np.ndim(posteriors) == 2:
+                    ## single posterior for all epochs, duplicate it
+                    posteriors_by_epoch_id = {epoch_id:posteriors for epoch_id in epoch_ids}
+                    
+                elif (np.ndim(posteriors) >= 3) and (len(posteriors) == len(epoch_ids)):
+                    posteriors_by_epoch_id = dict(zip(epoch_ids, list(posteriors)))
+                else:
+                    raise ValueError(f'np.shape(posteriors): {np.shape(posteriors)} is not supported')
+            
             else:
                 posteriors_by_epoch_id = None
+                
             for a_linear_index in self.linear_plotter_indicies:
                 if a_linear_index >= len(active_page_epochs_ids):
                     continue
                 curr_row = self.row_column_indicies[0][a_linear_index]
                 curr_col = self.row_column_indicies[1][a_linear_index]
+                curr_epoch_id = active_page_epochs_ids[a_linear_index]
+                curr_posterior = (posteriors_by_epoch_id or {}).get(curr_epoch_id, None)
                 an_ax = self.axs[curr_row][curr_col]
-                if posteriors_by_epoch_id is None:
+                if (curr_posterior is None):
                     _subfn_add_posterior_overlay(an_ax, posteriors, default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
                 else:
-                    curr_epoch_id = active_page_epochs_ids[a_linear_index]
-                    if curr_epoch_id in posteriors_by_epoch_id:
-                        _subfn_add_posterior_overlay(an_ax, posteriors_by_epoch_id[curr_epoch_id], default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
+                    _subfn_add_posterior_overlay(an_ax, curr_posterior, default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
          
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
