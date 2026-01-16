@@ -4569,18 +4569,21 @@ class PredictiveDecodingDisplayWidget:
         self._update_trajectory_widget('future', an_epoch_idx, epoch_data)
 
 
-    def _update_trajectory_widget(self, category_name: str, an_epoch_idx: int, epoch_data: Dict[str, Any]):
+    def _update_trajectory_widget(self, a_past_future_name: str, an_epoch_idx: int, epoch_data: Dict[str, Any]):
         """Update trajectory widget for past or future."""
+        existing_ax = None
+        needed_init: bool = False
         curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
         
-        if category_name not in curr_matching_past_future_positions_df_dict:
+        if a_past_future_name not in curr_matching_past_future_positions_df_dict:
+            # raise NotImplementedError(f'a_past_future_name: {a_past_future_name} not in curr_matching_past_future_positions_df_dict: {list(curr_matching_past_future_positions_df_dict.keys())}')
             return
         
-        curr_matching_positions_df_dict = curr_matching_past_future_positions_df_dict[category_name]
+        curr_matching_positions_df_dict = curr_matching_past_future_positions_df_dict[a_past_future_name]
         epoch_specific_position_dfs = list(curr_matching_positions_df_dict.values())
         found_pos_segment_ids = np.array(list(curr_matching_positions_df_dict.keys())) # (0, 1, ...)
         
-        curr_num_subplots: int = self.max_subplots_per_category.get(category_name, min(20, len(found_pos_segment_ids)))
+        curr_num_subplots: int = self.max_subplots_per_category.get(a_past_future_name, min(20, len(found_pos_segment_ids)))
 
         ## Pad the end of the subplots to make them empty        
         if len(epoch_specific_position_dfs) < curr_num_subplots:
@@ -4594,12 +4597,9 @@ class PredictiveDecodingDisplayWidget:
             epoch_specific_position_dfs.extend([empty_df.copy() for _ in range(num_to_pad)])
             found_pos_segment_ids = np.concatenate([found_pos_segment_ids, np.full(num_to_pad, -1, dtype=found_pos_segment_ids.dtype)])
         
-        a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(category_name)
+        a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)        
         if a_decoded_traj_plotter is None:
             return
-        
-        overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
-        a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
         
         existing_ax = a_decoded_traj_plotter.axs
         if existing_ax is not None:
@@ -4609,14 +4609,21 @@ class PredictiveDecodingDisplayWidget:
                         ax.clear()
             elif hasattr(existing_ax, 'clear'):
                 existing_ax.clear()
+            # Also clear the figure if it exists
             if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
+                # Clear all axes in the figure
                 for ax in a_decoded_traj_plotter.fig.get_axes():
                     ax.clear()
+                    
+
+        ## Get posterior data:
+        overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
+        a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
         
         ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
                                                                                     active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
-                                                                                    plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior,
+                                                                                    plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior, posterior_alpha=0.25, posterior_cmap='jet', posterior_masking_value=None,
                                                                                     )
         
         # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
@@ -4633,7 +4640,7 @@ class PredictiveDecodingDisplayWidget:
                                 if curr_row < axs.shape[0] and curr_col < axs.shape[1]:
                                     axs[curr_row, curr_col].set_visible(False)
         
-        perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{category_name} - an_epoch_idx: {an_epoch_idx}")
+        perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
         
         widget = self.display_widgets.get(category_name)
         if widget is not None:
@@ -4713,7 +4720,6 @@ class PredictiveDecodingDisplayWidget:
         past_future_names = ['past', 'future']
         curr_matching_past_future_positions_df_dict: Dict[str, Dict[int, pd.DataFrame]] = {}
         
-
         # ==================================================================================================================================================================================================================================================================================== #
         # TWO (Left, Right) Panes corresponding to the past and future positions                                                                                                                                                                                                               #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -4729,10 +4735,10 @@ class PredictiveDecodingDisplayWidget:
             curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name) ## the position dataframes for each possible future/past epoch
             curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
             epoch_specific_position_dfs = list(curr_matching_past_future_positions_df_dict[a_past_future_name].values())
-            epoch_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
+            found_pos_segment_ids = np.array(list(curr_matching_past_future_positions_df_dict[a_past_future_name].keys()))
             # epoch_specific_position_dfs
             # Always use the maximum number of subplots for this category (capped at 20)
-            curr_num_subplots: int = max_subplots_per_category.get(a_past_future_name, min(20, len(epoch_ids)))
+            curr_num_subplots: int = max_subplots_per_category.get(a_past_future_name, min(20, len(found_pos_segment_ids)))
             
             # Pad the lists to match curr_num_subplots if needed (to prevent IndexError)
             # This ensures the layout is consistent even when current epoch has fewer items
@@ -4750,7 +4756,7 @@ class PredictiveDecodingDisplayWidget:
                     empty_df = pd.DataFrame([{'t': np.nan, 'x': np.nan, 'y': np.nan, 'binned_x': np.nan, 'binned_y': np.nan}])
                 epoch_specific_position_dfs.extend([empty_df.copy() for _ in range(num_to_pad)])
                 # Pad epoch_ids with -1 (invalid ID) for empty subplots
-                epoch_ids = np.concatenate([epoch_ids, np.full(num_to_pad, -1, dtype=epoch_ids.dtype)])
+                found_pos_segment_ids = np.concatenate([found_pos_segment_ids, np.full(num_to_pad, -1, dtype=found_pos_segment_ids.dtype)])
             # curr_num_subplots: int = 40
             
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
@@ -4843,6 +4849,7 @@ class PredictiveDecodingDisplayWidget:
                     # Just trigger a redraw
                     canvas.draw_idle()
         ## END for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items()....
+
 
 
 
@@ -4966,181 +4973,6 @@ class PredictiveDecodingDisplayWidget:
                 # Widget not found - this shouldn't happen, but handle gracefully
                 print(f"Warning: Widget for '{category_name}' not found in dock_canvas_widgets. Available keys: {list(self.dock_canvas_widgets.keys())}")
 
-
-
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN OLD CODE                                                                                                                                                                                                                                                                       #
-        # ==================================================================================================================================================================================================================================================================================== #
-        # # Plot decoded posterior heatmap for 'decoded_posterior' dock
-        # category_name = 'decoded_posterior'
-
-        # posterior_2d = None
-        # ## do this part either way
-        # p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-
-        # epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
-        # if epoch_high_prob_pos_masks is not None:
-        #     print(f'using high_prob mask version!')
-        #     # posterior_2d = self.container.predictive_decoding.epoch_high_prob_pos_masks[an_epoch_idx]
-        #     posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
-            
-        # else:
-        #     ## use posterior:
-
-        #     # Sum over time dimension to create 2D heatmap
-        #     posterior_2d = np.sum(p_x_given_n, axis=2)
-        
-        # # Extract time bin posteriors for tiny heatmaps (only if p_x_given_n is available)
-        # time_bin_posteriors = None
-        # num_time_bins_to_show = 0
-        # if p_x_given_n is not None:
-        #     num_time_bins = p_x_given_n.shape[2]
-        #     num_time_bins_to_show = min(10, num_time_bins)
-        #     time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
-        
-        # # Check if we need to initialize (create new figure) or update existing one
-        # needed_init: bool = category_name not in self.dock_canvas_widgets
-        
-        # if needed_init:
-        #    # Create matplotlib figure for heatmap (using Figure directly to avoid showing in separate window)
-        #     from matplotlib.figure import Figure
-        #     from matplotlib import gridspec
-            
-        #     # Create figure with GridSpec layout: main heatmap on top, tiny heatmaps below
-        #     fig = Figure(figsize=(8, 6), layout="constrained")
-            
-        #     # Create GridSpec: 2 rows, 1 column, with height ratios favoring main plot
-        #     if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-        #         gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[3, 1], hspace=0.3)
-        #         ax_main = fig.add_subplot(gs[0])
-        #     else:
-        #         # If no time bins available, use single subplot
-        #         ax_main = fig.add_subplot(111)
-            
-        #     # Calculate extent from bin edges (more accurate than using centers)
-        #     extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
-            
-        #     # Plot main heatmap
-        #     im = ax_main.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
-        #     ax_main.set_xlabel('X Position')
-        #     ax_main.set_ylabel('Y Position')
-        #     ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-            
-        #     # Add colorbar for main heatmap
-        #     cbar = plt.colorbar(im, ax=ax_main)
-        #     cbar.set_label('Probability (sum over time)')
-            
-        #     # Create tiny heatmaps row if time bin data is available
-        #     if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-        #         # Calculate shared color scale for all tiny heatmaps
-        #         all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-        #         vmin_shared = np.nanmin(all_time_bin_values)
-        #         vmax_shared = np.nanmax(all_time_bin_values)
-                
-        #         # Create subplot for tiny heatmaps row
-        #         ax_time_bins = fig.add_subplot(gs[1])
-        #         ax_time_bins.set_axis_off()  # Turn off main axes for the row container
-                
-        #         # Create GridSpec for individual tiny heatmaps within the bottom row
-        #         gs_time_bins = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1], wspace=0.1, hspace=0.1)
-                
-        #         for t_bin_idx in range(num_time_bins_to_show):
-        #             ax_tiny = fig.add_subplot(gs_time_bins[0, t_bin_idx])
-        #             # Plot tiny heatmap
-        #             im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
-        #             # Remove ticks and labels to save space
-        #             ax_tiny.set_xticks([])
-        #             ax_tiny.set_yticks([])
-        #             # Add minimal label below
-        #             ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-            
-        #     # Embed the matplotlib figure in the dock widget
-        #     dock = self.dock_widgets.get(category_name)
-        #     if dock is not None:
-        #         # Remove existing widgets from dock
-        #         layout = dock.layout
-        #         if layout is not None:
-        #             while layout.count():
-        #                 child = layout.takeAt(0)
-        #                 if child.widget():
-        #                     child.widget().setParent(None)
-        #         # Clear the widgets list maintained by Dock
-        #         if hasattr(dock, 'widgets'):
-        #             dock.widgets.clear()
-        #         dock.currentRow = 0
-                
-        #         # Create canvas and toolbar for the matplotlib figure
-        #         canvas = FigureCanvas(fig)
-        #         toolbar = NavigationToolbar(canvas, self.dock_window)
-                
-        #         # Create a widget to hold canvas and toolbar
-        #         plot_widget = QtWidgets.QWidget()
-        #         plot_layout = QtWidgets.QVBoxLayout()
-        #         plot_layout.setContentsMargins(0, 0, 0, 0)
-        #         plot_layout.addWidget(toolbar)
-        #         plot_layout.addWidget(canvas)
-        #         plot_widget.setLayout(plot_layout)
-                
-        #         # Add to dock
-        #         dock.addWidget(plot_widget)
-                
-        #         # Store reference to canvas widget
-        #         self.dock_canvas_widgets[category_name] = canvas
-                
-        #         # Close the figure window if it's open (since it's now embedded in the dock)
-        #         plt.close(fig)
-        # else:
-        #     # Update existing canvas
-        #     canvas = self.dock_canvas_widgets.get(category_name)
-        #     if canvas is not None:
-        #         # Clear existing axes and replot
-        #         canvas.figure.clear()
-        #         from matplotlib import gridspec
-                
-        #         # Recreate GridSpec layout
-        #         if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-        #             gs = gridspec.GridSpec(2, 1, figure=canvas.figure, height_ratios=[3, 1], hspace=0.3)
-        #             ax_main = canvas.figure.add_subplot(gs[0])
-        #         else:
-        #             ax_main = canvas.figure.add_subplot(111)
-                
-        #         # Recalculate extent for update
-        #         extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
-                
-        #         # Plot main heatmap
-        #         im = ax_main.imshow(posterior_2d, aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest')
-        #         ax_main.set_xlabel('X Position')
-        #         ax_main.set_ylabel('Y Position')
-        #         ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-        #         cbar = plt.colorbar(im, ax=ax_main)
-        #         cbar.set_label('Probability (sum over time)')
-                
-        #         # Update tiny heatmaps row if time bin data is available
-        #         if time_bin_posteriors is not None and num_time_bins_to_show > 0:
-        #             # Calculate shared color scale for all tiny heatmaps
-        #             all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-        #             vmin_shared = np.nanmin(all_time_bin_values)
-        #             vmax_shared = np.nanmax(all_time_bin_values)
-                    
-        #             # Create subplot for tiny heatmaps row
-        #             ax_time_bins = canvas.figure.add_subplot(gs[1])
-        #             ax_time_bins.set_axis_off()  # Turn off main axes for the row container
-                    
-        #             # Create GridSpec for individual tiny heatmaps within the bottom row
-        #             gs_time_bins = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1], wspace=0.1, hspace=0.1)
-                    
-        #             for t_bin_idx in range(num_time_bins_to_show):
-        #                 ax_tiny = canvas.figure.add_subplot(gs_time_bins[0, t_bin_idx])
-        #                 # Plot tiny heatmap
-        #                 im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx], aspect='auto', origin='lower', extent=extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
-        #                 # Remove ticks and labels to save space
-        #                 ax_tiny.set_xticks([])
-        #                 ax_tiny.set_yticks([])
-        #                 # Add minimal label below
-        #                 ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-                
-        #         canvas.draw()
 
         ## OUTPUTS: curr_matching_past_future_positions_df_dict 
         self.active_epoch_idx = an_epoch_idx
