@@ -1676,8 +1676,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         # time_bin_edges: NDArray = deepcopy(results1D.continuous_results['global'].time_bin_edges[0])
         # time_bin_edges_list: List[NDArray] = deepcopy(a_decoded_result.time_bin_edges)
-        # assert len(time_bin_edges_list) == num_filter_epochs
-        
+        assert len(is_time_bin_active_list) == num_filter_epochs, f"len(is_time_bin_active_list): {len(is_time_bin_active_list)} != num_filter_epochs: {num_filter_epochs}"
+
         _out_is_time_bin_active_list = []
         inactive_mask_list = []
         
