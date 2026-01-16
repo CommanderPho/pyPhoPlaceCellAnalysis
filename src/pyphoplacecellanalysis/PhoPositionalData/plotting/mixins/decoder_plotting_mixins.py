@@ -3080,27 +3080,6 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # Handle 2D merged posterior (time-collapsed) as a single 2D image
             if (ybin_centers is not None) and (np.ndim(posterior_data) == 2):
                 # Direct 2D plotting for merged posteriors
-                # if should_perform_reshape:
-                #     posterior_data = deepcopy(posterior_data).T
-                # else:
-                #     posterior_data = deepcopy(posterior_data)
-                    
-                # if posterior_masking_value is not None:
-                #     masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
-                # else:
-                #     masked_posterior = posterior_data
-                # x_values = deepcopy(xbin_centers)
-                # y_values = deepcopy(ybin_centers)
-                # if self.rotate_to_vertical:
-                #     ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
-                #     masked_posterior = masked_posterior.T
-                # else:
-                #     ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
-                # if posterior_extent is not None:
-                #     ordinate_first_image_extent = deepcopy(posterior_extent)
-                # a_heatmap = ax.imshow(masked_posterior, aspect='auto', cmap=posterior_cmap, alpha=full_posterior_opacity, extent=ordinate_first_image_extent, origin='lower', interpolation='none')
-                # return [a_heatmap], ordinate_first_image_extent, None
-            
                 # Use helper again:
                 heatmaps, image_extent, plots_data = _active_posterior_plot_fn(ax, xbin_centers=xbin_centers, ybin_centers=ybin_centers, a_time_bin_centers=None, a_p_x_given_n=posterior_data, rotate_to_vertical=self.rotate_to_vertical, debug_print=False, posterior_masking_value=posterior_masking_value, full_posterior_opacity=full_posterior_opacity, custom_image_extent=posterior_extent, time_cmap=posterior_cmap, should_perform_reshape=should_perform_reshape, extant_plot_data=None)
                 return heatmaps, image_extent, plots_data
