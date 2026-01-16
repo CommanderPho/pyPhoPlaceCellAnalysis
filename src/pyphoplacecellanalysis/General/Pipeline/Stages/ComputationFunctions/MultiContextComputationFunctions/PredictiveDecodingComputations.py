@@ -4598,7 +4598,7 @@ class PredictiveDecodingDisplayWidget:
             return
         
         overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
-        a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
+        a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
         
         existing_ax = a_decoded_traj_plotter.axs
         if existing_ax is not None:

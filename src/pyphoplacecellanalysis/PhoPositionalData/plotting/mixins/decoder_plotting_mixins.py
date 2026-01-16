@@ -2843,7 +2843,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                     plot_mode: str='time_gradient', **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -3043,6 +3043,47 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 a_lap_label_text = axs[curr_row][curr_col].text(0.5, 1.02, curr_lap_label_text, horizontalalignment='center', verticalalignment='bottom', size=6, transform=axs[curr_row][curr_col].transAxes)
                 # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
 
+        def _subfn_extract_posterior_and_extent(posterior_item):
+            if isinstance(posterior_item, tuple) and (len(posterior_item) == 2):
+                return posterior_item[0], posterior_item[1]
+            return posterior_item, None
+
+        def _subfn_add_posterior_overlay(ax, posterior_item, default_extent=None, alpha=None, posterior_cmap='gray', posterior_masking_value: float = 0.0025, should_perform_reshape: bool = True):
+            if posterior_item is None:
+                return None
+            posterior_data, posterior_extent = _subfn_extract_posterior_and_extent(posterior_item)
+            if posterior_data is None:
+                return None
+            if posterior_extent is None:
+                posterior_extent = default_extent
+            xbin_centers = self.xbin_centers if (self.xbin_centers is not None) else self.xbin
+            ybin_centers = self.ybin_centers if (self.ybin_centers is not None) else self.ybin
+            full_posterior_opacity = 1.0 if alpha is None else alpha
+            
+            # Handle 2D merged posterior (time-collapsed) as a single 2D image
+            if (ybin_centers is not None) and (np.ndim(posterior_data) == 2):
+                # Direct 2D plotting for merged posteriors
+                if should_perform_reshape:
+                    posterior_data = deepcopy(posterior_data).T
+                else:
+                    posterior_data = deepcopy(posterior_data)
+                masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
+                x_values = deepcopy(xbin_centers)
+                y_values = deepcopy(ybin_centers)
+                if self.rotate_to_vertical:
+                    ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+                    masked_posterior = masked_posterior.T
+                else:
+                    ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+                if posterior_extent is not None:
+                    ordinate_first_image_extent = deepcopy(posterior_extent)
+                a_heatmap = ax.imshow(masked_posterior, aspect='auto', cmap=posterior_cmap, alpha=full_posterior_opacity, extent=ordinate_first_image_extent, origin='lower', interpolation='none')
+                return [a_heatmap], ordinate_first_image_extent, None
+            else:
+                # Use helper for 3D (time-series) or 1D cases
+                heatmaps, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(ax, xbin_centers=xbin_centers, ybin_centers=ybin_centers, a_time_bin_centers=None, a_p_x_given_n=posterior_data, rotate_to_vertical=self.rotate_to_vertical, debug_print=False, posterior_masking_value=posterior_masking_value, full_posterior_opacity=full_posterior_opacity, custom_image_extent=posterior_extent, time_cmap=posterior_cmap, should_perform_reshape=should_perform_reshape, extant_plot_data=None)
+                return heatmaps, image_extent, plots_data
+
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         # Compute required data from session:
@@ -3100,10 +3141,38 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         # generate the pages
         epochs_pages = [list(chunk) for chunk in _subfn_chunks(epoch_ids, curr_num_subplots)] ## this is specific to actual laps...
+        active_page_epochs_ids = epochs_pages[active_page_index] if (epochs_pages is not None) and (len(epochs_pages) > 0) else []
+        if posteriors is None:
+            posteriors = kwargs.get('posteriors', None)
+
+        if posteriors is not None:
+            posterior_alpha = kwargs.get('posterior_alpha', None)
+            posterior_cmap = kwargs.get('posterior_cmap', 'gray')
+            posterior_masking_value = kwargs.get('posterior_masking_value', 0.0025)
+            posterior_should_perform_reshape = kwargs.get('posterior_should_perform_reshape', True)
+            if isinstance(posteriors, dict):
+                posteriors_by_epoch_id = posteriors
+            elif isinstance(posteriors, (list, tuple)) and (len(posteriors) == len(epoch_ids)):
+                posteriors_by_epoch_id = dict(zip(epoch_ids, posteriors))
+            elif isinstance(posteriors, np.ndarray) and (np.ndim(posteriors) >= 3) and (len(posteriors) == len(epoch_ids)):
+                posteriors_by_epoch_id = dict(zip(epoch_ids, list(posteriors)))
+            else:
+                posteriors_by_epoch_id = None
+            for a_linear_index in self.linear_plotter_indicies:
+                if a_linear_index >= len(active_page_epochs_ids):
+                    continue
+                curr_row = self.row_column_indicies[0][a_linear_index]
+                curr_col = self.row_column_indicies[1][a_linear_index]
+                an_ax = self.axs[curr_row][curr_col]
+                if posteriors_by_epoch_id is None:
+                    _subfn_add_posterior_overlay(an_ax, posteriors, default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
+                else:
+                    curr_epoch_id = active_page_epochs_ids[a_linear_index]
+                    if curr_epoch_id in posteriors_by_epoch_id:
+                        _subfn_add_posterior_overlay(an_ax, posteriors_by_epoch_id[curr_epoch_id], default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
          
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
-            active_page_epochs_ids = epochs_pages[active_page_index]
             _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, active_plot_mode=plot_mode, **kwargs)
             # plt.ylim((125, 152))
         else:
