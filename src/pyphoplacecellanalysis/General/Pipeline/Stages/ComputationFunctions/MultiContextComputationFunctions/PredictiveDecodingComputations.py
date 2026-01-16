@@ -3026,6 +3026,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             window_size = 60, **kwargs,
         ) -> "PredictiveDecodingComputationsContainer":
         """ filters a copy of self
+        
+        container.predictive_decoding.matching_pos_epochs_dfs_list needs to be updated/filtered
+        
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
@@ -3076,6 +3079,179 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             return masked_container
 
 
+        def _subfn_filter_masked_container_epochs(masked_container, original_active_epochs_df: pd.DataFrame):
+            """ filters the epochs in the masked_container 
+                ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
+                # Build epoch_idx -> (actual_start, actual_stop) mapping once, reuse for filtering and recomputation
+
+            """
+            filter_epochs = None
+            
+            epoch_idx_to_actual_times = {}
+            for a_decoding_time_bin_size, a_decoded_results_dict in (masked_container.epochs_decoded_result_cache_dict or {}).items():
+                for an_decoder_name, a_decoded_local_epochs_result in (a_decoded_results_dict or {}).items():
+                    filter_epochs = a_decoded_local_epochs_result.filter_epochs
+                    for epoch_idx, time_bin_container in enumerate(a_decoded_local_epochs_result.time_bin_containers):
+                        epoch_idx_to_actual_times[epoch_idx] = (time_bin_container.edges[0], time_bin_container.edges[-1])
+                    break  # Only need one decoder/time_bin_size
+                    
+            ## assign the dang epoch:
+            has_valid_filter_epochs: bool = (filter_epochs is not None) and (len(filter_epochs) > 0) 
+            assert has_valid_filter_epochs
+            masked_container.active_epochs = filter_epochs
+
+            ## Maybe need to refine the epoch (start, end) times:
+            filtered_epochs_set = set(epoch_idx_to_actual_times.values())
+            time_tolerance = 0.01
+            
+            # Filter active_epochs_df to only include epochs that overlap with the filtered set
+            if masked_container.active_epochs_df is not None:
+                if len(filtered_epochs_set) > 0:
+                    original_len = len(masked_container.active_epochs_df)
+                    active_epochs_df = ensure_dataframe(masked_container.active_epochs_df)
+                    is_epoch_included = active_epochs_df.apply(lambda row: any(
+                        (abs(row['start'] - fs) < time_tolerance and abs(row['stop'] - fe) < time_tolerance) or (row['start'] <= fe and row['stop'] >= fs)
+                        for fs, fe in filtered_epochs_set), axis=1)
+                    masked_container.active_epochs_df = active_epochs_df[is_epoch_included].reset_index(drop=True)
+                    print(f'Filtered active_epochs_df: {original_len} -> {len(masked_container.active_epochs_df)} epochs (removed {original_len - len(masked_container.active_epochs_df)})')
+                else:
+                    print(f'WARN: No filtered epochs found, active_epochs_df may be empty or inconsistent')
+            
+            # Filter epoch-indexed lists in predictive_decoding to only include entries for epochs that remain after filtering
+            pred_dec = masked_container.predictive_decoding
+            filtered_to_original_idx = None  # Will be set if we can map filtered epochs to original indices
+            if pred_dec is not None and masked_container.active_epochs_df is not None and len(masked_container.active_epochs_df) > 0:
+                # original_active_epochs_df = ensure_dataframe(self.active_epochs_df) if (hasattr(self, 'active_epochs_df') and self.active_epochs_df is not None) else None
+                if original_active_epochs_df is not None:
+                    active_epochs_df = ensure_dataframe(masked_container.active_epochs_df)
+                    # Build mapping from filtered epochs to original indices
+                    filtered_to_original_idx = []
+                    for _, row in active_epochs_df.iterrows():
+                        matching_original_idx = next((orig_idx for orig_idx, orig_row in original_active_epochs_df.iterrows()
+                            if (abs(row['start'] - orig_row['start']) < time_tolerance and abs(row['stop'] - orig_row['stop']) < time_tolerance) or
+                            (row['start'] <= orig_row['stop'] and row['stop'] >= orig_row['start'])), None)
+                        if matching_original_idx is not None:
+                            filtered_to_original_idx.append(matching_original_idx)
+                    
+                    # Filter all epoch-indexed lists using the same mapping
+                    if hasattr(pred_dec, 'matching_pos_epochs_dfs_list') and pred_dec.matching_pos_epochs_dfs_list and len(pred_dec.matching_pos_epochs_dfs_list) > 0:
+                        original_len = len(pred_dec.matching_pos_epochs_dfs_list)
+                        pred_dec.matching_pos_epochs_dfs_list = [pred_dec.matching_pos_epochs_dfs_list[i] for i in filtered_to_original_idx if i < original_len]
+                        print(f'Filtered matching_pos_epochs_dfs_list: {original_len} -> {len(pred_dec.matching_pos_epochs_dfs_list)} entries (removed {original_len - len(pred_dec.matching_pos_epochs_dfs_list)})')
+                    
+                    if hasattr(pred_dec, 'matching_pos_dfs_list') and pred_dec.matching_pos_dfs_list and len(pred_dec.matching_pos_dfs_list) > 0:
+                        original_len = len(pred_dec.matching_pos_dfs_list)
+                        pred_dec.matching_pos_dfs_list = [pred_dec.matching_pos_dfs_list[i] for i in filtered_to_original_idx if i < original_len]
+                        print(f'Filtered matching_pos_dfs_list: {original_len} -> {len(pred_dec.matching_pos_dfs_list)} entries (removed {original_len - len(pred_dec.matching_pos_dfs_list)})')
+                    
+                    if hasattr(pred_dec, 'epoch_matching_past_future_positions') and pred_dec.epoch_matching_past_future_positions and len(pred_dec.epoch_matching_past_future_positions) > 0:
+                        original_len = len(pred_dec.epoch_matching_past_future_positions)
+                        pred_dec.epoch_matching_past_future_positions = [pred_dec.epoch_matching_past_future_positions[i] for i in filtered_to_original_idx if i < original_len]
+                        print(f'Filtered epoch_matching_past_future_positions: {original_len} -> {len(pred_dec.epoch_matching_past_future_positions)} entries (removed {original_len - len(pred_dec.epoch_matching_past_future_positions)})')
+                    
+                    if hasattr(pred_dec, 'epoch_high_prob_pos_masks') and pred_dec.epoch_high_prob_pos_masks and len(pred_dec.epoch_high_prob_pos_masks) > 0:
+                        original_len = len(pred_dec.epoch_high_prob_pos_masks)
+                        pred_dec.epoch_high_prob_pos_masks = [pred_dec.epoch_high_prob_pos_masks[i] for i in filtered_to_original_idx if i < original_len]
+                        print(f'Filtered epoch_high_prob_pos_masks: {original_len} -> {len(pred_dec.epoch_high_prob_pos_masks)} entries (removed {original_len - len(pred_dec.epoch_high_prob_pos_masks)})')
+                    
+                    if hasattr(pred_dec, 'epoch_t_bins_high_prob_pos_masks') and pred_dec.epoch_t_bins_high_prob_pos_masks and len(pred_dec.epoch_t_bins_high_prob_pos_masks) > 0:
+                        original_len = len(pred_dec.epoch_t_bins_high_prob_pos_masks)
+                        pred_dec.epoch_t_bins_high_prob_pos_masks = [pred_dec.epoch_t_bins_high_prob_pos_masks[i] for i in filtered_to_original_idx if i < original_len]
+                        print(f'Filtered epoch_t_bins_high_prob_pos_masks: {original_len} -> {len(pred_dec.epoch_t_bins_high_prob_pos_masks)} entries (removed {original_len - len(pred_dec.epoch_t_bins_high_prob_pos_masks)})')
+                else:
+                    # If we don't have original epochs, truncate all lists to the length of active_epochs_df
+                    filtered_len = len(masked_container.active_epochs_df)
+                    if hasattr(pred_dec, 'matching_pos_epochs_dfs_list') and pred_dec.matching_pos_epochs_dfs_list:
+                        original_len = len(pred_dec.matching_pos_epochs_dfs_list)
+                        pred_dec.matching_pos_epochs_dfs_list = pred_dec.matching_pos_epochs_dfs_list[:filtered_len]
+                        print(f'WARN: Truncated matching_pos_epochs_dfs_list to {filtered_len} entries (original: {original_len}) - proper mapping requires original active_epochs_df')
+                    if hasattr(pred_dec, 'matching_pos_dfs_list') and pred_dec.matching_pos_dfs_list:
+                        original_len = len(pred_dec.matching_pos_dfs_list)
+                        pred_dec.matching_pos_dfs_list = pred_dec.matching_pos_dfs_list[:filtered_len]
+                        print(f'WARN: Truncated matching_pos_dfs_list to {filtered_len} entries (original: {original_len}) - proper mapping requires original active_epochs_df')
+                    if hasattr(pred_dec, 'epoch_matching_past_future_positions') and pred_dec.epoch_matching_past_future_positions:
+                        original_len = len(pred_dec.epoch_matching_past_future_positions)
+                        pred_dec.epoch_matching_past_future_positions = pred_dec.epoch_matching_past_future_positions[:filtered_len]
+                        print(f'WARN: Truncated epoch_matching_past_future_positions to {filtered_len} entries (original: {original_len}) - proper mapping requires original active_epochs_df')
+                    if hasattr(pred_dec, 'epoch_high_prob_pos_masks') and pred_dec.epoch_high_prob_pos_masks:
+                        original_len = len(pred_dec.epoch_high_prob_pos_masks)
+                        pred_dec.epoch_high_prob_pos_masks = pred_dec.epoch_high_prob_pos_masks[:filtered_len]
+                        print(f'WARN: Truncated epoch_high_prob_pos_masks to {filtered_len} entries (original: {original_len}) - proper mapping requires original active_epochs_df')
+                    if hasattr(pred_dec, 'epoch_t_bins_high_prob_pos_masks') and pred_dec.epoch_t_bins_high_prob_pos_masks:
+                        original_len = len(pred_dec.epoch_t_bins_high_prob_pos_masks)
+                        pred_dec.epoch_t_bins_high_prob_pos_masks = pred_dec.epoch_t_bins_high_prob_pos_masks[:filtered_len]
+                        print(f'WARN: Truncated epoch_t_bins_high_prob_pos_masks to {filtered_len} entries (original: {original_len}) - proper mapping requires original active_epochs_df')
+                        
+            elif pred_dec is not None:
+                # If active_epochs_df is empty or None, clear all epoch-indexed lists
+                if hasattr(pred_dec, 'matching_pos_epochs_dfs_list') and pred_dec.matching_pos_epochs_dfs_list:
+                    original_len = len(pred_dec.matching_pos_epochs_dfs_list)
+                    pred_dec.matching_pos_epochs_dfs_list = []
+                    print(f'WARN: Cleared matching_pos_epochs_dfs_list ({original_len} entries) because active_epochs_df is empty or None')
+                if hasattr(pred_dec, 'matching_pos_dfs_list') and pred_dec.matching_pos_dfs_list:
+                    original_len = len(pred_dec.matching_pos_dfs_list)
+                    pred_dec.matching_pos_dfs_list = []
+                    print(f'WARN: Cleared matching_pos_dfs_list ({original_len} entries) because active_epochs_df is empty or None')
+                if hasattr(pred_dec, 'epoch_matching_past_future_positions') and pred_dec.epoch_matching_past_future_positions:
+                    original_len = len(pred_dec.epoch_matching_past_future_positions)
+                    pred_dec.epoch_matching_past_future_positions = []
+                    print(f'WARN: Cleared epoch_matching_past_future_positions ({original_len} entries) because active_epochs_df is empty or None')
+                if hasattr(pred_dec, 'epoch_high_prob_pos_masks') and pred_dec.epoch_high_prob_pos_masks:
+                    original_len = len(pred_dec.epoch_high_prob_pos_masks)
+                    pred_dec.epoch_high_prob_pos_masks = []
+                    print(f'WARN: Cleared epoch_high_prob_pos_masks ({original_len} entries) because active_epochs_df is empty or None')
+                if hasattr(pred_dec, 'epoch_t_bins_high_prob_pos_masks') and pred_dec.epoch_t_bins_high_prob_pos_masks:
+                    original_len = len(pred_dec.epoch_t_bins_high_prob_pos_masks)
+                    pred_dec.epoch_t_bins_high_prob_pos_masks = []
+                    print(f'WARN: Cleared epoch_t_bins_high_prob_pos_masks ({original_len} entries) because active_epochs_df is empty or None')
+            
+            
+            # Recompute 'is_future_present_past' column for filtered matching_pos_epochs_dfs_list and matching_pos_dfs_list using actual epoch times _____________________________________________________________________________________________________________________________________________ #
+            # assert len(masked_container.active_epochs) == len(epoch_idx_to_actual_times)
+            # epoch_start, epoch_stop = epoch_idx_to_actual_times
+            # masked_container.active_epochs = masked_container.active_epochs
+            # is_past = (masked_container.active_epochs['t'] < epoch_start)
+            # is_future = (masked_container.active_epochs['t'] > epoch_stop)
+            # masked_container.active_epochs['is_future_present_past'] = 'present'
+            # masked_container.active_epochs.loc[is_past, 'is_future_present_past'] = 'past'
+            # masked_container.active_epochs.loc[is_future, 'is_future_present_past'] = 'future'
+
+            # NOTE: We need to map filtered indices (0, 1, 2...) back to original indices to look up correct epoch times
+            if pred_dec is not None and len(epoch_idx_to_actual_times) > 0:
+                
+                if pred_dec.matching_pos_epochs_dfs_list and len(pred_dec.matching_pos_epochs_dfs_list) > 0:
+                    for filtered_idx, df in enumerate(pred_dec.matching_pos_epochs_dfs_list):
+                        # Map filtered index to original index to look up epoch times
+                        original_idx = filtered_to_original_idx[filtered_idx] if (filtered_to_original_idx is not None and filtered_idx < len(filtered_to_original_idx)) else filtered_idx
+                        if original_idx in epoch_idx_to_actual_times:
+                            epoch_start, epoch_stop = epoch_idx_to_actual_times[original_idx]
+                            is_past = (df['stop'] < epoch_start)
+                            is_future = (df['start'] > epoch_stop)
+                            df['is_future_present_past'] = 'present'
+                            df.loc[is_past, 'is_future_present_past'] = 'past'
+                            df.loc[is_future, 'is_future_present_past'] = 'future'
+                            pred_dec.matching_pos_epochs_dfs_list[filtered_idx] = df
+                    print(f'Recomputed is_future_present_past column for {len(pred_dec.matching_pos_epochs_dfs_list)} filtered epochs in matching_pos_epochs_dfs_list')
+                
+                if pred_dec.matching_pos_dfs_list and len(pred_dec.matching_pos_dfs_list) > 0:
+                    for filtered_idx, df in enumerate(pred_dec.matching_pos_dfs_list):
+                        # Map filtered index to original index to look up epoch times
+                        original_idx = filtered_to_original_idx[filtered_idx] if (filtered_to_original_idx is not None and filtered_idx < len(filtered_to_original_idx)) else filtered_idx
+                        if original_idx in epoch_idx_to_actual_times:
+                            epoch_start, epoch_stop = epoch_idx_to_actual_times[original_idx]
+                            is_past = (df['t'] < epoch_start)
+                            is_future = (df['t'] > epoch_stop)
+                            df['is_future_present_past'] = 'present'
+                            df.loc[is_past, 'is_future_present_past'] = 'past'
+                            df.loc[is_future, 'is_future_present_past'] = 'future'
+                            pred_dec.matching_pos_dfs_list[filtered_idx] = df
+                    print(f'Recomputed is_future_present_past column for {len(pred_dec.matching_pos_dfs_list)} entries in matching_pos_dfs_list')
+                ## END for
+            ## END for
+            
+            return masked_container, filter_epochs, epoch_idx_to_actual_times
+
 
         # ==================================================================================================================================================================================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
@@ -3113,8 +3289,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
             masked_directional_decoders_decode_result = directional_decoders_decode_result
             
-
-
             pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
             masked_locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=masked_directional_decoders_decode_result, extant_decoded_time_bin_size=most_recent_tbin, sigma=None)
             masked_predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(pos_df=pos_df, locality_measures=masked_locality_measures, a_result_decoded=masked_directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[most_recent_tbin], window_size=window_size)
@@ -3222,10 +3396,16 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
             ## END for an_epoch_name in epoch_names...
+            
 
-        if masked_container.active_epochs_df is not None:
-            ## TODO: filter these too
-            print(f'WARN: need to filter masked_container.active_epochs_df: {len(masked_container.active_epochs_df)}')
+        ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
+        # Build epoch_idx -> (actual_start, actual_stop) mapping once, reuse for filtering and recomputation
+
+
+        original_active_epochs_df: pd.DataFrame = ensure_dataframe(self.active_epochs_df) if (hasattr(self, 'active_epochs_df') and self.active_epochs_df is not None) else None
+        masked_container, filter_epochs, epoch_idx_to_actual_times = _subfn_filter_masked_container_epochs(masked_container=masked_container, original_active_epochs_df=original_active_epochs_df)
+
 
         return masked_container
 
@@ -4073,7 +4253,7 @@ class PredictiveDecodingDisplayWidget:
             a_matching_pos_epochs.loc[is_relevant_past_times, 'is_future_present_past'] = 'past'
             a_matching_pos_epochs.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
             
-            self.container.predictive_decoding.matching_pos_epochs_dfs_list[i] = a_matching_pos_epochs
+            self.container.predictive_decoding.matching_pos_epochs_dfs_list[i] = a_matching_pos_epochs # updated in the widget? very strange.
         
         # Calculate max_subplots_per_category
         self.max_subplots_per_category = self._calculate_max_subplots()
@@ -4140,7 +4320,9 @@ class PredictiveDecodingDisplayWidget:
         self.display_widgets['past'] = widget
         
         # Create trajectory plotter
-        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+        overlay_posterior, _, _ = self._get_posterior_data(self.active_epoch_idx)
+        overlay_prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
+        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
         self.trajectory_displaying_plotter['past'] = plotter
 
 
@@ -4176,7 +4358,9 @@ class PredictiveDecodingDisplayWidget:
         self.display_widgets['future'] = widget
         
         # Create trajectory plotter
-        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+        overlay_posterior, _, _ = self._get_posterior_data(self.active_epoch_idx)
+        overlay_prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
+        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
         self.trajectory_displaying_plotter['future'] = plotter
 
 
@@ -4220,6 +4404,11 @@ class PredictiveDecodingDisplayWidget:
         """Handle slider value change to update only the label (for immediate feedback while dragging)."""
         if self.epoch_value_label is not None:
             self.epoch_value_label.setText(f"{value}")
+        if (self.epoch_slider is not None) and (not self.epoch_slider.isSliderDown()):
+            self.update_displayed_epoch(an_epoch_idx=value)
+            for widget in self.display_widgets.values():
+                if widget is not None and hasattr(widget, 'draw'):
+                    widget.draw()
 
 
     def _on_slider_released(self):
@@ -4351,12 +4540,14 @@ class PredictiveDecodingDisplayWidget:
                 all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
                 vmin_shared = np.nanmin(all_time_bin_values)
                 vmax_shared = np.nanmax(all_time_bin_values)
+                overlay_alpha = 0.08
                 
                 gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
                 
                 for t_bin_idx in range(num_time_bins_to_show):
                     ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
                     im_tiny = ax_tiny.imshow(time_bin_posteriors[t_bin_idx].T, aspect='equal', origin='lower', extent=active_extent, cmap='viridis', interpolation='nearest', vmin=vmin_shared, vmax=vmax_shared)
+                    ax_tiny.imshow(active_posterior, aspect='equal', origin='lower', extent=active_extent, cmap='gray', interpolation='nearest', alpha=overlay_alpha)
                     ax_tiny.set_xticks([])
                     ax_tiny.set_yticks([])
                     ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
@@ -4406,6 +4597,9 @@ class PredictiveDecodingDisplayWidget:
         if a_decoded_traj_plotter is None:
             return
         
+        overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
+        a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
+        
         existing_ax = a_decoded_traj_plotter.axs
         if existing_ax is not None:
             if isinstance(existing_ax, (list, tuple, np.ndarray)):
@@ -4419,7 +4613,7 @@ class PredictiveDecodingDisplayWidget:
                     ax.clear()
         
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots,
-                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5,
+                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax, plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior,
                                                                                     )
         
         # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
@@ -4491,6 +4685,8 @@ class PredictiveDecodingDisplayWidget:
         assert len(self.container.predictive_decoding.matching_pos_epochs_dfs_list) > 0
         matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
 
+        self.container.active_epochs_df
+        
         # Calculate maximum number of subplots needed across all epochs for each category -- WTF is a category??
         # This ensures the layout doesn't need to resize when switching between epochs
         max_subplots_per_category: Dict[str, int] = {}
