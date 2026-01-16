@@ -4462,15 +4462,22 @@ class PredictiveDecodingDisplayWidget:
     def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
         """Extract posterior data for epoch.
 
+        
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx=an_epoch_idx)
+        
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False)
+        
+        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
+        
         """
         should_use_flipped_images: bool = self.should_use_flipped_images
         
         should_get_posterior: bool = (not get_high_prob_mask_instead)
         get_high_prob_mask_instead = get_high_prob_mask_instead or (not self.disable_showing_epoch_high_prob_pos_masks)
 
+        p_x_given_n = None
         posterior_2d = None
-
+        
         if get_high_prob_mask_instead:
             epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
             if (epoch_high_prob_pos_masks is not None):
@@ -4638,8 +4645,9 @@ class PredictiveDecodingDisplayWidget:
         
         ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
-                                                                                    active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
-                                                                                    plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior, posterior_alpha=0.25, posterior_cmap='jet', posterior_masking_value=None,
+                                                                                        active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
+                                                                                        plot_mode='scatter', c='red', cmap='Reds', alpha=0.55, s=5, posteriors=overlay_posterior, posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-3,
+                                                                                        posterior_should_perform_reshape=False, # rotate_to_vertical
                                                                                     )
         
         # Set visibility for all axes (hide unused axes where epoch_id == -1, indicating padded/empty data)
@@ -4726,7 +4734,10 @@ class PredictiveDecodingDisplayWidget:
         if widget is None:
             return
         
-        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx)
+        posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False)
+        
+        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
+
         
         try:
             self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx)

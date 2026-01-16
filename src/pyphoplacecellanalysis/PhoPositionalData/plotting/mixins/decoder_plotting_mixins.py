@@ -2410,8 +2410,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if debug_print:
             print(f'np.shape(posterior): {np.shape(posterior)}')
         
+        is_2D_dt: bool = (np.ndim(posterior) >= 3)
+        is_2D: bool = (np.ndim(posterior) == 2)
+
+        # Add time dimension if posterior is 2D (spatial 2D without time dimension)
+        if is_2D and (not is_2D_dt):
+            posterior = posterior[np.newaxis, :, :]  # Shape: (1, n_x_bins, n_y_bins)
+
         masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
-        is_2D: bool = (np.ndim(posterior) >= 3)
+
         if debug_print:
             print(f'is_2D: {is_2D}')
         
@@ -2486,7 +2493,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
-        if not is_2D:
+        if (not is_2D):
             a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=time_cmap, alpha=full_posterior_opacity,
                                        extent=ordinate_first_image_extent, origin='lower', interpolation='none')
             heatmaps.append(a_heatmap)
@@ -2867,6 +2874,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         """
         from pyphocorehelpers.geometry_helpers import compute_data_aspect_ratio
 
+        # _active_plot_fn = cls._helper_add_heatmap
+        # _active_plot_fn = cls._helper_add_hdr_contours
+        _active_posterior_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
+        
+
         if (self.xbin is not None) and (self.ybin is not None):
             single_ax_aspect_ratio, (single_ax_width, single_ax_height) = compute_data_aspect_ratio(xbin=self.xbin, ybin=self.ybin)
         else:
@@ -3049,8 +3061,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             return posterior_item, None
 
         def _subfn_add_posterior_overlay(ax, posterior_item, default_extent=None, alpha=None, posterior_cmap='gray', posterior_masking_value: float = 0.0025, should_perform_reshape: bool = True):
+            """ captures: _active_posterior_plot_fn 
+                        # Delegate the posterior plotting functionality.
+
+            """
             if posterior_item is None:
                 return None
+            
             posterior_data, posterior_extent = _subfn_extract_posterior_and_extent(posterior_item)
             if posterior_data is None:
                 return None
@@ -3063,35 +3080,44 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # Handle 2D merged posterior (time-collapsed) as a single 2D image
             if (ybin_centers is not None) and (np.ndim(posterior_data) == 2):
                 # Direct 2D plotting for merged posteriors
-                if should_perform_reshape:
-                    posterior_data = deepcopy(posterior_data).T
-                else:
-                    posterior_data = deepcopy(posterior_data)
+                # if should_perform_reshape:
+                #     posterior_data = deepcopy(posterior_data).T
+                # else:
+                #     posterior_data = deepcopy(posterior_data)
                     
-                if posterior_masking_value is not None:
-                    masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
-                else:
-                    masked_posterior = posterior_data
-                x_values = deepcopy(xbin_centers)
-                y_values = deepcopy(ybin_centers)
-                if self.rotate_to_vertical:
-                    ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
-                    masked_posterior = masked_posterior.T
-                else:
-                    ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
-                if posterior_extent is not None:
-                    ordinate_first_image_extent = deepcopy(posterior_extent)
-                a_heatmap = ax.imshow(masked_posterior, aspect='auto', cmap=posterior_cmap, alpha=full_posterior_opacity, extent=ordinate_first_image_extent, origin='lower', interpolation='none')
-                return [a_heatmap], ordinate_first_image_extent, None
+                # if posterior_masking_value is not None:
+                #     masked_posterior = np.ma.masked_less(posterior_data, posterior_masking_value)
+                # else:
+                #     masked_posterior = posterior_data
+                # x_values = deepcopy(xbin_centers)
+                # y_values = deepcopy(ybin_centers)
+                # if self.rotate_to_vertical:
+                #     ordinate_first_image_extent = (y_values.min(), y_values.max(), x_values.min(), x_values.max())
+                #     masked_posterior = masked_posterior.T
+                # else:
+                #     ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
+                # if posterior_extent is not None:
+                #     ordinate_first_image_extent = deepcopy(posterior_extent)
+                # a_heatmap = ax.imshow(masked_posterior, aspect='auto', cmap=posterior_cmap, alpha=full_posterior_opacity, extent=ordinate_first_image_extent, origin='lower', interpolation='none')
+                # return [a_heatmap], ordinate_first_image_extent, None
+            
+                # Use helper again:
+                heatmaps, image_extent, plots_data = _active_posterior_plot_fn(ax, xbin_centers=xbin_centers, ybin_centers=ybin_centers, a_time_bin_centers=None, a_p_x_given_n=posterior_data, rotate_to_vertical=self.rotate_to_vertical, debug_print=False, posterior_masking_value=posterior_masking_value, full_posterior_opacity=full_posterior_opacity, custom_image_extent=posterior_extent, time_cmap=posterior_cmap, should_perform_reshape=should_perform_reshape, extant_plot_data=None)
+                return heatmaps, image_extent, plots_data
+
             else:
                 # Use helper for 3D (time-series) or 1D cases
-                heatmaps, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(ax, xbin_centers=xbin_centers, ybin_centers=ybin_centers, a_time_bin_centers=None, a_p_x_given_n=posterior_data, rotate_to_vertical=self.rotate_to_vertical, debug_print=False, posterior_masking_value=posterior_masking_value, full_posterior_opacity=full_posterior_opacity, custom_image_extent=posterior_extent, time_cmap=posterior_cmap, should_perform_reshape=should_perform_reshape, extant_plot_data=None)
+                heatmaps, image_extent, plots_data = _active_posterior_plot_fn(ax, xbin_centers=xbin_centers, ybin_centers=ybin_centers, a_time_bin_centers=None, a_p_x_given_n=posterior_data, rotate_to_vertical=self.rotate_to_vertical, debug_print=False, posterior_masking_value=posterior_masking_value, full_posterior_opacity=full_posterior_opacity, custom_image_extent=posterior_extent, time_cmap=posterior_cmap, should_perform_reshape=should_perform_reshape, extant_plot_data=None)
                 return heatmaps, image_extent, plots_data
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
 
         # Compute required data from session:
-        
+        override_rotate_to_vertical: bool = kwargs.pop('override_rotate_to_vertical', None)
+        if override_rotate_to_vertical:
+            self.rotate_to_vertical = override_rotate_to_vertical
+            print(f'override_rotate_to_vertical: {override_rotate_to_vertical} so overriding self.rotate_to_Vertical')
+
         if self.rotate_to_vertical:
             # vertical
             # x_columns = [col for col in lap_specific_position_dfs[0].columns if col.startswith("x")]
