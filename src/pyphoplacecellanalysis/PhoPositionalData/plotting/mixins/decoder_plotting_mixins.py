@@ -2408,7 +2408,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         else:
             posterior = deepcopy(a_p_x_given_n)
         if debug_print:
-            print(f'np.shape(posterior): {np.shape(posterior)}')
+            print('_helper_add_heatmap(...)')
+            print(f'\tnp.shape(posterior): {np.shape(posterior)}')
         
         is_2D_dt: bool = (np.ndim(posterior) >= 3)
         is_2D: bool = (np.ndim(posterior) == 2)
@@ -2417,10 +2418,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if is_2D and (not is_2D_dt):
             posterior = posterior[np.newaxis, :, :]  # Shape: (1, n_x_bins, n_y_bins)
 
-        masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        if posterior_masking_value is not None:
+            masked_posterior = np.ma.masked_less(posterior, posterior_masking_value)
+        else:
+            masked_posterior = posterior
+            
 
         if debug_print:
-            print(f'is_2D: {is_2D}')
+            print(f'\tis_2D: {is_2D}')
         
         x_values = deepcopy(xbin_centers)
         extra_dict = {'is_2D': is_2D}
@@ -2456,17 +2461,17 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             x_values, y_values = y_values, x_values
             if should_perform_reshape:
                 if debug_print:
-                    print(f'rotate_to_vertical: swapping axes. Original masked_posterior shape: {np.shape(masked_posterior)}')
+                    print(f'\trotate_to_vertical: swapping axes. Original masked_posterior shape: {np.shape(masked_posterior)}')
                 masked_posterior = masked_posterior.swapaxes(-2, -1) ## swap the last two (x, y) axes -- this doesn't work, because
                 
             if debug_print:
-                print(f'Post-swap masked_posterior shape: {np.shape(masked_posterior)}')
+                print(f'\tPost-swap masked_posterior shape: {np.shape(masked_posterior)}')
         else:
             ordinate_first_image_extent = (x_values.min(), x_values.max(), y_values.min(), y_values.max())
         
         if custom_image_extent is not None:
             assert len(custom_image_extent) == 4
-            print(f'using `custom_image_extent`: prev_image_extent: {ordinate_first_image_extent}, custom_image_extent: {custom_image_extent}')
+            print(f'\tusing `custom_image_extent`: prev_image_extent: {ordinate_first_image_extent}, custom_image_extent: {custom_image_extent}')
             ordinate_first_image_extent = deepcopy(custom_image_extent)
 
         ## set after any swapping:
@@ -2489,7 +2494,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             plots_data = extant_plot_data
             plots_data['ordinate_first_image_extent'] = deepcopy(ordinate_first_image_extent)
             plots_data.update(**extra_dict) ## update the existing
-            
+
+        if debug_print:
+            print(f"\tfinal parameters: masked_posterior.shape: {np.shape(masked_posterior)}, aspect='auto', ordinate_first_image_extent={ordinate_first_image_extent}, origin='lower', interpolation='none'")            
 
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
