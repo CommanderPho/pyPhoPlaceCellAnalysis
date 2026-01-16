@@ -4459,22 +4459,29 @@ class PredictiveDecodingDisplayWidget:
 
 
 
-    def _get_posterior_data(self, an_epoch_idx: int) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
+    def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
         """Extract posterior data for epoch.
 
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx=an_epoch_idx)
         """
         should_use_flipped_images: bool = self.should_use_flipped_images
         
-        p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-        
-        epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
-        if (epoch_high_prob_pos_masks is not None) and (not self.disable_showing_epoch_high_prob_pos_masks):
-            print(f'using high_prob mask version from .epoch_high_prob_pos_masks!')
-            posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
-        else:
-            posterior_2d = np.sum(p_x_given_n, axis=2) ## collapse over time
+        should_get_posterior: bool = (not get_high_prob_mask_instead)
+        get_high_prob_mask_instead = get_high_prob_mask_instead or (not self.disable_showing_epoch_high_prob_pos_masks)
 
+        posterior_2d = None
+
+        if get_high_prob_mask_instead:
+            epoch_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_high_prob_pos_masks', None)
+            if (epoch_high_prob_pos_masks is not None):
+                print(f'using high_prob mask version from .epoch_high_prob_pos_masks!')
+                posterior_2d = epoch_high_prob_pos_masks[an_epoch_idx]
+            else:
+                should_get_posterior = True
+
+        if should_get_posterior:
+            p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+            posterior_2d = np.sum(p_x_given_n, axis=2) ## collapse over time
 
         time_bin_posteriors = None
         num_time_bins_to_show = 0
@@ -4599,10 +4606,19 @@ class PredictiveDecodingDisplayWidget:
         
         a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)        
         if a_decoded_traj_plotter is None:
-            return
-        
-        existing_ax = a_decoded_traj_plotter.axs
-        if existing_ax is not None:
+            ## create a new plotter
+            a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+            self.trajectory_displaying_plotter[a_past_future_name] = a_decoded_traj_plotter
+            needed_init = True
+            existing_ax = a_decoded_traj_plotter.axs
+
+        else:
+            existing_ax = a_decoded_traj_plotter.axs
+            
+
+        # Clear existing axes before plotting to prevent drawing over previous plots
+        if( existing_ax is not None) and (not needed_init):
+            # Handle different axis structures (list, array, or single axis)
             if isinstance(existing_ax, (list, tuple, np.ndarray)):
                 for ax in existing_ax:
                     if ax is not None and hasattr(ax, 'clear'):
@@ -4617,7 +4633,7 @@ class PredictiveDecodingDisplayWidget:
                     
 
         ## Get posterior data:
-        overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
+        overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
         a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
         
         ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
@@ -4626,23 +4642,80 @@ class PredictiveDecodingDisplayWidget:
                                                                                     plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior, posterior_alpha=0.25, posterior_cmap='jet', posterior_masking_value=None,
                                                                                     )
         
-        # Hide unused axes (where epoch_id == -1, indicating padded/empty data)
-        if len(epochs_pages) > 0:
-            active_page_epoch_ids = epochs_pages[0]
-            if hasattr(a_decoded_traj_plotter, 'row_column_indicies') and a_decoded_traj_plotter.row_column_indicies is not None:
-                row_column_indicies = a_decoded_traj_plotter.row_column_indicies
-                for linear_idx, epoch_id in enumerate(active_page_epoch_ids):
-                    if epoch_id == -1:
-                        if linear_idx < len(row_column_indicies[0]) and linear_idx < len(row_column_indicies[1]):
-                            curr_row = row_column_indicies[0][linear_idx]
-                            curr_col = row_column_indicies[1][linear_idx]
-                            if axs is not None and isinstance(axs, np.ndarray) and axs.ndim == 2:
+        # Set visibility for all axes (hide unused axes where epoch_id == -1, indicating padded/empty data)
+        if axs is not None and isinstance(axs, np.ndarray) and axs.ndim == 2:
+            # First, make all axes visible to reset any previously hidden axes
+            for row in range(axs.shape[0]):
+                for col in range(axs.shape[1]):
+                    if axs[row, col] is not None:
+                        axs[row, col].set_visible(True)
+            
+            # Then hide unused axes (where epoch_id == -1)
+            if len(epochs_pages) > 0:
+                active_page_epoch_ids = epochs_pages[0]
+                if hasattr(a_decoded_traj_plotter, 'row_column_indicies') and a_decoded_traj_plotter.row_column_indicies is not None:
+                    row_column_indicies = a_decoded_traj_plotter.row_column_indicies
+                    for linear_idx, epoch_id in enumerate(active_page_epoch_ids):
+                        if (epoch_id == -1):
+                            if linear_idx < len(row_column_indicies[0]) and linear_idx < len(row_column_indicies[1]):
+                                curr_row = row_column_indicies[0][linear_idx]
+                                curr_col = row_column_indicies[1][linear_idx]
                                 if curr_row < axs.shape[0] and curr_col < axs.shape[1]:
                                     axs[curr_row, curr_col].set_visible(False)
         
         perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
         
-        widget = self.display_widgets.get(category_name)
+
+        # Embed the matplotlib figure in the dock widget
+        # Check if canvas widget needs to be created (either plotter is new or canvas doesn't exist)
+        canvas_needs_init = needed_init or (a_past_future_name not in self.dock_canvas_widgets)
+        if canvas_needs_init:
+            dock = self.dock_widgets.get(a_past_future_name)
+            if (dock is not None): # (canvas is None)
+                # Remove existing widgets from dock
+                # Dock uses a QGridLayout and maintains a widgets list
+                layout = dock.layout
+                if layout is not None:
+                    while layout.count():
+                        child = layout.takeAt(0)
+                        if child.widget():
+                            child.widget().setParent(None)
+                # Clear the widgets list maintained by Dock
+                if hasattr(dock, 'widgets'):
+                    dock.widgets.clear()
+                dock.currentRow = 0
+                
+                # Create canvas and toolbar for the matplotlib figure
+                canvas = FigureCanvas(fig)
+                toolbar = NavigationToolbar(canvas, self.dock_window)
+                
+                # Create a widget to hold canvas and toolbar
+                plot_widget = QtWidgets.QWidget()
+                plot_layout = QtWidgets.QVBoxLayout()
+                plot_layout.setContentsMargins(0, 0, 0, 0)
+                plot_layout.addWidget(toolbar)
+                plot_layout.addWidget(canvas)
+                plot_widget.setLayout(plot_layout)
+                
+                # Add to dock
+                dock.addWidget(plot_widget)
+                
+                # Store reference to canvas widget
+                self.dock_canvas_widgets[a_past_future_name] = canvas
+                
+                # Close the figure window if it's open (since it's now embedded in the dock)
+                plt.close(fig)                
+
+        else:
+            ## just redraw - axes are already cleared above before plotting
+            canvas = self.dock_canvas_widgets.get(a_past_future_name)
+            if canvas is not None:
+                # The axes were already cleared before plot_decoded_trajectories_2d was called
+                # Just trigger a redraw
+                canvas.draw_idle()
+
+        ## alternative to the above?
+        widget = self.display_widgets.get(a_past_future_name)
         if widget is not None:
             widget.draw()
 
@@ -4762,92 +4835,109 @@ class PredictiveDecodingDisplayWidget:
             # an_epoch_specific_past_position_dfs = curr_matching_epochs_df_dict['past']
             # an_epoch_specific_past_epoch_ids = an_epoch_specific_past_position_dfs.index.to_numpy()
             ## OUTPUTS: an_epoch_specific_past_position_dfs, an_epoch_specific_past_epoch_ids
-            existing_ax = None
-            needed_init: bool = False
-            a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)
-            if a_decoded_traj_plotter is None:
-                ## create a new plotter
-                a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
-                self.trajectory_displaying_plotter[a_past_future_name] = a_decoded_traj_plotter
-                needed_init = True
-            else:
-                existing_ax = a_decoded_traj_plotter.axs
-                # Clear existing axes before plotting to prevent drawing over previous plots
-                if existing_ax is not None:
-                    # Handle different axis structures (list, array, or single axis)
-                    if isinstance(existing_ax, (list, tuple, np.ndarray)):
-                        for ax in existing_ax:
-                            if ax is not None and hasattr(ax, 'clear'):
-                                ax.clear()
-                    elif hasattr(existing_ax, 'clear'):
-                        existing_ax.clear()
-                    # Also clear the figure if it exists
-                    if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
-                        # Clear all axes in the figure
-                        for ax in a_decoded_traj_plotter.fig.get_axes():
-                            ax.clear()
+            
+
+            # existing_ax = None
+            # needed_init: bool = False
+            # a_decoded_traj_plotter = self.trajectory_displaying_plotter.get(a_past_future_name, None)
+            # if a_decoded_traj_plotter is None:
+            #     ## create a new plotter
+            #     a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers)
+            #     self.trajectory_displaying_plotter[a_past_future_name] = a_decoded_traj_plotter
+            #     needed_init = True
+            # else:
+            #     existing_ax = a_decoded_traj_plotter.axs
+            #     # Clear existing axes before plotting to prevent drawing over previous plots
+            #     if existing_ax is not None:
+            #         # Handle different axis structures (list, array, or single axis)
+            #         if isinstance(existing_ax, (list, tuple, np.ndarray)):
+            #             for ax in existing_ax:
+            #                 if ax is not None and hasattr(ax, 'clear'):
+            #                     ax.clear()
+            #         elif hasattr(existing_ax, 'clear'):
+            #             existing_ax.clear()
+            #         # Also clear the figure if it exists
+            #         if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
+            #             # Clear all axes in the figure
+            #             for ax in a_decoded_traj_plotter.fig.get_axes():
+            #                 ax.clear()
 
             # canvas: FigureCanvas = self.dock_canvas_widgets.get(a_past_future_name, None)
             # if canvas is not None:
             #     existing_ax = canvas.figure.get_axes() ## a list of 8 Axes objects
-            curr_posterior = None
-            fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=epoch_ids, curr_num_subplots=curr_num_subplots, active_page_index=0,
-                                                                                     fixed_columns = 4,
-                                                                                     plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
-                                                                                     #  plot_mode='line',
-                                                                                     plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, posteriors=curr_posterior,
-                                                                                     )
+
+            ## Duplicated plotting.            
+            # overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx)
+            # a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
             
-            perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
-            # self.active_epoch_idx = an_epoch_idx
+            # existing_ax = a_decoded_traj_plotter.axs
+            # if existing_ax is not None:
+            #     if isinstance(existing_ax, (list, tuple, np.ndarray)):
+            #         for ax in existing_ax:
+            #             if ax is not None and hasattr(ax, 'clear'):
+            #                 ax.clear()
+            #     elif hasattr(existing_ax, 'clear'):
+            #         existing_ax.clear()
+            #     if hasattr(a_decoded_traj_plotter, 'fig') and a_decoded_traj_plotter.fig is not None:
+            #         for ax in a_decoded_traj_plotter.fig.get_axes():
+            #             ax.clear()
+            
+            # ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
+            # fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
+            #                                                                             active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
+            #                                                                             plot_mode='scatter', c='red', cmap='Reds', alpha=0.65, s=5, posteriors=overlay_posterior, posterior_alpha=0.25, posterior_cmap='jet', posterior_masking_value=None,
+            #                                                                             )
+                    
+            # perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
+            # # self.active_epoch_idx = an_epoch_idx
 
-            # Embed the matplotlib figure in the dock widget
-            # Check if canvas widget needs to be created (either plotter is new or canvas doesn't exist)
-            canvas_needs_init = needed_init or (a_past_future_name not in self.dock_canvas_widgets)
-            if canvas_needs_init:
-                dock = self.dock_widgets.get(a_past_future_name)
-                if (dock is not None): # (canvas is None)
-                    # Remove existing widgets from dock
-                    # Dock uses a QGridLayout and maintains a widgets list
-                    layout = dock.layout
-                    if layout is not None:
-                        while layout.count():
-                            child = layout.takeAt(0)
-                            if child.widget():
-                                child.widget().setParent(None)
-                    # Clear the widgets list maintained by Dock
-                    if hasattr(dock, 'widgets'):
-                        dock.widgets.clear()
-                    dock.currentRow = 0
+            # # Embed the matplotlib figure in the dock widget
+            # # Check if canvas widget needs to be created (either plotter is new or canvas doesn't exist)
+            # canvas_needs_init = needed_init or (a_past_future_name not in self.dock_canvas_widgets)
+            # if canvas_needs_init:
+            #     dock = self.dock_widgets.get(a_past_future_name)
+            #     if (dock is not None): # (canvas is None)
+            #         # Remove existing widgets from dock
+            #         # Dock uses a QGridLayout and maintains a widgets list
+            #         layout = dock.layout
+            #         if layout is not None:
+            #             while layout.count():
+            #                 child = layout.takeAt(0)
+            #                 if child.widget():
+            #                     child.widget().setParent(None)
+            #         # Clear the widgets list maintained by Dock
+            #         if hasattr(dock, 'widgets'):
+            #             dock.widgets.clear()
+            #         dock.currentRow = 0
                     
-                    # Create canvas and toolbar for the matplotlib figure
-                    canvas = FigureCanvas(fig)
-                    toolbar = NavigationToolbar(canvas, self.dock_window)
+            #         # Create canvas and toolbar for the matplotlib figure
+            #         canvas = FigureCanvas(fig)
+            #         toolbar = NavigationToolbar(canvas, self.dock_window)
                     
-                    # Create a widget to hold canvas and toolbar
-                    plot_widget = QtWidgets.QWidget()
-                    plot_layout = QtWidgets.QVBoxLayout()
-                    plot_layout.setContentsMargins(0, 0, 0, 0)
-                    plot_layout.addWidget(toolbar)
-                    plot_layout.addWidget(canvas)
-                    plot_widget.setLayout(plot_layout)
+            #         # Create a widget to hold canvas and toolbar
+            #         plot_widget = QtWidgets.QWidget()
+            #         plot_layout = QtWidgets.QVBoxLayout()
+            #         plot_layout.setContentsMargins(0, 0, 0, 0)
+            #         plot_layout.addWidget(toolbar)
+            #         plot_layout.addWidget(canvas)
+            #         plot_widget.setLayout(plot_layout)
                     
-                    # Add to dock
-                    dock.addWidget(plot_widget)
+            #         # Add to dock
+            #         dock.addWidget(plot_widget)
                     
-                    # Store reference to canvas widget
-                    self.dock_canvas_widgets[a_past_future_name] = canvas
+            #         # Store reference to canvas widget
+            #         self.dock_canvas_widgets[a_past_future_name] = canvas
                     
-                    # Close the figure window if it's open (since it's now embedded in the dock)
-                    plt.close(fig)                
+            #         # Close the figure window if it's open (since it's now embedded in the dock)
+            #         plt.close(fig)                
 
-            else:
-                ## just redraw - axes are already cleared above before plotting
-                canvas = self.dock_canvas_widgets.get(a_past_future_name)
-                if canvas is not None:
-                    # The axes were already cleared before plot_decoded_trajectories_2d was called
-                    # Just trigger a redraw
-                    canvas.draw_idle()
+            # else:
+            #     ## just redraw - axes are already cleared above before plotting
+            #     canvas = self.dock_canvas_widgets.get(a_past_future_name)
+            #     if canvas is not None:
+            #         # The axes were already cleared before plot_decoded_trajectories_2d was called
+            #         # Just trigger a redraw
+            #         canvas.draw_idle()
         ## END for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items()....
 
 
