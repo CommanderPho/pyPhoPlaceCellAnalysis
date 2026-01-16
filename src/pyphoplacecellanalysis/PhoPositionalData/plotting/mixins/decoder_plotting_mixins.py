@@ -3149,14 +3149,18 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # generate the pages
         epochs_pages = [list(chunk) for chunk in _subfn_chunks(epoch_ids, curr_num_subplots)] ## this is specific to actual laps...
         active_page_epochs_ids = epochs_pages[active_page_index] if (epochs_pages is not None) and (len(epochs_pages) > 0) else []
+        
+
+        # Handle psoterior plottings _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         if posteriors is None:
-            posteriors = kwargs.get('posteriors', None)
+            posteriors = kwargs.pop('posteriors', None)
+
+        posterior_alpha = kwargs.pop('posterior_alpha', None)
+        posterior_cmap = kwargs.pop('posterior_cmap', 'gray')
+        posterior_masking_value = kwargs.pop('posterior_masking_value', 1e-12)
+        posterior_should_perform_reshape = kwargs.pop('posterior_should_perform_reshape', True)
 
         if posteriors is not None:
-            posterior_alpha = kwargs.get('posterior_alpha', None)
-            posterior_cmap = kwargs.get('posterior_cmap', 'gray')
-            posterior_masking_value = kwargs.get('posterior_masking_value', 0.0025)
-            posterior_should_perform_reshape = kwargs.get('posterior_should_perform_reshape', True)
             if isinstance(posteriors, dict):
                 posteriors_by_epoch_id = posteriors
             elif isinstance(posteriors, (list, tuple)) and (len(posteriors) == len(epoch_ids)):
@@ -3187,6 +3191,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 else:
                     _subfn_add_posterior_overlay(an_ax, curr_posterior, default_extent=None, alpha=posterior_alpha, posterior_cmap=posterior_cmap, posterior_masking_value=posterior_masking_value, should_perform_reshape=posterior_should_perform_reshape)
          
+        
+
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
             _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, active_plot_mode=plot_mode, **kwargs)
