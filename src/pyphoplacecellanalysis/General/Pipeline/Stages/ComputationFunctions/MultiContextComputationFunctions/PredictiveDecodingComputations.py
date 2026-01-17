@@ -3753,11 +3753,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
         gaussian_volume = self.predictive_decoding.gaussian_volume ## the volume for all time bins
 
+        max_workers: int = kwargs.pop('max_workers', 2)
+        
         ## decoded_local_epochs_result's epochs need to match the passed `active_epochs_df`
         epoch_matching_past_future_positions, _an_out_tuple, active_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=decoded_local_epochs_result, measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
             active_epochs_df=active_epochs_df,
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
-            **kwargs, # use_parallel=True, max_workers=2, 
+            max_workers=max_workers, **kwargs, # use_parallel=True, max_workers=2, 
         )
         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
         
