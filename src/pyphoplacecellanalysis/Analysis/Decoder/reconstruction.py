@@ -1854,7 +1854,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.marginal_x_list = [a_decoded_result.marginal_x_list[i] for i in valid_epoch_idxs]
                 a_decoded_result.marginal_y_list = [a_decoded_result.marginal_y_list[i] for i in valid_epoch_idxs]
                 a_decoded_result.marginal_z_list = [a_decoded_result.marginal_z_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.nbins = [a_decoded_result.nbins[i] for i in valid_epoch_idxs]
+                a_decoded_result.nbins = a_decoded_result.nbins[valid_epoch_idxs]  # Keep as ndarray via index slicing
                 a_decoded_result.time_bin_containers = [a_decoded_result.time_bin_containers[i] for i in valid_epoch_idxs]
                 a_decoded_result.time_bin_edges = [a_decoded_result.time_bin_edges[i] for i in valid_epoch_idxs]
                 a_decoded_result.spkcount = [a_decoded_result.spkcount[i] for i in valid_epoch_idxs]
