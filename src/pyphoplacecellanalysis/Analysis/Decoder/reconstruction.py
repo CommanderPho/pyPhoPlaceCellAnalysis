@@ -1658,8 +1658,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 
         #TODO 2025-03-04 10:10: - [ ] Seems like `a_decoder` is just passed-through unaltered. Could refactor into a classmethod of `DecodedFilterEpochsResult`
         
-        #TODO 2025-03-26 05:55: - [ ] Perhaps spike requirement should be in Hz, so it's normalized by the time_bin_size instead of pure spikes. Although you can't go lower than one spike.... so it does seem discrete somewhat.
-        
         
         """
         from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo, get_bin_edges
@@ -1669,8 +1667,6 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         # a_decoder = deepcopy(a_decoder)
         a_decoded_result: DecodedFilterEpochsResult = deepcopy(self) ## copy self to make the decoded result duplicate
-
-        
 
         num_filter_epochs: int = a_decoded_result.num_filter_epochs
         
@@ -1705,8 +1701,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 #@IgnoreException
                 print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
                 # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                # continue
-                break
+                continue
             else:
                 assert len(a_time_bin_edges) == (num_time_bins+1)
         
@@ -1825,11 +1820,59 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
             ## END if np.any(is_time_bin_active)
             _out_is_time_bin_active_list.append(is_time_bin_active) ## why are we changing this?
-            inactive_mask_list.append(last_valid_indices)
+            inactive_mask_list.append(inactive_mask)
             all_time_bin_indicies_list.append(all_time_bin_indicies)
             last_valid_indices_list.append(last_valid_indices)
                     
-        #END for i in np.arange(num_filter_epochs)    
+        #END for i in np.arange(num_filter_epochs)
+        
+        ## 2026-01-19 - After masking, update filter_epochs and num_filter_epochs when using 'dropped' mode
+        if masked_bin_fill_mode == 'dropped':
+            ## Update filter_epochs start/stop/duration based on remaining time bins for each epoch
+            a_decoded_result.filter_epochs = ensure_dataframe(a_decoded_result.filter_epochs)
+            
+            ## Update start/stop/duration columns based on remaining time_bin_containers
+            for i in np.arange(num_filter_epochs):
+                if a_decoded_result.nbins[i] > 0:
+                    remaining_centers = a_decoded_result.time_bin_containers[i].centers
+                    remaining_edges = a_decoded_result.time_bin_edges[i]
+                    if len(remaining_edges) > 0:
+                        a_decoded_result.filter_epochs.loc[i, 'start'] = remaining_edges[0]
+                        a_decoded_result.filter_epochs.loc[i, 'stop'] = remaining_edges[-1]
+                        a_decoded_result.filter_epochs.loc[i, 'duration'] = remaining_edges[-1] - remaining_edges[0]
+            
+            ## Identify and remove epochs with 0 remaining bins
+            epochs_with_bins_mask = np.array([a_decoded_result.nbins[i] > 0 for i in range(num_filter_epochs)])
+            if not np.all(epochs_with_bins_mask):
+                ## Some epochs have 0 bins - need to remove them
+                valid_epoch_idxs = np.where(epochs_with_bins_mask)[0]
+                
+                ## Filter all list fields
+                a_decoded_result.p_x_given_n_list = [a_decoded_result.p_x_given_n_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.most_likely_positions_list = [a_decoded_result.most_likely_positions_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.most_likely_position_indicies_list = [a_decoded_result.most_likely_position_indicies_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.marginal_x_list = [a_decoded_result.marginal_x_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.marginal_y_list = [a_decoded_result.marginal_y_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.marginal_z_list = [a_decoded_result.marginal_z_list[i] for i in valid_epoch_idxs]
+                a_decoded_result.nbins = [a_decoded_result.nbins[i] for i in valid_epoch_idxs]
+                a_decoded_result.time_bin_containers = [a_decoded_result.time_bin_containers[i] for i in valid_epoch_idxs]
+                a_decoded_result.time_bin_edges = [a_decoded_result.time_bin_edges[i] for i in valid_epoch_idxs]
+                a_decoded_result.spkcount = [a_decoded_result.spkcount[i] for i in valid_epoch_idxs]
+                if len(a_decoded_result.epoch_description_list) == num_filter_epochs:
+                    a_decoded_result.epoch_description_list = [a_decoded_result.epoch_description_list[i] for i in valid_epoch_idxs]
+                
+                ## Filter mask output lists as well
+                _out_is_time_bin_active_list = [_out_is_time_bin_active_list[i] for i in valid_epoch_idxs]
+                inactive_mask_list = [inactive_mask_list[i] for i in valid_epoch_idxs]
+                all_time_bin_indicies_list = [all_time_bin_indicies_list[i] for i in valid_epoch_idxs]
+                last_valid_indices_list = [last_valid_indices_list[i] for i in valid_epoch_idxs]
+                
+                ## Filter filter_epochs DataFrame
+                a_decoded_result.filter_epochs = a_decoded_result.filter_epochs.iloc[valid_epoch_idxs].reset_index(drop=True)
+            
+            ## Update num_filter_epochs to match the new count
+            a_decoded_result.num_filter_epochs = len(a_decoded_result.filter_epochs)
+        
         
         return a_decoded_result, (_out_is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
 
