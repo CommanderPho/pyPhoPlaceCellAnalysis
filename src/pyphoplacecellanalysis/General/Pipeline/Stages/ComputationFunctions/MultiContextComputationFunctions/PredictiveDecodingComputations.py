@@ -4073,7 +4073,6 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 if mask_position_like_time_score_cutoff:
                     a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None,
                                                                                                                                         xbin=a_decoder.xbin, ybin=a_decoder.ybin, normalization_across_epochs_epoch_names=epoch_names,
-                                                                                                                                                
                                                                                                                                      )
                 else:
                     a_masked_result = a_result_decoded
@@ -4266,8 +4265,6 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         # Validate container exists
         assert a_container is not None
 
-        
-        
         a_masked_container = None
         if enable_masked_filtered_container_before_any_comps:
             print(f'enable_masked_filtered_container_before_any_comps is True so pre-masking before second-half of `perform_predictive_decoding_analysis(...)`')

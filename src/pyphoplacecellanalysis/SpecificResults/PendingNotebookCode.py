@@ -909,7 +909,7 @@ class PositionLikePosteriorScoring:
     def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None,
             normalization_across_epochs_epoch_names: Optional[List]=None,
 
-        ) -> DecodedFilterEpochsResult:
+        ) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
         """
         decoding_time_bin_size = 0.025
         an_epoch_name = 'roam'
@@ -944,8 +944,6 @@ class PositionLikePosteriorScoring:
         ## flatten all epochs across time bins
         flat_p_x_given_n_list = np.concatenate(p_x_given_n_list, axis=2) # (41, 63, 1508)
 
-        np.shape(flat_p_x_given_n_list)
-
         if (np.ndim(flat_p_x_given_n_list) > 3):
             ## split by epoch
             # assert (normalization_across_epochs_epoch_names is not None), f"we must have the epoch_names to build the dictionary when passed a pseudo3D posterior"
@@ -978,22 +976,17 @@ class PositionLikePosteriorScoring:
 
             ## set the new 'score' column to the best of all the individual scores:
             scoring_results_df['score'] = scoring_results_df[all_score_col_names].max(axis=1, skipna=True)
-            scoring_results_df['is_position_like'] = (scoring_results_df['score'] >= cls.position_like_score_cutoff) ## update/replace the 'is_position_like' columns
+            scoring_results_df['is_position_like'] = (scoring_results_df['score'] >= position_like_score_cutoff) ## update/replace the 'is_position_like' columns
 
             all_out_col_names = ['t_bin_idx', 'epoch_idx', 't', *all_score_col_names, 'score', 'is_position_like']
             scoring_results_df = scoring_results_df[all_out_col_names]
             
         else:
             # Choose an epoch to visualize (e.g., the first one)
-            scoring_results_df = cls.compute_and_plot_posterior_stack(
-                flat_p_x_given_n_list,
-                x_edges=xbin,
-                y_edges=ybin, 
-                should_plot_results=False, 
-            )
+            scoring_results_df = cls.compute_and_plot_posterior_stack(flat_p_x_given_n_list, x_edges=xbin, y_edges=ybin, should_plot_results=False)
             scoring_results_df['t'] = np.concatenate([v.centers for v in a_masked_filtered_decoded_local_epochs_result.time_bin_containers])
             scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)]) ## these are "modern" epoch indicies
-            scoring_results_df
+            scoring_results_df['is_position_like'] = (scoring_results_df['score'] >= position_like_score_cutoff)
 
 
         ## FOR MASKING:
@@ -1023,7 +1016,7 @@ class PositionLikePosteriorScoring:
                 included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
                 a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
 
-        a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_Epoch(ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs)) ## convert to epoch_df
+        a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs) ## convert to epoch_df
 
 
         return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
