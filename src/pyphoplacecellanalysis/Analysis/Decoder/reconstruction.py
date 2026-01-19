@@ -1295,12 +1295,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         """
         subset = deepcopy(self)
         original_num_filter_epochs = subset.num_filter_epochs
-        if not isinstance(subset.filter_epochs, pd.DataFrame):
-            subset.filter_epochs = subset.filter_epochs.to_dataframe()
+        subset.filter_epochs = ensure_dataframe(subset.filter_epochs)
 
         if 'original_epoch_idx' not in subset.filter_epochs.columns:
             subset.filter_epochs['original_epoch_idx'] = subset.filter_epochs.index.to_numpy().astype(int) ## back up the original indicies if they haven't already been backed up. useful for later inverse mappings
             
+        subset.filter_epochs.reset_index(drop=True, inplace=True)
 
         ## Convert to the real-deal: pure indicies
         old_fashioned_indicies = np.array([subset.filter_epochs.index.get_loc(a_loc_idx) for a_loc_idx in included_epoch_indicies])
