@@ -3325,69 +3325,39 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         masked_container.pf1D_Decoder_dict = deepcopy(self.pf1D_Decoder_dict)
         
         _decode_kwargs = {k:kwargs.get(k, None) for k in ['merging_adjacent_max_separation_sec', 'minimum_epoch_duration'] if (kwargs.get(k, None) is not None)}
-        if selected_tbin in (self.epochs_decoded_result_cache_dict or {}):
-            # Dict[float, Dict[DecoderName, DecodedFilterEpochsResult]]
-            if selected_tbin not in masked_container.epochs_decoded_result_cache_dict:
-                masked_container.epochs_decoded_result_cache_dict[selected_tbin] = {} # deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin]) ## copy the cached result from the existing object
-                
-            # extant_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin]) ## copy the cached result from the existing object
-            for a_decoder_name, an_extant_result in self.epochs_decoded_result_cache_dict[selected_tbin].items():
-                filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=an_extant_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
-                masked_container.epochs_decoded_result_cache_dict[selected_tbin][a_decoder_name] = filtered_decoded_local_epochs_result
-                
+        
+        for an_active_t_bin_size in list(set([a_t_bin_size])): # only care about `a_t_bin_size`
+
+            if an_active_t_bin_size not in masked_container.epochs_decoded_result_cache_dict:
+                masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size] = {} # deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin]) ## copy the cached result from the existing object
+                            
+            for a_decoder_name in epoch_names:
+                an_extant_result = self.epochs_decoded_result_cache_dict.get(an_active_t_bin_size, {}).get(a_decoder_name, None)
+                if an_extant_result is not None:
+                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=an_extant_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
+                    masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
+                else:
+                    ## full recompute:
+                    an_extant_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=an_active_t_bin_size, 
+                                                                                    **_decode_kwargs,
+                                                                                    override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
+                                                                                    epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
+                                                                                )
+                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=an_extant_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
+
+                    
                 if masked_filter_epochs is None:
                     masked_filter_epochs = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
                     
                 masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
                 if masked_container.scoring_results_df is None:
-                    masked_container.scoring_results_df = scoring_results
-                    
-        else:
-            ## recompute:
-            print(f'WARN: todo, recompute for missing selected_tbin: {selected_tbin}')
-            ## Compute for self
-            print(f'\tfor epoch_names: {epoch_names}')                
-            # for an_active_t_bin_size in list(set([selected_tbin, a_t_bin_size])):
-            
-            for an_active_t_bin_size in list(set([a_t_bin_size])): # only care about `a_t_bin_size`
-                
-                for a_decoder_name in epoch_names:
-                    decoded_local_epochs_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=an_active_t_bin_size, 
-                                                                                    **_decode_kwargs,
-                                                                                    override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
-                                                                                    epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
-                                                                                )
-                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
-                    masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
-                    
-                    masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
-                    if masked_container.scoring_results_df is None:
-                        masked_container.scoring_results_df = scoring_results
-                    
-                    
-            print(f'done with all decoding.')
-            
-        # for an_active_t_bin_size in list(set([a_t_bin_size])): # only care about `a_t_bin_size`
-            
-        #     for a_decoder_name in epoch_names:
-        #         decoded_local_epochs_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=an_active_t_bin_size, 
-        #                                                                         **_decode_kwargs,
-        #                                                                         override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
-        #                                                                         epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
-        #                                                                     )
-        #         filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
-        #         masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
-                
-        #         masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
-        #         if masked_container.scoring_results_df is None:
-        #             masked_container.scoring_results_df = scoring_results
-                
-                
-        # print(f'done with all decoding.')
+                    masked_container.scoring_results_df = scoring_results    
+                masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
+            ## END for a_decoder_nam....
+        ## for an_active_t_bi...
+                        
+        print(f'done with all decoding.')
         
-
-
-
         ## where the main results are filtered
         masked_container = _subfn_update_internal_results(masked_container=masked_container, selected_tbin_size=selected_tbin)
         
