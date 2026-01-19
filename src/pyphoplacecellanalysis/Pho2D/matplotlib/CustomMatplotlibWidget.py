@@ -127,6 +127,7 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         self.toast = None
         self._init_ToastShowingWidgetMixin()
 
+
     def _buildUI_setup_statusbar(self):
         """ builds a status bar added to the bottom of the non-scrollable view.
         """
