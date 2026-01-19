@@ -25,7 +25,7 @@ from nptyping import NDArray
 import attrs
 import matplotlib as mpl
 import napari
-from neuropy.core.epoch import Epoch, ensure_dataframe
+from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
 from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
 import numpy as np
 import pandas as pd
@@ -922,16 +922,24 @@ class PositionLikePosteriorScoring:
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures
         
-        ## INPUTS: container
 
+        a_masked_filtered_decoded_local_epochs_result: DecodedFilterEpochsResult = deepcopy(decoded_local_epochs_result)
+        a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs) ## convert to epoch_df
+
+        ## INPUTS: container
+        if 'original_epoch_idx' not in ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs).columns:
+            a_masked_filtered_decoded_local_epochs_result.filter_epochs['original_epoch_idx'] = a_masked_filtered_decoded_local_epochs_result.filter_epochs.index.to_numpy().astype(int) ## back up the original indicies if they haven't already been backed up. useful for later inverse mappings
+            
+        a_masked_filtered_decoded_local_epochs_result.filter_epochs.reset_index(drop=True, inplace=True) ## reset the epoch_idx to start
 
         ## INPUTS: flat_p_x_given_n_list
-
-        p_x_given_n_list: List[NDArray] = deepcopy(decoded_local_epochs_result.p_x_given_n_list) # a List[NDArray]
+        # decoded_local_epochs_result.filter_epochs.reset_index(drop=True, inplace=True)
+        
+        p_x_given_n_list: List[NDArray] = deepcopy(a_masked_filtered_decoded_local_epochs_result.p_x_given_n_list) # a List[NDArray]
         # flat_p_x_given_n_list = flatten(p_x_given_n_list)
 
         # epoch_idx_list = [np.array([epoch_idx] * len(t_bin_values)) for epoch_idx, t_bin_values in enumerate(p_x_given_n_list)]
-        epoch_idx_list = [np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)]
+        epoch_idx_list = [np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)]
         
         ## flatten all epochs across time bins
         flat_p_x_given_n_list = np.concatenate(p_x_given_n_list, axis=2) # (41, 63, 1508)
@@ -951,8 +959,8 @@ class PositionLikePosteriorScoring:
             a_scoring_results_df_dict = {}
             for k, v in p_x_given_n_dict.items():
                 a_scoring_results_df = cls.compute_and_plot_posterior_stack(v, x_edges=xbin, y_edges=ybin, should_plot_results=False)
-                a_scoring_results_df['t'] = np.concatenate([v.centers for v in decoded_local_epochs_result.time_bin_containers])
-                a_scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)])
+                a_scoring_results_df['t'] = np.concatenate([v.centers for v in a_masked_filtered_decoded_local_epochs_result.time_bin_containers])
+                a_scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)]) ## these are "modern" epoch indicies
 
                 a_scoring_results_df_dict[k] = a_scoring_results_df
 
@@ -976,7 +984,6 @@ class PositionLikePosteriorScoring:
             scoring_results_df = scoring_results_df[all_out_col_names]
             
         else:
-
             # Choose an epoch to visualize (e.g., the first one)
             scoring_results_df = cls.compute_and_plot_posterior_stack(
                 flat_p_x_given_n_list,
@@ -984,27 +991,25 @@ class PositionLikePosteriorScoring:
                 y_edges=ybin, 
                 should_plot_results=False, 
             )
-
-            scoring_results_df['t'] = np.concatenate([v.centers for v in decoded_local_epochs_result.time_bin_containers])
-            scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins)])
-
+            scoring_results_df['t'] = np.concatenate([v.centers for v in a_masked_filtered_decoded_local_epochs_result.time_bin_containers])
+            scoring_results_df['epoch_idx'] = np.concatenate([np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)]) ## these are "modern" epoch indicies
             scoring_results_df
 
 
         ## FOR MASKING:
         is_position_like_list = []
-        for epoch_idx, a_n_bins in enumerate(decoded_local_epochs_result.nbins):
+        for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins):
+        # for epoch_idx, a_row in enumerate(decoded_local_epochs_result.filter_epochs.itertuples(index=True)):
             curr_epoch_t_bins_is_position_like = scoring_results_df[scoring_results_df['epoch_idx'] == epoch_idx]['is_position_like'].to_numpy()
             is_position_like_list.append(curr_epoch_t_bins_is_position_like)
 
-
-        a_masked_filtered_decoded_local_epochs_result: DecodedFilterEpochsResult = deepcopy(decoded_local_epochs_result)
-
+        ## main masking happens here:
         a_masked_filtered_decoded_local_epochs_result, mask_index_tuple = a_masked_filtered_decoded_local_epochs_result.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(
             is_time_bin_active_list=is_position_like_list,
             masked_bin_fill_mode='dropped',
             # masked_bin_fill_mode='nan_filled'
         )
+        a_masked_filtered_decoded_local_epochs_result.filter_epochs.reset_index(drop=True, inplace=True)
 
 
         ## Finds the epochs containing a at least a minimum number of position-like bins and returns a filtered result object with only those.
@@ -1017,6 +1022,9 @@ class PositionLikePosteriorScoring:
             if not np.all(is_epoch_idx_included):
                 included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
                 a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
+
+        a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_Epoch(ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs)) ## convert to epoch_df
+
 
         return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
 
