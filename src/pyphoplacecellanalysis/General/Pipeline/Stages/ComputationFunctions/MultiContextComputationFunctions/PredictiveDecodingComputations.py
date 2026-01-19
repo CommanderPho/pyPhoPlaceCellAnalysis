@@ -3035,6 +3035,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
+        position_like_kwargs = dict(position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+        
         # from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PeakCounts, SlabResult, PeakPromenenceMetrics, PosteriorPeaksPeakProminence2dResult
 
         # an_epoch_name = 'roam'
@@ -3264,6 +3266,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
         masked_container: Optional[PredictiveDecodingComputationsContainer] = None
+        masked_filter_epochs: Optional[pd.DataFrame] = None
         
         if hasattr(self, 'locality_measures') and (self.locality_measures is not None):
             # epoch_names: List[str] = self.locality_measures.paradigm_epochs_df.label.to_list() # ['roam', 'sprinkle']
@@ -3294,7 +3297,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
                 a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
                 filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, xbin=a_decoder.xbin, ybin=a_decoder.ybin,
-                                                                                                                                            position_like_score_cutoff=0.42, num_min_position_like_t_bins=3, normalization_across_epochs_epoch_names=epoch_names)
+                                                                                                                                            **position_like_kwargs, normalization_across_epochs_epoch_names=epoch_names)
                 directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = filtered_decoded_local_epochs_result.get_result_for_epoch(0) ## get the single epoch, re-assign
             ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoder...
 
@@ -3315,56 +3318,86 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             print(f'using sigma from masked_locality_measures: {sigma}')
 
         _moving_avg_dict, _moving_avg_meas_pos_overlap_dict, _gaussian_volume = masked_predictive_decoding.compute(sigma=sigma) ## updates masked_predictive_decoding.moving_avg_dict, masked_predictive_decoding.moving_avg_meas_pos_overlap_dict
-        masked_container = PredictiveDecodingComputationsContainer(predictive_decoding=masked_predictive_decoding, is_global=True)
+        masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(predictive_decoding=masked_predictive_decoding, is_global=True)
+        if (masked_filter_epochs is not None):
+            masked_container.active_epochs_df = masked_filter_epochs
 
         masked_container.pf1D_Decoder_dict = deepcopy(self.pf1D_Decoder_dict)
         
         _decode_kwargs = {k:kwargs.get(k, None) for k in ['merging_adjacent_max_separation_sec', 'minimum_epoch_duration'] if (kwargs.get(k, None) is not None)}
         if selected_tbin in (self.epochs_decoded_result_cache_dict or {}):
-            masked_container.epochs_decoded_result_cache_dict[selected_tbin] = deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin])
+            # Dict[float, Dict[DecoderName, DecodedFilterEpochsResult]]
+            if selected_tbin not in masked_container.epochs_decoded_result_cache_dict:
+                masked_container.epochs_decoded_result_cache_dict[selected_tbin] = {} # deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin]) ## copy the cached result from the existing object
+                
+            # extant_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = deepcopy(self.epochs_decoded_result_cache_dict[selected_tbin]) ## copy the cached result from the existing object
+            for a_decoder_name, an_extant_result in self.epochs_decoded_result_cache_dict[selected_tbin].items():
+                filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=an_extant_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
+                masked_container.epochs_decoded_result_cache_dict[selected_tbin][a_decoder_name] = filtered_decoded_local_epochs_result
+                
+                if masked_filter_epochs is None:
+                    masked_filter_epochs = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
+                    
+                masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
+                if masked_container.scoring_results_df is None:
+                    masked_container.scoring_results_df = scoring_results
+                    
         else:
             ## recompute:
             print(f'WARN: todo, recompute for missing selected_tbin: {selected_tbin}')
-            # decoded_local_epochs_result, a_decoder = self.decode_epochs_for_posterior_analysis(curr_active_pipeline=curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=selected_tbin, active_epochs_df=active_epochs_df)
-            # print(f'done with all decoding.')
-            # self.active_epochs_df = ensure_dataframe(self.active_epochs_df) # deepcopy(active_epochs_df)
-            # Get the decoders to decode the epochs with higher precision ________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            # decoded_local_epochs_result, a_decoder = self.decode_epochs_for_posterior_analysis(curr_active_pipeline=curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=selected_tbin, active_epochs_df=ensure_dataframe(self.active_epochs_df))
-            
-            # Get the decoders to decode the epochs with higher precision ________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            
-            # ## Compute for self
-            # print(f'\tfor epoch_names: {epoch_names}')                
-            # for an_active_t_bin_size in list(set([selected_tbin, a_t_bin_size])):
-            #     for an_epoch_name in epoch_names:
-            #         decoded_local_epochs_result, a_decoder, active_epochs_df = self.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=an_active_t_bin_size, 
-            #                                                                         **_decode_kwargs,
-            #                                                                         override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
-            #                                                                         epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
-            #                                                                     )
-                    
-            #     ## copy to masked:
-            #     masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size] = deepcopy(self.epochs_decoded_result_cache_dict[an_active_t_bin_size])
-                    
-
             ## Compute for self
             print(f'\tfor epoch_names: {epoch_names}')                
             # for an_active_t_bin_size in list(set([selected_tbin, a_t_bin_size])):
             
             for an_active_t_bin_size in list(set([a_t_bin_size])): # only care about `a_t_bin_size`
                 
-                for an_epoch_name in epoch_names:
-                    decoded_local_epochs_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=an_active_t_bin_size, 
+                for a_decoder_name in epoch_names:
+                    decoded_local_epochs_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=an_active_t_bin_size, 
                                                                                     **_decode_kwargs,
                                                                                     override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
                                                                                     epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
                                                                                 )
+                    filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
+                    masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
+                    
+                    masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
+                    if masked_container.scoring_results_df is None:
+                        masked_container.scoring_results_df = scoring_results
+                    
                     
             print(f'done with all decoding.')
             
+        # for an_active_t_bin_size in list(set([a_t_bin_size])): # only care about `a_t_bin_size`
+            
+        #     for a_decoder_name in epoch_names:
+        #         decoded_local_epochs_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=an_active_t_bin_size, 
+        #                                                                         **_decode_kwargs,
+        #                                                                         override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
+        #                                                                         epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
+        #                                                                     )
+        #         filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, **position_like_kwargs)
+        #         masked_container.epochs_decoded_result_cache_dict[an_active_t_bin_size][a_decoder_name] = filtered_decoded_local_epochs_result
+                
+        #         masked_container.active_epochs_df = ensure_dataframe(filtered_decoded_local_epochs_result.filter_epochs)
+        #         if masked_container.scoring_results_df is None:
+        #             masked_container.scoring_results_df = scoring_results
+                
+                
+        # print(f'done with all decoding.')
+        
+
+
+
         ## where the main results are filtered
         masked_container = _subfn_update_internal_results(masked_container=masked_container, selected_tbin_size=selected_tbin)
         
+        ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
+        # Build epoch_idx -> (actual_start, actual_stop) mapping once, reuse for filtering and recomputation
+        original_active_epochs_df: pd.DataFrame = ensure_dataframe(self.active_epochs_df) if (hasattr(self, 'active_epochs_df') and (self.active_epochs_df is not None)) else None
+        masked_container, filter_epochs, epoch_idx_to_actual_times = _subfn_filter_masked_container_epochs(masked_container=masked_container, original_active_epochs_df=original_active_epochs_df)
+
+
         # ## REQUIRED OUTPUTS: masked_container
         # assert masked_container is not None
 
@@ -3386,22 +3419,22 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # raise NotImplementedError(f'Peak prominence analysis is intentionally disabled in build_masked_container (enable explicitly if needed).')
 
             print(f'\tfor epoch_names: {epoch_names}')
-            for an_epoch_name in epoch_names:
-                if an_epoch_name not in masked_container.debug_computed_dict:
-                    masked_container.debug_computed_dict[an_epoch_name] = {}
+            for a_decoder_name in epoch_names:
+                if a_decoder_name not in masked_container.debug_computed_dict:
+                    masked_container.debug_computed_dict[a_decoder_name] = {}
 
                 _comp_result_key: str = 'peak_prom_analysis'
-                if _comp_result_key not in masked_container.debug_computed_dict[an_epoch_name]:
-                    masked_container.debug_computed_dict[an_epoch_name][_comp_result_key] = {}
+                if _comp_result_key not in masked_container.debug_computed_dict[a_decoder_name]:
+                    masked_container.debug_computed_dict[a_decoder_name][_comp_result_key] = {}
 
-                a_decoded_local_epochs_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None)
-                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(an_epoch_name, None)
+                a_decoded_local_epochs_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(a_decoder_name, None)
+                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(a_decoder_name, None)
                 # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3) ## this seems to be done previously in `_subfn_update_internal_results`, but that's okay
 
                 step: float = PeakPromenence.compute_optimal_step_size(a_masked_result.p_x_given_n_list, resolution_factor=500.0)
                 print(f'\tstep: {step}')
-                masked_container.debug_computed_dict[an_epoch_name][_comp_result_key]['step'] = step
+                masked_container.debug_computed_dict[a_decoder_name][_comp_result_key]['step'] = step
                 
                 decoded_epoch_t_bins_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(p_x_given_n_list=a_masked_result.p_x_given_n_list, 
                     xbin_centers=masked_container.predictive_decoding.xbin_centers, 
@@ -3412,7 +3445,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                     should_use_faster_compute_single_slab_implementation=False,
                     min_considered_promenence=1e-11,
                 )
-                masked_container.debug_computed_dict[an_epoch_name][_comp_result_key]['decoded_epoch_t_bins_promenence_result_obj'] = decoded_epoch_t_bins_promenence_result_obj
+                masked_container.debug_computed_dict[a_decoder_name][_comp_result_key]['decoded_epoch_t_bins_promenence_result_obj'] = decoded_epoch_t_bins_promenence_result_obj
                 print(f'\tcomputation done.')
 
 
@@ -3429,42 +3462,40 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 #     masked_container.epochs_decoded_result_cache_dict[a_t_bin_size] = deepcopy(self.epochs_decoded_result_cache_dict[a_t_bin_size]) ## copy of self's result
 
 
-            for an_epoch_name in epoch_names:
-                if an_epoch_name not in masked_container.debug_computed_dict:
-                    masked_container.debug_computed_dict[an_epoch_name] = {}
+            for a_decoder_name in epoch_names:
+                if a_decoder_name not in masked_container.debug_computed_dict:
+                    masked_container.debug_computed_dict[a_decoder_name] = {}
 
                 assert a_t_bin_size in masked_container.epochs_decoded_result_cache_dict, f'we created it above!!'
-                a_masked_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(an_epoch_name, None) ## already masked in previously in `_subfn_update_internal_results`
-                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(an_epoch_name, None)
+                a_masked_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size].get(a_decoder_name, None) ## already masked in previously in `_subfn_update_internal_results`
+                a_decoder: BayesianPlacemapPositionDecoder = masked_container.pf1D_Decoder_dict.get(a_decoder_name, None)
                 
                 if a_masked_result is None:
-                    a_masked_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=a_t_bin_size, 
+                    a_masked_result, a_decoder, active_epochs_df = masked_container.update_active_epochs_and_decode_posteriors_if_needed(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=a_t_bin_size, 
                                                                 **_decode_kwargs,
                                                                 override_included_analysis_epochs=None, ## because it will use self.active_epochs if it exists.
                                                                 epoch_id_key_name='non_local_PBE_non_moving_epoch', force_recompute_epoch_df_columns=False,
                                                             )
                     
                 # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-                _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=a_t_bin_size, enable_updating_instance_states=True, 
+                _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=a_t_bin_size, enable_updating_instance_states=True, 
                                                                             override_included_analysis_epochs=ensure_dataframe(a_masked_result.filter_epochs), ## is this right?
                                                                              **kwargs,
                                                                          )
                 # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _out
                 epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                 # masked_container.debug_computed_dict[an_epoch_name] = {'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict}
-                masked_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
+                masked_container.debug_computed_dict[a_decoder_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
 
 
             ## END for an_epoch_name in epoch_names...
             
 
-        ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
-        # Build epoch_idx -> (actual_start, actual_stop) mapping once, reuse for filtering and recomputation
-
-
-        original_active_epochs_df: pd.DataFrame = ensure_dataframe(self.active_epochs_df) if (hasattr(self, 'active_epochs_df') and self.active_epochs_df is not None) else None
-        masked_container, filter_epochs, epoch_idx_to_actual_times = _subfn_filter_masked_container_epochs(masked_container=masked_container, original_active_epochs_df=original_active_epochs_df)
+        # ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
+        # # Build epoch_idx -> (actual_start, actual_stop) mapping once, reuse for filtering and recomputation
+        # original_active_epochs_df: pd.DataFrame = ensure_dataframe(self.active_epochs_df) if (hasattr(self, 'active_epochs_df') and self.active_epochs_df is not None) else None
+        # masked_container, filter_epochs, epoch_idx_to_actual_times = _subfn_filter_masked_container_epochs(masked_container=masked_container, original_active_epochs_df=original_active_epochs_df)
 
 
         return masked_container
