@@ -4509,15 +4509,24 @@ class MaskDataSource:
     filter_epochs: pd.DataFrame = field()
     p_x_given_n_list: List = field() #  = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
 
+    xbin: NDArray = field(default=None)
+    ybin: NDArray = field(default=None)
+    xbin_centers: NDArray = field(default=None)
+    ybin_centers: NDArray = field(default=None)
+
+    curr_position_df: pd.DataFrame = field(default=None)
+
 
     @classmethod
-    def init_from_list_of_MatchingPastFuturePositionsResult(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], filter_epochs: pd.DataFrame) -> "MaskDataSource":
+    def init_from_list_of_MatchingPastFuturePositionsResult(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], filter_epochs: pd.DataFrame, **kwargs) -> "MaskDataSource":
         a_new_ds = cls(
                      matching_pos_dfs_list=[v.relevant_positions_df for v in epoch_flat_mask_future_past_result],
                      matching_pos_epochs_dfs_list=[v.matching_pos_epochs_df for v in epoch_flat_mask_future_past_result],
                epoch_high_prob_pos_masks=[v.epoch_high_prob_mask for v in epoch_flat_mask_future_past_result], epoch_t_bins_high_prob_pos_masks=[v.epoch_t_bins_high_prob_pos_mask for v in epoch_flat_mask_future_past_result],
 			   filter_epochs=filter_epochs, p_x_given_n_list=[a_single_epoch_result.decoded_epoch_result.p_x_given_n for a_single_epoch_result in epoch_flat_mask_future_past_result],
+               **kwargs,
         )
+        
         return a_new_ds
         
 
@@ -4534,7 +4543,6 @@ class PredictiveDecodingDisplayWidget:
 
                 self.decoded_result 
 
-
     
     Usage:
     
@@ -4543,6 +4551,35 @@ class PredictiveDecodingDisplayWidget:
         a_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_container(container=container, decoding_time_bin_size=0.025, an_epoch_name='roam')
         a_widget
         
+        
+        
+    Usage 2:
+        
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MatchingPastFuturePositionsResult
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MaskDataSource
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
+
+        a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
+        a_flat_matching_ds_widget: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_datasource(datasource=a_flat_matching_results_list_ds, curr_position_df=container.decoding_locality.pos_df,
+                                                                                                        pf_decoder=a_decoder, decoded_result=a_decoded_result)
+        a_flat_matching_ds_widget
+
+
+    Usage 3:
+    
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MaskDataSource
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingDisplayWidget
+
+        a_new_ds: MaskDataSource = MaskDataSource(matching_pos_dfs_list=matching_pos_dfs_list, matching_pos_epochs_dfs_list=matching_pos_epochs_dfs_list,
+                    epoch_high_prob_pos_masks=epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks=epoch_t_bins_high_prob_pos_masks,
+                    filter_epochs=a_decoded_filter_epochs_df, p_x_given_n_list=a_decoded_result.p_x_given_n_list,
+        )
+
+        a_widget_ds: PredictiveDecodingDisplayWidget = PredictiveDecodingDisplayWidget.init_from_datasource(datasource=a_new_ds, curr_position_df=container.decoding_locality.pos_df,
+                                                                                                        pf_decoder=a_decoder, decoded_result=a_decoded_result)
+        a_widget_ds
+
+
         
         
     ## FILTERED VERSION
@@ -4558,10 +4595,10 @@ class PredictiveDecodingDisplayWidget:
 
     result_datasource: Optional[MaskDataSource] = field(default=None)
         
-    xbin: np.ndarray = field(default=None)
-    ybin: np.ndarray = field(default=None)
-    xbin_centers: np.ndarray = field(default=None)
-    ybin_centers: np.ndarray = field(default=None)
+    xbin: NDArray = field(default=None)
+    ybin: NDArray = field(default=None)
+    xbin_centers: NDArray = field(default=None)
+    ybin_centers: NDArray = field(default=None)
     curr_position_df: pd.DataFrame = field(default=None)
     
     pf1D_Decoder: BasePositionDecoder = field(default=None)
@@ -5414,7 +5451,6 @@ class PredictiveDecodingDisplayWidget:
                                               xbin_centers=xbin_centers, ybin_centers=ybin_centers,
                                             #   posterior_should_perform_reshape=True, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
                                                posterior_should_perform_reshape=False, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
-                                              
                                               )
         posterior_main_subfn_kwargs = dict(posterior_alpha=0.6, posterior_cmap='viridis', posterior_masking_value=None) # 1e-12
         posterior_overlay_subfn_kwargs = dict(overlay_alpha=0.75, overlay_cmap='Greens', overlay_masking_value=1e-3)
