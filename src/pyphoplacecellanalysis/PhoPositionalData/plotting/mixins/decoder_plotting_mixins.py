@@ -2666,6 +2666,81 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         return artists_list, ordinate_first_image_extent, plots_data
 
 
+    @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'grid', 'xbin', 'ybin'], input_requires=[], output_provides=[], uses=[], used_by=['plot_epoch', 'plot_decoded_trajectories_2d'], creation_date='2025-01-XX XX:XX', related_items=[])
+    @classmethod
+    def _helper_add_bin_grid_lines(cls, an_ax, xbin=None, ybin=None, xbin_centers=None, ybin_centers=None, rotate_to_vertical: bool=False, grid_kwargs: Optional[Dict[str, Any]]=None):
+        """Adds grid lines at xbin/ybin edge positions to a matplotlib axes.
+        
+        Arguments:
+            an_ax: the matplotlib axes to add grid lines to.
+            xbin: array of x bin edges. If None, will try to infer from xbin_centers.
+            ybin: array of y bin edges. If None, will try to infer from ybin_centers.
+            xbin_centers: array of x bin centers (used to infer edges if xbin is None).
+            ybin_centers: array of y bin centers (used to infer edges if ybin is None).
+            rotate_to_vertical: if True, swap x and y axes.
+            grid_kwargs: optional dictionary of kwargs to pass to axvline/axhline (e.g., {'color': 'gray', 'linestyle': '--', 'linewidth': 0.5, 'alpha': 0.3}).
+        
+        Returns:
+            grid_lines: list of matplotlib Line2D objects representing the grid lines.
+        """
+        if grid_kwargs is None:
+            grid_kwargs = {'color': 'gray', 'linestyle': '--', 'linewidth': 0.1, 'alpha': 0.3}
+        
+        grid_lines = []
+        
+        # Determine x bin edges
+        if xbin is not None:
+            x_edges = np.asarray(xbin)
+        elif xbin_centers is not None:
+            x_centers = np.asarray(xbin_centers)
+            # Infer edges from centers (assuming uniform spacing)
+            if len(x_centers) > 1:
+                bin_width = x_centers[1] - x_centers[0]
+                x_edges = np.concatenate([x_centers - bin_width/2, [x_centers[-1] + bin_width/2]])
+            else:
+                x_edges = None
+        else:
+            x_edges = None
+        
+        # Determine y bin edges
+        if ybin is not None:
+            y_edges = np.asarray(ybin)
+        elif ybin_centers is not None:
+            y_centers = np.asarray(ybin_centers)
+            # Infer edges from centers (assuming uniform spacing)
+            if len(y_centers) > 1:
+                bin_width = y_centers[1] - y_centers[0]
+                y_edges = np.concatenate([y_centers - bin_width/2, [y_centers[-1] + bin_width/2]])
+            else:
+                y_edges = None
+        else:
+            y_edges = None
+        
+        # Add grid lines
+        if not rotate_to_vertical:
+            # Normal orientation: x is horizontal, y is vertical
+            if x_edges is not None:
+                for x_edge in x_edges:
+                    line = an_ax.axvline(x=x_edge, **grid_kwargs)
+                    grid_lines.append(line)
+            if y_edges is not None:
+                for y_edge in y_edges:
+                    line = an_ax.axhline(y=y_edge, **grid_kwargs)
+                    grid_lines.append(line)
+        else:
+            # Rotated orientation: x is vertical, y is horizontal
+            if x_edges is not None:
+                for x_edge in x_edges:
+                    line = an_ax.axhline(y=x_edge, **grid_kwargs)
+                    grid_lines.append(line)
+            if y_edges is not None:
+                for y_edge in y_edges:
+                    line = an_ax.axvline(x=y_edge, **grid_kwargs)
+                    grid_lines.append(line)
+        
+        return grid_lines
+
+
     # ==================================================================================================================== #
     # Specific Data Extraction and plot wrapping functions                                                                 #
     # ==================================================================================================================== #

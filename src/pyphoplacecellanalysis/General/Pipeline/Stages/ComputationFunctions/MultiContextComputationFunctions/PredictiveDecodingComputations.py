@@ -5193,6 +5193,7 @@ class PredictiveDecodingDisplayWidget:
             for row in range(axs.shape[0]):
                 for col in range(axs.shape[1]):
                     if axs[row, col] is not None:
+                        a_grid_lines = a_decoded_traj_plotter._helper_add_bin_grid_lines(an_ax=axs[row, col], xbin=self.xbin, ybin=self.ybin)
                         axs[row, col].set_visible(True)
             
             # Then hide unused axes (where epoch_id == -1)
@@ -5270,7 +5271,7 @@ class PredictiveDecodingDisplayWidget:
         """Update decoded posterior display."""
         
         # Use _helper_add_heatmap for consistent display with past/future panes
-
+        import matplotlib.ticker as ticker
         
 
         def _subfn_plot_posterior_with_potential_overlay(ax, posterior_2d: np.ndarray, posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=None,
@@ -5282,6 +5283,37 @@ class PredictiveDecodingDisplayWidget:
             
             _main_out, _overlay_out = _subfn_plot_posterior_with_potential_overlay(
             """
+            # 1. Force grid/ticks behind data elements
+            ax.set_axisbelow('line')
+
+            # # 1. Set the locators (where the ticks/grid lines happen)
+            # ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0)) # x-grid every 0.5
+            # ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0)) # y-grid every 1.0
+
+            # 3. Apply those positions
+            ax.set_xticks(xbin)
+            ax.set_yticks(ybin)
+
+            # # Turn on minor ticks
+            # ax.minorticks_on()
+
+            ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='gray') # Customize major grid
+            # ax.grid(which='minor', axis='both', linestyle=':', linewidth='0.5', color='gray') # # Customize minor grid
+
+            # 4. Hide ticks and labels, but KEEP the grid
+            # 'length=0' is another way to hide ticks, but turning them off is more explicit.
+            ax.tick_params(
+                axis='both',       # Apply to both x and y axes
+                which='both',      # Apply to both major and minor ticks
+                bottom=False,      # Turn off the tick marks on the bottom
+                top=False,         # Turn off the tick marks on the top
+                left=False,        # Turn off the tick marks on the left
+                right=False,       # Turn off the tick marks on the right
+                labelbottom=False, # Turn off the text labels on the bottom
+                labelleft=False    # Turn off the text labels on the left
+            )
+
+
             # Plot main posterior using _helper_add_heatmap
             _main_out = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
                 an_ax=ax,
@@ -5309,20 +5341,19 @@ class PredictiveDecodingDisplayWidget:
                     time_cmap=overlay_cmap,
                     should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=overlay_alpha,
                 )
-                heatmaps_overlay_main, _, _ = _overlay_out
+                # heatmaps_overlay_main, _, _ = _overlay_out
                 
-
-                _overlay_out_countours = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours(
-                    an_ax=ax,
-                    xbin_centers=xbin_centers, ybin_centers=ybin_centers,
-                    a_p_x_given_n=overlay_posterior_2d,
-                    a_time_bin_centers=None,
-                    rotate_to_vertical=posterior_should_use_flipped,
-                    custom_image_extent=extent,
-                    time_cmap=overlay_cmap,
-                    should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=0.9,
-                    contour_level_fractions=[0.25, 0.5, 0.9], smoothing_sigma=1,
-                )
+                # _overlay_out_countours = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours(
+                #     an_ax=ax,
+                #     xbin_centers=xbin_centers, ybin_centers=ybin_centers,
+                #     a_p_x_given_n=overlay_posterior_2d,
+                #     a_time_bin_centers=None,
+                #     rotate_to_vertical=posterior_should_use_flipped,
+                #     custom_image_extent=extent,
+                #     time_cmap=overlay_cmap,
+                #     should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=0.9,
+                #     contour_level_fractions=[0.25, 0.5, 0.9], smoothing_sigma=1,
+                # )
                 # heatmaps_overlay_main_countours,  _, _ = _overlay_out_countours
                 
                 # _overlay_out = (heatmaps_overlay_main, heatmaps_overlay_main_countours)
@@ -5352,6 +5383,9 @@ class PredictiveDecodingDisplayWidget:
         assert posterior_widget is not None
         ax_main = posterior_widget.plots.axes_dict['main']
         ax_tiny_dict = posterior_widget.plots.axes_dict['ax_tiny_dict']
+
+        xbin = self.xbin # _centers if self.xbin_centers is not None else self.xbin
+        ybin = self.ybin # self.ybin_centers if self.ybin_centers is not None else self.ybin
         
         xbin_centers = self.xbin_centers if self.xbin_centers is not None else self.xbin
         ybin_centers = self.ybin_centers if self.ybin_centers is not None else self.ybin
@@ -5376,12 +5410,13 @@ class PredictiveDecodingDisplayWidget:
         # posterior_should_use_flipped: bool = self.should_use_flipped_images
 
         posterior_should_use_flipped: bool = False
-        posterior_common_subfn_kwargs = dict(xbin_centers=xbin_centers, ybin_centers=ybin_centers,
+        posterior_common_subfn_kwargs = dict(xbin=xbin, ybin=ybin,
+                                              xbin_centers=xbin_centers, ybin_centers=ybin_centers,
                                             #   posterior_should_perform_reshape=True, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
                                                posterior_should_perform_reshape=False, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
                                               
                                               )
-        posterior_main_subfn_kwargs = dict(posterior_alpha=0.5, posterior_cmap='viridis', posterior_masking_value=None) # 1e-12
+        posterior_main_subfn_kwargs = dict(posterior_alpha=0.6, posterior_cmap='viridis', posterior_masking_value=None) # 1e-12
         posterior_overlay_subfn_kwargs = dict(overlay_alpha=0.75, overlay_cmap='Greens', overlay_masking_value=1e-3)
 
         posterior_subfn_all_kwargs = dict(**posterior_common_subfn_kwargs, **posterior_main_subfn_kwargs, **posterior_overlay_subfn_kwargs)       
@@ -5442,8 +5477,8 @@ class PredictiveDecodingDisplayWidget:
                         a_heatmap.set_clim(vmin=vmin_masks_shared, vmax=vmax_masks_shared)
 
 
-                ax_tiny.set_xticks([])
-                ax_tiny.set_yticks([])
+                # ax_tiny.set_xticks([])
+                # ax_tiny.set_yticks([])
                 ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
                 ax_tiny.set_visible(True)
             else:
