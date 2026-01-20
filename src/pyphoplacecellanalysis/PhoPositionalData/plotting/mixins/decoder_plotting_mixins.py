@@ -157,7 +157,7 @@ class OptimizedViewportRenderer:
         artists, extent = renderer.render_viewport(viewport, posterior_masking_value=0.0025)
     """
     results2D: "DecodingResultND" = field()
-    active_ax = field()
+    active_ax: Any = field()
     base_frame_divide_bin_size: float = field(default=0.5)
     rotate_to_vertical: bool = field(default=True)
     active_epoch_name: str = field(default='global')
@@ -551,9 +551,6 @@ class OptimizedViewportRenderer:
             traceback.print_exc()
             return None
 
-
-
-    
     def render_viewport(self, viewport: Viewport, posterior_masking_value: float = 0.0025,
                        debug_print: bool = False) -> Tuple[Dict[str, Any], Tuple[float, float, float, float]]:
         """
@@ -737,29 +734,6 @@ class OptimizedViewportRenderer:
             'cache_keys': list(self._thumbnail_cache.keys())[:10]  # First 10 keys
         }
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @metadata_attributes(short_name=None, tags=['OLD', '2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
 @define(slots=False, eq=False)
@@ -2413,6 +2387,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
         is_2D_dt: bool = (np.ndim(posterior) >= 3)
         is_2D: bool = (np.ndim(posterior) == 2)
+        is_1D: bool = (np.ndim(posterior) < 2)
 
         # Add time dimension if posterior is 2D (spatial 2D without time dimension)
         if is_2D and (not is_2D_dt):
@@ -2430,7 +2405,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         x_values = deepcopy(xbin_centers)
         extra_dict = {'is_2D': is_2D}
         
-        if not is_2D:
+        # if not is_2D:
+        if is_1D:
             # 1D: Build fake y-axis values from current axes limits.
             y_min, y_max = an_ax.get_ylim()
             fake_y_width = (y_max - y_min)
@@ -2500,7 +2476,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         heatmaps = []
         # For simplicity, we assume non-single-time-bin mode (as asserted in the calling function).
-        if (not is_2D):
+        # if (not is_2D):
+        if is_1D:
             a_heatmap = an_ax.imshow(masked_posterior, aspect='auto', cmap=time_cmap, alpha=full_posterior_opacity,
                                        extent=ordinate_first_image_extent, origin='lower', interpolation='none')
             heatmaps.append(a_heatmap)
