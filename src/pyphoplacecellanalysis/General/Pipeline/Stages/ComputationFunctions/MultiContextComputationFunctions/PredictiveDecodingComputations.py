@@ -3510,7 +3510,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 print(f'\tlen(override_included_analysis_epochs): {len(override_included_analysis_epochs)}, \n\toverride_included_analysis_epochs: {override_included_analysis_epochs}')
                 
                 # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-                _out = masked_container.compute_future_and_past_analysis(curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=a_t_bin_size, enable_updating_instance_states=True, 
+                _out = masked_container.compute_future_and_past_analysis(an_epoch_name=a_decoder_name, decoding_time_bin_size=a_t_bin_size, enable_updating_instance_states=True, 
                                                                             override_included_analysis_epochs=override_included_analysis_epochs, ## is this right?
                                                                              **kwargs,
                                                                          )
@@ -4366,8 +4366,8 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     if an_epoch_name not in a_container.debug_computed_dict:
                         a_container.debug_computed_dict[an_epoch_name] = {}
                     # active_epochs_df
-                    # _out = a_container.compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name)
-                    _out = a_container.compute_future_and_past_analysis(owning_pipeline_reference, an_epoch_name=an_epoch_name, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
+                    # _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name)
+                    _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name, decoding_time_bin_size=fine_time_bin_size, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
                     epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out ## too many to unpack?
                     a_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:

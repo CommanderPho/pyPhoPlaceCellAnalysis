@@ -2671,6 +2671,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     def _helper_add_bin_grid_lines(cls, an_ax, xbin=None, ybin=None, xbin_centers=None, ybin_centers=None, rotate_to_vertical: bool=False, grid_kwargs: Optional[Dict[str, Any]]=None):
         """Adds grid lines at xbin/ybin edge positions to a matplotlib axes.
         
+        Uses matplotlib's built-in grid() function with custom tick positions for efficiency.
+        This is much more efficient than creating individual axvline/axhline calls, especially
+        when called on many axes or with many bins.
+        
         Arguments:
             an_ax: the matplotlib axes to add grid lines to.
             xbin: array of x bin edges. If None, will try to infer from xbin_centers.
@@ -2678,15 +2682,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             xbin_centers: array of x bin centers (used to infer edges if xbin is None).
             ybin_centers: array of y bin centers (used to infer edges if ybin is None).
             rotate_to_vertical: if True, swap x and y axes.
-            grid_kwargs: optional dictionary of kwargs to pass to axvline/axhline (e.g., {'color': 'gray', 'linestyle': '--', 'linewidth': 0.5, 'alpha': 0.3}).
+            grid_kwargs: optional dictionary of kwargs to pass to grid() (e.g., {'color': 'gray', 'linestyle': '--', 'linewidth': 0.5, 'alpha': 0.3}).
         
         Returns:
-            grid_lines: list of matplotlib Line2D objects representing the grid lines.
+            grid_lines: reference to the grid object (for compatibility, though grid() doesn't return individual lines).
         """
         if grid_kwargs is None:
             grid_kwargs = {'color': 'gray', 'linestyle': '--', 'linewidth': 0.1, 'alpha': 0.3}
-        
-        grid_lines = []
         
         # Determine x bin edges
         if xbin is not None:
@@ -2716,29 +2718,59 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         else:
             y_edges = None
         
-        # Add grid lines
+
+
+        # 1. Force grid/ticks behind data elements
+        an_ax.set_axisbelow('line')
+
+        # Add grid lines using matplotlib's efficient grid() function with minor ticks
+        # This is much more efficient than creating individual line artists
         if not rotate_to_vertical:
             # Normal orientation: x is horizontal, y is vertical
             if x_edges is not None:
-                for x_edge in x_edges:
-                    line = an_ax.axvline(x=x_edge, **grid_kwargs)
-                    grid_lines.append(line)
+                an_ax.set_xticks(x_edges, minor=True)
             if y_edges is not None:
-                for y_edge in y_edges:
-                    line = an_ax.axhline(y=y_edge, **grid_kwargs)
-                    grid_lines.append(line)
+                an_ax.set_yticks(y_edges, minor=True)
         else:
             # Rotated orientation: x is vertical, y is horizontal
             if x_edges is not None:
-                for x_edge in x_edges:
-                    line = an_ax.axhline(y=x_edge, **grid_kwargs)
-                    grid_lines.append(line)
+                an_ax.set_yticks(x_edges, minor=True)
             if y_edges is not None:
-                for y_edge in y_edges:
-                    line = an_ax.axvline(x=y_edge, **grid_kwargs)
-                    grid_lines.append(line)
+                an_ax.set_xticks(y_edges, minor=True)
         
-        return grid_lines
+        # Enable grid on minor ticks only (doesn't interfere with major ticks/labels)
+        an_ax.grid(True, which='minor', **grid_kwargs)
+
+        # # 1. Set the locators (where the ticks/grid lines happen)
+        # ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0)) # x-grid every 0.5
+        # ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0)) # y-grid every 1.0
+
+        # # 3. Apply those positions
+        # an_ax.set_xticks(xbin)
+        # an_ax.set_yticks(ybin)
+
+        # # Turn on minor ticks
+        # ax.minorticks_on()
+
+        # an_ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='gray') # Customize major grid
+        # ax.grid(which='minor', axis='both', linestyle=':', linewidth='0.5', color='gray') # # Customize minor grid
+
+        # 4. Hide ticks and labels, but KEEP the grid
+        # 'length=0' is another way to hide ticks, but turning them off is more explicit.
+        an_ax.tick_params(
+            axis='both',       # Apply to both x and y axes
+            # which='both',      # Apply to both major and minor ticks
+            which='both',      # Apply to both major and minor ticks
+            bottom=False,      # Turn off the tick marks on the bottom
+            top=False,         # Turn off the tick marks on the top
+            left=False,        # Turn off the tick marks on the left
+            right=False,       # Turn off the tick marks on the right
+            labelbottom=False, # Turn off the text labels on the bottom
+            labelleft=False    # Turn off the text labels on the left
+        )
+
+        
+        return an_ax  # Return axes for compatibility
 
 
     # ==================================================================================================================== #
