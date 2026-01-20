@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
-from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
 
@@ -87,6 +86,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
+        from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 
         def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
             """ captures debug_print 
