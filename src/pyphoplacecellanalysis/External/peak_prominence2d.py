@@ -1921,9 +1921,8 @@ class PeakPromenence:
                                         (ybin_centers[:-1] + ybin_centers[1:]) / 2.0,
                                         [ybin_centers[-1] + (ybin_centers[-1] - ybin_centers[-2]) / 2.0]))
             else:
-                assert len(xbin) == len(xbin_centers) - 1
-                assert len(ybin) == len(ybin_centers) - 1
-
+                assert (len(xbin) - 1) == len(xbin_centers)
+                assert (len(ybin) - 1) == len(ybin_centers)
 
 
             # Build list of slabs (epoch_idx, t_idx, slab) to process

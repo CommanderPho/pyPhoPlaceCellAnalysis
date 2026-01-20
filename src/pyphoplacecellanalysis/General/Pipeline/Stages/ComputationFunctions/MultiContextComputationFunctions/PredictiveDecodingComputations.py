@@ -502,10 +502,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         paradigm_epochs_df = deepcopy(curr_active_pipeline.sess.epochs.to_dataframe())
         paradigm_epochs_df = paradigm_epochs_df.epochs.label_slice(epoch_names)
 
-        _obj = cls(time_window_centers=time_window_centers, pos_df=deepcopy(pos_df),
+        _obj = cls(time_window_centers=time_window_centers, pos_df=pos_df,
                    xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
                    xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
-                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=deepcopy(p_x_given_n),
+                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=p_x_given_n,
                    paradigm_epochs_df=paradigm_epochs_df, epoch_names=epoch_names,
                    sigma=sigma)
         return _obj
