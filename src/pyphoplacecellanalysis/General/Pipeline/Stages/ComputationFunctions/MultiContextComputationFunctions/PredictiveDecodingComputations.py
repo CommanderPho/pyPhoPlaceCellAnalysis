@@ -4837,7 +4837,7 @@ class PredictiveDecodingDisplayWidget:
         }
 
 
-    def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False, should_use_flipped_images: Optional[bool]=None) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
+    def _get_posterior_data(self, an_epoch_idx: int, get_high_prob_mask_instead: bool=False, should_use_flipped_images: Optional[bool]=None, max_num_t_bins_to_get: int = 10) -> Tuple[np.ndarray, Optional[List[np.ndarray]], int]:
         """Extract posterior data for epoch.
 
         
@@ -4872,24 +4872,42 @@ class PredictiveDecodingDisplayWidget:
         num_time_bins_to_show: int = 0
         
         # epoch_t_bins_high_prob_pos_masks
-        epoch_t_bins_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_t_bins_high_prob_pos_masks', None)
-        if (epoch_t_bins_high_prob_pos_masks is not None): # self.disable_showing_epoch_high_prob_pos_masks
-            print(f'using high_prob mask version from .epoch_t_bins_high_prob_pos_masks!')
-            time_bin_posteriors = epoch_t_bins_high_prob_pos_masks[an_epoch_idx]
-            if len(time_bin_posteriors) > 0:
-                num_time_bins = time_bin_posteriors.shape[2]
-                num_time_bins_to_show = min(10, num_time_bins)
-                time_bin_posteriors = [time_bin_posteriors[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+        if get_high_prob_mask_instead:
+            epoch_t_bins_high_prob_pos_masks = getattr(self.container.predictive_decoding, 'epoch_t_bins_high_prob_pos_masks', None)
+            if (epoch_t_bins_high_prob_pos_masks is not None): # self.disable_showing_epoch_high_prob_pos_masks
+                print(f'using high_prob mask version from .epoch_t_bins_high_prob_pos_masks!')
+                time_bin_posteriors = epoch_t_bins_high_prob_pos_masks[an_epoch_idx]
+                if len(time_bin_posteriors) > 0:
+                    num_time_bins: int = time_bin_posteriors.shape[2]
+                    num_time_bins_to_show: int = min(max_num_t_bins_to_get, num_time_bins)
+                    time_bin_posteriors = [time_bin_posteriors[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+                else:
+                    print(f'could not get time bins from p_x_given_n (raw posterior).')
+                    num_time_bins_to_show = 0
+                    time_bin_posteriors = []
             else:
-                num_time_bins_to_show = 0
-                time_bin_posteriors = []      
+                should_get_posterior = True
+                                
 
         else:
             ## Use raw posteriors:
+            should_get_posterior = True
+            # if p_x_given_n is not None:
+            #     num_time_bins = p_x_given_n.shape[2]
+            #     num_time_bins_to_show = min(max_num_t_bins_to_get, num_time_bins)
+            #     time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+
+
+        if should_get_posterior:
+            ## Use raw posteriors:
             if p_x_given_n is not None:
                 num_time_bins = p_x_given_n.shape[2]
-                num_time_bins_to_show = min(10, num_time_bins)
+                num_time_bins_to_show = min(max_num_t_bins_to_get, num_time_bins)
                 time_bin_posteriors = [p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins_to_show)]
+            else:
+                print(f'could not get time bins from p_x_given_n (raw posterior).')
+                num_time_bins_to_show = 0
+                time_bin_posteriors = []
 
 
         if not should_use_flipped_images:
@@ -5199,7 +5217,7 @@ class PredictiveDecodingDisplayWidget:
             
             if is_valid_time_bin_idx:
                 _main_out_tiny, _overlay_out_tiny = _subfn_plot_posterior_with_potential_overlay(ax=ax_tiny, posterior_2d=time_bin_posteriors[t_bin_idx], overlay_posterior_2d=time_bin_masks[t_bin_idx], 
-                                                                                                    **posterior_subfn_all_kwargs, time_cmap='viridis',
+                                                                                                    **posterior_subfn_all_kwargs, # time_cmap='viridis',
                                                                                                     )
                 heatmaps_tiny, image_extent_tiny, plots_data_tiny = _main_out_tiny
                 heatmaps_overlay_tiny, _, _ = _overlay_out_tiny
