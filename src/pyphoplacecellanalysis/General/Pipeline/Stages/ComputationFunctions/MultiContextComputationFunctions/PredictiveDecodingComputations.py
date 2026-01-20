@@ -2821,6 +2821,11 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             curr_epoch_tbin_indicies = reverse_flattened_time_bin_indicies_list[i]
             n_epoch_time_bins = curr_epoch_p_x_given_n.shape[-1]  # Number of time bins for this epoch
             epoch_data_list.append((i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins, a_decoded_epoch_result))
+
+        # Decide whether to run in parallel or serial
+        n_tasks: int = n_total_epochs
+        n_cpus: int = os.cpu_count() or 1
+        use_parallel: bool = use_parallel and (n_tasks > 1) and (n_cpus > 1)
         
         # Process epochs in parallel or sequentially
         if use_parallel and n_total_epochs > 1:
@@ -4274,16 +4279,6 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             
             print(f'[PredictiveDecoding] Calling init_from_decode_result...')
 
-            # masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
-            #     spikes_df=spikes_df,
-            #     min_num_spikes_per_bin_to_be_considered_active=5,
-            #     min_num_unique_active_neurons_per_time_bin=1,
-            #     masked_bin_fill_mode='dropped',
-            #     # masked_bin_fill_mode='nan_filled'
-            # )
-            # masked_result
-
-
             #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
             ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
             ## INPUTS: spikes_df
@@ -4517,7 +4512,9 @@ class MaskDataSource:
 
     @classmethod
     def init_from_list_of_MatchingPastFuturePositionsResult(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], filter_epochs: pd.DataFrame) -> "MaskDataSource":
-        a_new_ds = cls(matching_pos_dfs_list=[v.matching_pos_dfs_list for v in epoch_flat_mask_future_past_result], matching_pos_epochs_dfs_list=[v.matching_pos_epochs_df for v in epoch_flat_mask_future_past_result],
+        a_new_ds = cls(
+                     matching_pos_dfs_list=[v.relevant_positions_df for v in epoch_flat_mask_future_past_result],
+                     matching_pos_epochs_dfs_list=[v.matching_pos_epochs_df for v in epoch_flat_mask_future_past_result],
                epoch_high_prob_pos_masks=[v.epoch_high_prob_mask for v in epoch_flat_mask_future_past_result], epoch_t_bins_high_prob_pos_masks=[v.epoch_t_bins_high_prob_pos_mask for v in epoch_flat_mask_future_past_result],
 			   filter_epochs=filter_epochs, p_x_given_n_list=[a_single_epoch_result.decoded_epoch_result.p_x_given_n for a_single_epoch_result in epoch_flat_mask_future_past_result],
         )
@@ -4798,8 +4795,25 @@ class PredictiveDecodingDisplayWidget:
         # Create trajectory plotter
         overlay_posterior, _, _ = self._get_posterior_data(self.active_epoch_idx)
         overlay_prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
-        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
-        self.trajectory_displaying_plotter['past'] = plotter
+        a_decoded_traj_plotter: DecodedTrajectoryMatplotlibPlotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
+        # a_decoded_traj_plotter.params.plot_decoded_trajectories_2d_kwargs = dict(active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False,
+        #                                                                         plot_mode='scatter', c='red', cmap='Reds', alpha=0.55, s=5,
+        #                                                                         posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-12, posterior_should_perform_reshape=False, # rotate_to_vertical
+        # )
+        
+        self.trajectory_displaying_plotter['past'] = a_decoded_traj_plotter
+        
+        # ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
+        # fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
+        #                                                                                 active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
+        #                                                                                 plot_mode='scatter', c='red', cmap='Reds', alpha=0.55, s=5,
+        #                                                                                 posteriors=overlay_posterior, posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-12,
+        #                                                                                 posterior_should_perform_reshape=False, # rotate_to_vertical
+        #                                                                             )
+        
+            
+
+        # fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(global_session, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False, use_theoretical_tracks_instead=True)
 
 
     def _build_posterior_widget(self):
@@ -4882,8 +4896,8 @@ class PredictiveDecodingDisplayWidget:
         # Create trajectory plotter
         overlay_posterior, _, _ = self._get_posterior_data(self.active_epoch_idx)
         overlay_prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else []
-        plotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
-        self.trajectory_displaying_plotter['future'] = plotter
+        a_decoded_traj_plotter: DecodedTrajectoryMatplotlibPlotter = DecodedTrajectoryMatplotlibPlotter(a_result=self.decoded_result, xbin=self.xbin, xbin_centers=self.xbin_centers, ybin=self.ybin, ybin_centers=self.ybin_centers, prev_heatmaps=overlay_prev_heatmaps)
+        self.trajectory_displaying_plotter['future'] = a_decoded_traj_plotter
 
 
     def _build_epoch_control(self):
@@ -5296,6 +5310,36 @@ class PredictiveDecodingDisplayWidget:
                     should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=overlay_alpha,
                 )
                 heatmaps_overlay_main, _, _ = _overlay_out
+                
+
+                _overlay_out_countours = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours(
+                    an_ax=ax,
+                    xbin_centers=xbin_centers, ybin_centers=ybin_centers,
+                    a_p_x_given_n=overlay_posterior_2d,
+                    a_time_bin_centers=None,
+                    rotate_to_vertical=posterior_should_use_flipped,
+                    custom_image_extent=extent,
+                    time_cmap=overlay_cmap,
+                    should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=0.9,
+                    contour_level_fractions=[0.25, 0.5, 0.9], smoothing_sigma=1,
+                )
+                # heatmaps_overlay_main_countours,  _, _ = _overlay_out_countours
+                
+                # _overlay_out = (heatmaps_overlay_main, heatmaps_overlay_main_countours)
+                
+                
+                # # 3. Plot the Contours on TOP (zorder=3) to emphasize the "active" zone
+                # # levels=[0.5] draws a line exactly halfway between 0 (background) and 1 (mask)
+                # ax.contour(mask_image, 
+                #         levels=[0.5], 
+                #         extent=bounds, 
+                #         origin='lower', 
+                #         colors='lime',    # High contrast color
+                #         linewidths=2, 
+                #         zorder=3)
+
+                # plt.show()
+
             return (_main_out, _overlay_out)
         
 
@@ -5337,7 +5381,7 @@ class PredictiveDecodingDisplayWidget:
                                                posterior_should_perform_reshape=False, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
                                               
                                               )
-        posterior_main_subfn_kwargs = dict(posterior_alpha=0.3, posterior_cmap='viridis', posterior_masking_value=1e-12)
+        posterior_main_subfn_kwargs = dict(posterior_alpha=0.5, posterior_cmap='viridis', posterior_masking_value=None) # 1e-12
         posterior_overlay_subfn_kwargs = dict(overlay_alpha=0.75, overlay_cmap='Greens', overlay_masking_value=1e-3)
 
         posterior_subfn_all_kwargs = dict(**posterior_common_subfn_kwargs, **posterior_main_subfn_kwargs, **posterior_overlay_subfn_kwargs)       
