@@ -3349,6 +3349,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         if (masked_filter_epochs is not None):
             masked_container.active_epochs_df = masked_filter_epochs
 
+
+        if (self.pf1D_Decoder_dict is None) or (len(self.pf1D_Decoder_dict) == 0):
+            ## initialize it self.pf1D_Decoder_dict if it isn't setup:
+            assert directional_decoders_decode_result is not None
+            self.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
+            print(f'assigning pf1D_Decoder_dict: {list(self.pf1D_Decoder_dict.keys())}')
+            
         masked_container.pf1D_Decoder_dict = deepcopy(self.pf1D_Decoder_dict)
         
         _decode_kwargs = {k:kwargs.get(k, None) for k in ['merging_adjacent_max_separation_sec', 'minimum_epoch_duration'] if (kwargs.get(k, None) is not None)}
@@ -3607,7 +3614,14 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # ## 55m - step=1e-4, minimum_included_peak_height=1e-5
         # ## 11m - step=1e-3, minimum_included_peak_height=1e-5,
 
-        step: float = PeakPromenence.compute_optimal_step_size(a_masked_result.p_x_given_n_list, resolution_factor=500.0)
+        # resolution_factor = 13.0
+        resolution_factor = 9.0
+        minimum_included_peak_height = 1e-9
+        # should_use_faster_compute_single_slab_implementation: bool = True
+        should_use_faster_compute_single_slab_implementation: bool = False
+        # minimum_included_peak_height = None
+
+        step: float = PeakPromenence.compute_optimal_step_size(a_masked_result.p_x_given_n_list, resolution_factor=resolution_factor)
         print(f'step: {step}')
 
         # decoded_epoch_t_bins_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PosteriorPeaksPeakProminence2dResult.init_from_old_PeakProminence2D_result_dict(active_peak_prominence_2d_results=old_prom_2d_result)
@@ -3618,8 +3632,10 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             step=step, minimum_included_peak_height=None, # 1m 42s - 7m 1s
             # step=1e-2, minimum_included_peak_height=1e-5, # 47.3s
             peak_height_multiplier_probe_levels=(0.25, 0.5, 0.9),
-            should_use_faster_compute_single_slab_implementation=False,
+            should_use_faster_compute_single_slab_implementation=should_use_faster_compute_single_slab_implementation,
             min_considered_promenence=1e-11,
+            # parallel=True, max_workers=4,
+            parallel=True, max_workers=None,    
         )
         ## 55m - step=1e-4, minimum_included_peak_height=1e-5
         ## 11m - step=1e-3, minimum_included_peak_height=1e-5,
@@ -4169,6 +4185,14 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         a_container_container: PredictiveDecodingComputationsContainerContainer = global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
         a_container: PredictiveDecodingComputationsContainer = a_container_container.container # global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
 
+        # Get or create the decoder
+        if (a_container.pf1D_Decoder_dict is None) or (len(a_container.pf1D_Decoder_dict) == 0):
+            ## initialize it
+            assert directional_decoders_decode_result is not None
+            a_container.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
+            print(f'assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
+            
+
         locality_measures = None
         try:
             # Create DecodingLocalityMeasures first (required for new interface)
@@ -4342,12 +4366,16 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 assert a_container is not None
                 a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
             
+            fine_time_bin_size: float = a_masked_container.most_recent_decoding_time_bin_size
+
             for an_epoch_name in epoch_names:    
                 try:
                     print(f'\ttrying `.masked_container._filter_single_epoch_result(...)` for an_epoch_name: "{an_epoch_name}"...')
                     if an_epoch_name not in a_masked_container.debug_computed_dict:
                         a_masked_container.debug_computed_dict[an_epoch_name] = {}
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
+                    
+                    # active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=fine_time_bin_size, an_epoch_name=an_epoch_name)
                     a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the `enable_filter_and_final_result_processing` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
