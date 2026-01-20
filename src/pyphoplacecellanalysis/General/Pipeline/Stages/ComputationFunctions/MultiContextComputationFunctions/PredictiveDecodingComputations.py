@@ -3634,8 +3634,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             peak_height_multiplier_probe_levels=(0.25, 0.5, 0.9),
             should_use_faster_compute_single_slab_implementation=should_use_faster_compute_single_slab_implementation,
             min_considered_promenence=1e-11,
+            parallel=False, max_workers=1,
             # parallel=True, max_workers=4,
-            parallel=True, max_workers=None,    
+            # parallel=True, max_workers=None,    
         )
         ## 55m - step=1e-4, minimum_included_peak_height=1e-5
         ## 11m - step=1e-3, minimum_included_peak_height=1e-5,

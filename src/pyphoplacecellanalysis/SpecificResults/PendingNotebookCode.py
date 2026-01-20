@@ -916,6 +916,19 @@ class PositionLikePosteriorScoring:
         ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
 
         
+        
+        ## try to get the relevant entries:
+        # active_idx_to_epoch_idx_map = {i:int(a_row.label) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+        epoch_idx_to_active_idx_map = {int(a_row.original_epoch_idx):i for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+        original_epoch_idxs = active_epochs_df['original_epoch_idx'].to_numpy() ## get the original index
+        original_epoch_idx_to_linear_idx_map = active_epochs_df['original_epoch_idx'].map(epoch_idx_to_active_idx_map).to_dict()
+        assert len(original_epoch_idxs) == len(original_epoch_idx_to_linear_idx_map), f"cannot adapt indicies, have to give up. len(original_epoch_idxs): {len(original_epoch_idxs)}, len(v): {len(original_epoch_idx_to_linear_idx_map)}"
+        active_linear_idxs = np.array(list(original_epoch_idx_to_linear_idx_map.values()))
+        assert len(active_epochs_df) == len(active_linear_idxs), f"cannot adapt indicies, have to give up. len(active_epochs_df): {len(active_epochs_df)}, len(active_linear_idxs): {len(active_linear_idxs)}"
+        target_key: str = f"{computed_df_col_name_prefix}{k}"
+        active_epochs_df[target_key] = v[active_linear_idxs] # ValueError: Length of values (103) does not match length of index (93)
+        
+        
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures
         
@@ -949,7 +962,7 @@ class PositionLikePosteriorScoring:
                 normalization_across_epochs_epoch_names = ['roam', 'sprinkle']                
 
             ## need to build at `p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] =`
-            p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=normalization_across_epochs_epoch_names)
+            p_x_given_n_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = DecodingLocalityMeasures.perform_build_normalized_outputs(p_x_given_n=flat_p_x_given_n_list, epoch_names=normalization_across_epochs_epoch_names)
 
             a_scoring_results_df_dict = {}
             for k, v in p_x_given_n_dict.items():
@@ -989,15 +1002,29 @@ class PositionLikePosteriorScoring:
         ## FOR MASKING:
         is_position_like_list = []
         for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins):
-        # for epoch_idx, a_row in enumerate(decoded_local_epochs_result.filter_epochs.itertuples(index=True)):
+        # for epoch_idx, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True)):
             curr_epoch_t_bins_is_position_like = scoring_results_df[scoring_results_df['epoch_idx'] == epoch_idx]['is_position_like'].to_numpy()
+            # curr_epoch_t_bins_is_position_like = scoring_results_df[scoring_results_df['epoch_idx'] == a_row.original_epoch_idx]['is_position_like'].to_numpy()
             is_position_like_list.append(curr_epoch_t_bins_is_position_like)
-
+            ## dict version:
+            # is_epoch_t_bin_included_original_epoch_idx_dict[a_row.original_epoch_idx] = scoring_results_df[scoring_results_df['epoch_idx'] == a_row.original_epoch_idx]['is_position_like'].to_numpy()
+        
+        # # active_idx_to_epoch_idx_map = {i:int(a_row.label) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+        # epoch_idx_to_active_idx_map = {int(a_row.original_epoch_idx):i for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+        # original_epoch_idxs = active_epochs_df['original_epoch_idx'].to_numpy() ## get the original index
+        # original_epoch_idx_to_linear_idx_map = active_epochs_df['original_epoch_idx'].map(epoch_idx_to_active_idx_map).to_dict()
+        # assert len(original_epoch_idxs) == len(original_epoch_idx_to_linear_idx_map), f"cannot adapt indicies, have to give up. len(original_epoch_idxs): {len(original_epoch_idxs)}, len(v): {len(original_epoch_idx_to_linear_idx_map)}"
+        # active_linear_idxs = np.array(list(original_epoch_idx_to_linear_idx_map.values()))
+        # assert len(active_epochs_df) == len(active_linear_idxs), f"cannot adapt indicies, have to give up. len(active_epochs_df): {len(active_epochs_df)}, len(active_linear_idxs): {len(active_linear_idxs)}"
+        # target_key: str = f"{computed_df_col_name_prefix}{k}"
+        # active_epochs_df[target_key] = v[active_linear_idxs] # ValueError: Length of values (103) does not match length of index (93)
+        
         ## main masking happens here:
         a_masked_filtered_decoded_local_epochs_result, mask_index_tuple = a_masked_filtered_decoded_local_epochs_result.mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(
             is_time_bin_active_list=is_position_like_list,
             masked_bin_fill_mode='dropped',
-            # masked_bin_fill_mode='nan_filled'
+            # masked_bin_fill_mode='nan_filled',
+            min_num_included_time_bins_per_epoch=num_min_position_like_t_bins,
         )
         a_masked_filtered_decoded_local_epochs_result.filter_epochs.reset_index(drop=True, inplace=True) ## that's not going to work yet because we haven't dropped any short epochs
 
@@ -1006,16 +1033,16 @@ class PositionLikePosteriorScoring:
         ## INPUTS: scoring_results, decoded_local_epochs_result
         # 'num_position_like_t_bins'
         
-        if num_min_position_like_t_bins:
-            is_epoch_idx_included = (a_masked_filtered_decoded_local_epochs_result.nbins >= num_min_position_like_t_bins)
-            # epoch_overall_scoring_results_df: pd.DataFrame = scoring_results_df.groupby(['epoch_idx']).agg(num_position_like_t_bins=('is_position_like', 'sum'), score_mean=('score', 'mean')).reset_index() ## this one contains the right number of epochs for the filtered result (74)
-            # is_epoch_idx_included = (epoch_overall_scoring_results_df['num_position_like_t_bins'] > num_min_position_like_t_bins)
-            if not np.all(is_epoch_idx_included):
-                # included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
-                included_epoch_idxs = a_masked_filtered_decoded_local_epochs_result.filter_epochs.index.to_numpy()[is_epoch_idx_included]                
-                a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
+        # if num_min_position_like_t_bins:
+        #     is_epoch_idx_included = (a_masked_filtered_decoded_local_epochs_result.nbins >= num_min_position_like_t_bins)
+        #     # epoch_overall_scoring_results_df: pd.DataFrame = scoring_results_df.groupby(['epoch_idx']).agg(num_position_like_t_bins=('is_position_like', 'sum'), score_mean=('score', 'mean')).reset_index() ## this one contains the right number of epochs for the filtered result (74)
+        #     # is_epoch_idx_included = (epoch_overall_scoring_results_df['num_position_like_t_bins'] > num_min_position_like_t_bins)
+        #     if not np.all(is_epoch_idx_included):
+        #         # included_epoch_idxs = epoch_overall_scoring_results_df[is_epoch_idx_included]['epoch_idx'].to_numpy()
+        #         included_epoch_idxs = a_masked_filtered_decoded_local_epochs_result.filter_epochs.index.to_numpy()[is_epoch_idx_included]                
+        #         a_masked_filtered_decoded_local_epochs_result = a_masked_filtered_decoded_local_epochs_result.filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
 
-        a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs) ## convert to epoch_df
+        # a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs) ## convert to epoch_df
 
 
         return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
