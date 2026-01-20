@@ -1836,7 +1836,10 @@ class PeakPromenence:
 
     @function_attributes(short_name=None, tags=['peak', 'promenence-2d'], input_requires=[], output_provides=[], uses=['compute_prominence_contours', 'PeakPromenence._find_contours_at_levels'], used_by=[], creation_date='2025-12-21 00:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation', 'compute_2d_peak_prominence'])
     @classmethod
-    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray], xbin_centers: NDArray, ybin_centers: NDArray, step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False,
+    def _perform_find_posterior_peaks_peak_prominence2d_computation(cls, p_x_given_n_list: List[NDArray],
+                                                                    xbin_centers: NDArray, ybin_centers: NDArray,
+                                                                    xbin: Optional[NDArray]=None, ybin: Optional[NDArray]=None,
+                                                                    step: float = 0.01, peak_height_multiplier_probe_levels: Tuple = (0.5, 0.9), minimum_included_peak_height: float = 0.2, min_considered_promenence: float = 0.2, uniform_blur_size: int = 3, gaussian_blur_sigma: float = 3, debug_print: bool = False,
             parallel: bool = True, max_workers: Optional[int] = 4, should_use_faster_compute_single_slab_implementation: bool=False) -> 'PosteriorPeaksPeakProminence2dResult':
             """Uses the peak_prominence2d package to find the peaks and prominences of 2D decoded posteriors.
 
@@ -1904,17 +1907,24 @@ class PeakPromenence:
             # infer edges from centers for later binning (xbin, ybin)
             xbin_centers = np.asarray(xbin_centers)
             ybin_centers = np.asarray(ybin_centers)
-            if xbin_centers.ndim != 1 or ybin_centers.ndim != 1:
-                raise ValueError('xbin_centers and ybin_centers must be 1D arrays.')
-            if len(xbin_centers) < 2 or len(ybin_centers) < 2:
-                raise ValueError('xbin_centers and ybin_centers must each have length >= 2.')
+            
+            if (xbin is None) or (ybin is None):                
+                if xbin_centers.ndim != 1 or ybin_centers.ndim != 1:
+                    raise ValueError('xbin_centers and ybin_centers must be 1D arrays.')
+                if len(xbin_centers) < 2 or len(ybin_centers) < 2:
+                    raise ValueError('xbin_centers and ybin_centers must each have length >= 2.')
 
-            x_edges = np.concatenate(([xbin_centers[0] - (xbin_centers[1] - xbin_centers[0]) / 2.0],
-                                      (xbin_centers[:-1] + xbin_centers[1:]) / 2.0,
-                                      [xbin_centers[-1] + (xbin_centers[-1] - xbin_centers[-2]) / 2.0]))
-            y_edges = np.concatenate(([ybin_centers[0] - (ybin_centers[1] - ybin_centers[0]) / 2.0],
-                                      (ybin_centers[:-1] + ybin_centers[1:]) / 2.0,
-                                      [ybin_centers[-1] + (ybin_centers[-1] - ybin_centers[-2]) / 2.0]))
+                xbin = np.concatenate(([xbin_centers[0] - (xbin_centers[1] - xbin_centers[0]) / 2.0],
+                                        (xbin_centers[:-1] + xbin_centers[1:]) / 2.0,
+                                        [xbin_centers[-1] + (xbin_centers[-1] - xbin_centers[-2]) / 2.0]))
+                ybin = np.concatenate(([ybin_centers[0] - (ybin_centers[1] - ybin_centers[0]) / 2.0],
+                                        (ybin_centers[:-1] + ybin_centers[1:]) / 2.0,
+                                        [ybin_centers[-1] + (ybin_centers[-1] - ybin_centers[-2]) / 2.0]))
+            else:
+                assert len(xbin) == len(xbin_centers) - 1
+                assert len(ybin) == len(ybin_centers) - 1
+
+
 
             # Build list of slabs (epoch_idx, t_idx, slab) to process
             tasks = []
@@ -1985,7 +1995,7 @@ class PeakPromenence:
                         slab_result: SlabResult = SlabResult(**slab_result_dict)
                         slab_result_dict = slab_result
                 except Exception as e:
-                    raise e
+                    raise
                 out_results[(epoch_idx, t_idx)] = slab_result_dict
 
                 if not posterior_peaks_df.empty:
@@ -2009,7 +2019,7 @@ class PeakPromenence:
 
             # Find which position bin each peak falls in and add it to the flat_peaks_df:
             posterior_peaks_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(
-                posterior_peaks_df, bin_values=(x_edges, y_edges),
+                posterior_peaks_df, bin_values=(xbin, ybin),
                 position_column_names=('peak_center_x', 'peak_center_y'),
                 binned_column_names=('peak_center_binned_x', 'peak_center_binned_y'),
                 active_computation_config=None, force_recompute=False, debug_print=debug_print)
