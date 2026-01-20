@@ -847,7 +847,7 @@ class PositionLikePosteriorScoring:
         for t in range(frames_to_process):
             current_posterior = posterior_stack[:, :, t]
             
-            score, comps = cls.calculate_pli_score(current_posterior, x_edges, y_edges, noise_threshold_percent=noise_threshold_percent, **pli_score_kwargs)
+            score, comps = cls.calculate_pli_score(current_posterior, x_edges=x_edges, y_edges=y_edges, noise_threshold_percent=noise_threshold_percent, **pli_score_kwargs)
             
             a_record = {'t': t, 'score': score, 'comps': comps}
             a_record.update(**comps) ## comps as separate columns
@@ -906,10 +906,7 @@ class PositionLikePosteriorScoring:
 
     @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
     @classmethod
-    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None,
-            normalization_across_epochs_epoch_names: Optional[List]=None,
-
-        ) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
+    def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None, normalization_across_epochs_epoch_names: Optional[List]=None) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
         """
         decoding_time_bin_size = 0.025
         an_epoch_name = 'roam'

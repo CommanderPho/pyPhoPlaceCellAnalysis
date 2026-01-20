@@ -2740,16 +2740,12 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # measured_positions_df
 
         gaussian_volume = self.predictive_decoding.gaussian_volume ## the volume for all time bins
-
-        
-
         epoch_matching_past_future_positions, _an_out_tuple, non_local_PBE_non_moving_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=decoded_local_epochs_result, measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
             non_local_PBE_non_moving_epochs_df=non_local_PBE_non_moving_epochs_df,
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
         )
         epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list = _an_out_tuple
-        
-
+    
         """
 
         ## HARDCODED an_epoch_name
@@ -2887,12 +2883,45 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         if active_epochs_df is not None:
             ## add the columns to the datframe
             for k, v in past_future_info_dict.items():
-                active_epochs_df[f"{computed_df_col_name_prefix}{k}"] = v
-                
-            ## add more columns after the others are added:
-            active_epochs_df[f'{computed_df_col_name_prefix}ratio_avail_past'] = active_epochs_df[f'{computed_df_col_name_prefix}n_total_relevant_past'] / active_epochs_df[f'{computed_df_col_name_prefix}n_total_possible_past']
-            active_epochs_df[f'{computed_df_col_name_prefix}ratio_avail_future'] = active_epochs_df[f'{computed_df_col_name_prefix}n_total_relevant_future'] / active_epochs_df[f'{computed_df_col_name_prefix}n_total_possible_future']
+                ## This is aweful :[ The indicies don't match and so it's failing here:
+                try:
+                    ## try to add directly
+                    active_epochs_df[f"{computed_df_col_name_prefix}{k}"] = v # ValueError: Length of values (103) does not match length of index (93)
 
+                except ValueError as e:
+                    print(f'wARN: len(v): {len(v)} > len(active_epochs_df): {len(active_epochs_df)}, trying to adapt the columns...')
+                    if len(v) > len(active_epochs_df):
+                        ## try to get the relevant entries:
+                        # active_idx_to_epoch_idx_map = {i:int(a_row.label) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+                        epoch_idx_to_active_idx_map = {int(a_row.original_epoch_idx):i for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+                        original_epoch_idxs = active_epochs_df['original_epoch_idx'].to_numpy() ## get the original index
+                        original_epoch_idx_to_linear_idx_map = active_epochs_df['original_epoch_idx'].map(epoch_idx_to_active_idx_map).to_dict()
+                        assert len(original_epoch_idxs) == len(original_epoch_idx_to_linear_idx_map), f"cannot adapt indicies, have to give up. len(original_epoch_idxs): {len(original_epoch_idxs)}, len(v): {len(original_epoch_idx_to_linear_idx_map)}"
+                        active_linear_idxs = np.array(list(original_epoch_idx_to_linear_idx_map.values()))
+                        assert len(active_epochs_df) == len(active_linear_idxs), f"cannot adapt indicies, have to give up. len(active_epochs_df): {len(active_epochs_df)}, len(active_linear_idxs): {len(active_linear_idxs)}"
+                        target_key: str = f"{computed_df_col_name_prefix}{k}"
+                        active_epochs_df[target_key] = v[active_linear_idxs] # ValueError: Length of values (103) does not match length of index (93)
+                        print(f'\tsuccessfully adapted the column: "{k}": added column name: "{target_key}".')
+                    else:
+                        print(f'wARN: failed to add the df columns due to error: {e}. Skipping')
+                        print(f'incompatibile lengths :[')
+            ## END for k, v in past_future_in...
+
+            try:
+                ## add more columns after the others are added:
+                active_epochs_df[f'{computed_df_col_name_prefix}ratio_avail_past'] = active_epochs_df[f'{computed_df_col_name_prefix}n_total_relevant_past'] / active_epochs_df[f'{computed_df_col_name_prefix}n_total_possible_past']
+                active_epochs_df[f'{computed_df_col_name_prefix}ratio_avail_future'] = active_epochs_df[f'{computed_df_col_name_prefix}n_total_relevant_future'] / active_epochs_df[f'{computed_df_col_name_prefix}n_total_possible_future']
+
+            except (KeyError, ValueError, AttributeError) as e:
+                print(f'failed to add two additional columns post-hoc eith error: {e}')
+                pass
+            
+            # except Exception as e:
+                # print(f'failed to add two additional columns post-hoc eith error: {e}')
+                # raise e        
+
+
+        
         # epoch_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list
         
         return epoch_matching_past_future_positions, (epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict), active_epochs_df
@@ -2937,8 +2966,6 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
         super().to_hdf(file_path, key=key, **kwargs)
-
-
 
 
 @define(slots=False, repr=False, eq=False)
@@ -3316,6 +3343,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             print(f'using sigma from masked_locality_measures: {sigma}')
 
         _moving_avg_dict, _moving_avg_meas_pos_overlap_dict, _gaussian_volume = masked_predictive_decoding.compute(sigma=sigma) ## updates masked_predictive_decoding.moving_avg_dict, masked_predictive_decoding.moving_avg_meas_pos_overlap_dict
+        
+
         masked_container: PredictiveDecodingComputationsContainer = PredictiveDecodingComputationsContainer(predictive_decoding=masked_predictive_decoding, is_global=True)
         if (masked_filter_epochs is not None):
             masked_container.active_epochs_df = masked_filter_epochs
@@ -4483,15 +4512,21 @@ class PredictiveDecodingDisplayWidget:
 
         """
         decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name]
-        pf_decoder = container.pf1D_Decoder_dict[an_epoch_name]
+        pf_decoder = container.pf1D_Decoder_dict.get(an_epoch_name, None)
         decoded_result: DecodedFilterEpochsResult = decoded_local_epochs_result
         curr_position_df: pd.DataFrame = deepcopy(container.decoding_locality.pos_df)
 
         ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict
-        xbin = deepcopy(pf_decoder.xbin)
-        xbin_centers = deepcopy(pf_decoder.xbin_centers)
-        ybin_centers = deepcopy(pf_decoder.ybin_centers)
-        ybin = deepcopy(pf_decoder.ybin)
+        if pf_decoder is not None:
+            xbin = deepcopy(pf_decoder.xbin)
+            xbin_centers = deepcopy(pf_decoder.xbin_centers)
+            ybin_centers = deepcopy(pf_decoder.ybin_centers)
+            ybin = deepcopy(pf_decoder.ybin)
+        else:
+            xbin = deepcopy(container.decoding_locality.xbin)
+            xbin_centers = deepcopy(container.decoding_locality.xbin_centers)
+            ybin_centers = deepcopy(container.decoding_locality.ybin_centers)
+            ybin = deepcopy(container.decoding_locality.ybin)
 
         # num_filter_epochs: int = decoded_local_epochs_result.num_filter_epochs
 
@@ -4518,11 +4553,22 @@ class PredictiveDecodingDisplayWidget:
 
 
     def setup(self):
-        """Calculate constants (max_subplots_per_category, extent), prepare data structures."""        
+        """Calculate constants (max_subplots_per_category, extent), prepare data structures.
+        
+        Updates:
+        
+            self.container.predictive_decoding.matching_pos_epochs_dfs_list
+            
+        """        
         matching_pos_epochs_dfs_list = self.container.predictive_decoding.matching_pos_epochs_dfs_list
         
+        active_epochs_df: pd.DataFrame = ensure_dataframe(self.container.active_epochs_df)
+        
         # Prepare matching_pos_epochs_dfs_list with is_future_present_past labels
-        for i, a_row in enumerate(ensure_dataframe(self.decoded_result.filter_epochs).itertuples(index=False)):
+        # for i, a_row in enumerate(ensure_dataframe(self.decoded_result.filter_epochs).itertuples(index=False)):
+        
+        for i, a_row in enumerate(active_epochs_df.itertuples(index=False)):
+            
             a_matching_pos_epochs: pd.DataFrame = matching_pos_epochs_dfs_list[i]
             curr_epoch_start_t: float = a_row.start
             curr_epoch_stop_t: float = a_row.stop
@@ -4534,7 +4580,8 @@ class PredictiveDecodingDisplayWidget:
             a_matching_pos_epochs.loc[is_relevant_future_times, 'is_future_present_past'] = 'future'
             
             self.container.predictive_decoding.matching_pos_epochs_dfs_list[i] = a_matching_pos_epochs # updated in the widget? very strange.
-        
+        ## END for i, a_row in enumerate(active_epochs_df.itertuples(index=False))....        
+
         # Calculate max_subplots_per_category
         self.max_subplots_per_category = self._calculate_max_subplots()
         
@@ -4866,154 +4913,7 @@ class PredictiveDecodingDisplayWidget:
     # ==================================================================================================================================================================================================================================================================================== #
     # Rendering                                                                                                                                                                                                                                                                            #
     # ==================================================================================================================================================================================================================================================================================== #
-    # def _update_posterior_plot(self, widget, posterior_2d: np.ndarray, time_bin_posteriors: Optional[List[np.ndarray]], num_time_bins_to_show: int, an_epoch_idx: int,
-    #                                     posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=None,
-    #                                     posterior_should_perform_reshape=False, extent=None, overlay_posterior_2d: Optional[NDArray]=None, show_overlay=False, overlay_alpha = 0.08, debug_print=True, **kwargs):
-    #     """Update posterior plot with configurable parameters.
-        
-    #     Args:
-    #         widget: The matplotlib widget to update
-    #         posterior_2d: 2D posterior array
-    #         time_bin_posteriors: Optional list of time bin posterior arrays
-    #         num_time_bins_to_show: Number of time bins to display
-    #         an_epoch_idx: Epoch index for title
-    #         posterior_alpha: Opacity for posterior heatmaps (default: 0.65)
-    #         posterior_cmap: Colormap name (default: 'Greens')
-    #         posterior_masking_value: Minimum value to display (default: 1e-3)
-    #         posterior_should_perform_reshape: Whether to reshape (default: False)
-    #         extent: Optional extent tuple, defaults to self.extent if None
-    #         show_overlay: Whether to show main posterior overlay on time bin heatmaps (default: True)
-    #     """
-    #     import matplotlib.pyplot as plt
-    #     from matplotlib import gridspec
-        
-    #     fig = widget.getFigure()
-    #     # fig.clear() ## don't do this!
-                
-    #     if (time_bin_posteriors is not None) and (num_time_bins_to_show > 0):
-    #         gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[7, 2], hspace=0.1)
-    #         ax_main = fig.add_subplot(gs[0, 0])
-    #     else:
-    #         ax_main = fig.add_subplot(111)
-        
-    #     # Use _helper_add_heatmap for consistent display with past/future panes
-    #     xbin_centers = self.xbin_centers if self.xbin_centers is not None else self.xbin
-    #     ybin_centers = self.ybin_centers if self.ybin_centers is not None else self.ybin
-        
-
-    #     ## where does self.extent come from? self.extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
-    #     # Use provided extent or fall back to self.extent
-    #     posterior_extent = extent if (extent is not None) else self.extent
-    #     # posterior_should_use_flipped: bool = self.should_use_flipped_images
-    #     overlay_alpha = 0.5
-    #     overlay_cmap = kwargs.pop('overlay_cmap', 'Greens')
-
-    #     posterior_should_use_flipped: bool = False
-    #     print(f'posterior_extent: {posterior_extent}')
-    #     print(f'posterior_should_use_flipped: {posterior_should_use_flipped}')
-        
-    #     # Plot main posterior using _helper_add_heatmap
-    #     heatmaps_main, image_extent, plots_data = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-    #         an_ax=ax_main,
-    #         xbin_centers=xbin_centers,
-    #         ybin_centers=ybin_centers,
-    #         a_p_x_given_n=posterior_2d,
-    #         a_time_bin_centers=None,
-    #         rotate_to_vertical=posterior_should_use_flipped,
-    #         custom_image_extent=posterior_extent,
-    #         time_cmap=posterior_cmap,
-    #         should_perform_reshape=posterior_should_perform_reshape,
-    #         posterior_masking_value=posterior_masking_value,
-    #         full_posterior_opacity=posterior_alpha,
-    #         debug_print=debug_print,
-    #     )
-        
-
-    #     # Add overlay of main posterior with low alpha (if enabled)
-    #     if show_overlay:
-    #         if overlay_posterior_2d is None:
-    #             overlay_posterior_2d = posterior_2d ## use the posterior if none provided
-                
-    #         if debug_print:
-    #             print(f'posterior_2d.shape: {np.shape(posterior_2d)}')
-    #             print(f'overlay_posterior_2d.shape: {np.shape(overlay_posterior_2d)}')
-            
-    #         heatmaps_overlay_main, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-    #             an_ax=ax_main,
-    #             xbin_centers=xbin_centers,
-    #             ybin_centers=ybin_centers,
-    #             a_p_x_given_n=overlay_posterior_2d,
-    #             a_time_bin_centers=None,
-    #             rotate_to_vertical=posterior_should_use_flipped,
-    #             custom_image_extent=posterior_extent,
-    #             time_cmap=overlay_cmap,
-    #             should_perform_reshape=posterior_should_perform_reshape,
-    #             posterior_masking_value=None,
-    #             full_posterior_opacity=overlay_alpha
-    #         )
-            
-
-    #     ax_main.set_xlabel('X Position')
-    #     ax_main.set_ylabel('Y Position')
-    #     ax_main.set_title(f'Decoded Posterior Heatmap - Epoch {an_epoch_idx}')
-        
-    #     if (time_bin_posteriors is not None) and (num_time_bins_to_show > 0):
-    #         all_time_bin_values = np.concatenate([tb.flatten() for tb in time_bin_posteriors])
-    #         vmin_shared = np.nanmin(all_time_bin_values)
-    #         vmax_shared = np.nanmax(all_time_bin_values)
-            
-            
-    #         gs_tiny = gridspec.GridSpecFromSubplotSpec(1, num_time_bins_to_show, subplot_spec=gs[1, 0], wspace=0.01)
-            
-    #         for t_bin_idx in range(num_time_bins_to_show):
-    #             ax_tiny = fig.add_subplot(gs_tiny[0, t_bin_idx])
-                
-    #             # Plot time bin posterior using _helper_add_heatmap
-    #             heatmaps_tiny, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-    #                 an_ax=ax_tiny,
-    #                 xbin_centers=xbin_centers,
-    #                 ybin_centers=ybin_centers,
-    #                 a_p_x_given_n=time_bin_posteriors[t_bin_idx],
-    #                 a_time_bin_centers=None,
-    #                 rotate_to_vertical=posterior_should_use_flipped,
-    #                 custom_image_extent=posterior_extent,
-    #                 time_cmap=posterior_cmap,
-    #                 should_perform_reshape=posterior_should_perform_reshape,
-    #                 posterior_masking_value=posterior_masking_value,
-    #                 full_posterior_opacity=posterior_alpha
-    #             )
-                
-    #             # Apply shared color scale to time bin heatmap
-    #             if heatmaps_tiny and len(heatmaps_tiny) > 0:
-    #                 heatmaps_tiny[0].set_clim(vmin=vmin_shared, vmax=vmax_shared)
-                
-    #             # Add overlay of main posterior with low alpha (if enabled)
-    #             if show_overlay:
-    #                 if overlay_posterior_2d is None:
-    #                     overlay_posterior_2d = posterior_2d ## use the posterior if none provided                        
-
-    #                 heatmaps_overlay, _, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
-    #                     an_ax=ax_tiny,
-    #                     xbin_centers=xbin_centers,
-    #                     ybin_centers=ybin_centers,
-    #                     a_p_x_given_n=overlay_posterior_2d,
-    #                     a_time_bin_centers=None,
-    #                     rotate_to_vertical=posterior_should_use_flipped,
-    #                     custom_image_extent=posterior_extent,
-    #                     time_cmap=posterior_cmap,
-    #                     should_perform_reshape=posterior_should_perform_reshape,
-    #                     posterior_masking_value=None,
-    #                     full_posterior_opacity=overlay_alpha
-    #                 )
-                
-    #             ax_tiny.set_xticks([])
-    #             ax_tiny.set_yticks([])
-    #             ax_tiny.set_xlabel(f't={t_bin_idx}', fontsize=8)
-        
-    #     widget.draw()
-
-
-
+    
     def _update_past_widget(self, an_epoch_idx: int, epoch_data: Dict[str, Any]):
         """Update past trajectory display."""
         self._update_trajectory_widget('past', an_epoch_idx, epoch_data)
@@ -5170,8 +5070,7 @@ class PredictiveDecodingDisplayWidget:
             widget.draw()
 
 
-    def _update_posterior_widget(self, an_epoch_idx: int, debug_print=True, **kwargs,
-    ):
+    def _update_posterior_widget(self, an_epoch_idx: int, debug_print=True, **kwargs):
         """Update decoded posterior display."""
         
         # Use _helper_add_heatmap for consistent display with past/future panes
@@ -5234,9 +5133,10 @@ class PredictiveDecodingDisplayWidget:
         # ==================================================================================================================================================================================================================================================================================== #
         # Get Data                                                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
-        override_should_use_flipped_images: bool = False
+        # override_should_use_flipped_images: bool = False
+        override_should_use_flipped_images: bool = None
         posterior_2d, time_bin_posteriors, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=False, should_use_flipped_images=override_should_use_flipped_images)
-        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
+        mask_2d, time_bin_masks, num_time_bins_to_show = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True, should_use_flipped_images=override_should_use_flipped_images)
         
         # self._update_posterior_plot(widget, posterior_2d=mask_2d, time_bin_posteriors=time_bin_masks, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, overlay_posterior_2d=None, posterior_cmap='Greens', posterior_alpha=0.95, show_overlay=False)
         # self._update_posterior_plot(widget, posterior_2d=posterior_2d, time_bin_posteriors=time_bin_posteriors, num_time_bins_to_show=num_time_bins_to_show, an_epoch_idx=an_epoch_idx, overlay_posterior_2d=mask_2d, posterior_cmap='Greens', posterior_alpha=0.95, show_overlay=True)
@@ -5244,18 +5144,18 @@ class PredictiveDecodingDisplayWidget:
         # ==================================================================================================================================================================================================================================================================================== #
         # Update Figure                                                                                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
-        
-
-        
-
         ## where does self.extent come from? self.extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
         # Use provided extent or fall back to self.extent
         posterior_extent = self.extent # extent if (extent is not None) else self.extent
         # posterior_should_use_flipped: bool = self.should_use_flipped_images
 
         posterior_should_use_flipped: bool = False
-        posterior_common_subfn_kwargs = dict(xbin_centers=xbin_centers, ybin_centers=ybin_centers, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent, posterior_should_perform_reshape=True)
-        posterior_main_subfn_kwargs = dict(posterior_alpha=0.3, posterior_cmap='viridis', posterior_masking_value=1e-11)
+        posterior_common_subfn_kwargs = dict(xbin_centers=xbin_centers, ybin_centers=ybin_centers,
+                                            #   posterior_should_perform_reshape=True, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
+                                               posterior_should_perform_reshape=False, posterior_should_use_flipped=posterior_should_use_flipped, extent=posterior_extent,
+                                              
+                                              )
+        posterior_main_subfn_kwargs = dict(posterior_alpha=0.3, posterior_cmap='viridis', posterior_masking_value=1e-12)
         posterior_overlay_subfn_kwargs = dict(overlay_alpha=0.75, overlay_cmap='Greens', overlay_masking_value=1e-3)
 
         posterior_subfn_all_kwargs = dict(**posterior_common_subfn_kwargs, **posterior_main_subfn_kwargs, **posterior_overlay_subfn_kwargs)       
