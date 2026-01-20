@@ -4190,8 +4190,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             ## initialize it
             assert directional_decoders_decode_result is not None
             a_container.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
-            print(f'assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
-            
+            print(f'a_container: assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
 
         locality_measures = None
         try:
