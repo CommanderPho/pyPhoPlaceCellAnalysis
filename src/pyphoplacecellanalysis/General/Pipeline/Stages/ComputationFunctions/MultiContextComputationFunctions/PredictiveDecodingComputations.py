@@ -4321,7 +4321,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         a_masked_container = None
         if enable_masked_filtered_container_before_any_comps:
             print(f'enable_masked_filtered_container_before_any_comps is True so pre-masking before second-half of `perform_predictive_decoding_analysis(...)`')
-            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False) ## 3m now
+            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=0.025,
+                                                                     should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
+                                                                     window_size=window_size) ## 3m now
             global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
             a_container = a_masked_container ## change the target of a_container
 
