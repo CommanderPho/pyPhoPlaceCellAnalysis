@@ -3558,10 +3558,27 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             
         # Get this specific result ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         decoded_local_epochs_result = self.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
-        a_decoder: BayesianPlacemapPositionDecoder = list(self.pf1D_Decoder_dict.values())[0]
+        # a_decoder: BayesianPlacemapPositionDecoder = list(self.pf1D_Decoder_dict.values())[0]
+        a_decoder: BayesianPlacemapPositionDecoder = self.pf1D_Decoder_dict.get(an_epoch_name, None)
+
+
+        xybin_edges_kwargs = dict()
+        xybin_centers_only_kwargs = dict()
+        if a_decoder is None:
+            xybin_centers_only_kwargs = dict(xbin_centers=self.predictive_decoding.xbin_centers, 
+                    ybin_centers=self.predictive_decoding.ybin_centers,
+            )
+
+        else:
+            xybin_centers_only_kwargs = dict(xbin_centers=a_decoder.xbin_centers, 
+                ybin_centers=a_decoder.ybin_centers,
+            )            
+            xybin_edges_kwargs = dict(xbin=a_decoder.xbin, ybin=a_decoder.ybin,
+            )
+
 
         # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, **xybin_edges_kwargs, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3) # xbin=a_decoder.xbin, ybin=a_decoder.ybin
 
         ## INPUTS: active_epochs_result
         custom_results_list = []
@@ -3578,8 +3595,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
                 a_p_x_given_n=curr_epoch_p_x_given_n,
                 # gaussian_volume=container.predictive_decoding.gaussian_volume, ## if we have it
-                xbin_centers=self.predictive_decoding.xbin_centers, 
-                ybin_centers=self.predictive_decoding.ybin_centers,
+                # xbin_centers=self.predictive_decoding.xbin_centers, 
+                # ybin_centers=self.predictive_decoding.ybin_centers,
+                **xybin_centers_only_kwargs,
                 min_val_epsilon=1e-6,
                 alpha_list = [0.5, 0.8],
                 enable_debug_outputs=True,
@@ -3589,8 +3607,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
             custom_computation_results_df = DecodingLocalityMeasures.perform_build_locality_measures_df(locality_measures_dict_dict={an_epoch_name: custom_computation_results_dict}, ## expects a dict with key of the epoch type, so we need to wrap it
                 time_window_centers=curr_epoch_time_bin_centers, 
-                xbin_centers=self.predictive_decoding.xbin_centers, 
-                ybin_centers=self.predictive_decoding.ybin_centers,
+                # xbin_centers=self.predictive_decoding.xbin_centers, 
+                # ybin_centers=self.predictive_decoding.ybin_centers,
+                **xybin_centers_only_kwargs,
             )
 
             custom_computation_results_df['epoch_idx'] = i ## same value for all
@@ -3627,8 +3646,10 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # decoded_epoch_t_bins_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PosteriorPeaksPeakProminence2dResult.init_from_old_PeakProminence2D_result_dict(active_peak_prominence_2d_results=old_prom_2d_result)
         
         decoded_epoch_t_bins_promenence_result_obj: PosteriorPeaksPeakProminence2dResult = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(p_x_given_n_list=a_masked_result.p_x_given_n_list, 
-            xbin_centers=self.predictive_decoding.xbin_centers, 
-            ybin_centers=self.predictive_decoding.ybin_centers,
+            **xybin_edges_kwargs,
+            **xybin_centers_only_kwargs,
+            # xbin_centers=self.predictive_decoding.xbin_centers, 
+            # ybin_centers=self.predictive_decoding.ybin_centers,
             step=step, minimum_included_peak_height=None, # 1m 42s - 7m 1s
             # step=1e-2, minimum_included_peak_height=1e-5, # 47.3s
             peak_height_multiplier_probe_levels=(0.25, 0.5, 0.9),
