@@ -1640,7 +1640,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
     
     @function_attributes(short_name=None, tags=['mask', 'time-bin-mask', 'pure'], input_requires=[], output_provides=[], uses=['spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask'], used_by=[], creation_date='2026-01-08 01:32', related_items=[])
-    def mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(self, is_time_bin_active_list: List[NDArray[ND.Shape["N_TIME_BINS"], Any]], masked_bin_fill_mode:MaskedTimeBinFillType='last_valid') -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
+    def mask_computed_DecodedFilterEpochsResult_by_time_bin_inclusion_masks(self, is_time_bin_active_list: List[NDArray[ND.Shape["N_TIME_BINS"], Any]], masked_bin_fill_mode:MaskedTimeBinFillType='last_valid',
+                                                                            min_num_included_time_bins_per_epoch: Optional[int]=0) -> Tuple["DecodedFilterEpochsResult", Tuple[NDArray, NDArray]]:
         """ Returns a copy of itself, masked by finding periods where there is insufficient firing to decode based on the provided paramters, copies the decoded result and returns a version with positions back-filled from the last bin that did meet the minimum firing criteria
         
         Pure: does not modify self
@@ -1779,7 +1780,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
                     
                 except Exception as e:
-                    raise e
+                    raise
                 
 
                 # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
@@ -1841,38 +1842,47 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                         a_decoded_result.filter_epochs.loc[i, 'stop'] = remaining_edges[-1]
                         a_decoded_result.filter_epochs.loc[i, 'duration'] = remaining_edges[-1] - remaining_edges[0]
             
-            ## Identify and remove epochs with 0 remaining bins
-            epochs_with_bins_mask = np.array([a_decoded_result.nbins[i] > 0 for i in range(num_filter_epochs)])
-            if not np.all(epochs_with_bins_mask):
-                ## Some epochs have 0 bins - need to remove them
-                valid_epoch_idxs = np.where(epochs_with_bins_mask)[0]
-                
-                ## Filter all list fields
-                a_decoded_result.p_x_given_n_list = [a_decoded_result.p_x_given_n_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.most_likely_positions_list = [a_decoded_result.most_likely_positions_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.most_likely_position_indicies_list = [a_decoded_result.most_likely_position_indicies_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.marginal_x_list = [a_decoded_result.marginal_x_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.marginal_y_list = [a_decoded_result.marginal_y_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.marginal_z_list = [a_decoded_result.marginal_z_list[i] for i in valid_epoch_idxs]
-                a_decoded_result.nbins = a_decoded_result.nbins[valid_epoch_idxs]  # Keep as ndarray via index slicing
-                a_decoded_result.time_bin_containers = [a_decoded_result.time_bin_containers[i] for i in valid_epoch_idxs]
-                a_decoded_result.time_bin_edges = [a_decoded_result.time_bin_edges[i] for i in valid_epoch_idxs]
-                a_decoded_result.spkcount = [a_decoded_result.spkcount[i] for i in valid_epoch_idxs]
-                if len(a_decoded_result.epoch_description_list) == num_filter_epochs:
-                    a_decoded_result.epoch_description_list = [a_decoded_result.epoch_description_list[i] for i in valid_epoch_idxs]
-                
-                ## Filter mask output lists as well
-                _out_is_time_bin_active_list = [_out_is_time_bin_active_list[i] for i in valid_epoch_idxs]
-                inactive_mask_list = [inactive_mask_list[i] for i in valid_epoch_idxs]
-                all_time_bin_indicies_list = [all_time_bin_indicies_list[i] for i in valid_epoch_idxs]
-                last_valid_indices_list = [last_valid_indices_list[i] for i in valid_epoch_idxs]
-                
-                ## Filter filter_epochs DataFrame
-                a_decoded_result.filter_epochs = a_decoded_result.filter_epochs.iloc[valid_epoch_idxs].reset_index(drop=True)
+            ## END for i in np.arange(num_filter_epochs)...
             
-            ## Update num_filter_epochs to match the new count
-            a_decoded_result.num_filter_epochs = len(a_decoded_result.filter_epochs)
-        
+            ## Identify and remove epochs with 0 remaining bins
+            if min_num_included_time_bins_per_epoch is not None:
+                epochs_with_bins_mask = np.array([a_decoded_result.nbins[i] > min_num_included_time_bins_per_epoch for i in range(num_filter_epochs)])
+                if not np.all(epochs_with_bins_mask):
+                    ## Some epochs have 0 bins - need to remove them
+                    valid_epoch_idxs = np.where(epochs_with_bins_mask)[0]
+                    
+                    ## Filter all list fields
+                    a_decoded_result.p_x_given_n_list = [a_decoded_result.p_x_given_n_list[i] for i in valid_epoch_idxs]
+                    a_decoded_result.most_likely_positions_list = [a_decoded_result.most_likely_positions_list[i] for i in valid_epoch_idxs]
+                    a_decoded_result.most_likely_position_indicies_list = [a_decoded_result.most_likely_position_indicies_list[i] for i in valid_epoch_idxs]
+                    a_decoded_result.marginal_x_list = [a_decoded_result.marginal_x_list[i] for i in valid_epoch_idxs]
+                    a_decoded_result.marginal_y_list = [a_decoded_result.marginal_y_list[i] for i in valid_epoch_idxs]
+                    if len(a_decoded_result.marginal_z_list) > 0:
+                        a_decoded_result.marginal_z_list = [a_decoded_result.marginal_z_list[i] for i in valid_epoch_idxs]
+                    
+                    if len(valid_epoch_idxs) > 0:
+                        a_decoded_result.nbins = a_decoded_result.nbins[valid_epoch_idxs]  # Keep as ndarray via index slicing # can be subset because it's an ndarray. `IndexError: arrays used as indices must be of integer (or boolean) type`: occurs because when it is empty it seems to default to float64 dtype
+                    else:    
+                        a_decoded_result.nbins = [] # empty list
+                    a_decoded_result.time_bin_containers = [a_decoded_result.time_bin_containers[i] for i in valid_epoch_idxs]
+                    a_decoded_result.time_bin_edges = [a_decoded_result.time_bin_edges[i] for i in valid_epoch_idxs]
+                    a_decoded_result.spkcount = [a_decoded_result.spkcount[i] for i in valid_epoch_idxs]
+                    if len(a_decoded_result.epoch_description_list) == num_filter_epochs:
+                        # sometimes epoch_description_list is empty and so it doesn't need to be subsetted.
+                        a_decoded_result.epoch_description_list = [a_decoded_result.epoch_description_list[i] for i in valid_epoch_idxs]
+                    
+                    ## Filter mask output lists as well
+                    _out_is_time_bin_active_list = [_out_is_time_bin_active_list[i] for i in valid_epoch_idxs]
+                    inactive_mask_list = [inactive_mask_list[i] for i in valid_epoch_idxs]
+                    all_time_bin_indicies_list = [all_time_bin_indicies_list[i] for i in valid_epoch_idxs]
+                    last_valid_indices_list = [last_valid_indices_list[i] for i in valid_epoch_idxs]
+                    
+                    ## Filter filter_epochs DataFrame
+                    a_decoded_result.filter_epochs = a_decoded_result.filter_epochs.iloc[valid_epoch_idxs].reset_index(drop=True)
+                
+                ## Update num_filter_epochs to match the new count
+                a_decoded_result.num_filter_epochs = len(a_decoded_result.filter_epochs)
+            
         
         return a_decoded_result, (_out_is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list)
 
