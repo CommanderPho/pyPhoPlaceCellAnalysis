@@ -3053,7 +3053,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                         # Add subaxes at [left, bottom, width, height] in normalized parent coordinates
                         # ax_inset = existing_ax.add_axes([0.2, 0.6, 0.3, 0.3])  # Positioned at 20% left, 60% bottom
                         ax_inset_location = axes_inset_locators_list[a_linear_index]
-                        ax_inset = existing_ax.inset_axes(ax_inset_location, transform=existing_ax.transData, borderpad=0) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
+                        
+                        try:
+                            ax_inset = existing_ax.inset_axes(ax_inset_location, transform=existing_ax.transData, borderpad=0) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`
+                        except AttributeError as e:
+                            # AttributeError: Axes.set() got an unexpected keyword argument 'borderpad'
+                            ax_inset = existing_ax.inset_axes(ax_inset_location, transform=existing_ax.transData) # [x0, y0, width, height], where [x0, y0] is the lower-left corner -- can do data_coords by adding `, transform=existing_ax.transData`                        
+                        except Exception as e:
+                            raise
+                        
                         a_new_axs_list.append(ax_inset) 
                         a_linear_index += 1 ## increment
 
