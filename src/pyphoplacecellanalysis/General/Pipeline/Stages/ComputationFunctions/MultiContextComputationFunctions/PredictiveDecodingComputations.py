@@ -4535,7 +4535,51 @@ class MaskDataSource:
         )
         
         return a_new_ds
+
+
+
+    @function_attributes(short_name=None, tags=['get-data', 'by-epoch', ''], input_requires=[], output_provides=[], uses=[], used_by=['multi_trajectory_color_plotter'], creation_date='2026-01-21 05:10', related_items=[])
+    def _prepare_epoch_data(self, an_epoch_idx: int) -> Dict[str, Any]:
+        """ Used by `multi_trajectory_color_plotter` to get the data for a given epoch, currently used manually only
         
+            epoch_data = _prepare_epoch_data(a_ds=a_flat_matching_results_list_ds, an_epoch_idx=5)
+            # curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+            curr_matching_past_future_positions_df_list = epoch_data['curr_matching_past_future_positions_df_list']
+
+
+        """
+        ## from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations.PredictiveDecodingDisplayWidget._prepare_epoch_data`
+
+        col_name: str = 'past_future_matching_pos_epoch_id'
+
+        curr_matching_epochs_df: pd.DataFrame = self.matching_pos_epochs_dfs_list[an_epoch_idx]
+        curr_matching_positions_df: pd.DataFrame = self.matching_pos_dfs_list[an_epoch_idx]
+        curr_matching_epochs_df_dict: Dict[types.PastFutureCategory, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
+
+        curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {}
+
+        for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+            an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
+            a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
+                                                                                                                        override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
+                                                                                                                        drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+
+        ## END for ...            
+        curr_matching_past_future_positions_df_list: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {k:list(v.values()) for k, v in curr_matching_past_future_positions_df_dict.items()}
+        ## OUTPUTS: curr_matching_past_future_positions_df_dict
+        return {
+            'curr_matching_epochs_df': curr_matching_epochs_df,
+            'curr_matching_positions_df': curr_matching_positions_df,
+            'curr_matching_epochs_df_dict': curr_matching_epochs_df_dict,
+            'curr_matching_past_future_positions_df_dict': curr_matching_past_future_positions_df_dict,
+            'curr_matching_past_future_positions_df_list': curr_matching_past_future_positions_df_list,
+        }
+
+
+
 
 @metadata_attributes(short_name=None, tags=['partially-working', 'matplotlib', '3-pane', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:42', related_items=[])
 @define(slots=False, repr=False, eq=False)
