@@ -5635,11 +5635,17 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         if overlay_mask.ndim != 2:
             raise ValueError("overlay_mask must be a 2D array")
     
+    # Handle case where trajectory_colors is a string (likely a colormap name)
+    # If trajectory_colors is a string and cmap is None, treat it as a colormap name
+    if isinstance(trajectory_colors, str) and cmap is None:
+        cmap = trajectory_colors
+        trajectory_colors = None
+    
     # Validate and convert trajectory_colors if provided
     trajectory_color_objects = None
     if trajectory_colors is not None:
         if not isinstance(trajectory_colors, (list, tuple)):
-            raise ValueError("trajectory_colors must be a list or tuple")
+            raise ValueError("trajectory_colors must be a list or tuple (or a string colormap name if cmap is not provided)")
         if len(trajectory_colors) != len(position_dfs):
             raise ValueError(f"trajectory_colors must have length {len(position_dfs)}, got {len(trajectory_colors)}")
         # Convert each color to QColor
