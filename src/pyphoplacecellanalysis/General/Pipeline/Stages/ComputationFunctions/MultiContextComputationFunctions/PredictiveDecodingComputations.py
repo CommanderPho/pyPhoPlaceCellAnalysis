@@ -4190,35 +4190,48 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 - DRAWBACK: for mostly stationary events, the direction doesn't mean much, could artificially exclude stationary events
 
         """
+        import time as _time
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
         ## NEW: filtering by whether decoded posterior in each t_bin is "position-like"
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
 
+        _fn_name: str = 'perform_predictive_decoding_analysis'
+        _total_start_time = _time.perf_counter()
+        
+        print(f'[{_fn_name}] ========== STARTING ==========')
+        print(f'[{_fn_name}] Parameters: window_size={window_size}, fine_time_bin_size={fine_time_bin_size}, extant_decoded_time_bin_size={extant_decoded_time_bin_size}')
+        print(f'[{_fn_name}] Flags: drop_previous_result_and_compute_fresh={drop_previous_result_and_compute_fresh}, enable_masked_filtered_container_before_any_comps={enable_masked_filtered_container_before_any_comps}')
+        print(f'[{_fn_name}] Flags: should_perform_first_pass_compute_future_and_past_analysis={should_perform_first_pass_compute_future_and_past_analysis}, enable_filter_and_final_result_processing={enable_filter_and_final_result_processing}')
 
         if include_includelist is not None:
-            print(f'WARN: perform_predictive_decoding_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
+            print(f'[{_fn_name}] WARN: include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         ## Get the needed data:
         should_filter_by_active_spikes: bool = ((min_num_spikes_per_bin_to_be_considered_active is not None) and (min_num_spikes_per_bin_to_be_considered_active > 0))
         should_filter_by_position_like_posterior_bins: bool = ((mask_position_like_time_score_cutoff is not None) and (mask_position_like_time_score_cutoff > 0))
+        print(f'[{_fn_name}] Filtering config: should_filter_by_active_spikes={should_filter_by_active_spikes} (min_spikes={min_num_spikes_per_bin_to_be_considered_active}), should_filter_by_position_like_posterior_bins={should_filter_by_position_like_posterior_bins} (cutoff={mask_position_like_time_score_cutoff})')
         
         # ==================================================================================================================================================================================================================================================================================== #
-        # MASK low-firing bins before using result                                                                                                                                                                                                                                             #
+        # PHASE 1: MASK low-firing bins before using result                                                                                                                                                                                                                                    #
         # ==================================================================================================================================================================================================================================================================================== #
-        # extant_decoded_time_bin_size = 0.250
+        _phase1_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 1: Loading and masking decoded results ---')
 
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
         spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
+        print(f'[{_fn_name}] Loaded DirectionalDecodersDecoded (deepcopy). spikes_df shape: {spikes_df.shape}')
             
         if (should_filter_by_active_spikes or should_filter_by_position_like_posterior_bins):
             ## Masked result:
             epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
-            # a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
             a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
+            n_time_bin_sizes = len(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict)
+            print(f'[{_fn_name}] Applying masks to {n_time_bin_sizes} time bin size(s)...')
             
-            for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
+            for i_tbin, (extant_decoded_time_bin_size, a_result_decoded) in enumerate(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items()):
+                print(f'[{_fn_name}]   Processing time_bin_size {i_tbin+1}/{n_time_bin_sizes}: {extant_decoded_time_bin_size}s')
                 a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
                 a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
                 
@@ -4252,270 +4265,302 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = a_masked_result.get_result_for_epoch(0) ## get the single epoch, re-assign
 
             ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuousl...
-            
+            print(f'[{_fn_name}] Masking complete for all time bin sizes.')
+        else:
+            print(f'[{_fn_name}] Skipping masking (no filters enabled).')
         ## end if (should_filter...
         
+        _phase1_elapsed = _time.perf_counter() - _phase1_start_time
+        print(f'[{_fn_name}] PHASE 1 complete. Elapsed: {_phase1_elapsed:.2f}s')
 
-        # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 2: Setup position data and container initialization                                                                                                                                                                                                                            #
+        # ==================================================================================================================================================================================================================================================================================== #
+        _phase2_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 2: Setup position data and container ---')
         
         pos_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
+        print(f'[{_fn_name}] Loaded position dataframe. Shape: {pos_df.shape}')
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
-        print(f'previously_decoded time_bin_sizes: {previously_decoded_keys}')
+        print(f'[{_fn_name}] Previously decoded time_bin_sizes: {previously_decoded_keys}')
 
         if extant_decoded_time_bin_size is None:
             time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+            print(f'[{_fn_name}] Using most_recent_decoding_time_bin_size: {time_bin_size}')
         else:
-            assert extant_decoded_time_bin_size in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict, f"extant size wasn't computed!"
+            available_sizes = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
+            if extant_decoded_time_bin_size not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
+                raise KeyError(f"[{_fn_name}] extant_decoded_time_bin_size={extant_decoded_time_bin_size} not in available sizes: {available_sizes}")
             time_bin_size: float = extant_decoded_time_bin_size
-
-        print(f'time_bin_size: {time_bin_size}')
+            print(f'[{_fn_name}] Using specified extant_decoded_time_bin_size: {time_bin_size}')
 
         if drop_previous_result_and_compute_fresh:
             removed_predictive_decoding_result = global_computation_results.computed_data.pop('PredictiveDecoding', None)
             if removed_predictive_decoding_result is not None:
-                print(f'removed previous "PredictiveDecoding" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
+                print(f'[{_fn_name}] Removed previous "PredictiveDecoding" result (drop_previous_result_and_compute_fresh=True)')
+            else:
+                print(f'[{_fn_name}] No previous "PredictiveDecoding" result to remove.')
 
+        # Initialize or upgrade container
         if ('PredictiveDecoding' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'PredictiveDecoding')):
-            # initialize
+            print(f'[{_fn_name}] Initializing new PredictiveDecodingComputationsContainerContainer...')
             a_container = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
             global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainerContainer(container=a_container, masked_container=None, is_global=True)
-            
-            # global_computation_results.computed_data['PredictiveDecoding'] = PredictiveDecodingComputationsContainer(predictive_decoding=None, is_global=True)
         elif isinstance(global_computation_results.computed_data['PredictiveDecoding'], PredictiveDecodingComputationsContainer):
-              ## upgraded to container container
-              print(f'upgrading from pre-2026-01-16 format with non-nested containers')
-              a_container = global_computation_results.computed_data['PredictiveDecoding'] ## get the original result
-              a_container_container: PredictiveDecodingComputationsContainerContainer = PredictiveDecodingComputationsContainerContainer(container=a_container, masked_container=None, is_global=True)
-              global_computation_results.computed_data['PredictiveDecoding'] = a_container_container
-
+            ## upgraded to container container
+            print(f'[{_fn_name}] Upgrading from pre-2026-01-16 format (non-nested containers)')
+            a_container = global_computation_results.computed_data['PredictiveDecoding'] ## get the original result
+            a_container_container: PredictiveDecodingComputationsContainerContainer = PredictiveDecodingComputationsContainerContainer(container=a_container, masked_container=None, is_global=True)
+            global_computation_results.computed_data['PredictiveDecoding'] = a_container_container
+        else:
+            print(f'[{_fn_name}] Using existing PredictiveDecodingComputationsContainerContainer.')
 
         a_container_container: PredictiveDecodingComputationsContainerContainer = global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
-        a_container: PredictiveDecodingComputationsContainer = a_container_container.container # global_computation_results.computed_data['PredictiveDecoding'] ## shorthand
+        a_container: PredictiveDecodingComputationsContainer = a_container_container.container
 
         # Get or create the decoder
         if (a_container.pf1D_Decoder_dict is None) or (len(a_container.pf1D_Decoder_dict) == 0):
             ## initialize it
             assert directional_decoders_decode_result is not None
             a_container.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
-            print(f'a_container: assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
+            print(f'[{_fn_name}] Assigned pf1D_Decoder_dict with keys: {list(a_container.pf1D_Decoder_dict.keys())}')
+        
+        _phase2_elapsed = _time.perf_counter() - _phase2_start_time
+        print(f'[{_fn_name}] PHASE 2 complete. Elapsed: {_phase2_elapsed:.2f}s')
 
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 3: Initialize DecodingLocalityMeasures                                                                                                                                                                                                                                         #
+        # ==================================================================================================================================================================================================================================================================================== #
+        _phase3_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 3: Initialize DecodingLocalityMeasures ---')
+        
         locality_measures = None
         try:
-            # Create DecodingLocalityMeasures first (required for new interface)
-            print(f'[DecodingLocalityMeasures] Initializing DecodingLocalityMeasures with time_bin_size={time_bin_size}...')
-            print(f'[DecodingLocalityMeasures] Input validation: directional_decoders_decode_result type={type(directional_decoders_decode_result).__name__}, has continuously_decoded_pseudo2D_decoder_dict={hasattr(directional_decoders_decode_result, "continuously_decoded_pseudo2D_decoder_dict")}')
+            print(f'[{_fn_name}] [DecodingLocalityMeasures] Initializing with time_bin_size={time_bin_size}...')
             
             if not hasattr(directional_decoders_decode_result, 'continuously_decoded_pseudo2D_decoder_dict'):
-                raise AttributeError(f"directional_decoders_decode_result missing required attribute 'continuously_decoded_pseudo2D_decoder_dict'. Available attributes: {list(directional_decoders_decode_result.__dict__.keys())[:10]}")
+                available_attrs = list(directional_decoders_decode_result.__dict__.keys())[:10]
+                raise AttributeError(f"[{_fn_name}] directional_decoders_decode_result missing 'continuously_decoded_pseudo2D_decoder_dict'. Available: {available_attrs}")
             
             if time_bin_size not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
                 available_sizes = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
-                raise KeyError(f"time_bin_size={time_bin_size} not found in continuously_decoded_pseudo2D_decoder_dict. Available sizes: {available_sizes}")
+                raise KeyError(f"[{_fn_name}] time_bin_size={time_bin_size} not in continuously_decoded_pseudo2D_decoder_dict. Available: {available_sizes}")
             
-            print(f'[DecodingLocalityMeasures] Calling init_from_decode_result...')
-            locality_measures = DecodingLocalityMeasures.init_from_decode_result(
-                curr_active_pipeline=owning_pipeline_reference,
-                directional_decoders_decode_result=directional_decoders_decode_result,
-                extant_decoded_time_bin_size=time_bin_size,
-                sigma=None  # Will be computed automatically if not provided
-            )
+            locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=owning_pipeline_reference, directional_decoders_decode_result=directional_decoders_decode_result, extant_decoded_time_bin_size=time_bin_size, sigma=None)
             
-            print(f'[DecodingLocalityMeasures] Successfully initialized. Type: {type(locality_measures).__name__}')
-            print(f'[DecodingLocalityMeasures] Checking computed properties: has gaussian_volume={hasattr(locality_measures, "gaussian_volume")}, has p_x_given_n_dict={hasattr(locality_measures, "p_x_given_n_dict")}')
-            
-            # Compute locality measures to ensure they are fully computed
-            # locality_measures.compute()
-            # non_local_PBE_non_moving_epochs_df: pd.DataFrame = locality_measures.get_non_moving_PBE_non_local_epochs(owning_pipeline_reference.sess, merging_adjacent_max_separation_sec=0.5)
+            print(f'[{_fn_name}] [DecodingLocalityMeasures] Successfully initialized.')
             if locality_measures is not None:
                 a_container.locality_measures = locality_measures
 
-
         except Exception as e:
-            print(f'[DecodingLocalityMeasures] error during computation: {e}')
-            # if fail_on
+            print(f'[{_fn_name}] [DecodingLocalityMeasures] ERROR during computation: {e}')
             raise
+        
+        _phase3_elapsed = _time.perf_counter() - _phase3_start_time
+        print(f'[{_fn_name}] PHASE 3 complete. Elapsed: {_phase3_elapsed:.2f}s')
 
 
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 4: Initialize and compute PredictiveDecoding                                                                                                                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
+        _phase4_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 4: Initialize and compute PredictiveDecoding ---')
+        
         try:
-            # Create DecodingLocalityMeasures first (required for new interface)
-            print(f'[PredictiveDecoding] Initializing PredictiveDecoding with time_bin_size={time_bin_size}...')
-            # print(f'[PredictiveDecoding] Input validation: directional_decoders_decode_result type={type(directional_decoders_decode_result).__name__}, has continuously_decoded_pseudo2D_decoder_dict={hasattr(directional_decoders_decode_result, "continuously_decoded_pseudo2D_decoder_dict")}')
+            print(f'[{_fn_name}] [PredictiveDecoding] Initializing with time_bin_size={time_bin_size}, window_size={window_size}...')
             
             if locality_measures is None:
                 locality_measures = a_container.locality_measures
+                print(f'[{_fn_name}] [PredictiveDecoding] Retrieved locality_measures from container.')
 
-            assert locality_measures is not None
+            if locality_measures is None:
+                raise ValueError(f"[{_fn_name}] locality_measures is None - cannot proceed with PredictiveDecoding initialization.")
 
             # Get a_result_decoded from directional_decoders_decode_result
             a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
             
-            ## INPUTS: a_result_decoded, locality_measures, pos_df
-            
-            print(f'[PredictiveDecoding] Calling init_from_decode_result...')
-
             #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
             ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).
-            ## INPUTS: spikes_df
-            # masked_result, mask_index_tuple = a_result_decoded.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
-            #     spikes_df=spikes_df,
-            #     min_num_spikes_per_bin_to_be_considered_active=5,
-            #     min_num_unique_active_neurons_per_time_bin=1,
-            #     masked_bin_fill_mode='ignore'
-            # )
-
-            ## TODO: do something with masked_result, mask_index_tuple
             
             # Create PredictiveDecoding using the new simplified interface
-            ## INPUTS: pos_df, locality_measures, ..
-            predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(
-                pos_df=pos_df,
-                locality_measures=locality_measures,
-                a_result_decoded=a_result_decoded,
-                window_size=window_size
-            )
-            print(f'[PredictiveDecoding] Successfully initialized. Type: {type(predictive_decoding).__name__}')
+            predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(pos_df=pos_df, locality_measures=locality_measures, a_result_decoded=a_result_decoded, window_size=window_size)
+            print(f'[{_fn_name}] [PredictiveDecoding] Successfully initialized.')
 
             # Use sigma from locality_measures (computed automatically) or compute from bin sizes if not available
             if locality_measures.sigma is None:
                 x_step: float = np.nanmean(np.diff(predictive_decoding.xbin))
                 y_step: float = np.nanmean(np.diff(predictive_decoding.ybin))
                 sigma: float = np.nanmax([x_step, y_step]) * 5.0
-                print(f'computed sigma from bin sizes: {sigma}')
+                print(f'[{_fn_name}] [PredictiveDecoding] Computed sigma from bin sizes: {sigma}')
             else:
                 sigma = locality_measures.sigma
-                print(f'using sigma from locality_measures: {sigma}')
+                print(f'[{_fn_name}] [PredictiveDecoding] Using sigma from locality_measures: {sigma}')
 
-            print(f'\t[PredictiveDecoding] computing via .compute(sigma={sigma})...')
+            print(f'[{_fn_name}] [PredictiveDecoding] Computing via .compute(sigma={sigma})... (this may take a while)')
+            _compute_start = _time.perf_counter()
             # Compute predictive decoding outputs
-            moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma) ## This line might be the slow one
-            print('\tdone computing!')
-            
-            # print(f'[PredictiveDecoding] Checking computed properties: has gaussian_volume={hasattr(predictive_decoding, "gaussian_volume")}, has p_x_given_n_dict={hasattr(predictive_decoding, "p_x_given_n_dict")}')
-            
-            # Compute locality measures to ensure they are fully computed
-            # locality_measures.compute()
-            # non_local_PBE_non_moving_epochs_df: pd.DataFrame = locality_measures.get_non_moving_PBE_non_local_epochs(owning_pipeline_reference.sess, merging_adjacent_max_separation_sec=0.5)
+            moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma)
+            _compute_elapsed = _time.perf_counter() - _compute_start
+            print(f'[{_fn_name}] [PredictiveDecoding] .compute() done! Elapsed: {_compute_elapsed:.2f}s')
             
             if predictive_decoding is not None:
                 # Store the PredictiveDecoding instance in the container
                 a_container.predictive_decoding = predictive_decoding
 
         except Exception as e:
-            print(f'[PredictiveDecoding] error during computation: {e}')
-            # if fail_on
+            print(f'[{_fn_name}] [PredictiveDecoding] ERROR during computation: {e}')
             raise
+        
+        _phase4_elapsed = _time.perf_counter() - _phase4_start_time
+        print(f'[{_fn_name}] PHASE 4 complete. Elapsed: {_phase4_elapsed:.2f}s')
 
 
-        # container = global_computation_results.computed_data.get('PredictiveDecoding', None)
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 5: Container validation and masked container building                                                                                                                                                                                                                          #
+        # ==================================================================================================================================================================================================================================================================================== #
+        _phase5_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 5: Container validation and masked container building ---')
+        
+        # Sync container reference
         if (a_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'].container != a_container):
-            ## set the container from the pipeline, it should be the same object through
             global_computation_results.computed_data['PredictiveDecoding'].container = a_container
-
-
+            print(f'[{_fn_name}] Synced a_container to global_computation_results.')
 
         # Validate container exists
-        assert a_container is not None
+        if a_container is None:
+            raise ValueError(f"[{_fn_name}] a_container is None after Phase 4 - critical error.")
+        
         if (a_container.pf1D_Decoder_dict is None) or (len(a_container.pf1D_Decoder_dict) == 0):
             ## initialize it
-            print(f'\t!!! this could be a regression, but a_container.pf1D_Decoder_dict is None so building from the original pipeline `DirectionalDecodersDecoded`...')
+            print(f'[{_fn_name}] WARN: a_container.pf1D_Decoder_dict is None/empty - rebuilding from DirectionalDecodersDecoded...')
             directional_decoders_decode_result = owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded']
-            assert directional_decoders_decode_result is not None
+            if directional_decoders_decode_result is None:
+                raise ValueError(f"[{_fn_name}] DirectionalDecodersDecoded is None - cannot rebuild pf1D_Decoder_dict.")
             a_container.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
-            print(f'\t\tcontainer: assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
-            
-
-        print('\t========== building masked_filtered_container...')
-
+            print(f'[{_fn_name}] Assigned pf1D_Decoder_dict with keys: {list(a_container.pf1D_Decoder_dict.keys())}')
 
         a_masked_container = None
         if enable_masked_filtered_container_before_any_comps:
-            print(f'enable_masked_filtered_container_before_any_comps is True so pre-masking before second-half of `perform_predictive_decoding_analysis(...)`')
-            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size,
-                                                                     should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
-                                                                     window_size=window_size) ## 3m now
+            print(f'[{_fn_name}] Building masked_container (enable_masked_filtered_container_before_any_comps=True)...')
+            _masked_build_start = _time.perf_counter()
+            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size)
+            _masked_build_elapsed = _time.perf_counter() - _masked_build_start
+            print(f'[{_fn_name}] Built masked_container. Elapsed: {_masked_build_elapsed:.2f}s')
             global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
             a_container = a_masked_container ## change the target of a_container
+        else:
+            print(f'[{_fn_name}] Skipping masked_container building (enable_masked_filtered_container_before_any_comps=False).')
+        
+        _phase5_elapsed = _time.perf_counter() - _phase5_start_time
+        print(f'[{_fn_name}] PHASE 5 complete. Elapsed: {_phase5_elapsed:.2f}s')
 
         # ==================================================================================================================================================================================================================================================================================== #
-        # Second half of `perform_predictive_decoding_analysis(...)`                                                                                                                                                                                                                           #
+        # PHASE 6: Optional future/past analysis computation                                                                                                                                                                                                                                   #
         # ==================================================================================================================================================================================================================================================================================== #
+        _phase6_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 6: Optional future/past analysis computation ---')
 
         if include_includelist is None:
             include_includelist = ['roam'] # , 'sprinkle'
         epoch_names: List[str] = include_includelist 
-        print(f'\t processing will occur for epoch_names: {epoch_names}')
+        print(f'[{_fn_name}] Target epoch_names for processing: {epoch_names}')
 
-        # compute_future_and_past_analysis ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # compute_future_and_past_analysis
         if should_perform_first_pass_compute_future_and_past_analysis:
-            for an_epoch_name in epoch_names:    
+            print(f'[{_fn_name}] Running compute_future_and_past_analysis for {len(epoch_names)} epoch(s)...')
+            for i_epoch, an_epoch_name in enumerate(epoch_names):    
                 try:
-                    print(f'\ttrying `.compute_future_and_past_analysis(...)` for an_epoch_name: "{an_epoch_name}"...')
+                    print(f'[{_fn_name}]   [{i_epoch+1}/{len(epoch_names)}] compute_future_and_past_analysis for epoch "{an_epoch_name}"...')
+                    _epoch_start = _time.perf_counter()
                     if an_epoch_name not in a_container.debug_computed_dict:
                         a_container.debug_computed_dict[an_epoch_name] = {}
-                    # active_epochs_df
-                    # _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name)
-                    _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name, decoding_time_bin_size=fine_time_bin_size, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True) ## #TODO 2026-01-15 02:06: - [ ] This is what's wasting all the memory ## `, should_defer_extended_computations=should_defer_extended_computations`
-                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out ## too many to unpack?
+                    _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name, decoding_time_bin_size=fine_time_bin_size, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True)
+                    epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                     a_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
+                    _epoch_elapsed = _time.perf_counter() - _epoch_start
+                    print(f'[{_fn_name}]     Completed "{an_epoch_name}" in {_epoch_elapsed:.2f}s')
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
-                    print(f'\t\tWARN: the `should_perform_first_pass_compute_future_and_past_analysis` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
-                    pass
+                    print(f'[{_fn_name}]     WARN: compute_future_and_past_analysis failed for "{an_epoch_name}": {e}. Skipping.')
                 except Exception as e:
+                    print(f'[{_fn_name}]     ERROR: Unexpected exception for "{an_epoch_name}": {e}')
                     raise
-                
-            ## END for an_epoch_name in epoch_names...
         else:
-            print(f'should_perform_first_pass_compute_future_and_past_analysis == False, so skipping those comps.')
+            print(f'[{_fn_name}] Skipping compute_future_and_past_analysis (should_perform_first_pass_compute_future_and_past_analysis=False).')
         
+        _phase6_elapsed = _time.perf_counter() - _phase6_start_time
+        print(f'[{_fn_name}] PHASE 6 complete. Elapsed: {_phase6_elapsed:.2f}s')
+        
+        
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 7: Optional filter and final result processing                                                                                                                                                                                                                                 #
+        # ==================================================================================================================================================================================================================================================================================== #
+        _phase7_start_time = _time.perf_counter()
+        print(f'[{_fn_name}] --- PHASE 7: Optional filter and final result processing ---')
         
         if enable_filter_and_final_result_processing:
             if (a_masked_container is None):
-                # Validate container exists
+                # Need to build masked_container first
+                print(f'[{_fn_name}] Building masked_container (was None, needed for final processing)...')
                 a_container_container = global_computation_results.computed_data.get('PredictiveDecoding', None)
-                assert a_container_container is not None
+                if a_container_container is None:
+                    raise ValueError(f"[{_fn_name}] PredictiveDecoding not found in computed_data during Phase 7.")
                 a_container = a_container_container.container
-                assert a_container is not None
-                print(f'\tbuilding masked_container...')
-                a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
-                                                                     window_size=window_size) ## 3m now
+                if a_container is None:
+                    raise ValueError(f"[{_fn_name}] a_container is None during Phase 7.")
+                _masked_build_start = _time.perf_counter()
+                a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size)
+                _masked_build_elapsed = _time.perf_counter() - _masked_build_start
+                print(f'[{_fn_name}] Built masked_container. Elapsed: {_masked_build_elapsed:.2f}s')
             
-            fine_time_bin_size: float = a_masked_container.most_recent_decoding_time_bin_size
+            # Use fine_time_bin_size from the masked container (don't shadow the parameter)
+            effective_fine_time_bin_size: float = a_masked_container.most_recent_decoding_time_bin_size
+            print(f'[{_fn_name}] Using effective_fine_time_bin_size={effective_fine_time_bin_size} from masked_container')
 
-            for an_epoch_name in epoch_names:    
+            print(f'[{_fn_name}] Running final_refine_single_epoch_result_masks for {len(epoch_names)} epoch(s)...')
+            for i_epoch, an_epoch_name in enumerate(epoch_names):    
                 try:
-                    print(f'\ttrying `.masked_container._filter_single_epoch_result(...)` for an_epoch_name: "{an_epoch_name}"...')
+                    print(f'[{_fn_name}]   [{i_epoch+1}/{len(epoch_names)}] final_refine_single_epoch_result_masks for epoch "{an_epoch_name}"...')
+                    _epoch_start = _time.perf_counter()
                     if an_epoch_name not in a_masked_container.debug_computed_dict:
                         a_masked_container.debug_computed_dict[an_epoch_name] = {}
                     
-                    # active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_epoch_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=fine_time_bin_size, a_decoder_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_epoch_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=effective_fine_time_bin_size, a_decoder_name=an_epoch_name)
                     a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
+                    _epoch_elapsed = _time.perf_counter() - _epoch_start
+                    print(f'[{_fn_name}]     Completed "{an_epoch_name}" in {_epoch_elapsed:.2f}s')
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
-                    print(f'\t\tWARN: the `enable_filter_and_final_result_processing` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
-                    pass
+                    print(f'[{_fn_name}]     WARN: final_refine_single_epoch_result_masks failed for "{an_epoch_name}": {e}. Skipping.')
                 except Exception as e:
+                    print(f'[{_fn_name}]     ERROR: Unexpected exception for "{an_epoch_name}": {e}')
                     raise
-            ## END for an_epoch_name in epoch_names...
         else:
-            print(f'enable_filter_and_final_result_processing == False, so skipping those comps.')
-            
+            print(f'[{_fn_name}] Skipping final result processing (enable_filter_and_final_result_processing=False).')
+        
+        _phase7_elapsed = _time.perf_counter() - _phase7_start_time
+        print(f'[{_fn_name}] PHASE 7 complete. Elapsed: {_phase7_elapsed:.2f}s')
 
-        ## Now filter
+        # ==================================================================================================================================================================================================================================================================================== #
+        # PHASE 8: Final container synchronization                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        print(f'[{_fn_name}] --- PHASE 8: Final container synchronization ---')
+        
+        ## Ensure all containers are properly stored in global_computation_results
         if (a_container_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'] != a_container_container):
-            ## set the container from the pipeline, it should be the same object through
             global_computation_results.computed_data['PredictiveDecoding'] = a_container_container
+            print(f'[{_fn_name}] Synced a_container_container to global_computation_results.')
         
         if (a_container is not None) and (a_container != a_masked_container) and (global_computation_results.computed_data['PredictiveDecoding'].container != a_container):
-            ## set the container from the pipeline, it should be the same object through
             global_computation_results.computed_data['PredictiveDecoding'].container = a_container
+            print(f'[{_fn_name}] Synced a_container to PredictiveDecoding.container.')
             
         if (a_masked_container is not None) and (global_computation_results.computed_data['PredictiveDecoding'].masked_container != a_masked_container):
-            ## set the container from the pipeline, it should be the same object through
             global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
-            
+            print(f'[{_fn_name}] Synced a_masked_container to PredictiveDecoding.masked_container.')
 
-        print(f'done')
+        _total_elapsed = _time.perf_counter() - _total_start_time
+        print(f'[{_fn_name}] ========== COMPLETE ==========')
+        print(f'[{_fn_name}] Total elapsed time: {_total_elapsed:.2f}s')
 
 
         """ Usage:
