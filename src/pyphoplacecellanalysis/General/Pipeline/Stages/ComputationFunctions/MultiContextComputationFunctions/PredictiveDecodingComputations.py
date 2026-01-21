@@ -6528,6 +6528,15 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         
     Returns:
         vispy.app.Application instance with the rendered visualization
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_vispy
+
+
+        viewer = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                        curr_position_df=container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result)
+
     """
     from vispy import app, scene
     from vispy.scene import visuals
@@ -6553,13 +6562,22 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 900), title='Predictive Decoding Display - Vispy')
     grid = canvas.central_widget.add_grid()
     
-    # Create three panes: Past, Posterior, Future
-    past_view = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
-    posterior_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
-    future_view = grid.add_view(row=0, col=2, col_span=1, border_color='gray')
+    # Create three main panes: Past, Posterior (split into 2D heatmap top + time bin grid bottom), Future
+    past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='gray')
+    future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='gray')
     
-    # Create colorbar view below the three panes
-    colorbar_view = grid.add_view(row=1, col=0, col_span=3, border_color='gray')
+    # Split the middle column into top (2D heatmap) and bottom (time bin grid)
+    posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
+    
+    # Create a nested grid for time bin views in the bottom half of middle column
+    max_time_bins_to_show = 8  # Maximum number of time bins to display
+    time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
+    time_bin_views = []  # Will be populated with views for each time bin
+    time_bin_images = []  # Will store image visuals for cleanup
+    time_bin_labels = []  # Will store text labels for cleanup
+    
+    # Create colorbar view below all panes
+    colorbar_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
     
     # Store references to visual elements for updating
     past_lines = []
@@ -6580,7 +6598,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'xbin': xbin,
         'ybin': ybin,
         'past_view': past_view,
-        'posterior_view': posterior_view,
+        'posterior_2d_view': posterior_2d_view,
+        'time_bin_grid': time_bin_grid,
+        'time_bin_views': time_bin_views,
+        'time_bin_images': time_bin_images,
+        'time_bin_labels': time_bin_labels,
+        'max_time_bins_to_show': max_time_bins_to_show,
         'future_view': future_view,
         'colorbar_view': colorbar_view,
         'past_lines': past_lines,
@@ -6610,6 +6633,17 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if state['posterior_img'] is not None:
             state['posterior_img'].parent = None
             state['posterior_img'] = None
+        
+        # Clear time bin images and labels
+        for img in state['time_bin_images']:
+            if img is not None:
+                img.parent = None
+        state['time_bin_images'].clear()
+        
+        for label in state['time_bin_labels']:
+            if label is not None:
+                label.parent = None
+        state['time_bin_labels'].clear()
         
         for line in state['future_lines']:
             line.parent = None
@@ -6823,9 +6857,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
                         state['past_lines'].append(line)
         
-        # Render Posterior Heatmap
+        # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
-            state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_view'].scene)
+            state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_2d_view'].scene)
             state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
         
         # Add epoch information text above the posterior view
@@ -6835,11 +6869,63 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             # Add extra space above for text
             text_y_pos = y_max + (y_max - y_min) * 0.15  # 15% above the top
             text_x_pos = (x_min + x_max) / 2  # Center horizontally
-            state['epoch_info_text'] = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=state['posterior_view'].scene)
+            state['epoch_info_text'] = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=state['posterior_2d_view'].scene)
             
-            # Update posterior view camera to include space for text
+            # Update posterior 2D view camera to include space for text
             y_range = y_max - y_min
-            state['posterior_view'].camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+            state['posterior_2d_view'].camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+        
+        # Render time bin grid (bottom half) - per-time-bin posteriors in a 2D grid layout
+        if p_x_given_n is not None and p_x_given_n.size > 0:
+            # p_x_given_n has shape (n_x_bins, n_y_bins, n_time_bins)
+            n_time_bins = p_x_given_n.shape[2]
+            n_bins_to_show = min(n_time_bins, state['max_time_bins_to_show'])
+            
+            # Global normalization across all time bins
+            vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
+            
+            # Create views if not already created, or if count changed
+            if len(state['time_bin_views']) != n_bins_to_show:
+                # Clear existing views from grid
+                for view in state['time_bin_views']:
+                    if view is not None and hasattr(view, 'parent'):
+                        view.parent = None
+                state['time_bin_views'].clear()
+                
+                # Create new views in a single row
+                for t_idx in range(n_bins_to_show):
+                    view = state['time_bin_grid'].add_view(row=0, col=t_idx, border_color='gray')
+                    view.camera = scene.PanZoomCamera(aspect=1)
+                    view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
+                    state['time_bin_views'].append(view)
+            
+            # Render each time bin in its view
+            for t_idx in range(n_bins_to_show):
+                # Get this time bin's 2D posterior (n_x_bins, n_y_bins) and transpose for vispy
+                slice_2d = p_x_given_n[:, :, t_idx].T.astype(np.float32)
+                
+                # Normalize to [0, 1]
+                if vol_max > vol_min:
+                    slice_2d = (slice_2d - vol_min) / (vol_max - vol_min)
+                
+                # Create image visual for this slice
+                view = state['time_bin_views'][t_idx]
+                slice_img = scene.visuals.Image(slice_2d, cmap='viridis', parent=view.scene)
+                
+                # Scale and position the image to fit the data extent
+                img_height, img_width = slice_2d.shape
+                scale_x_img = (x_max - x_min) / img_width if img_width > 0 else 1
+                scale_y_img = (y_max - y_min) / img_height if img_height > 0 else 1
+                slice_img.transform = scene.STTransform(scale=(scale_x_img, scale_y_img), translate=(x_min, y_min))
+                state['time_bin_images'].append(slice_img)
+                
+                # Add time bin label
+                label_y_pos = y_max + (y_max - y_min) * 0.05
+                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='cyan', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
+                state['time_bin_labels'].append(label)
+                
+                # Update camera to show label
+                view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
         
         # Render mask overlays on all three views
         if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
@@ -6860,8 +6946,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                     state['past_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['past_view'].scene)
                     state['past_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
                     
-                    # Add mask overlay to posterior view
-                    state['posterior_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['posterior_view'].scene)
+                    # Add mask overlay to posterior 2D view
+                    state['posterior_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['posterior_2d_view'].scene)
                     state['posterior_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
                     
                     # Add mask overlay to future view
@@ -6931,8 +7017,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     if hasattr(canvas.events, 'key_press'):
         canvas.events.key_press.connect(on_key_press)
     
-    # Add axes to all views
-    for view in [past_view, posterior_view, future_view]:
+    # Add axes to all 2D views
+    for view in [past_view, posterior_2d_view, future_view]:
         view.camera = scene.PanZoomCamera(aspect=1)
         scene.visuals.GridLines(parent=view.scene)
     
@@ -6945,8 +7031,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     # Create rectangle corners: bottom-left, bottom-right, top-right, top-left, back to bottom-left
     bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
     
-    # Add bounding box to each view (white color, 2px width)
-    for view in [past_view, posterior_view, future_view]:
+    # Add bounding box to each 2D view (white color, 2px width)
+    for view in [past_view, posterior_2d_view, future_view]:
         bbox_line = scene.visuals.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
     
     # Set camera ranges based on data extent
@@ -6954,9 +7040,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     # For past and future views, use standard extent
     for view in [past_view, future_view]:
         view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
-    # For posterior view, expand y-range to include space for text above
+    # For posterior 2D view, expand y-range to include space for text above
     y_range = extent[3] - extent[2]
-    posterior_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
+    posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
     
     # Initial render
     update_epoch_display(active_epoch_idx)
@@ -6996,6 +7082,18 @@ def render_predictive_decoding_with_napari(epoch_flat_mask_future_past_result: L
         
     Returns:
         napari.Viewer instance with the rendered visualization
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_napari
+
+        ## too many trajectories
+        viewer = render_predictive_decoding_with_napari(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                        curr_position_df=container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result)
+
+
+
     """
     import napari
     
