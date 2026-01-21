@@ -3722,6 +3722,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         if a_decoder_name not in self.debug_computed_dict:
             self.debug_computed_dict[a_decoder_name] = {}
 
+        if 'prominence_future_past_analysis' not in self.debug_computed_dict[a_decoder_name]:
+            self.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis'] = {} ## init new
+
         self.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis'].update({
             'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks,
             'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks,
