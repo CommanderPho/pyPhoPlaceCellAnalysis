@@ -6550,7 +6550,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     num_epochs = len(a_flat_matching_results_list_ds.p_x_given_n_list)
     
     # Create vispy application
-    canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 800), title='Predictive Decoding Display - Vispy')
+    canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 900), title='Predictive Decoding Display - Vispy')
     grid = canvas.central_widget.add_grid()
     
     # Create three panes: Past, Posterior, Future
@@ -6558,10 +6558,18 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     posterior_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
     future_view = grid.add_view(row=0, col=2, col_span=1, border_color='gray')
     
+    # Create colorbar view below the three panes
+    colorbar_view = grid.add_view(row=1, col=0, col_span=3, border_color='gray')
+    
     # Store references to visual elements for updating
     past_lines = []
     posterior_img = None
     future_lines = []
+    past_mask_overlay = None
+    posterior_mask_overlay = None
+    future_mask_overlay = None
+    colorbar_rects = []
+    colorbar_texts = []
     
     # Store data for updates
     state = {
@@ -6573,9 +6581,15 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'past_view': past_view,
         'posterior_view': posterior_view,
         'future_view': future_view,
+        'colorbar_view': colorbar_view,
         'past_lines': past_lines,
         'posterior_img': posterior_img,
         'future_lines': future_lines,
+        'past_mask_overlay': past_mask_overlay,
+        'posterior_mask_overlay': posterior_mask_overlay,
+        'future_mask_overlay': future_mask_overlay,
+        'colorbar_rects': colorbar_rects,
+        'colorbar_texts': colorbar_texts,
         'canvas': canvas
     }
     
@@ -6599,15 +6613,162 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             line.parent = None
         state['future_lines'].clear()
         
+        # Clear mask overlays
+        if state['past_mask_overlay'] is not None:
+            state['past_mask_overlay'].parent = None
+            state['past_mask_overlay'] = None
+        
+        if state['posterior_mask_overlay'] is not None:
+            state['posterior_mask_overlay'].parent = None
+            state['posterior_mask_overlay'] = None
+        
+        if state['future_mask_overlay'] is not None:
+            state['future_mask_overlay'].parent = None
+            state['future_mask_overlay'] = None
+        
+        # Clear colorbar
+        for rect in state['colorbar_rects']:
+            if rect is not None:
+                rect.parent = None
+        state['colorbar_rects'].clear()
+        
+        for text in state['colorbar_texts']:
+            if text is not None:
+                text.parent = None
+        state['colorbar_texts'].clear()
+        
         # Prepare epoch data
         epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx)
+        
+        # Get epoch start and end times
+        filter_epochs = state['a_flat_matching_results_list_ds'].filter_epochs
+        if new_epoch_idx < len(filter_epochs):
+            epoch_row = filter_epochs.iloc[new_epoch_idx]
+            epoch_start_t = epoch_row['start'] if 'start' in epoch_row else epoch_row.get('t_start', None)
+            epoch_end_t = epoch_row['stop'] if 'stop' in epoch_row else epoch_row.get('t_stop', None)
+        else:
+            epoch_start_t = None
+            epoch_end_t = None
         
         # Get posterior data
         p_x_given_n = state['a_flat_matching_results_list_ds'].p_x_given_n_list[new_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
         posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
         
-        # Render Past Trajectories
+        # Calculate extent and scale for rendering (used by posterior and mask overlays)
+        x_min, x_max = state['xbin'][0], state['xbin'][-1]
+        y_min, y_max = state['ybin'][0], state['ybin'][-1]
+        # Determine image dimensions from posterior (or mask if posterior is not available)
+        if posterior_2d is not None and posterior_2d.size > 0:
+            img_height, img_width = posterior_2d.T.shape
+        else:
+            # Fallback: use mask dimensions if available
+            if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
+                if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
+                    mask_2d = state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks[new_epoch_idx]
+                    if mask_2d is not None and mask_2d.size > 0:
+                        img_height, img_width = mask_2d.T.shape
+                    else:
+                        return  # No data to render
+                else:
+                    return  # Invalid epoch index
+            else:
+                return  # No data to render
+        # Calculate scale: map image pixels to world coordinates
+        x_scale = (x_max - x_min) / img_width
+        y_scale = (y_max - y_min) / img_height
+        
+        # First pass: collect all time distances to find maximum for common normalization
+        all_time_distances = []
         curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+        
+        # Collect past time distances
+        if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
+            past_positions_dict = curr_matching_past_future_positions_df_dict['past']
+            for epoch_id, positions_df in past_positions_dict.items():
+                if len(positions_df) > 0 and 't' in positions_df.columns:
+                    t_coords = positions_df['t'].values
+                    valid_mask = ~np.isnan(t_coords)
+                    if np.any(valid_mask):
+                        time_rel = t_coords[valid_mask] - epoch_start_t ## negative values
+                        time_distance = np.abs(time_rel)  # Absolute distance
+                        all_time_distances.extend(time_distance.tolist())
+        
+        # Collect future time distances
+        if 'future' in curr_matching_past_future_positions_df_dict and epoch_end_t is not None:
+            future_positions_dict = curr_matching_past_future_positions_df_dict['future']
+            for epoch_id, positions_df in future_positions_dict.items():
+                if len(positions_df) > 0 and 't' in positions_df.columns:
+                    t_coords = positions_df['t'].values
+                    valid_mask = ~np.isnan(t_coords)
+                    if np.any(valid_mask):
+                        time_rel = t_coords[valid_mask] - epoch_end_t ## positive values, good
+                        time_distance = np.abs(time_rel)  # Absolute distance
+                        all_time_distances.extend(time_distance.tolist())
+        
+        # Find maximum distance for normalization
+        if len(all_time_distances) > 0:
+            max_time_distance = max(all_time_distances)
+        else:
+            max_time_distance = 1.0  # Fallback
+        print(f'max_time_distance: {max_time_distance}')
+        
+        # Render colorbar showing time-to-opacity mapping
+        if max_time_distance > 0:
+            # Create colorbar using rectangles for better visibility
+            colorbar_width = 800
+            colorbar_height = 40
+            num_segments = 200  # Number of segments for smooth gradient
+            
+            # Time range: from -max_time_distance (past) to +max_time_distance (future)
+            time_range = np.linspace(-max_time_distance, max_time_distance, num_segments)
+            segment_width = colorbar_width / num_segments
+            
+            # Store rectangles for cleanup
+            colorbar_rects = []
+            
+            # Create gradient segments
+            for i, time_val in enumerate(time_range):
+                time_distance = np.abs(time_val)
+                distance_normalized = time_distance / max_time_distance  # [0, 1]
+                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
+                opacity = np.clip(opacity, 0.2, 1.0)
+                
+                # Past side (left): warm colors, Future side (right): cool colors
+                if time_val < 0:  # Past
+                    hue = 0.0  # Red
+                else:  # Future
+                    hue = 0.5  # Cyan
+                
+                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                color = (rgb[0], rgb[1], rgb[2], opacity)
+                
+                # Create rectangle for this segment
+                x_pos = i * segment_width
+                rect = scene.visuals.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=state['colorbar_view'].scene)
+                colorbar_rects.append(rect)
+            
+            # Store rectangles in state for cleanup
+            state['colorbar_rects'] = colorbar_rects
+            
+            # Add text labels for time values
+            label_times = [-max_time_distance, -max_time_distance/2, 0, max_time_distance/2, max_time_distance]
+            label_positions = np.linspace(0, colorbar_width, len(label_times))
+            
+            for time_val, x_pos in zip(label_times, label_positions):
+                text = scene.visuals.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=state['colorbar_view'].scene)
+                state['colorbar_texts'].append(text)
+            
+            # Add title labels
+            title_past = scene.visuals.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=state['colorbar_view'].scene)
+            title_future = scene.visuals.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=state['colorbar_view'].scene)
+            title_opacity = scene.visuals.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=state['colorbar_view'].scene)
+            state['colorbar_texts'].extend([title_past, title_future, title_opacity])
+            
+            # Set colorbar camera to show the full colorbar
+            state['colorbar_view'].camera = scene.PanZoomCamera(aspect=1)
+            state['colorbar_view'].camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
+
+        # Render Past Trajectories
         if 'past' in curr_matching_past_future_positions_df_dict:
             past_positions_dict = curr_matching_past_future_positions_df_dict['past']
             past_trajectory_items = list(past_positions_dict.items())
@@ -6617,25 +6778,75 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                     y_coords = positions_df['y'].values
                     valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
                     if np.any(valid_mask):
-                        # Generate unique color for each trajectory using HSV color space
+                        x_valid = x_coords[valid_mask]
+                        y_valid = y_coords[valid_mask]
+                        
+                        # Generate unique base color for each trajectory using HSV color space
                         hue = (idx / max(len(past_trajectory_items), 1)) * 0.7  # Use 0-0.7 range for red-orange-yellow colors
                         saturation = 0.8
                         value = 0.9
-                        rgb = colorsys.hsv_to_rgb(hue, saturation, value)
-                        line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color=rgb, width=2, parent=state['past_view'].scene)
+                        base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        
+                        # Calculate opacity based on time distance from epoch start using common normalization
+                        if epoch_start_t is not None and 't' in positions_df.columns:
+                            t_coords = positions_df['t'].values[valid_mask]
+                            # Time relative to start: negative values (t < start_t)
+                            time_rel = t_coords - epoch_start_t
+                            # Absolute distance from start
+                            time_distance = np.abs(time_rel)
+                            # Normalize using common max distance, then map to [0.2, 1.0]
+                            if max_time_distance > 0:
+                                distance_normalized = time_distance / max_time_distance  # [0, 1]
+                                # Invert: closer to start (smaller distance) should be brighter
+                                # Map from [0, 1] to [0.2, 1.0]: 0 -> 1.0, 1 -> 0.2
+                                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
+                            else:
+                                opacity = np.ones(len(x_valid)) * 0.8
+                        else:
+                            opacity = np.ones(len(x_valid)) * 0.8
+                        
+                        # Create per-vertex colors with varying opacity
+                        n_points = len(x_valid)
+                        colors = np.ones((n_points, 4), dtype=np.float32)
+                        colors[:, 0] = base_rgb[0]  # R
+                        colors[:, 1] = base_rgb[1]  # G
+                        colors[:, 2] = base_rgb[2]  # B
+                        colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
+                        
+                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
                         state['past_lines'].append(line)
         
         # Render Posterior Heatmap
         if posterior_2d is not None and posterior_2d.size > 0:
-            x_min, x_max = state['xbin'][0], state['xbin'][-1]
-            y_min, y_max = state['ybin'][0], state['ybin'][-1]
-            # posterior_2d has shape (n_x_bins, n_y_bins), after .T it's (n_y_bins, n_x_bins)
-            img_height, img_width = posterior_2d.T.shape
-            # Calculate scale: map image pixels to world coordinates
-            x_scale = (x_max - x_min) / img_width
-            y_scale = (y_max - y_min) / img_height
             state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_view'].scene)
             state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+        
+        # Render mask overlays on all three views
+        if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
+            if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
+                mask_2d = state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks[new_epoch_idx]
+                if mask_2d is not None and mask_2d.size > 0:
+                    # Convert boolean mask to RGBA image with transparency
+                    # mask_2d has shape (n_x_bins, n_y_bins), after .T it's (n_y_bins, n_x_bins)
+                    mask_transposed = mask_2d.T.astype(np.float32)
+                    # Create RGBA image: white where mask is True, transparent where False
+                    mask_rgba = np.zeros((mask_transposed.shape[0], mask_transposed.shape[1], 4), dtype=np.float32)
+                    mask_rgba[:, :, 0] = 1.0  # Red channel
+                    mask_rgba[:, :, 1] = 1.0  # Green channel
+                    mask_rgba[:, :, 2] = 1.0  # Blue channel
+                    mask_rgba[:, :, 3] = mask_transposed * 0.3  # Alpha channel (30% opacity where mask is True)
+                    
+                    # Add mask overlay to past view
+                    state['past_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['past_view'].scene)
+                    state['past_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+                    
+                    # Add mask overlay to posterior view
+                    state['posterior_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['posterior_view'].scene)
+                    state['posterior_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+                    
+                    # Add mask overlay to future view
+                    state['future_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['future_view'].scene)
+                    state['future_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
         
         # Render Future Trajectories
         if 'future' in curr_matching_past_future_positions_df_dict:
@@ -6647,12 +6858,42 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                     y_coords = positions_df['y'].values
                     valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
                     if np.any(valid_mask):
-                        # Generate unique color for each trajectory using HSV color space
+                        x_valid = x_coords[valid_mask]
+                        y_valid = y_coords[valid_mask]
+                        
+                        # Generate unique base color for each trajectory using HSV color space
                         hue = 0.5 + (idx / max(len(future_trajectory_items), 1)) * 0.3  # Use 0.5-0.8 range for cyan-blue colors
                         saturation = 0.8
                         value = 0.9
-                        rgb = colorsys.hsv_to_rgb(hue, saturation, value)
-                        line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color=rgb, width=2, parent=state['future_view'].scene)
+                        base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        
+                        # Calculate opacity based on time distance from epoch end using common normalization
+                        if epoch_end_t is not None and 't' in positions_df.columns:
+                            t_coords = positions_df['t'].values[valid_mask]
+                            # Time relative to end: positive values (t > end_t)
+                            time_rel = t_coords - epoch_end_t
+                            # Absolute distance from end
+                            time_distance = np.abs(time_rel)
+                            # Normalize using common max distance, then map to [0.2, 1.0]
+                            if max_time_distance > 0:
+                                distance_normalized = time_distance / max_time_distance  # [0, 1]
+                                # Invert: closer to end (smaller distance) should be brighter
+                                # Map from [0, 1] to [0.2, 1.0]: 0 -> 1.0, 1 -> 0.2
+                                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
+                            else:
+                                opacity = np.ones(len(x_valid)) * 0.8
+                        else:
+                            opacity = np.ones(len(x_valid)) * 0.8
+                        
+                        # Create per-vertex colors with varying opacity
+                        n_points = len(x_valid)
+                        colors = np.ones((n_points, 4), dtype=np.float32)
+                        colors[:, 0] = base_rgb[0]  # R
+                        colors[:, 1] = base_rgb[1]  # G
+                        colors[:, 2] = base_rgb[2]  # B
+                        colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
+                        
+                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
                         state['future_lines'].append(line)
         
         # Update title
@@ -6674,6 +6915,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     for view in [past_view, posterior_view, future_view]:
         view.camera = scene.PanZoomCamera(aspect=1)
         scene.visuals.GridLines(parent=view.scene)
+    
+    # Set up colorbar view camera
+    colorbar_view.camera = scene.PanZoomCamera(aspect=1)
     
     # Draw bounding boxes for each view (based on xbin/ybin extent)
     x_min, x_max = xbin[0], xbin[-1]
