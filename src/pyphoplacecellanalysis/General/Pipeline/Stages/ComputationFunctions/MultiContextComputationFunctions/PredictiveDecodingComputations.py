@@ -6513,6 +6513,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
     to render all the data in an interactive visualization.
     
+    Keyboard controls:
+        Left Arrow: Navigate to previous epoch
+        Right Arrow: Navigate to next epoch
+    
     Args:
         epoch_flat_mask_future_past_result: List of MatchingPastFuturePositionsResult objects
         a_decoded_filter_epochs_df: DataFrame with filter epochs
@@ -6528,6 +6532,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     from vispy import app, scene
     from vispy.scene import visuals
     import vispy.color
+    import colorsys
     
     # Create MaskDataSource from the matching results
     a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
@@ -6541,6 +6546,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     else:
         raise ValueError("pf_decoder must be provided")
     
+    # Get total number of epochs
+    num_epochs = len(a_flat_matching_results_list_ds.p_x_given_n_list)
+    
     # Create vispy application
     canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 800), title='Predictive Decoding Display - Vispy')
     grid = canvas.central_widget.add_grid()
@@ -6550,52 +6558,140 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     posterior_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
     future_view = grid.add_view(row=0, col=2, col_span=1, border_color='gray')
     
-    # Prepare epoch data
-    epoch_data = a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=active_epoch_idx)
+    # Store references to visual elements for updating
+    past_lines = []
+    posterior_img = None
+    future_lines = []
     
-    # Get posterior data
-    p_x_given_n = a_flat_matching_results_list_ds.p_x_given_n_list[active_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-    posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
+    # Store data for updates
+    state = {
+        'current_epoch_idx': active_epoch_idx,
+        'num_epochs': num_epochs,
+        'a_flat_matching_results_list_ds': a_flat_matching_results_list_ds,
+        'xbin': xbin,
+        'ybin': ybin,
+        'past_view': past_view,
+        'posterior_view': posterior_view,
+        'future_view': future_view,
+        'past_lines': past_lines,
+        'posterior_img': posterior_img,
+        'future_lines': future_lines,
+        'canvas': canvas
+    }
     
-    # Render Past Trajectories
-    curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
-    if 'past' in curr_matching_past_future_positions_df_dict:
-        past_positions_dict = curr_matching_past_future_positions_df_dict['past']
-        for epoch_id, positions_df in past_positions_dict.items():
-            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
-                x_coords = positions_df['x'].values
-                y_coords = positions_df['y'].values
-                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
-                if np.any(valid_mask):
-                    line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color='red', width=2, parent=past_view.scene)
+    def update_epoch_display(new_epoch_idx: int):
+        """Update the display to show a different epoch."""
+        if new_epoch_idx < 0 or new_epoch_idx >= num_epochs:
+            return
+        
+        state['current_epoch_idx'] = new_epoch_idx
+        
+        # Clear existing visuals
+        for line in state['past_lines']:
+            line.parent = None
+        state['past_lines'].clear()
+        
+        if state['posterior_img'] is not None:
+            state['posterior_img'].parent = None
+            state['posterior_img'] = None
+        
+        for line in state['future_lines']:
+            line.parent = None
+        state['future_lines'].clear()
+        
+        # Prepare epoch data
+        epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx)
+        
+        # Get posterior data
+        p_x_given_n = state['a_flat_matching_results_list_ds'].p_x_given_n_list[new_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+        posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
+        
+        # Render Past Trajectories
+        curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+        if 'past' in curr_matching_past_future_positions_df_dict:
+            past_positions_dict = curr_matching_past_future_positions_df_dict['past']
+            past_trajectory_items = list(past_positions_dict.items())
+            for idx, (epoch_id, positions_df) in enumerate(past_trajectory_items):
+                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                    x_coords = positions_df['x'].values
+                    y_coords = positions_df['y'].values
+                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                    if np.any(valid_mask):
+                        # Generate unique color for each trajectory using HSV color space
+                        hue = (idx / max(len(past_trajectory_items), 1)) * 0.7  # Use 0-0.7 range for red-orange-yellow colors
+                        saturation = 0.8
+                        value = 0.9
+                        rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color=rgb, width=2, parent=state['past_view'].scene)
+                        state['past_lines'].append(line)
+        
+        # Render Posterior Heatmap
+        if posterior_2d is not None and posterior_2d.size > 0:
+            x_min, x_max = state['xbin'][0], state['xbin'][-1]
+            y_min, y_max = state['ybin'][0], state['ybin'][-1]
+            # posterior_2d has shape (n_x_bins, n_y_bins), after .T it's (n_y_bins, n_x_bins)
+            img_height, img_width = posterior_2d.T.shape
+            # Calculate scale: map image pixels to world coordinates
+            x_scale = (x_max - x_min) / img_width
+            y_scale = (y_max - y_min) / img_height
+            state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_view'].scene)
+            state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+        
+        # Render Future Trajectories
+        if 'future' in curr_matching_past_future_positions_df_dict:
+            future_positions_dict = curr_matching_past_future_positions_df_dict['future']
+            future_trajectory_items = list(future_positions_dict.items())
+            for idx, (epoch_id, positions_df) in enumerate(future_trajectory_items):
+                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                    x_coords = positions_df['x'].values
+                    y_coords = positions_df['y'].values
+                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                    if np.any(valid_mask):
+                        # Generate unique color for each trajectory using HSV color space
+                        hue = 0.5 + (idx / max(len(future_trajectory_items), 1)) * 0.3  # Use 0.5-0.8 range for cyan-blue colors
+                        saturation = 0.8
+                        value = 0.9
+                        rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color=rgb, width=2, parent=state['future_view'].scene)
+                        state['future_lines'].append(line)
+        
+        # Update title
+        state['canvas'].title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{num_epochs})'
+        state['canvas'].update()
     
-    # Render Posterior Heatmap
-    if posterior_2d is not None and posterior_2d.size > 0:
-        # Create image from posterior
-        extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-        img = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=posterior_view.scene)
-        img.transform = scene.STTransform(scale=(extent[1] - extent[0], extent[3] - extent[2]), translate=(extent[0], extent[2]))
+    def on_key_press(event):
+        """Handle keyboard events for epoch navigation."""
+        if event.key == 'Left':
+            update_epoch_display(state['current_epoch_idx'] - 1)
+        elif event.key == 'Right':
+            update_epoch_display(state['current_epoch_idx'] + 1)
     
-    # Render Future Trajectories
-    if 'future' in curr_matching_past_future_positions_df_dict:
-        future_positions_dict = curr_matching_past_future_positions_df_dict['future']
-        for epoch_id, positions_df in future_positions_dict.items():
-            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
-                x_coords = positions_df['x'].values
-                y_coords = positions_df['y'].values
-                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
-                if np.any(valid_mask):
-                    line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color='blue', width=2, parent=future_view.scene)
+    # Connect keyboard event handler - vispy uses events.connect() method
+    if hasattr(canvas.events, 'key_press'):
+        canvas.events.key_press.connect(on_key_press)
     
     # Add axes to all views
     for view in [past_view, posterior_view, future_view]:
         view.camera = scene.PanZoomCamera(aspect=1)
         scene.visuals.GridLines(parent=view.scene)
     
+    # Draw bounding boxes for each view (based on xbin/ybin extent)
+    x_min, x_max = xbin[0], xbin[-1]
+    y_min, y_max = ybin[0], ybin[-1]
+    # Create rectangle corners: bottom-left, bottom-right, top-right, top-left, back to bottom-left
+    bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
+    
+    # Add bounding box to each view (white color, 2px width)
+    for view in [past_view, posterior_view, future_view]:
+        bbox_line = scene.visuals.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+    
     # Set camera ranges based on data extent
     extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
     for view in [past_view, posterior_view, future_view]:
         view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
+    
+    # Initial render
+    update_epoch_display(active_epoch_idx)
     
     return canvas
 
