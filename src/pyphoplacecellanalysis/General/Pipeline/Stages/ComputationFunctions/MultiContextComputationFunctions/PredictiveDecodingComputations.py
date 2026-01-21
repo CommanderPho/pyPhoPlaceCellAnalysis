@@ -3527,7 +3527,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
-    def final_refine_single_epoch_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam') -> DecodedFilterEpochsResult:
+    def final_refine_single_epoch_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam', **kwargs) -> DecodedFilterEpochsResult:
         """
         Seems to just do the whole set of computations again after the filtering/masking
         
@@ -3546,6 +3546,18 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
+
+        parallel: bool = kwargs.pop('paralell', True)
+        max_workers: int = kwargs.pop('max_workers', 4)
+
+        n_cpus: int = os.cpu_count() or 1
+        if n_cpus < 2:
+            max_workers = 1
+            parallel = False
+            print(f'overriding max_workers <--- 1 and (parallel = False) because only 1 cpu detected!')
+        else:
+            print(f'WARNING::::: RUNNING PARALELL IF POSSIBLE: max_workers: {max_workers}, parallel: {parallel}....')
+
 
         if fine_decoding_t_bin_size not in self.epochs_decoded_result_cache_dict:
             print(f'needs to compute: decoding_time_bin_size: {fine_decoding_t_bin_size}')
@@ -3627,6 +3639,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         
         print(f'\tfinished with for epochs loops doing locality recomputations')
         
+
+        # n_tasks: int = n_total_epochs
+        # use_parallel: bool = use_parallel and (n_tasks > 1) and (n_cpus > 1)
+
+
         # Promenecen stuff too:
         ## INPUTS: decoded_local_epochs_result
         # old_prom_2d_result = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(p_x_given_n_list=decoded_local_epochs_result.p_x_given_n_list, 
@@ -3666,7 +3683,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             peak_height_multiplier_probe_levels=slice_level_multipliers,
             should_use_faster_compute_single_slab_implementation=should_use_faster_compute_single_slab_implementation,
             min_considered_promenence=1e-11,
-            parallel=False, max_workers=1,
+            parallel=parallel, max_workers=max_workers,
             # parallel=True, max_workers=4,
             # parallel=True, max_workers=None,    
         )
@@ -3708,7 +3725,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 merging_adjacent_max_separation_sec = 1e-9,
                 minimum_epoch_duration = 0.05,
                 # merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
-                should_defer_extended_computations=True, max_workers=4,
+                should_defer_extended_computations=True, max_workers=max_workers,
         )
         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
         # _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result']
@@ -3732,7 +3749,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             'past_future_info_dict': past_future_info_dict,
             'matching_pos_dfs_list': matching_pos_dfs_list,
             'matching_pos_epochs_dfs_list': matching_pos_epochs_dfs_list,
-            # '_out_epoch_flat_mask_future_past_result': _out_epoch_flat_mask_future_past_result,
             'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj,
             'slice_level_multiplier_used': slice_level_multipliers[0],
         })
@@ -3740,8 +3756,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         ## add the processed items to the dict too
         self.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis'].update(_out_processed_items_list_dict)
         ### _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = masked_container.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis']['_out_epoch_flat_mask_future_past_result']
-
-
 
         # for k, v in _out_processed_items_list_dict.items():
         #     ## add the processed items to the dict too
@@ -4634,6 +4648,8 @@ from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock, DockArea
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
 from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
+from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidget import PaginationControlWidget
+# from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController ## 
 
 @define(slots=False, repr=False, eq=False)
 class MaskDataSource:
@@ -4801,7 +4817,7 @@ class PredictiveDecodingDisplayWidget:
     dock_container_widgets: Dict[str, Any] = field(default=Factory(dict))
     epoch_slider: Any = field(default=None)
     epoch_value_label: Any = field(default=None)
-    page_controls: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
+    page_controls: Dict[str, Dict[str, PaginationControlWidget]] = field(default=Factory(dict))
 
     active_epoch_idx: int = field(default=20)
     
@@ -5190,7 +5206,7 @@ class PredictiveDecodingDisplayWidget:
 
 
     def _build_page_controls(self, a_past_future_name: str, num_pages: int):
-        """Build page navigation controls for a trajectory widget.
+        """Build page navigation controls for a trajectory widget using PaginationControlWidget.
         
         Note: The controls widget is created but NOT added to the dock here.
         It should be added to a container widget that also contains the plot.
@@ -5202,54 +5218,23 @@ class PredictiveDecodingDisplayWidget:
             self._update_page_controls_visibility(a_past_future_name, num_pages)
             return
         
-        # Create control widget
-        control_widget = QtWidgets.QWidget()
-        control_layout = QtWidgets.QHBoxLayout()
-        control_layout.setContentsMargins(5, 2, 5, 2)
+        # Create PaginationControlWidget
+        pagination_widget = PaginationControlWidget(n_pages=num_pages)
         
-        # Label
-        label = QtWidgets.QLabel(f"{a_past_future_name.capitalize()} Page:")
-        control_layout.addWidget(label)
-        
-        # Previous button
-        prev_button = QtWidgets.QPushButton("◀ Prev")
-        prev_button.setMaximumWidth(60)
-        prev_button.clicked.connect(lambda: self._on_page_change(a_past_future_name, -1))
-        control_layout.addWidget(prev_button)
-        
-        # Slider
-        page_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        page_slider.setMinimum(0)
-        page_slider.setMaximum(max(0, num_pages - 1))
-        page_slider.setValue(self.trajectory_active_page_idx.get(a_past_future_name, 0))
-        page_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        page_slider.setTickInterval(1)
-        page_slider.setMinimumWidth(200)
-        page_slider.valueChanged.connect(lambda value: self._on_page_slider_changed(a_past_future_name, value))
-        control_layout.addWidget(page_slider, stretch=1)
-        
-        # Page label
-        page_label = QtWidgets.QLabel(f"Page {self.trajectory_active_page_idx.get(a_past_future_name, 0) + 1}/{num_pages}")
-        page_label.setMinimumWidth(80)
-        page_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        control_layout.addWidget(page_label)
-        
-        # Next button
-        next_button = QtWidgets.QPushButton("Next ▶")
-        next_button.setMaximumWidth(60)
-        next_button.clicked.connect(lambda: self._on_page_change(a_past_future_name, 1))
-        control_layout.addWidget(next_button)
-        
-        control_widget.setLayout(control_layout)
+        # Connect signals
+        pagination_widget.jump_to_page.connect(lambda page_idx: self._on_page_jump(a_past_future_name, page_idx))
+        pagination_widget.jump_previous_page.connect(lambda: self._on_page_change(a_past_future_name, -1))
+        pagination_widget.jump_next_page.connect(lambda: self._on_page_change(a_past_future_name, 1))
         
         # Store references
         if a_past_future_name not in self.page_controls:
             self.page_controls[a_past_future_name] = {}
-        self.page_controls[a_past_future_name]['widget'] = control_widget
-        self.page_controls[a_past_future_name]['slider'] = page_slider
-        self.page_controls[a_past_future_name]['label'] = page_label
-        self.page_controls[a_past_future_name]['prev_button'] = prev_button
-        self.page_controls[a_past_future_name]['next_button'] = next_button
+        self.page_controls[a_past_future_name]['widget'] = pagination_widget
+        
+        # Set initial page index if needed
+        initial_page_idx = self.trajectory_active_page_idx.get(a_past_future_name, 0)
+        if initial_page_idx != 0:
+            pagination_widget.programmatically_update_page_idx(initial_page_idx, block_signals=True)
         
         # Set initial visibility
         self._update_page_controls_visibility(a_past_future_name, num_pages)
@@ -5265,25 +5250,22 @@ class PredictiveDecodingDisplayWidget:
         active_page_idx = self.trajectory_active_page_idx.get(a_past_future_name, 0)
         
         if 'widget' in page_controls and page_controls['widget'] is not None:
-            page_controls['widget'].setVisible(should_show)
-        
-        if should_show:
-            # Update slider and label
-            if 'slider' in page_controls and page_controls['slider'] is not None:
-                page_controls['slider'].setMaximum(max(0, num_pages - 1))
-                page_controls['slider'].setValue(active_page_idx)
-            if 'label' in page_controls and page_controls['label'] is not None:
-                page_controls['label'].setText(f"Page {active_page_idx + 1}/{num_pages}")
+            pagination_widget = page_controls['widget']
+            pagination_widget.setVisible(should_show)
+            
+            if should_show:
+                # Update the number of pages
+                if pagination_widget.state.n_pages != num_pages:
+                    pagination_widget.state.n_pages = num_pages
+                    pagination_widget._on_update_pagination()
+                
+                # Update the current page index if it changed externally
+                if pagination_widget.state.current_page_idx != active_page_idx:
+                    pagination_widget.programmatically_update_page_idx(active_page_idx, block_signals=True)
 
 
-    def _on_page_slider_changed(self, a_past_future_name: str, page_idx: int):
-        """Handle page slider value change."""
-        if a_past_future_name in self.page_controls:
-            page_controls = self.page_controls[a_past_future_name]
-            num_pages = len(self.trajectory_epochs_pages.get(a_past_future_name, []))
-            if page_controls.get('label') is not None:
-                page_controls['label'].setText(f"Page {page_idx + 1}/{num_pages}")
-        
+    def _on_page_jump(self, a_past_future_name: str, page_idx: int):
+        """Handle direct page jump from PaginationControlWidget."""
         # Update the page index
         self.trajectory_active_page_idx[a_past_future_name] = page_idx
         
@@ -5305,11 +5287,10 @@ class PredictiveDecodingDisplayWidget:
         if new_page != current_page:
             self.trajectory_active_page_idx[a_past_future_name] = new_page
             
-            # Update slider if it exists
-            if a_past_future_name in self.page_controls:
-                page_controls = self.page_controls[a_past_future_name]
-                if page_controls.get('slider') is not None:
-                    page_controls['slider'].setValue(new_page)
+            # Update pagination widget if it exists
+            if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                pagination_widget = self.page_controls[a_past_future_name]['widget']
+                pagination_widget.programmatically_update_page_idx(new_page, block_signals=True)
             
             # Re-render the widget
             self._refresh_trajectory_widget(a_past_future_name)
@@ -5554,15 +5535,8 @@ class PredictiveDecodingDisplayWidget:
         ## Store epochs_pages for this widget
         self.trajectory_epochs_pages[a_past_future_name] = epochs_pages
         
-        ## Update or create page controls based on number of pages
+        ## Get number of pages
         num_pages = len(epochs_pages) if epochs_pages else 0
-        
-        # Build controls if they don't exist
-        if a_past_future_name not in self.page_controls or 'widget' not in self.page_controls.get(a_past_future_name, {}):
-            self._build_page_controls(a_past_future_name, num_pages)
-        else:
-            # Update existing controls visibility and state
-            self._update_page_controls_visibility(a_past_future_name, num_pages)
         
         # Set visibility for all axes (hide unused axes where epoch_id == -1, indicating padded/empty data)
         if axs is not None and isinstance(axs, np.ndarray) and axs.ndim == 2:
@@ -5609,6 +5583,12 @@ class PredictiveDecodingDisplayWidget:
                     dock.widgets.clear()
                 dock.currentRow = 0
                 
+                # Create pagination controls BEFORE creating container
+                # Always create them (even if hidden initially) to ensure single initialization
+                # Use num_pages from current data, or 1 as placeholder if no pages yet
+                initial_num_pages = max(1, num_pages) if num_pages > 0 else 1
+                self._build_page_controls(a_past_future_name, initial_num_pages)
+                
                 # Create canvas and toolbar for the matplotlib figure
                 canvas = FigureCanvas(fig)
                 toolbar = NavigationToolbar(canvas, self.dock_window)
@@ -5630,16 +5610,15 @@ class PredictiveDecodingDisplayWidget:
                 # Add plot widget (with stretch to take available space)
                 container_layout.addWidget(plot_widget, stretch=1)
                 
-                # Build pagination controls (will be added to container_layout)
-                # This will create the controls widget if needed
-                if num_pages > 1:
-                    self._build_page_controls(a_past_future_name, num_pages)
-                    # Get the control widget and add it to the container
-                    if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
-                        control_widget = self.page_controls[a_past_future_name]['widget']
-                        container_layout.addWidget(control_widget)
-                        # Ensure controls are visible
-                        control_widget.setVisible(True)
+                # Always add pagination widget to container (even if hidden initially)
+                if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                    control_widget = self.page_controls[a_past_future_name]['widget']
+                    container_layout.addWidget(control_widget)
+                    # Set visibility based on actual num_pages
+                    control_widget.setVisible(num_pages > 1)
+                    # Update the widget state with actual num_pages
+                    if num_pages > 0:
+                        self._update_page_controls_visibility(a_past_future_name, num_pages)
                 
                 container_widget.setLayout(container_layout)
                 
@@ -5664,34 +5643,10 @@ class PredictiveDecodingDisplayWidget:
                 # canvas.draw_idle()
                 canvas.draw()
             
-            ## Update pagination controls if they exist
-            if num_pages > 1:
-                # Ensure controls exist and are visible
-                if a_past_future_name not in self.page_controls or 'widget' not in self.page_controls.get(a_past_future_name, {}):
-                    self._build_page_controls(a_past_future_name, num_pages)
-                    # If controls were just created, we need to add them to the container or dock
-                    if a_past_future_name in self.dock_container_widgets:
-                        # New structure: add to container
-                        container_widget = self.dock_container_widgets[a_past_future_name]
-                        container_layout = container_widget.layout()
-                        if container_layout and a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
-                            control_widget = self.page_controls[a_past_future_name]['widget']
-                            # Check if already in layout
-                            if control_widget.parent() != container_widget:
-                                container_layout.addWidget(control_widget)
-                    else:
-                        # Fallback: add directly to dock (for backward compatibility)
-                        dock = self.dock_widgets.get(a_past_future_name)
-                        if dock is not None and a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
-                            control_widget = self.page_controls[a_past_future_name]['widget']
-                            if control_widget.parent() != dock:
-                                dock.addWidget(control_widget)
-                else:
-                    self._update_page_controls_visibility(a_past_future_name, num_pages)
-            else:
-                # Hide controls if only one page
-                if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
-                    self.page_controls[a_past_future_name]['widget'].setVisible(False)
+            ## Update existing pagination controls (never create new ones here)
+            if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                # Only update existing controls, never create new ones
+                self._update_page_controls_visibility(a_past_future_name, num_pages)
 
         ## alternative to the above?
         widget = self.display_widgets.get(a_past_future_name)
