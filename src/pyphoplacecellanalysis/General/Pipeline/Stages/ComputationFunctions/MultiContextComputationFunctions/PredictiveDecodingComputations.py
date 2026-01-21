@@ -3534,16 +3534,15 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         Uses:
             self.epochs_decoded_result_cache_dict
             
-        
-            decoding_time_bin_size = 0.025
+            fine_decoding_t_bin_size: float = 0.025
             an_epoch_name = 'roam'
-            masked_container = container.build_masked_container(curr_active_pipeline=curr_active_pipeline, a_t_bin_size=decoding_time_bin_size,
+            masked_container = container.build_masked_container(curr_active_pipeline=curr_active_pipeline, a_t_bin_size=fine_decoding_t_bin_size,
                 should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
             ) ## 4m 18s now
-            active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
+            active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=curr_active_pipeline, fine_decoding_t_bin_size=fine_decoding_t_bin_size, an_epoch_name=an_epoch_name)
 
         """
-        fine_decoding_t_bin_size: float = 0.025
+        
         
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
@@ -3666,7 +3665,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             # ybin_centers=self.predictive_decoding.ybin_centers,
             step=step, minimum_included_peak_height=None, # 1m 42s - 7m 1s
             # step=1e-2, minimum_included_peak_height=1e-5, # 47.3s
-            peak_height_multiplier_probe_levels=(0.25, 0.5, 0.9),
+            peak_height_multiplier_probe_levels=slice_level_multipliers,
             should_use_faster_compute_single_slab_implementation=should_use_faster_compute_single_slab_implementation,
             min_considered_promenence=1e-11,
             parallel=False, max_workers=1,
@@ -3675,6 +3674,48 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         )
         ## 55m - step=1e-4, minimum_included_peak_height=1e-5
         ## 11m - step=1e-3, minimum_included_peak_height=1e-5,
+
+        assert decoded_epoch_t_bins_promenence_result_obj is not None
+        print(f'\tfinished with PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(...)')
+        
+
+        a_decoder = self.pf1D_Decoder_dict[a_decoder_name]
+        a_decoded_result = self.epochs_decoded_result_cache_dict[fine_decoding_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
+        a_decoded_filter_epochs_df: pd.DataFrame = a_decoded_result.filter_epochs
+        # a_decoded_result.active_filter_epochs
+
+        ## INPUTS: decoded_epoch_t_bins_promenence_result_obj
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Finsh computing the final masks from the computed promenence results                                                                                                                                                                                                                 #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # print(f'\tfinished with PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(...)')
+        
+        mask_included_bins_list, summit_slice_levels_list, mask_included_p_x_given_n_list_dict, epoch_prom_t_bin_high_prob_pos_masks_dict, epoch_prom_high_prob_pos_masks_dict, *extra_outs = decoded_epoch_t_bins_promenence_result_obj.compute_discrete_contour_masks(p_x_given_n_list=a_decoded_result.p_x_given_n_list, slice_level_multipliers=slice_level_multipliers)
+
+        print(f'\tfinished with promenence_result_obj.compute_discrete_contour_masks(...)')
+        
+        measured_positions_df: pd.DataFrame = deepcopy(self.decoding_locality.measured_positions_df)
+        #TODO 2026-01-21 08:45: - [ ] `epoch_t_bin_high_prob_masks_dict ` or `epoch_high_prob_masks_dict` are used to update the final masks
+        epoch_matching_past_future_positions, _an_out_tuple, a_decoded_filter_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=a_decoded_result,
+                measured_positions_df=measured_positions_df, gaussian_volume=self.predictive_decoding.gaussian_volume, ## the volume for all time bins,
+                active_epochs_df=a_decoded_filter_epochs_df,
+                an_epoch_name=a_decoder_name, top_v_percent=None,
+                epoch_t_bin_high_prob_masks_dict=epoch_prom_t_bin_high_prob_pos_masks_dict,
+                epoch_high_prob_masks_dict=epoch_prom_high_prob_pos_masks_dict,
+                a_slice_multiplier=slice_level_multipliers[0],
+                progress_print=True,
+                merging_adjacent_max_separation_sec = 1e-9,
+                minimum_epoch_duration = 0.05,
+                # merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
+                should_defer_extended_computations=True, max_workers=4,
+        )
+        epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
+        _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result']
+
+        ## OUTPUTS: _out_epoch_flat_mask_future_past_result
+        print(f'\tfinished with PredictiveDecoding.compute_specific_future_and_past_analysis(...)')
+
 
         return a_masked_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj
 
