@@ -2826,6 +2826,13 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
         use_parallel: bool = use_parallel and (n_tasks > 1) and (n_cpus > 1)
         
+        # Set default max_workers if None to prevent ThreadPoolExecutor from using too many threads
+        if max_workers is None:
+            # Cap at a reasonable number to prevent resource exhaustion on supercomputers
+            max_workers = min(8, n_cpus)  # Use at most 8 workers or available CPUs, whichever is smaller
+            if progress_print:
+                print(f'WARNING: max_workers was None, defaulting to {max_workers} to prevent resource exhaustion')
+        
         # Process epochs in parallel or sequentially
         if use_parallel and n_total_epochs > 1:
             if progress_print:
@@ -3557,26 +3564,25 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
 
-        parallel: bool = kwargs.pop('parallel', True)
+        use_parallel: bool = kwargs.pop('use_parallel', True)
         max_workers: int = kwargs.pop('max_workers', 4)
-        use_parallel: bool = kwargs.pop('use_parallel', True)  # Also accept use_parallel for consistency
 
         # Store original values for warning purposes
-        parallel_requested = parallel
+        use_parallel_requested = use_parallel
 
         n_cpus: int = os.cpu_count() or 1
         if n_cpus < 2:
-            if parallel_requested:
+            if use_parallel_requested:
                 import warnings
-                warnings.warn(f"Parallel execution was requested (parallel=True) but cannot run: only {n_cpus} CPU(s) available. Running sequentially instead.", UserWarning)
-                print(f"WARNING: Parallel execution requested but only {n_cpus} CPU(s) available. Overriding: max_workers=1, parallel=False")
+                warnings.warn(f"Parallel execution was requested (use_parallel=True) but cannot run: only {n_cpus} CPU(s) available. Running sequentially instead.", UserWarning)
+                print(f"WARNING: Parallel execution requested but only {n_cpus} CPU(s) available. Overriding: max_workers=1, use_parallel=False")
             else:
-                print(f'Only {n_cpus} CPU detected. Using max_workers=1, parallel=False')
+                print(f'Only {n_cpus} CPU detected. Using max_workers=1, use_parallel=False')
             max_workers = 1
-            parallel = False
+            use_parallel = False
         else:
-            if parallel_requested:
-                print(f'Running in parallel: max_workers={max_workers}, parallel={parallel}')
+            if use_parallel_requested:
+                print(f'Running in parallel: max_workers={max_workers}, use_parallel={use_parallel}')
 
 
         if fine_decoding_t_bin_size not in self.epochs_decoded_result_cache_dict:
@@ -3703,7 +3709,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             peak_height_multiplier_probe_levels=slice_level_multipliers,
             should_use_faster_compute_single_slab_implementation=should_use_faster_compute_single_slab_implementation,
             min_considered_promenence=1e-11,
-            parallel=parallel, max_workers=max_workers,
+            parallel=use_parallel, max_workers=max_workers,
             # parallel=True, max_workers=4,
             # parallel=True, max_workers=None,    
         )
@@ -3745,7 +3751,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 merging_adjacent_max_separation_sec = 1e-9,
                 minimum_epoch_duration = 0.05,
                 # merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
-                should_defer_extended_computations=True, max_workers=max_workers,
+                should_defer_extended_computations=True, max_workers=max_workers, use_parallel=use_parallel,
         )
         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
         # _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = _out_processed_items_list_dict['_out_epoch_flat_mask_future_past_result']
@@ -4003,13 +4009,19 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
         gaussian_volume = self.predictive_decoding.gaussian_volume ## the volume for all time bins
 
-        max_workers: int = kwargs.pop('max_workers', 2)
+        max_workers: Optional[int] = kwargs.pop('max_workers', 2)
+        # Ensure max_workers is not None - if it was explicitly None in kwargs, use default of 2
+        if max_workers is None:
+            max_workers = 2
+        
+        # Extract use_parallel from kwargs if present, otherwise use default True
+        use_parallel: bool = kwargs.pop('use_parallel', True)
         
         ## decoded_local_epochs_result's epochs need to match the passed `active_epochs_df`
         epoch_matching_past_future_positions, _an_out_tuple, active_epochs_df = PredictiveDecoding.compute_specific_future_and_past_analysis(decoded_local_epochs_result=decoded_local_epochs_result, measured_positions_df=measured_positions_df, gaussian_volume=gaussian_volume,
             active_epochs_df=active_epochs_df,
             an_epoch_name=an_epoch_name, top_v_percent=top_v_percent, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration,
-            max_workers=max_workers, **kwargs, # use_parallel=True, max_workers=2, 
+            max_workers=max_workers, use_parallel=use_parallel, **kwargs, # use_parallel=True, max_workers=2, 
         )
         epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _an_out_tuple
         
@@ -4246,7 +4258,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
         # Handle max_workers override for parallel execution
         if max_workers == 1:
-            parallel_kwargs = {'max_workers': 1, 'use_parallel': False, 'parallel': False}
+            parallel_kwargs = {'max_workers': 1, 'use_parallel': False}
             print(f'[{_fn_name}] max_workers=1: disabling all parallel execution')
         else:
             parallel_kwargs = {'max_workers': max_workers}
@@ -5644,6 +5656,8 @@ class PredictiveDecodingDisplayWidget:
                 if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
                     control_widget = self.page_controls[a_past_future_name]['widget']
                     container_layout.addWidget(control_widget)
+                    # Set fixed height to match pattern used in other widgets (PaginationMixins, stacked_epoch_slices)
+                    control_widget.setFixedHeight(21)
                     # Set visibility based on actual num_pages
                     control_widget.setVisible(num_pages > 1)
                     # Update the widget state with actual num_pages
@@ -5696,41 +5710,10 @@ class PredictiveDecodingDisplayWidget:
                                                         overlay_posterior_2d: Optional[NDArray]=None, overlay_alpha = 0.08, overlay_masking_value=None, overlay_cmap='Greens',
                                                         **kwargs):
             """ plots a posterior and an optional overlay on the same axes
-            captures: xbin_centers, ybin_centers, debug_print, lots
+            captures: xbin, ybin, xbin_centers, ybin_centers, posterior_should_use_flipped, debug_print
             
             _main_out, _overlay_out = _subfn_plot_posterior_with_potential_overlay(
             """
-            # 1. Force grid/ticks behind data elements
-            ax.set_axisbelow('line')
-
-            # # 1. Set the locators (where the ticks/grid lines happen)
-            # ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0)) # x-grid every 0.5
-            # ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0)) # y-grid every 1.0
-
-            # 3. Apply those positions
-            ax.set_xticks(xbin)
-            ax.set_yticks(ybin)
-
-            # # Turn on minor ticks
-            # ax.minorticks_on()
-
-            ax.grid(which='major', axis='both', linestyle='-', linewidth='0.1', color='gray') # Customize major grid
-            # ax.grid(which='minor', axis='both', linestyle=':', linewidth='0.5', color='gray') # # Customize minor grid
-
-            # 4. Hide ticks and labels, but KEEP the grid
-            # 'length=0' is another way to hide ticks, but turning them off is more explicit.
-            ax.tick_params(
-                axis='both',       # Apply to both x and y axes
-                which='both',      # Apply to both major and minor ticks
-                bottom=False,      # Turn off the tick marks on the bottom
-                top=False,         # Turn off the tick marks on the top
-                left=False,        # Turn off the tick marks on the left
-                right=False,       # Turn off the tick marks on the right
-                labelbottom=False, # Turn off the text labels on the bottom
-                labelleft=False    # Turn off the text labels on the left
-            )
-
-
             # Plot main posterior using _helper_add_heatmap
             _main_out = DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap(
                 an_ax=ax,
@@ -5758,35 +5741,9 @@ class PredictiveDecodingDisplayWidget:
                     time_cmap=overlay_cmap,
                     should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=overlay_alpha,
                 )
-                # heatmaps_overlay_main, _, _ = _overlay_out
-                
-                # _overlay_out_countours = DecodedTrajectoryMatplotlibPlotter._helper_add_hdr_contours(
-                #     an_ax=ax,
-                #     xbin_centers=xbin_centers, ybin_centers=ybin_centers,
-                #     a_p_x_given_n=overlay_posterior_2d,
-                #     a_time_bin_centers=None,
-                #     rotate_to_vertical=posterior_should_use_flipped,
-                #     custom_image_extent=extent,
-                #     time_cmap=overlay_cmap,
-                #     should_perform_reshape=posterior_should_perform_reshape, posterior_masking_value=overlay_masking_value, full_posterior_opacity=0.9,
-                #     contour_level_fractions=[0.25, 0.5, 0.9], smoothing_sigma=1,
-                # )
-                # heatmaps_overlay_main_countours,  _, _ = _overlay_out_countours
-                
-                # _overlay_out = (heatmaps_overlay_main, heatmaps_overlay_main_countours)
-                
-                
-                # # 3. Plot the Contours on TOP (zorder=3) to emphasize the "active" zone
-                # # levels=[0.5] draws a line exactly halfway between 0 (background) and 1 (mask)
-                # ax.contour(mask_image, 
-                #         levels=[0.5], 
-                #         extent=bounds, 
-                #         origin='lower', 
-                #         colors='lime',    # High contrast color
-                #         linewidths=2, 
-                #         zorder=3)
 
-                # plt.show()
+            # Add xbin/ybin grid lines using the helper function (after heatmaps are plotted so grid is on top)
+            _out_grid_lines = DecodedTrajectoryMatplotlibPlotter._helper_add_bin_grid_lines(an_ax=ax, xbin=xbin, ybin=ybin, xbin_centers=xbin_centers, ybin_centers=ybin_centers, rotate_to_vertical=posterior_should_use_flipped, should_plot_on_top=True)
 
             return (_main_out, _overlay_out)
         
@@ -6536,3 +6493,241 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
     
     return color_fn
 
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-01-21 - Vispi                                                                                                                                                                                                                                                                   #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
+def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, **kwargs):
+    """Standalone function that renders predictive decoding data using vispy instead of the widget.
+    
+    Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
+    to render all the data in an interactive visualization.
+    
+    Args:
+        epoch_flat_mask_future_past_result: List of MatchingPastFuturePositionsResult objects
+        a_decoded_filter_epochs_df: DataFrame with filter epochs
+        curr_position_df: DataFrame with current position data
+        pf_decoder: BasePositionDecoder instance
+        decoded_result: DecodedFilterEpochsResult instance
+        active_epoch_idx: Initial epoch index to display (default: 0)
+        **kwargs: Additional keyword arguments
+        
+    Returns:
+        vispy.app.Application instance with the rendered visualization
+    """
+    from vispy import app, scene
+    from vispy.scene import visuals
+    import vispy.color
+    
+    # Create MaskDataSource from the matching results
+    a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
+    
+    # Get binning information
+    if pf_decoder is not None:
+        xbin = deepcopy(pf_decoder.xbin)
+        xbin_centers = deepcopy(pf_decoder.xbin_centers)
+        ybin_centers = deepcopy(pf_decoder.ybin_centers)
+        ybin = deepcopy(pf_decoder.ybin)
+    else:
+        raise ValueError("pf_decoder must be provided")
+    
+    # Create vispy application
+    canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 800), title='Predictive Decoding Display - Vispy')
+    grid = canvas.central_widget.add_grid()
+    
+    # Create three panes: Past, Posterior, Future
+    past_view = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
+    posterior_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
+    future_view = grid.add_view(row=0, col=2, col_span=1, border_color='gray')
+    
+    # Prepare epoch data
+    epoch_data = a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=active_epoch_idx)
+    
+    # Get posterior data
+    p_x_given_n = a_flat_matching_results_list_ds.p_x_given_n_list[active_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+    posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
+    
+    # Render Past Trajectories
+    curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+    if 'past' in curr_matching_past_future_positions_df_dict:
+        past_positions_dict = curr_matching_past_future_positions_df_dict['past']
+        for epoch_id, positions_df in past_positions_dict.items():
+            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                x_coords = positions_df['x'].values
+                y_coords = positions_df['y'].values
+                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                if np.any(valid_mask):
+                    line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color='red', width=2, parent=past_view.scene)
+    
+    # Render Posterior Heatmap
+    if posterior_2d is not None and posterior_2d.size > 0:
+        # Create image from posterior
+        extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+        img = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=posterior_view.scene)
+        img.transform = scene.STTransform(scale=(extent[1] - extent[0], extent[3] - extent[2]), translate=(extent[0], extent[2]))
+    
+    # Render Future Trajectories
+    if 'future' in curr_matching_past_future_positions_df_dict:
+        future_positions_dict = curr_matching_past_future_positions_df_dict['future']
+        for epoch_id, positions_df in future_positions_dict.items():
+            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                x_coords = positions_df['x'].values
+                y_coords = positions_df['y'].values
+                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                if np.any(valid_mask):
+                    line = scene.visuals.Line(pos=np.column_stack([x_coords[valid_mask], y_coords[valid_mask]]), color='blue', width=2, parent=future_view.scene)
+    
+    # Add axes to all views
+    for view in [past_view, posterior_view, future_view]:
+        view.camera = scene.PanZoomCamera(aspect=1)
+        scene.visuals.GridLines(parent=view.scene)
+    
+    # Set camera ranges based on data extent
+    extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+    for view in [past_view, posterior_view, future_view]:
+        view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
+    
+    return canvas
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-01-21 - Napari                                                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-01-21 - Napari Rendering                                                                                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['napari', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
+def render_predictive_decoding_with_napari(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, **kwargs):
+    """Standalone function that renders predictive decoding data using napari instead of the widget.
+    
+    Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses napari
+    to render all the data in an interactive visualization.
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_napari
+        
+        viewer = render_predictive_decoding_with_napari(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df, curr_position_df=container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result)
+    
+    Args:
+        epoch_flat_mask_future_past_result: List of MatchingPastFuturePositionsResult objects
+        a_decoded_filter_epochs_df: DataFrame with filter epochs
+        curr_position_df: DataFrame with current position data
+        pf_decoder: BasePositionDecoder instance
+        decoded_result: DecodedFilterEpochsResult instance
+        active_epoch_idx: Initial epoch index to display (default: 0)
+        **kwargs: Additional keyword arguments
+        
+    Returns:
+        napari.Viewer instance with the rendered visualization
+    """
+    import napari
+    
+    # Create MaskDataSource from the matching results
+    a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
+    
+    # Get binning information
+    if pf_decoder is not None:
+        xbin = deepcopy(pf_decoder.xbin)
+        xbin_centers = deepcopy(pf_decoder.xbin_centers)
+        ybin_centers = deepcopy(pf_decoder.ybin_centers)
+        ybin = deepcopy(pf_decoder.ybin)
+    else:
+        raise ValueError("pf_decoder must be provided")
+    
+    # Create napari viewer
+    viewer = napari.Viewer(title='Predictive Decoding Display - Napari')
+    
+    # Prepare epoch data for the active epoch
+    epoch_data = a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=active_epoch_idx)
+    
+    # Get posterior data - shape: (n_x_bins, n_y_bins, n_time_bins)
+    p_x_given_n = a_flat_matching_results_list_ds.p_x_given_n_list[active_epoch_idx]
+    posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
+    
+    # Get time-binned posteriors for time slider
+    num_time_bins = p_x_given_n.shape[2]
+    time_bin_posteriors = np.stack([p_x_given_n[:, :, t_bin_idx] for t_bin_idx in range(num_time_bins)])  # Shape: (n_time_bins, n_x_bins, n_y_bins)
+    
+    # Add posterior heatmap as image layer (with time dimension)
+    if posterior_2d is not None and posterior_2d.size > 0:
+        # Add the full posterior (summed over time)
+        viewer.add_image(posterior_2d.T, name='decoded_posterior_summed', colormap='viridis', blending='translucent', opacity=0.6)
+        
+        # Add time-binned posteriors for time navigation
+        if num_time_bins > 0:
+            viewer.add_image(time_bin_posteriors.transpose(0, 2, 1), name='decoded_posterior_time_bins', colormap='viridis', blending='translucent', opacity=0.7)
+    
+    # Render Past Trajectories
+    curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+    if 'past' in curr_matching_past_future_positions_df_dict:
+        past_positions_dict = curr_matching_past_future_positions_df_dict['past']
+        past_track_data_list = []
+        for epoch_id, positions_df in past_positions_dict.items():
+            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                x_coords = positions_df['x'].values
+                y_coords = positions_df['y'].values
+                t_coords = positions_df['t'].values if 't' in positions_df.columns else np.arange(len(positions_df))
+                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                if np.any(valid_mask):
+                    valid_coords = np.column_stack([t_coords[valid_mask], x_coords[valid_mask], y_coords[valid_mask]])
+                    # Format: [track_id, t, x, y]
+                    track_data = np.column_stack([np.full(len(valid_coords), epoch_id), valid_coords])
+                    past_track_data_list.append(track_data)
+                    
+                    # Also add as points for visualization
+                    viewer.add_points(valid_coords[:, 1:], name=f'past_trajectory_{epoch_id}', face_color='red', size=3, edge_width=0.5)
+        
+        # Add past tracks if we have any
+        if len(past_track_data_list) > 0:
+            all_past_tracks = np.vstack(past_track_data_list)
+            viewer.add_tracks(all_past_tracks, name='past_tracks', tail_width=2, head_length=3, tail_length=5, colormap='red')
+    
+    # Render Future Trajectories
+    if 'future' in curr_matching_past_future_positions_df_dict:
+        future_positions_dict = curr_matching_past_future_positions_df_dict['future']
+        future_track_data_list = []
+        for epoch_id, positions_df in future_positions_dict.items():
+            if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                x_coords = positions_df['x'].values
+                y_coords = positions_df['y'].values
+                t_coords = positions_df['t'].values if 't' in positions_df.columns else np.arange(len(positions_df))
+                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                if np.any(valid_mask):
+                    valid_coords = np.column_stack([t_coords[valid_mask], x_coords[valid_mask], y_coords[valid_mask]])
+                    # Format: [track_id, t, x, y]
+                    track_data = np.column_stack([np.full(len(valid_coords), epoch_id), valid_coords])
+                    future_track_data_list.append(track_data)
+                    
+                    # Also add as points for visualization
+                    viewer.add_points(valid_coords[:, 1:], name=f'future_trajectory_{epoch_id}', face_color='blue', size=3, edge_width=0.5)
+        
+        # Add future tracks if we have any
+        if len(future_track_data_list) > 0:
+            all_future_tracks = np.vstack(future_track_data_list)
+            viewer.add_tracks(all_future_tracks, name='future_tracks', tail_width=2, head_length=3, tail_length=5, colormap='blue')
+    
+    # Set axis labels for time dimension
+    if viewer.dims.ndim >= 3:
+        viewer.dims.axis_labels = ('time', 'y', 'x')
+    elif viewer.dims.ndim == 2:
+        viewer.dims.axis_labels = ('y', 'x')
+    
+    # Enable grid layout if multiple time bins
+    if num_time_bins > 1:
+        viewer.grid.enabled = True
+        viewer.grid.shape = (-1, 3)  # 3 columns: past, posterior, future
+    
+    return viewer

@@ -2645,7 +2645,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'grid', 'xbin', 'ybin'], input_requires=[], output_provides=[], uses=[], used_by=['plot_epoch', 'plot_decoded_trajectories_2d'], creation_date='2025-01-XX XX:XX', related_items=[])
     @classmethod
-    def _helper_add_bin_grid_lines(cls, an_ax, xbin=None, ybin=None, xbin_centers=None, ybin_centers=None, rotate_to_vertical: bool=False, grid_kwargs: Optional[Dict[str, Any]]=None):
+    def _helper_add_bin_grid_lines(cls, an_ax, xbin=None, ybin=None, xbin_centers=None, ybin_centers=None, rotate_to_vertical: bool=False, grid_kwargs: Optional[Dict[str, Any]]=None, should_plot_on_top: bool=False):
         """Adds grid lines at xbin/ybin edge positions to a matplotlib axes.
         
         Uses matplotlib's built-in grid() function with custom tick positions for efficiency.
@@ -2660,6 +2660,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             ybin_centers: array of y bin centers (used to infer edges if ybin is None).
             rotate_to_vertical: if True, swap x and y axes.
             grid_kwargs: optional dictionary of kwargs to pass to grid() (e.g., {'color': 'gray', 'linestyle': '--', 'linewidth': 0.5, 'alpha': 0.3}).
+            should_plot_on_top: if True, render grid on top of data elements (useful for opaque heatmaps). Default False renders grid behind data.
         
         Returns:
             grid_lines: reference to the grid object (for compatibility, though grid() doesn't return individual lines).
@@ -2696,9 +2697,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             y_edges = None
         
 
-
-        # 1. Force grid/ticks behind data elements
-        an_ax.set_axisbelow('line')
+        # 1. Control whether grid renders on top of or behind data elements
+        an_ax.set_axisbelow(not should_plot_on_top)
 
         # Add grid lines using matplotlib's efficient grid() function with minor ticks
         # This is much more efficient than creating individual line artists
@@ -2716,7 +2716,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 an_ax.set_xticks(y_edges, minor=True)
         
         # Enable grid on minor ticks only (doesn't interfere with major ticks/labels)
-        an_ax.grid(True, which='minor', **grid_kwargs)
+        if should_plot_on_top:
+            an_ax.grid(True, which='minor', zorder=10, **grid_kwargs)
+        else:
+            an_ax.grid(True, which='minor', **grid_kwargs)
 
         # # 1. Set the locators (where the ticks/grid lines happen)
         # ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0)) # x-grid every 0.5
