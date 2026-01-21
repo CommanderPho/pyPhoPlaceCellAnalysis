@@ -1111,6 +1111,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         return _obj
 
 
+    @function_attributes(short_name=None, tags=['UNUSED', 'downsampling'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21 08:29', related_items=[])
     def downsampling_spatial_data(self, spatial_axes=(0, 1, 2), factors=(5, 5), axes=(0, 1)) -> "DecodingLocalityMeasures":
         """ downsample all of the position dependent properties and returns a downsampled copy of itself. 
 
@@ -1536,7 +1537,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         return relevant_positions_df
     
 
-    @function_attributes(short_name=None, tags=['traj', 'angle', 'direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 19:36', related_items=[])
+    @function_attributes(short_name=None, tags=['new', 'traj', 'angle', 'direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 19:36', related_items=[])
     def recompute_relevant_position_active_mask_centroid_traj_angle(self, disable_segmentation: bool=True):
         """Recompute relevant position active mask centroid trajectory angle matching.
         
@@ -2159,7 +2160,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
     # ==================================================================================================================================================================================================================================================================================== #
 
     ## INPUTS: sync_plotters, moving_avg
-    @function_attributes(short_name=None, tags=['predictive_decoding', 'layers', 'heatmap', 'overlay'], input_requires=[], output_provides=[], uses=['TimeSynchronizedGenericPlotterLayer'], used_by=[], creation_date='2025-12-09 19:03', related_items=[])
+    @function_attributes(short_name=None, tags=['OLD', 'predictive_decoding', 'layers', 'heatmap', 'overlay'], input_requires=[], output_provides=[], uses=['TimeSynchronizedGenericPlotterLayer'], used_by=[], creation_date='2025-12-09 19:03', related_items=[])
     @classmethod
     def add_moving_average_layers(cls, sync_plotters: Dict, time_window_centers: NDArray, moving_avg: NDArray):
         """ 
@@ -2593,12 +2594,16 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         return _out_obj
     
 
-    @function_attributes(short_name=None, tags=['SINGLE_MAIN'], input_requires=[], output_provides=[], uses=[], used_by=['compute_specific_future_and_past_analysis'], creation_date='2026-01-14 19:49', related_items=[])
+    @function_attributes(short_name=None, tags=['SINGLE_MAIN'], input_requires=[], output_provides=[], uses=['cls.detect_matching_past_future_positions'], used_by=['compute_specific_future_and_past_analysis'], creation_date='2026-01-14 19:49', related_items=[])
     @classmethod
     def _process_single_epoch_future_past_analysis(cls, i: int, curr_epoch_p_x_given_n: NDArray, curr_epoch_time_bin_centers: NDArray, measured_positions_df: pd.DataFrame, top_v_percent: float,
                 epoch_t_bin_high_prob_masks_dict: Optional[Dict], epoch_high_prob_masks_dict: Optional[Dict],
                 a_slice_multiplier: float, n_epoch_time_bins: int, merging_adjacent_max_separation_sec: float, minimum_epoch_duration: float, progress_print: bool, n_total_epochs: int, decoded_epoch_result=None, **kwargs) -> Tuple[int, Any, Any, Any, Any, Any, Any]:
-        """Process a single epoch for future/past analysis. Returns results in a tuple for parallel processing."""
+        """Process a single epoch for future/past analysis. Returns results in a tuple for parallel processing.
+
+        After done, calls  `PredictiveDecoding.detect_matching_past_future_positions(...)` to find the potential past/future positions given the new masks
+
+        """
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PosteriorMaskPostProcessing
         
         if progress_print:
@@ -2624,7 +2629,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             Assert.same_shape(an_epoch_t_bins_custom_high_prob_mask, curr_epoch_p_x_given_n)
             is_high_prob_mask = an_epoch_t_bins_custom_high_prob_mask
             
-            labeled, n_objects, masks = PosteriorMaskPostProcessing._process_epoch_time_bins_masks(a_mask_t=an_epoch_t_bins_custom_high_prob_mask, max_gap=8, n_interp=1)
+            labeled, n_objects, masks = PosteriorMaskPostProcessing._process_epoch_time_bins_masks(a_mask_t=an_epoch_t_bins_custom_high_prob_mask, max_gap=8, n_interp=1) #TODO 2026-01-21 08:12: - [ ] Review what this does
             processed_masks = masks
             merged_epoch_mask = np.any(masks, axis=-1)
         
@@ -2640,7 +2645,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             sorted_flat = np.sort(flat, axis=0)[::-1]
             cdf = np.cumsum(sorted_flat, axis=0)
             thresholds = sorted_flat[np.argmax(cdf >= top_v_percent * flat.sum(axis=0), axis=0), np.arange(flat.shape[1])]
-            is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds)
+            is_high_prob_mask = (curr_epoch_p_x_given_n >= thresholds) #TODO 2026-01-21 08:13: - [ ] The promenence peaks are much better
         
         ## allow future positions to match any position in the epoch to count:
         if is_high_prob_mask is not None:
@@ -3114,6 +3119,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             return masked_container
 
 
+        #TODO 2026-01-21 08:08: - [ ] Needs review to see if it's filtering right
+        @function_attributes(short_name=None, tags=['NEEDS_REVIEW'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21 08:08', related_items=[])
         def _subfn_filter_masked_container_epochs(masked_container, original_active_epochs_df: pd.DataFrame):
             """ filters the epochs in the masked_container 
                 ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -3520,11 +3527,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
-    def _filter_single_epoch_result(self, curr_active_pipeline, decoding_time_bin_size = 0.025, an_epoch_name = 'roam') -> DecodedFilterEpochsResult:
+    def _filter_single_epoch_result(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam') -> DecodedFilterEpochsResult:
         """
         Seems to just do the whole set of computations again after the filtering/masking
         
-        
+        Uses:
+            self.epochs_decoded_result_cache_dict
+            
         
             decoding_time_bin_size = 0.025
             an_epoch_name = 'roam'
@@ -3534,31 +3543,33 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = masked_container._filter_single_epoch_result(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, an_epoch_name=an_epoch_name)
 
         """
+        fine_decoding_t_bin_size: float = 0.025
+        
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
 
-        if decoding_time_bin_size not in self.epochs_decoded_result_cache_dict:
-            print(f'needs to compute: decoding_time_bin_size: {decoding_time_bin_size}')
+        if fine_decoding_t_bin_size not in self.epochs_decoded_result_cache_dict:
+            print(f'needs to compute: decoding_time_bin_size: {fine_decoding_t_bin_size}')
             assert (self.active_epochs_df is not None)
             active_epochs_df = deepcopy(self.active_epochs_df)
-            decoded_local_epochs_result, a_decoder = self.decode_epochs_for_posterior_analysis(curr_active_pipeline=curr_active_pipeline, an_epoch_name=an_epoch_name, decoding_time_bin_size=decoding_time_bin_size, active_epochs_df=active_epochs_df)
+            decoded_local_epochs_result, a_decoder = self.decode_epochs_for_posterior_analysis(curr_active_pipeline=curr_active_pipeline, an_epoch_name=a_decoder_name, decoding_time_bin_size=fine_decoding_t_bin_size, active_epochs_df=active_epochs_df)
             print(f'done with all decoding.')
-            if decoding_time_bin_size not in self.epochs_decoded_result_cache_dict:            
-                self.epochs_decoded_result_cache_dict[decoding_time_bin_size] = {} ## init to empty
-            self.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name] = decoded_local_epochs_result
+            if fine_decoding_t_bin_size not in self.epochs_decoded_result_cache_dict:            
+                self.epochs_decoded_result_cache_dict[fine_decoding_t_bin_size] = {} ## init to empty
+            self.epochs_decoded_result_cache_dict[fine_decoding_t_bin_size][a_decoder_name] = decoded_local_epochs_result
             if self.pf1D_Decoder_dict is None:
                 self.pf1D_Decoder_dict = {} ## init to empty
-            if an_epoch_name not in self.pf1D_Decoder_dict:
-                self.pf1D_Decoder_dict[an_epoch_name] = a_decoder
+            if a_decoder_name not in self.pf1D_Decoder_dict:
+                self.pf1D_Decoder_dict[a_decoder_name] = a_decoder
             ## add the result:
-            self.epochs_decoded_result_cache_dict[decoding_time_bin_size][an_epoch_name] = decoded_local_epochs_result
+            self.epochs_decoded_result_cache_dict[fine_decoding_t_bin_size][a_decoder_name] = decoded_local_epochs_result
             
             
         # Get this specific result ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        decoded_local_epochs_result = self.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
+        decoded_local_epochs_result = self.epochs_decoded_result_cache_dict[fine_decoding_t_bin_size].get(a_decoder_name, None)
         # a_decoder: BayesianPlacemapPositionDecoder = list(self.pf1D_Decoder_dict.values())[0]
-        a_decoder: BayesianPlacemapPositionDecoder = self.pf1D_Decoder_dict.get(an_epoch_name, None)
+        a_decoder: BayesianPlacemapPositionDecoder = self.pf1D_Decoder_dict.get(a_decoder_name, None)
 
         xybin_edges_kwargs = dict()
         xybin_centers_only_kwargs = dict()
@@ -3590,6 +3601,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             curr_epoch_start_t: float = curr_epoch_time_bin_centers[0]
             curr_epoch_stop_t: float = curr_epoch_time_bin_centers[-1]
             
+
+            #TODO 2026-01-21 08:51: - [ ] Do we do anything with these this time?
             custom_computation_results_dict = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
                 a_p_x_given_n=curr_epoch_p_x_given_n,
                 # gaussian_volume=container.predictive_decoding.gaussian_volume, ## if we have it
@@ -3601,7 +3614,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
             )
             # a_debug_result_dict = custom_computation_results_dict.pop('debug', None) ## remove so it isn't added to the df
 
-            custom_computation_results_df = DecodingLocalityMeasures.perform_build_locality_measures_df(locality_measures_dict_dict={an_epoch_name: custom_computation_results_dict}, ## expects a dict with key of the epoch type, so we need to wrap it
+            custom_computation_results_df = DecodingLocalityMeasures.perform_build_locality_measures_df(locality_measures_dict_dict={a_decoder_name: custom_computation_results_dict}, ## expects a dict with key of the epoch type, so we need to wrap it
                 time_window_centers=curr_epoch_time_bin_centers, 
                 **xybin_centers_only_kwargs,
             )
@@ -3615,6 +3628,8 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         ## flatten/concat into a single flat df for all epochs:
         custom_results_df_list = pd.concat(custom_results_df_list, ignore_index=True)
         
+        print(f'\tfinished with for epochs loops doing locality recomputations')
+        
         # Promenecen stuff too:
         ## INPUTS: decoded_local_epochs_result
         # old_prom_2d_result = PeakPromenence._perform_find_posterior_peaks_peak_prominence2d_computation(p_x_given_n_list=decoded_local_epochs_result.p_x_given_n_list, 
@@ -3627,6 +3642,11 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # ## 55m - step=1e-4, minimum_included_peak_height=1e-5
         # ## 11m - step=1e-3, minimum_included_peak_height=1e-5,
 
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Peak Promenece Calculation Parameters                                                                                                                                                                                                                                                #
+        # ==================================================================================================================================================================================================================================================================================== #
+        slice_level_multipliers = (0.25, 0.5, 0.9)
+        
         # resolution_factor = 13.0
         resolution_factor = 9.0
         minimum_included_peak_height = 1e-9
@@ -4384,7 +4404,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         a_masked_container.debug_computed_dict[an_epoch_name] = {}
                     
                     # active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=time_bin_size, an_epoch_name=an_epoch_name)
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, decoding_time_bin_size=fine_time_bin_size, an_epoch_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container._filter_single_epoch_result(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=fine_time_bin_size, a_decoder_name=an_epoch_name)
                     a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                 except (ValueError, AttributeError, IndexError, KeyError, TypeError) as e:
                     print(f'\t\tWARN: the `enable_filter_and_final_result_processing` part of `perform_predictive_decoding_analysis(...) failed with error: {e}. Skipping.')
@@ -4480,9 +4500,12 @@ from matplotlib import gridspec
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea import Dock, DockArea
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
 from pyphoplacecellanalysis.Pho2D.matplotlib.MatplotlibTimeSynchronizedWidget import MatplotlibTimeSynchronizedWidget
+from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallbackBehavior
 
 @define(slots=False, repr=False, eq=False)
 class MaskDataSource:
+    """ provides data to its owner related to each epoch 
+    """
     matching_pos_epochs_dfs_list: List = field() # self.container.predictive_decoding.matching_pos_epochs_dfs_list
     matching_pos_dfs_list: List = field() # = self.container.predictive_decoding.matching_pos_dfs_list
 
