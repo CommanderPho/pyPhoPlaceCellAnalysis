@@ -1618,7 +1618,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
     @classmethod
-    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.5, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> pd.DataFrame:
+    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.075, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> pd.DataFrame:
         """
         Compute matching position epochs DataFrame from position matches and time filters.
         
@@ -1641,14 +1641,14 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs) ## dataframe is already filtered to past/future positions before being passed
 
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
-        if merging_adjacent_max_separation_sec is not None:
+        if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec) ## Loses other columns!
-        if minimum_epoch_duration is not None:
+        if (minimum_epoch_duration is not None) and (len(a_matching_pos_epochs_df) > 0): 
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_epochs_longer_than(minimum_duration=minimum_epoch_duration)
-        if merging_adjacent_max_separation_sec is not None:
+        if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec) ## Loses other columns!
-            
-        a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
+        if (len(a_matching_pos_epochs_df) > 0):
+            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
         
         ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
         return a_matching_pos_epochs_df
@@ -5022,9 +5022,9 @@ class PredictiveDecodingDisplayWidget:
         
         curr_matching_epochs_df: pd.DataFrame = matching_pos_epochs_dfs_list[an_epoch_idx]
         curr_matching_positions_df: pd.DataFrame = matching_pos_dfs_list[an_epoch_idx]
-        curr_matching_epochs_df_dict: Dict[int, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
+        curr_matching_epochs_df_dict: Dict[types.PastFutureCategory, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
         
-        curr_matching_past_future_positions_df_dict: Dict[str, Dict[int, pd.DataFrame]] = {}
+        curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[int, pd.DataFrame]] = {}
         
         for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
             a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
@@ -5526,10 +5526,6 @@ class PredictiveDecodingDisplayWidget:
         
 
 
-
-
-
-
     @function_attributes(short_name=None, tags=['widget', 'GUI', 'display', 'interactive', 'position-like', 'pred', 'prospective'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryMatplotlibPlotter'], used_by=[], creation_date='2026-01-09 02:04', related_items=[])
     def update_displayed_epoch(self, an_epoch_idx: int = 0):
         """Main entry point - validate, prepare data, update all widgets."""
@@ -5595,7 +5591,7 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
     import numpy as np
     
     # Validate input
-    if not position_dfs or len(position_dfs) == 0:
+    if (position_dfs is None) or len(position_dfs) == 0:
         raise ValueError("position_dfs must be a non-empty list")
     
     for i, df in enumerate(position_dfs):
