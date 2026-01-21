@@ -2811,9 +2811,19 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
             n_epoch_time_bins = curr_epoch_p_x_given_n.shape[-1]  # Number of time bins for this epoch
             epoch_data_list.append((i, curr_epoch_p_x_given_n, curr_epoch_time_bin_centers, curr_epoch_tbin_indicies, n_epoch_time_bins, a_decoded_epoch_result))
 
+        # Store original value for warning purposes
+        use_parallel_requested = use_parallel
+
         # Decide whether to run in parallel or serial
         n_tasks: int = n_total_epochs
         n_cpus: int = os.cpu_count() or 1
+
+        # Check if parallel was requested but can't run due to insufficient CPUs
+        if use_parallel_requested and n_cpus <= 1:
+            import warnings
+            warnings.warn(f"Parallel execution was requested (use_parallel=True) but cannot run: only {n_cpus} CPU(s) available. Running sequentially instead.", UserWarning)
+            print(f"WARNING: Parallel execution requested but only {n_cpus} CPU(s) available. Running sequentially.")
+
         use_parallel: bool = use_parallel and (n_tasks > 1) and (n_cpus > 1)
         
         # Process epochs in parallel or sequentially
@@ -3547,16 +3557,26 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
 
-        parallel: bool = kwargs.pop('paralell', True)
+        parallel: bool = kwargs.pop('parallel', True)
         max_workers: int = kwargs.pop('max_workers', 4)
+        use_parallel: bool = kwargs.pop('use_parallel', True)  # Also accept use_parallel for consistency
+
+        # Store original values for warning purposes
+        parallel_requested = parallel
 
         n_cpus: int = os.cpu_count() or 1
         if n_cpus < 2:
+            if parallel_requested:
+                import warnings
+                warnings.warn(f"Parallel execution was requested (parallel=True) but cannot run: only {n_cpus} CPU(s) available. Running sequentially instead.", UserWarning)
+                print(f"WARNING: Parallel execution requested but only {n_cpus} CPU(s) available. Overriding: max_workers=1, parallel=False")
+            else:
+                print(f'Only {n_cpus} CPU detected. Using max_workers=1, parallel=False')
             max_workers = 1
             parallel = False
-            print(f'overriding max_workers <--- 1 and (parallel = False) because only 1 cpu detected!')
         else:
-            print(f'WARNING::::: RUNNING PARALELL IF POSSIBLE: max_workers: {max_workers}, parallel: {parallel}....')
+            if parallel_requested:
+                print(f'Running in parallel: max_workers={max_workers}, parallel={parallel}')
 
 
         if fine_decoding_t_bin_size not in self.epochs_decoded_result_cache_dict:
@@ -4176,7 +4196,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None,
                 drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42,  fine_time_bin_size: float=0.025, 
-                enable_masked_filtered_container_before_any_comps: bool = True, should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False):
+                enable_masked_filtered_container_before_any_comps: bool = True, should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False,
+                max_workers: Optional[int]=1,
+        ):
         """ Performs predictive decoding analysis to relate PBE activity to future visited locations.
 
         Requires:
@@ -4221,6 +4243,14 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         print(f'[{_fn_name}] Parameters: window_size={window_size}, fine_time_bin_size={fine_time_bin_size}, extant_decoded_time_bin_size={extant_decoded_time_bin_size}')
         print(f'[{_fn_name}] Flags: drop_previous_result_and_compute_fresh={drop_previous_result_and_compute_fresh}, enable_masked_filtered_container_before_any_comps={enable_masked_filtered_container_before_any_comps}')
         print(f'[{_fn_name}] Flags: should_perform_first_pass_compute_future_and_past_analysis={should_perform_first_pass_compute_future_and_past_analysis}, enable_filter_and_final_result_processing={enable_filter_and_final_result_processing}')
+
+        # Handle max_workers override for parallel execution
+        if max_workers == 1:
+            parallel_kwargs = {'max_workers': 1, 'use_parallel': False, 'parallel': False}
+            print(f'[{_fn_name}] max_workers=1: disabling all parallel execution')
+        else:
+            parallel_kwargs = {'max_workers': max_workers}
+            print(f'[{_fn_name}] Using max_workers={max_workers} for parallel execution')
 
         if include_includelist is not None:
             print(f'[{_fn_name}] WARN: include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
@@ -4461,7 +4491,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         if enable_masked_filtered_container_before_any_comps:
             print(f'[{_fn_name}] Building masked_container (enable_masked_filtered_container_before_any_comps=True)...')
             _masked_build_start = _time.perf_counter()
-            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size)
+            a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size, **parallel_kwargs)
             _masked_build_elapsed = _time.perf_counter() - _masked_build_start
             print(f'[{_fn_name}] Built masked_container. Elapsed: {_masked_build_elapsed:.2f}s')
             global_computation_results.computed_data['PredictiveDecoding'].masked_container = a_masked_container
@@ -4492,7 +4522,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     _epoch_start = _time.perf_counter()
                     if an_epoch_name not in a_container.debug_computed_dict:
                         a_container.debug_computed_dict[an_epoch_name] = {}
-                    _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name, decoding_time_bin_size=fine_time_bin_size, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True)
+                    _out = a_container.compute_future_and_past_analysis(an_epoch_name=an_epoch_name, decoding_time_bin_size=fine_time_bin_size, override_included_analysis_epochs=a_container.active_epochs_df, disable_segmentation=True, **parallel_kwargs)
                     epoch_high_prob_pos_masks, epoch_t_bins_high_prob_pos_masks, epoch_matching_positions, past_future_info_dict, matching_pos_dfs_list, matching_pos_epochs_dfs_list, _out_processed_items_list_dict = _out
                     a_container.debug_computed_dict[an_epoch_name].update({'epoch_high_prob_pos_masks': epoch_high_prob_pos_masks, 'epoch_t_bins_high_prob_pos_masks': epoch_t_bins_high_prob_pos_masks, 'epoch_matching_positions': epoch_matching_positions, 'past_future_info_dict': past_future_info_dict})
                     _epoch_elapsed = _time.perf_counter() - _epoch_start
@@ -4526,7 +4556,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 if a_container is None:
                     raise ValueError(f"[{_fn_name}] a_container is None during Phase 7.")
                 _masked_build_start = _time.perf_counter()
-                a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size)
+                a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False, window_size=window_size, **parallel_kwargs)
                 _masked_build_elapsed = _time.perf_counter() - _masked_build_start
                 print(f'[{_fn_name}] Built masked_container. Elapsed: {_masked_build_elapsed:.2f}s')
             
@@ -4542,7 +4572,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     if an_epoch_name not in a_masked_container.debug_computed_dict:
                         a_masked_container.debug_computed_dict[an_epoch_name] = {}
                     
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_epoch_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=effective_fine_time_bin_size, a_decoder_name=an_epoch_name)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_epoch_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=effective_fine_time_bin_size, a_decoder_name=an_epoch_name, **parallel_kwargs)
                     a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                     _epoch_elapsed = _time.perf_counter() - _epoch_start
                     print(f'[{_fn_name}]     Completed "{an_epoch_name}" in {_epoch_elapsed:.2f}s')
