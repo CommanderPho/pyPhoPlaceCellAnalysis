@@ -6570,6 +6570,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     future_mask_overlay = None
     colorbar_rects = []
     colorbar_texts = []
+    epoch_info_text = None
     
     # Store data for updates
     state = {
@@ -6590,6 +6591,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'future_mask_overlay': future_mask_overlay,
         'colorbar_rects': colorbar_rects,
         'colorbar_texts': colorbar_texts,
+        'epoch_info_text': epoch_info_text,
         'canvas': canvas
     }
     
@@ -6636,6 +6638,11 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             if text is not None:
                 text.parent = None
         state['colorbar_texts'].clear()
+        
+        # Clear epoch info text
+        if state['epoch_info_text'] is not None:
+            state['epoch_info_text'].parent = None
+            state['epoch_info_text'] = None
         
         # Prepare epoch data
         epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx)
@@ -6821,6 +6828,19 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_view'].scene)
             state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
         
+        # Add epoch information text above the posterior view
+        if epoch_start_t is not None and epoch_end_t is not None:
+            epoch_info_str = f'Epoch {new_epoch_idx + 1}/{num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
+            # Position text above the data area (y_max is the top of the data)
+            # Add extra space above for text
+            text_y_pos = y_max + (y_max - y_min) * 0.15  # 15% above the top
+            text_x_pos = (x_min + x_max) / 2  # Center horizontally
+            state['epoch_info_text'] = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=state['posterior_view'].scene)
+            
+            # Update posterior view camera to include space for text
+            y_range = y_max - y_min
+            state['posterior_view'].camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+        
         # Render mask overlays on all three views
         if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
             if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
@@ -6931,8 +6951,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     
     # Set camera ranges based on data extent
     extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-    for view in [past_view, posterior_view, future_view]:
+    # For past and future views, use standard extent
+    for view in [past_view, future_view]:
         view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
+    # For posterior view, expand y-range to include space for text above
+    y_range = extent[3] - extent[2]
+    posterior_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
     
     # Initial render
     update_epoch_display(active_epoch_idx)
