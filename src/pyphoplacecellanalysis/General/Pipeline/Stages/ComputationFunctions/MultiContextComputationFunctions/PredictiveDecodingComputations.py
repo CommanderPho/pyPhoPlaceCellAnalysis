@@ -4657,14 +4657,18 @@ class PredictiveDecodingDisplayWidget:
 
     ## Display Variables
     trajectory_displaying_plotter: Dict[types.PastFutureCategory, DecodedTrajectoryMatplotlibPlotter] = field(default=Factory(dict))
+    trajectory_epochs_pages: Dict[types.PastFutureCategory, List] = field(default=Factory(dict))
+    trajectory_active_page_idx: Dict[types.PastFutureCategory, int] = field(default=Factory(dict))
     
     ## Dock UI Variables
     dock_area: Any = field(default=None)
     dock_window: Any = field(default=None)
     dock_widgets: Dict[str, Any] = field(default=Factory(dict))
     dock_canvas_widgets: Dict[str, Any] = field(default=Factory(dict))
+    dock_container_widgets: Dict[str, Any] = field(default=Factory(dict))
     epoch_slider: Any = field(default=None)
     epoch_value_label: Any = field(default=None)
+    page_controls: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
 
     active_epoch_idx: int = field(default=20)
     
@@ -4672,6 +4676,9 @@ class PredictiveDecodingDisplayWidget:
     should_use_flipped_images: bool = field(default=False)
     
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # INIT Helpers                                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     def init_from_container(cls, container: PredictiveDecodingComputationsContainer, decoding_time_bin_size: float, an_epoch_name: str, active_epoch_idx: int=0, **kwargs) -> "PredictiveDecodingDisplayWidget":
         """
@@ -5049,6 +5056,139 @@ class PredictiveDecodingDisplayWidget:
                     widget.draw()
 
 
+    def _build_page_controls(self, a_past_future_name: str, num_pages: int):
+        """Build page navigation controls for a trajectory widget.
+        
+        Note: The controls widget is created but NOT added to the dock here.
+        It should be added to a container widget that also contains the plot.
+        This method just creates and stores the control widget.
+        """
+        # Check if controls already exist
+        if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+            # Controls already exist, just update them
+            self._update_page_controls_visibility(a_past_future_name, num_pages)
+            return
+        
+        # Create control widget
+        control_widget = QtWidgets.QWidget()
+        control_layout = QtWidgets.QHBoxLayout()
+        control_layout.setContentsMargins(5, 2, 5, 2)
+        
+        # Label
+        label = QtWidgets.QLabel(f"{a_past_future_name.capitalize()} Page:")
+        control_layout.addWidget(label)
+        
+        # Previous button
+        prev_button = QtWidgets.QPushButton("◀ Prev")
+        prev_button.setMaximumWidth(60)
+        prev_button.clicked.connect(lambda: self._on_page_change(a_past_future_name, -1))
+        control_layout.addWidget(prev_button)
+        
+        # Slider
+        page_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        page_slider.setMinimum(0)
+        page_slider.setMaximum(max(0, num_pages - 1))
+        page_slider.setValue(self.trajectory_active_page_idx.get(a_past_future_name, 0))
+        page_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        page_slider.setTickInterval(1)
+        page_slider.setMinimumWidth(200)
+        page_slider.valueChanged.connect(lambda value: self._on_page_slider_changed(a_past_future_name, value))
+        control_layout.addWidget(page_slider, stretch=1)
+        
+        # Page label
+        page_label = QtWidgets.QLabel(f"Page {self.trajectory_active_page_idx.get(a_past_future_name, 0) + 1}/{num_pages}")
+        page_label.setMinimumWidth(80)
+        page_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        control_layout.addWidget(page_label)
+        
+        # Next button
+        next_button = QtWidgets.QPushButton("Next ▶")
+        next_button.setMaximumWidth(60)
+        next_button.clicked.connect(lambda: self._on_page_change(a_past_future_name, 1))
+        control_layout.addWidget(next_button)
+        
+        control_widget.setLayout(control_layout)
+        
+        # Store references
+        if a_past_future_name not in self.page_controls:
+            self.page_controls[a_past_future_name] = {}
+        self.page_controls[a_past_future_name]['widget'] = control_widget
+        self.page_controls[a_past_future_name]['slider'] = page_slider
+        self.page_controls[a_past_future_name]['label'] = page_label
+        self.page_controls[a_past_future_name]['prev_button'] = prev_button
+        self.page_controls[a_past_future_name]['next_button'] = next_button
+        
+        # Set initial visibility
+        self._update_page_controls_visibility(a_past_future_name, num_pages)
+
+
+    def _update_page_controls_visibility(self, a_past_future_name: str, num_pages: int):
+        """Update visibility and state of page controls based on number of pages."""
+        if a_past_future_name not in self.page_controls:
+            return
+        
+        page_controls = self.page_controls[a_past_future_name]
+        should_show = num_pages > 1
+        active_page_idx = self.trajectory_active_page_idx.get(a_past_future_name, 0)
+        
+        if 'widget' in page_controls and page_controls['widget'] is not None:
+            page_controls['widget'].setVisible(should_show)
+        
+        if should_show:
+            # Update slider and label
+            if 'slider' in page_controls and page_controls['slider'] is not None:
+                page_controls['slider'].setMaximum(max(0, num_pages - 1))
+                page_controls['slider'].setValue(active_page_idx)
+            if 'label' in page_controls and page_controls['label'] is not None:
+                page_controls['label'].setText(f"Page {active_page_idx + 1}/{num_pages}")
+
+
+    def _on_page_slider_changed(self, a_past_future_name: str, page_idx: int):
+        """Handle page slider value change."""
+        if a_past_future_name in self.page_controls:
+            page_controls = self.page_controls[a_past_future_name]
+            num_pages = len(self.trajectory_epochs_pages.get(a_past_future_name, []))
+            if page_controls.get('label') is not None:
+                page_controls['label'].setText(f"Page {page_idx + 1}/{num_pages}")
+        
+        # Update the page index
+        self.trajectory_active_page_idx[a_past_future_name] = page_idx
+        
+        # Re-render the widget with the new page
+        self._refresh_trajectory_widget(a_past_future_name)
+
+
+    def _on_page_change(self, a_past_future_name: str, direction: int):
+        """Handle page navigation button clicks (direction: -1 for prev, 1 for next)."""
+        epochs_pages = self.trajectory_epochs_pages.get(a_past_future_name, [])
+        num_pages = len(epochs_pages)
+        if num_pages == 0:
+            return
+        
+        current_page = self.trajectory_active_page_idx.get(a_past_future_name, 0)
+        new_page = current_page + direction
+        new_page = max(0, min(new_page, num_pages - 1))
+        
+        if new_page != current_page:
+            self.trajectory_active_page_idx[a_past_future_name] = new_page
+            
+            # Update slider if it exists
+            if a_past_future_name in self.page_controls:
+                page_controls = self.page_controls[a_past_future_name]
+                if page_controls.get('slider') is not None:
+                    page_controls['slider'].setValue(new_page)
+            
+            # Re-render the widget
+            self._refresh_trajectory_widget(a_past_future_name)
+
+
+    def _refresh_trajectory_widget(self, a_past_future_name: str):
+        """Refresh a trajectory widget with the current epoch and page."""
+        # Re-use the current epoch data
+        epoch_data = self._prepare_epoch_data(an_epoch_idx=self.active_epoch_idx)
+        self._update_trajectory_widget(a_past_future_name, self.active_epoch_idx, epoch_data)
+
+
     def _validate_epoch_idx(self, an_epoch_idx: int) -> int:
         """Validate and clamp epoch index."""
         # num_epochs = len(ensure_dataframe(self.decoded_result.filter_epochs))
@@ -5268,12 +5408,28 @@ class PredictiveDecodingDisplayWidget:
         overlay_posterior, _, _ = self._get_posterior_data(an_epoch_idx, get_high_prob_mask_instead=True)
         a_decoded_traj_plotter.prev_heatmaps = [overlay_posterior] if overlay_posterior is not None else [] # seems stupid
         
+        ## Get the active page index for this widget (default to 0 if not set)
+        active_page_idx = self.trajectory_active_page_idx.get(a_past_future_name, 0)
+        
         ## NOTE: `epoch_ids` used here and in the following function call actually refer to `found_pos_segment_ids`, not epochs, it's just how the `a_decoded_traj_plotter` class is named:
         fig, axs, epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=self.curr_position_df, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=found_pos_segment_ids, curr_num_subplots=curr_num_subplots,
-                                                                                        active_page_index=0, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
+                                                                                        active_page_index=active_page_idx, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
                                                                                         plot_mode='scatter', c='red', cmap='Reds', alpha=0.55, s=5, posteriors=overlay_posterior, posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-12,
                                                                                         posterior_should_perform_reshape=False, # rotate_to_vertical
                                                                                     )
+        
+        ## Store epochs_pages for this widget
+        self.trajectory_epochs_pages[a_past_future_name] = epochs_pages
+        
+        ## Update or create page controls based on number of pages
+        num_pages = len(epochs_pages) if epochs_pages else 0
+        
+        # Build controls if they don't exist
+        if a_past_future_name not in self.page_controls or 'widget' not in self.page_controls.get(a_past_future_name, {}):
+            self._build_page_controls(a_past_future_name, num_pages)
+        else:
+            # Update existing controls visibility and state
+            self._update_page_controls_visibility(a_past_future_name, num_pages)
         
         # Set visibility for all axes (hide unused axes where epoch_id == -1, indicating padded/empty data)
         if axs is not None and isinstance(axs, np.ndarray) and axs.ndim == 2:
@@ -5285,8 +5441,8 @@ class PredictiveDecodingDisplayWidget:
                         axs[row, col].set_visible(True)
             
             # Then hide unused axes (where epoch_id == -1)
-            if len(epochs_pages) > 0:
-                active_page_epoch_ids = epochs_pages[0]
+            if len(epochs_pages) > 0 and active_page_idx < len(epochs_pages):
+                active_page_epoch_ids = epochs_pages[active_page_idx]
                 if hasattr(a_decoded_traj_plotter, 'row_column_indicies') and a_decoded_traj_plotter.row_column_indicies is not None:
                     row_column_indicies = a_decoded_traj_plotter.row_column_indicies
                     for linear_idx, epoch_id in enumerate(active_page_epoch_ids):
@@ -5297,7 +5453,8 @@ class PredictiveDecodingDisplayWidget:
                                 if curr_row < axs.shape[0] and curr_col < axs.shape[1]:
                                     axs[curr_row, curr_col].set_visible(False)
         
-        perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - an_epoch_idx: {an_epoch_idx}")
+        num_pages = len(epochs_pages) if epochs_pages else 0
+        perform_update_title_subtitle(fig=fig, ax=None, title_string=f"{a_past_future_name} - epoch_idx: {an_epoch_idx} | Page {active_page_idx + 1}/{num_pages}")
         
 
         # Embed the matplotlib figure in the dock widget
@@ -5331,11 +5488,36 @@ class PredictiveDecodingDisplayWidget:
                 plot_layout.addWidget(canvas)
                 plot_widget.setLayout(plot_layout)
                 
-                # Add to dock
-                dock.addWidget(plot_widget)
+                # Create container widget that holds both plot and pagination controls
+                container_widget = QtWidgets.QWidget()
+                container_layout = QtWidgets.QVBoxLayout()
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                container_layout.setSpacing(0)
                 
-                # Store reference to canvas widget
+                # Add plot widget (with stretch to take available space)
+                container_layout.addWidget(plot_widget, stretch=1)
+                
+                # Build pagination controls (will be added to container_layout)
+                # This will create the controls widget if needed
+                if num_pages > 1:
+                    self._build_page_controls(a_past_future_name, num_pages)
+                    # Get the control widget and add it to the container
+                    if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                        control_widget = self.page_controls[a_past_future_name]['widget']
+                        container_layout.addWidget(control_widget)
+                        # Ensure controls are visible
+                        control_widget.setVisible(True)
+                
+                container_widget.setLayout(container_layout)
+                
+                # Add container to dock (instead of just the plot widget)
+                dock.addWidget(container_widget)
+                
+                # Store reference to canvas widget and container
                 self.dock_canvas_widgets[a_past_future_name] = canvas
+                if not hasattr(self, 'dock_container_widgets'):
+                    self.dock_container_widgets = {}
+                self.dock_container_widgets[a_past_future_name] = container_widget
                 
                 # Close the figure window if it's open (since it's now embedded in the dock)
                 plt.close(fig)                
@@ -5348,6 +5530,35 @@ class PredictiveDecodingDisplayWidget:
                 # Just trigger a redraw
                 # canvas.draw_idle()
                 canvas.draw()
+            
+            ## Update pagination controls if they exist
+            if num_pages > 1:
+                # Ensure controls exist and are visible
+                if a_past_future_name not in self.page_controls or 'widget' not in self.page_controls.get(a_past_future_name, {}):
+                    self._build_page_controls(a_past_future_name, num_pages)
+                    # If controls were just created, we need to add them to the container or dock
+                    if a_past_future_name in self.dock_container_widgets:
+                        # New structure: add to container
+                        container_widget = self.dock_container_widgets[a_past_future_name]
+                        container_layout = container_widget.layout()
+                        if container_layout and a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                            control_widget = self.page_controls[a_past_future_name]['widget']
+                            # Check if already in layout
+                            if control_widget.parent() != container_widget:
+                                container_layout.addWidget(control_widget)
+                    else:
+                        # Fallback: add directly to dock (for backward compatibility)
+                        dock = self.dock_widgets.get(a_past_future_name)
+                        if dock is not None and a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                            control_widget = self.page_controls[a_past_future_name]['widget']
+                            if control_widget.parent() != dock:
+                                dock.addWidget(control_widget)
+                else:
+                    self._update_page_controls_visibility(a_past_future_name, num_pages)
+            else:
+                # Hide controls if only one page
+                if a_past_future_name in self.page_controls and 'widget' in self.page_controls[a_past_future_name]:
+                    self.page_controls[a_past_future_name]['widget'].setVisible(False)
 
         ## alternative to the above?
         widget = self.display_widgets.get(a_past_future_name)
@@ -5582,6 +5793,15 @@ class PredictiveDecodingDisplayWidget:
         """Main entry point - validate, prepare data, update all widgets."""
         # Validate epoch index
         an_epoch_idx = self._validate_epoch_idx(an_epoch_idx)
+        
+        # Reset page indices to 0 when epoch changes (optional: could preserve per-epoch page indices)
+        # For now, reset to 0 for simplicity
+        if an_epoch_idx != self.active_epoch_idx:
+            for widget_name in ['past', 'future']:
+                self.trajectory_active_page_idx[widget_name] = 0
+                # Update slider if it exists
+                if widget_name in self.page_controls and self.page_controls[widget_name].get('slider') is not None:
+                    self.page_controls[widget_name]['slider'].setValue(0)
         
         # Update slider value if it exists (block signals to avoid recursion)
         if self.epoch_slider is not None:
