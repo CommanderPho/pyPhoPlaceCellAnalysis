@@ -5826,32 +5826,37 @@ class PredictiveDecodingDisplayWidget:
                 
         
 
-
+# from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingHelpers
 
 @function_attributes(short_name=None, tags=['pyqtgraph', 'trajectory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:40', related_items=[])
-def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None,
-        overlay_mask: Optional[NDArray] = None, trajectory_colors: Optional[List] = None, single_plot: bool = False, cmap: Optional[str] = None):
-    """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a grid of tiny subplots.
-    It assigns each of them a unique id and color.
-    They can be rendered as lines of solid color, gradients from 0.25 alpha to 0.9 alpha of their assigned color, or something custom.
-
-    Alternatively, we can plot them with a diverging color pallete with -1.0 meaning far past: start of the recording, and +1.0 meaning far-future: end of the recording.
+def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None,
+        overlay_mask: Optional[NDArray] = None, single_plot: bool = False, 
+        color_fn: Optional[Callable] = None, cmap: Optional[Union[str, Callable]] = None, 
+        color_value_column: Optional[str] = None, color_value_range: Optional[Tuple[float, float]] = None):
+    """ Takes a list of position dataframes representing separate trajectories and plots them.
+    
+    Fully flexible color mapping system that supports:
+    - Custom color functions
+    - Matplotlib or pyqtgraph colormaps
+    - Value-based coloring from dataframe columns
     
     Args:
-        position_dfs: List of position dataframes, each with 'x' and 'y' columns. Optional 't' column for time-based modes.
-        rendering_mode: One of 'solid_colors', 'alpha_gradient', or 'time_diverging'. Default is 'solid_colors'.
+        position_dfs: List of position dataframes, each with 'x' and 'y' columns. Optional 't' column for time.
         fixed_columns: Number of columns in the grid layout. Default is 5. Only used when single_plot=False.
         return_widget: If True, returns (GraphicsLayoutWidget, list of PlotItems). If False, returns only list of PlotItems.
         maze_extent: Optional tuple of (xmin, xmax, ymin, ymax) to set fixed x/y limits for all subplots. If None, auto-ranges each plot.
         overlay_mask: Optional 2D numpy array to render as a low-alpha overlay on each subplot. Extents are set to maze_extent if provided, otherwise viewport edges.
-        trajectory_colors: Optional list of colors to assign to each trajectory. If None, colors are automatically assigned. 
-                           Each color can be a color name (str), hex string (str), QColor, or RGB/RGBA tuple.
-                           Length must match len(position_dfs). Only used in 'solid_colors' and 'alpha_gradient' modes.
-                           If provided, takes precedence over cmap.
         single_plot: If True, plots all trajectories on the same axes as separate series. If False, plots each trajectory in its own subplot in a grid. Default is False.
-        cmap: Optional matplotlib colormap name (e.g., 'viridis', 'plasma', 'inferno', 'magma', 'coolwarm', etc.) to generate trajectory colors.
-              Colors are sampled evenly across the colormap for each trajectory. Only used if trajectory_colors is None.
-              Only used in 'solid_colors' and 'alpha_gradient' modes.
+        color_fn: Optional callable that maps point data to colors. Signature: color_fn(x, y, t, trajectory_idx, point_idx, df) -> QColor or (R, G, B) or (R, G, B, A) or color name/hex.
+                  If None, uses default per-trajectory colors.
+        cmap: Optional colormap for value-based coloring. Can be:
+              - String name of matplotlib colormap (e.g., 'viridis', 'plasma')
+              - String name of pyqtgraph colormap (e.g., 'CET-L4')
+              - Callable that maps [0, 1] -> (R, G, B, A) in [0, 1] range
+              Requires color_value_column to be specified.
+        color_value_column: Optional column name in dataframes to use for colormap-based coloring. 
+                            Values will be normalized to [0, 1] based on color_value_range or auto-computed range.
+        color_value_range: Optional tuple (min, max) for normalizing color_value_column. If None, computed from all data.
     
     Returns:
         Tuple of (GraphicsLayoutWidget, list of PlotItems) if return_widget=True, else just list of PlotItems.
@@ -5860,25 +5865,49 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import multi_trajectory_color_plotter
 
+        # Default: per-trajectory colors
         plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list)
         
-        # With fixed maze extent:
-        maze_extent = (a_decoder.xbin[0], a_decoder.xbin[-1], a_decoder.ybin[0], a_decoder.ybin[-1])
-        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, maze_extent=maze_extent)
+        # Time-based colormap coloring
+        plot_widget, plot_items = multi_trajectory_color_plotter(
+            position_dfs=dfs_list, 
+            cmap='plasma',
+            color_value_column='t',
+            single_plot=True
+        )
         
-        # With custom trajectory colors:
-        custom_colors = ['red', 'blue', 'green', '#FF00FF', (255, 128, 0)]
-        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, trajectory_colors=custom_colors)
+        # Custom color function
+        def my_color_fn(x, y, t, traj_idx, point_idx, df):
+            # Color by x position
+            return pg.mkColor(int(255 * (x - xmin) / (xmax - xmin)), 0, 0)
         
-        # Plot all trajectories on the same axes:
-        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, single_plot=True)
+        plot_widget, plot_items = multi_trajectory_color_plotter(
+            position_dfs=dfs_list,
+            color_fn=my_color_fn,
+            single_plot=True
+        )
         
-        # Using a colormap to generate trajectory colors:
-        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, cmap='viridis')
+        # Categorical colormap with saturation fade (shows direction)
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import create_categorical_saturation_fade_color_fn
+        
+        color_fn = create_categorical_saturation_fade_color_fn(
+            position_dfs=dfs_list,
+            categorical_cmap='tab10',
+            saturation_start=0.9,  # High saturation at start
+            saturation_end=0.3     # Low saturation at end
+        )
+        
+        plot_widget, plot_items = multi_trajectory_color_plotter(
+            position_dfs=dfs_list,
+            color_fn=color_fn,
+            single_plot=True
+        )
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
     import numpy as np
+    import pandas as pd
+    from typing import Callable, Union
     
     # Validate input
     if (position_dfs is None) or len(position_dfs) == 0:
@@ -5887,9 +5916,6 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
     for i, df in enumerate(position_dfs):
         if 'x' not in df.columns or 'y' not in df.columns:
             raise ValueError(f"position_dfs[{i}] must have 'x' and 'y' columns")
-    
-    if rendering_mode not in ['solid_colors', 'alpha_gradient', 'time_diverging']:
-        raise ValueError(f"rendering_mode must be one of 'solid_colors', 'alpha_gradient', or 'time_diverging', got '{rendering_mode}'")
     
     # Validate maze_extent if provided
     if maze_extent is not None:
@@ -5906,86 +5932,114 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         if overlay_mask.ndim != 2:
             raise ValueError("overlay_mask must be a 2D array")
     
-    # Handle case where trajectory_colors is a string (likely a colormap name)
-    # If trajectory_colors is a string and cmap is None, treat it as a colormap name
-    if isinstance(trajectory_colors, str) and cmap is None:
-        cmap = trajectory_colors
-        trajectory_colors = None
-    
-    # Validate and convert trajectory_colors if provided
-    trajectory_color_objects = None
-    if trajectory_colors is not None:
-        if not isinstance(trajectory_colors, (list, tuple)):
-            raise ValueError("trajectory_colors must be a list or tuple (or a string colormap name if cmap is not provided)")
-        if len(trajectory_colors) != len(position_dfs):
-            raise ValueError(f"trajectory_colors must have length {len(position_dfs)}, got {len(trajectory_colors)}")
-        # Convert each color to QColor
-        trajectory_color_objects = []
-        for i, color in enumerate(trajectory_colors):
-            try:
-                if isinstance(color, str):
-                    # Color name or hex string
-                    qcolor = pg.mkColor(color)
-                elif isinstance(color, (tuple, list)):
-                    # RGB or RGBA tuple
-                    if len(color) == 3:
-                        qcolor = pg.mkColor(int(color[0]), int(color[1]), int(color[2]))
-                    elif len(color) == 4:
-                        qcolor = pg.mkColor(int(color[0]), int(color[1]), int(color[2]), int(color[3]))
-                    else:
-                        raise ValueError(f"trajectory_colors[{i}] tuple must have 3 (RGB) or 4 (RGBA) elements")
-                else:
-                    # Assume it's already a QColor or compatible object
-                    qcolor = pg.mkColor(color)
-                trajectory_color_objects.append(qcolor)
-            except Exception as e:
-                raise ValueError(f"trajectory_colors[{i}] could not be converted to a color: {e}")
-    
-    # Generate colors from colormap if cmap is provided and trajectory_colors is not
-    if trajectory_color_objects is None and cmap is not None:
-        try:
-            import matplotlib.cm as cm
-            import matplotlib.pyplot as plt
-            # Get the colormap
-            colormap = plt.get_cmap(cmap)
-            num_epochs = len(position_dfs)
-            # Generate evenly spaced values from 0 to 1
-            if num_epochs > 1:
-                color_values = np.linspace(0, 1, num_epochs)
-            else:
-                color_values = [0.5]  # Use middle of colormap for single trajectory
-            # Convert colormap colors to QColor
-            trajectory_color_objects = []
-            for val in color_values:
-                rgba = colormap(val)  # Returns (R, G, B, A) in [0, 1] range
-                # Convert to [0, 255] range and create QColor
-                r = int(rgba[0] * 255)
-                g = int(rgba[1] * 255)
-                b = int(rgba[2] * 255)
-                a = int(rgba[3] * 255) if len(rgba) > 3 else 255
-                qcolor = pg.mkColor(r, g, b, a)
-                trajectory_color_objects.append(qcolor)
-        except Exception as e:
-            raise ValueError(f"Could not generate colors from colormap '{cmap}': {e}")
-    
+    # Setup color mapping system
     num_epochs = len(position_dfs)
+    colormap_fn = None
+    color_value_min = None
+    color_value_max = None
     
-    # Compute global time range for time_diverging mode if needed
-    global_t_min = None
-    global_t_max = None
-    if rendering_mode == 'time_diverging':
-        all_times = []
-        for df in position_dfs:
-            if 't' in df.columns:
-                valid_t = df['t'].dropna()
-                if len(valid_t) > 0:
-                    all_times.extend(valid_t.tolist())
-        if len(all_times) > 0:
-            global_t_min = min(all_times)
-            global_t_max = max(all_times)
-        if global_t_min is None or global_t_max is None:
-            # Fallback to solid_colors if no time data available
-            rendering_mode = 'solid_colors'
+    # Process colormap if provided
+    if cmap is not None:
+        if color_value_column is None:
+            raise ValueError("cmap requires color_value_column to be specified")
+        
+        if isinstance(cmap, str):
+            # Try matplotlib first, then pyqtgraph
+            try:
+                import matplotlib.pyplot as plt
+                matplotlib_cmap = plt.get_cmap(cmap)
+                colormap_fn = lambda v: matplotlib_cmap(v)
+            except:
+                # Try pyqtgraph colormap
+                try:
+                    pg_cmap = pg.colormap.get(cmap)
+                    if pg_cmap is not None:
+                        # pyqtgraph colormap returns QColor, convert to RGBA tuple
+                        def pg_cmap_wrapper(v):
+                            qcolor = pg_cmap.map(v)
+                            return (qcolor.red() / 255.0, qcolor.green() / 255.0, qcolor.blue() / 255.0, qcolor.alpha() / 255.0)
+                        colormap_fn = pg_cmap_wrapper
+                    else:
+                        raise ValueError(f"Colormap '{cmap}' not found in matplotlib or pyqtgraph")
+                except Exception as e:
+                    raise ValueError(f"Could not load colormap '{cmap}': {e}")
+        elif callable(cmap):
+            colormap_fn = cmap
+        else:
+            raise ValueError("cmap must be a string (colormap name) or callable")
+        
+        # Compute color value range
+        if color_value_range is not None:
+            color_value_min, color_value_max = color_value_range
+        else:
+            # Auto-compute from all data
+            all_values = []
+            for df in position_dfs:
+                if color_value_column in df.columns:
+                    valid_vals = df[color_value_column].dropna()
+                    if len(valid_vals) > 0:
+                        all_values.extend(valid_vals.tolist())
+            if len(all_values) > 0:
+                color_value_min = min(all_values)
+                color_value_max = max(all_values)
+            else:
+                raise ValueError(f"color_value_column '{color_value_column}' not found or has no valid values")
+    
+    def _convert_to_qcolor(color):
+        """Convert various color formats to QColor"""
+        if isinstance(color, str):
+            return pg.mkColor(color)
+        elif isinstance(color, (tuple, list)):
+            if len(color) == 3:
+                return pg.mkColor(int(color[0]), int(color[1]), int(color[2]))
+            elif len(color) == 4:
+                return pg.mkColor(int(color[0]), int(color[1]), int(color[2]), int(color[3]))
+            else:
+                raise ValueError(f"Color tuple must have 3 (RGB) or 4 (RGBA) elements, got {len(color)}")
+        else:
+            # Assume it's already a QColor or compatible
+            return pg.mkColor(color)
+    
+    def _get_point_color(x, y, t, trajectory_idx, point_idx, df, valid_mask_idx):
+        """Get color for a single point using the configured color system"""
+        if color_fn is not None:
+            # Use custom color function
+            color = color_fn(x, y, t, trajectory_idx, point_idx, df)
+            return _convert_to_qcolor(color)
+        elif colormap_fn is not None and color_value_column is not None:
+            # Use colormap with value column
+            if color_value_column in df.columns:
+                try:
+                    value = df[color_value_column].iloc[valid_mask_idx]
+                    if pd.isna(value):
+                        value = color_value_min  # Use min for NaN
+                except (IndexError, KeyError):
+                    value = color_value_min  # Fallback
+                
+                # Normalize to [0, 1]
+                if color_value_min is not None and color_value_max is not None and color_value_max > color_value_min:
+                    normalized = (value - color_value_min) / (color_value_max - color_value_min)
+                    normalized = max(0.0, min(1.0, normalized))  # Clamp
+                else:
+                    normalized = 0.5
+                
+                rgba = colormap_fn(normalized)
+                if isinstance(rgba, (tuple, list)) and len(rgba) >= 3:
+                    # Convert from [0, 1] to [0, 255] if needed
+                    if rgba[0] <= 1.0:
+                        r, g, b = int(rgba[0] * 255), int(rgba[1] * 255), int(rgba[2] * 255)
+                        a = int(rgba[3] * 255) if len(rgba) > 3 else 255
+                    else:
+                        r, g, b = int(rgba[0]), int(rgba[1]), int(rgba[2])
+                        a = int(rgba[3]) if len(rgba) > 3 else 255
+                    return pg.mkColor(r, g, b, a)
+                else:
+                    return _convert_to_qcolor(rgba)
+        
+        # Default: per-trajectory colors
+        traj_color = pg.intColor(trajectory_idx, hues=num_epochs)
+        traj_color.setAlphaF(0.4)
+        return traj_color
     
     # White pen for axes outline
     white_pen = pg.mkPen('white', width=1)
@@ -6020,10 +6074,15 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
             x_vals = pos_df['x'].to_numpy()
             y_vals = pos_df['y'].to_numpy()
             
+            # Get time values if available
+            t_vals = pos_df['t'].to_numpy() if 't' in pos_df.columns else None
+            
             # Remove NaN values
             valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
             x_vals = x_vals[valid_mask]
             y_vals = y_vals[valid_mask]
+            if t_vals is not None:
+                t_vals = t_vals[valid_mask]
             
             if len(x_vals) < 2:
                 continue  # Skip trajectories with insufficient points
@@ -6031,84 +6090,17 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
             all_x_vals.extend(x_vals.tolist())
             all_y_vals.extend(y_vals.tolist())
             
-            if rendering_mode == 'solid_colors':
-                # Each trajectory gets a unique color
-                if trajectory_color_objects is not None:
-                    traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                else:
-                    traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                traj_color.setAlphaF(0.4)  # Moderately low alpha
-                brush = pg.mkBrush(traj_color)
-                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            # Generate colors for each point
+            brushes = []
+            for i in range(len(x_vals)):
+                t = t_vals[i] if t_vals is not None else None
+                # Find original index in dataframe for color_value_column access
+                valid_indices = np.where(valid_mask)[0]
+                orig_idx = valid_indices[i] if i < len(valid_indices) else i
+                point_color = _get_point_color(x_vals[i], y_vals[i], t, a_linear_index, i, pos_df, orig_idx)
+                brushes.append(pg.mkBrush(point_color))
             
-            elif rendering_mode == 'alpha_gradient':
-                # Alpha gradient from 0.25 to 0.9 along the path
-                if trajectory_color_objects is not None:
-                    base_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                else:
-                    base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                n_points = len(x_vals)
-                brushes = []
-                for i in range(n_points):
-                    # Interpolate alpha from 0.25 to 0.9
-                    alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
-                    point_color = pg.mkColor(base_color)
-                    point_color.setAlphaF(alpha)
-                    brushes.append(pg.mkBrush(point_color))
-                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
-            
-            elif rendering_mode == 'time_diverging':
-                # Diverging color palette based on normalized time (-1.0 to +1.0)
-                if 't' in pos_df.columns:
-                    t_vals = pos_df['t'].to_numpy()[valid_mask]
-                    if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
-                        # Normalize time to [-1.0, 1.0]
-                        t_range = global_t_max - global_t_min
-                        if t_range > 0:
-                            normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
-                        else:
-                            normalized_t = np.zeros_like(t_vals)
-                        
-                        # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
-                        brushes = []
-                        for i in range(len(x_vals)):
-                            seg_t = normalized_t[i]
-                            # Map from [-1.0, 1.0] to color
-                            # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
-                            if seg_t < 0:
-                                # Blue to white gradient
-                                intensity = abs(seg_t)
-                                r = int(255 * intensity)
-                                g = int(255 * intensity)
-                                b = 255
-                            else:
-                                # White to red gradient
-                                intensity = seg_t
-                                r = 255
-                                g = int(255 * (1 - intensity))
-                                b = int(255 * (1 - intensity))
-                            
-                            seg_color = pg.mkColor(r, g, b, 200)
-                            brushes.append(pg.mkBrush(seg_color))
-                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
-                    else:
-                        # Fallback to solid color if time data is invalid
-                        if trajectory_color_objects is not None:
-                            traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                        else:
-                            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                        traj_color.setAlphaF(0.4)  # Moderately low alpha
-                        brush = pg.mkBrush(traj_color)
-                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
-                else:
-                    # Fallback to solid color if no time column
-                    if trajectory_color_objects is not None:
-                        traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                    else:
-                        traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                    traj_color.setAlphaF(0.4)  # Moderately low alpha
-                    brush = pg.mkBrush(traj_color)
-                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
         
         # Set x/y limits based on maze_extent if provided, otherwise auto-range to fit all trajectories
         if maze_extent is not None:
@@ -6195,92 +6187,30 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
             x_vals = pos_df['x'].to_numpy()
             y_vals = pos_df['y'].to_numpy()
             
+            # Get time values if available
+            t_vals = pos_df['t'].to_numpy() if 't' in pos_df.columns else None
+            
             # Remove NaN values
             valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
             x_vals = x_vals[valid_mask]
             y_vals = y_vals[valid_mask]
+            if t_vals is not None:
+                t_vals = t_vals[valid_mask]
             
             if len(x_vals) < 2:
                 continue  # Skip trajectories with insufficient points
             
-            if rendering_mode == 'solid_colors':
-                # Each trajectory gets a unique color
-                if trajectory_color_objects is not None:
-                    traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                else:
-                    traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                traj_color.setAlphaF(0.4)  # Moderately low alpha
-                brush = pg.mkBrush(traj_color)
-                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            # Generate colors for each point
+            brushes = []
+            for i in range(len(x_vals)):
+                t = t_vals[i] if t_vals is not None else None
+                # Find original index in dataframe for color_value_column access
+                valid_indices = np.where(valid_mask)[0]
+                orig_idx = valid_indices[i] if i < len(valid_indices) else i
+                point_color = _get_point_color(x_vals[i], y_vals[i], t, a_linear_index, i, pos_df, orig_idx)
+                brushes.append(pg.mkBrush(point_color))
             
-            elif rendering_mode == 'alpha_gradient':
-                # Alpha gradient from 0.25 to 0.9 along the path
-                if trajectory_color_objects is not None:
-                    base_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                else:
-                    base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                n_points = len(x_vals)
-                brushes = []
-                for i in range(n_points):
-                    # Interpolate alpha from 0.25 to 0.9
-                    alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
-                    point_color = pg.mkColor(base_color)
-                    point_color.setAlphaF(alpha)
-                    brushes.append(pg.mkBrush(point_color))
-                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
-            
-            elif rendering_mode == 'time_diverging':
-                # Diverging color palette based on normalized time (-1.0 to +1.0)
-                if 't' in pos_df.columns:
-                    t_vals = pos_df['t'].to_numpy()[valid_mask]
-                    if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
-                        # Normalize time to [-1.0, 1.0]
-                        t_range = global_t_max - global_t_min
-                        if t_range > 0:
-                            normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
-                        else:
-                            normalized_t = np.zeros_like(t_vals)
-                        
-                        # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
-                        brushes = []
-                        for i in range(len(x_vals)):
-                            seg_t = normalized_t[i]
-                            # Map from [-1.0, 1.0] to color
-                            # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
-                            if seg_t < 0:
-                                # Blue to white gradient
-                                intensity = abs(seg_t)
-                                r = int(255 * intensity)
-                                g = int(255 * intensity)
-                                b = 255
-                            else:
-                                # White to red gradient
-                                intensity = seg_t
-                                r = 255
-                                g = int(255 * (1 - intensity))
-                                b = int(255 * (1 - intensity))
-                            
-                            seg_color = pg.mkColor(r, g, b, 200)
-                            brushes.append(pg.mkBrush(seg_color))
-                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
-                    else:
-                        # Fallback to solid color if time data is invalid
-                        if trajectory_color_objects is not None:
-                            traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                        else:
-                            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                        traj_color.setAlphaF(0.4)  # Moderately low alpha
-                        brush = pg.mkBrush(traj_color)
-                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
-                else:
-                    # Fallback to solid color if no time column
-                    if trajectory_color_objects is not None:
-                        traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
-                    else:
-                        traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                    traj_color.setAlphaF(0.4)  # Moderately low alpha
-                    brush = pg.mkBrush(traj_color)
-                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
             
             # Set x/y limits based on maze_extent if provided, otherwise auto-range
             if maze_extent is not None:
@@ -6327,4 +6257,164 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         return graphics_widget, plot_items
     else:
         return plot_items
+
+
+@function_attributes(short_name=None, tags=['pyqtgraph', 'trajectory', 'colormap'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-20 00:00', related_items=[])
+def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame], categorical_cmap: str = 'tab10', saturation_start: float = 0.9, saturation_end: float = 0.3):
+    """Creates a color function for multi_trajectory_color_plotter that assigns each trajectory a unique color
+    from a categorical colormap and fades saturation from high (at start) to low (at end) to show direction.
+    
+    Args:
+        position_dfs: List of position dataframes, each with 'x' and 'y' columns. Optional 't' column for time.
+        categorical_cmap: Name of matplotlib categorical colormap (e.g., 'tab10', 'Set3', 'Pastel1'). Default is 'tab10'.
+        saturation_start: Starting saturation value (0.0 to 1.0) at trajectory start. Default is 0.9 (high saturation).
+        saturation_end: Ending saturation value (0.0 to 1.0) at trajectory end. Default is 0.3 (low saturation).
+    
+    Returns:
+        A color function compatible with multi_trajectory_color_plotter's color_fn parameter.
+        The function signature is: (x, y, t, trajectory_idx, point_idx, df) -> QColor or color tuple
+    
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import (
+            multi_trajectory_color_plotter, create_categorical_saturation_fade_color_fn
+        )
+        
+        # Create the color function
+        color_fn = create_categorical_saturation_fade_color_fn(
+            position_dfs=dfs_list,
+            categorical_cmap='tab10',
+            saturation_start=0.9,
+            saturation_end=0.3
+        )
+        
+        # Use it with the plotter
+        plot_widget, plot_items = multi_trajectory_color_plotter(
+            position_dfs=dfs_list,
+            color_fn=color_fn,
+            single_plot=True
+        )
+    """
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    import numpy as np
+    import pandas as pd
+    import colorsys
+    
+    # Validate inputs
+    if len(position_dfs) == 0:
+        raise ValueError("position_dfs must be a non-empty list")
+    
+    if not (0.0 <= saturation_start <= 1.0):
+        raise ValueError(f"saturation_start must be between 0.0 and 1.0, got {saturation_start}")
+    if not (0.0 <= saturation_end <= 1.0):
+        raise ValueError(f"saturation_end must be between 0.0 and 1.0, got {saturation_end}")
+    
+    num_trajectories = len(position_dfs)
+    
+    # Pre-compute t_start and t_end for each trajectory
+    trajectory_t_starts = []
+    trajectory_t_ends = []
+    has_time_data = []
+    
+    for df in position_dfs:
+        if 't' in df.columns:
+            valid_t = df['t'].dropna()
+            if len(valid_t) > 0:
+                trajectory_t_starts.append(valid_t.min())
+                trajectory_t_ends.append(valid_t.max())
+                has_time_data.append(True)
+            else:
+                trajectory_t_starts.append(None)
+                trajectory_t_ends.append(None)
+                has_time_data.append(False)
+        else:
+            trajectory_t_starts.append(None)
+            trajectory_t_ends.append(None)
+            has_time_data.append(False)
+    
+    # Load categorical colormap and assign base colors to each trajectory
+    try:
+        import matplotlib.pyplot as plt
+        categorical_cmap_obj = plt.get_cmap(categorical_cmap)
+    except Exception as e:
+        raise ValueError(f"Could not load categorical colormap '{categorical_cmap}': {e}")
+    
+    # Assign base colors to each trajectory
+    # Use evenly spaced indices in the colormap
+    if num_trajectories > 1:
+        color_indices = np.linspace(0, 1, num_trajectories)
+    else:
+        color_indices = [0.5]
+    
+    trajectory_base_colors = []
+    for i in range(num_trajectories):
+        rgba = categorical_cmap_obj(color_indices[i])  # Returns (R, G, B, A) in [0, 1] range
+        # Convert to QColor and store HSV values
+        r = int(rgba[0] * 255)
+        g = int(rgba[1] * 255)
+        b = int(rgba[2] * 255)
+        base_qcolor = pg.mkColor(r, g, b)
+        trajectory_base_colors.append(base_qcolor)
+    
+    # Create the color function closure
+    def color_fn(x, y, t, trajectory_idx, point_idx, df):
+        """Color function that adjusts saturation based on normalized time within trajectory"""
+        # Validate trajectory index
+        if trajectory_idx < 0 or trajectory_idx >= num_trajectories:
+            # Fallback to default color
+            return pg.intColor(0, hues=1)
+        
+        # Get base color for this trajectory
+        base_color = trajectory_base_colors[trajectory_idx]
+        
+        # Helper function to create color from HSV
+        def hsv_to_qcolor(h, s, v, a=1.0):
+            """Convert HSV to QColor via RGB"""
+            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+            return pg.mkColor(int(r * 255), int(g * 255), int(b * 255), int(a * 255))
+        
+        # Check if we have time data for this trajectory
+        if not has_time_data[trajectory_idx] or t is None or pd.isna(t):
+            # No time data: use base color with saturation_start
+            h, s, v, a = base_color.getHsvF()
+            if h < 0:  # Grayscale, convert RGB to HSV
+                r, g, b = base_color.redF(), base_color.greenF(), base_color.blueF()
+                h, s, v = colorsys.rgb_to_hsv(r, g, b)
+            return hsv_to_qcolor(h, saturation_start, v, a if a >= 0 else 1.0)
+        
+        # Get time range for this trajectory
+        t_start = trajectory_t_starts[trajectory_idx]
+        t_end = trajectory_t_ends[trajectory_idx]
+        
+        if t_start is None or t_end is None:
+            # Fallback: use saturation_start
+            h, s, v, a = base_color.getHsvF()
+            if h < 0:  # Grayscale, convert RGB to HSV
+                r, g, b = base_color.redF(), base_color.greenF(), base_color.blueF()
+                h, s, v = colorsys.rgb_to_hsv(r, g, b)
+            return hsv_to_qcolor(h, saturation_start, v, a if a >= 0 else 1.0)
+        
+        # Normalize time to [0, 1] within this trajectory's range
+        if t_end > t_start:
+            normalized_time = (t - t_start) / (t_end - t_start)
+            normalized_time = max(0.0, min(1.0, normalized_time))  # Clamp to [0, 1]
+        else:
+            # t_start == t_end: use saturation_start
+            normalized_time = 0.0
+        
+        # Interpolate saturation from saturation_start to saturation_end
+        saturation = saturation_start + (saturation_end - saturation_start) * normalized_time
+        
+        # Get HSV values from base color
+        h, s, v, a = base_color.getHsvF()
+        
+        # If base color has invalid HSV (e.g., grayscale), use RGB to HSV conversion
+        if h < 0:  # QColor returns -1 for grayscale colors
+            # Convert RGB to HSV using colorsys
+            r, g, b = base_color.redF(), base_color.greenF(), base_color.blueF()
+            h, s, v = colorsys.rgb_to_hsv(r, g, b)
+        
+        # Create adjusted color with new saturation
+        return hsv_to_qcolor(h, saturation, v, a if a >= 0 else 1.0)
+    
+    return color_fn
 
