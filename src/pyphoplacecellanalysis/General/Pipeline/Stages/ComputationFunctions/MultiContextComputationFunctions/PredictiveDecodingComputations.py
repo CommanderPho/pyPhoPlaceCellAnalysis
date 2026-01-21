@@ -6503,11 +6503,11 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 
 
 # ==================================================================================================================================================================================================================================================================================== #
-# 2026-01-21 - Vispi                                                                                                                                                                                                                                                                   #
+# 2026-01-21 - Vispy                                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
-def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, **kwargs):
+def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, current_traj_seconds_pre_post_extension: float = 0.750, past_future_trajectory_extension_seconds: float = 0.0, show_full_position_background: bool = False, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -6524,6 +6524,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         pf_decoder: BasePositionDecoder instance
         decoded_result: DecodedFilterEpochsResult instance
         active_epoch_idx: Initial epoch index to display (default: 0)
+        current_traj_seconds_pre_post_extension: Seconds to extend current epoch trajectory before/after epoch bounds (default: 0.750). Positions outside epoch are rendered with 0.2 alpha.
+        past_future_trajectory_extension_seconds: Seconds to extend past/future trajectories beyond their computed bounds (default: 0.0). Extended portions are rendered with 0.2 alpha.
+        show_full_position_background: If True, renders the entire position dataframe as a faint (0.2 alpha) grey line behind past/future trajectories (default: False).
         **kwargs: Additional keyword arguments
         
     Returns:
@@ -6645,6 +6648,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     colorbar_rects = []
     colorbar_texts = []
     epoch_info_text = None
+    current_position_line = None  # Line visual for current position trajectory during epoch
+    trajectory_arrows = []  # List of Arrow visuals for trajectory direction indicators (start and end)
     
     # Store data for updates
     state = {
@@ -6678,6 +6683,13 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'colorbar_rects': colorbar_rects,
         'colorbar_texts': colorbar_texts,
         'epoch_info_text': epoch_info_text,
+        'current_position_line': current_position_line,
+        'trajectory_arrows': trajectory_arrows,
+        'curr_position_df': curr_position_df,
+        'current_traj_seconds_pre_post_extension': current_traj_seconds_pre_post_extension,
+        'past_future_trajectory_extension_seconds': past_future_trajectory_extension_seconds,
+        'show_full_position_background': show_full_position_background,
+        'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
         'main_window': main_window,
         'epoch_slider': epoch_slider,
@@ -6765,6 +6777,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if state['epoch_info_text'] is not None:
             state['epoch_info_text'].parent = None
             state['epoch_info_text'] = None
+        
+        # Update current position line (reuse existing visual if available)
         
         # Clear timeline visuals
         for tick in state['timeline_ticks']:
@@ -6915,6 +6929,38 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             state['colorbar_view'].camera = scene.PanZoomCamera(aspect=1)
             state['colorbar_view'].camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
 
+        # Render full position background line (if enabled) - rendered behind past/future trajectories in all views
+        if state['show_full_position_background'] and state['curr_position_df'] is not None:
+            if 'x' in state['curr_position_df'].columns and 'y' in state['curr_position_df'].columns:
+                bg_x = state['curr_position_df']['x'].values
+                bg_y = state['curr_position_df']['y'].values
+                bg_valid_mask = ~(np.isnan(bg_x) | np.isnan(bg_y))
+                if np.any(bg_valid_mask):
+                    bg_x_valid = bg_x[bg_valid_mask]
+                    bg_y_valid = bg_y[bg_valid_mask]
+                    n_bg_points = len(bg_x_valid)
+                    bg_colors = np.ones((n_bg_points, 4), dtype=np.float32)
+                    bg_colors[:, 0] = 0.5  # Grey
+                    bg_colors[:, 1] = 0.5
+                    bg_colors[:, 2] = 0.5
+                    bg_colors[:, 3] = 0.2  # Very faint alpha
+                    
+                    # Remove old background lines if exist
+                    for bg_line in state['full_position_background_line']:
+                        if bg_line is not None:
+                            bg_line.parent = None
+                    state['full_position_background_line'].clear()
+                    
+                    # Create background lines in all trajectory views (past, posterior 2D, future) - order=0 renders behind other elements
+                    bg_pos = np.column_stack([bg_x_valid, bg_y_valid])
+                    past_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['past_view'].scene)
+                    past_bg_line.order = 0
+                    posterior_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['posterior_2d_view'].scene)
+                    posterior_bg_line.order = 0
+                    future_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['future_view'].scene)
+                    future_bg_line.order = 0
+                    state['full_position_background_line'] = [past_bg_line, posterior_bg_line, future_bg_line]
+
         # Render Past Trajectories and collect data for timeline
         past_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
         if 'past' in curr_matching_past_future_positions_df_dict:
@@ -6953,6 +6999,32 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
                             else:
                                 opacity = np.ones(len(x_valid)) * 0.8
+                            
+                            # Check for trajectory extension (extend backward in time for past trajectories)
+                            extension_seconds = state['past_future_trajectory_extension_seconds']
+                            if extension_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                traj_t_min = np.min(t_coords)
+                                # Get positions before trajectory start (extending backward)
+                                ext_start_t = traj_t_min - extension_seconds
+                                ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
+                                ext_positions = state['curr_position_df'][ext_mask]
+                                
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid = ext_x[ext_valid_mask]
+                                        ext_y_valid = ext_y[ext_valid_mask]
+                                        n_ext_points = len(ext_x_valid)
+                                        
+                                        # Prepend extended positions (they come before in time)
+                                        x_valid = np.concatenate([ext_x_valid, x_valid])
+                                        y_valid = np.concatenate([ext_y_valid, y_valid])
+                                        
+                                        # Create extended opacity array (0.2 for extended, original for rest)
+                                        ext_opacity = np.ones(n_ext_points) * 0.2
+                                        opacity = np.concatenate([ext_opacity, opacity])
                         else:
                             opacity = np.ones(len(x_valid)) * 0.8
                         
@@ -6965,6 +7037,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
+                        line.order = 5  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['past_lines'].append(line)
         
@@ -6972,6 +7045,177 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if posterior_2d is not None and posterior_2d.size > 0:
             state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_2d_view'].scene)
             state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+        
+        # Render current position trajectory during the active epoch as grey line overlay
+        # Extends beyond epoch bounds by current_traj_seconds_pre_post_extension with reduced opacity
+        if state['curr_position_df'] is not None and epoch_start_t is not None and epoch_end_t is not None:
+            if 't' in state['curr_position_df'].columns and 'x' in state['curr_position_df'].columns and 'y' in state['curr_position_df'].columns:
+                # Filter positions within extended time range (epoch ± extension)
+                extended_start_t = epoch_start_t - state['current_traj_seconds_pre_post_extension']
+                extended_end_t = epoch_end_t + state['current_traj_seconds_pre_post_extension']
+                extended_mask = (state['curr_position_df']['t'] >= extended_start_t) & (state['curr_position_df']['t'] <= extended_end_t)
+                extended_positions = state['curr_position_df'][extended_mask]
+                
+                if len(extended_positions) > 0:
+                    x_coords = extended_positions['x'].values
+                    y_coords = extended_positions['y'].values
+                    t_coords = extended_positions['t'].values
+                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords) | np.isnan(t_coords))
+                    
+                    if np.any(valid_mask):
+                        x_valid = x_coords[valid_mask]
+                        y_valid = y_coords[valid_mask]
+                        t_valid = t_coords[valid_mask]
+                        
+                        # Determine alpha for each point: 1.0 within epoch, 0.2 outside epoch
+                        within_epoch_mask = (t_valid >= epoch_start_t) & (t_valid <= epoch_end_t)
+                        n_points = len(x_valid)
+                        colors = np.ones((n_points, 4), dtype=np.float32)
+                        colors[:, 0] = 0.7  # R (grey)
+                        colors[:, 1] = 0.7  # G (grey)
+                        colors[:, 2] = 0.7  # B (grey)
+                        colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)  # A (opacity): 1.0 within epoch, 0.2 outside
+                        
+                        # Reuse existing line visual or create new one (more efficient than recreating each time)
+                        if state['current_position_line'] is None:
+                            # Create line visual on first use
+                            state['current_position_line'] = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=state['posterior_2d_view'].scene)
+                            state['current_position_line'].order = 5  # Render above posterior image but below mask contours
+                        else:
+                            # Update existing line visual using set_data (more efficient, as per official vispy example)
+                            state['current_position_line'].set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
+                        
+                        # Render trajectory arrows using angle column (highly efficient with reuse)
+                        # Check for common angle column names
+                        angle_column = None
+                        for col_name in ['angle', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
+                            if col_name in extended_positions.columns:
+                                angle_column = col_name
+                                break
+                        
+                        # Debug: print available columns if no angle column found
+                        if angle_column is None:
+                            print(f"DEBUG: No angle column found. Available columns: {list(extended_positions.columns)}")
+                            print("DEBUG: Computing angles from trajectory direction as fallback")
+                            # Fallback: compute angles from trajectory direction
+                            if len(x_valid) > 1:
+                                # Compute direction vectors between consecutive points
+                                dx = np.diff(x_valid)
+                                dy = np.diff(y_valid)
+                                # Compute angles from direction vectors
+                                computed_angles = np.arctan2(dy, dx)
+                                # Pad with last angle to match length
+                                computed_angles = np.append(computed_angles, computed_angles[-1])
+                                angle_coords = computed_angles
+                                angle_valid_mask = ~np.isnan(angle_coords)
+                                angle_column = 'computed_from_trajectory'
+                            else:
+                                angle_coords = np.array([])
+                                angle_valid_mask = np.array([], dtype=bool)
+                        
+                        if angle_column is not None:
+                            # Get angle values for valid positions (if not already computed)
+                            if angle_column != 'computed_from_trajectory':
+                                angle_coords = extended_positions[angle_column].values[valid_mask]
+                                angle_valid_mask = ~np.isnan(angle_coords)
+                            
+                            if np.any(angle_valid_mask) and len(x_valid) >= 2:
+                                # Clean up old Arrow instances first
+                                for arrow in state['trajectory_arrows']:
+                                    if arrow is not None:
+                                        arrow.parent = None
+                                state['trajectory_arrows'].clear()
+                                
+                                # Calculate arrow length proportional to data scale
+                                data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
+                                arrow_length = data_scale * 0.015  # 1.5% of data scale
+                                arrow_head_size = data_scale * 0.02  # Arrow head size
+                                
+                                # Convert angles to radians if needed (check if in degrees)
+                                if np.max(np.abs(angle_coords)) > 2 * np.pi:
+                                    angle_coords_rad = np.deg2rad(angle_coords)
+                                else:
+                                    angle_coords_rad = angle_coords
+                                
+                                # Get start and end indices with valid angles
+                                start_idx = 0
+                                end_idx = len(x_valid) - 1
+                                
+                                # Find first valid angle from start
+                                while start_idx < len(angle_valid_mask) and not angle_valid_mask[start_idx]:
+                                    start_idx += 1
+                                
+                                # Find last valid angle from end
+                                while end_idx >= 0 and not angle_valid_mask[end_idx]:
+                                    end_idx -= 1
+                                
+                                # Create arrows at start and end if valid
+                                if start_idx < len(x_valid) and end_idx >= 0:
+                                    arrow_color = (1.0, 0.9, 0.0, max(colors[start_idx, 3], 0.6))  # Yellow with opacity
+                                    
+                                    # Create start arrow
+                                    start_angle = angle_coords_rad[start_idx]
+                                    start_x, start_y = x_valid[start_idx], y_valid[start_idx]
+                                    start_end_x = start_x + arrow_length * np.cos(start_angle)
+                                    start_end_y = start_y + arrow_length * np.sin(start_angle)
+                                    
+                                    start_arrow = scene.visuals.Arrow(pos=np.array([[start_x, start_y], [start_end_x, start_end_y]]), arrows=np.array([[start_x, start_y, start_end_x, start_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
+                                    start_arrow.order = 6
+                                    state['trajectory_arrows'].append(start_arrow)
+                                    
+                                    # Create end arrow (if different from start)
+                                    if end_idx != start_idx:
+                                        end_angle = angle_coords_rad[end_idx]
+                                        end_x, end_y = x_valid[end_idx], y_valid[end_idx]
+                                        end_end_x = end_x + arrow_length * np.cos(end_angle)
+                                        end_end_y = end_y + arrow_length * np.sin(end_angle)
+                                        
+                                        end_arrow_color = (1.0, 0.9, 0.0, max(colors[end_idx, 3], 0.6))
+                                        end_arrow = scene.visuals.Arrow(pos=np.array([[end_x, end_y], [end_end_x, end_end_y]]), arrows=np.array([[end_x, end_y, end_end_x, end_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=end_arrow_color, arrow_color=end_arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
+                                        end_arrow.order = 6
+                                        state['trajectory_arrows'].append(end_arrow)
+                                    
+                                    print(f"DEBUG: Rendered {len(state['trajectory_arrows'])} Arrow instances (start/end) using angle source '{angle_column}'")
+                            else:
+                                # No valid angles or insufficient points - clear arrows
+                                for arrow in state['trajectory_arrows']:
+                                    if arrow is not None:
+                                        arrow.parent = None
+                                state['trajectory_arrows'].clear()
+                        else:
+                            # No angle column - clear arrows
+                            for arrow in state['trajectory_arrows']:
+                                if arrow is not None:
+                                    arrow.parent = None
+                            state['trajectory_arrows'].clear()
+                    else:
+                        # No valid positions after filtering - hide the line if it exists
+                        if state['current_position_line'] is not None:
+                            state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+                else:
+                    # No extended positions - hide the line and clear arrows
+                    if state['current_position_line'] is not None:
+                        state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+                    for arrow in state['trajectory_arrows']:
+                        if arrow is not None:
+                            arrow.parent = None
+                    state['trajectory_arrows'].clear()
+            else:
+                # No position data columns - hide the line and clear arrows
+                if state['current_position_line'] is not None:
+                    state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+                for arrow in state['trajectory_arrows']:
+                    if arrow is not None:
+                        arrow.parent = None
+                state['trajectory_arrows'].clear()
+        else:
+            # No position data or epoch times - hide the line and clear arrows
+            if state['current_position_line'] is not None:
+                state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+            for arrow in state['trajectory_arrows']:
+                if arrow is not None:
+                    arrow.parent = None
+            state['trajectory_arrows'].clear()
         
         # Add epoch information text above the posterior view
         if epoch_start_t is not None and epoch_end_t is not None:
@@ -7059,24 +7303,24 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
                         contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
                         
-                        # Add contour to past view (white color, high z-order)
-                        past_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['past_view'].scene)
+                        # Add contour to past view (white color with alpha, high z-order)
+                        past_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['past_view'].scene)
                         past_contour.order = 10  # Higher order renders on top
                         state['past_mask_contours'].append(past_contour)
                         
-                        # Add contour to posterior 2D view (white color, high z-order)
-                        posterior_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['posterior_2d_view'].scene)
+                        # Add contour to posterior 2D view (white color with alpha, high z-order)
+                        posterior_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['posterior_2d_view'].scene)
                         posterior_contour.order = 10  # Higher order renders on top
                         state['posterior_mask_contours'].append(posterior_contour)
                         
-                        # Add contour to future view (white color, high z-order)
-                        future_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['future_view'].scene)
+                        # Add contour to future view (white color with alpha, high z-order)
+                        future_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['future_view'].scene)
                         future_contour.order = 10  # Higher order renders on top
                         state['future_mask_contours'].append(future_contour)
                         
                         # Add contour to each time bin view as well
                         for time_bin_view in state['time_bin_views']:
-                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=time_bin_view.scene)
+                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=time_bin_view.scene)
                             time_bin_contour.order = 10  # Higher order renders on top
                             state['posterior_mask_contours'].append(time_bin_contour)
         
@@ -7118,6 +7362,32 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
                             else:
                                 opacity = np.ones(len(x_valid)) * 0.8
+                            
+                            # Check for trajectory extension (extend forward in time for future trajectories)
+                            extension_seconds = state['past_future_trajectory_extension_seconds']
+                            if extension_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                traj_t_max = np.max(t_coords)
+                                # Get positions after trajectory end (extending forward)
+                                ext_end_t = traj_t_max + extension_seconds
+                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
+                                ext_positions = state['curr_position_df'][ext_mask]
+                                
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid = ext_x[ext_valid_mask]
+                                        ext_y_valid = ext_y[ext_valid_mask]
+                                        n_ext_points = len(ext_x_valid)
+                                        
+                                        # Append extended positions (they come after in time)
+                                        x_valid = np.concatenate([x_valid, ext_x_valid])
+                                        y_valid = np.concatenate([y_valid, ext_y_valid])
+                                        
+                                        # Create extended opacity array (original for first, 0.2 for extended)
+                                        ext_opacity = np.ones(n_ext_points) * 0.2
+                                        opacity = np.concatenate([opacity, ext_opacity])
                         else:
                             opacity = np.ones(len(x_valid)) * 0.8
                         
@@ -7130,6 +7400,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
+                        line.order = 5  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['future_lines'].append(line)
         
