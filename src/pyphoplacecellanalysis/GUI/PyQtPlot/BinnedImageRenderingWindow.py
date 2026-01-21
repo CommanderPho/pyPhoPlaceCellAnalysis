@@ -23,22 +23,44 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import 
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
 class BasicBinnedImageRenderingHelpers:
+
     @classmethod
-    def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65, extra_space_for_labels=12):
-        """ adds the ticks/grid for xbins and ybins to the plot_item """
+    def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65, grid_color=None, use_bin_index_axes:bool=True, extra_space_for_labels=12):
+        """ adds the ticks/grid for xbins and ybins to the plot_item 
+
+            use_bin_index_axes: If True, ticks are set at indices (0, 1, 2, ...). If False, ticks are set at actual bin values (data coordinates).
+
+        """
         # show full frame, label tick marks at top and left sides, with some extra space for labels:
         plot_item.showAxes(True, showValues=(True, True, False, False), size=extra_space_for_labels)
         # define major tick marks and labels:
         if xbins is not None:
-            xticks = [(idx, label) for idx, label in enumerate(xbins)]
+            if use_bin_index_axes:
+                # Use indices as tick positions (0, 1, 2, ...)
+                xticks = [(idx, label) for idx, label in enumerate(xbins)]
+            else:
+                # Use actual bin values as tick positions (data coordinates)
+                xticks = [(bin_val, label) for bin_val, label in zip(xbins, xbins)]
             for side in ('top','bottom'):
                 plot_item.getAxis(side).setStyle(showValues=False)
                 plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks
         if ybins is not None:
-            yticks = [(idx, label) for idx, label in enumerate(ybins)]
+            if use_bin_index_axes:
+                # Use indices as tick positions (0, 1, 2, ...)
+                yticks = [(idx, label) for idx, label in enumerate(ybins)]
+            else:
+                # Use actual bin values as tick positions (data coordinates)
+                yticks = [(bin_val, label) for bin_val, label in zip(ybins, ybins)]
             for side in ('left','right'):
                 plot_item.getAxis(side).setStyle(showValues=False)
                 plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
+
+        # Set grid color if provided
+        if grid_color is not None:
+            for side in ('top', 'bottom', 'left', 'right'):
+                plot_item.getAxis(side).setPen(grid_color)
+
+
         plot_item.showGrid(x=True, y=True, alpha=grid_opacity)
         return plot_item
 
