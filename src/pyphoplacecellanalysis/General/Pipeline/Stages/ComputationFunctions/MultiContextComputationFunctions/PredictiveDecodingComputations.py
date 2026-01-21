@@ -6542,6 +6542,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     from vispy.scene import visuals
     import vispy.color
     import colorsys
+    from qtpy import QtWidgets, QtCore
     
     # Create MaskDataSource from the matching results
     a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
@@ -6558,26 +6559,81 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     # Get total number of epochs
     num_epochs = len(a_flat_matching_results_list_ds.p_x_given_n_list)
     
-    # Create vispy application
-    canvas = scene.SceneCanvas(keys='interactive', show=True, size=(1400, 900), title='Predictive Decoding Display - Vispy')
+    # Create vispy canvas (don't show yet - we'll embed it in a QMainWindow)
+    canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title='Predictive Decoding Display - Vispy')
+    
+    # Create main window to host canvas and slider
+    main_window = QtWidgets.QMainWindow()
+    main_window.setWindowTitle('Predictive Decoding Display - Vispy')
+    central_widget = QtWidgets.QWidget()
+    main_layout = QtWidgets.QVBoxLayout(central_widget)
+    main_layout.setContentsMargins(0, 0, 0, 0)
+    
+    # Add vispy canvas to layout
+    main_layout.addWidget(canvas.native, stretch=1)
+    
+    # Create slider controls
+    slider_widget = QtWidgets.QWidget()
+    slider_layout = QtWidgets.QHBoxLayout(slider_widget)
+    slider_label = QtWidgets.QLabel("Epoch:")
+    epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    epoch_slider.setMinimum(0)
+    epoch_slider.setMaximum(max(0, num_epochs - 1))
+    epoch_slider.setValue(min(active_epoch_idx, num_epochs - 1))
+    epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+    epoch_slider.setTickInterval(1)
+    epoch_value_label = QtWidgets.QLabel(f"{active_epoch_idx}/{num_epochs}")
+    epoch_value_label.setMinimumWidth(60)
+    
+    slider_layout.addWidget(slider_label)
+    slider_layout.addWidget(epoch_slider, stretch=1)
+    slider_layout.addWidget(epoch_value_label)
+    main_layout.addWidget(slider_widget)
+    
+    main_window.setCentralWidget(central_widget)
+    main_window.resize(1400, 950)
+    main_window.show()
+    
     grid = canvas.central_widget.add_grid()
     
-    # Create three main panes: Past, Posterior (split into 2D heatmap top + time bin grid bottom), Future
+    # Create three main panes: Past, Posterior, Future
+    # Past and Future views span both rows 0 and 1, Posterior only row 0
+    # Row 0 is 70% height, Row 1 is 30% height (for the middle column)
     past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='gray')
     future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='gray')
-    
-    # Split the middle column into top (2D heatmap) and bottom (time bin grid)
     posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
+    posterior_2d_view.stretch = (1, 7)  # 70% of combined height for row 0
     
-    # Create a nested grid for time bin views in the bottom half of middle column
-    max_time_bins_to_show = 8  # Maximum number of time bins to display
+    # Row 1: Time bin grid in the middle column only (30% of combined height)
+    max_time_bins_to_show = 12  # Maximum number of time bins to display
     time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
+    time_bin_grid.stretch = (1, 3)  # 30% of combined height for row 1
     time_bin_views = []  # Will be populated with views for each time bin
     time_bin_images = []  # Will store image visuals for cleanup
     time_bin_labels = []  # Will store text labels for cleanup
     
-    # Create colorbar view below all panes
-    colorbar_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
+    # Row 2: Combined timeline view (full width) showing all trajectory ticks
+    combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
+    combined_timeline_view.height_max = 40  # Reduce timeline height to 1/3
+    
+    # Timeline visual elements (combined)
+    timeline_ticks = []  # List of Line visuals for all trajectory ticks (past and future)
+    timeline_bar = None  # Background bar visual
+    timeline_epoch_rect = None  # Rectangle showing current epoch
+    timeline_epoch_triangle = None  # Triangle marker above current epoch
+    
+    # Create colorbar view below timeline (row 3)
+    colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
+    colorbar_view.height_max = 60  # Reduce colorbar height to 1/3
+    
+    # Compute recording time range from curr_position_df
+    if curr_position_df is not None and 't' in curr_position_df.columns:
+        recording_t_min = curr_position_df['t'].min()
+        recording_t_max = curr_position_df['t'].max()
+    else:
+        # Fallback: estimate from filter epochs
+        recording_t_min = a_decoded_filter_epochs_df['start'].min() if 'start' in a_decoded_filter_epochs_df.columns else 0.0
+        recording_t_max = a_decoded_filter_epochs_df['stop'].max() if 'stop' in a_decoded_filter_epochs_df.columns else 1.0
     
     # Store references to visual elements for updating
     past_lines = []
@@ -6597,6 +6653,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'a_flat_matching_results_list_ds': a_flat_matching_results_list_ds,
         'xbin': xbin,
         'ybin': ybin,
+        'recording_t_min': recording_t_min,
+        'recording_t_max': recording_t_max,
         'past_view': past_view,
         'posterior_2d_view': posterior_2d_view,
         'time_bin_grid': time_bin_grid,
@@ -6606,6 +6664,11 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'max_time_bins_to_show': max_time_bins_to_show,
         'future_view': future_view,
         'colorbar_view': colorbar_view,
+        'combined_timeline_view': combined_timeline_view,
+        'timeline_ticks': timeline_ticks,
+        'timeline_bar': timeline_bar,
+        'timeline_epoch_rect': timeline_epoch_rect,
+        'timeline_epoch_triangle': timeline_epoch_triangle,
         'past_lines': past_lines,
         'posterior_img': posterior_img,
         'future_lines': future_lines,
@@ -6615,8 +6678,24 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'colorbar_rects': colorbar_rects,
         'colorbar_texts': colorbar_texts,
         'epoch_info_text': epoch_info_text,
-        'canvas': canvas
+        'canvas': canvas,
+        'main_window': main_window,
+        'epoch_slider': epoch_slider,
+        'epoch_value_label': epoch_value_label
     }
+    
+    # Slider event handlers
+    def on_slider_value_changed(value):
+        """Update label only while dragging (no expensive display update)."""
+        state['epoch_value_label'].setText(f"{value}/{state['num_epochs']}")
+    
+    def on_slider_released():
+        """Update display when slider is released."""
+        value = state['epoch_slider'].value()
+        update_epoch_display(value)
+    
+    epoch_slider.valueChanged.connect(on_slider_value_changed)
+    epoch_slider.sliderReleased.connect(on_slider_released)
     
     def update_epoch_display(new_epoch_idx: int):
         """Update the display to show a different epoch."""
@@ -6624,6 +6703,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             return
         
         state['current_epoch_idx'] = new_epoch_idx
+        
+        # Sync slider with current epoch (without triggering valueChanged handler recursively)
+        state['epoch_slider'].blockSignals(True)
+        state['epoch_slider'].setValue(new_epoch_idx)
+        state['epoch_slider'].blockSignals(False)
+        state['epoch_value_label'].setText(f"{new_epoch_idx}/{state['num_epochs']}")
         
         # Clear existing visuals
         for line in state['past_lines']:
@@ -6680,6 +6765,24 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if state['epoch_info_text'] is not None:
             state['epoch_info_text'].parent = None
             state['epoch_info_text'] = None
+        
+        # Clear timeline visuals
+        for tick in state['timeline_ticks']:
+            if tick is not None:
+                tick.parent = None
+        state['timeline_ticks'].clear()
+        
+        if state['timeline_bar'] is not None:
+            state['timeline_bar'].parent = None
+            state['timeline_bar'] = None
+        
+        if state['timeline_epoch_rect'] is not None:
+            state['timeline_epoch_rect'].parent = None
+            state['timeline_epoch_rect'] = None
+        
+        if state['timeline_epoch_triangle'] is not None:
+            state['timeline_epoch_triangle'].parent = None
+            state['timeline_epoch_triangle'] = None
         
         # Prepare epoch data
         epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx)
@@ -6812,7 +6915,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             state['colorbar_view'].camera = scene.PanZoomCamera(aspect=1)
             state['colorbar_view'].camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
 
-        # Render Past Trajectories
+        # Render Past Trajectories and collect data for timeline
+        past_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
         if 'past' in curr_matching_past_future_positions_df_dict:
             past_positions_dict = curr_matching_past_future_positions_df_dict['past']
             past_trajectory_items = list(past_positions_dict.items())
@@ -6825,8 +6929,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         x_valid = x_coords[valid_mask]
                         y_valid = y_coords[valid_mask]
                         
-                        # Generate unique base color for each trajectory using HSV color space
-                        hue = (idx / max(len(past_trajectory_items), 1)) * 0.7  # Use 0-0.7 range for red-orange-yellow colors
+                        # Fixed red color for all past trajectories (matches colorbar)
+                        hue = 0.0  # Red
                         saturation = 0.8
                         value = 0.9
                         base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
@@ -6834,6 +6938,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Calculate opacity based on time distance from epoch start using common normalization
                         if epoch_start_t is not None and 't' in positions_df.columns:
                             t_coords = positions_df['t'].values[valid_mask]
+                            # Store mean time for timeline tick
+                            mean_time = np.mean(t_coords)
+                            past_trajectory_colors_and_times.append((base_rgb, mean_time))
                             # Time relative to start: negative values (t < start_t)
                             time_rel = t_coords - epoch_start_t
                             # Absolute distance from start
@@ -6858,6 +6965,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
+                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['past_lines'].append(line)
         
         # Render Posterior Heatmap (2D view - top half)
@@ -6972,7 +7080,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             time_bin_contour.order = 10  # Higher order renders on top
                             state['posterior_mask_contours'].append(time_bin_contour)
         
-        # Render Future Trajectories
+        # Render Future Trajectories and collect data for timeline
+        future_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
         if 'future' in curr_matching_past_future_positions_df_dict:
             future_positions_dict = curr_matching_past_future_positions_df_dict['future']
             future_trajectory_items = list(future_positions_dict.items())
@@ -6985,8 +7094,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         x_valid = x_coords[valid_mask]
                         y_valid = y_coords[valid_mask]
                         
-                        # Generate unique base color for each trajectory using HSV color space
-                        hue = 0.5 + (idx / max(len(future_trajectory_items), 1)) * 0.3  # Use 0.5-0.8 range for cyan-blue colors
+                        # Fixed cyan color for all future trajectories (matches colorbar)
+                        hue = 0.5  # Cyan
                         saturation = 0.8
                         value = 0.9
                         base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
@@ -6994,6 +7103,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Calculate opacity based on time distance from epoch end using common normalization
                         if epoch_end_t is not None and 't' in positions_df.columns:
                             t_coords = positions_df['t'].values[valid_mask]
+                            # Store mean time for timeline tick
+                            mean_time = np.mean(t_coords)
+                            future_trajectory_colors_and_times.append((base_rgb, mean_time))
                             # Time relative to end: positive values (t > end_t)
                             time_rel = t_coords - epoch_end_t
                             # Absolute distance from end
@@ -7018,7 +7130,53 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
+                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['future_lines'].append(line)
+        
+        # Render Combined Timeline Bar (full width, shows all trajectory ticks and current epoch)
+        timeline_bar_height = 1.0  # Normalized height
+        recording_t_min = state['recording_t_min']
+        recording_t_max = state['recording_t_max']
+        recording_duration = recording_t_max - recording_t_min
+        
+        if recording_duration > 0:
+            # Draw filled background bar (dark gray)
+            bar_fill = scene.visuals.Rectangle(center=((recording_t_min + recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=state['combined_timeline_view'].scene)
+            state['timeline_bar'] = bar_fill
+            
+            # Draw current epoch as a white rectangle
+            if epoch_start_t is not None and epoch_end_t is not None:
+                epoch_duration = epoch_end_t - epoch_start_t
+                epoch_center_t = (epoch_start_t + epoch_end_t) / 2
+                epoch_rect = scene.visuals.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=state['combined_timeline_view'].scene)
+                state['timeline_epoch_rect'] = epoch_rect
+                
+                # Draw downward-facing triangle marker above the epoch rectangle
+                triangle_height = timeline_bar_height * 0.35  # Small triangle
+                triangle_half_width = recording_duration * 0.008  # Scale width with recording duration
+                triangle_top_y = timeline_bar_height + triangle_height * 0.3  # Slightly above and overlapping top
+                triangle_bottom_y = timeline_bar_height - triangle_height * 0.3  # Overlap the top of the timeline bar
+                triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
+                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 1.0), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=state['combined_timeline_view'].scene)
+                state['timeline_epoch_triangle'] = epoch_triangle
+            
+            # Draw past trajectory ticks (full height)
+            for base_rgb, mean_time in past_trajectory_colors_and_times:
+                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
+                tick_color = (base_rgb[0], base_rgb[1], base_rgb[2], 1.0)
+                tick = scene.visuals.Line(pos=tick_pos, color=tick_color, width=2, parent=state['combined_timeline_view'].scene)
+                state['timeline_ticks'].append(tick)
+            
+            # Draw future trajectory ticks (full height)
+            for base_rgb, mean_time in future_trajectory_colors_and_times:
+                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
+                tick_color = (base_rgb[0], base_rgb[1], base_rgb[2], 1.0)
+                tick = scene.visuals.Line(pos=tick_pos, color=tick_color, width=2, parent=state['combined_timeline_view'].scene)
+                state['timeline_ticks'].append(tick)
+            
+            # Set camera range for combined timeline view - no aspect ratio constraint
+            state['combined_timeline_view'].camera = scene.PanZoomCamera()
+            state['combined_timeline_view'].camera.set_range(x=(recording_t_min, recording_t_max), y=(0, timeline_bar_height))
         
         # Update title
         state['canvas'].title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{num_epochs})'
@@ -7062,10 +7220,18 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     y_range = extent[3] - extent[2]
     posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
     
+    # Setup combined timeline view camera - no aspect ratio constraint to fill the view
+    timeline_bar_height = 1.0  # Normalized height
+    recording_duration = recording_t_max - recording_t_min
+    
+    # Combined timeline view setup - camera will stretch to fill view
+    combined_timeline_view.camera = scene.PanZoomCamera()
+    combined_timeline_view.camera.set_range(x=(recording_t_min, recording_t_max), y=(0, timeline_bar_height))
+    
     # Initial render
     update_epoch_display(active_epoch_idx)
     
-    return canvas
+    return main_window, canvas, state
 
 
 
