@@ -5558,7 +5558,8 @@ class PredictiveDecodingDisplayWidget:
 
 
 @function_attributes(short_name=None, tags=['pyqtgraph', 'trajectory'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-14 14:40', related_items=[])
-def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None, overlay_mask: Optional[NDArray] = None):
+def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_mode: str = 'solid_colors', fixed_columns: int = 5, return_widget: bool = True, maze_extent: Optional[Tuple[float, float, float, float]] = None,
+        overlay_mask: Optional[NDArray] = None, trajectory_colors: Optional[List] = None, single_plot: bool = False, cmap: Optional[str] = None):
     """ Takes a list of position dataframes representing separate trajectories in the same environment and plots them in a grid of tiny subplots.
     It assigns each of them a unique id and color.
     They can be rendered as lines of solid color, gradients from 0.25 alpha to 0.9 alpha of their assigned color, or something custom.
@@ -5568,10 +5569,18 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
     Args:
         position_dfs: List of position dataframes, each with 'x' and 'y' columns. Optional 't' column for time-based modes.
         rendering_mode: One of 'solid_colors', 'alpha_gradient', or 'time_diverging'. Default is 'solid_colors'.
-        fixed_columns: Number of columns in the grid layout. Default is 5.
+        fixed_columns: Number of columns in the grid layout. Default is 5. Only used when single_plot=False.
         return_widget: If True, returns (GraphicsLayoutWidget, list of PlotItems). If False, returns only list of PlotItems.
         maze_extent: Optional tuple of (xmin, xmax, ymin, ymax) to set fixed x/y limits for all subplots. If None, auto-ranges each plot.
         overlay_mask: Optional 2D numpy array to render as a low-alpha overlay on each subplot. Extents are set to maze_extent if provided, otherwise viewport edges.
+        trajectory_colors: Optional list of colors to assign to each trajectory. If None, colors are automatically assigned. 
+                           Each color can be a color name (str), hex string (str), QColor, or RGB/RGBA tuple.
+                           Length must match len(position_dfs). Only used in 'solid_colors' and 'alpha_gradient' modes.
+                           If provided, takes precedence over cmap.
+        single_plot: If True, plots all trajectories on the same axes as separate series. If False, plots each trajectory in its own subplot in a grid. Default is False.
+        cmap: Optional matplotlib colormap name (e.g., 'viridis', 'plasma', 'inferno', 'magma', 'coolwarm', etc.) to generate trajectory colors.
+              Colors are sampled evenly across the colormap for each trajectory. Only used if trajectory_colors is None.
+              Only used in 'solid_colors' and 'alpha_gradient' modes.
     
     Returns:
         Tuple of (GraphicsLayoutWidget, list of PlotItems) if return_widget=True, else just list of PlotItems.
@@ -5585,6 +5594,16 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         # With fixed maze extent:
         maze_extent = (a_decoder.xbin[0], a_decoder.xbin[-1], a_decoder.ybin[0], a_decoder.ybin[-1])
         plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, maze_extent=maze_extent)
+        
+        # With custom trajectory colors:
+        custom_colors = ['red', 'blue', 'green', '#FF00FF', (255, 128, 0)]
+        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, trajectory_colors=custom_colors)
+        
+        # Plot all trajectories on the same axes:
+        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, single_plot=True)
+        
+        # Using a colormap to generate trajectory colors:
+        plot_widget, plot_items = multi_trajectory_color_plotter(position_dfs=dfs_list, cmap='viridis')
 
     """
     import pyphoplacecellanalysis.External.pyqtgraph as pg
@@ -5616,14 +5635,63 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
         if overlay_mask.ndim != 2:
             raise ValueError("overlay_mask must be a 2D array")
     
-    num_epochs = len(position_dfs)
-    needed_rows = int(np.ceil(num_epochs / fixed_columns))
-    linear_plotter_indices = np.arange(num_epochs)
-    row_column_indices = np.unravel_index(linear_plotter_indices, (needed_rows, fixed_columns))
+    # Validate and convert trajectory_colors if provided
+    trajectory_color_objects = None
+    if trajectory_colors is not None:
+        if not isinstance(trajectory_colors, (list, tuple)):
+            raise ValueError("trajectory_colors must be a list or tuple")
+        if len(trajectory_colors) != len(position_dfs):
+            raise ValueError(f"trajectory_colors must have length {len(position_dfs)}, got {len(trajectory_colors)}")
+        # Convert each color to QColor
+        trajectory_color_objects = []
+        for i, color in enumerate(trajectory_colors):
+            try:
+                if isinstance(color, str):
+                    # Color name or hex string
+                    qcolor = pg.mkColor(color)
+                elif isinstance(color, (tuple, list)):
+                    # RGB or RGBA tuple
+                    if len(color) == 3:
+                        qcolor = pg.mkColor(int(color[0]), int(color[1]), int(color[2]))
+                    elif len(color) == 4:
+                        qcolor = pg.mkColor(int(color[0]), int(color[1]), int(color[2]), int(color[3]))
+                    else:
+                        raise ValueError(f"trajectory_colors[{i}] tuple must have 3 (RGB) or 4 (RGBA) elements")
+                else:
+                    # Assume it's already a QColor or compatible object
+                    qcolor = pg.mkColor(color)
+                trajectory_color_objects.append(qcolor)
+            except Exception as e:
+                raise ValueError(f"trajectory_colors[{i}] could not be converted to a color: {e}")
     
-    # Create GraphicsLayoutWidget for grid of plots
-    graphics_widget = pg.GraphicsLayoutWidget()
-    plot_items = []
+    # Generate colors from colormap if cmap is provided and trajectory_colors is not
+    if trajectory_color_objects is None and cmap is not None:
+        try:
+            import matplotlib.cm as cm
+            import matplotlib.pyplot as plt
+            # Get the colormap
+            colormap = plt.get_cmap(cmap)
+            num_epochs = len(position_dfs)
+            # Generate evenly spaced values from 0 to 1
+            if num_epochs > 1:
+                color_values = np.linspace(0, 1, num_epochs)
+            else:
+                color_values = [0.5]  # Use middle of colormap for single trajectory
+            # Convert colormap colors to QColor
+            trajectory_color_objects = []
+            for val in color_values:
+                rgba = colormap(val)  # Returns (R, G, B, A) in [0, 1] range
+                # Convert to [0, 255] range and create QColor
+                r = int(rgba[0] * 255)
+                g = int(rgba[1] * 255)
+                b = int(rgba[2] * 255)
+                a = int(rgba[3] * 255) if len(rgba) > 3 else 255
+                qcolor = pg.mkColor(r, g, b, a)
+                trajectory_color_objects.append(qcolor)
+        except Exception as e:
+            raise ValueError(f"Could not generate colors from colormap '{cmap}': {e}")
+    
+    num_epochs = len(position_dfs)
     
     # Compute global time range for time_diverging mode if needed
     global_t_min = None
@@ -5645,132 +5713,143 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
     # White pen for axes outline
     white_pen = pg.mkPen('white', width=1)
     
-    # Create and plot each trajectory in its own tiny subplot
-    for a_linear_index in linear_plotter_indices:
-        curr_row = row_column_indices[0][a_linear_index]
-        curr_col = row_column_indices[1][a_linear_index]
-        pos_df = position_dfs[a_linear_index]
+    if single_plot:
+        # Single plot mode: all trajectories on the same axes
+        graphics_widget = pg.GraphicsLayoutWidget()
+        plot_item = graphics_widget.addPlot()
+        plot_items = [plot_item]
         
-        # Create a tiny plot in the grid
-        plot_item = graphics_widget.addPlot(row=curr_row, col=curr_col)
-        plot_items.append(plot_item)
-        
-        # Hide labels but show axes with white outline
-        plot_item.hideAxis('bottom')
-        plot_item.hideAxis('left')
-        plot_item.hideAxis('top')
-        plot_item.hideAxis('right')
-        # Show axes but hide tick labels - set white pen for outline
+        # Configure axes for single plot (show labels, enable interaction)
         plot_item.showAxis('bottom')
         plot_item.showAxis('left')
         plot_item.showAxis('top')
         plot_item.showAxis('right')
-        # Set white pen for all axes to create the box outline
         plot_item.getAxis('bottom').setPen(white_pen)
         plot_item.getAxis('left').setPen(white_pen)
         plot_item.getAxis('top').setPen(white_pen)
         plot_item.getAxis('right').setPen(white_pen)
-        # Hide tick labels
-        plot_item.getAxis('bottom').setTicks([])
-        plot_item.getAxis('left').setTicks([])
-        plot_item.getAxis('top').setTicks([])
-        plot_item.getAxis('right').setTicks([])
-        plot_item.setMenuEnabled(False)
-        plot_item.setMouseEnabled(False, False)
+        plot_item.setMenuEnabled(True)
+        plot_item.setMouseEnabled(True, True)
         
-        # Extract coordinates
-        x_vals = pos_df['x'].to_numpy()
-        y_vals = pos_df['y'].to_numpy()
+        # Collect all valid coordinates for auto-ranging if needed
+        all_x_vals = []
+        all_y_vals = []
         
-        # Remove NaN values
-        valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
-        x_vals = x_vals[valid_mask]
-        y_vals = y_vals[valid_mask]
-        
-        if len(x_vals) < 2:
-            continue  # Skip trajectories with insufficient points
-        
-        if rendering_mode == 'solid_colors':
-            # Each trajectory gets a unique color
-            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-            traj_color.setAlphaF(0.4)  # Moderately low alpha
-            brush = pg.mkBrush(traj_color)
-            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
-        
-        elif rendering_mode == 'alpha_gradient':
-            # Alpha gradient from 0.25 to 0.9 along the path
-            base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-            n_points = len(x_vals)
-            brushes = []
-            for i in range(n_points):
-                # Interpolate alpha from 0.25 to 0.9
-                alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
-                point_color = pg.mkColor(base_color)
-                point_color.setAlphaF(alpha)
-                brushes.append(pg.mkBrush(point_color))
-            plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
-        
-        elif rendering_mode == 'time_diverging':
-            # Diverging color palette based on normalized time (-1.0 to +1.0)
-            if 't' in pos_df.columns:
-                t_vals = pos_df['t'].to_numpy()[valid_mask]
-                if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
-                    # Normalize time to [-1.0, 1.0]
-                    t_range = global_t_max - global_t_min
-                    if t_range > 0:
-                        normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
-                    else:
-                        normalized_t = np.zeros_like(t_vals)
-                    
-                    # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
-                    brushes = []
-                    for i in range(len(x_vals)):
-                        seg_t = normalized_t[i]
-                        # Map from [-1.0, 1.0] to color
-                        # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
-                        if seg_t < 0:
-                            # Blue to white gradient
-                            intensity = abs(seg_t)
-                            r = int(255 * intensity)
-                            g = int(255 * intensity)
-                            b = 255
-                        else:
-                            # White to red gradient
-                            intensity = seg_t
-                            r = 255
-                            g = int(255 * (1 - intensity))
-                            b = int(255 * (1 - intensity))
-                        
-                        seg_color = pg.mkColor(r, g, b, 200)
-                        brushes.append(pg.mkBrush(seg_color))
-                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
+        # Plot all trajectories on the same plot
+        for a_linear_index in range(num_epochs):
+            pos_df = position_dfs[a_linear_index]
+            
+            # Extract coordinates
+            x_vals = pos_df['x'].to_numpy()
+            y_vals = pos_df['y'].to_numpy()
+            
+            # Remove NaN values
+            valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+            x_vals = x_vals[valid_mask]
+            y_vals = y_vals[valid_mask]
+            
+            if len(x_vals) < 2:
+                continue  # Skip trajectories with insufficient points
+            
+            all_x_vals.extend(x_vals.tolist())
+            all_y_vals.extend(y_vals.tolist())
+            
+            if rendering_mode == 'solid_colors':
+                # Each trajectory gets a unique color
+                if trajectory_color_objects is not None:
+                    traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
                 else:
-                    # Fallback to solid color if time data is invalid
                     traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
-                    traj_color.setAlphaF(0.4)  # Moderately low alpha
-                    brush = pg.mkBrush(traj_color)
-                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
-            else:
-                # Fallback to solid color if no time column
-                traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
                 traj_color.setAlphaF(0.4)  # Moderately low alpha
                 brush = pg.mkBrush(traj_color)
                 plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            
+            elif rendering_mode == 'alpha_gradient':
+                # Alpha gradient from 0.25 to 0.9 along the path
+                if trajectory_color_objects is not None:
+                    base_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                else:
+                    base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                n_points = len(x_vals)
+                brushes = []
+                for i in range(n_points):
+                    # Interpolate alpha from 0.25 to 0.9
+                    alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
+                    point_color = pg.mkColor(base_color)
+                    point_color.setAlphaF(alpha)
+                    brushes.append(pg.mkBrush(point_color))
+                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
+            
+            elif rendering_mode == 'time_diverging':
+                # Diverging color palette based on normalized time (-1.0 to +1.0)
+                if 't' in pos_df.columns:
+                    t_vals = pos_df['t'].to_numpy()[valid_mask]
+                    if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
+                        # Normalize time to [-1.0, 1.0]
+                        t_range = global_t_max - global_t_min
+                        if t_range > 0:
+                            normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
+                        else:
+                            normalized_t = np.zeros_like(t_vals)
+                        
+                        # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
+                        brushes = []
+                        for i in range(len(x_vals)):
+                            seg_t = normalized_t[i]
+                            # Map from [-1.0, 1.0] to color
+                            # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
+                            if seg_t < 0:
+                                # Blue to white gradient
+                                intensity = abs(seg_t)
+                                r = int(255 * intensity)
+                                g = int(255 * intensity)
+                                b = 255
+                            else:
+                                # White to red gradient
+                                intensity = seg_t
+                                r = 255
+                                g = int(255 * (1 - intensity))
+                                b = int(255 * (1 - intensity))
+                            
+                            seg_color = pg.mkColor(r, g, b, 200)
+                            brushes.append(pg.mkBrush(seg_color))
+                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
+                    else:
+                        # Fallback to solid color if time data is invalid
+                        if trajectory_color_objects is not None:
+                            traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                        else:
+                            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                        traj_color.setAlphaF(0.4)  # Moderately low alpha
+                        brush = pg.mkBrush(traj_color)
+                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+                else:
+                    # Fallback to solid color if no time column
+                    if trajectory_color_objects is not None:
+                        traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                    else:
+                        traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                    traj_color.setAlphaF(0.4)  # Moderately low alpha
+                    brush = pg.mkBrush(traj_color)
+                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
         
-        # Set x/y limits based on maze_extent if provided, otherwise auto-range
+        # Set x/y limits based on maze_extent if provided, otherwise auto-range to fit all trajectories
         if maze_extent is not None:
             xmin, xmax, ymin, ymax = maze_extent
             plot_item.setXRange(xmin, xmax, padding=0)
             plot_item.setYRange(ymin, ymax, padding=0)
         else:
-            # Auto-range each plot to fit its trajectory
-            plot_item.autoRange()
-            # Get the viewport bounds after auto-ranging
+            # Auto-range to fit all trajectories
+            if len(all_x_vals) > 0 and len(all_y_vals) > 0:
+                plot_item.setXRange(min(all_x_vals), max(all_x_vals), padding=0.05)
+                plot_item.setYRange(min(all_y_vals), max(all_y_vals), padding=0.05)
+            else:
+                plot_item.autoRange()
             view_range = plot_item.viewRange()
             xmin, xmax = view_range[0]
             ymin, ymax = view_range[1]
         
-        # Add overlay_mask if provided
+        # Add overlay_mask if provided (only once for single plot)
         if overlay_mask is not None:
             # Determine extents: use maze_extent if provided, otherwise use viewport
             if maze_extent is not None:
@@ -5783,22 +5862,192 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], rendering_m
             pg.setConfigOptions(imageAxisOrder='row-major')
             
             # Create ImageItem for the overlay mask with low alpha
-            # Use setImage with rect parameter instead of transform (like BinByBinDecodingDebugger pattern)
-            # Note: overlay_mask is expected to be [rows, cols] = [y_size, x_size] in spatial coordinates
             overlay_img = pg.ImageItem(image=overlay_mask, levels=(0, 1), opacity=0.2)
-            # rect format: [x, y, width, height] where (x, y) is bottom-left corner
-            # Account for pixel centering: adjust by half pixel to align edges properly
             pixel_width = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1] if overlay_mask.shape[1] > 0 else 1.0
             pixel_height = (overlay_ymax - overlay_ymin) / overlay_mask.shape[0] if overlay_mask.shape[0] > 0 else 1.0
             overlay_width = overlay_xmax - overlay_xmin
             overlay_height = overlay_ymax - overlay_ymin
-            # Adjust rect to account for pixel centering (subtract half pixel from position, add half pixel to size)
             image_bounds_extent = [overlay_xmin - pixel_width/2, overlay_ymin - pixel_height/2, overlay_width + pixel_width, overlay_height + pixel_height]
             overlay_img.setImage(overlay_mask, rect=image_bounds_extent, autoLevels=False)
             plot_item.addItem(overlay_img)
+    
+    else:
+        # Grid mode: each trajectory in its own subplot
+        needed_rows = int(np.ceil(num_epochs / fixed_columns))
+        linear_plotter_indices = np.arange(num_epochs)
+        row_column_indices = np.unravel_index(linear_plotter_indices, (needed_rows, fixed_columns))
+        
+        # Create GraphicsLayoutWidget for grid of plots
+        graphics_widget = pg.GraphicsLayoutWidget()
+        plot_items = []
+        
+        # Create and plot each trajectory in its own tiny subplot
+        for a_linear_index in linear_plotter_indices:
+            curr_row = row_column_indices[0][a_linear_index]
+            curr_col = row_column_indices[1][a_linear_index]
+            pos_df = position_dfs[a_linear_index]
+            
+            # Create a tiny plot in the grid
+            plot_item = graphics_widget.addPlot(row=curr_row, col=curr_col)
+            plot_items.append(plot_item)
+            
+            # Hide labels but show axes with white outline
+            plot_item.hideAxis('bottom')
+            plot_item.hideAxis('left')
+            plot_item.hideAxis('top')
+            plot_item.hideAxis('right')
+            # Show axes but hide tick labels - set white pen for outline
+            plot_item.showAxis('bottom')
+            plot_item.showAxis('left')
+            plot_item.showAxis('top')
+            plot_item.showAxis('right')
+            # Set white pen for all axes to create the box outline
+            plot_item.getAxis('bottom').setPen(white_pen)
+            plot_item.getAxis('left').setPen(white_pen)
+            plot_item.getAxis('top').setPen(white_pen)
+            plot_item.getAxis('right').setPen(white_pen)
+            # Hide tick labels
+            plot_item.getAxis('bottom').setTicks([])
+            plot_item.getAxis('left').setTicks([])
+            plot_item.getAxis('top').setTicks([])
+            plot_item.getAxis('right').setTicks([])
+            plot_item.setMenuEnabled(False)
+            plot_item.setMouseEnabled(False, False)
+            
+            # Extract coordinates
+            x_vals = pos_df['x'].to_numpy()
+            y_vals = pos_df['y'].to_numpy()
+            
+            # Remove NaN values
+            valid_mask = ~(np.isnan(x_vals) | np.isnan(y_vals))
+            x_vals = x_vals[valid_mask]
+            y_vals = y_vals[valid_mask]
+            
+            if len(x_vals) < 2:
+                continue  # Skip trajectories with insufficient points
+            
+            if rendering_mode == 'solid_colors':
+                # Each trajectory gets a unique color
+                if trajectory_color_objects is not None:
+                    traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                else:
+                    traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                traj_color.setAlphaF(0.4)  # Moderately low alpha
+                brush = pg.mkBrush(traj_color)
+                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            
+            elif rendering_mode == 'alpha_gradient':
+                # Alpha gradient from 0.25 to 0.9 along the path
+                if trajectory_color_objects is not None:
+                    base_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                else:
+                    base_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                n_points = len(x_vals)
+                brushes = []
+                for i in range(n_points):
+                    # Interpolate alpha from 0.25 to 0.9
+                    alpha = 0.25 + (0.9 - 0.25) * (i / max(1, n_points - 1))
+                    point_color = pg.mkColor(base_color)
+                    point_color.setAlphaF(alpha)
+                    brushes.append(pg.mkBrush(point_color))
+                plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
+            
+            elif rendering_mode == 'time_diverging':
+                # Diverging color palette based on normalized time (-1.0 to +1.0)
+                if 't' in pos_df.columns:
+                    t_vals = pos_df['t'].to_numpy()[valid_mask]
+                    if len(t_vals) > 0 and global_t_min is not None and global_t_max is not None:
+                        # Normalize time to [-1.0, 1.0]
+                        t_range = global_t_max - global_t_min
+                        if t_range > 0:
+                            normalized_t = 2.0 * ((t_vals - global_t_min) / t_range) - 1.0
+                        else:
+                            normalized_t = np.zeros_like(t_vals)
+                        
+                        # Use diverging colormap (RdBu-like: blue for -1.0, red for +1.0)
+                        brushes = []
+                        for i in range(len(x_vals)):
+                            seg_t = normalized_t[i]
+                            # Map from [-1.0, 1.0] to color
+                            # Blue (0, 0, 255) for -1.0, Red (255, 0, 0) for +1.0
+                            if seg_t < 0:
+                                # Blue to white gradient
+                                intensity = abs(seg_t)
+                                r = int(255 * intensity)
+                                g = int(255 * intensity)
+                                b = 255
+                            else:
+                                # White to red gradient
+                                intensity = seg_t
+                                r = 255
+                                g = int(255 * (1 - intensity))
+                                b = int(255 * (1 - intensity))
+                            
+                            seg_color = pg.mkColor(r, g, b, 200)
+                            brushes.append(pg.mkBrush(seg_color))
+                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brushes)
+                    else:
+                        # Fallback to solid color if time data is invalid
+                        if trajectory_color_objects is not None:
+                            traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                        else:
+                            traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                        traj_color.setAlphaF(0.4)  # Moderately low alpha
+                        brush = pg.mkBrush(traj_color)
+                        plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+                else:
+                    # Fallback to solid color if no time column
+                    if trajectory_color_objects is not None:
+                        traj_color = pg.mkColor(trajectory_color_objects[a_linear_index])
+                    else:
+                        traj_color = pg.intColor(a_linear_index, hues=len(position_dfs))
+                    traj_color.setAlphaF(0.4)  # Moderately low alpha
+                    brush = pg.mkBrush(traj_color)
+                    plot_item.plot(x_vals, y_vals, pen=None, symbol='o', symbolSize=2, symbolBrush=brush)
+            
+            # Set x/y limits based on maze_extent if provided, otherwise auto-range
+            if maze_extent is not None:
+                xmin, xmax, ymin, ymax = maze_extent
+                plot_item.setXRange(xmin, xmax, padding=0)
+                plot_item.setYRange(ymin, ymax, padding=0)
+            else:
+                # Auto-range each plot to fit its trajectory
+                plot_item.autoRange()
+                # Get the viewport bounds after auto-ranging
+                view_range = plot_item.viewRange()
+                xmin, xmax = view_range[0]
+                ymin, ymax = view_range[1]
+            
+            # Add overlay_mask if provided
+            if overlay_mask is not None:
+                # Determine extents: use maze_extent if provided, otherwise use viewport
+                if maze_extent is not None:
+                    overlay_xmin, overlay_xmax, overlay_ymin, overlay_ymax = maze_extent
+                else:
+                    overlay_xmin, overlay_xmax = xmin, xmax
+                    overlay_ymin, overlay_ymax = ymin, ymax
+                
+                # Set image axis order to row-major (like BinByBinDecodingDebugger pattern)
+                pg.setConfigOptions(imageAxisOrder='row-major')
+                
+                # Create ImageItem for the overlay mask with low alpha
+                # Use setImage with rect parameter instead of transform (like BinByBinDecodingDebugger pattern)
+                # Note: overlay_mask is expected to be [rows, cols] = [y_size, x_size] in spatial coordinates
+                overlay_img = pg.ImageItem(image=overlay_mask, levels=(0, 1), opacity=0.2)
+                # rect format: [x, y, width, height] where (x, y) is bottom-left corner
+                # Account for pixel centering: adjust by half pixel to align edges properly
+                pixel_width = (overlay_xmax - overlay_xmin) / overlay_mask.shape[1] if overlay_mask.shape[1] > 0 else 1.0
+                pixel_height = (overlay_ymax - overlay_ymin) / overlay_mask.shape[0] if overlay_mask.shape[0] > 0 else 1.0
+                overlay_width = overlay_xmax - overlay_xmin
+                overlay_height = overlay_ymax - overlay_ymin
+                # Adjust rect to account for pixel centering (subtract half pixel from position, add half pixel to size)
+                image_bounds_extent = [overlay_xmin - pixel_width/2, overlay_ymin - pixel_height/2, overlay_width + pixel_width, overlay_height + pixel_height]
+                overlay_img.setImage(overlay_mask, rect=image_bounds_extent, autoLevels=False)
+                plot_item.addItem(overlay_img)
     
     # Return based on return_widget parameter
     if return_widget:
         return graphics_widget, plot_items
     else:
         return plot_items
+
