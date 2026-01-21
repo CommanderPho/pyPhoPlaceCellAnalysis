@@ -6583,9 +6583,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     past_lines = []
     posterior_img = None
     future_lines = []
-    past_mask_overlay = None
-    posterior_mask_overlay = None
-    future_mask_overlay = None
+    past_mask_contours = []  # List of contour Line visuals
+    posterior_mask_contours = []  # List of contour Line visuals
+    future_mask_contours = []  # List of contour Line visuals
     colorbar_rects = []
     colorbar_texts = []
     epoch_info_text = None
@@ -6609,9 +6609,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'past_lines': past_lines,
         'posterior_img': posterior_img,
         'future_lines': future_lines,
-        'past_mask_overlay': past_mask_overlay,
-        'posterior_mask_overlay': posterior_mask_overlay,
-        'future_mask_overlay': future_mask_overlay,
+        'past_mask_contours': past_mask_contours,
+        'posterior_mask_contours': posterior_mask_contours,
+        'future_mask_contours': future_mask_contours,
         'colorbar_rects': colorbar_rects,
         'colorbar_texts': colorbar_texts,
         'epoch_info_text': epoch_info_text,
@@ -6649,18 +6649,21 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             line.parent = None
         state['future_lines'].clear()
         
-        # Clear mask overlays
-        if state['past_mask_overlay'] is not None:
-            state['past_mask_overlay'].parent = None
-            state['past_mask_overlay'] = None
+        # Clear mask contours
+        for contour in state['past_mask_contours']:
+            if contour is not None:
+                contour.parent = None
+        state['past_mask_contours'].clear()
         
-        if state['posterior_mask_overlay'] is not None:
-            state['posterior_mask_overlay'].parent = None
-            state['posterior_mask_overlay'] = None
+        for contour in state['posterior_mask_contours']:
+            if contour is not None:
+                contour.parent = None
+        state['posterior_mask_contours'].clear()
         
-        if state['future_mask_overlay'] is not None:
-            state['future_mask_overlay'].parent = None
-            state['future_mask_overlay'] = None
+        for contour in state['future_mask_contours']:
+            if contour is not None:
+                contour.parent = None
+        state['future_mask_contours'].clear()
         
         # Clear colorbar
         for rect in state['colorbar_rects']:
@@ -6927,32 +6930,47 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                 # Update camera to show label
                 view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
         
-        # Render mask overlays on all three views
+        # Render mask contours on all views (with higher z-order to render on top of images)
         if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
             if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
                 mask_2d = state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks[new_epoch_idx]
                 if mask_2d is not None and mask_2d.size > 0:
-                    # Convert boolean mask to RGBA image with transparency
-                    # mask_2d has shape (n_x_bins, n_y_bins), after .T it's (n_y_bins, n_x_bins)
+                    # Extract contours from the binary mask using skimage
+                    from skimage import measure
+                    # mask_2d has shape (n_x_bins, n_y_bins), transpose for contour finding
                     mask_transposed = mask_2d.T.astype(np.float32)
-                    # Create RGBA image: white where mask is True, transparent where False
-                    mask_rgba = np.zeros((mask_transposed.shape[0], mask_transposed.shape[1], 4), dtype=np.float32)
-                    mask_rgba[:, :, 0] = 1.0  # Red channel
-                    mask_rgba[:, :, 1] = 1.0  # Green channel
-                    mask_rgba[:, :, 2] = 1.0  # Blue channel
-                    mask_rgba[:, :, 3] = mask_transposed * 0.3  # Alpha channel (30% opacity where mask is True)
+                    contours = measure.find_contours(mask_transposed, level=0.5)
                     
-                    # Add mask overlay to past view
-                    state['past_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['past_view'].scene)
-                    state['past_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
-                    
-                    # Add mask overlay to posterior 2D view
-                    state['posterior_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['posterior_2d_view'].scene)
-                    state['posterior_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
-                    
-                    # Add mask overlay to future view
-                    state['future_mask_overlay'] = scene.visuals.Image(mask_rgba, parent=state['future_view'].scene)
-                    state['future_mask_overlay'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+                    # Convert contour coordinates from pixel space to world coordinates
+                    # contours are in (row, col) format which maps to (y_pixel, x_pixel)
+                    n_y_bins, n_x_bins = mask_transposed.shape
+                    for contour in contours:
+                        # contour[:, 0] is row (y pixel), contour[:, 1] is col (x pixel)
+                        # Map pixel coords to world coords
+                        x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
+                        y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
+                        contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
+                        
+                        # Add contour to past view (white color, high z-order)
+                        past_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['past_view'].scene)
+                        past_contour.order = 10  # Higher order renders on top
+                        state['past_mask_contours'].append(past_contour)
+                        
+                        # Add contour to posterior 2D view (white color, high z-order)
+                        posterior_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['posterior_2d_view'].scene)
+                        posterior_contour.order = 10  # Higher order renders on top
+                        state['posterior_mask_contours'].append(posterior_contour)
+                        
+                        # Add contour to future view (white color, high z-order)
+                        future_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=state['future_view'].scene)
+                        future_contour.order = 10  # Higher order renders on top
+                        state['future_mask_contours'].append(future_contour)
+                        
+                        # Add contour to each time bin view as well
+                        for time_bin_view in state['time_bin_views']:
+                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color='white', width=2, parent=time_bin_view.scene)
+                            time_bin_contour.order = 10  # Higher order renders on top
+                            state['posterior_mask_contours'].append(time_bin_contour)
         
         # Render Future Trajectories
         if 'future' in curr_matching_past_future_positions_df_dict:
