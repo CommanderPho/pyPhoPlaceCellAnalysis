@@ -4412,8 +4412,21 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             ## set the container from the pipeline, it should be the same object through
             global_computation_results.computed_data['PredictiveDecoding'].container = a_container
 
+
+
         # Validate container exists
         assert a_container is not None
+        if (a_container.pf1D_Decoder_dict is None) or (len(a_container.pf1D_Decoder_dict) == 0):
+            ## initialize it
+            print(f'\t!!! this could be a regression, but a_container.pf1D_Decoder_dict is None so building from the original pipeline `DirectionalDecodersDecoded`...')
+            directional_decoders_decode_result = owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            assert directional_decoders_decode_result is not None
+            a_container.pf1D_Decoder_dict = deepcopy(directional_decoders_decode_result.pf1D_Decoder_dict) ## copy the independent decoders
+            print(f'\t\tcontainer: assigning pf1D_Decoder_dict: {list(a_container.pf1D_Decoder_dict.keys())}')
+            
+
+        print('\t========== building masked_filtered_container...')
+
 
         a_masked_container = None
         if enable_masked_filtered_container_before_any_comps:
@@ -4463,6 +4476,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 assert a_container_container is not None
                 a_container = a_container_container.container
                 assert a_container is not None
+                print(f'\tbuilding masked_container...')
                 a_masked_container = a_container.build_masked_container(curr_active_pipeline=owning_pipeline_reference, a_t_bin_size=fine_time_bin_size, should_filter_directional_decoders_decode_result=True, should_compute_future_and_past_analysis=False, should_compute_peak_prom_analysis=False,
                                                                      window_size=window_size) ## 3m now
             
