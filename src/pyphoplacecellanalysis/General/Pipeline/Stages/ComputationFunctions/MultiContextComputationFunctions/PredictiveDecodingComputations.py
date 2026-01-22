@@ -7721,7 +7721,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 @function_attributes(short_name=None, tags=['vispy', 'export', 'screenshot', 'high-resolution'], input_requires=[], output_provides=[], uses=['render_predictive_decoding_with_vispy'], used_by=[], creation_date='2026-01-22', related_items=['render_predictive_decoding_with_vispy'])
-def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Path], resolution_scale: float = 2.0, export_individual_views: bool = False, epoch_indices: Optional[List[int]] = None, delay_between_epochs: float = 0.15, progress_print: bool = True) -> List[Path]:
+def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Path], resolution_scale: float = 1.0, export_individual_views: bool = False, epoch_indices: Optional[List[int]] = None, delay_between_epochs: float = 0.15, progress_print: bool = True) -> List[Path]:
     """Export high-resolution renderings of all epoch views from the vispy predictive decoding viewer.
     
     Programmatically iterates through epoch indices, updates the display, and exports high-resolution 
