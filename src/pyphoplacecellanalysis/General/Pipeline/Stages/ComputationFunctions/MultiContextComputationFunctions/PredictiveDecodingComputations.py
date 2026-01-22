@@ -1478,7 +1478,15 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         
         ## NOTE: some have negative duration, they overlap, and all sorts of other confusing things...
         # self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult._custom_build_sequential_position_epochs(matching_past_positions_df=self.relevant_positions_df) # curr_matching_positions_df_dict: types.epoch_index
-        self.matching_pos_epochs_df = self.compute_matching_pos_epochs_df(self.relevant_positions_df, disable_segmentation=True) 
+        self.matching_pos_epochs_df, curr_matching_positions_df_dict = self.compute_matching_pos_epochs_df(self.relevant_positions_df, disable_segmentation=True) 
+
+        ## Propagate per-position-trajectory-epoch segmentation columns back to relevant_positions_df
+        segmented_traj_columns = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_dir_angle_binned', 'segment_Vp_scatteredness']
+        for epoch_idx, epoch_pos_df in curr_matching_positions_df_dict.items():
+            for col in segmented_traj_columns:
+                if col in epoch_pos_df.columns:
+                    # Update values in relevant_positions_df by matching on index
+                    self.relevant_positions_df.loc[epoch_pos_df.index, col] = epoch_pos_df[col]
 
         ## re-index:
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
@@ -1619,7 +1627,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
     @classmethod
-    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.075, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> pd.DataFrame:
+    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.075, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
         """
         Compute matching position epochs DataFrame from position matches and time filters.
         
@@ -1629,7 +1637,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             minimum_epoch_duration: Minimum duration for detected epochs
             
         Returns:
-            DataFrame with detected epochs categorized as past/present/future
+            Tuple of (position trajectory epochs DataFrame, dict of per-position-trajectory-epoch DataFrames with segmentation columns)
 
             a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(measured_positions_df, disable_segmentation=disable_segmentation, **kwargs)
             
@@ -1662,7 +1670,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             a_matching_pos_epochs_df['is_future_present_past'] = saved_is_future_present_past
 
         ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
-        return a_matching_pos_epochs_df
+        return a_matching_pos_epochs_df, curr_matching_positions_df_dict
 
 
     def filter_positions_to_epoch_mask_included_bins(self, a_pos_df: pd.DataFrame) -> pd.DataFrame:
@@ -1712,7 +1720,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # Partition first, then segment each epoch separately so each trajectory gets its own segment_Vp_deg
         curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
         
-        ## Segment trajectories per-epoch (so each trajectory gets its own representative direction angle)
+        ## Segment trajectories per-position-trajectory-epoch (so each trajectory gets its own representative direction angle)
         for epoch_idx, epoch_pos_df in curr_matching_positions_df_dict.items():
             curr_matching_positions_df_dict[epoch_idx] = epoch_pos_df.position.adding_segmented_trajectories_columns(disable_segmentation=disable_segmentation)
 
@@ -2556,7 +2564,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         # Filter once before passing to function (only copy the filtered subset, not the entire dataframe)
         filtered_positions_df = measured_positions_df[is_included_mask].copy()
 
-        a_matching_pos_epochs_df: pd.DataFrame = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=filtered_positions_df, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, disable_segmentation=should_defer_extended_computations)
+        a_matching_pos_epochs_df, _ = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(measured_positions_df=filtered_positions_df, merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration, disable_segmentation=should_defer_extended_computations)
         
         ## found all matching events, now see whether these events are in the path or the future:
         is_pos_epochs_relevant_past_times = (a_matching_pos_epochs_df['start'] < curr_epoch_start_t)
