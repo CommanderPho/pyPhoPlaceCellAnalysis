@@ -6507,7 +6507,7 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # ==================================================================================================================================================================================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
-def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, current_traj_seconds_pre_post_extension: float = 0.750, past_future_trajectory_extension_seconds: float = 0.0, show_full_position_background: bool = False, **kwargs):
+def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, current_traj_seconds_pre_post_extension: float = 0.750, past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = 0.0, start_end_extension_max_opacity: float = 0.2, show_full_position_background: bool = False, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -6525,7 +6525,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         decoded_result: DecodedFilterEpochsResult instance
         active_epoch_idx: Initial epoch index to display (default: 0)
         current_traj_seconds_pre_post_extension: Seconds to extend current epoch trajectory before/after epoch bounds (default: 0.750). Positions outside epoch are rendered with 0.2 alpha.
-        past_future_trajectory_extension_seconds: Seconds to extend past/future trajectories beyond their computed bounds (default: 0.0). Extended portions are rendered with 0.2 alpha.
+        past_future_trajectory_extension_seconds: Seconds to extend past/future trajectories beyond their computed bounds (default: 0.0).
+            Can be a single float (applies to both start and end) or a tuple (start_extension, end_extension).
+            Start extensions are rendered with solid start_end_extension_max_opacity. End extensions fade out from 
+            start_end_extension_max_opacity to 0.0, visually indicating trajectory direction.
+        start_end_extension_max_opacity: Maximum opacity for trajectory extensions (default: 0.2). Start extensions use this as solid opacity,
+            end extensions fade from this value to 0.0.
         show_full_position_background: If True, renders the entire position dataframe as a faint (0.2 alpha) grey line behind past/future trajectories (default: False).
         **kwargs: Additional keyword arguments
         
@@ -6546,6 +6551,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     import vispy.color
     import colorsys
     from qtpy import QtWidgets, QtCore
+    from qtpy.QtWidgets import QApplication
     
     # Create MaskDataSource from the matching results
     a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
@@ -6602,8 +6608,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     # Create three main panes: Past, Posterior, Future
     # Past and Future views span both rows 0 and 1, Posterior only row 0
     # Row 0 is 70% height, Row 1 is 30% height (for the middle column)
-    past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='gray')
-    future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='gray')
+    past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
+    future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
     posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
     posterior_2d_view.stretch = (1, 7)  # 70% of combined height for row 0
     
@@ -6650,11 +6656,27 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     epoch_info_text = None
     current_position_line = None  # Line visual for current position trajectory during epoch
     trajectory_arrows = []  # List of Arrow visuals for trajectory direction indicators (start and end)
+    centroid_dots = []  # List of Marker visuals for centroid position dots
+    centroid_arrows = []  # List of Arrow visuals for centroid direction arrows
+    
+    # Parse past_future_trajectory_extension_seconds to get separate start/end values
+    if isinstance(past_future_trajectory_extension_seconds, (int, float)):
+        start_extension_seconds = float(past_future_trajectory_extension_seconds)
+        end_extension_seconds = float(past_future_trajectory_extension_seconds)
+    elif isinstance(past_future_trajectory_extension_seconds, (tuple, list)) and len(past_future_trajectory_extension_seconds) == 2:
+        start_extension_seconds, end_extension_seconds = float(past_future_trajectory_extension_seconds[0]), float(past_future_trajectory_extension_seconds[1])
+    elif isinstance(past_future_trajectory_extension_seconds, dict):
+        start_extension_seconds = float(past_future_trajectory_extension_seconds.get('start', 0.0))
+        end_extension_seconds = float(past_future_trajectory_extension_seconds.get('end', 0.0))
+    else:
+        start_extension_seconds = 0.0
+        end_extension_seconds = 0.0
     
     # Store data for updates
     state = {
         'current_epoch_idx': active_epoch_idx,
         'num_epochs': num_epochs,
+        'epoch_flat_mask_future_past_result': epoch_flat_mask_future_past_result,
         'a_flat_matching_results_list_ds': a_flat_matching_results_list_ds,
         'xbin': xbin,
         'ybin': ybin,
@@ -6685,9 +6707,13 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'epoch_info_text': epoch_info_text,
         'current_position_line': current_position_line,
         'trajectory_arrows': trajectory_arrows,
+        'centroid_dots': centroid_dots,
+        'centroid_arrows': centroid_arrows,
         'curr_position_df': curr_position_df,
         'current_traj_seconds_pre_post_extension': current_traj_seconds_pre_post_extension,
-        'past_future_trajectory_extension_seconds': past_future_trajectory_extension_seconds,
+        'past_future_trajectory_start_extension_seconds': start_extension_seconds,
+        'past_future_trajectory_end_extension_seconds': end_extension_seconds,
+        'start_end_extension_max_opacity': start_end_extension_max_opacity,
         'show_full_position_background': show_full_position_background,
         'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
@@ -6777,6 +6803,17 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if state['epoch_info_text'] is not None:
             state['epoch_info_text'].parent = None
             state['epoch_info_text'] = None
+        
+        # Clear centroid dots and arrows
+        for dot in state['centroid_dots']:
+            if dot is not None:
+                dot.parent = None
+        state['centroid_dots'].clear()
+        
+        for arrow in state['centroid_arrows']:
+            if arrow is not None:
+                arrow.parent = None
+        state['centroid_arrows'].clear()
         
         # Update current position line (reuse existing visual if available)
         
@@ -7000,12 +7037,15 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             else:
                                 opacity = np.ones(len(x_valid)) * 0.8
                             
-                            # Check for trajectory extension (extend backward in time for past trajectories)
-                            extension_seconds = state['past_future_trajectory_extension_seconds']
-                            if extension_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                traj_t_min = np.min(t_coords)
-                                # Get positions before trajectory start (extending backward)
-                                ext_start_t = traj_t_min - extension_seconds
+                            # Check for trajectory extensions (separate start and end)
+                            start_ext_seconds = state['past_future_trajectory_start_extension_seconds']
+                            end_ext_seconds = state['past_future_trajectory_end_extension_seconds']
+                            traj_t_min = np.min(t_coords)
+                            traj_t_max = np.max(t_coords)
+                            
+                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity
+                            if start_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                ext_start_t = traj_t_min - start_ext_seconds
                                 ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
                                 ext_positions = state['curr_position_df'][ext_mask]
                                 
@@ -7022,9 +7062,38 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                         x_valid = np.concatenate([ext_x_valid, x_valid])
                                         y_valid = np.concatenate([ext_y_valid, y_valid])
                                         
-                                        # Create extended opacity array (0.2 for extended, original for rest)
-                                        ext_opacity = np.ones(n_ext_points) * 0.2
+                                        # Start extension uses solid start_end_extension_max_opacity (no fade-in)
+                                        ext_opacity = np.ones(n_ext_points) * state['start_end_extension_max_opacity']
                                         opacity = np.concatenate([ext_opacity, opacity])
+                            
+                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0
+                            if end_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                ext_end_t = traj_t_max + end_ext_seconds
+                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
+                                ext_positions = state['curr_position_df'][ext_mask]
+                                
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_t = ext_positions['t'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid = ext_x[ext_valid_mask]
+                                        ext_y_valid = ext_y[ext_valid_mask]
+                                        ext_t_valid = ext_t[ext_valid_mask]
+                                        n_ext_points = len(ext_x_valid)
+                                        
+                                        # Append extended positions (they come after in time)
+                                        x_valid = np.concatenate([x_valid, ext_x_valid])
+                                        y_valid = np.concatenate([y_valid, ext_y_valid])
+                                        
+                                        # End extension uses fade-out: start_end_extension_max_opacity -> 0.0
+                                        max_opacity = state['start_end_extension_max_opacity']
+                                        ext_distance = ext_t_valid - traj_t_max  # Distance from trajectory end
+                                        ext_distance_normalized = ext_distance / end_ext_seconds  # [0, 1]
+                                        # Fade from max_opacity to 0.0
+                                        ext_opacity = max_opacity * (1.0 - ext_distance_normalized)
+                                        opacity = np.concatenate([opacity, ext_opacity])
                         else:
                             opacity = np.ones(len(x_valid)) * 0.8
                         
@@ -7034,7 +7103,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 0] = base_rgb[0]  # R
                         colors[:, 1] = base_rgb[1]  # G
                         colors[:, 2] = base_rgb[2]  # B
-                        colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)  # A (opacity), allow fade to 0.0 for end extensions
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
                         line.order = 1  # Render above background (0) but below contours (10)
@@ -7045,6 +7114,110 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         if posterior_2d is not None and posterior_2d.size > 0:
             state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_2d_view'].scene)
             state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+        
+        # Render centroid dots and arrows on posterior plot (main view only)
+        if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
+            epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
+            if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None:
+                centroids_df = epoch_result.centroids_df
+                if 'x' in centroids_df.columns and 'y' in centroids_df.columns and 'segment_idx' in centroids_df.columns:
+                    # Filter valid centroids
+                    valid_mask = ~(np.isnan(centroids_df['x'].values) | np.isnan(centroids_df['y'].values))
+                    if np.any(valid_mask):
+                        # Centroids are in pixel/bin coordinates, need to convert to world coordinates
+
+                        # INCORRECT: "This is swapped! So we need to swap them back and convert to world coords"
+                        # Note: centroids_from_binary_stack returns [cy, cx] = [y_pixel, x_pixel]
+                        # and DataFrame is created with columns=['x', 'y'], so:
+                        # centroids_df['x'] = cy (y pixel coordinate)
+                        # centroids_df['y'] = cx (x pixel coordinate)
+                        # y_pixel = centroids_df['x'].values[valid_mask]  # Actually y pixel (cy)
+                        # x_pixel = centroids_df['y'].values[valid_mask]  # Actually x pixel (cx)
+
+                        ## CORRECT: non-swapped
+                        x_pixel = centroids_df['x'].values[valid_mask]  # Actually x pixel (cx)
+                        y_pixel = centroids_df['y'].values[valid_mask]  # Actually y pixel (cy)
+
+                        # Convert pixel coordinates to world coordinates using the same scale as the image
+                        # x_world = x_min + x_pixel * x_scale
+                        # y_world = y_min + y_pixel * y_scale
+                        x_centroids = x_min + x_pixel * x_scale
+                        y_centroids = y_min + y_pixel * y_scale
+                        
+                        segment_indices = centroids_df['segment_idx'].values[valid_mask]
+                        
+                        # Get unique segment indices for color mapping (exclude NaN) - used for arrows only
+                        unique_segments = np.unique(segment_indices[~np.isnan(segment_indices)])
+                        n_segments = len(unique_segments)
+                        
+                        # Create color map for segments (using HSV color space for distinct colors) - used for arrows only
+                        segment_colors = {}
+                        if n_segments > 0:
+                            # Generate distinct colors for each segment
+                            for idx, seg_idx in enumerate(unique_segments):
+                                hue = (idx / max(n_segments, 1)) % 1.0  # Distribute hues evenly
+                                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                                segment_colors[seg_idx] = (rgb[0], rgb[1], rgb[2], 1.0)  # Full opacity
+                        
+                        # Use white for all centroids (ignore segment_idx-based colors)
+                        # Common color for centroids and arrows
+                        centroid_base_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.8 opacity for dots
+                        centroid_arrow_color = (1.0, 1.0, 1.0, 0.4)  # White with 0.4 opacity for arrows (slightly more transparent)
+                        
+                        n_centroids = len(x_centroids)
+                        centroid_colors = np.ones((n_centroids, 4), dtype=np.float32)
+                        centroid_colors[:] = centroid_base_color  # White for all centroids
+                        
+                        # Create scatter plot markers for centroid dots
+                        centroid_pos = np.column_stack([x_centroids, y_centroids])
+                        centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, parent=state['posterior_2d_view'].scene)
+                        centroid_markers.order = 7  # Render above posterior image and current position line, but below mask contours
+                        state['centroid_dots'].append(centroid_markers)
+                        
+                        # Create tiny arrows in the direction of segment_Vp_deg at each centroid
+                        if 'segment_Vp_deg' in centroids_df.columns:
+                            segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
+                            valid_angle_mask = ~np.isnan(segment_Vp_deg)
+                            
+                            if np.any(valid_angle_mask):
+                                # Calculate arrow head size to be visually similar to centroid dot (size 8)
+                                # Convert dot size from pixels to world coordinates
+                                # Dot size 8 pixels ≈ radius of 4 pixels
+                                # Estimate pixel-to-world scale: assume ~100-200 pixels per data range
+                                data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
+                                # Make arrow head size similar to dot size - use a reasonable fraction of data scale
+                                # For a dot of size 8, we want arrow head to be ~6-8 in world units
+                                # Assuming typical data scale, use ~2-3% of data scale for arrow head
+                                arrow_head_size = data_scale * 0.025  # 2.5% of data scale - similar visual size to dot
+                                # Make arrow length very short - just enough to position the arrow head
+                                # Position arrow head slightly offset from centroid center
+                                arrow_length = arrow_head_size * 0.3  # Very short shaft, mostly just the head
+                                
+                                # Convert degrees to radians
+                                angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
+                                x_centroids_valid = x_centroids[valid_angle_mask]
+                                y_centroids_valid = y_centroids[valid_angle_mask]
+                                
+                                # Create arrows for each valid centroid
+                                for i in range(len(x_centroids_valid)):
+                                    x_center = x_centroids_valid[i]
+                                    y_center = y_centroids_valid[i]
+                                    angle = angles_rad[i]
+                                    
+                                    # Position arrow head slightly offset from center in the direction of the angle
+                                    # This makes the arrow head visible and clearly indicates direction
+                                    x_start = x_center
+                                    y_start = y_center
+                                    x_end = x_center + arrow_length * np.cos(angle)
+                                    y_end = y_center + arrow_length * np.sin(angle)
+                                    
+                                    # Get color for this arrow (use common centroid arrow color)
+                                    arrow_color = centroid_arrow_color
+                                    
+                                    # Create arrow visual - just the triangle head, minimal shaft
+                                    arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=2.0, method='agg', parent=state['posterior_2d_view'].scene)
+                                    arrow.order = 7  # Same order as dots
+                                    state['centroid_arrows'].append(arrow)
         
         # Render current position trajectory during the active epoch as grey line overlay
         # Extends beyond epoch bounds by current_traj_seconds_pre_post_extension with reduced opacity
@@ -7088,7 +7261,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Render trajectory arrows using angle column (highly efficient with reuse)
                         # Check for common angle column names
                         angle_column = None
-                        for col_name in ['angle', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
+                        for col_name in ['approx_head_dir_degrees', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
                             if col_name in extended_positions.columns:
                                 angle_column = col_name
                                 break
@@ -7275,8 +7448,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                 state['time_bin_images'].append(slice_img)
                 
                 # Add time bin label
-                label_y_pos = y_max + (y_max - y_min) * 0.05
-                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='cyan', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
+                label_y_pos = y_max + (y_max - y_min) * 0.08
+                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
                 state['time_bin_labels'].append(label)
                 
                 # Update camera to show label
@@ -7304,23 +7477,23 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
                         
                         # Add contour to past view (white color with alpha, high z-order)
-                        past_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['past_view'].scene)
+                        past_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['past_view'].scene)
                         past_contour.order = 10  # Higher order renders on top
                         state['past_mask_contours'].append(past_contour)
                         
                         # Add contour to posterior 2D view (white color with alpha, high z-order)
-                        posterior_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['posterior_2d_view'].scene)
+                        posterior_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['posterior_2d_view'].scene)
                         posterior_contour.order = 10  # Higher order renders on top
                         state['posterior_mask_contours'].append(posterior_contour)
                         
                         # Add contour to future view (white color with alpha, high z-order)
-                        future_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=state['future_view'].scene)
+                        future_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['future_view'].scene)
                         future_contour.order = 10  # Higher order renders on top
                         state['future_mask_contours'].append(future_contour)
                         
                         # Add contour to each time bin view as well
                         for time_bin_view in state['time_bin_views']:
-                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.75), width=2, parent=time_bin_view.scene)
+                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=time_bin_view.scene)
                             time_bin_contour.order = 10  # Higher order renders on top
                             state['posterior_mask_contours'].append(time_bin_contour)
         
@@ -7363,13 +7536,16 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             else:
                                 opacity = np.ones(len(x_valid)) * 0.8
                             
-                            # Check for trajectory extension (extend forward in time for future trajectories)
-                            extension_seconds = state['past_future_trajectory_extension_seconds']
-                            if extension_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                traj_t_max = np.max(t_coords)
-                                # Get positions after trajectory end (extending forward)
-                                ext_end_t = traj_t_max + extension_seconds
-                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
+                            # Check for trajectory extensions (separate start and end)
+                            start_ext_seconds = state['past_future_trajectory_start_extension_seconds']
+                            end_ext_seconds = state['past_future_trajectory_end_extension_seconds']
+                            traj_t_min = np.min(t_coords)
+                            traj_t_max = np.max(t_coords)
+                            
+                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity
+                            if start_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                ext_start_t = traj_t_min - start_ext_seconds
+                                ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
                                 ext_positions = state['curr_position_df'][ext_mask]
                                 
                                 if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
@@ -7381,12 +7557,41 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                         ext_y_valid = ext_y[ext_valid_mask]
                                         n_ext_points = len(ext_x_valid)
                                         
+                                        # Prepend extended positions (they come before in time)
+                                        x_valid = np.concatenate([ext_x_valid, x_valid])
+                                        y_valid = np.concatenate([ext_y_valid, y_valid])
+                                        
+                                        # Start extension uses solid start_end_extension_max_opacity (no fade-in)
+                                        ext_opacity = np.ones(n_ext_points) * state['start_end_extension_max_opacity']
+                                        opacity = np.concatenate([ext_opacity, opacity])
+                            
+                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0
+                            if end_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
+                                ext_end_t = traj_t_max + end_ext_seconds
+                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
+                                ext_positions = state['curr_position_df'][ext_mask]
+                                
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_t = ext_positions['t'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid = ext_x[ext_valid_mask]
+                                        ext_y_valid = ext_y[ext_valid_mask]
+                                        ext_t_valid = ext_t[ext_valid_mask]
+                                        n_ext_points = len(ext_x_valid)
+                                        
                                         # Append extended positions (they come after in time)
                                         x_valid = np.concatenate([x_valid, ext_x_valid])
                                         y_valid = np.concatenate([y_valid, ext_y_valid])
                                         
-                                        # Create extended opacity array (original for first, 0.2 for extended)
-                                        ext_opacity = np.ones(n_ext_points) * 0.2
+                                        # End extension uses fade-out: start_end_extension_max_opacity -> 0.0
+                                        max_opacity = state['start_end_extension_max_opacity']
+                                        ext_distance = ext_t_valid - traj_t_max  # Distance from trajectory end
+                                        ext_distance_normalized = ext_distance / end_ext_seconds  # [0, 1]
+                                        # Fade from max_opacity to 0.0
+                                        ext_opacity = max_opacity * (1.0 - ext_distance_normalized)
                                         opacity = np.concatenate([opacity, ext_opacity])
                         else:
                             opacity = np.ones(len(x_valid)) * 0.8
@@ -7428,7 +7633,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                 triangle_top_y = timeline_bar_height + triangle_height * 0.3  # Slightly above and overlapping top
                 triangle_bottom_y = timeline_bar_height - triangle_height * 0.3  # Overlap the top of the timeline bar
                 triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 1.0), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=state['combined_timeline_view'].scene)
+                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=state['combined_timeline_view'].scene)
                 state['timeline_epoch_triangle'] = epoch_triangle
             
             # Draw past trajectory ticks (full height)
@@ -7452,6 +7657,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         # Update title
         state['canvas'].title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{num_epochs})'
         state['canvas'].update()
+        QApplication.processEvents()  # Force Qt to process redraw
     
     def on_key_press(event):
         """Handle keyboard events for epoch navigation."""
@@ -7499,10 +7705,158 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     combined_timeline_view.camera = scene.PanZoomCamera()
     combined_timeline_view.camera.set_range(x=(recording_t_min, recording_t_max), y=(0, timeline_bar_height))
     
+    # Add update_epoch_display function reference to state for programmatic access
+    state['update_epoch_display'] = update_epoch_display
+    
     # Initial render
     update_epoch_display(active_epoch_idx)
     
     return main_window, canvas, state
+
+
+@function_attributes(short_name=None, tags=['vispy', 'export', 'screenshot', 'high-resolution'], input_requires=[], output_provides=[], uses=['render_predictive_decoding_with_vispy'], used_by=[], creation_date='2026-01-22', related_items=['render_predictive_decoding_with_vispy'])
+def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Path], resolution_scale: float = 2.0, export_individual_views: bool = False, epoch_indices: Optional[List[int]] = None, delay_between_epochs: float = 0.15, progress_print: bool = True) -> List[Path]:
+    """Export high-resolution renderings of all epoch views from the vispy predictive decoding viewer.
+    
+    Programmatically iterates through epoch indices, updates the display, and exports high-resolution 
+    screenshots of all displayed views to an export folder.
+    
+    Args:
+        viewer_tuple: Tuple returned from render_predictive_decoding_with_vispy containing (main_window, canvas, state)
+        export_folder: Path to folder where images will be saved. Created if it doesn't exist.
+        resolution_scale: Scale factor for high-res rendering (default: 2.0). Higher values produce larger images.
+        export_individual_views: If True, export individual views (past, posterior, future) separately (default: False)
+        epoch_indices: Optional list of specific epoch indices to export. If None, exports all epochs.
+        delay_between_epochs: Delay in seconds after updating epoch display to allow rendering to stabilize (default: 0.15)
+        progress_print: If True, print progress messages during export (default: True)
+        
+    Returns:
+        List of Path objects for all exported image files
+        
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_vispy, export_vispy_viewer_epochs
+        
+        viewer = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, 
+                                                        a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                        curr_position_df=container.decoding_locality.pos_df, 
+                                                        pf_decoder=a_decoder, decoded_result=a_decoded_result)
+        
+        exported_files = export_vispy_viewer_epochs(viewer, export_folder='./exports', resolution_scale=2.0)
+    """
+    import time
+    from pathlib import Path
+    from qtpy.QtWidgets import QApplication
+    
+    # Try to import imageio for saving, fall back to PIL if not available
+    try:
+        from imageio import imwrite as save_image
+        _use_imageio = True
+    except ImportError:
+        from PIL import Image
+        _use_imageio = False
+        def save_image(path, img_array):
+            """Save image array using PIL."""
+            Image.fromarray(img_array).save(path)
+    
+    # Extract components from viewer tuple
+    main_window, canvas, state = viewer_tuple
+    
+    # Validate and create export folder
+    export_folder = Path(export_folder)
+    export_folder.mkdir(parents=True, exist_ok=True)
+    
+    # Get number of epochs and determine which indices to export
+    num_epochs = state['num_epochs']
+    if epoch_indices is None:
+        epoch_indices = list(range(num_epochs))
+    else:
+        # Validate provided epoch indices
+        epoch_indices = [idx for idx in epoch_indices if 0 <= idx < num_epochs]
+    
+    if len(epoch_indices) == 0:
+        print("Warning: No valid epoch indices to export.")
+        return []
+    
+    # Get the update function from state
+    update_epoch_display = state.get('update_epoch_display')
+    if update_epoch_display is None:
+        raise ValueError("update_epoch_display function not found in state. Ensure you're using an updated version of render_predictive_decoding_with_vispy.")
+    
+    # Get canvas size for high-res rendering
+    canvas_width, canvas_height = canvas.size
+    high_res_width = int(canvas_width * resolution_scale)
+    high_res_height = int(canvas_height * resolution_scale)
+    
+    exported_files = []
+    total_epochs = len(epoch_indices)
+    
+    if progress_print:
+        print(f"Exporting {total_epochs} epochs to {export_folder} at {resolution_scale}x resolution ({high_res_width}x{high_res_height})...")
+    
+    for i, epoch_idx in enumerate(epoch_indices):
+        try:
+            if progress_print:
+                print(f"  Exporting epoch {epoch_idx + 1}/{num_epochs} ({i + 1}/{total_epochs})...", end='', flush=True)
+            
+            # Update the epoch display programmatically
+            # Block slider signals to avoid recursive updates
+            state['epoch_slider'].blockSignals(True)
+            state['epoch_slider'].setValue(epoch_idx)
+            state['epoch_slider'].blockSignals(False)
+            
+            # Call the update function directly
+            update_epoch_display(epoch_idx)
+            
+            # Process Qt events to ensure rendering completes
+            QApplication.processEvents()
+            
+            # Small delay to allow rendering to stabilize
+            time.sleep(delay_between_epochs)
+            
+            # Process events again after delay
+            QApplication.processEvents()
+            
+            # Ensure canvas is updated
+            canvas.update()
+            QApplication.processEvents()
+            
+            # Render high-resolution screenshot
+            # vispy's render() returns RGBA numpy array with shape (height, width, 4)
+            img_array = canvas.render(size=(high_res_width, high_res_height))
+            
+            # Convert RGBA to RGB by dropping alpha channel (optional, keeps file size smaller)
+            img_rgb = img_array[:, :, :3]
+            
+            # Flip vertically if needed (vispy may return origin at bottom-left)
+            # Check if image appears upside down and flip
+            img_rgb = np.flipud(img_rgb)
+            
+            # Save full canvas screenshot
+            full_filename = f"epoch_{epoch_idx:04d}_full.png"
+            full_path = export_folder / full_filename
+            save_image(str(full_path), img_rgb)
+            exported_files.append(full_path)
+            
+            if progress_print:
+                print(f" saved to {full_filename}")
+            
+            # Export individual views if requested
+            if export_individual_views:
+                # Note: Individual view export requires rendering each view separately
+                # This is more complex and may require accessing view.scene directly
+                # For now, we export the full canvas; individual view export can be added later
+                pass
+                
+        except Exception as e:
+            if progress_print:
+                print(f" ERROR: {e}")
+            # Continue with next epoch even if this one fails
+            continue
+    
+    if progress_print:
+        print(f"Export complete. {len(exported_files)} files saved to {export_folder}")
+    
+    return exported_files
 
 
 
