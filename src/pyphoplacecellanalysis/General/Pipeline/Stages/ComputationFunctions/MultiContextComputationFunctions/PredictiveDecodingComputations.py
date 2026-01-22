@@ -7037,7 +7037,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
-                        line.order = 5  # Render above background (0) but below contours (10)
+                        line.order = 1  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['past_lines'].append(line)
         
@@ -7400,7 +7400,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
-                        line.order = 5  # Render above background (0) but below contours (10)
+                        line.order = 1  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['future_lines'].append(line)
         
