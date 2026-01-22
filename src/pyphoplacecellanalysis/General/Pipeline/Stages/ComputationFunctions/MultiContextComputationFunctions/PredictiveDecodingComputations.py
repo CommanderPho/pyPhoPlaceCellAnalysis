@@ -7167,33 +7167,40 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         y_centroids = y_min + y_pixel * y_scale
                         
                         segment_indices = centroids_df['segment_idx'].values[valid_mask]
+                        
+                        # ========== DIAGNOSTIC COUNT VERIFICATION ==========
+                        n_time_bins = p_x_given_n.shape[2]
+                        n_centroids_total = len(centroids_df)
+                        n_centroids_valid = len(x_centroids)
+                        n_mask_time_bins = epoch_result.epoch_t_bins_high_prob_pos_mask.shape[2] if (hasattr(epoch_result, 'epoch_t_bins_high_prob_pos_mask') and epoch_result.epoch_t_bins_high_prob_pos_mask is not None) else 0
+                        n_views = min(n_time_bins, state['max_time_bins_to_show'])
+                        print(f"COUNT VERIFICATION - n_time_bins: {n_time_bins}, n_centroids_total: {n_centroids_total}, n_centroids_valid: {n_centroids_valid}, n_mask_time_bins: {n_mask_time_bins}, n_views: {n_views}")
+                        if n_centroids_total != n_time_bins:
+                            print(f"  WARNING: Centroid count ({n_centroids_total}) != time bin count ({n_time_bins})")
+                        if n_mask_time_bins != n_time_bins:
+                            print(f"  WARNING: Mask time bin count ({n_mask_time_bins}) != posterior time bin count ({n_time_bins})")
                         print(f'segment_indices: {segment_indices}')
                         
-                        # Get unique segment indices for color mapping (exclude NaN) - used for arrows only
-                        unique_segments = np.unique(segment_indices[~np.isnan(segment_indices)])
-                        n_segments = len(unique_segments)
+                        # ========== GENERATE TIME BIN COLORMAP ==========
+                        # Generate distinct colors for each time bin using HSV color space
+                        time_bin_colors = np.zeros((n_time_bins, 4), dtype=np.float32)
+                        for t_idx in range(n_time_bins):
+                            hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Distribute hues evenly
+                            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                            time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.9)  # High opacity
                         
-                        # Create color map for segments (using HSV color space for distinct colors) - used for arrows only
-                        segment_colors = {}
-                        if n_segments > 0:
-                            # Generate distinct colors for each segment
-                            for idx, seg_idx in enumerate(unique_segments):
-                                hue = (idx / max(n_segments, 1)) % 1.0  # Distribute hues evenly
-                                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-                                segment_colors[seg_idx] = (rgb[0], rgb[1], rgb[2], 1.0)  # Full opacity
-                        
-                        print(f'segment_colors: {segment_colors}')
-                        # Use white for all centroids (ignore segment_idx-based colors)
-
-
-                        #TODO 2026-01-22 10:55: - [ ] this is what overrides with white
-                        # Common color for centroids and arrows
-                        centroid_base_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.8 opacity for dots
-                        centroid_arrow_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.4 opacity for arrows (slightly more transparent)
-                        
+                        # ========== PER-TIME-BIN CENTROID COLORS ==========
+                        # Each centroid row index corresponds to a time bin index
+                        # Get the original indices (before valid_mask filtering) to map to time bins
+                        original_indices = np.where(valid_mask)[0]  # Original row indices in centroids_df
                         n_centroids = len(x_centroids)
-                        centroid_colors = np.ones((n_centroids, 4), dtype=np.float32)
-                        centroid_colors[:] = centroid_base_color  # White for all centroids
+                        centroid_colors = np.zeros((n_centroids, 4), dtype=np.float32)
+                        for i in range(n_centroids):
+                            t_idx = original_indices[i]  # Original time bin index
+                            if t_idx < len(time_bin_colors):
+                                centroid_colors[i] = time_bin_colors[t_idx]
+                            else:
+                                centroid_colors[i] = (1.0, 1.0, 1.0, 0.8)  # Fallback to white
                         
                         # Create scatter plot markers for centroid dots
                         centroid_pos = np.column_stack([x_centroids, y_centroids])
@@ -7225,6 +7232,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 x_centroids_valid = x_centroids[valid_angle_mask]
                                 y_centroids_valid = y_centroids[valid_angle_mask]
                                 
+                                # Get indices mapping arrows back to time bins
+                                # valid_angle_mask filters from valid_mask-filtered centroids
+                                arrow_centroid_indices = np.where(valid_angle_mask)[0]  # Indices within valid centroids
+                                
                                 # Create arrows for each valid centroid
                                 for i in range(len(x_centroids_valid)):
                                     x_center = x_centroids_valid[i]
@@ -7238,8 +7249,13 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                     x_end = x_center + (arrow_length * np.cos(angle))
                                     y_end = y_center + (arrow_length * np.sin(angle))
                                     
-                                    # Get color for this arrow (use common centroid arrow color)
-                                    arrow_color = centroid_arrow_color
+                                    # Get color for this arrow based on time bin index (matching centroid color)
+                                    centroid_idx = arrow_centroid_indices[i]  # Index within valid centroids
+                                    t_idx = original_indices[centroid_idx]  # Original time bin index
+                                    if t_idx < len(time_bin_colors):
+                                        arrow_color = tuple(time_bin_colors[t_idx])
+                                    else:
+                                        arrow_color = (1.0, 1.0, 1.0, 0.8)  # Fallback to white
                                     
                                     # Create arrow visual - just the triangle head, minimal shaft
                                     arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=state['posterior_2d_view'].scene)
@@ -7440,6 +7456,13 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             n_time_bins = p_x_given_n.shape[2]
             n_bins_to_show = min(n_time_bins, state['max_time_bins_to_show'])
             
+            # Generate time bin colors for view borders (same colormap as centroids/contours)
+            view_time_bin_colors = []
+            for t_idx in range(n_bins_to_show):
+                hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Use n_time_bins for consistent colors with centroids
+                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                view_time_bin_colors.append((rgb[0], rgb[1], rgb[2]))  # RGB tuple for border_color
+            
             # Global normalization across all time bins
             vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
             
@@ -7451,9 +7474,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         view.parent = None
                 state['time_bin_views'].clear()
                 
-                # Create new views in a single row
+                # Create new views in a single row with per-time-bin colored borders
                 for t_idx in range(n_bins_to_show):
-                    view = state['time_bin_grid'].add_view(row=0, col=t_idx, border_color='gray')
+                    t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
+                    view = state['time_bin_grid'].add_view(row=0, col=t_idx, border_color=t_bin_border_color)
                     view.camera = scene.PanZoomCamera(aspect=1)
                     view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
                     state['time_bin_views'].append(view)
@@ -7486,47 +7510,60 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                 # Update camera to show label
                 view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
         
-        # Render mask contours on all views (with higher z-order to render on top of images)
-        if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
-            if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
-                mask_2d = state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks[new_epoch_idx]
-                if mask_2d is not None and mask_2d.size > 0:
-                    # Extract contours from the binary mask using skimage
-                    from skimage import measure
-                    # mask_2d has shape (n_x_bins, n_y_bins), transpose for contour finding
-                    mask_transposed = mask_2d.T.astype(np.float32)
-                    contours = measure.find_contours(mask_transposed, level=0.5)
-                    
-                    # Convert contour coordinates from pixel space to world coordinates
-                    # contours are in (row, col) format which maps to (y_pixel, x_pixel)
-                    n_y_bins, n_x_bins = mask_transposed.shape
-                    for contour in contours:
-                        # contour[:, 0] is row (y pixel), contour[:, 1] is col (x pixel)
-                        # Map pixel coords to world coords
-                        x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
-                        y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
-                        contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
+        # Render per-time-bin mask contours on all views (with higher z-order to render on top of images)
+        # Use 3D epoch_t_bins_high_prob_pos_mask for per-time-bin colored contours
+        if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
+            epoch_result_for_contours = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
+            if epoch_result_for_contours is not None and hasattr(epoch_result_for_contours, 'epoch_t_bins_high_prob_pos_mask') and epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask is not None:
+                per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask  # Shape: (N_XBINS, N_Y_BINS, N_TIME_BINS)
+                n_mask_t_bins = per_t_bin_mask.shape[2]
+                
+                # Generate time bin colors for contours (same colormap as centroids)
+                contour_time_bin_colors = np.zeros((n_mask_t_bins, 4), dtype=np.float32)
+                for t_idx in range(n_mask_t_bins):
+                    hue = (t_idx / max(n_mask_t_bins, 1)) % 1.0
+                    rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                    contour_time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.7)  # Slightly lower opacity for contours
+                
+                from skimage import measure
+                
+                # Render contours for each time bin with distinct colors
+                for t_idx in range(n_mask_t_bins):
+                    mask_slice = per_t_bin_mask[:, :, t_idx]
+                    if np.any(mask_slice):
+                        mask_transposed = mask_slice.T.astype(np.float32)
+                        contours = measure.find_contours(mask_transposed, level=0.5)
                         
-                        # Add contour to past view (white color with alpha, high z-order)
-                        past_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['past_view'].scene)
-                        past_contour.order = 10  # Higher order renders on top
-                        state['past_mask_contours'].append(past_contour)
+                        # Get color for this time bin
+                        contour_color = tuple(contour_time_bin_colors[t_idx])
                         
-                        # Add contour to posterior 2D view (white color with alpha, high z-order)
-                        posterior_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['posterior_2d_view'].scene)
-                        posterior_contour.order = 10  # Higher order renders on top
-                        state['posterior_mask_contours'].append(posterior_contour)
-                        
-                        # Add contour to future view (white color with alpha, high z-order)
-                        future_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=state['future_view'].scene)
-                        future_contour.order = 10  # Higher order renders on top
-                        state['future_mask_contours'].append(future_contour)
-                        
-                        # Add contour to each time bin view as well
-                        for time_bin_view in state['time_bin_views']:
-                            time_bin_contour = scene.visuals.Line(pos=contour_coords, color=(1.0, 1.0, 1.0, 0.55), width=2, parent=time_bin_view.scene)
-                            time_bin_contour.order = 10  # Higher order renders on top
-                            state['posterior_mask_contours'].append(time_bin_contour)
+                        # Convert contour coordinates from pixel space to world coordinates
+                        n_y_bins, n_x_bins = mask_transposed.shape
+                        for contour in contours:
+                            x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
+                            y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
+                            contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
+                            
+                            # Add colored contour to past view
+                            past_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['past_view'].scene)
+                            past_contour.order = 10
+                            state['past_mask_contours'].append(past_contour)
+                            
+                            # Add colored contour to posterior 2D view
+                            posterior_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['posterior_2d_view'].scene)
+                            posterior_contour.order = 10
+                            state['posterior_mask_contours'].append(posterior_contour)
+                            
+                            # Add colored contour to future view
+                            future_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['future_view'].scene)
+                            future_contour.order = 10
+                            state['future_mask_contours'].append(future_contour)
+                            
+                            # Add contour to corresponding time bin view (if within display range)
+                            if t_idx < len(state['time_bin_views']):
+                                time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['time_bin_views'][t_idx].scene)
+                                time_bin_contour.order = 10
+                                state['posterior_mask_contours'].append(time_bin_contour)
         
         # Render Future Trajectories and collect data for timeline
         future_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
