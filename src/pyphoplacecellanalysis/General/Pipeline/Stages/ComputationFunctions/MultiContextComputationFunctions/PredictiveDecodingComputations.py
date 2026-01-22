@@ -7165,7 +7165,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Use white for all centroids (ignore segment_idx-based colors)
                         # Common color for centroids and arrows
                         centroid_base_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.8 opacity for dots
-                        centroid_arrow_color = (1.0, 1.0, 1.0, 0.4)  # White with 0.4 opacity for arrows (slightly more transparent)
+                        centroid_arrow_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.4 opacity for arrows (slightly more transparent)
                         
                         n_centroids = len(x_centroids)
                         centroid_colors = np.ones((n_centroids, 4), dtype=np.float32)
@@ -7173,7 +7173,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         
                         # Create scatter plot markers for centroid dots
                         centroid_pos = np.column_stack([x_centroids, y_centroids])
-                        centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, parent=state['posterior_2d_view'].scene)
+                        centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=state['posterior_2d_view'].scene)
                         centroid_markers.order = 7  # Render above posterior image and current position line, but below mask contours
                         state['centroid_dots'].append(centroid_markers)
                         
