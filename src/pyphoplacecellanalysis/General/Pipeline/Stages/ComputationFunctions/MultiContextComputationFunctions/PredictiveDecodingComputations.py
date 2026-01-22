@@ -4721,7 +4721,7 @@ class MaskDataSource:
                      matching_pos_dfs_list=[v.relevant_positions_df for v in epoch_flat_mask_future_past_result],
                      matching_pos_epochs_dfs_list=[v.matching_pos_epochs_df for v in epoch_flat_mask_future_past_result],
                epoch_high_prob_pos_masks=[v.epoch_high_prob_mask for v in epoch_flat_mask_future_past_result], epoch_t_bins_high_prob_pos_masks=[v.epoch_t_bins_high_prob_pos_mask for v in epoch_flat_mask_future_past_result],
-			   filter_epochs=filter_epochs, p_x_given_n_list=[a_single_epoch_result.decoded_epoch_result.p_x_given_n for a_single_epoch_result in epoch_flat_mask_future_past_result],
+               filter_epochs=filter_epochs, p_x_given_n_list=[a_single_epoch_result.decoded_epoch_result.p_x_given_n for a_single_epoch_result in epoch_flat_mask_future_past_result],
                **kwargs,
         )
         
@@ -6614,12 +6614,11 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
     future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
     posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
-    posterior_2d_view.stretch = (1, 7)  # 70% of combined height for row 0
     
-    # Row 1: Time bin grid in the middle column only (30% of combined height)
+    # Row 1: Time bin grid in the middle column only (compact height, expands horizontally)
     max_time_bins_to_show = 12  # Maximum number of time bins to display
     time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
-    time_bin_grid.stretch = (1, 3)  # 30% of combined height for row 1
+    time_bin_grid.height_max = 120  # Constrain height to be compact, posterior view above will expand to fill remaining space
     time_bin_views = []  # Will be populated with views for each time bin
     time_bin_images = []  # Will store image visuals for cleanup
     time_bin_labels = []  # Will store text labels for cleanup
@@ -7191,7 +7190,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 # Make arrow head size similar to dot size - use a reasonable fraction of data scale
                                 # For a dot of size 8, we want arrow head to be ~6-8 in world units
                                 # Assuming typical data scale, use ~2-3% of data scale for arrow head
-                                arrow_head_size = data_scale * 0.025  # 2.5% of data scale - similar visual size to dot
+                                arrow_head_size = data_scale * 0.05  # 2.5% of data scale - similar visual size to dot
                                 # Make arrow length very short - just enough to position the arrow head
                                 # Position arrow head slightly offset from centroid center
                                 arrow_length = arrow_head_size * 0.3  # Very short shaft, mostly just the head
@@ -7211,14 +7210,14 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                     # This makes the arrow head visible and clearly indicates direction
                                     x_start = x_center
                                     y_start = y_center
-                                    x_end = x_center + arrow_length * np.cos(angle)
-                                    y_end = y_center + arrow_length * np.sin(angle)
+                                    x_end = x_center + (arrow_length * np.cos(angle))
+                                    y_end = y_center + (arrow_length * np.sin(angle))
                                     
                                     # Get color for this arrow (use common centroid arrow color)
                                     arrow_color = centroid_arrow_color
                                     
                                     # Create arrow visual - just the triangle head, minimal shaft
-                                    arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=2.0, method='agg', parent=state['posterior_2d_view'].scene)
+                                    arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=state['posterior_2d_view'].scene)
                                     arrow.order = 7  # Same order as dots
                                     state['centroid_arrows'].append(arrow)
         
@@ -7261,109 +7260,113 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             # Update existing line visual using set_data (more efficient, as per official vispy example)
                             state['current_position_line'].set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
                         
-                        # Render trajectory arrows using angle column (highly efficient with reuse)
-                        # Check for common angle column names
-                        angle_column = None
-                        for col_name in ['approx_head_dir_degrees', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
-                            if col_name in extended_positions.columns:
-                                angle_column = col_name
-                                break
+                        # # Render trajectory arrows using angle column (highly efficient with reuse)
+                        # # Check for common angle column names
+                        # angle_column = None
+                        # for col_name in ['approx_head_dir_degrees', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
+                        #     if col_name in extended_positions.columns:
+                        #         angle_column = col_name
+                        #         break
                         
-                        # Debug: print available columns if no angle column found
-                        if angle_column is None:
-                            print(f"DEBUG: No angle column found. Available columns: {list(extended_positions.columns)}")
-                            print("DEBUG: Computing angles from trajectory direction as fallback")
-                            # Fallback: compute angles from trajectory direction
-                            if len(x_valid) > 1:
-                                # Compute direction vectors between consecutive points
-                                dx = np.diff(x_valid)
-                                dy = np.diff(y_valid)
-                                # Compute angles from direction vectors
-                                computed_angles = np.arctan2(dy, dx)
-                                # Pad with last angle to match length
-                                computed_angles = np.append(computed_angles, computed_angles[-1])
-                                angle_coords = computed_angles
-                                angle_valid_mask = ~np.isnan(angle_coords)
-                                angle_column = 'computed_from_trajectory'
-                            else:
-                                angle_coords = np.array([])
-                                angle_valid_mask = np.array([], dtype=bool)
+                        # # Debug: print available columns if no angle column found
+                        # if angle_column is None:
+                        #     print(f"DEBUG: No angle column found. Available columns: {list(extended_positions.columns)}")
+                        #     print("DEBUG: Computing angles from trajectory direction as fallback")
+                        #     # Fallback: compute angles from trajectory direction
+                        #     if len(x_valid) > 1:
+                        #         # Compute direction vectors between consecutive points
+                        #         dx = np.diff(x_valid)
+                        #         dy = np.diff(y_valid)
+                        #         # Compute angles from direction vectors
+                        #         computed_angles = np.arctan2(dy, dx)
+                        #         # Pad with last angle to match length
+                        #         computed_angles = np.append(computed_angles, computed_angles[-1])
+                        #         angle_coords = computed_angles
+                        #         angle_valid_mask = ~np.isnan(angle_coords)
+                        #         angle_column = 'computed_from_trajectory'
+                        #     else:
+                        #         angle_coords = np.array([])
+                        #         angle_valid_mask = np.array([], dtype=bool)
                         
-                        if angle_column is not None:
-                            # Get angle values for valid positions (if not already computed)
-                            if angle_column != 'computed_from_trajectory':
-                                angle_coords = extended_positions[angle_column].values[valid_mask]
-                                angle_valid_mask = ~np.isnan(angle_coords)
+                        # if angle_column is not None:
+                        #     # Get angle values for valid positions (if not already computed)
+                        #     if angle_column != 'computed_from_trajectory':
+                        #         angle_coords = extended_positions[angle_column].values[valid_mask]
+                        #         angle_valid_mask = ~np.isnan(angle_coords)
                             
-                            if np.any(angle_valid_mask) and len(x_valid) >= 2:
-                                # Clean up old Arrow instances first
-                                for arrow in state['trajectory_arrows']:
-                                    if arrow is not None:
-                                        arrow.parent = None
-                                state['trajectory_arrows'].clear()
+                        #     if np.any(angle_valid_mask) and len(x_valid) >= 2:
+                        #         # Clean up old Arrow instances first
+                        #         for arrow in state['trajectory_arrows']:
+                        #             if arrow is not None:
+                        #                 arrow.parent = None
+                        #         state['trajectory_arrows'].clear()
                                 
-                                # Calculate arrow length proportional to data scale
-                                data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
-                                arrow_length = data_scale * 0.015  # 1.5% of data scale
-                                arrow_head_size = data_scale * 0.02  # Arrow head size
+                        #         # Calculate arrow length proportional to data scale
+                        #         data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
+                        #         arrow_length = data_scale * 0.015  # 1.5% of data scale
+                        #         arrow_head_size = data_scale * 0.02  # Arrow head size
                                 
-                                # Convert angles to radians if needed (check if in degrees)
-                                if np.max(np.abs(angle_coords)) > 2 * np.pi:
-                                    angle_coords_rad = np.deg2rad(angle_coords)
-                                else:
-                                    angle_coords_rad = angle_coords
+                        #         # Convert angles to radians if needed (check if in degrees)
+                        #         if np.max(np.abs(angle_coords)) > 2 * np.pi:
+                        #             angle_coords_rad = np.deg2rad(angle_coords)
+                        #         else:
+                        #             angle_coords_rad = angle_coords
                                 
-                                # Get start and end indices with valid angles
-                                start_idx = 0
-                                end_idx = len(x_valid) - 1
+                        #         # Get start and end indices with valid angles
+                        #         start_idx = 0
+                        #         end_idx = len(x_valid) - 1
                                 
-                                # Find first valid angle from start
-                                while start_idx < len(angle_valid_mask) and not angle_valid_mask[start_idx]:
-                                    start_idx += 1
+                        #         # Find first valid angle from start
+                        #         while start_idx < len(angle_valid_mask) and not angle_valid_mask[start_idx]:
+                        #             start_idx += 1
                                 
-                                # Find last valid angle from end
-                                while end_idx >= 0 and not angle_valid_mask[end_idx]:
-                                    end_idx -= 1
+                        #         # Find last valid angle from end
+                        #         while end_idx >= 0 and not angle_valid_mask[end_idx]:
+                        #             end_idx -= 1
                                 
-                                # Create arrows at start and end if valid
-                                if start_idx < len(x_valid) and end_idx >= 0:
-                                    arrow_color = (1.0, 0.9, 0.0, max(colors[start_idx, 3], 0.6))  # Yellow with opacity
+                        #         # Create arrows at start and end if valid
+                        #         if start_idx < len(x_valid) and end_idx >= 0:
+                        #             arrow_color = (1.0, 0.9, 0.0, max(colors[start_idx, 3], 0.6))  # Yellow with opacity
                                     
-                                    # Create start arrow
-                                    start_angle = angle_coords_rad[start_idx]
-                                    start_x, start_y = x_valid[start_idx], y_valid[start_idx]
-                                    start_end_x = start_x + arrow_length * np.cos(start_angle)
-                                    start_end_y = start_y + arrow_length * np.sin(start_angle)
+                        #             # Create start arrow
+                        #             start_angle = angle_coords_rad[start_idx]
+                        #             start_x, start_y = x_valid[start_idx], y_valid[start_idx]
+                        #             start_end_x = start_x + arrow_length * np.cos(start_angle)
+                        #             start_end_y = start_y + arrow_length * np.sin(start_angle)
                                     
-                                    start_arrow = scene.visuals.Arrow(pos=np.array([[start_x, start_y], [start_end_x, start_end_y]]), arrows=np.array([[start_x, start_y, start_end_x, start_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
-                                    start_arrow.order = 6
-                                    state['trajectory_arrows'].append(start_arrow)
+                        #             start_arrow = scene.visuals.Arrow(pos=np.array([[start_x, start_y], [start_end_x, start_end_y]]), arrows=np.array([[start_x, start_y, start_end_x, start_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
+                        #             start_arrow.order = 6
+                        #             state['trajectory_arrows'].append(start_arrow)
                                     
-                                    # Create end arrow (if different from start)
-                                    if end_idx != start_idx:
-                                        end_angle = angle_coords_rad[end_idx]
-                                        end_x, end_y = x_valid[end_idx], y_valid[end_idx]
-                                        end_end_x = end_x + arrow_length * np.cos(end_angle)
-                                        end_end_y = end_y + arrow_length * np.sin(end_angle)
+                        #             # Create end arrow (if different from start)
+                        #             if end_idx != start_idx:
+                        #                 end_angle = angle_coords_rad[end_idx]
+                        #                 end_x, end_y = x_valid[end_idx], y_valid[end_idx]
+                        #                 end_end_x = end_x + arrow_length * np.cos(end_angle)
+                        #                 end_end_y = end_y + arrow_length * np.sin(end_angle)
                                         
-                                        end_arrow_color = (1.0, 0.9, 0.0, max(colors[end_idx, 3], 0.6))
-                                        end_arrow = scene.visuals.Arrow(pos=np.array([[end_x, end_y], [end_end_x, end_end_y]]), arrows=np.array([[end_x, end_y, end_end_x, end_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=end_arrow_color, arrow_color=end_arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
-                                        end_arrow.order = 6
-                                        state['trajectory_arrows'].append(end_arrow)
+                        #                 end_arrow_color = (1.0, 0.9, 0.0, max(colors[end_idx, 3], 0.6))
+                        #                 end_arrow = scene.visuals.Arrow(pos=np.array([[end_x, end_y], [end_end_x, end_end_y]]), arrows=np.array([[end_x, end_y, end_end_x, end_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=end_arrow_color, arrow_color=end_arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
+                        #                 end_arrow.order = 6
+                        #                 state['trajectory_arrows'].append(end_arrow)
                                     
-                                    print(f"DEBUG: Rendered {len(state['trajectory_arrows'])} Arrow instances (start/end) using angle source '{angle_column}'")
-                            else:
-                                # No valid angles or insufficient points - clear arrows
-                                for arrow in state['trajectory_arrows']:
-                                    if arrow is not None:
-                                        arrow.parent = None
-                                state['trajectory_arrows'].clear()
-                        else:
-                            # No angle column - clear arrows
-                            for arrow in state['trajectory_arrows']:
-                                if arrow is not None:
-                                    arrow.parent = None
-                            state['trajectory_arrows'].clear()
+                        #             print(f"DEBUG: Rendered {len(state['trajectory_arrows'])} Arrow instances (start/end) using angle source '{angle_column}'")
+                        #     else:
+                        #         # No valid angles or insufficient points - clear arrows
+                        #         for arrow in state['trajectory_arrows']:
+                        #             if arrow is not None:
+                        #                 arrow.parent = None
+                        #         state['trajectory_arrows'].clear()
+
+
+                        # else:
+                        #     # No angle column - clear arrows
+                        #     for arrow in state['trajectory_arrows']:
+                        #         if arrow is not None:
+                        #             arrow.parent = None
+                        #     state['trajectory_arrows'].clear()
+                        pass
+
                     else:
                         # No valid positions after filtering - hide the line if it exists
                         if state['current_position_line'] is not None:
