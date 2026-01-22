@@ -6524,7 +6524,7 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
-    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, color_matches_by_matching_angle: bool=True, **kwargs):
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, color_matches_by_matching_angle: bool=True, enable_debug_plot_trajectory_average_angle_arrows: bool=True, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -6552,6 +6552,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         require_angle_match: If True, only display trajectories whose direction aligns with the decoded posterior centroid direction (centroid_pos_traj_matching_angle_idx >= 0). Default: False.
         color_matches_by_matching_angle: If True, trajectories that have a valid angle match (centroid_pos_traj_matching_angle_idx >= 0) 
             will be colored using the corresponding time bin's color instead of the default red (past) or cyan (future). Default: True.
+        enable_debug_plot_trajectory_average_angle_arrows: If True, draws small arrows at the temporal center of each 
+            past/future trajectory indicating the trajectory's representative direction (circular mean of segment_Vp_deg). Default: True.
         **kwargs: Additional keyword arguments
         
     Returns:
@@ -6736,6 +6738,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'show_full_position_background': show_full_position_background,
         'require_angle_match': require_angle_match,
         'color_matches_by_matching_angle': color_matches_by_matching_angle,
+        'enable_debug_plot_trajectory_average_angle_arrows': enable_debug_plot_trajectory_average_angle_arrows,
+        'trajectory_debug_arrows': [],  # List of Arrow visuals for debug trajectory direction
         'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
         'main_window': main_window,
@@ -6835,6 +6839,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             if arrow is not None:
                 arrow.parent = None
         state['centroid_arrows'].clear()
+        
+        # Clear trajectory debug arrows
+        for arrow in state['trajectory_debug_arrows']:
+            if arrow is not None:
+                arrow.parent = None
+        state['trajectory_debug_arrows'].clear()
         
         # Update current position line (reuse existing visual if available)
         
@@ -7050,9 +7060,22 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
                             valid_match_indices = matching_idx_values[matching_idx_values >= 0]
                             if len(valid_match_indices) > 0:
-                                # Use the first valid matching time bin index
-                                matched_t_idx = int(valid_match_indices[0])
-                                if matched_t_idx < len(time_bin_colors):
+                                # Get segment row index from positions_df
+                                segment_row_idx = int(valid_match_indices[0])
+                                # Map segment row index to actual time bin index using epoch's centroids_df
+                                matched_t_idx = None
+                                if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
+                                    curr_epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
+                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None:
+                                        if hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
+                                            search_df = curr_epoch_result.a_centroids_search_segments_df
+                                            if segment_row_idx < len(search_df):
+                                                actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+                                                # Find first time bin with this segment_idx
+                                                matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+                                                if len(matching_t_bins) > 0:
+                                                    matched_t_idx = matching_t_bins[0]  # First time bin in segment
+                                if matched_t_idx is not None and matched_t_idx < len(time_bin_colors):
                                     base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
                                 else:
                                     base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Fallback to red
@@ -7065,9 +7088,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Calculate opacity based on time distance from epoch start using common normalization
                         if epoch_start_t is not None and 't' in positions_df.columns:
                             t_coords = positions_df['t'].values[valid_mask]
-                            # Store mean time for timeline tick
+                            # Store mean time for timeline tick - ALWAYS use red for past timeline ticks
                             mean_time = np.mean(t_coords)
-                            past_trajectory_colors_and_times.append((base_rgb, mean_time))
+                            timeline_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Always red for past
+                            past_trajectory_colors_and_times.append((timeline_rgb, mean_time))
                             # Time relative to start: negative values (t < start_t)
                             time_rel = t_coords - epoch_start_t
                             # Absolute distance from start
@@ -7153,6 +7177,32 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         line.order = 1  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['past_lines'].append(line)
+                        
+                        # Draw debug arrow at trajectory temporal center if enabled
+                        if state['enable_debug_plot_trajectory_average_angle_arrows'] and 'segment_Vp_deg' in positions_df.columns:
+                            segment_angles = positions_df['segment_Vp_deg'].values
+                            valid_angles = segment_angles[~np.isnan(segment_angles)]
+                            if len(valid_angles) > 0:
+                                # Compute circular mean angle
+                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
+                                mean_angle_rad = np.radians(mean_angle_deg)
+                                
+                                # Find temporal center position
+                                center_idx = len(x_valid) // 2
+                                x_center = x_valid[center_idx]
+                                y_center = y_valid[center_idx]
+                                
+                                # Arrow size based on data scale
+                                data_scale = max(x_max - x_min, y_max - y_min)
+                                arrow_head_size = data_scale * 0.04
+                                arrow_length = arrow_head_size * 0.5
+                                
+                                x_end = x_center + (arrow_length * np.cos(mean_angle_rad))
+                                y_end = y_center + (arrow_length * np.sin(mean_angle_rad))
+                                
+                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=state['past_view'].scene)
+                                debug_arrow.order = 5
+                                state['trajectory_debug_arrows'].append(debug_arrow)
         
         # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
@@ -7610,9 +7660,22 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
                             valid_match_indices = matching_idx_values[matching_idx_values >= 0]
                             if len(valid_match_indices) > 0:
-                                # Use the first valid matching time bin index
-                                matched_t_idx = int(valid_match_indices[0])
-                                if matched_t_idx < len(time_bin_colors):
+                                # Get segment row index from positions_df
+                                segment_row_idx = int(valid_match_indices[0])
+                                # Map segment row index to actual time bin index using epoch's centroids_df
+                                matched_t_idx = None
+                                if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
+                                    curr_epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
+                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None:
+                                        if hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
+                                            search_df = curr_epoch_result.a_centroids_search_segments_df
+                                            if segment_row_idx < len(search_df):
+                                                actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+                                                # Find first time bin with this segment_idx
+                                                matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+                                                if len(matching_t_bins) > 0:
+                                                    matched_t_idx = matching_t_bins[0]  # First time bin in segment
+                                if matched_t_idx is not None and matched_t_idx < len(time_bin_colors):
                                     base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
                                 else:
                                     base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Fallback to cyan
@@ -7625,9 +7688,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         # Calculate opacity based on time distance from epoch end using common normalization
                         if epoch_end_t is not None and 't' in positions_df.columns:
                             t_coords = positions_df['t'].values[valid_mask]
-                            # Store mean time for timeline tick
+                            # Store mean time for timeline tick - ALWAYS use cyan for future timeline ticks
                             mean_time = np.mean(t_coords)
-                            future_trajectory_colors_and_times.append((base_rgb, mean_time))
+                            timeline_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Always cyan for future
+                            future_trajectory_colors_and_times.append((timeline_rgb, mean_time))
                             # Time relative to end: positive values (t > end_t)
                             time_rel = t_coords - epoch_end_t
                             # Absolute distance from end
@@ -7713,6 +7777,32 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         line.order = 1  # Render above background (0) but below contours (10)
                         line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
                         state['future_lines'].append(line)
+                        
+                        # Draw debug arrow at trajectory temporal center if enabled
+                        if state['enable_debug_plot_trajectory_average_angle_arrows'] and 'segment_Vp_deg' in positions_df.columns:
+                            segment_angles = positions_df['segment_Vp_deg'].values
+                            valid_angles = segment_angles[~np.isnan(segment_angles)]
+                            if len(valid_angles) > 0:
+                                # Compute circular mean angle
+                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
+                                mean_angle_rad = np.radians(mean_angle_deg)
+                                
+                                # Find temporal center position
+                                center_idx = len(x_valid) // 2
+                                x_center = x_valid[center_idx]
+                                y_center = y_valid[center_idx]
+                                
+                                # Arrow size based on data scale
+                                data_scale = max(x_max - x_min, y_max - y_min)
+                                arrow_head_size = data_scale * 0.04
+                                arrow_length = arrow_head_size * 0.5
+                                
+                                x_end = x_center + (arrow_length * np.cos(mean_angle_rad))
+                                y_end = y_center + (arrow_length * np.sin(mean_angle_rad))
+                                
+                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=state['future_view'].scene)
+                                debug_arrow.order = 5
+                                state['trajectory_debug_arrows'].append(debug_arrow)
         
         # Render Combined Timeline Bar (full width, shows all trajectory ticks and current epoch)
         timeline_bar_height = 1.0  # Normalized height
