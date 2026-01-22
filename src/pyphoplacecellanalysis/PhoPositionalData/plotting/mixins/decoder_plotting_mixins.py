@@ -2944,7 +2944,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
