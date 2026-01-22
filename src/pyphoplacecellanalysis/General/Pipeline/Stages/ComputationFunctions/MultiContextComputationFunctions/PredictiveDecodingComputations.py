@@ -6550,6 +6550,8 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             end extensions fade from this value to 0.0.
         show_full_position_background: If True, renders the entire position dataframe as a faint (0.2 alpha) grey line behind past/future trajectories (default: False).
         require_angle_match: If True, only display trajectories whose direction aligns with the decoded posterior centroid direction (centroid_pos_traj_matching_angle_idx >= 0). Default: False.
+        color_matches_by_matching_angle: If True, trajectories that have a valid angle match (centroid_pos_traj_matching_angle_idx >= 0) 
+            will be colored using the corresponding time bin's color instead of the default red (past) or cyan (future). Default: True.
         **kwargs: Additional keyword arguments
         
     Returns:
@@ -7603,11 +7605,22 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         x_valid = x_coords[valid_mask]
                         y_valid = y_coords[valid_mask]
                         
-                        # Fixed cyan color for all future trajectories (matches colorbar)
-                        hue = 0.5  # Cyan
-                        saturation = 0.8
-                        value = 0.9
-                        base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        # Determine base color for this trajectory
+                        if state['color_matches_by_matching_angle'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
+                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
+                            if len(valid_match_indices) > 0:
+                                # Use the first valid matching time bin index
+                                matched_t_idx = int(valid_match_indices[0])
+                                if matched_t_idx < len(time_bin_colors):
+                                    base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
+                                else:
+                                    base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Fallback to cyan
+                            else:
+                                base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Default cyan for non-matching
+                        else:
+                            # Fixed cyan color for all future trajectories (matches colorbar)
+                            base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)
                         
                         # Calculate opacity based on time distance from epoch end using common normalization
                         if epoch_end_t is not None and 't' in positions_df.columns:
