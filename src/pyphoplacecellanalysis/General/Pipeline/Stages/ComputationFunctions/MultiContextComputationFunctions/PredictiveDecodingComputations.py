@@ -6507,7 +6507,10 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # ==================================================================================================================================================================================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
-def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, current_traj_seconds_pre_post_extension: float = 0.750, past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = 0.0, start_end_extension_max_opacity: float = 0.2, show_full_position_background: bool = False, **kwargs):
+def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
+    current_traj_seconds_pre_post_extension: float = 0.750, 
+    past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -7602,7 +7605,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         colors[:, 0] = base_rgb[0]  # R
                         colors[:, 1] = base_rgb[1]  # G
                         colors[:, 2] = base_rgb[2]  # B
-                        colors[:, 3] = np.clip(opacity, 0.2, 1.0)  # A (opacity), min 0.2
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)  # A (opacity), allow fade to 0.0 for end extensions
                         
                         line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
                         line.order = 1  # Render above background (0) but below contours (10)
