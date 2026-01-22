@@ -6524,7 +6524,7 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
-    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, **kwargs):
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, color_matches_by_matching_angle: bool=True, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -6733,6 +6733,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'start_end_extension_max_opacity': start_end_extension_max_opacity,
         'show_full_position_background': show_full_position_background,
         'require_angle_match': require_angle_match,
+        'color_matches_by_matching_angle': color_matches_by_matching_angle,
         'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
         'main_window': main_window,
@@ -6869,6 +6870,14 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         # Get posterior data
         p_x_given_n = state['a_flat_matching_results_list_ds'].p_x_given_n_list[new_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
         posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
+        
+        # Generate time bin colors for use in trajectory and centroid coloring
+        n_time_bins = p_x_given_n.shape[2]
+        time_bin_colors = np.zeros((n_time_bins, 4), dtype=np.float32)
+        for t_idx in range(n_time_bins):
+            hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Distribute hues evenly
+            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+            time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.9)  # High opacity
         
         # Calculate extent and scale for rendering (used by posterior and mask overlays)
         x_min, x_max = state['xbin'][0], state['xbin'][-1]
@@ -7034,11 +7043,22 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         x_valid = x_coords[valid_mask]
                         y_valid = y_coords[valid_mask]
                         
-                        # Fixed red color for all past trajectories (matches colorbar)
-                        hue = 0.0  # Red
-                        saturation = 0.8
-                        value = 0.9
-                        base_rgb = colorsys.hsv_to_rgb(hue, saturation, value)
+                        # Determine base color for this trajectory
+                        if state['color_matches_by_matching_angle'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
+                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
+                            if len(valid_match_indices) > 0:
+                                # Use the first valid matching time bin index
+                                matched_t_idx = int(valid_match_indices[0])
+                                if matched_t_idx < len(time_bin_colors):
+                                    base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
+                                else:
+                                    base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Fallback to red
+                            else:
+                                base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Default red for non-matching
+                        else:
+                            # Fixed red color for all past trajectories (matches colorbar)
+                            base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)
                         
                         # Calculate opacity based on time distance from epoch start using common normalization
                         if epoch_start_t is not None and 't' in positions_df.columns:
