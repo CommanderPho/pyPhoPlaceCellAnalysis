@@ -2944,7 +2944,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                    posteriors=None, plot_mode: str='time_gradient', **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -2971,6 +2971,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # _active_plot_fn = cls._helper_add_heatmap
         # _active_plot_fn = cls._helper_add_hdr_contours
         _active_posterior_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
+
+
+        if should_include_trajectory_arrows:
+            arrow_concentration_kwargs = dict(
+                arrow_skip = 50, time_cmap='viridis',
+                mutation_scale_multiplier = 20, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
+            ) | (arrow_concentration_kwargs or {})
+            print(f'arrow_concentration_kwargs: {arrow_concentration_kwargs}')
         
 
         if (self.xbin is not None) and (self.ybin is not None):
@@ -3101,40 +3109,61 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
         def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, active_plot_mode: str ='time_gradient', **plot_traj_kwargs):
-            """ captures: cmap 
+            """ captures: cmap, should_include_trajectory_arrows
             """
 
 
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
-                curr_lap_id = active_page_epochs_ids[a_linear_index]
+                curr_epoch_id = active_page_epochs_ids[a_linear_index]
                 curr_row = row_column_indicies[0][a_linear_index]
                 curr_col = row_column_indicies[1][a_linear_index]
-                curr_lap_time_range = epochs_time_ranges[curr_lap_id]
-                curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_lap_id, curr_lap_time_range[0], curr_lap_time_range[1])
-                curr_lap_num_points = len(epochs_position_traces[curr_lap_id][0,:])
+                curr_lap_time_range = epochs_time_ranges[curr_epoch_id]
+                curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_epoch_id, curr_lap_time_range[0], curr_lap_time_range[1])
+                curr_lap_num_points = len(epochs_position_traces[curr_epoch_id][0,:])
                 valid_plotting_modes: List[str] = ['time_gradient', 'line', 'scatter']
                 # if use_time_gradient_line:
                 if active_plot_mode == 'time_gradient':
                     # Create a continuous norm to map from data points to colors
-                    curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_lap_id][0,:]))
-                    norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
+                    curr_epoch_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_epoch_id][0,:]))
+                    norm = plt.Normalize(curr_epoch_timeseries.min(), curr_epoch_timeseries.max())
                     # needs to be (numlines) x (points per line) x 2 (for x and y)
-                    points = np.array([epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:]]).T.reshape(-1, 1, 2)
+                    points = np.array([epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:]]).T.reshape(-1, 1, 2)
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     lc = LineCollection(segments, cmap=cmap, norm=norm)
                     # Set the values used for colormapping
-                    lc.set_array(curr_lap_timeseries)
+                    lc.set_array(curr_epoch_timeseries)
                     lc.set_linewidth(plot_traj_kwargs.get('linewidth', 2))
                     lc.set_alpha(plot_traj_kwargs.get('alpha', 0.85))
                     a_line = axs[curr_row][curr_col].add_collection(lc)
+                    
+
+                    #TODO 2026-01-22 13:03: - [ ] Why not use this?
+                    # line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
+                    #     t=curr_epoch_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                    #     x=epochs_position_traces[curr_epoch_id][0,:],
+                    #     y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
+                    # )
+
+                    if should_include_trajectory_arrows:
+                        ## try to add some arrow markers, might be very bad performance
+                        _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_concentrated_arrows_to_line(ax=axs[curr_row][curr_col], 
+                            t=curr_epoch_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                            x=epochs_position_traces[curr_epoch_id][0,:],
+                            y=epochs_position_traces[curr_epoch_id][1,:], 
+                            speed=None,
+                            **arrow_concentration_kwargs
+                        )
+                    
+
+
                     # add_arrow(line)
                 elif active_plot_mode == 'line':
                     if 'c' not in plot_traj_kwargs:
                         plot_traj_kwargs['c'] = 'k'
                     if 'alpha' not in plot_traj_kwargs:
                         plot_traj_kwargs['alpha'] = 0.85
-                    a_line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], **plot_traj_kwargs)
+                    a_line = axs[curr_row][curr_col].plot(epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:], **plot_traj_kwargs)
                     # curr_lap_endpoint = curr_lap_position_traces[curr_lap_id][:,-1].T
                     a_start_arrow = _plot_helper_add_arrow(a_line[0], position=0, position_mode='index', direction='right', size=20, color='green') # start
                     a_middle_arrow = _plot_helper_add_arrow(a_line[0], position=None, position_mode='index', direction='right', size=20, color='yellow') # middle
@@ -3147,7 +3176,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                         plot_traj_kwargs['c'] = 'k'
                     if 'alpha' not in plot_traj_kwargs:
                         plot_traj_kwargs['alpha'] = 0.85
-                    a_scatter = axs[curr_row][curr_col].scatter(epochs_position_traces[curr_lap_id][0,:], epochs_position_traces[curr_lap_id][1,:], **plot_traj_kwargs)
+                    a_scatter = axs[curr_row][curr_col].scatter(epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:], **plot_traj_kwargs)
 
                 else:
                     raise NotImplementedError(f'unexpected plotting mode: plot_mode: "{active_plot_mode}", valid options: {valid_plotting_modes}')                    

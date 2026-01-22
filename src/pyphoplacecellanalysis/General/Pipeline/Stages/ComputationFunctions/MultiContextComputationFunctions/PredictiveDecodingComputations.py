@@ -5596,6 +5596,7 @@ class PredictiveDecodingDisplayWidget:
                                                                                         active_page_index=active_page_idx, fixed_columns=4, plot_actual_lap_lines=True, use_theoretical_tracks_instead=False, existing_ax=existing_ax,
                                                                                         plot_mode='scatter', c='red', cmap='Reds', alpha=0.55, s=5, posteriors=overlay_posterior, posterior_alpha=0.65, posterior_cmap='Greens', posterior_masking_value=1e-12,
                                                                                         posterior_should_perform_reshape=False, # rotate_to_vertical
+                                                                                        should_include_trajectory_arrows=True,
                                                                                     )
         
         ## Store epochs_pages for this widget
@@ -6534,7 +6535,9 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
-    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, color_matches_by_matching_angle: bool=True, enable_debug_plot_trajectory_average_angle_arrows: bool=True, **kwargs):
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, 
+    require_angle_match: bool = False, color_matches_by_matching_angle: bool=False, enable_debug_plot_trajectory_average_angle_arrows: bool=False,
+    **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
