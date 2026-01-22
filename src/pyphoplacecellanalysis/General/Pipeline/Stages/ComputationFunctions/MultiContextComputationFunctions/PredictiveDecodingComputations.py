@@ -1641,6 +1641,12 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)        
         a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_past_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs) ## dataframe is already filtered to past/future positions before being passed
 
+        # Save is_future_present_past value before merge operations (which lose extra columns)
+        # All epochs in this call should have the same value since they come from the same past/future category
+        saved_is_future_present_past = None
+        if 'is_future_present_past' in a_matching_pos_epochs_df.columns and len(a_matching_pos_epochs_df) > 0:
+            saved_is_future_present_past = a_matching_pos_epochs_df['is_future_present_past'].iloc[0]
+
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
         if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec) ## Loses other columns!
@@ -1651,6 +1657,10 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         if (len(a_matching_pos_epochs_df) > 0):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
         
+        # Restore is_future_present_past column after merge operations
+        if saved_is_future_present_past is not None and len(a_matching_pos_epochs_df) > 0:
+            a_matching_pos_epochs_df['is_future_present_past'] = saved_is_future_present_past
+
         ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
         return a_matching_pos_epochs_df
 
@@ -1685,7 +1695,11 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         df['sequence_id'] = (df['t'].diff() > dt_max).cumsum()
 
         # Build epochs by aggregating each sequence - use first/last 't' values
-        new_pos_epochs: pd.DataFrame = df.groupby('sequence_id').agg(start=('t', 'first'), stop=('t', 'last'), t_count=('t', 'count'), start_pos_idx=('t', 'idxmin'), stop_pos_idx=('t', 'idxmax')).reset_index()
+        # Include is_future_present_past if it exists in the dataframe
+        agg_dict = {'start': ('t', 'first'), 'stop': ('t', 'last'), 't_count': ('t', 'count'), 'start_pos_idx': ('t', 'idxmin'), 'stop_pos_idx': ('t', 'idxmax')}
+        if 'is_future_present_past' in df.columns:
+            agg_dict['is_future_present_past'] = ('is_future_present_past', 'first')
+        new_pos_epochs: pd.DataFrame = df.groupby('sequence_id').agg(**agg_dict).reset_index()
         # Extend stop by bin_size (last 't' is start of last bin, not end)
         new_pos_epochs['stop'] = new_pos_epochs['stop'] + pos_t_bin_sample_size_sec - EPSILON_GAP_SIZE_SEC
         new_pos_epochs['duration'] = new_pos_epochs['stop'] - new_pos_epochs['start']
@@ -6510,7 +6524,7 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
-    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, **kwargs):
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, require_angle_match: bool = False, **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
@@ -6535,6 +6549,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         start_end_extension_max_opacity: Maximum opacity for trajectory extensions (default: 0.2). Start extensions use this as solid opacity,
             end extensions fade from this value to 0.0.
         show_full_position_background: If True, renders the entire position dataframe as a faint (0.2 alpha) grey line behind past/future trajectories (default: False).
+        require_angle_match: If True, only display trajectories whose direction aligns with the decoded posterior centroid direction (centroid_pos_traj_matching_angle_idx >= 0). Default: False.
         **kwargs: Additional keyword arguments
         
     Returns:
@@ -6717,6 +6732,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'past_future_trajectory_end_extension_seconds': end_extension_seconds,
         'start_end_extension_max_opacity': start_end_extension_max_opacity,
         'show_full_position_background': show_full_position_background,
+        'require_angle_match': require_angle_match,
         'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
         'main_window': main_window,
@@ -7006,6 +7022,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             past_positions_dict = curr_matching_past_future_positions_df_dict['past']
             past_trajectory_items = list(past_positions_dict.items())
             for idx, (epoch_id, positions_df) in enumerate(past_trajectory_items):
+                # Filter by angle match if required
+                if state['require_angle_match'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                    if not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
+                        continue  # Skip this trajectory - no angle match
                 if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
                     x_coords = positions_df['x'].values
                     y_coords = positions_df['y'].values
@@ -7147,6 +7167,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                         y_centroids = y_min + y_pixel * y_scale
                         
                         segment_indices = centroids_df['segment_idx'].values[valid_mask]
+                        print(f'segment_indices: {segment_indices}')
                         
                         # Get unique segment indices for color mapping (exclude NaN) - used for arrows only
                         unique_segments = np.unique(segment_indices[~np.isnan(segment_indices)])
@@ -7161,7 +7182,11 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
                                 segment_colors[seg_idx] = (rgb[0], rgb[1], rgb[2], 1.0)  # Full opacity
                         
+                        print(f'segment_colors: {segment_colors}')
                         # Use white for all centroids (ignore segment_idx-based colors)
+
+
+                        #TODO 2026-01-22 10:55: - [ ] this is what overrides with white
                         # Common color for centroids and arrows
                         centroid_base_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.8 opacity for dots
                         centroid_arrow_color = (1.0, 1.0, 1.0, 0.8)  # White with 0.4 opacity for arrows (slightly more transparent)
@@ -7509,6 +7534,10 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             future_positions_dict = curr_matching_past_future_positions_df_dict['future']
             future_trajectory_items = list(future_positions_dict.items())
             for idx, (epoch_id, positions_df) in enumerate(future_trajectory_items):
+                # Filter by angle match if required
+                if state['require_angle_match'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                    if not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
+                        continue  # Skip this trajectory - no angle match
                 if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
                     x_coords = positions_df['x'].values
                     y_coords = positions_df['y'].values
