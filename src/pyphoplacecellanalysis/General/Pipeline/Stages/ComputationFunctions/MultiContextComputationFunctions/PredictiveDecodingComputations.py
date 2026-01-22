@@ -1709,10 +1709,12 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         a_curr_matching_positions_df = df.copy()
         a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=new_pos_epochs, epoch_id_key_name=col_name, override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True, drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
 
-        ## Segment trajectories
-        a_curr_matching_positions_df = a_curr_matching_positions_df.position.adding_segmented_trajectories_columns(disable_segmentation=disable_segmentation)
-
+        # Partition first, then segment each epoch separately so each trajectory gets its own segment_Vp_deg
         curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+        
+        ## Segment trajectories per-epoch (so each trajectory gets its own representative direction angle)
+        for epoch_idx, epoch_pos_df in curr_matching_positions_df_dict.items():
+            curr_matching_positions_df_dict[epoch_idx] = epoch_pos_df.position.adding_segmented_trajectories_columns(disable_segmentation=disable_segmentation)
 
         return new_pos_epochs, curr_matching_positions_df_dict
 
