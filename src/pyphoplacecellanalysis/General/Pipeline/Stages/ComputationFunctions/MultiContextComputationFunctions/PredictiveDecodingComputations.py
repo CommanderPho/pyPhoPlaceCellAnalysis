@@ -1394,7 +1394,6 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     epoch_id_key_name: str = serialized_attribute_field(default='matching_found_relevant_pos_epoch', is_computable=False, repr=False, metadata={'field_added':"2026.01.14_0"})
 
-
     # OLD/COMPATIBILITY FIELDS ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     relevant_positions_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `relevant_positions_df`: the df of all potentially relevant positions, with a 'matching_found_relevant_pos_epoch' column corresponding to the the found *epochs* (not some aren't in an epoch and have a value of -1 for this column)
     matching_pos_epochs_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `matching_pos_epochs_df`: the df of found *epochs* corresponding to the position sequences in `relevant_positions_df`
@@ -1419,7 +1418,11 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     should_defer_extended_computations: bool = serialized_attribute_field(default=True, metadata={'field_added':"2026.01.15_0"})
 
     epoch_t_idx_col_name: str = non_serialized_field(default='epoch_t_idx', metadata={'field_added':"2026.01.23_0"})
-
+    merged_found_pos_epoch_id_key_name: str = non_serialized_field(default='matching_found_relevant_merged_pos_epoch', metadata={'field_added':"2026.01.23_0"})
+    
+    max_allowed_trajectory_gap_seconds: float = serialized_attribute_field(default=2.5, metadata={'field_added':"2026.01.23_0"})
+    merged_segment_epochs: Optional[pd.DataFrame] = serialized_field(default=None, repr=False, metadata={'field_added':"2026.01.23_0", 'desc':'computed by self._recompute_all_pos_dfs using self.max_allowed_trajectory_gap_seconds'})
+    
 
     @property
     def matching_past_position_df_list(self) -> List[pd.DataFrame]:
@@ -1527,6 +1530,21 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         ## re-index:
         self.relevant_positions_df = self._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=self.matching_pos_epochs_df, relevant_positions_df=self.relevant_positions_df, drop_non_epoch_events=False, epoch_id_key_name=self.epoch_id_key_name) ## drop those that aren't in the epochs
 
+        #TODO 2026-01-23 12:32: - [ ] Recompute the complete path
+        ## I think the compute order is correct, but can't be sure
+        
+        ## OUTPUTS: matching_relevant_positions_df
+        merged_segment_epochs, relevant_merged_positions_df, matching_pos_epochs_df = self.compute_compilete_paths(max_allowed_trajectory_gap_seconds=self.max_allowed_trajectory_gap_seconds, merged_found_pos_epoch_id_key_name=self.merged_found_pos_epoch_id_key_name)
+        ## the above method is pure, so update the self properties --- I think this is "a-ok" because it just adds some badass indicies... but maybe something tragic is lost and NO ONE WILL KNOW:
+        self.merged_segment_epochs = merged_segment_epochs        
+
+        Assert.same_length(self.matching_pos_epochs_df, matching_pos_epochs_df)
+        self.matching_pos_epochs_df = matching_pos_epochs_df ## no this one isn't right at least :[ It will be missing the main epoch info and will have fewer of em because they are merged. Need to add this info to the existing epochs_df or something
+
+        ## this one is fine on the other hand, maybe check to make sure the DANG SIZE DOESN'T CHANGE
+        Assert.same_length(self.relevant_positions_df, relevant_merged_positions_df)
+        self.relevant_positions_df = relevant_merged_positions_df
+        
         if self.relevant_past_times is not None:
             # self.matching_past_positions_df = self.relevant_positions_df.epochs.matching_epoch_times_slice(epoch_times=self.relevant_past_times).copy() # , t_column_names=['t']) ## AttributeError: Must have 'start' column.
             # self.matching_past_positions_df = self.relevant_positions_df[np.isin(self.relevant_positions_df['t'], self.relevant_past_times)]
@@ -1675,7 +1693,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
 
     @classmethod
-    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.075, minimum_epoch_duration: float = 0.050, disable_segmentation=True, **kwargs) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
+    def compute_matching_pos_epochs_df(cls, measured_positions_df: pd.DataFrame, merging_adjacent_max_separation_sec: float = 0.075, minimum_epoch_duration: float = 0.050, disable_segmentation=True, column_merge_dict: Optional[Dict]=None, **kwargs) -> Tuple[pd.DataFrame, Dict[types.epoch_index, pd.DataFrame]]:
         """
         Compute matching position epochs DataFrame from position matches and time filters.
         
@@ -1690,7 +1708,10 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls.compute_matching_pos_epochs_df(measured_positions_df, disable_segmentation=disable_segmentation, **kwargs)
             
         """
-        column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} 
+        if column_merge_dict is None:
+            column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} ## idk, normally we just probagated is_future_present_past
+            
+
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         # measured_positions_df_copy = measured_positions_df.copy()
         # assert 'is_included' in measured_positions_df_copy
@@ -1871,7 +1892,10 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
         
         """
-        column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'require_same'}  ## different than before, now we want to find all unique items in 'epoch_t_idx' as this gives which time bins it satisfies after merging
+        # pre_merge_column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} #TODO 2026-01-23 14:00: - [ ] Worked for most epochs, but I guess fails when there is overlap
+        pre_merge_column_merge_dict = {'epoch_t_idx': 'first', 'is_future_present_past': 'require_same'} #TODO 2026-01-23 14:00: - [ ] Worked for most epochs, but I guess fails when there is overlap
+        
+        post_merge_column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'require_same'}  ## different than before, now we want to find all unique items in 'epoch_t_idx' as this gives which time bins it satisfies after merging
         # column_to_split: str = 'label'
         column_to_split: str = 'epoch_t_idx'
         
@@ -1883,10 +1907,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         ## INPUTS: matching_relevant_positions_df
         
         ## gotta update `matching_pos_epochs_df`
-        matching_pos_epochs_df, _ = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(matching_relevant_positions_df, disable_segmentation=True) # curr_matching_positions_df_dict: types.epoch_index
+        matching_pos_epochs_df, _ = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(matching_relevant_positions_df, disable_segmentation=True, column_merge_dict=pre_merge_column_merge_dict) # curr_matching_positions_df_dict: types.epoch_index
         matching_pos_epochs_df = matching_pos_epochs_df.sort_values(['start']).reset_index(drop=True)
         
-
         ## INPUTS: max_allowed_trajectory_gap_seconds
         
         # inter_segment_epoch_df: pd.DataFrame = matching_pos_epochs_df.epochs.get_in_between()
@@ -1894,17 +1917,33 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # can_be_merged_segments = inter_segment_epoch_df[inter_segment_epoch_df['duration'] < max_allowed_trajectory_gap_seconds]
         # can_be_merged_segments
 
-        merged_segment_epochs: pd.DataFrame = deepcopy(matching_pos_epochs_df).epochs.merge_adjacent_epochs_within(max_merge_duration=max_allowed_trajectory_gap_seconds, **column_merge_dict)
+        merged_segment_epochs: pd.DataFrame = deepcopy(matching_pos_epochs_df).epochs.merge_adjacent_epochs_within(max_merge_duration=max_allowed_trajectory_gap_seconds, **post_merge_column_merge_dict)
         split_epoch_labels: List[List[int]] = merged_segment_epochs[column_to_split].astype(str).map(lambda x: [int(v) for v in x.split('+')]).to_list()
+        
         # split_epoch_labels
         merged_segment_epochs['num_epoch_t_bins'] = np.array([len(v) for v in split_epoch_labels]) ## the number of merged segments in each thingy
         merged_segment_epochs['is_reversely_replayed'] = [(v[0] > v[-1]) for v in split_epoch_labels] # this column doesn't mean anything for num_epoch_t_bins == 1
 
         ## Now build the complete new paths for the NEW merged epochs to get the full position path
-        merged_segment_epochs['pre_merged_epoch_label'] = deepcopy(merged_segment_epochs['label'])
+        merged_segment_epochs['pre_merged_epoch_label'] = deepcopy(merged_segment_epochs['label']) ## want the inverse of this for `merged_segment_epochs`
         merged_segment_epochs['label'] = merged_segment_epochs.index.astype(int) ## reset the label so it's a valid int-like type for the new path instead of something merged, like "1+2+3"
 
-        ## gotta update `matching_pos_epochs_df`
+        # # #TODO 2026-01-23 13:16: - [ ] gotta update `matching_pos_epochs_df` with new merged epoch indicies (to decide whether they are included or not) __________________________________________________________________________________________________________________________________________________________________ #
+        # # Assert.same_length(split_epoch_labels, merged_segment_epochs)
+        # matching_pos_epoch_labels_to_split_epoch_labels = {a_label: [] for a_label in merged_segment_epochs['label'].to_numpy().astype(int)} ## make a list for each epoch
+        
+        # for idx, a_row in enumerate(merged_segment_epochs.itertuples(index=True)):
+        #     an_original_labels = split_epoch_labels[idx]
+        #     for an_original_label in an_original_labels:
+        #         matching_pos_epoch_labels_to_split_epoch_labels[an_original_label].append(int(a_row.label)) ## the fresh label
+
+        # matching_pos_epoch_labels_to_split_epoch_labels = {k:list(set(v)) for k, v in matching_pos_epoch_labels_to_split_epoch_labels.items()} # de-duplicate each list 
+
+        # assert np.all([len(v) < 2 for v in matching_pos_epoch_labels_to_split_epoch_labels.values()]) #BUG 2026-01-23 13:11: - [ ] Something is seriously wrong here :[ The lengths are actually like [85, 86, 12, 14, 0, 0, 0, ..., 0, 0] and idk why
+
+        # matching_pos_epochs_df[merged_found_pos_epoch_id_key_name] = -1 ## None, initialize the column:
+        # matching_pos_epochs_df[merged_found_pos_epoch_id_key_name] = matching_pos_epochs_df['label'].map(lambda x: matching_pos_epoch_labels_to_split_epoch_labels.get(int(x), -1)[0] ) # `[0]` unpack the merge list
+
         # matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult.compute_matching_pos_epochs_df(matching_relevant_positions_df, disable_segmentation=True) # curr_matching_positions_df_dict: types.epoch_index
         # matching_pos_epochs_df
 
@@ -1912,7 +1951,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         relevant_merged_positions_df = MatchingPastFuturePositionsResult._recompute_relevant_pos_epoch_position_df_index_column(a_matching_pos_epochs_df=merged_segment_epochs, relevant_positions_df=deepcopy(relevant_positions_df),
                                                                                                                                 drop_non_epoch_events=False, epoch_id_key_name=merged_found_pos_epoch_id_key_name) ## don't drop yet so we have all the events for the object creation
 
-        return merged_segment_epochs, relevant_merged_positions_df
+
+
+        return merged_segment_epochs, relevant_merged_positions_df, matching_pos_epochs_df # matching_pos_epochs_df: has [merged_found_pos_epoch_id_key_name] column added to back-identify the merged epoch label from the original epochs
 
 
     # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -4866,6 +4907,7 @@ class MaskDataSource:
     ybin_centers: NDArray = field(default=None)
 
     curr_position_df: pd.DataFrame = field(default=None)
+    matching_pos_merged_segment_epochs_dfs_list: List[Optional[pd.DataFrame]] = field(default=None)
 
 
     @classmethod
@@ -4875,6 +4917,7 @@ class MaskDataSource:
                      matching_pos_epochs_dfs_list=[v.matching_pos_epochs_df for v in epoch_flat_mask_future_past_result],
                epoch_high_prob_pos_masks=[v.epoch_high_prob_mask for v in epoch_flat_mask_future_past_result], epoch_t_bins_high_prob_pos_masks=[v.epoch_t_bins_high_prob_pos_mask for v in epoch_flat_mask_future_past_result],
                filter_epochs=filter_epochs, p_x_given_n_list=[a_single_epoch_result.decoded_epoch_result.p_x_given_n for a_single_epoch_result in epoch_flat_mask_future_past_result],
+               matching_pos_merged_segment_epochs_dfs_list=[v.merged_segment_epochs for v in epoch_flat_mask_future_past_result],
                **kwargs,
         )
         
@@ -4883,7 +4926,7 @@ class MaskDataSource:
 
 
     @function_attributes(short_name=None, tags=['get-data', 'by-epoch', ''], input_requires=[], output_provides=[], uses=[], used_by=['multi_trajectory_color_plotter'], creation_date='2026-01-21 05:10', related_items=[])
-    def _prepare_epoch_data(self, an_epoch_idx: int) -> Dict[str, Any]:
+    def _prepare_epoch_data(self, an_epoch_idx: int, minimum_included_matching_sequence_length: Optional[int]=None) -> Dict[str, Any]:
         """ Used by `multi_trajectory_color_plotter` to get the data for a given epoch, currently used manually only
         
             epoch_data = _prepare_epoch_data(a_ds=a_flat_matching_results_list_ds, an_epoch_idx=5)
@@ -4899,25 +4942,53 @@ class MaskDataSource:
         curr_matching_epochs_df: pd.DataFrame = self.matching_pos_epochs_dfs_list[an_epoch_idx]
         curr_matching_positions_df: pd.DataFrame = self.matching_pos_dfs_list[an_epoch_idx]
         curr_matching_epochs_df_dict: Dict[types.PastFutureCategory, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
+        curr_matching_merged_segment_epochs_df_dict: Optional[Dict[types.PastFutureCategory, pd.DataFrame]] = None
+
+        should_filter_to_minimum: bool = (minimum_included_matching_sequence_length is not None) and (minimum_included_matching_sequence_length > 0) and (self.matching_pos_merged_segment_epochs_dfs_list is not None)
+        
+        if should_filter_to_minimum:
+            curr_merged_segment_epochs: pd.DataFrame = self.matching_pos_merged_segment_epochs_dfs_list[an_epoch_idx]
+            ## filter the sequences shorter than `minimum_included_matching_sequence_length`
+            ## UPDATES: curr_matching_positions_df, 
+            # minimum_included_matching_sequence_length
+            assert curr_merged_segment_epochs is not None
+            long_merged_segment_epochs: pd.DataFrame = curr_merged_segment_epochs[(curr_merged_segment_epochs['num_epoch_t_bins'] > minimum_included_matching_sequence_length)]
+            assert 'matching_found_relevant_merged_pos_epoch' in curr_matching_positions_df, f"curr_matching_positions_df.columns: {list(curr_matching_positions_df.columns)}"
+            curr_epoch_is_included_in_merged = np.isin(curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], long_merged_segment_epochs['label'])
+            curr_matching_positions_df['is_included_in_merged'] = curr_epoch_is_included_in_merged
+            long_only_relevant_merged_positions_df: pd.DataFrame = curr_matching_positions_df[curr_epoch_is_included_in_merged]
+            curr_matching_positions_df = long_only_relevant_merged_positions_df
+            curr_matching_merged_segment_epochs_df_dict = long_merged_segment_epochs.pho.partition_df_dict('is_future_present_past')
+
 
         curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {}
 
         for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
             a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
             an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
+            if should_filter_to_minimum:
+                a_curr_epoch_is_included_in_merged = np.isin(a_curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], long_merged_segment_epochs['label'])
+                a_curr_matching_positions_df['is_included_in_merged'] = a_curr_epoch_is_included_in_merged
+                ## DROP non-included
+                a_curr_matching_positions_df = a_curr_matching_positions_df[a_curr_matching_positions_df['is_included_in_merged']] ## reset indicies here or anything?
+
             a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
                                                                                                                         override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
                                                                                                                         drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+            
+
             curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
             curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
 
-        ## END for ...            
+        ## END for ...
+        
         curr_matching_past_future_positions_df_list: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {k:list(v.values()) for k, v in curr_matching_past_future_positions_df_dict.items()}
         ## OUTPUTS: curr_matching_past_future_positions_df_dict
         return {
             'curr_matching_epochs_df': curr_matching_epochs_df,
             'curr_matching_positions_df': curr_matching_positions_df,
             'curr_matching_epochs_df_dict': curr_matching_epochs_df_dict,
+            'curr_matching_merged_segment_epochs_df_dict': curr_matching_merged_segment_epochs_df_dict, 
             'curr_matching_past_future_positions_df_dict': curr_matching_past_future_positions_df_dict,
             'curr_matching_past_future_positions_df_list': curr_matching_past_future_positions_df_list,
         }
@@ -5519,7 +5590,6 @@ class PredictiveDecodingDisplayWidget:
         matching_pos_dfs_list = self.result_datasource.matching_pos_dfs_list
         matching_pos_epochs_dfs_list = self.result_datasource.matching_pos_epochs_dfs_list
         
-        
         curr_matching_epochs_df: pd.DataFrame = matching_pos_epochs_dfs_list[an_epoch_idx]
         curr_matching_positions_df: pd.DataFrame = matching_pos_dfs_list[an_epoch_idx]
         curr_matching_epochs_df_dict: Dict[types.PastFutureCategory, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
@@ -5534,6 +5604,18 @@ class PredictiveDecodingDisplayWidget:
             curr_matching_positions_df_dict: Dict[int, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
             curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
         
+
+        # if (minimum_included_matching_sequence_length is not None) and (minimum_included_matching_sequence_length > 0):
+        #     ## filter the sequences shorter than `minimum_included_matching_sequence_length`
+        #     # minimum_included_matching_sequence_length
+        #     raise NotImplementedError(f'#TODO 2026-01-23 13:06: - [ ] Finish')
+        #     assert _test_epoch_result.merged_segment_epochs is not None
+        #     merged_segment_epochs = _test_epoch_result.merged_segment_epochs
+        #     long_merged_segment_epochs: pd.DataFrame = merged_segment_epochs[(merged_segment_epochs['num_epoch_t_bins'] > min_num_spanning_bins)]
+        #     long_only_relevant_merged_positions_df: pd.DataFrame = relevant_merged_positions_df[np.isin(relevant_merged_positions_df[merged_found_pos_epoch_id_key_name], long_merged_segment_epochs['label'])]
+        #     long_only_relevant_merged_positions_df
+            
+
         return {
             'curr_matching_epochs_df': curr_matching_epochs_df,
             'curr_matching_positions_df': curr_matching_positions_df,
@@ -6666,6 +6748,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
     start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, 
     require_angle_match: bool = False, color_matches_by_matching_angle: bool=False, enable_debug_plot_trajectory_average_angle_arrows: bool=False,
+    minimum_included_matching_sequence_length: Optional[int] = None,
     **kwargs):
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
@@ -6881,6 +6964,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         'require_angle_match': require_angle_match,
         'color_matches_by_matching_angle': color_matches_by_matching_angle,
         'enable_debug_plot_trajectory_average_angle_arrows': enable_debug_plot_trajectory_average_angle_arrows,
+        'minimum_included_matching_sequence_length': minimum_included_matching_sequence_length,
         'trajectory_debug_arrows': [],  # List of Arrow visuals for debug trajectory direction
         'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
         'canvas': canvas,
@@ -7009,8 +7093,9 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
             state['timeline_epoch_triangle'] = None
         
         # Prepare epoch data
-        epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx)
+        epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length) ## get the datasource and the prepare the result
         
+
         # Get epoch start and end times
         filter_epochs = state['a_flat_matching_results_list_ds'].filter_epochs
         if new_epoch_idx < len(filter_epochs):
@@ -7059,6 +7144,21 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         # First pass: collect all time distances to find maximum for common normalization
         all_time_distances = []
         curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+
+        curr_matching_past_future_positions_df_dict = {k:v for k, v in curr_matching_past_future_positions_df_dict.items()}
+        
+        # epoch_data['merged_segment_epochs'] = 
+
+        # if (minimum_included_matching_sequence_length is not None) and (minimum_included_matching_sequence_length > 0):
+        #     ## filter the sequences shorter than `minimum_included_matching_sequence_length`
+        #     # minimum_included_matching_sequence_length
+        #     raise NotImplementedError(f'#TODO 2026-01-23 13:06: - [ ] Finish')
+        #     assert _test_epoch_result.merged_segment_epochs is not None
+        #     merged_segment_epochs = _test_epoch_result.merged_segment_epochs
+        #     long_merged_segment_epochs: pd.DataFrame = merged_segment_epochs[(merged_segment_epochs['num_epoch_t_bins'] > min_num_spanning_bins)]
+        #     long_only_relevant_merged_positions_df: pd.DataFrame = relevant_merged_positions_df[np.isin(relevant_merged_positions_df[merged_found_pos_epoch_id_key_name], long_merged_segment_epochs['label'])]
+        #     long_only_relevant_merged_positions_df
+        #     # OUTPUTS: long_merged_segment_epochs, long_only_relevant_merged_positions_df
         
         # Collect past time distances
         if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
@@ -7178,6 +7278,11 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                     future_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['future_view'].scene)
                     future_bg_line.order = 0
                     state['full_position_background_line'] = [past_bg_line, posterior_bg_line, future_bg_line]
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # LEFT PANE: PAST                                                                                                                                                                                                                                                                      #
+        # ==================================================================================================================================================================================================================================================================================== #
 
         # Render Past Trajectories and collect data for timeline
         past_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
@@ -7345,6 +7450,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=state['past_view'].scene)
                                 debug_arrow.order = 5
                                 state['trajectory_debug_arrows'].append(debug_arrow)
+        
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # CENTER PANE: CURRENT PBE                                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
         
         # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
@@ -7778,7 +7889,12 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                 time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['time_bin_views'][t_idx].scene)
                                 time_bin_contour.order = 10
                                 state['posterior_mask_contours'].append(time_bin_contour)
-        
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # RIGHT PANE: FUTURE                                                                                                                                                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
         # Render Future Trajectories and collect data for timeline
         future_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
         if 'future' in curr_matching_past_future_positions_df_dict:
