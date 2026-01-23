@@ -1733,22 +1733,6 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         # a_matching_pos_epochs_df: pd.DataFrame = measured_positions_df_copy.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (measured_positions_df_copy['is_included'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, minimum_epoch_duration=minimum_epoch_duration)        
         a_matching_pos_epochs_df, curr_matching_positions_df_dict = cls._custom_build_sequential_position_epochs(matching_positions_df=measured_positions_df, disable_segmentation=disable_segmentation, **kwargs) ## dataframe is already filtered to past/future positions before being passed
 
-        # # Save is_future_present_past value before merge operations (which lose extra columns)
-        # backup_restore_column_list = ['is_future_present_past'] # , "epoch_t_idx"
-        # backup_restore_column_dict = {k: None for k in backup_restore_column_list if (k in a_matching_pos_epochs_df.columns) and (len(a_matching_pos_epochs_df) > 0)}
-
-        # # All epochs in this call should have the same value since they come from the same past/future category
-        # if (len(a_matching_pos_epochs_df) > 0):
-        #     # for k, v in backup_restore_column_dict.items():
-        #     for k in list(backup_restore_column_dict.keys()):
-        #         if k in a_matching_pos_epochs_df.columns:
-        #             backup_restore_column_dict[k] = a_matching_pos_epochs_df[k].iloc[0]
-
-        # # All epochs in this call should have the same value since they come from the same past/future category
-        # saved_is_future_present_past = None
-        # if 'is_future_present_past' in a_matching_pos_epochs_df.columns and len(a_matching_pos_epochs_df) > 0:
-        #     saved_is_future_present_past = a_matching_pos_epochs_df['is_future_present_past'].iloc[0]
-
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
         if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
             if "epoch_t_idx" in a_matching_pos_epochs_df.columns:
@@ -1772,18 +1756,9 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
         
         # Restore is_future_present_past column after merge operations
-        # if saved_is_future_present_past is not None and len(a_matching_pos_epochs_df) > 0:
-        #     a_matching_pos_epochs_df['is_future_present_past'] = saved_is_future_present_past
-
-
-        # # All epochs in this call should have the same value since they come from the same past/future category
-        # if (len(a_matching_pos_epochs_df) > 0):
-        #     for k, v in backup_restore_column_dict.items():
-        #         if (v is not None):
-        #             a_matching_pos_epochs_df[k] = v
-
 
         ## #TODO 2026-01-14 18:09: - [ ] Add the relevant epoch idx to the `measured_positions_df`
+        
         return a_matching_pos_epochs_df, curr_matching_positions_df_dict
 
 
