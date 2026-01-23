@@ -78,6 +78,13 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 
 
+# #TODO 2026-01-22 13:44: - [ ] Comparing Directed to Scatttered
+
+Decoded Occupancy of only good events / compared to observed occupancy -- similar to the checks I did on the 1D track
+
+Do the directed PBEs need to follow the 
+
+During mid sleep, PBEs would be biased toward the more interesting 2D maze instead of htte environment measured.
 
 
 """
@@ -1323,6 +1330,28 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import Posterior
 class MatchingPastFuturePositionsResult(ComputedResult):
     """Result container for matching past/future positions in a single decoded epoch (with potentially several time bins).
     
+    
+    
+    Updates the following columns in `self.relevant_positions_df`:
+
+        - 'segment_idx': Segment index (initialized to -1 if not in epoch)
+        - 'Vp': Persistence velocity (direction of movement)
+        - 'segment_Vp_deg': Segment velocity direction in degrees
+        - 'segment_dir_angle_binned': Binned direction angle for segment
+        - 'segment_Vp_scatteredness': Velocity scatteredness measure for segment
+
+
+        
+        - 'segment_Vp_deg': Mean direction angle in degrees for each segment
+        - 'segment_Vp_scatteredness': Scatteredness measure (R) for each segment (1 = aligned, 0 = scattered)
+        - 'segment_dir_angle_binned': Binned direction angle
+        
+        - 'segment_idx': Segment index (created as all zeros if missing)
+        - 'centroid_pos_traj_matching_angle_idx': Index of matching centroid segment (initialized to -1 if no match)
+        
+        
+    
+    
     Attributes:
         epoch_high_prob_mask: 2D boolean mask (N_XBINS, N_Y_BINS) indicating high probability positions during the epoch
         pos_matches_epoch_mask: Indices of positions that match the epoch mask
@@ -1365,9 +1394,14 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
     epoch_id_key_name: str = serialized_attribute_field(default='matching_found_relevant_pos_epoch', is_computable=False, repr=False, metadata={'field_added':"2026.01.14_0"})
 
+
     # OLD/COMPATIBILITY FIELDS ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    pos_matches_epoch_mask: NDArray = serialized_field(repr=False)
     relevant_positions_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `relevant_positions_df`: the df of all potentially relevant positions, with a 'matching_found_relevant_pos_epoch' column corresponding to the the found *epochs* (not some aren't in an epoch and have a value of -1 for this column)
+    matching_pos_epochs_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `matching_pos_epochs_df`: the df of found *epochs* corresponding to the position sequences in `relevant_positions_df`
+
+
+    # Basically IRRELEVANT FIELDS ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    pos_matches_epoch_mask: NDArray = serialized_field(repr=False)
     
     is_relevant_past_times: NDArray = serialized_field(repr=False)
     is_relevant_future_times: NDArray = serialized_field(repr=False)
@@ -1375,7 +1409,7 @@ class MatchingPastFuturePositionsResult(ComputedResult):
     n_total_possible_future_times: int = serialized_field()
     n_relevant_past_times: int = serialized_field()
     n_relevant_future_times: int = serialized_field()
-    matching_pos_epochs_df: pd.DataFrame = serialized_field(repr=False) ## !IMPORTANT: `matching_pos_epochs_df`: the df of found *epochs* corresponding to the position sequences in `relevant_positions_df`
+
 
     # Computed fields ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     matching_past_positions_df: pd.DataFrame = serialized_field(default=None, is_computable=True, repr=False)
@@ -7118,13 +7152,13 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                             else:
                                 opacity = np.ones(len(x_valid)) * 0.8
                             
-                            # Check for trajectory extensions (separate start and end)
+                            ### Check for trajectory extensions (separate start and end) ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                             start_ext_seconds = state['past_future_trajectory_start_extension_seconds']
                             end_ext_seconds = state['past_future_trajectory_end_extension_seconds']
                             traj_t_min = np.min(t_coords)
                             traj_t_max = np.max(t_coords)
                             
-                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity
+                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity _________________________________________________________________________________________________________________________________________________________________________________________________ #
                             if start_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
                                 ext_start_t = traj_t_min - start_ext_seconds
                                 ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
@@ -7147,7 +7181,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
                                         ext_opacity = np.ones(n_ext_points) * state['start_end_extension_max_opacity']
                                         opacity = np.concatenate([ext_opacity, opacity])
                             
-                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0
+                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0 _________________________________________________________________________________________________________________________________________________________________________________________ #
                             if end_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
                                 ext_end_t = traj_t_max + end_ext_seconds
                                 ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
