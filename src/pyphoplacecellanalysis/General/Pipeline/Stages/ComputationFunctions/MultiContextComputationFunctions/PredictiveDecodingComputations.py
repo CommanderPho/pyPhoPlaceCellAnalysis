@@ -1450,6 +1450,50 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         return partitioned_dfs_list
 
 
+    @property
+    def epoch_mask_included_binned_x_y_columns_idx_df(self) -> pd.DataFrame:
+        """
+        DataFrame containing the unique binned_x, binned_y position pairs that are included in the epoch mask.
+        
+        This property computes the equivalent of `an_epoch_mask_included_binned_x_y_columns_idx_df` from 
+        detect_matching_past_future_positions (lines 1764-1766). It extracts the unique spatial positions
+        (binned_x, binned_y) that match the epoch's high-probability mask.
+        
+        Returns:
+            DataFrame with columns ["binned_x", "binned_y"] containing unique position pairs in the epoch mask.
+            Sorted by binned_x then binned_y for consistency.
+        """
+        # Compute from stored epoch_high_prob_mask (exact equivalent of original computation)
+        # row_col_indices = np.argwhere(self.epoch_high_prob_mask)
+        # row_col_row_ids = row_col_indices + 1
+        # an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
+        # return an_epoch_mask_included_binned_x_y_columns_idx_df.sort_values(by=["binned_x", "binned_y"]).reset_index(drop=True)
+
+        # # Compute from stored epoch_high_prob_mask (exact equivalent of original computation)
+        # row_col_indices = np.argwhere(_test_epoch_result.epoch_high_prob_mask)
+        # row_col_row_ids = row_col_indices + 1
+        
+
+        # # Remove Temporal+Spatial overlap to try and fix epoch merging failures, but it didn't work __________________________________________________________________________________________________________________________________________________________________________________________ #
+        ## make masks mutually exclusive first        
+        # mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask = np.full_like(self.epoch_t_bins_high_prob_pos_mask, fill_value=False) # deepcopy(self.epoch_t_bins_high_prob_pos_mask)
+        # n_t_bins: int = np.shape(self.epoch_t_bins_high_prob_pos_mask)[-1]
+        # # mutually_accumulating_or_mask = np.full_like(self.epoch_high_prob_mask, fill_value=False) ## boolean mask
+        # for i in np.arange(n_t_bins):
+        #     if i == 0:
+        #         mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask[:, :, i] = self.epoch_t_bins_high_prob_pos_mask[:, :, i] ## original mask is unchanged for this iteration
+        #     else:
+        #         prev_t_bins_mutually_accumulating_or_mask = np.any(mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask[:, :, :i], axis=-1) ## up to, but not including i, meaning we'll effectively subtract off any previous masks to ensure that the final map doesn't overlap
+        #         # mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask[:, :, i] = np.logical_xor(mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask[:, :, i], prev_t_bins_mutually_accumulating_or_mask) ## effectively finding only the True values in the current mask that haven't been in any previous masks
+        #         mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask[:, :, i] = np.logical_and(self.epoch_t_bins_high_prob_pos_mask[:, :, i], np.logical_not(prev_t_bins_mutually_accumulating_or_mask))
+        # OUTPUTS: mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask
+        
+        row_col_row_ids_dt = np.argwhere(self.epoch_t_bins_high_prob_pos_mask) ## old way could produce multiple (duplicated) values if a position fell into multiple t_idx time bins
+        # row_col_row_ids_dt = np.argwhere(mutually_non_overlapping_epoch_t_bins_high_prob_pos_mask) ## old way could produce multiple (duplicated) values if a position fell into multiple t_idx time bins
+        row_col_row_ids_dt[:, :2] = row_col_row_ids_dt[:, :2] + 1
+        epoch_mask_included_binned_x_y_columns_idx_df_dt: pd.DataFrame = pd.DataFrame(row_col_row_ids_dt, columns=["binned_x", "binned_y", self.epoch_t_idx_col_name])
+        return epoch_mask_included_binned_x_y_columns_idx_df_dt.sort_values(by=["binned_x", "binned_y", self.epoch_t_idx_col_name]).reset_index(drop=True)
+        
 
 
     def __attrs_post_init__(self):
@@ -1658,38 +1702,6 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             import warnings
             warnings.warn("Warning: `self.a_centroids_search_segments_df` is None. Computation of centroid/position matching skipped.", UserWarning)
             return None, None
-
-
-    @property
-    def epoch_mask_included_binned_x_y_columns_idx_df(self) -> pd.DataFrame:
-        """
-        DataFrame containing the unique binned_x, binned_y position pairs that are included in the epoch mask.
-        
-        This property computes the equivalent of `an_epoch_mask_included_binned_x_y_columns_idx_df` from 
-        detect_matching_past_future_positions (lines 1764-1766). It extracts the unique spatial positions
-        (binned_x, binned_y) that match the epoch's high-probability mask.
-        
-        Returns:
-            DataFrame with columns ["binned_x", "binned_y"] containing unique position pairs in the epoch mask.
-            Sorted by binned_x then binned_y for consistency.
-        """
-        # Compute from stored epoch_high_prob_mask (exact equivalent of original computation)
-        # row_col_indices = np.argwhere(self.epoch_high_prob_mask)
-        # row_col_row_ids = row_col_indices + 1
-        # an_epoch_mask_included_binned_x_y_columns_idx_df = pd.DataFrame(row_col_row_ids, columns=["binned_x", "binned_y"])
-        # return an_epoch_mask_included_binned_x_y_columns_idx_df.sort_values(by=["binned_x", "binned_y"]).reset_index(drop=True)
-
-        # # Compute from stored epoch_high_prob_mask (exact equivalent of original computation)
-        # row_col_indices = np.argwhere(_test_epoch_result.epoch_high_prob_mask)
-        # row_col_row_ids = row_col_indices + 1
-
-        # row_col_indices = [np.argwhere(v) for v in _test_epoch_result.epoch_t_bins_high_prob_pos_mask]
-        row_col_row_ids_dt = np.argwhere(self.epoch_t_bins_high_prob_pos_mask)
-        row_col_row_ids_dt[:, :2] = row_col_row_ids_dt[:, :2] + 1
-        epoch_mask_included_binned_x_y_columns_idx_df_dt: pd.DataFrame = pd.DataFrame(row_col_row_ids_dt, columns=["binned_x", "binned_y", self.epoch_t_idx_col_name])
-        return epoch_mask_included_binned_x_y_columns_idx_df_dt.sort_values(by=["binned_x", "binned_y", self.epoch_t_idx_col_name]).reset_index(drop=True)
-        
-
 
 
     @classmethod
