@@ -1559,9 +1559,11 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
         # recompute pos_epochs _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         
+        pre_merge_column_merge_dict = None # {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'require_same'} ## do not specify
+
         ## NOTE: some have negative duration, they overlap, and all sorts of other confusing things...
         # self.matching_pos_epochs_df, curr_matching_positions_df_dict = MatchingPastFuturePositionsResult._custom_build_sequential_position_epochs(matching_past_positions_df=self.relevant_positions_df) # curr_matching_positions_df_dict: types.epoch_index
-        self.matching_pos_epochs_df, curr_matching_positions_df_dict = self.compute_matching_pos_epochs_df(self.relevant_positions_df, disable_segmentation=True) 
+        self.matching_pos_epochs_df, curr_matching_positions_df_dict = self.compute_matching_pos_epochs_df(self.relevant_positions_df, disable_segmentation=True, column_merge_dict=pre_merge_column_merge_dict)
 
         ## Propagate per-position-trajectory-epoch segmentation columns back to relevant_positions_df
         segmented_traj_columns = ['segment_idx', 'Vp', 'segment_Vp_deg', 'segment_dir_angle_binned', 'segment_Vp_scatteredness']
@@ -1580,10 +1582,10 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         ## OUTPUTS: matching_relevant_positions_df
         merged_segment_epochs, relevant_merged_positions_df, matching_pos_epochs_df = self.compute_compilete_paths(max_allowed_trajectory_gap_seconds=self.max_allowed_trajectory_gap_seconds, merged_found_pos_epoch_id_key_name=self.merged_found_pos_epoch_id_key_name)
         ## the above method is pure, so update the self properties --- I think this is "a-ok" because it just adds some badass indicies... but maybe something tragic is lost and NO ONE WILL KNOW:
-        self.merged_segment_epochs = merged_segment_epochs        
+        self.merged_segment_epochs = merged_segment_epochs
 
-        Assert.same_length(self.matching_pos_epochs_df, matching_pos_epochs_df)
-        self.matching_pos_epochs_df = matching_pos_epochs_df ## no this one isn't right at least :[ It will be missing the main epoch info and will have fewer of em because they are merged. Need to add this info to the existing epochs_df or something
+        # Assert.same_length(self.matching_pos_epochs_df, matching_pos_epochs_df)
+        # self.matching_pos_epochs_df = matching_pos_epochs_df ## no this one isn't right at least :[ It will be missing the main epoch info and will have fewer of em because they are merged. Need to add this info to the existing epochs_df or something
 
         ## this one is fine on the other hand, maybe check to make sure the DANG SIZE DOESN'T CHANGE
         Assert.same_length(self.relevant_positions_df, relevant_merged_positions_df)
@@ -1721,8 +1723,8 @@ class MatchingPastFuturePositionsResult(ComputedResult):
             
         """
         if column_merge_dict is None:
-            column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} ## idk, normally we just probagated is_future_present_past
-            
+            # column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} ## idk, normally we just probagated is_future_present_past
+            column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'first'} ## idk, normally we just probagated is_future_present_past
 
         ## find adjacent epochs from the position time bins (periods where the animal is in the positions)
         # measured_positions_df_copy = measured_positions_df.copy()
@@ -1749,11 +1751,23 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
         ## Copied from `.neuropy.detect_epoch_satisfying_condition(...)``
         if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
-            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict)
+            if "epoch_t_idx" in a_matching_pos_epochs_df.columns:
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().sort_values(["epoch_t_idx", "start"])
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.groupby("epoch_t_idx", group_keys=False).apply(lambda df: df.epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict))
+            else:
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict)
+                
         if (minimum_epoch_duration is not None) and (len(a_matching_pos_epochs_df) > 0): 
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_epochs_longer_than(minimum_duration=minimum_epoch_duration)
+
         if (merging_adjacent_max_separation_sec is not None) and (len(a_matching_pos_epochs_df) > 0):
-            a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict)
+            if "epoch_t_idx" in a_matching_pos_epochs_df.columns:
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().sort_values(["epoch_t_idx", "start"])
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.groupby("epoch_t_idx", group_keys=False).apply(lambda df: df.epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict))
+            else:
+                a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.get_valid_df().epochs.merge_adjacent_epochs_within(max_merge_duration=merging_adjacent_max_separation_sec, **column_merge_dict)
+
+
         if (len(a_matching_pos_epochs_df) > 0):
             a_matching_pos_epochs_df = a_matching_pos_epochs_df.epochs.rebuild_labels_column()
         
@@ -1905,9 +1919,13 @@ class MatchingPastFuturePositionsResult(ComputedResult):
         
         """
         # pre_merge_column_merge_dict = {'epoch_t_idx': 'require_same', 'is_future_present_past': 'require_same'} #TODO 2026-01-23 14:00: - [ ] Worked for most epochs, but I guess fails when there is overlap
-        pre_merge_column_merge_dict = {'epoch_t_idx': 'first', 'is_future_present_past': 'require_same'} #TODO 2026-01-23 14:00: - [ ] Worked for most epochs, but I guess fails when there is overlap
-        
-        post_merge_column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'require_same'}  ## different than before, now we want to find all unique items in 'epoch_t_idx' as this gives which time bins it satisfies after merging
+        pre_merge_column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'first'}  
+
+        # post_merge_column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'require_same'}  ## different than before, now we want to find all unique items in 'epoch_t_idx' as this gives which time bins it satisfies after merging
+        post_merge_column_merge_dict = {'epoch_t_idx': 'unique_concat', 'is_future_present_past': 'first'}  ## different than before, now we want to find all unique items in 'epoch_t_idx' as this gives which time bins it satisfies after merging
+
+
+
         # column_to_split: str = 'label'
         column_to_split: str = 'epoch_t_idx'
         
