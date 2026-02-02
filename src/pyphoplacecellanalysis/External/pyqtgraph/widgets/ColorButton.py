@@ -29,7 +29,7 @@ class ColorButton(QtWidgets.QPushButton):
         QtWidgets.QPushButton.__init__(self, parent)
         self.padding = (padding, padding, -padding, -padding) if isinstance(padding, (int, float)) else padding
         self.setColor(color)
-        self.colorDialog = QtWidgets.QColorDialog()
+        # self.colorDialog = QtWidgets.QColorDialog()
         self.colorDialog = ColorPickerDialog()
         # self.colorDialog.setOption(QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel, True)
         # self.colorDialog.setOption(QtWidgets.QColorDialog.ColorDialogOption.DontUseNativeDialog, True)

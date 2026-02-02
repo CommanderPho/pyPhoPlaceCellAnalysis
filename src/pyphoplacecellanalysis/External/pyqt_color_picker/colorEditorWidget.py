@@ -1,6 +1,9 @@
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QSpinBox, QLineEdit
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QSpinBox, QLineEdit, QMenu, QApplication,
+)
 
 
 class ColorEditorWidget(QWidget):
@@ -72,6 +75,14 @@ class ColorEditorWidget(QWidget):
             self.__aSpinBox = None
         lay.setContentsMargins(0, 0, 0, 0)
 
+        # Right-click Copy for hex and all spinboxes
+        copyable_widgets = [self.__hLineEdit, self.__rSpinBox, self.__gSpinBox, self.__bSpinBox]
+        if self.__aSpinBox is not None:
+            copyable_widgets.append(self.__aSpinBox)
+        for w in copyable_widgets:
+            w.setContextMenuPolicy(Qt.CustomContextMenu)
+            w.customContextMenuRequested.connect(self.__showCopyContextMenu)
+
         colorEditor = QWidget()
         colorEditor.setLayout(lay)
         if orientation == 'horizontal':
@@ -142,6 +153,29 @@ class ColorEditorWidget(QWidget):
         self.__hLineEdit.setText(self.__hexString(self.__current_color))
         self.setColorPreviewWithGraphics()
         self.colorChanged.emit(QColor(self.__current_color))
+
+    def __showCopyContextMenu(self, pos):
+        widget = self.sender()
+        if widget is None:
+            return
+        menu = QMenu(self)
+        copy_act = menu.addAction("Copy")
+        copy_act.triggered.connect(lambda checked, w=widget: self.__copyWidgetValue(w))
+        menu.exec_(widget.mapToGlobal(pos))
+
+    def __copyWidgetValue(self, widget):
+        app = QApplication.instance()
+        if app is None:
+            return
+        if widget == self.__hLineEdit:
+            text = self.__hLineEdit.text()
+        elif widget in (self.__rSpinBox, self.__gSpinBox, self.__bSpinBox):
+            text = str(widget.value())
+        elif widget == self.__aSpinBox:
+            text = str(widget.value())
+        else:
+            return
+        app.clipboard().setText(text)
 
     def getCurrentColor(self):
         return self.__current_color
