@@ -168,11 +168,11 @@ class PickleSerializableMixin: # (FileRepresentable, DictRepresentable)
     #         print("WARNING: filename can not be None")
 
 
-    def save(self, pkl_output_path: Union[Path, str], status_print=True):
+    def save(self, pkl_output_path: Union[Path, str], status_print=True, safe_save: bool = True, **kwargs):
         pkl_output_path = ensure_pathlib_Path(pkl_output_path)
         if status_print:
             print(f'saving to pkl_output_path: "{pkl_output_path}"...')
-        saveData(pkl_output_path, self) ## save self
+        saveData(pkl_output_path, self, safe_save=safe_save, **kwargs) ## save self
         # data = self.to_dict()
         # self.to_file(data, pkl_output_path=pkl_output_path, status_print=status_print)
         if status_print:
