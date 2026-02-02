@@ -20,6 +20,7 @@ from nptyping import NDArray
 
 from pyphocorehelpers.print_helpers import SimplePrintable, PrettyPrintable, iPythonKeyCompletingMixin
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+from neuropy.utils.misc import split_list_of_dicts
 from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.DataStructure.general_parameter_containers import DebugHelper, VisualizationParameters, RenderPlots, RenderPlotsData
@@ -803,7 +804,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         return out_dict
 
 
-
+    @function_attributes(short_name=None, tags=['update', 'intervals', 'rect'], input_requires=[], output_provides=[], uses=[], used_by=['update_epochs_from_configs_widget', 'update_rendered_interval_heights'], creation_date='2026-02-02 12:57', related_items=[])
     def update_rendered_intervals_visualization_properties(self, update_dict):
         """ Updates the interval datasources (and thus the actual rendered rectangles) from the provided `update_dict`
 
@@ -821,6 +822,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             stacked_epoch_layout_dict = {interval_key:dict(y_location=y_location, height=height) for interval_key, y_location, height in zip(rendered_interval_keys, required_vertical_offsets, required_interval_heights)}
 
         """
+        from neuropy.utils.misc import split_list_of_dicts
+        
 
 
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
@@ -828,7 +831,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             if interval_key in self.interval_datasources:
                 # Extract visibility settings before updating datasource (handle both single dict and list of dicts)
                 visibility_settings = None
-                if isinstance(interval_update_kwargs, (list, tuple)):
+                is_multi_part_interval_config: bool = isinstance(interval_update_kwargs, (list, tuple))
+                
+                if is_multi_part_interval_config:
                     ## list of update dicts - each item can have its own isVisible property
                     a_list_interval_update_kwargs = []
                     visibility_settings = []
@@ -838,11 +843,13 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                         a_list_interval_update_kwargs.append(a_sub_interval_update_kwargs)
                         # Extract visibility from each item (can be None if not specified)
                         visibility_settings.append(a_sub_interval_update_kwargs.get('isVisible', None))
-                        # self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_sub_interval_update_kwargs | kwargs))) ## Fully inline
+                    ## END for a_sub_interval_update_kwargs in interval_update_kwargs...
+                    
                     ## Update with list
+                    a_list_interval_update_kwargs = split_list_of_dicts(a_list_interval_update_kwargs) ## convert List[Dict[str, Any]] -> Dict[str, List] (list of dicts with same keys to dict of lists
                     # a_list_interval_update_kwargs = [a_sub_interval_update_kwargs for a_sub_interval_update_kwargs in interval_update_kwargs]
-                    self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_sub_interval_update_kwargs | kwargs))) ## Fully inline
-
+                    self.interval_datasources[interval_key].update_visualization_properties(lambda active_df, **kwargs: General2DRenderTimeEpochs._update_df_visualization_columns(active_df, **(a_list_interval_update_kwargs | kwargs))) ##  Fixed for multiple lists
+    
                 else:
                     ## single update item dict
                     if not isinstance(interval_update_kwargs, dict):
@@ -853,8 +860,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 # Apply visibility setting to rendered items if provided
                 # For list configs: only apply if all items have the same visibility (or all None)
                 # For single configs: apply directly
-                if visibility_settings is not None and interval_key in self.rendered_epochs:
-                    if isinstance(visibility_settings, list):
+                if visibility_settings is not None and (interval_key in self.rendered_epochs):
+                    if isinstance(visibility_settings, (list, tuple)):
                         # List case: check if all non-None values are the same
                         non_none_visibilities = [v for v in visibility_settings if v is not None]
                         if len(non_none_visibilities) > 0:
@@ -875,7 +882,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                                 rect_item.setVisible(visibility_settings)
             else:
                 print(f"WARNING: interval_key '{interval_key}' was not found in self.interval_datasources. Skipping update for unknown item.")
-
+        ## END for interval_key, interval_update_kwargs in update_dict...
+        
 
 
     # Interval Positioning Helpers _______________________________________________________________________________________ #
