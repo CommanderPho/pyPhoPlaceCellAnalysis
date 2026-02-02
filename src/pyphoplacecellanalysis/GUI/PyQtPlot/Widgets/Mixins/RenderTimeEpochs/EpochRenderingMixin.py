@@ -1165,6 +1165,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         """ Build the EpochDisplayConfig lists for each interval datasource
 
         
+        #TODO 2026-02-02 11:39: - [ ] Doesn't quite work for multi-color datasources
+        
+        
         Usage:
         
             import panel as pn
@@ -1173,6 +1176,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             out_configs_dict = active_2d_plot.extract_interval_display_config_lists()
             pn.Row(*[pn.Column(*[pn.Param(a_sub_v) for a_sub_v in v]) for k,v in out_configs_dict.items()])
 
+            
             
             
             
@@ -1460,7 +1464,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
 
 
-    @function_attributes(short_name=None, tags=['heights', 'sizing', 'geometry', 'intervals'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-30 14:15', related_items=[])
+    @function_attributes(short_name=None, tags=['heights', 'sizing', 'geometry', 'intervals'], input_requires=[], output_provides=[], uses=['update_rendered_intervals_visualization_properties'], used_by=[], creation_date='2024-12-30 14:15', related_items=[])
     def update_rendered_interval_heights(self, absolute_combined_height_px: float = 60.0):
         """ 
         Updates the total height
