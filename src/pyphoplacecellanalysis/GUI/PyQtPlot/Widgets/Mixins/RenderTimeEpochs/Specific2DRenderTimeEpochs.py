@@ -23,14 +23,19 @@ A general epochs_dataframe_formatter takes a dataframe and adds the required col
 
 @define(slots=False)
 class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
-    """Subclasses render specific epochs as intervals."""
+    """Subclasses render specific epochs as intervals.
+    Usage:
+    
+    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
+    
+    """
     default_datasource_name: str = 'GeneralEpochs' # class variable
     # default_datasource_name: str = field(default='GeneralEpochs')
     
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
     @classmethod
-    def _update_df_visualization_columns(cls, active_df, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs):
+    def _update_df_visualization_columns(cls, active_df: pd.DataFrame, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs) -> pd.DataFrame:
         """ updates the columns of the provided active_df given the values specified. If values aren't provided, they aren't changed. 
         
         active_df['series_vertical_offset', 'series_height', 'pen', 'brush']
