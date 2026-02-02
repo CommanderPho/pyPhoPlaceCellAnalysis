@@ -13,7 +13,7 @@ from attrs import asdict, astuple, define, field, Factory
 from qtpy import QtGui, QtWidgets
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
+from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers # replacing `RectangleRenderTupleHelpers`
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.LegendItem import ItemSample, LegendItem # for custom legend
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.graphicsItems.TextItem.AlignableTextItem import CustomRectBoundedTextItem
@@ -258,11 +258,11 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
 
     ## Copy Constructors:
     def __copy__(self):
-        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
         return IntervalRectsItem(independent_data_copy)
     
     def __deepcopy__(self, memo):
-        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
         return IntervalRectsItem(independent_data_copy)
         # return IntervalRectsItem(copy.deepcopy(self.data, memo))
 

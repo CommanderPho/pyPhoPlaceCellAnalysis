@@ -6,7 +6,7 @@ import copy
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph import QtCore, QtGui, QtWidgets
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
+from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers # replacing `RectangleRenderTupleHelpers`
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.ReprPrintableWidgetMixin import ReprPrintableItemMixin
 
 ## Create a subclass of GraphicsObject.
@@ -117,11 +117,11 @@ class CustomIntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
 
     # Copy Constructors: _________________________________________________________________________________________________ #
     def __copy__(self):
-        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
         return CustomIntervalRectsItem(independent_data_copy)
     
     def __deepcopy__(self, memo):
-        independent_data_copy = RectangleRenderTupleHelpers.copy_data(self.data)
+        independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
         return CustomIntervalRectsItem(independent_data_copy)
         # return CustomIntervalRectsItem(copy.deepcopy(self.data, memo))
 

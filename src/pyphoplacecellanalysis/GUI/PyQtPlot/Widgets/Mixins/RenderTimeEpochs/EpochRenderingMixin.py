@@ -29,7 +29,8 @@ from pyphocorehelpers.gui.Qt.connections_container import ConnectionsContainer
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem, RectangleRenderTupleHelpers
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers, ColorFormatConverter, QColorColumnsAccessor # replacing `RectangleRenderTupleHelpers`
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
 
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
@@ -76,7 +77,7 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
         else:
             for a_plot in target_plots_list:
                 # make an independent copy of the rendered_rects_item for each plot
-                independent_data_copy = RectangleRenderTupleHelpers.copy_data(rendered_rects_item.data)
+                independent_data_copy = ColorDataframeColumnHelpers.copy_data(rendered_rects_item.data)
                 self[a_plot] = IntervalRectsItem(data=independent_data_copy, **kwargs)
                 ## Copy tooltip function
                 if rendered_rects_item.format_item_tooltip_fn is not None:
@@ -587,7 +588,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 if a_plot in extant_rects_plot_items_container:
                     # Update data in-place instead of remove/recreate
                     extant_rect_plot_item = extant_rects_plot_items_container[a_plot]
-                    new_data = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
+                    new_data = ColorDataframeColumnHelpers.copy_data(new_interval_rects_item.data)
                     extant_rect_plot_item.update_data(new_data)
                     # Preserve tooltip function
                     extant_rect_plot_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
@@ -597,7 +598,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
 
                 else:
                     # New plot, add new item
-                    independent_data_copy = RectangleRenderTupleHelpers.copy_data(new_interval_rects_item.data)
+                    independent_data_copy = ColorDataframeColumnHelpers.copy_data(new_interval_rects_item.data)
                     extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
                     extant_rects_plot_items_container[a_plot].format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
                     self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
@@ -1387,6 +1388,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         update_epochs_from_configs_widget(active_2d_plot)
 
         """
+        from neuropy.utils.misc import split_list_of_dicts        
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Render2DEventRectanglesHelper import Render2DEventRectanglesHelper
         
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
@@ -1436,7 +1438,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     container = self.rendered_epochs[interval_key]
                     for a_plot, rect_item in container.items():
                         if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
-                            new_data = RectangleRenderTupleHelpers.copy_data(new_rects_item.data)
+                            new_data = ColorDataframeColumnHelpers.copy_data(new_rects_item.data)
                             rect_item.update_data(new_data)
                             # Preserve tooltip function from original item
                             if hasattr(new_rects_item, 'format_item_tooltip_fn'):

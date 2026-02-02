@@ -16,7 +16,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 from pyphoplacecellanalysis.General.Model.Datasources.Datasources import BaseDatasource, DataframeDatasource
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers # used for  `get_serialized_data` and `get_deserialized_data`
+from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers, ColorFormatConverter, QColorColumnsAccessor # used for  `get_serialized_data` and `get_deserialized_data`
 
 
 class IntervalsDatasource(BaseDatasource):
@@ -236,16 +236,16 @@ class IntervalsDatasource(BaseDatasource):
             active_2d_plot.update_rendered_intervals_visualization_properties(scaled_epochs_update_dict)
              
         """
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import RectangleRenderTupleHelpers
+        from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers, ColorFormatConverter, QColorColumnsAccessor
         
         # series_viz_df = self.df[self._series_update_dict_visualization_columns].copy() # , 'pen', 'brush'
         series_viz_df: pd.DataFrame = deepcopy(self.df)[self._series_update_dict_visualization_columns]
 
         ## Extract pen and brush colors to a color string (hex-formatted string), otherwise the `series_viz_df.drop_duplicates()` below fails because QPen and QBrush aren't hashable:
-        series_viz_df['pen_color'] = series_viz_df['pen'].map(lambda x: RectangleRenderTupleHelpers.QPen_to_dict(x)['color'])
-        series_viz_df['pen_width'] = series_viz_df['pen'].map(lambda x: RectangleRenderTupleHelpers.QPen_to_dict(x)['width'])
+        series_viz_df['pen_color'] = series_viz_df['pen'].map(lambda x: ColorDataframeColumnHelpers.QPen_to_dict(x)['color'])
+        series_viz_df['pen_width'] = series_viz_df['pen'].map(lambda x: ColorDataframeColumnHelpers.QPen_to_dict(x)['width'])
         
-        series_viz_df['brush_color'] = series_viz_df['brush'].map(lambda x: RectangleRenderTupleHelpers.QBrush_to_dict(x)['color'])
+        series_viz_df['brush_color'] = series_viz_df['brush'].map(lambda x: ColorDataframeColumnHelpers.QBrush_to_dict(x)['color'])
         series_viz_df = series_viz_df.drop(columns=['pen', 'brush'], inplace=False)
         
         # Generate a compressed-position representation of curr_df:
@@ -283,9 +283,9 @@ class IntervalsDatasource(BaseDatasource):
         interval_datasource_df = self.df
         serialized_df = deepcopy(interval_datasource_df)
         if 'pen_tuple' not in serialized_df.columns:
-            serialized_df['pen_tuple'] = [RectangleRenderTupleHelpers.QPen_to_tuple(a_pen) for a_pen in serialized_df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
+            serialized_df['pen_tuple'] = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) for a_pen in serialized_df['pen']] # gets the RgbF values of the QColor returned from the QPen a_pen
         if 'brush_tuple' not in serialized_df.columns:
-            serialized_df['brush_tuple'] = [RectangleRenderTupleHelpers.QBrush_to_tuple(a_brush) for a_brush in serialized_df['brush']] # gets the RgbF values of the QColor returned from the QBrush a_brush
+            serialized_df['brush_tuple'] = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) for a_brush in serialized_df['brush']] # gets the RgbF values of the QColor returned from the QBrush a_brush
         # overwrite:
         serialized_df['pen'] = serialized_df['pen_tuple']
         serialized_df['brush'] = serialized_df['brush_tuple']
