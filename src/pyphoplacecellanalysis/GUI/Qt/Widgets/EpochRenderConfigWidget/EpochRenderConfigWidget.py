@@ -570,6 +570,8 @@ QToolButton:!checked {
                         
                         # Connect individual widget visibility changes to update toggle button state
                         a_sub_curr_widget.ui.chkbtnVisible.toggled.connect(lambda checked, name=a_config_name: self._update_row_visibility_toggle_button_state(name))
+                    ## END for i, a_sub_config in enumerate(a_config)...
+                    
 
                     # Update the widget container's size after adding all widgets
                     # This is critical when setWidgetResizable(False) - the container needs explicit sizing
@@ -628,10 +630,13 @@ QToolButton:!checked {
         # self.ui.out_render_config_widgets_dict = self._build_children_widgets(configs=self.configs)
         self._build_children_widgets(configs=self.configs)
         
-        # Add custom buttons bar widget
+        # Add custom buttons bar widget and make it stick to the bottom using a stretch spacer above it
+        # Insert vertical stretch first to push following widgets (the button bar) to the bottom
+        self.ui.config_widget_layout.addStretch(1)
         self.ui.buttons_bar_widget = IntervalConfigListExtraButtonsWidget(parent=self)
+        self.ui.buttons_bar_widget.setFixedHeight(21)  # footer bar: fixed height 21px at bottom
         self.ui.config_widget_layout.addWidget(self.ui.buttons_bar_widget)
-        
+
         # Connect button bar callbacks to parent widget methods
         self._connect_button_bar_callbacks()
 
