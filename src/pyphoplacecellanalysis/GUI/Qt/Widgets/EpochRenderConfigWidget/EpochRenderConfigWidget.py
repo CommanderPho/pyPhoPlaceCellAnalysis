@@ -517,9 +517,15 @@ QToolButton:!checked {
                     a_sub_config_scroll_area.setFrameShape(pg.Qt.QtWidgets.QFrame.Shape.NoFrame)
                     a_sub_config_scroll_area.setObjectName(f"scrollArea[{a_config_name}]")
 
-                    # Add a bottom margin to the sub_config_scroll_container_layout to avoid the scroll bar cutting off content
-                    # This margin can be dynamically set if needed
-                    margin_pixels = 20  # adjust as needed for the typical scroll bar height
+                    # Reserve vertical space for horizontal scroll bar (QScrollArea sizeHint doesn't include it with ScrollBarAsNeeded)
+                    scroll_bar_height = a_sub_config_scroll_area.style().pixelMetric(pg.Qt.QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent)
+                    if scroll_bar_height <= 0:
+                        scroll_bar_height = a_sub_config_scroll_area.horizontalScrollBar().sizeHint().height()
+                    if scroll_bar_height <= 0:
+                        scroll_bar_height = 16  # fallback default
+
+                    # Add a bottom margin so the section's preferred height includes the scroll bar
+                    margin_pixels = max(scroll_bar_height, 4)
                     a_sub_config_scroll_container_layout.addWidget(a_sub_config_scroll_area)
                     a_sub_config_scroll_container_layout.addSpacing(margin_pixels)
 
@@ -576,9 +582,16 @@ QToolButton:!checked {
                         # Set size policy to allow vertical expansion but maintain horizontal scrollability
                         size_policy = pg.Qt.QtWidgets.QSizePolicy(pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum, pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum)
                         a_sub_config_widget_container.setSizePolicy(size_policy)
+                        # Reserve height for content + horizontal scroll bar so nothing is cut off
+                        a_sub_config_scroll_area.setMinimumHeight(max_height + scroll_bar_height)
                         # Update the scroll area's viewport to show the content properly
                         a_sub_config_scroll_area.updateGeometry()
-                        
+
+                        # Set container minimum height so the section's preferred height includes title + scroll area + scroll bar
+                        title_row_height = a_config_title_button.sizeHint().height()
+                        min_container_height = title_row_height + (max_height + scroll_bar_height) + margin_pixels
+                        a_config_container_widget.setMinimumHeight(max(112, min_container_height))
+
                         # Set initial state of the visibility toggle button based on current widget states
                         self._update_row_visibility_toggle_button_state(a_config_name)
 
