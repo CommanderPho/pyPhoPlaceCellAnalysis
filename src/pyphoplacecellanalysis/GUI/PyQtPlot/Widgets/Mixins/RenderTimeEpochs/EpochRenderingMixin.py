@@ -825,8 +825,6 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         """
         from neuropy.utils.misc import split_list_of_dicts
         
-
-
         ## Inline Concise: Position Replays, PBEs, and Ripples all below the scatter:
         for interval_key, interval_update_kwargs in update_dict.items():
             if interval_key in self.interval_datasources:
@@ -1340,6 +1338,66 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         return _all_removed_items
 
 
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=[], used_by=['self.update_epochs_from_configs_widget'], creation_date='2026-02-02 14:24', related_items=[])
+    def perform_update_epoch_interval_render_configs_from_configs(self, update_dict: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig], Dict[str, EpochDisplayConfig]]]):
+        """ Called after updating datasources to directly (as opposed to indirectly) update existing IntervalRectsItem objects
+
+        Factored out of `update_epochs_from_configs_widget`
+        
+        """
+        # Directly update existing IntervalRectsItem objects
+        for interval_key, interval_update_kwargs in update_dict.items():
+            if interval_key in self.rendered_epochs and interval_key in self.interval_datasources:
+                # Rebuild data from updated datasource
+                datasource = self.interval_datasources[interval_key]
+                new_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(datasource)
+                
+                # Extract visibility settings (handle both single dict and list of dicts)
+                # Each item in a list can have its own isVisible property (or it can be missing)
+                visibility_settings = None
+                if isinstance(interval_update_kwargs, (list, tuple)):
+                    # List case: extract visibility from each item
+                    visibility_settings = []
+                    for a_sub_kwargs in interval_update_kwargs:
+                        if not isinstance(a_sub_kwargs, dict):
+                            a_sub_kwargs = a_sub_kwargs.to_dict()
+                        # Extract visibility from each item (can be None if not specified)
+                        visibility_settings.append(a_sub_kwargs.get('isVisible', None))
+                else:
+                    # Single dict case
+                    if not isinstance(interval_update_kwargs, dict):
+                        interval_update_kwargs = interval_update_kwargs.to_dict()
+                    visibility_settings = interval_update_kwargs.get('isVisible', None)
+                
+                # Update all plot items for this interval
+                container = self.rendered_epochs[interval_key]
+                for a_plot, rect_item in container.items():
+                    if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
+                        new_data = ColorDataframeColumnHelpers.copy_data(new_rects_item.data)
+                        rect_item.update_data(new_data)
+                        # Preserve tooltip function from original item
+                        if hasattr(new_rects_item, 'format_item_tooltip_fn'):
+                            rect_item.format_item_tooltip_fn = deepcopy(new_rects_item.format_item_tooltip_fn)
+                        # Apply visibility setting if provided
+                        # For list configs: only apply if all items have the same visibility (or all None)
+                        # For single configs: apply directly
+                        if visibility_settings is not None:
+                            if isinstance(visibility_settings, list):
+                                # List case: check if all non-None values are the same
+                                non_none_visibilities = [v for v in visibility_settings if v is not None]
+                                if len(non_none_visibilities) > 0:
+                                    # If all non-None values are the same, apply that visibility
+                                    if len(set(non_none_visibilities)) == 1:
+                                        rect_item.setVisible(non_none_visibilities[0])
+                                    # If they differ, we can't set per-rectangle visibility, so skip
+                                    # (IntervalRectsItem is a single graphics item that renders all rectangles)
+                            else:
+                                # Single config case: apply directly
+                                rect_item.setVisible(visibility_settings)
+                                    
+
+
+
 
     def update_epoch_interval_render_configs_from_configs(self, _out_configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig], Dict[str, EpochDisplayConfig]]]):
         """ Update plots from configs:
@@ -1407,58 +1465,12 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 print(f"Intervals to be removed (present in self.interval_datasources but not in update_dict): {removed_interval_keys}")
                 self.perform_remove_epoch_intervals(removed_interval_keys=removed_interval_keys, should_perform_remove=True)
 
-            # Update datasources
+            # Update datasources, but with datasource update signals blocked
             self.update_rendered_intervals_visualization_properties(update_dict=update_dict)
             
-            # Directly update existing IntervalRectsItem objects
-            for interval_key, interval_update_kwargs in update_dict.items():
-                if interval_key in self.rendered_epochs and interval_key in self.interval_datasources:
-                    # Rebuild data from updated datasource
-                    datasource = self.interval_datasources[interval_key]
-                    new_rects_item = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(datasource)
-                    
-                    # Extract visibility settings (handle both single dict and list of dicts)
-                    # Each item in a list can have its own isVisible property (or it can be missing)
-                    visibility_settings = None
-                    if isinstance(interval_update_kwargs, (list, tuple)):
-                        # List case: extract visibility from each item
-                        visibility_settings = []
-                        for a_sub_kwargs in interval_update_kwargs:
-                            if not isinstance(a_sub_kwargs, dict):
-                                a_sub_kwargs = a_sub_kwargs.to_dict()
-                            # Extract visibility from each item (can be None if not specified)
-                            visibility_settings.append(a_sub_kwargs.get('isVisible', None))
-                    else:
-                        # Single dict case
-                        if not isinstance(interval_update_kwargs, dict):
-                            interval_update_kwargs = interval_update_kwargs.to_dict()
-                        visibility_settings = interval_update_kwargs.get('isVisible', None)
-                    
-                    # Update all plot items for this interval
-                    container = self.rendered_epochs[interval_key]
-                    for a_plot, rect_item in container.items():
-                        if not isinstance(a_plot, str) and isinstance(rect_item, IntervalRectsItem):
-                            new_data = ColorDataframeColumnHelpers.copy_data(new_rects_item.data)
-                            rect_item.update_data(new_data)
-                            # Preserve tooltip function from original item
-                            if hasattr(new_rects_item, 'format_item_tooltip_fn'):
-                                rect_item.format_item_tooltip_fn = deepcopy(new_rects_item.format_item_tooltip_fn)
-                            # Apply visibility setting if provided
-                            # For list configs: only apply if all items have the same visibility (or all None)
-                            # For single configs: apply directly
-                            if visibility_settings is not None:
-                                if isinstance(visibility_settings, list):
-                                    # List case: check if all non-None values are the same
-                                    non_none_visibilities = [v for v in visibility_settings if v is not None]
-                                    if len(non_none_visibilities) > 0:
-                                        # If all non-None values are the same, apply that visibility
-                                        if len(set(non_none_visibilities)) == 1:
-                                            rect_item.setVisible(non_none_visibilities[0])
-                                        # If they differ, we can't set per-rectangle visibility, so skip
-                                        # (IntervalRectsItem is a single graphics item that renders all rectangles)
-                                else:
-                                    # Single config case: apply directly
-                                    rect_item.setVisible(visibility_settings)
+            # Directly update existing IntervalRectsItem objects since we manually blocked update signals above
+            self.perform_update_epoch_interval_render_configs_from_configs(update_dict=update_dict)
+
 
 
 
