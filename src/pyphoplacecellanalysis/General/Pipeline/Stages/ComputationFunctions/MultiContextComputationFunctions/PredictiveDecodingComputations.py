@@ -7333,9 +7333,11 @@ class PredictiveDecodingVispyWidget:
         return t_valid, x_valid, y_valid, opacity
 
 
+    @function_attributes(short_name=None, tags=['CENTER_COL', 'update', 'pure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-03 13:12', related_items=[])
     def _render_central_view(self, p_x_given_n: pd.DataFrame, posterior_2d: pd.DataFrame, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, 
                              new_epoch_idx: int, epoch_start_t: float, epoch_end_t: float,
                              use_new_centroid_arrows: bool = True, use_single_arrows_object: bool = False,
+                             _update_dict=None,
                              **kwargs,
                              ):
         """ updates the center view with the posteriors and time bins 
@@ -7343,10 +7345,20 @@ class PredictiveDecodingVispyWidget:
         self.posterior_img, self.centroid_arrows, self.centroid_arrows 
         
         Uses: self.epoch_flat_mask_future_past_result, 
-        
+
+        Usage: 
+            _update_dict = dict(
+                centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
+                current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
+                time_bin_views=self.time_bin_views, time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
+            )
+                    
         """
-        _update_dict = {}
-        
+        if _update_dict is None:
+            _update_dict = {}
+ 
+
         if posterior_2d is None or posterior_2d.size == 0:
             if hasattr(self.a_flat_matching_results_list_ds, 'epoch_high_prob_pos_masks') and self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks is not None and new_epoch_idx < len(self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks):
                 mask_2d = self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks[new_epoch_idx]
@@ -7375,8 +7387,8 @@ class PredictiveDecodingVispyWidget:
 
         # Render centroid dots and arrows on posterior plot (main view only)
         ## UPDATES: self.centroid_dots, self.centroid_arrows, self.centroid_dots
-        centroid_dots = [] # self.centroid_dots
-        centroid_arrows = [] ## new blank list # self.centroid_arrows
+        centroid_dots = _update_dict.get('centroid_dots', []) # self.centroid_dots
+        centroid_arrows = _update_dict.get('centroid_arrows', []) ## new blank list # self.centroid_arrows
         
         if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
             epoch_result: MatchingPastFuturePositionsResult = self.epoch_flat_mask_future_past_result[new_epoch_idx] ## does it really need this?
@@ -7562,9 +7574,9 @@ class PredictiveDecodingVispyWidget:
 
         ## Uses: self.posterior_2d_view
         # Updates: self.current_position_line, self.trajectory_arrows, self.posterior_2d_view
-        current_position_line = None # self.current_position_line
-        trajectory_arrows = [] # self.trajectory_arrows
-        epoch_info_text = None # self.epoch_info_text
+        current_position_line = _update_dict.get('current_position_line', None) # self.current_position_line
+        trajectory_arrows = _update_dict.get('trajectory_arrows', []) # self.trajectory_arrows
+        epoch_info_text = _update_dict.get('epoch_info_text', None) # self.epoch_info_text
         
         if self.curr_position_df is not None and epoch_start_t is not None and epoch_end_t is not None and 't' in self.curr_position_df.columns and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
             extended_start_t = epoch_start_t - self.current_traj_seconds_pre_post_extension
@@ -7624,9 +7636,9 @@ class PredictiveDecodingVispyWidget:
         # Builds the self.time_bin_views if needed for each t-bin in the epoch                                                                                                                                                                                                                 #
         # ==================================================================================================================================================================================================================================================================================== #
         ## Updates: self.time_bin_views, self.time_bin_images\
-        time_bin_views = [] # self.time_bin_views
-        time_bin_labels = [] # self.time_bin_labels
-        time_bin_images = [] # self.time_bin_images
+        time_bin_views = _update_dict.get('time_bin_views', []) # self.time_bin_views
+        time_bin_labels = _update_dict.get('time_bin_labels', []) # self.time_bin_labels
+        time_bin_images = _update_dict.get('time_bin_images', []) # self.time_bin_images
         
         if p_x_given_n is not None and p_x_given_n.size > 0:
             n_time_bins = p_x_given_n.shape[2]
@@ -7675,10 +7687,10 @@ class PredictiveDecodingVispyWidget:
         # Renders the contours _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         ## Updates: self.posterior_mask_contours
         ## UPDATES: [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, self.posterior_mask_contours), (self.future_view, self.future_mask_contours)]
-        posterior_mask_contours = [] # self.posterior_mask_contours
+        posterior_mask_contours = _update_dict.get('posterior_mask_contours', []) # self.posterior_mask_contours
         # active_posterior_contours_dict_list = [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, posterior_mask_contours), (self.future_view, self.future_mask_contours)]
         list_names = ['past_mask_contours', 'posterior_mask_contours', 'future_mask_contours']
-        active_posterior_contours_dict_list = [(self.past_view, []), (self.posterior_2d_view, []), (self.future_view, [])]
+        active_posterior_contours_dict_list = [(self.past_view, _update_dict.get('past_mask_contours', [])), (self.posterior_2d_view, _update_dict.get('posterior_mask_contours', [])), (self.future_view, _update_dict.get('future_mask_contours', []))]
         
         if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result)):
             epoch_result_for_contours = self.epoch_flat_mask_future_past_result[new_epoch_idx]
@@ -8218,6 +8230,12 @@ class PredictiveDecodingVispyWidget:
         _update_dict = self._render_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d,
                                   epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t,
                                   **_common_past_future_render_trajectory_side_kwargs,
+                                  _update_dict = dict(
+                                        centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
+                                        current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
+                                        time_bin_views=self.time_bin_views, time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                                        past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
+                                    ),  
         )
         #TODO 2026-02-03 12:56: - [ ] Apply to self!
         
