@@ -7261,8 +7261,12 @@ class PredictiveDecodingVispyWidget:
         else:
             epoch_start_t = None
             epoch_end_t = None
+            
+        # Get posterior data
         p_x_given_n = self.a_flat_matching_results_list_ds.p_x_given_n_list[new_epoch_idx]
         posterior_2d = np.sum(p_x_given_n, axis=2)
+        
+        # Generate time bin colors for use in trajectory and centroid coloring
         n_time_bins = p_x_given_n.shape[2]
         time_bin_colors = self._time_bin_colors(n_time_bins, alpha=0.9)
         x_min, x_max = self.xbin[0], self.xbin[-1]
@@ -7344,12 +7348,30 @@ class PredictiveDecodingVispyWidget:
                     line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=view.scene)
                     line.order = 0
                     self.full_position_background_line.append(line)
+                    
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # LEFT PANE: PAST                                                                                                                                                                                                                                                                      #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # Render Past Trajectories and collect data for timeline
         past_trajectory_colors_and_times = []
         if 'past' in curr_matching_past_future_positions_df_dict:
             self._render_trajectory_side(curr_matching_past_future_positions_df_dict['past'], epoch_start_t, 0.0, self.past_view, self.past_lines, past_trajectory_colors_and_times, max_time_distance, time_bin_colors, x_min, x_max, y_min, y_max, new_epoch_idx)
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # CENTER PANE: CURRENT PBE                                                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        
+        # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
             self.posterior_img = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=self.posterior_2d_view.scene)
             self.posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+            
+        # Render centroid dots and arrows on posterior plot (main view only)
         if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
             epoch_result = self.epoch_flat_mask_future_past_result[new_epoch_idx]
             if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None and 'x' in epoch_result.centroids_df.columns and 'y' in epoch_result.centroids_df.columns and 'segment_idx' in epoch_result.centroids_df.columns:
@@ -7499,9 +7521,22 @@ class PredictiveDecodingVispyWidget:
                                 time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
                                 time_bin_contour.order = 10
                                 self.posterior_mask_contours.append(time_bin_contour)
+                                
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # RIGHT PANE: FUTURE                                                                                                                                                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Render Future Trajectories and collect data for timeline
         future_trajectory_colors_and_times = []
         if 'future' in curr_matching_past_future_positions_df_dict:
             self._render_trajectory_side(curr_matching_past_future_positions_df_dict['future'], epoch_end_t, 0.5, self.future_view, self.future_lines, future_trajectory_colors_and_times, max_time_distance, time_bin_colors, x_min, x_max, y_min, y_max, new_epoch_idx)
+            
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Bottom/Common Panes                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        
+        # Render Combined Timeline Bar (full width, shows all trajectory ticks and current epoch)
         timeline_bar_height = 1.0
         recording_duration = self.recording_t_max - self.recording_t_min
         if recording_duration > 0:
