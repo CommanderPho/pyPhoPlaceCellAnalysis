@@ -7494,7 +7494,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, 
     require_angle_match: bool = False, color_matches_by_matching_angle: bool=False, enable_debug_plot_trajectory_average_angle_arrows: bool=False,
     minimum_included_matching_sequence_length: Optional[int] = None,
-    **kwargs):
+    **kwargs) -> PredictiveDecodingVispyWidget:
     """Standalone function that renders predictive decoding data using vispy instead of the widget.
     
     Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
