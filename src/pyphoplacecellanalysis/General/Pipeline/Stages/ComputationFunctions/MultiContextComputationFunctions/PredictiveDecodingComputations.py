@@ -6865,6 +6865,25 @@ import vispy.scene.visuals as vz
 from vispy.color import Colormap
 from qtpy import QtWidgets, QtCore
 
+# # Vispy - Extreme Debugging __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+# # Set the logging level to DEBUG or INFO
+# vp.set_log_level('DEBUG')
+# # Optional: specifically tell VisPy to be more talkative about config
+# vp.sys_info()
+# # Enable full debug mode for the gloo layer
+# vp.config.update(debug=True, check_errors=True)
+
+
+# Vispy - Normal Running/Development __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+# Set the logging level to DEBUG or INFO
+vp.set_log_level('WARNING')
+# Optional: specifically tell VisPy to be more talkative about config
+# vp.sys_info()
+# Enable full debug mode for the gloo layer
+vp.config.update(debug=False, check_errors=True)
+
+
+
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingVispyWidget:
@@ -8207,95 +8226,11 @@ class PredictiveDecodingVispyWidget:
                 """
                 self.perform_update_table_widgets(new_epoch_idx=new_epoch_idx, epoch_data=epoch_data)
                 
-                # if (self.epoch_table_manager is not None) and (epoch_data is not None):
-                #     # QApplication.processEvents()
-                #     try:
-                #         print(f'trying to update self.epoch_table_manager tables for new_epoch_idx: {new_epoch_idx}...')
-                #         table_update_sources = {}                    
-                #         curr_matching_epochs_df = epoch_data.get('curr_matching_epochs_df', None)
-                #         curr_matching_good_merged_segment_epochs_df = epoch_data.get('curr_matching_good_merged_segment_epochs_df', None)
-                    
-                #         if (curr_matching_epochs_df is None):
-                #             print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_epochs_df is None')
-                #         else:
-                #             a_matching_pos_merged_segment_epochs_df: pd.DataFrame = curr_matching_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[new_epoch_idx]
-                #             if (a_matching_pos_merged_segment_epochs_df is not None) and (len(a_matching_pos_merged_segment_epochs_df) > 0):
-                #                 # table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
-                #                 table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_merged_segment_epochs_df
-                                
-
-                #         if (curr_matching_good_merged_segment_epochs_df is None):
-                #             print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_good_merged_segment_epochs_df is None')
-                #         else:
-                #             a_matching_pos_epochs_df: pd.DataFrame = curr_matching_good_merged_segment_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[new_epoch_idx]
-                #             if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-                #                 # table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
-                #                 table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_epochs_df
-                                
-                #         if table_update_sources:
-                #             visible_columns_dict = {
-                #                 'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
-                #                 'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-                #             }
-                #             print(f'\tperforming update_tables: len(table_update_sources): {len(table_update_sources)}, table_update_sources.keys(): {list(table_update_sources.keys())}, visible_columns_dict: {visible_columns_dict}')
-                #             self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
-                #             try:
-                #                 table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
-                #                 # table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_pos_epochs')
-                #                 try:
-                #                     table.selectionModel().selectionChanged.disconnect(self._apply_trajectory_highlight_for_selected_row)
-                #                 except Exception:
-                #                     pass
-                #                 table.selectionModel().selectionChanged.connect(self._apply_trajectory_highlight_for_selected_row)
-                #                 self._apply_trajectory_highlight_for_selected_row()
-                #             except Exception:
-                #                 pass
-                #         else:
-                #             print(f'\tWARN: no table_update_sources (empty)')
-
-                #     except Exception as e:
-                #         print(f'\tERROR: encountered exception {e} while trying to update table widgets for new_epoch_idx: {new_epoch_idx}!')
-                #         # raise e
-                #         pass
 
             # END def _perform_async_de...
             print(F'scheduling `_perform_async_deferred_update_table_widgets(...)` on timer')
             QtCore.QTimer.singleShot(0, _perform_async_deferred_update_table_widgets)
 
-
-            ## OLDER: from unfiltered datsources
-            # if (self.epoch_table_manager is not None) and (self.a_flat_matching_results_list_ds is not None):
-            #     try:
-            #         print(f'trying to update self.epoch_table_manager tables for new_epoch_idx: {new_epoch_idx}...')
-            #         table_update_sources = {}                    
-            #         if new_epoch_idx >= len(self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list):
-            #             print(f'\tERROR: new_epoch_idx: {new_epoch_idx} >= len(self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list): {len(self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list)}')
-            #         else:
-            #             a_matching_pos_merged_segment_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[new_epoch_idx]
-            #             if (a_matching_pos_merged_segment_epochs_df is not None) and (len(a_matching_pos_merged_segment_epochs_df) > 0):
-            #                 table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
-                                    
-            #         if new_epoch_idx >= len(self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list):
-            #             print(f'\tERROR: new_epoch_idx: {new_epoch_idx} >= len(self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list): {len(self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list)}')
-            #         else:
-            #             a_matching_pos_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[new_epoch_idx]
-            #             if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-            #                 table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
-                            
-            #         if table_update_sources:
-            #             visible_columns_dict = {
-            #                 'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
-            #                 'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-            #             }    
-            #             self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
-            #         else:
-            #             print(f'\tWARN: no table_update_sources (empty)')
-
-            #     except Exception as e:
-            #         print(f'\tERROR: encountered exception {e} while trying to update table widgets for new_epoch_idx: {new_epoch_idx}!')
-            #         # raise e
-            #         pass
-                            
 
         # self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
         self.canvas.update()

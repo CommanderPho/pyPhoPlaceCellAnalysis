@@ -263,12 +263,12 @@ class TableManager:
                 self._update_table(self.dock_items[name], df)
 
 
-    def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100)):
+    def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100), showTimelineSyncModeButton=False, showOptionsButton=True, showCollapseButton=False, **kwargs):
         """Creates a new docked table widget
 
             Uses: `self.visible_columns_dict` to try and determine what columns to display for this dataseries name
         """
-        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', showTimelineSyncModeButton=False, showOptionsButton=True, showCollapseButton=False)
+        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', showTimelineSyncModeButton=showTimelineSyncModeButton, showOptionsButton=showOptionsButton, showCollapseButton=showCollapseButton, **kwargs)
         
         # Create table widget
         visible_columns = self.visible_columns_dict.get(name, ['start', 'delta_aligned_start_t', 'label', 'unique_active_aclus'])
