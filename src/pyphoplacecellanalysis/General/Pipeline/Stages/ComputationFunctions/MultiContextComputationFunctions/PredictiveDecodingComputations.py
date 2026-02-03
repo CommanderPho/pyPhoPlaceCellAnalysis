@@ -7241,7 +7241,7 @@ class PredictiveDecodingVispyWidget:
     # ==================================================================================================================================================================================================================================================================================== #
     def update_epoch_display(self, new_epoch_idx: int):
         """Update the display to show a different epoch."""
-        if new_epoch_idx < 0 or new_epoch_idx >= self.num_epochs:
+        if (new_epoch_idx < 0) or (new_epoch_idx >= self.num_epochs):
             return
         from vispy import scene
         import colorsys
@@ -7251,7 +7251,9 @@ class PredictiveDecodingVispyWidget:
         self.epoch_slider.setValue(new_epoch_idx)
         self.epoch_slider.blockSignals(False)
         self.epoch_value_label.setText(f"{new_epoch_idx}/{self.num_epochs}")
-        self._clear_epoch_visuals()
+        self._clear_epoch_visuals() ## clear existing
+        
+        ## Get the epoch data (this performs the filtering by `minimum_included_matching_sequence_length` if set, etc
         epoch_data = self.a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length)
         filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs        
         if new_epoch_idx < len(filter_epochs):
@@ -7284,6 +7286,12 @@ class PredictiveDecodingVispyWidget:
             img_height, img_width = posterior_2d.T.shape
         x_scale = (x_max - x_min) / img_width
         y_scale = (y_max - y_min) / img_height
+        
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Common PAST/Future Properties                                                                                                                                                                                                                                                        #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## INPUTS: epoch_data (filtered data)
         curr_matching_past_future_positions_df_dict = {k: v for k, v in epoch_data['curr_matching_past_future_positions_df_dict'].items()}
         all_time_distances = []
         if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
@@ -7302,6 +7310,7 @@ class PredictiveDecodingVispyWidget:
                     if np.any(valid_mask):
                         time_rel = t_coords[valid_mask] - epoch_end_t
                         all_time_distances.extend(np.abs(time_rel).tolist())
+                        
         max_time_distance = max(all_time_distances) if all_time_distances else 1.0
         print(f'max_time_distance: {max_time_distance}')
         if max_time_distance > 0:
@@ -7329,6 +7338,8 @@ class PredictiveDecodingVispyWidget:
             self.colorbar_texts.extend([title_past, title_future, title_opacity])
             self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
             self.colorbar_view.camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
+            
+
         if self.show_full_position_background and self.curr_position_df is not None and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
             bg_x = self.curr_position_df['x'].values
             bg_y = self.curr_position_df['y'].values
@@ -7352,6 +7363,10 @@ class PredictiveDecodingVispyWidget:
 
 
 
+        _common_past_future_render_trajectory_side_kwargs = dict(max_time_distance=max_time_distance, time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=new_epoch_idx)
+        ## common outputs: _common_past_future_render_trajectory_side_kwargs
+
+
         # ==================================================================================================================================================================================================================================================================================== #
         # LEFT PANE: PAST                                                                                                                                                                                                                                                                      #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -7359,7 +7374,7 @@ class PredictiveDecodingVispyWidget:
         # Render Past Trajectories and collect data for timeline
         past_trajectory_colors_and_times = []
         if 'past' in curr_matching_past_future_positions_df_dict:
-            self._render_trajectory_side(curr_matching_past_future_positions_df_dict['past'], epoch_start_t, 0.0, self.past_view, self.past_lines, past_trajectory_colors_and_times, max_time_distance, time_bin_colors, x_min, x_max, y_min, y_max, new_epoch_idx)
+            self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict['past'], epoch_anchor_t=epoch_start_t, default_hue=0.0, view=self.past_view, lines_list=self.past_lines, trajectory_colors_and_times_out=past_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs)
 
 
         # ==================================================================================================================================================================================================================================================================================== #
@@ -7529,7 +7544,7 @@ class PredictiveDecodingVispyWidget:
         # Render Future Trajectories and collect data for timeline
         future_trajectory_colors_and_times = []
         if 'future' in curr_matching_past_future_positions_df_dict:
-            self._render_trajectory_side(curr_matching_past_future_positions_df_dict['future'], epoch_end_t, 0.5, self.future_view, self.future_lines, future_trajectory_colors_and_times, max_time_distance, time_bin_colors, x_min, x_max, y_min, y_max, new_epoch_idx)
+            self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict['future'], epoch_anchor_t=epoch_end_t, default_hue=0.5, view=self.future_view, lines_list=self.future_lines, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs)
             
 
         # ==================================================================================================================================================================================================================================================================================== #
