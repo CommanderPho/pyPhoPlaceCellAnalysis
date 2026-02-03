@@ -6801,6 +6801,790 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # 2026-01-21 - Vispy                                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
 
+@metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
+@define(slots=False, repr=False, eq=False)
+class PredictiveDecodingVispyWidget:
+    """Vispy-based widget that renders predictive decoding data (same data as PredictiveDecodingDisplayWidget).
+
+    Keyboard: Left/Right arrow to change epoch. Use init_from_list or init_from_datasource to create;
+    render_predictive_decoding_with_vispy is a thin wrapper that returns (main_window, canvas, state).
+    """
+    # Data / config
+    epoch_flat_mask_future_past_result: Optional[List[MatchingPastFuturePositionsResult]] = field(default=None)
+    a_decoded_filter_epochs_df: Optional[pd.DataFrame] = field(default=None)
+    a_flat_matching_results_list_ds: Optional['MaskDataSource'] = field(default=None)
+    curr_position_df: pd.DataFrame = field(default=None)
+    pf_decoder: BasePositionDecoder = field(default=None)
+    decoded_result: DecodedFilterEpochsResult = field(default=None)
+    active_epoch_idx: int = field(default=0)
+    current_traj_seconds_pre_post_extension: float = field(default=0.750)
+    past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = field(default=(0.4, 1.0))
+    start_end_extension_max_opacity: float = field(default=0.4)
+    show_full_position_background: bool = field(default=False)
+    require_angle_match: bool = field(default=False)
+    color_matches_by_matching_angle: bool = field(default=False)
+    enable_debug_plot_trajectory_average_angle_arrows: bool = field(default=False)
+    minimum_included_matching_sequence_length: Optional[int] = field(default=None)
+    max_time_bins_to_show: int = field(default=12)
+    # Derived in setup()
+    xbin: Optional[Any] = field(default=None)
+    ybin: Optional[Any] = field(default=None)
+    num_epochs: int = field(default=0)
+    recording_t_min: float = field(default=0.0)
+    recording_t_max: float = field(default=1.0)
+    past_future_trajectory_start_extension_seconds: float = field(default=0.0)
+    past_future_trajectory_end_extension_seconds: float = field(default=0.0)
+    # UI / vispy (created in buildUI)
+    canvas: Any = field(default=None)
+    main_window: Any = field(default=None)
+    grid: Any = field(default=None)
+    past_view: Any = field(default=None)
+    posterior_2d_view: Any = field(default=None)
+    future_view: Any = field(default=None)
+    time_bin_grid: Any = field(default=None)
+    time_bin_views: List[Any] = field(default=Factory(list))
+    combined_timeline_view: Any = field(default=None)
+    colorbar_view: Any = field(default=None)
+    epoch_slider: Any = field(default=None)
+    epoch_value_label: Any = field(default=None)
+    current_epoch_idx: int = field(default=0)
+    # Mutable visual lists (cleared/repopulated in update_epoch_display)
+    past_lines: List[Any] = field(default=Factory(list))
+    future_lines: List[Any] = field(default=Factory(list))
+    time_bin_images: List[Any] = field(default=Factory(list))
+    time_bin_labels: List[Any] = field(default=Factory(list))
+    past_mask_contours: List[Any] = field(default=Factory(list))
+    posterior_mask_contours: List[Any] = field(default=Factory(list))
+    future_mask_contours: List[Any] = field(default=Factory(list))
+    colorbar_rects: List[Any] = field(default=Factory(list))
+    colorbar_texts: List[Any] = field(default=Factory(list))
+    centroid_dots: List[Any] = field(default=Factory(list))
+    centroid_arrows: List[Any] = field(default=Factory(list))
+    trajectory_debug_arrows: List[Any] = field(default=Factory(list))
+    full_position_background_line: List[Any] = field(default=Factory(list))
+    timeline_ticks: List[Any] = field(default=Factory(list))
+    trajectory_arrows: List[Any] = field(default=Factory(list))
+    posterior_img: Any = field(default=None)
+    epoch_info_text: Any = field(default=None)
+    current_position_line: Any = field(default=None)
+    timeline_bar: Any = field(default=None)
+    timeline_epoch_rect: Any = field(default=None)
+    timeline_epoch_triangle: Any = field(default=None)
+
+    def __attrs_post_init__(self):
+        if self.a_flat_matching_results_list_ds is None and self.epoch_flat_mask_future_past_result is not None and self.a_decoded_filter_epochs_df is not None:
+            self.a_flat_matching_results_list_ds = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(
+                epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result,
+                filter_epochs=self.a_decoded_filter_epochs_df)
+        self.setup()
+        self.buildUI()
+
+    @classmethod
+    def init_from_list(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
+        current_traj_seconds_pre_post_extension: float = 0.750, past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False,
+        require_angle_match: bool = False, color_matches_by_matching_angle: bool = False, enable_debug_plot_trajectory_average_angle_arrows: bool = False, minimum_included_matching_sequence_length: Optional[int] = None, **kwargs) -> "PredictiveDecodingVispyWidget":
+        a_flat_matching_results_list_ds = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(
+            epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
+        return cls(
+            epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result,
+            a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+            a_flat_matching_results_list_ds=a_flat_matching_results_list_ds,
+            curr_position_df=curr_position_df,
+            pf_decoder=pf_decoder,
+            decoded_result=decoded_result,
+            active_epoch_idx=active_epoch_idx,
+            current_traj_seconds_pre_post_extension=current_traj_seconds_pre_post_extension,
+            past_future_trajectory_extension_seconds=past_future_trajectory_extension_seconds,
+            start_end_extension_max_opacity=start_end_extension_max_opacity,
+            show_full_position_background=show_full_position_background,
+            require_angle_match=require_angle_match,
+            color_matches_by_matching_angle=color_matches_by_matching_angle,
+            enable_debug_plot_trajectory_average_angle_arrows=enable_debug_plot_trajectory_average_angle_arrows,
+            minimum_included_matching_sequence_length=minimum_included_matching_sequence_length,
+            **kwargs)
+
+    @classmethod
+    def init_from_datasource(cls, datasource: 'MaskDataSource', curr_position_df: pd.DataFrame, pf_decoder: Any, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0, **kwargs) -> "PredictiveDecodingVispyWidget":
+        return cls(
+            epoch_flat_mask_future_past_result=None,
+            a_decoded_filter_epochs_df=datasource.filter_epochs,
+            a_flat_matching_results_list_ds=datasource,
+            curr_position_df=curr_position_df,
+            pf_decoder=pf_decoder,
+            decoded_result=decoded_result,
+            active_epoch_idx=active_epoch_idx)
+
+    def setup(self):
+        if self.pf_decoder is None:
+            raise ValueError("pf_decoder must be provided")
+        self.xbin = deepcopy(self.pf_decoder.xbin)
+        self.ybin = deepcopy(self.pf_decoder.ybin)
+        self.num_epochs = len(self.a_flat_matching_results_list_ds.p_x_given_n_list)
+        if self.curr_position_df is not None and 't' in self.curr_position_df.columns:
+            self.recording_t_min = self.curr_position_df['t'].min()
+            self.recording_t_max = self.curr_position_df['t'].max()
+        elif self.a_decoded_filter_epochs_df is not None:
+            self.recording_t_min = self.a_decoded_filter_epochs_df['start'].min() if 'start' in self.a_decoded_filter_epochs_df.columns else 0.0
+            self.recording_t_max = self.a_decoded_filter_epochs_df['stop'].max() if 'stop' in self.a_decoded_filter_epochs_df.columns else 1.0
+        ext = self.past_future_trajectory_extension_seconds
+        if isinstance(ext, (int, float)):
+            self.past_future_trajectory_start_extension_seconds = float(ext)
+            self.past_future_trajectory_end_extension_seconds = float(ext)
+        elif isinstance(ext, (tuple, list)) and len(ext) == 2:
+            self.past_future_trajectory_start_extension_seconds, self.past_future_trajectory_end_extension_seconds = float(ext[0]), float(ext[1])
+        elif isinstance(ext, dict):
+            self.past_future_trajectory_start_extension_seconds = float(ext.get('start', 0.0))
+            self.past_future_trajectory_end_extension_seconds = float(ext.get('end', 0.0))
+        else:
+            self.past_future_trajectory_start_extension_seconds = 0.0
+            self.past_future_trajectory_end_extension_seconds = 0.0
+
+    def get_state(self) -> dict:
+        return {
+            'num_epochs': self.num_epochs,
+            'epoch_slider': self.epoch_slider,
+            'epoch_value_label': self.epoch_value_label,
+            'update_epoch_display': self.update_epoch_display,
+        }
+
+    def as_viewer_tuple(self) -> tuple:
+        return (self.main_window, self.canvas, self.get_state())
+
+    def buildUI(self):
+        from vispy import app, scene
+        from qtpy import QtWidgets, QtCore
+        self.current_epoch_idx = self.active_epoch_idx
+        canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
+        self.canvas = canvas
+        main_window = QtWidgets.QMainWindow()
+        main_window.setWindowTitle('Predictive Decoding Display - Vispy')
+        self.main_window = main_window
+        central_widget = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(canvas.native, stretch=1)
+        slider_widget = QtWidgets.QWidget()
+        slider_layout = QtWidgets.QHBoxLayout(slider_widget)
+        slider_label = QtWidgets.QLabel("Epoch:")
+        epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        epoch_slider.setMinimum(0)
+        epoch_slider.setMaximum(max(0, self.num_epochs - 1))
+        epoch_slider.setValue(min(self.active_epoch_idx, self.num_epochs - 1))
+        epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        epoch_slider.setTickInterval(1)
+        epoch_value_label = QtWidgets.QLabel(f"{self.active_epoch_idx}/{self.num_epochs}")
+        epoch_value_label.setMinimumWidth(60)
+        self.epoch_slider = epoch_slider
+        self.epoch_value_label = epoch_value_label
+        slider_layout.addWidget(slider_label)
+        slider_layout.addWidget(epoch_slider, stretch=1)
+        slider_layout.addWidget(epoch_value_label)
+        main_layout.addWidget(slider_widget)
+        main_window.setCentralWidget(central_widget)
+        main_window.resize(1400, 950)
+        main_window.show()
+        grid = canvas.central_widget.add_grid()
+        self.grid = grid
+        self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
+        self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
+        self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
+        self.time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
+        self.time_bin_grid.height_max = 120
+        self.combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
+        self.combined_timeline_view.height_max = 40
+        self.colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
+        self.colorbar_view.height_max = 60
+
+        def on_slider_value_changed(value):
+            self.epoch_value_label.setText(f"{value}/{self.num_epochs}")
+
+        def on_slider_released():
+            self.update_epoch_display(self.epoch_slider.value())
+
+        epoch_slider.valueChanged.connect(on_slider_value_changed)
+        epoch_slider.sliderReleased.connect(on_slider_released)
+
+        def on_key_press(event):
+            if event.key == 'Left':
+                self.update_epoch_display(self.current_epoch_idx - 1)
+            elif event.key == 'Right':
+                self.update_epoch_display(self.current_epoch_idx + 1)
+
+        if hasattr(canvas.events, 'key_press'):
+            canvas.events.key_press.connect(on_key_press)
+
+        for view in [self.past_view, self.posterior_2d_view, self.future_view]:
+            view.camera = scene.PanZoomCamera(aspect=1)
+            scene.visuals.GridLines(parent=view.scene)
+        self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
+        x_min, x_max = self.xbin[0], self.xbin[-1]
+        y_min, y_max = self.ybin[0], self.ybin[-1]
+        bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
+        for view in [self.past_view, self.posterior_2d_view, self.future_view]:
+            scene.visuals.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+        extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
+        for view in [self.past_view, self.future_view]:
+            view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
+        y_range = extent[3] - extent[2]
+        self.posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
+        timeline_bar_height = 1.0
+        recording_duration = self.recording_t_max - self.recording_t_min
+        self.combined_timeline_view.camera = scene.PanZoomCamera()
+        self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
+        self.update_epoch_display(self.active_epoch_idx)
+
+    def _clear_epoch_visuals(self):
+        for line in self.past_lines:
+            line.parent = None
+        self.past_lines.clear()
+        if self.posterior_img is not None:
+            self.posterior_img.parent = None
+            self.posterior_img = None
+        for img in self.time_bin_images:
+            if img is not None:
+                img.parent = None
+        self.time_bin_images.clear()
+        for label in self.time_bin_labels:
+            if label is not None:
+                label.parent = None
+        self.time_bin_labels.clear()
+        for line in self.future_lines:
+            line.parent = None
+        self.future_lines.clear()
+        for contour in self.past_mask_contours:
+            if contour is not None:
+                contour.parent = None
+        self.past_mask_contours.clear()
+        for contour in self.posterior_mask_contours:
+            if contour is not None:
+                contour.parent = None
+        self.posterior_mask_contours.clear()
+        for contour in self.future_mask_contours:
+            if contour is not None:
+                contour.parent = None
+        self.future_mask_contours.clear()
+        for rect in self.colorbar_rects:
+            if rect is not None:
+                rect.parent = None
+        self.colorbar_rects.clear()
+        for text in self.colorbar_texts:
+            if text is not None:
+                text.parent = None
+        self.colorbar_texts.clear()
+        if self.epoch_info_text is not None:
+            self.epoch_info_text.parent = None
+            self.epoch_info_text = None
+        for dot in self.centroid_dots:
+            if dot is not None:
+                dot.parent = None
+        self.centroid_dots.clear()
+        for arrow in self.centroid_arrows:
+            if arrow is not None:
+                arrow.parent = None
+        self.centroid_arrows.clear()
+        for arrow in self.trajectory_debug_arrows:
+            if arrow is not None:
+                arrow.parent = None
+        self.trajectory_debug_arrows.clear()
+        for tick in self.timeline_ticks:
+            if tick is not None:
+                tick.parent = None
+        self.timeline_ticks.clear()
+        if self.timeline_bar is not None:
+            self.timeline_bar.parent = None
+            self.timeline_bar = None
+        if self.timeline_epoch_rect is not None:
+            self.timeline_epoch_rect.parent = None
+            self.timeline_epoch_rect = None
+        if self.timeline_epoch_triangle is not None:
+            self.timeline_epoch_triangle.parent = None
+            self.timeline_epoch_triangle = None
+
+    def update_epoch_display(self, new_epoch_idx: int):
+        """Update the display to show a different epoch."""
+        if new_epoch_idx < 0 or new_epoch_idx >= self.num_epochs:
+            return
+        from vispy import scene
+        import colorsys
+        from qtpy.QtWidgets import QApplication
+        self.current_epoch_idx = new_epoch_idx
+        self.epoch_slider.blockSignals(True)
+        self.epoch_slider.setValue(new_epoch_idx)
+        self.epoch_slider.blockSignals(False)
+        self.epoch_value_label.setText(f"{new_epoch_idx}/{self.num_epochs}")
+        self._clear_epoch_visuals()
+        epoch_data = self.a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length)
+        filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs
+        if new_epoch_idx < len(filter_epochs):
+            epoch_row = filter_epochs.iloc[new_epoch_idx]
+            epoch_start_t = epoch_row['start'] if 'start' in epoch_row else epoch_row.get('t_start', None)
+            epoch_end_t = epoch_row['stop'] if 'stop' in epoch_row else epoch_row.get('t_stop', None)
+        else:
+            epoch_start_t = None
+            epoch_end_t = None
+        p_x_given_n = self.a_flat_matching_results_list_ds.p_x_given_n_list[new_epoch_idx]
+        posterior_2d = np.sum(p_x_given_n, axis=2)
+        n_time_bins = p_x_given_n.shape[2]
+        time_bin_colors = np.zeros((n_time_bins, 4), dtype=np.float32)
+        for t_idx in range(n_time_bins):
+            hue = (t_idx / max(n_time_bins, 1)) % 1.0
+            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+            time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.9)
+        x_min, x_max = self.xbin[0], self.xbin[-1]
+        y_min, y_max = self.ybin[0], self.ybin[-1]
+        if posterior_2d is None or posterior_2d.size == 0:
+            if hasattr(self.a_flat_matching_results_list_ds, 'epoch_high_prob_pos_masks') and self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks is not None and new_epoch_idx < len(self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks):
+                mask_2d = self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks[new_epoch_idx]
+                if mask_2d is not None and mask_2d.size > 0:
+                    img_height, img_width = mask_2d.T.shape
+                else:
+                    return
+            else:
+                return
+        else:
+            img_height, img_width = posterior_2d.T.shape
+        x_scale = (x_max - x_min) / img_width
+        y_scale = (y_max - y_min) / img_height
+        curr_matching_past_future_positions_df_dict = {k: v for k, v in epoch_data['curr_matching_past_future_positions_df_dict'].items()}
+        all_time_distances = []
+        if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
+            for epoch_id, positions_df in curr_matching_past_future_positions_df_dict['past'].items():
+                if len(positions_df) > 0 and 't' in positions_df.columns:
+                    t_coords = positions_df['t'].values
+                    valid_mask = ~np.isnan(t_coords)
+                    if np.any(valid_mask):
+                        time_rel = t_coords[valid_mask] - epoch_start_t
+                        all_time_distances.extend(np.abs(time_rel).tolist())
+        if 'future' in curr_matching_past_future_positions_df_dict and epoch_end_t is not None:
+            for epoch_id, positions_df in curr_matching_past_future_positions_df_dict['future'].items():
+                if len(positions_df) > 0 and 't' in positions_df.columns:
+                    t_coords = positions_df['t'].values
+                    valid_mask = ~np.isnan(t_coords)
+                    if np.any(valid_mask):
+                        time_rel = t_coords[valid_mask] - epoch_end_t
+                        all_time_distances.extend(np.abs(time_rel).tolist())
+        max_time_distance = max(all_time_distances) if all_time_distances else 1.0
+        print(f'max_time_distance: {max_time_distance}')
+        if max_time_distance > 0:
+            colorbar_width, colorbar_height, num_segments = 800, 40, 200
+            time_range = np.linspace(-max_time_distance, max_time_distance, num_segments)
+            segment_width = colorbar_width / num_segments
+            for i, time_val in enumerate(time_range):
+                time_distance = np.abs(time_val)
+                distance_normalized = time_distance / max_time_distance
+                opacity = np.clip(1.0 - distance_normalized * 0.8, 0.2, 1.0)
+                hue = 0.0 if time_val < 0 else 0.5
+                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                color = (rgb[0], rgb[1], rgb[2], opacity)
+                x_pos = i * segment_width
+                rect = scene.visuals.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene)
+                self.colorbar_rects.append(rect)
+            label_times = [-max_time_distance, -max_time_distance/2, 0, max_time_distance/2, max_time_distance]
+            label_positions = np.linspace(0, colorbar_width, len(label_times))
+            for time_val, x_pos in zip(label_times, label_positions):
+                text = scene.visuals.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=self.colorbar_view.scene)
+                self.colorbar_texts.append(text)
+            title_past = scene.visuals.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_future = scene.visuals.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_opacity = scene.visuals.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=self.colorbar_view.scene)
+            self.colorbar_texts.extend([title_past, title_future, title_opacity])
+            self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
+            self.colorbar_view.camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
+        if self.show_full_position_background and self.curr_position_df is not None and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
+            bg_x = self.curr_position_df['x'].values
+            bg_y = self.curr_position_df['y'].values
+            bg_valid_mask = ~(np.isnan(bg_x) | np.isnan(bg_y))
+            if np.any(bg_valid_mask):
+                bg_x_valid, bg_y_valid = bg_x[bg_valid_mask], bg_y[bg_valid_mask]
+                n_bg_points = len(bg_x_valid)
+                bg_colors = np.ones((n_bg_points, 4), dtype=np.float32)
+                bg_colors[:, :3] = 0.5
+                bg_colors[:, 3] = 0.2
+                for bg_line in self.full_position_background_line:
+                    if bg_line is not None:
+                        bg_line.parent = None
+                self.full_position_background_line.clear()
+                bg_pos = np.column_stack([bg_x_valid, bg_y_valid])
+                for view in [self.past_view, self.posterior_2d_view, self.future_view]:
+                    line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=view.scene)
+                    line.order = 0
+                    self.full_position_background_line.append(line)
+        past_trajectory_colors_and_times = []
+        if 'past' in curr_matching_past_future_positions_df_dict:
+            past_positions_dict = curr_matching_past_future_positions_df_dict['past']
+            for epoch_id, positions_df in list(past_positions_dict.items()):
+                if self.require_angle_match and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns and not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
+                    continue
+                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                    x_coords, y_coords = positions_df['x'].values, positions_df['y'].values
+                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                    if np.any(valid_mask):
+                        x_valid, y_valid = x_coords[valid_mask], y_coords[valid_mask]
+                        if self.color_matches_by_matching_angle and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
+                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
+                            if len(valid_match_indices) > 0:
+                                segment_row_idx = int(valid_match_indices[0])
+                                matched_t_idx = None
+                                if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+                                    curr_epoch_result = self.epoch_flat_mask_future_past_result[new_epoch_idx]
+                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None and hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
+                                        search_df = curr_epoch_result.a_centroids_search_segments_df
+                                        if segment_row_idx < len(search_df):
+                                            actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+                                            matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+                                            if len(matching_t_bins) > 0:
+                                                matched_t_idx = matching_t_bins[0]
+                                base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if (matched_t_idx is not None and matched_t_idx < len(time_bin_colors)) else colorsys.hsv_to_rgb(0.0, 0.8, 0.9)
+                            else:
+                                base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)
+                        else:
+                            base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)
+                        if epoch_start_t is not None and 't' in positions_df.columns:
+                            t_coords = positions_df['t'].values[valid_mask]
+                            mean_time = np.mean(t_coords)
+                            past_trajectory_colors_and_times.append((colorsys.hsv_to_rgb(0.0, 0.8, 0.9), mean_time))
+                            time_rel = t_coords - epoch_start_t
+                            time_distance = np.abs(time_rel)
+                            opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
+                            traj_t_min, traj_t_max = np.min(t_coords), np.max(t_coords)
+                            if self.past_future_trajectory_start_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
+                                ext_start_t = traj_t_min - self.past_future_trajectory_start_extension_seconds
+                                ext_mask = (self.curr_position_df['t'] >= ext_start_t) & (self.curr_position_df['t'] < traj_t_min)
+                                ext_positions = self.curr_position_df[ext_mask]
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid, ext_y_valid = ext_x[ext_valid_mask], ext_y[ext_valid_mask]
+                                        x_valid = np.concatenate([ext_x_valid, x_valid])
+                                        y_valid = np.concatenate([ext_y_valid, y_valid])
+                                        ext_opacity = np.ones(len(ext_x_valid)) * self.start_end_extension_max_opacity
+                                        opacity = np.concatenate([ext_opacity, opacity])
+                            if self.past_future_trajectory_end_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
+                                ext_end_t = traj_t_max + self.past_future_trajectory_end_extension_seconds
+                                ext_mask = (self.curr_position_df['t'] > traj_t_max) & (self.curr_position_df['t'] <= ext_end_t)
+                                ext_positions = self.curr_position_df[ext_mask]
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns and 't' in ext_positions.columns:
+                                    ext_x = ext_positions['x'].values
+                                    ext_y = ext_positions['y'].values
+                                    ext_t = ext_positions['t'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid = ext_x[ext_valid_mask]
+                                        ext_y_valid = ext_y[ext_valid_mask]
+                                        ext_t_valid = ext_t[ext_valid_mask]
+                                        x_valid = np.concatenate([x_valid, ext_x_valid])
+                                        y_valid = np.concatenate([y_valid, ext_y_valid])
+                                        ext_opacity = self.start_end_extension_max_opacity * (1.0 - (ext_t_valid - traj_t_max) / self.past_future_trajectory_end_extension_seconds)
+                                        opacity = np.concatenate([opacity, ext_opacity])
+                        else:
+                            opacity = np.ones(len(x_valid)) * 0.8
+                        n_points = len(x_valid)
+                        colors = np.ones((n_points, 4), dtype=np.float32)
+                        colors[:, 0], colors[:, 1], colors[:, 2] = base_rgb[0], base_rgb[1], base_rgb[2]
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=self.past_view.scene)
+                        line.order = 1
+                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
+                        self.past_lines.append(line)
+                        if self.enable_debug_plot_trajectory_average_angle_arrows and 'segment_Vp_deg' in positions_df.columns:
+                            segment_angles = positions_df['segment_Vp_deg'].values
+                            valid_angles = segment_angles[~np.isnan(segment_angles)]
+                            if len(valid_angles) > 0:
+                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
+                                mean_angle_rad = np.radians(mean_angle_deg)
+                                center_idx = len(x_valid) // 2
+                                x_center, y_center = x_valid[center_idx], y_valid[center_idx]
+                                data_scale = max(x_max - x_min, y_max - y_min)
+                                arrow_head_size = data_scale * 0.04
+                                arrow_length = arrow_head_size * 0.5
+                                x_end = x_center + arrow_length * np.cos(mean_angle_rad)
+                                y_end = y_center + arrow_length * np.sin(mean_angle_rad)
+                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=self.past_view.scene)
+                                debug_arrow.order = 5
+                                self.trajectory_debug_arrows.append(debug_arrow)
+        if posterior_2d is not None and posterior_2d.size > 0:
+            self.posterior_img = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=self.posterior_2d_view.scene)
+            self.posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+        if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+            epoch_result = self.epoch_flat_mask_future_past_result[new_epoch_idx]
+            if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None and 'x' in epoch_result.centroids_df.columns and 'y' in epoch_result.centroids_df.columns and 'segment_idx' in epoch_result.centroids_df.columns:
+                centroids_df = epoch_result.centroids_df
+                valid_mask = ~(np.isnan(centroids_df['x'].values) | np.isnan(centroids_df['y'].values))
+                if np.any(valid_mask):
+                    x_pixel = centroids_df['x'].values[valid_mask]
+                    y_pixel = centroids_df['y'].values[valid_mask]
+                    x_centroids = x_min + x_pixel * x_scale
+                    y_centroids = y_min + y_pixel * y_scale
+                    original_indices = np.where(valid_mask)[0]
+                    n_centroids = len(x_centroids)
+                    centroid_colors = np.zeros((n_centroids, 4), dtype=np.float32)
+                    for i in range(n_centroids):
+                        t_idx = original_indices[i]
+                        centroid_colors[i] = time_bin_colors[t_idx] if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                    centroid_pos = np.column_stack([x_centroids, y_centroids])
+                    centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=self.posterior_2d_view.scene)
+                    centroid_markers.order = 7
+                    self.centroid_dots.append(centroid_markers)
+                    if 'segment_Vp_deg' in centroids_df.columns:
+                        segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
+                        valid_angle_mask = ~np.isnan(segment_Vp_deg)
+                        if np.any(valid_angle_mask):
+                            data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
+                            arrow_head_size = data_scale * 0.05
+                            arrow_length = arrow_head_size * 0.3
+                            angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
+                            x_centroids_valid = x_centroids[valid_angle_mask]
+                            y_centroids_valid = y_centroids[valid_angle_mask]
+                            arrow_centroid_indices = np.where(valid_angle_mask)[0]
+                            for i in range(len(x_centroids_valid)):
+                                x_center = x_centroids_valid[i]
+                                y_center = y_centroids_valid[i]
+                                angle = angles_rad[i]
+                                x_start, y_start = x_center, y_center
+                                x_end = x_center + arrow_length * np.cos(angle)
+                                y_end = y_center + arrow_length * np.sin(angle)
+                                centroid_idx = arrow_centroid_indices[i]
+                                t_idx = original_indices[centroid_idx]
+                                arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                                arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                arrow.order = 7
+                                self.centroid_arrows.append(arrow)
+        if self.curr_position_df is not None and epoch_start_t is not None and epoch_end_t is not None and 't' in self.curr_position_df.columns and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
+            extended_start_t = epoch_start_t - self.current_traj_seconds_pre_post_extension
+            extended_end_t = epoch_end_t + self.current_traj_seconds_pre_post_extension
+            extended_mask = (self.curr_position_df['t'] >= extended_start_t) & (self.curr_position_df['t'] <= extended_end_t)
+            extended_positions = self.curr_position_df[extended_mask]
+            if len(extended_positions) > 0:
+                x_coords = extended_positions['x'].values
+                y_coords = extended_positions['y'].values
+                t_coords = extended_positions['t'].values
+                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords) | np.isnan(t_coords))
+                if np.any(valid_mask):
+                    x_valid = x_coords[valid_mask]
+                    y_valid = y_coords[valid_mask]
+                    t_valid = t_coords[valid_mask]
+                    within_epoch_mask = (t_valid >= epoch_start_t) & (t_valid <= epoch_end_t)
+                    n_points = len(x_valid)
+                    colors = np.ones((n_points, 4), dtype=np.float32)
+                    colors[:, :3] = 0.7
+                    colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
+                    if self.current_position_line is None:
+                        self.current_position_line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
+                        self.current_position_line.order = 5
+                    else:
+                        self.current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
+                else:
+                    if self.current_position_line is not None:
+                        self.current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+            else:
+                if self.current_position_line is not None:
+                    self.current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+                for arrow in self.trajectory_arrows:
+                    if arrow is not None:
+                        arrow.parent = None
+                self.trajectory_arrows.clear()
+        else:
+            if self.current_position_line is not None:
+                self.current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+            for arrow in self.trajectory_arrows:
+                if arrow is not None:
+                    arrow.parent = None
+            self.trajectory_arrows.clear()
+        if epoch_start_t is not None and epoch_end_t is not None:
+            epoch_info_str = f'Epoch {new_epoch_idx + 1}/{self.num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
+            text_y_pos = y_max + (y_max - y_min) * 0.15
+            text_x_pos = (x_min + x_max) / 2
+            self.epoch_info_text = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=self.posterior_2d_view.scene)
+            y_range = y_max - y_min
+            self.posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+        if p_x_given_n is not None and p_x_given_n.size > 0:
+            n_time_bins = p_x_given_n.shape[2]
+            n_bins_to_show = min(n_time_bins, self.max_time_bins_to_show)
+            view_time_bin_colors = [(colorsys.hsv_to_rgb((t_idx / max(n_time_bins, 1)) % 1.0, 0.8, 0.9)[0], colorsys.hsv_to_rgb((t_idx / max(n_time_bins, 1)) % 1.0, 0.8, 0.9)[1], colorsys.hsv_to_rgb((t_idx / max(n_time_bins, 1)) % 1.0, 0.8, 0.9)[2]) for t_idx in range(n_bins_to_show)]
+            vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
+            if len(self.time_bin_views) != n_bins_to_show:
+                for view in self.time_bin_views:
+                    if view is not None and hasattr(view, 'parent'):
+                        view.parent = None
+                self.time_bin_views.clear()
+                for t_idx in range(n_bins_to_show):
+                    t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
+                    view = self.time_bin_grid.add_view(row=0, col=t_idx, border_color=t_bin_border_color)
+                    view.camera = scene.PanZoomCamera(aspect=1)
+                    view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
+                    self.time_bin_views.append(view)
+            for t_idx in range(n_bins_to_show):
+                slice_2d = p_x_given_n[:, :, t_idx].T.astype(np.float32)
+                if vol_max > vol_min:
+                    slice_2d = (slice_2d - vol_min) / (vol_max - vol_min)
+                view = self.time_bin_views[t_idx]
+                slice_img = scene.visuals.Image(slice_2d, cmap='viridis', parent=view.scene)
+                img_height, img_width = slice_2d.shape
+                scale_x_img = (x_max - x_min) / img_width if img_width > 0 else 1
+                scale_y_img = (y_max - y_min) / img_height if img_height > 0 else 1
+                slice_img.transform = scene.STTransform(scale=(scale_x_img, scale_y_img), translate=(x_min, y_min))
+                self.time_bin_images.append(slice_img)
+                label_y_pos = y_max + (y_max - y_min) * 0.08
+                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
+                self.time_bin_labels.append(label)
+                view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
+        if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+            epoch_result_for_contours = self.epoch_flat_mask_future_past_result[new_epoch_idx]
+            if epoch_result_for_contours is not None and hasattr(epoch_result_for_contours, 'epoch_t_bins_high_prob_pos_mask') and epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask is not None:
+                from skimage import measure
+                per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask
+                n_mask_t_bins = per_t_bin_mask.shape[2]
+                contour_time_bin_colors = np.zeros((n_mask_t_bins, 4), dtype=np.float32)
+                for t_idx in range(n_mask_t_bins):
+                    hue = (t_idx / max(n_mask_t_bins, 1)) % 1.0
+                    rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                    contour_time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.7)
+                for t_idx in range(n_mask_t_bins):
+                    mask_slice = per_t_bin_mask[:, :, t_idx]
+                    if np.any(mask_slice):
+                        mask_transposed = mask_slice.T.astype(np.float32)
+                        contours = measure.find_contours(mask_transposed, level=0.5)
+                        contour_color = tuple(contour_time_bin_colors[t_idx])
+                        n_y_bins, n_x_bins = mask_transposed.shape
+                        for contour in contours:
+                            x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
+                            y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
+                            contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
+                            for view, cont_list in [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, self.posterior_mask_contours), (self.future_view, self.future_mask_contours)]:
+                                c = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
+                                c.order = 10
+                                cont_list.append(c)
+                            if t_idx < len(self.time_bin_views):
+                                time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
+                                time_bin_contour.order = 10
+                                self.postererior_mask_contours.append(time_bin_contour)
+        future_trajectory_colors_and_times = []
+        if 'future' in curr_matching_past_future_positions_df_dict:
+            future_positions_dict = curr_matching_past_future_positions_df_dict['future']
+            for epoch_id, positions_df in list(future_positions_dict.items()):
+                if self.require_angle_match and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns and not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
+                    continue
+                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
+                    x_coords, y_coords = positions_df['x'].values, positions_df['y'].values
+                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
+                    if np.any(valid_mask):
+                        x_valid, y_valid = x_coords[valid_mask], y_coords[valid_mask]
+                        if self.color_matches_by_matching_angle and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
+                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
+                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
+                            if len(valid_match_indices) > 0:
+                                segment_row_idx = int(valid_match_indices[0])
+                                matched_t_idx = None
+                                if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+                                    curr_epoch_result = self.epoch_flat_mask_future_past_result[new_epoch_idx]
+                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None and hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
+                                        search_df = curr_epoch_result.a_centroids_search_segments_df
+                                        if segment_row_idx < len(search_df):
+                                            actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+                                            matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+                                            if len(matching_t_bins) > 0:
+                                                matched_t_idx = matching_t_bins[0]
+                                base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if (matched_t_idx is not None and matched_t_idx < len(time_bin_colors)) else colorsys.hsv_to_rgb(0.5, 0.8, 0.9)
+                            else:
+                                base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)
+                        else:
+                            base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)
+                        if epoch_end_t is not None and 't' in positions_df.columns:
+                            t_coords = positions_df['t'].values[valid_mask]
+                            mean_time = np.mean(t_coords)
+                            future_trajectory_colors_and_times.append((colorsys.hsv_to_rgb(0.5, 0.8, 0.9), mean_time))
+                            time_rel = t_coords - epoch_end_t
+                            time_distance = np.abs(time_rel)
+                            opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
+                            traj_t_min, traj_t_max = np.min(t_coords), np.max(t_coords)
+                            if self.past_future_trajectory_start_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
+                                ext_start_t = traj_t_min - self.past_future_trajectory_start_extension_seconds
+                                ext_mask = (self.curr_position_df['t'] >= ext_start_t) & (self.curr_position_df['t'] < traj_t_min)
+                                ext_positions = self.curr_position_df[ext_mask]
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
+                                    ext_x, ext_y = ext_positions['x'].values, ext_positions['y'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid, ext_y_valid = ext_x[ext_valid_mask], ext_y[ext_valid_mask]
+                                        x_valid = np.concatenate([ext_x_valid, x_valid])
+                                        y_valid = np.concatenate([ext_y_valid, y_valid])
+                                        ext_opacity = np.ones(len(ext_x_valid)) * self.start_end_extension_max_opacity
+                                        opacity = np.concatenate([ext_opacity, opacity])
+                            if self.past_future_trajectory_end_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
+                                ext_end_t = traj_t_max + self.past_future_trajectory_end_extension_seconds
+                                ext_mask = (self.curr_position_df['t'] > traj_t_max) & (self.curr_position_df['t'] <= ext_end_t)
+                                ext_positions = self.curr_position_df[ext_mask]
+                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns and 't' in ext_positions.columns:
+                                    ext_x, ext_y, ext_t = ext_positions['x'].values, ext_positions['y'].values, ext_positions['t'].values
+                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                                    if np.any(ext_valid_mask):
+                                        ext_x_valid, ext_y_valid = ext_x[ext_valid_mask], ext_y[ext_valid_mask]
+                                        ext_t_valid = ext_t[ext_valid_mask]
+                                        x_valid = np.concatenate([x_valid, ext_x_valid])
+                                        y_valid = np.concatenate([y_valid, ext_y_valid])
+                                        ext_opacity = self.start_end_extension_max_opacity * (1.0 - (ext_t_valid - traj_t_max) / self.past_future_trajectory_end_extension_seconds)
+                                        opacity = np.concatenate([opacity, ext_opacity])
+                        else:
+                            opacity = np.ones(len(x_valid)) * 0.8
+                        n_points = len(x_valid)
+                        colors = np.ones((n_points, 4), dtype=np.float32)
+                        colors[:, 0], colors[:, 1], colors[:, 2] = base_rgb[0], base_rgb[1], base_rgb[2]
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=self.future_view.scene)
+                        line.order = 1
+                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
+                        self.future_lines.append(line)
+                        if self.enable_debug_plot_trajectory_average_angle_arrows and 'segment_Vp_deg' in positions_df.columns:
+                            segment_angles = positions_df['segment_Vp_deg'].values
+                            valid_angles = segment_angles[~np.isnan(segment_angles)]
+                            if len(valid_angles) > 0:
+                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
+                                mean_angle_rad = np.radians(mean_angle_deg)
+                                center_idx = len(x_valid) // 2
+                                x_center, y_center = x_valid[center_idx], y_valid[center_idx]
+                                data_scale = max(x_max - x_min, y_max - y_min)
+                                arrow_head_size = data_scale * 0.04
+                                arrow_length = arrow_head_size * 0.5
+                                x_end = x_center + arrow_length * np.cos(mean_angle_rad)
+                                y_end = y_center + arrow_length * np.sin(mean_angle_rad)
+                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=self.future_view.scene)
+                                debug_arrow.order = 5
+                                self.trajectory_debug_arrows.append(debug_arrow)
+        timeline_bar_height = 1.0
+        recording_duration = self.recording_t_max - self.recording_t_min
+        if recording_duration > 0:
+            bar_fill = scene.visuals.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
+            self.timeline_bar = bar_fill
+            if epoch_start_t is not None and epoch_end_t is not None:
+                epoch_duration = epoch_end_t - epoch_start_t
+                epoch_center_t = (epoch_start_t + epoch_end_t) / 2
+                epoch_rect = scene.visuals.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
+                self.timeline_epoch_rect = epoch_rect
+                triangle_height = timeline_bar_height * 0.35
+                triangle_half_width = recording_duration * 0.008
+                triangle_top_y = timeline_bar_height + triangle_height * 0.3
+                triangle_bottom_y = timeline_bar_height - triangle_height * 0.3
+                triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
+                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
+                self.timeline_epoch_triangle = epoch_triangle
+            for base_rgb, mean_time in past_trajectory_colors_and_times:
+                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
+                tick = scene.visuals.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
+                self.timeline_ticks.append(tick)
+            for base_rgb, mean_time in future_trajectory_colors_and_times:
+                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
+                tick = scene.visuals.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
+                self.timeline_ticks.append(tick)
+            self.combined_timeline_view.camera = scene.PanZoomCamera()
+            self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
+        self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
+        self.canvas.update()
+        QApplication.processEvents()
+
+
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
@@ -6841,7 +7625,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         **kwargs: Additional keyword arguments
         
     Returns:
-        vispy.app.Application instance with the rendered visualization
+        Tuple of (main_window, canvas, state) for compatibility with export_vispy_viewer_epochs.
 
     Usage:
 
@@ -6851,1379 +7635,27 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         viewer = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
                                                         curr_position_df=container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result)
 
+    Implemented via PredictiveDecodingVispyWidget.init_from_list(...); returns (main_window, canvas, state) for compatibility.
     """
-    from vispy import app, scene
-    from vispy.scene import visuals
-    import vispy.color
-    import colorsys
-    from qtpy import QtWidgets, QtCore
-    from qtpy.QtWidgets import QApplication
-    
-    # Create MaskDataSource from the matching results
-    a_flat_matching_results_list_ds: MaskDataSource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, filter_epochs=a_decoded_filter_epochs_df)
-    
-    # Get binning information
-    if pf_decoder is not None:
-        xbin = deepcopy(pf_decoder.xbin)
-        xbin_centers = deepcopy(pf_decoder.xbin_centers)
-        ybin_centers = deepcopy(pf_decoder.ybin_centers)
-        ybin = deepcopy(pf_decoder.ybin)
-    else:
-        raise ValueError("pf_decoder must be provided")
-    
-    # Get total number of epochs
-    num_epochs = len(a_flat_matching_results_list_ds.p_x_given_n_list)
-    
-    # Create vispy canvas (don't show yet - we'll embed it in a QMainWindow)
-    canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
-    
-    # Create main window to host canvas and slider
-    main_window = QtWidgets.QMainWindow()
-    main_window.setWindowTitle('Predictive Decoding Display - Vispy')
-    central_widget = QtWidgets.QWidget()
-    main_layout = QtWidgets.QVBoxLayout(central_widget)
-    main_layout.setContentsMargins(0, 0, 0, 0)
-    
-    # Add vispy canvas to layout
-    main_layout.addWidget(canvas.native, stretch=1)
-    
-    # Create slider controls
-    slider_widget = QtWidgets.QWidget()
-    slider_layout = QtWidgets.QHBoxLayout(slider_widget)
-    slider_label = QtWidgets.QLabel("Epoch:")
-    epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-    epoch_slider.setMinimum(0)
-    epoch_slider.setMaximum(max(0, num_epochs - 1))
-    epoch_slider.setValue(min(active_epoch_idx, num_epochs - 1))
-    epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-    epoch_slider.setTickInterval(1)
-    epoch_value_label = QtWidgets.QLabel(f"{active_epoch_idx}/{num_epochs}")
-    epoch_value_label.setMinimumWidth(60)
-    
-    slider_layout.addWidget(slider_label)
-    slider_layout.addWidget(epoch_slider, stretch=1)
-    slider_layout.addWidget(epoch_value_label)
-    main_layout.addWidget(slider_widget)
-    
-    main_window.setCentralWidget(central_widget)
-    main_window.resize(1400, 950)
-    main_window.show()
-    
-    grid = canvas.central_widget.add_grid()
-    
-    # Create three main panes: Past, Posterior, Future
-    # Past and Future views span both rows 0 and 1, Posterior only row 0
-    # Row 0 is 70% height, Row 1 is 30% height (for the middle column)
-    past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
-    future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
-    posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
-    
-    # Row 1: Time bin grid in the middle column only (compact height, expands horizontally)
-    max_time_bins_to_show = 12  # Maximum number of time bins to display
-    time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
-    time_bin_grid.height_max = 120  # Constrain height to be compact, posterior view above will expand to fill remaining space
-    time_bin_views = []  # Will be populated with views for each time bin
-    time_bin_images = []  # Will store image visuals for cleanup
-    time_bin_labels = []  # Will store text labels for cleanup
-    
-    # Row 2: Combined timeline view (full width) showing all trajectory ticks
-    combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
-    combined_timeline_view.height_max = 40  # Reduce timeline height to 1/3
-    
-    # Timeline visual elements (combined)
-    timeline_ticks = []  # List of Line visuals for all trajectory ticks (past and future)
-    timeline_bar = None  # Background bar visual
-    timeline_epoch_rect = None  # Rectangle showing current epoch
-    timeline_epoch_triangle = None  # Triangle marker above current epoch
-    
-    # Create colorbar view below timeline (row 3)
-    colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
-    colorbar_view.height_max = 60  # Reduce colorbar height to 1/3
-    
-    # Compute recording time range from curr_position_df
-    if curr_position_df is not None and 't' in curr_position_df.columns:
-        recording_t_min = curr_position_df['t'].min()
-        recording_t_max = curr_position_df['t'].max()
-    else:
-        # Fallback: estimate from filter epochs
-        recording_t_min = a_decoded_filter_epochs_df['start'].min() if 'start' in a_decoded_filter_epochs_df.columns else 0.0
-        recording_t_max = a_decoded_filter_epochs_df['stop'].max() if 'stop' in a_decoded_filter_epochs_df.columns else 1.0
-    
-    # Store references to visual elements for updating
-    past_lines = []
-    posterior_img = None
-    future_lines = []
-    past_mask_contours = []  # List of contour Line visuals
-    posterior_mask_contours = []  # List of contour Line visuals
-    future_mask_contours = []  # List of contour Line visuals
-    colorbar_rects = []
-    colorbar_texts = []
-    epoch_info_text = None
-    current_position_line = None  # Line visual for current position trajectory during epoch
-    trajectory_arrows = []  # List of Arrow visuals for trajectory direction indicators (start and end)
-    centroid_dots = []  # List of Marker visuals for centroid position dots
-    centroid_arrows = []  # List of Arrow visuals for centroid direction arrows
-    
-    # Parse past_future_trajectory_extension_seconds to get separate start/end values
-    if isinstance(past_future_trajectory_extension_seconds, (int, float)):
-        start_extension_seconds = float(past_future_trajectory_extension_seconds)
-        end_extension_seconds = float(past_future_trajectory_extension_seconds)
-    elif isinstance(past_future_trajectory_extension_seconds, (tuple, list)) and len(past_future_trajectory_extension_seconds) == 2:
-        start_extension_seconds, end_extension_seconds = float(past_future_trajectory_extension_seconds[0]), float(past_future_trajectory_extension_seconds[1])
-    elif isinstance(past_future_trajectory_extension_seconds, dict):
-        start_extension_seconds = float(past_future_trajectory_extension_seconds.get('start', 0.0))
-        end_extension_seconds = float(past_future_trajectory_extension_seconds.get('end', 0.0))
-    else:
-        start_extension_seconds = 0.0
-        end_extension_seconds = 0.0
-    
-    # Store data for updates
-    state = {
-        'current_epoch_idx': active_epoch_idx,
-        'num_epochs': num_epochs,
-        'epoch_flat_mask_future_past_result': epoch_flat_mask_future_past_result,
-        'a_flat_matching_results_list_ds': a_flat_matching_results_list_ds,
-        'xbin': xbin,
-        'ybin': ybin,
-        'recording_t_min': recording_t_min,
-        'recording_t_max': recording_t_max,
-        'past_view': past_view,
-        'posterior_2d_view': posterior_2d_view,
-        'time_bin_grid': time_bin_grid,
-        'time_bin_views': time_bin_views,
-        'time_bin_images': time_bin_images,
-        'time_bin_labels': time_bin_labels,
-        'max_time_bins_to_show': max_time_bins_to_show,
-        'future_view': future_view,
-        'colorbar_view': colorbar_view,
-        'combined_timeline_view': combined_timeline_view,
-        'timeline_ticks': timeline_ticks,
-        'timeline_bar': timeline_bar,
-        'timeline_epoch_rect': timeline_epoch_rect,
-        'timeline_epoch_triangle': timeline_epoch_triangle,
-        'past_lines': past_lines,
-        'posterior_img': posterior_img,
-        'future_lines': future_lines,
-        'past_mask_contours': past_mask_contours,
-        'posterior_mask_contours': posterior_mask_contours,
-        'future_mask_contours': future_mask_contours,
-        'colorbar_rects': colorbar_rects,
-        'colorbar_texts': colorbar_texts,
-        'epoch_info_text': epoch_info_text,
-        'current_position_line': current_position_line,
-        'trajectory_arrows': trajectory_arrows,
-        'centroid_dots': centroid_dots,
-        'centroid_arrows': centroid_arrows,
-        'curr_position_df': curr_position_df,
-        'current_traj_seconds_pre_post_extension': current_traj_seconds_pre_post_extension,
-        'past_future_trajectory_start_extension_seconds': start_extension_seconds,
-        'past_future_trajectory_end_extension_seconds': end_extension_seconds,
-        'start_end_extension_max_opacity': start_end_extension_max_opacity,
-        'show_full_position_background': show_full_position_background,
-        'require_angle_match': require_angle_match,
-        'color_matches_by_matching_angle': color_matches_by_matching_angle,
-        'enable_debug_plot_trajectory_average_angle_arrows': enable_debug_plot_trajectory_average_angle_arrows,
-        'minimum_included_matching_sequence_length': minimum_included_matching_sequence_length,
-        'trajectory_debug_arrows': [],  # List of Arrow visuals for debug trajectory direction
-        'full_position_background_line': [],  # List of Line visuals for full position background in each view (if enabled)
-        'canvas': canvas,
-        'main_window': main_window,
-        'epoch_slider': epoch_slider,
-        'epoch_value_label': epoch_value_label
-    }
-    
-    # Slider event handlers
-    def on_slider_value_changed(value):
-        """Update label only while dragging (no expensive display update)."""
-        state['epoch_value_label'].setText(f"{value}/{state['num_epochs']}")
-    
-    def on_slider_released():
-        """Update display when slider is released."""
-        value = state['epoch_slider'].value()
-        update_epoch_display(value)
-    
-    epoch_slider.valueChanged.connect(on_slider_value_changed)
-    epoch_slider.sliderReleased.connect(on_slider_released)
-    
-    def update_epoch_display(new_epoch_idx: int):
-        """Update the display to show a different epoch."""
-        if new_epoch_idx < 0 or new_epoch_idx >= num_epochs:
-            return
-        
-        state['current_epoch_idx'] = new_epoch_idx
-        
-        # Sync slider with current epoch (without triggering valueChanged handler recursively)
-        state['epoch_slider'].blockSignals(True)
-        state['epoch_slider'].setValue(new_epoch_idx)
-        state['epoch_slider'].blockSignals(False)
-        state['epoch_value_label'].setText(f"{new_epoch_idx}/{state['num_epochs']}")
-        
-        # Clear existing visuals
-        for line in state['past_lines']:
-            line.parent = None
-        state['past_lines'].clear()
-        
-        if state['posterior_img'] is not None:
-            state['posterior_img'].parent = None
-            state['posterior_img'] = None
-        
-        # Clear time bin images and labels
-        for img in state['time_bin_images']:
-            if img is not None:
-                img.parent = None
-        state['time_bin_images'].clear()
-        
-        for label in state['time_bin_labels']:
-            if label is not None:
-                label.parent = None
-        state['time_bin_labels'].clear()
-        
-        for line in state['future_lines']:
-            line.parent = None
-        state['future_lines'].clear()
-        
-        # Clear mask contours
-        for contour in state['past_mask_contours']:
-            if contour is not None:
-                contour.parent = None
-        state['past_mask_contours'].clear()
-        
-        for contour in state['posterior_mask_contours']:
-            if contour is not None:
-                contour.parent = None
-        state['posterior_mask_contours'].clear()
-        
-        for contour in state['future_mask_contours']:
-            if contour is not None:
-                contour.parent = None
-        state['future_mask_contours'].clear()
-        
-        # Clear colorbar
-        for rect in state['colorbar_rects']:
-            if rect is not None:
-                rect.parent = None
-        state['colorbar_rects'].clear()
-        
-        for text in state['colorbar_texts']:
-            if text is not None:
-                text.parent = None
-        state['colorbar_texts'].clear()
-        
-        # Clear epoch info text
-        if state['epoch_info_text'] is not None:
-            state['epoch_info_text'].parent = None
-            state['epoch_info_text'] = None
-        
-        # Clear centroid dots and arrows
-        for dot in state['centroid_dots']:
-            if dot is not None:
-                dot.parent = None
-        state['centroid_dots'].clear()
-        
-        for arrow in state['centroid_arrows']:
-            if arrow is not None:
-                arrow.parent = None
-        state['centroid_arrows'].clear()
-        
-        # Clear trajectory debug arrows
-        for arrow in state['trajectory_debug_arrows']:
-            if arrow is not None:
-                arrow.parent = None
-        state['trajectory_debug_arrows'].clear()
-        
-        # Update current position line (reuse existing visual if available)
-        
-        # Clear timeline visuals
-        for tick in state['timeline_ticks']:
-            if tick is not None:
-                tick.parent = None
-        state['timeline_ticks'].clear()
-        
-        if state['timeline_bar'] is not None:
-            state['timeline_bar'].parent = None
-            state['timeline_bar'] = None
-        
-        if state['timeline_epoch_rect'] is not None:
-            state['timeline_epoch_rect'].parent = None
-            state['timeline_epoch_rect'] = None
-        
-        if state['timeline_epoch_triangle'] is not None:
-            state['timeline_epoch_triangle'].parent = None
-            state['timeline_epoch_triangle'] = None
-        
-        # Prepare epoch data
-        epoch_data = state['a_flat_matching_results_list_ds']._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length) ## get the datasource and the prepare the result
-        
-
-        # Get epoch start and end times
-        filter_epochs = state['a_flat_matching_results_list_ds'].filter_epochs
-        if new_epoch_idx < len(filter_epochs):
-            epoch_row = filter_epochs.iloc[new_epoch_idx]
-            epoch_start_t = epoch_row['start'] if 'start' in epoch_row else epoch_row.get('t_start', None)
-            epoch_end_t = epoch_row['stop'] if 'stop' in epoch_row else epoch_row.get('t_stop', None)
-        else:
-            epoch_start_t = None
-            epoch_end_t = None
-        
-        # Get posterior data
-        p_x_given_n = state['a_flat_matching_results_list_ds'].p_x_given_n_list[new_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
-        posterior_2d = np.sum(p_x_given_n, axis=2)  # Collapse over time
-        
-        # Generate time bin colors for use in trajectory and centroid coloring
-        n_time_bins = p_x_given_n.shape[2]
-        time_bin_colors = np.zeros((n_time_bins, 4), dtype=np.float32)
-        for t_idx in range(n_time_bins):
-            hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Distribute hues evenly
-            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-            time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.9)  # High opacity
-        
-        # Calculate extent and scale for rendering (used by posterior and mask overlays)
-        x_min, x_max = state['xbin'][0], state['xbin'][-1]
-        y_min, y_max = state['ybin'][0], state['ybin'][-1]
-        # Determine image dimensions from posterior (or mask if posterior is not available)
-        if posterior_2d is not None and posterior_2d.size > 0:
-            img_height, img_width = posterior_2d.T.shape
-        else:
-            # Fallback: use mask dimensions if available
-            if hasattr(state['a_flat_matching_results_list_ds'], 'epoch_high_prob_pos_masks') and state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks is not None:
-                if new_epoch_idx < len(state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks):
-                    mask_2d = state['a_flat_matching_results_list_ds'].epoch_high_prob_pos_masks[new_epoch_idx]
-                    if mask_2d is not None and mask_2d.size > 0:
-                        img_height, img_width = mask_2d.T.shape
-                    else:
-                        return  # No data to render
-                else:
-                    return  # Invalid epoch index
-            else:
-                return  # No data to render
-        # Calculate scale: map image pixels to world coordinates
-        x_scale = (x_max - x_min) / img_width
-        y_scale = (y_max - y_min) / img_height
-        
-        # First pass: collect all time distances to find maximum for common normalization
-        all_time_distances = []
-        curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
-
-        curr_matching_past_future_positions_df_dict = {k:v for k, v in curr_matching_past_future_positions_df_dict.items()}
-        
-        # epoch_data['merged_segment_epochs'] = 
-
-        # if (minimum_included_matching_sequence_length is not None) and (minimum_included_matching_sequence_length > 0):
-        #     ## filter the sequences shorter than `minimum_included_matching_sequence_length`
-        #     # minimum_included_matching_sequence_length
-        #     raise NotImplementedError(f'#TODO 2026-01-23 13:06: - [ ] Finish')
-        #     assert _test_epoch_result.merged_segment_epochs is not None
-        #     merged_segment_epochs = _test_epoch_result.merged_segment_epochs
-        #     long_merged_segment_epochs: pd.DataFrame = merged_segment_epochs[(merged_segment_epochs['num_epoch_t_bins'] > min_num_spanning_bins)]
-        #     long_only_relevant_merged_positions_df: pd.DataFrame = relevant_merged_positions_df[np.isin(relevant_merged_positions_df[merged_found_pos_epoch_id_key_name], long_merged_segment_epochs['label'])]
-        #     long_only_relevant_merged_positions_df
-        #     # OUTPUTS: long_merged_segment_epochs, long_only_relevant_merged_positions_df
-        
-        # Collect past time distances
-        if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
-            past_positions_dict = curr_matching_past_future_positions_df_dict['past']
-            for epoch_id, positions_df in past_positions_dict.items():
-                if len(positions_df) > 0 and 't' in positions_df.columns:
-                    t_coords = positions_df['t'].values
-                    valid_mask = ~np.isnan(t_coords)
-                    if np.any(valid_mask):
-                        time_rel = t_coords[valid_mask] - epoch_start_t ## negative values
-                        time_distance = np.abs(time_rel)  # Absolute distance
-                        all_time_distances.extend(time_distance.tolist())
-        
-        # Collect future time distances
-        if 'future' in curr_matching_past_future_positions_df_dict and epoch_end_t is not None:
-            future_positions_dict = curr_matching_past_future_positions_df_dict['future']
-            for epoch_id, positions_df in future_positions_dict.items():
-                if len(positions_df) > 0 and 't' in positions_df.columns:
-                    t_coords = positions_df['t'].values
-                    valid_mask = ~np.isnan(t_coords)
-                    if np.any(valid_mask):
-                        time_rel = t_coords[valid_mask] - epoch_end_t ## positive values, good
-                        time_distance = np.abs(time_rel)  # Absolute distance
-                        all_time_distances.extend(time_distance.tolist())
-        
-        # Find maximum distance for normalization
-        if len(all_time_distances) > 0:
-            max_time_distance = max(all_time_distances)
-        else:
-            max_time_distance = 1.0  # Fallback
-        print(f'max_time_distance: {max_time_distance}')
-        
-        # Render colorbar showing time-to-opacity mapping
-        if max_time_distance > 0:
-            # Create colorbar using rectangles for better visibility
-            colorbar_width = 800
-            colorbar_height = 40
-            num_segments = 200  # Number of segments for smooth gradient
-            
-            # Time range: from -max_time_distance (past) to +max_time_distance (future)
-            time_range = np.linspace(-max_time_distance, max_time_distance, num_segments)
-            segment_width = colorbar_width / num_segments
-            
-            # Store rectangles for cleanup
-            colorbar_rects = []
-            
-            # Create gradient segments
-            for i, time_val in enumerate(time_range):
-                time_distance = np.abs(time_val)
-                distance_normalized = time_distance / max_time_distance  # [0, 1]
-                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
-                opacity = np.clip(opacity, 0.2, 1.0)
-                
-                # Past side (left): warm colors, Future side (right): cool colors
-                if time_val < 0:  # Past
-                    hue = 0.0  # Red
-                else:  # Future
-                    hue = 0.5  # Cyan
-                
-                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-                color = (rgb[0], rgb[1], rgb[2], opacity)
-                
-                # Create rectangle for this segment
-                x_pos = i * segment_width
-                rect = scene.visuals.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=state['colorbar_view'].scene)
-                colorbar_rects.append(rect)
-            
-            # Store rectangles in state for cleanup
-            state['colorbar_rects'] = colorbar_rects
-            
-            # Add text labels for time values
-            label_times = [-max_time_distance, -max_time_distance/2, 0, max_time_distance/2, max_time_distance]
-            label_positions = np.linspace(0, colorbar_width, len(label_times))
-            
-            for time_val, x_pos in zip(label_times, label_positions):
-                text = scene.visuals.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=state['colorbar_view'].scene)
-                state['colorbar_texts'].append(text)
-            
-            # Add title labels
-            title_past = scene.visuals.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=state['colorbar_view'].scene)
-            title_future = scene.visuals.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=state['colorbar_view'].scene)
-            title_opacity = scene.visuals.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=state['colorbar_view'].scene)
-            state['colorbar_texts'].extend([title_past, title_future, title_opacity])
-            
-            # Set colorbar camera to show the full colorbar
-            state['colorbar_view'].camera = scene.PanZoomCamera(aspect=1)
-            state['colorbar_view'].camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
-
-        # Render full position background line (if enabled) - rendered behind past/future trajectories in all views
-        if state['show_full_position_background'] and state['curr_position_df'] is not None:
-            if 'x' in state['curr_position_df'].columns and 'y' in state['curr_position_df'].columns:
-                bg_x = state['curr_position_df']['x'].values
-                bg_y = state['curr_position_df']['y'].values
-                bg_valid_mask = ~(np.isnan(bg_x) | np.isnan(bg_y))
-                if np.any(bg_valid_mask):
-                    bg_x_valid = bg_x[bg_valid_mask]
-                    bg_y_valid = bg_y[bg_valid_mask]
-                    n_bg_points = len(bg_x_valid)
-                    bg_colors = np.ones((n_bg_points, 4), dtype=np.float32)
-                    bg_colors[:, 0] = 0.5  # Grey
-                    bg_colors[:, 1] = 0.5
-                    bg_colors[:, 2] = 0.5
-                    bg_colors[:, 3] = 0.2  # Very faint alpha
-                    
-                    # Remove old background lines if exist
-                    for bg_line in state['full_position_background_line']:
-                        if bg_line is not None:
-                            bg_line.parent = None
-                    state['full_position_background_line'].clear()
-                    
-                    # Create background lines in all trajectory views (past, posterior 2D, future) - order=0 renders behind other elements
-                    bg_pos = np.column_stack([bg_x_valid, bg_y_valid])
-                    past_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['past_view'].scene)
-                    past_bg_line.order = 0
-                    posterior_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['posterior_2d_view'].scene)
-                    posterior_bg_line.order = 0
-                    future_bg_line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=state['future_view'].scene)
-                    future_bg_line.order = 0
-                    state['full_position_background_line'] = [past_bg_line, posterior_bg_line, future_bg_line]
+    widget = PredictiveDecodingVispyWidget.init_from_list(
+        epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result,
+        a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+        curr_position_df=curr_position_df,
+        pf_decoder=pf_decoder,
+        decoded_result=decoded_result,
+        active_epoch_idx=active_epoch_idx,
+        current_traj_seconds_pre_post_extension=current_traj_seconds_pre_post_extension,
+        past_future_trajectory_extension_seconds=past_future_trajectory_extension_seconds,
+        start_end_extension_max_opacity=start_end_extension_max_opacity,
+        show_full_position_background=show_full_position_background,
+        require_angle_match=require_angle_match,
+        color_matches_by_matching_angle=color_matches_by_matching_angle,
+        enable_debug_plot_trajectory_average_angle_arrows=enable_debug_plot_trajectory_average_angle_arrows,
+        minimum_included_matching_sequence_length=minimum_included_matching_sequence_length,
+        **kwargs)
+    return widget.as_viewer_tuple()
 
 
-        # ==================================================================================================================================================================================================================================================================================== #
-        # LEFT PANE: PAST                                                                                                                                                                                                                                                                      #
-        # ==================================================================================================================================================================================================================================================================================== #
-
-        # Render Past Trajectories and collect data for timeline
-        past_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
-        if 'past' in curr_matching_past_future_positions_df_dict:
-            past_positions_dict = curr_matching_past_future_positions_df_dict['past']
-            past_trajectory_items = list(past_positions_dict.items())
-            for idx, (epoch_id, positions_df) in enumerate(past_trajectory_items):
-                # Filter by angle match if required
-                if state['require_angle_match'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
-                    if not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
-                        continue  # Skip this trajectory - no angle match
-                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
-                    x_coords = positions_df['x'].values
-                    y_coords = positions_df['y'].values
-                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
-                    if np.any(valid_mask):
-                        x_valid = x_coords[valid_mask]
-                        y_valid = y_coords[valid_mask]
-                        
-                        # Determine base color for this trajectory
-                        if state['color_matches_by_matching_angle'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
-                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
-                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
-                            if len(valid_match_indices) > 0:
-                                # Get segment row index from positions_df
-                                segment_row_idx = int(valid_match_indices[0])
-                                # Map segment row index to actual time bin index using epoch's centroids_df
-                                matched_t_idx = None
-                                if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
-                                    curr_epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
-                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None:
-                                        if hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
-                                            search_df = curr_epoch_result.a_centroids_search_segments_df
-                                            if segment_row_idx < len(search_df):
-                                                actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
-                                                # Find first time bin with this segment_idx
-                                                matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
-                                                if len(matching_t_bins) > 0:
-                                                    matched_t_idx = matching_t_bins[0]  # First time bin in segment
-                                if matched_t_idx is not None and matched_t_idx < len(time_bin_colors):
-                                    base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
-                                else:
-                                    base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Fallback to red
-                            else:
-                                base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Default red for non-matching
-                        else:
-                            # Fixed red color for all past trajectories (matches colorbar)
-                            base_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)
-                        
-                        # Calculate opacity based on time distance from epoch start using common normalization
-                        if epoch_start_t is not None and 't' in positions_df.columns:
-                            t_coords = positions_df['t'].values[valid_mask]
-                            # Store mean time for timeline tick - ALWAYS use red for past timeline ticks
-                            mean_time = np.mean(t_coords)
-                            timeline_rgb = colorsys.hsv_to_rgb(0.0, 0.8, 0.9)  # Always red for past
-                            past_trajectory_colors_and_times.append((timeline_rgb, mean_time))
-                            # Time relative to start: negative values (t < start_t)
-                            time_rel = t_coords - epoch_start_t
-                            # Absolute distance from start
-                            time_distance = np.abs(time_rel)
-                            # Normalize using common max distance, then map to [0.2, 1.0]
-                            if max_time_distance > 0:
-                                distance_normalized = time_distance / max_time_distance  # [0, 1]
-                                # Invert: closer to start (smaller distance) should be brighter
-                                # Map from [0, 1] to [0.2, 1.0]: 0 -> 1.0, 1 -> 0.2
-                                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
-                            else:
-                                opacity = np.ones(len(x_valid)) * 0.8
-                            
-                            ### Check for trajectory extensions (separate start and end) ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-                            start_ext_seconds = state['past_future_trajectory_start_extension_seconds']
-                            end_ext_seconds = state['past_future_trajectory_end_extension_seconds']
-                            traj_t_min = np.min(t_coords)
-                            traj_t_max = np.max(t_coords)
-                            
-                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity _________________________________________________________________________________________________________________________________________________________________________________________________ #
-                            if start_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                ext_start_t = traj_t_min - start_ext_seconds
-                                ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
-                                ext_positions = state['curr_position_df'][ext_mask]
-                                
-                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
-                                    ext_x = ext_positions['x'].values
-                                    ext_y = ext_positions['y'].values
-                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                                    if np.any(ext_valid_mask):
-                                        ext_x_valid = ext_x[ext_valid_mask]
-                                        ext_y_valid = ext_y[ext_valid_mask]
-                                        n_ext_points = len(ext_x_valid)
-                                        
-                                        # Prepend extended positions (they come before in time)
-                                        x_valid = np.concatenate([ext_x_valid, x_valid])
-                                        y_valid = np.concatenate([ext_y_valid, y_valid])
-                                        
-                                        # Start extension uses solid start_end_extension_max_opacity (no fade-in)
-                                        ext_opacity = np.ones(n_ext_points) * state['start_end_extension_max_opacity']
-                                        opacity = np.concatenate([ext_opacity, opacity])
-                            
-                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0 _________________________________________________________________________________________________________________________________________________________________________________________ #
-                            if end_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                ext_end_t = traj_t_max + end_ext_seconds
-                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
-                                ext_positions = state['curr_position_df'][ext_mask]
-                                
-                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
-                                    ext_x = ext_positions['x'].values
-                                    ext_y = ext_positions['y'].values
-                                    ext_t = ext_positions['t'].values
-                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                                    if np.any(ext_valid_mask):
-                                        ext_x_valid = ext_x[ext_valid_mask]
-                                        ext_y_valid = ext_y[ext_valid_mask]
-                                        ext_t_valid = ext_t[ext_valid_mask]
-                                        n_ext_points = len(ext_x_valid)
-                                        
-                                        # Append extended positions (they come after in time)
-                                        x_valid = np.concatenate([x_valid, ext_x_valid])
-                                        y_valid = np.concatenate([y_valid, ext_y_valid])
-                                        
-                                        # End extension uses fade-out: start_end_extension_max_opacity -> 0.0
-                                        max_opacity = state['start_end_extension_max_opacity']
-                                        ext_distance = ext_t_valid - traj_t_max  # Distance from trajectory end
-                                        ext_distance_normalized = ext_distance / end_ext_seconds  # [0, 1]
-                                        # Fade from max_opacity to 0.0
-                                        ext_opacity = max_opacity * (1.0 - ext_distance_normalized)
-                                        opacity = np.concatenate([opacity, ext_opacity])
-                        else:
-                            opacity = np.ones(len(x_valid)) * 0.8
-                        
-                        # Create per-vertex colors with varying opacity
-                        n_points = len(x_valid)
-                        colors = np.ones((n_points, 4), dtype=np.float32)
-                        colors[:, 0] = base_rgb[0]  # R
-                        colors[:, 1] = base_rgb[1]  # G
-                        colors[:, 2] = base_rgb[2]  # B
-                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)  # A (opacity), allow fade to 0.0 for end extensions
-                        
-                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['past_view'].scene)
-                        line.order = 1  # Render above background (0) but below contours (10)
-                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
-                        state['past_lines'].append(line)
-                        
-                        # Draw debug arrow at trajectory temporal center if enabled
-                        if state['enable_debug_plot_trajectory_average_angle_arrows'] and 'segment_Vp_deg' in positions_df.columns:
-                            segment_angles = positions_df['segment_Vp_deg'].values
-                            valid_angles = segment_angles[~np.isnan(segment_angles)]
-                            if len(valid_angles) > 0:
-                                # Compute circular mean angle
-                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
-                                mean_angle_rad = np.radians(mean_angle_deg)
-                                
-                                # Find temporal center position
-                                center_idx = len(x_valid) // 2
-                                x_center = x_valid[center_idx]
-                                y_center = y_valid[center_idx]
-                                
-                                # Arrow size based on data scale
-                                data_scale = max(x_max - x_min, y_max - y_min)
-                                arrow_head_size = data_scale * 0.04
-                                arrow_length = arrow_head_size * 0.5
-                                
-                                x_end = x_center + (arrow_length * np.cos(mean_angle_rad))
-                                y_end = y_center + (arrow_length * np.sin(mean_angle_rad))
-                                
-                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=state['past_view'].scene)
-                                debug_arrow.order = 5
-                                state['trajectory_debug_arrows'].append(debug_arrow)
-        
-
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # CENTER PANE: CURRENT PBE                                                                                                                                                                                                                                                             #
-        # ==================================================================================================================================================================================================================================================================================== #
-        
-        # Render Posterior Heatmap (2D view - top half)
-        if posterior_2d is not None and posterior_2d.size > 0:
-            state['posterior_img'] = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=state['posterior_2d_view'].scene)
-            state['posterior_img'].transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
-        
-        # Render centroid dots and arrows on posterior plot (main view only)
-        if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
-            epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
-            if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None:
-                centroids_df = epoch_result.centroids_df
-                if 'x' in centroids_df.columns and 'y' in centroids_df.columns and 'segment_idx' in centroids_df.columns:
-                    # Filter valid centroids
-                    valid_mask = ~(np.isnan(centroids_df['x'].values) | np.isnan(centroids_df['y'].values))
-                    if np.any(valid_mask):
-                        # Centroids are in pixel/bin coordinates, need to convert to world coordinates
-
-                        # INCORRECT: "This is swapped! So we need to swap them back and convert to world coords"
-                        # Note: centroids_from_binary_stack returns [cy, cx] = [y_pixel, x_pixel]
-                        # and DataFrame is created with columns=['x', 'y'], so:
-                        # centroids_df['x'] = cy (y pixel coordinate)
-                        # centroids_df['y'] = cx (x pixel coordinate)
-                        # y_pixel = centroids_df['x'].values[valid_mask]  # Actually y pixel (cy)
-                        # x_pixel = centroids_df['y'].values[valid_mask]  # Actually x pixel (cx)
-
-                        ## CORRECT: non-swapped
-                        x_pixel = centroids_df['x'].values[valid_mask]  # Actually x pixel (cx)
-                        y_pixel = centroids_df['y'].values[valid_mask]  # Actually y pixel (cy)
-
-                        # Convert pixel coordinates to world coordinates using the same scale as the image
-                        # x_world = x_min + x_pixel * x_scale
-                        # y_world = y_min + y_pixel * y_scale
-                        x_centroids = x_min + x_pixel * x_scale
-                        y_centroids = y_min + y_pixel * y_scale
-                        
-                        segment_indices = centroids_df['segment_idx'].values[valid_mask]
-                        
-                        # ========== DIAGNOSTIC COUNT VERIFICATION ==========
-                        n_time_bins = p_x_given_n.shape[2]
-                        n_centroids_total = len(centroids_df)
-                        n_centroids_valid = len(x_centroids)
-                        n_mask_time_bins = epoch_result.epoch_t_bins_high_prob_pos_mask.shape[2] if (hasattr(epoch_result, 'epoch_t_bins_high_prob_pos_mask') and epoch_result.epoch_t_bins_high_prob_pos_mask is not None) else 0
-                        n_views = min(n_time_bins, state['max_time_bins_to_show'])
-                        print(f"COUNT VERIFICATION - n_time_bins: {n_time_bins}, n_centroids_total: {n_centroids_total}, n_centroids_valid: {n_centroids_valid}, n_mask_time_bins: {n_mask_time_bins}, n_views: {n_views}")
-                        if n_centroids_total != n_time_bins:
-                            print(f"  WARNING: Centroid count ({n_centroids_total}) != time bin count ({n_time_bins})")
-                        if n_mask_time_bins != n_time_bins:
-                            print(f"  WARNING: Mask time bin count ({n_mask_time_bins}) != posterior time bin count ({n_time_bins})")
-                        print(f'segment_indices: {segment_indices}')
-                        
-                        # ========== GENERATE TIME BIN COLORMAP ==========
-                        # Generate distinct colors for each time bin using HSV color space
-                        time_bin_colors = np.zeros((n_time_bins, 4), dtype=np.float32)
-                        for t_idx in range(n_time_bins):
-                            hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Distribute hues evenly
-                            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-                            time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.9)  # High opacity
-                        
-                        # ========== PER-TIME-BIN CENTROID COLORS ==========
-                        # Each centroid row index corresponds to a time bin index
-                        # Get the original indices (before valid_mask filtering) to map to time bins
-                        original_indices = np.where(valid_mask)[0]  # Original row indices in centroids_df
-                        n_centroids = len(x_centroids)
-                        centroid_colors = np.zeros((n_centroids, 4), dtype=np.float32)
-                        for i in range(n_centroids):
-                            t_idx = original_indices[i]  # Original time bin index
-                            if t_idx < len(time_bin_colors):
-                                centroid_colors[i] = time_bin_colors[t_idx]
-                            else:
-                                centroid_colors[i] = (1.0, 1.0, 1.0, 0.8)  # Fallback to white
-                        
-                        # Create scatter plot markers for centroid dots
-                        centroid_pos = np.column_stack([x_centroids, y_centroids])
-                        centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=state['posterior_2d_view'].scene)
-                        centroid_markers.order = 7  # Render above posterior image and current position line, but below mask contours
-                        state['centroid_dots'].append(centroid_markers)
-                        
-                        # Create tiny arrows in the direction of segment_Vp_deg at each centroid
-                        if 'segment_Vp_deg' in centroids_df.columns:
-                            segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
-                            valid_angle_mask = ~np.isnan(segment_Vp_deg)
-                            
-                            if np.any(valid_angle_mask):
-                                # Calculate arrow head size to be visually similar to centroid dot (size 8)
-                                # Convert dot size from pixels to world coordinates
-                                # Dot size 8 pixels ≈ radius of 4 pixels
-                                # Estimate pixel-to-world scale: assume ~100-200 pixels per data range
-                                data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
-                                # Make arrow head size similar to dot size - use a reasonable fraction of data scale
-                                # For a dot of size 8, we want arrow head to be ~6-8 in world units
-                                # Assuming typical data scale, use ~2-3% of data scale for arrow head
-                                arrow_head_size = data_scale * 0.05  # 2.5% of data scale - similar visual size to dot
-                                # Make arrow length very short - just enough to position the arrow head
-                                # Position arrow head slightly offset from centroid center
-                                arrow_length = arrow_head_size * 0.3  # Very short shaft, mostly just the head
-                                
-                                # Convert degrees to radians
-                                angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
-                                x_centroids_valid = x_centroids[valid_angle_mask]
-                                y_centroids_valid = y_centroids[valid_angle_mask]
-                                
-                                # Get indices mapping arrows back to time bins
-                                # valid_angle_mask filters from valid_mask-filtered centroids
-                                arrow_centroid_indices = np.where(valid_angle_mask)[0]  # Indices within valid centroids
-                                
-                                # Create arrows for each valid centroid
-                                for i in range(len(x_centroids_valid)):
-                                    x_center = x_centroids_valid[i]
-                                    y_center = y_centroids_valid[i]
-                                    angle = angles_rad[i]
-                                    
-                                    # Position arrow head slightly offset from center in the direction of the angle
-                                    # This makes the arrow head visible and clearly indicates direction
-                                    x_start = x_center
-                                    y_start = y_center
-                                    x_end = x_center + (arrow_length * np.cos(angle))
-                                    y_end = y_center + (arrow_length * np.sin(angle))
-                                    
-                                    # Get color for this arrow based on time bin index (matching centroid color)
-                                    centroid_idx = arrow_centroid_indices[i]  # Index within valid centroids
-                                    t_idx = original_indices[centroid_idx]  # Original time bin index
-                                    if t_idx < len(time_bin_colors):
-                                        arrow_color = tuple(time_bin_colors[t_idx])
-                                    else:
-                                        arrow_color = (1.0, 1.0, 1.0, 0.8)  # Fallback to white
-                                    
-                                    # Create arrow visual - just the triangle head, minimal shaft
-                                    arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=state['posterior_2d_view'].scene)
-                                    arrow.order = 7  # Same order as dots
-                                    state['centroid_arrows'].append(arrow)
-        
-        # Render current position trajectory during the active epoch as grey line overlay
-        # Extends beyond epoch bounds by current_traj_seconds_pre_post_extension with reduced opacity
-        if state['curr_position_df'] is not None and epoch_start_t is not None and epoch_end_t is not None:
-            if 't' in state['curr_position_df'].columns and 'x' in state['curr_position_df'].columns and 'y' in state['curr_position_df'].columns:
-                # Filter positions within extended time range (epoch ± extension)
-                extended_start_t = epoch_start_t - state['current_traj_seconds_pre_post_extension']
-                extended_end_t = epoch_end_t + state['current_traj_seconds_pre_post_extension']
-                extended_mask = (state['curr_position_df']['t'] >= extended_start_t) & (state['curr_position_df']['t'] <= extended_end_t)
-                extended_positions = state['curr_position_df'][extended_mask]
-                
-                if len(extended_positions) > 0:
-                    x_coords = extended_positions['x'].values
-                    y_coords = extended_positions['y'].values
-                    t_coords = extended_positions['t'].values
-                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords) | np.isnan(t_coords))
-                    
-                    if np.any(valid_mask):
-                        x_valid = x_coords[valid_mask]
-                        y_valid = y_coords[valid_mask]
-                        t_valid = t_coords[valid_mask]
-                        
-                        # Determine alpha for each point: 1.0 within epoch, 0.2 outside epoch
-                        within_epoch_mask = (t_valid >= epoch_start_t) & (t_valid <= epoch_end_t)
-                        n_points = len(x_valid)
-                        colors = np.ones((n_points, 4), dtype=np.float32)
-                        colors[:, 0] = 0.7  # R (grey)
-                        colors[:, 1] = 0.7  # G (grey)
-                        colors[:, 2] = 0.7  # B (grey)
-                        colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)  # A (opacity): 1.0 within epoch, 0.2 outside
-                        
-                        # Reuse existing line visual or create new one (more efficient than recreating each time)
-                        if state['current_position_line'] is None:
-                            # Create line visual on first use
-                            state['current_position_line'] = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=state['posterior_2d_view'].scene)
-                            state['current_position_line'].order = 5  # Render above posterior image but below mask contours
-                        else:
-                            # Update existing line visual using set_data (more efficient, as per official vispy example)
-                            state['current_position_line'].set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
-                        
-                        # # Render trajectory arrows using angle column (highly efficient with reuse)
-                        # # Check for common angle column names
-                        # angle_column = None
-                        # for col_name in ['approx_head_dir_degrees', 'heading', 'direction', 'approx_dir_degrees', 'dir_degrees', 'theta']:
-                        #     if col_name in extended_positions.columns:
-                        #         angle_column = col_name
-                        #         break
-                        
-                        # # Debug: print available columns if no angle column found
-                        # if angle_column is None:
-                        #     print(f"DEBUG: No angle column found. Available columns: {list(extended_positions.columns)}")
-                        #     print("DEBUG: Computing angles from trajectory direction as fallback")
-                        #     # Fallback: compute angles from trajectory direction
-                        #     if len(x_valid) > 1:
-                        #         # Compute direction vectors between consecutive points
-                        #         dx = np.diff(x_valid)
-                        #         dy = np.diff(y_valid)
-                        #         # Compute angles from direction vectors
-                        #         computed_angles = np.arctan2(dy, dx)
-                        #         # Pad with last angle to match length
-                        #         computed_angles = np.append(computed_angles, computed_angles[-1])
-                        #         angle_coords = computed_angles
-                        #         angle_valid_mask = ~np.isnan(angle_coords)
-                        #         angle_column = 'computed_from_trajectory'
-                        #     else:
-                        #         angle_coords = np.array([])
-                        #         angle_valid_mask = np.array([], dtype=bool)
-                        
-                        # if angle_column is not None:
-                        #     # Get angle values for valid positions (if not already computed)
-                        #     if angle_column != 'computed_from_trajectory':
-                        #         angle_coords = extended_positions[angle_column].values[valid_mask]
-                        #         angle_valid_mask = ~np.isnan(angle_coords)
-                            
-                        #     if np.any(angle_valid_mask) and len(x_valid) >= 2:
-                        #         # Clean up old Arrow instances first
-                        #         for arrow in state['trajectory_arrows']:
-                        #             if arrow is not None:
-                        #                 arrow.parent = None
-                        #         state['trajectory_arrows'].clear()
-                                
-                        #         # Calculate arrow length proportional to data scale
-                        #         data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
-                        #         arrow_length = data_scale * 0.015  # 1.5% of data scale
-                        #         arrow_head_size = data_scale * 0.02  # Arrow head size
-                                
-                        #         # Convert angles to radians if needed (check if in degrees)
-                        #         if np.max(np.abs(angle_coords)) > 2 * np.pi:
-                        #             angle_coords_rad = np.deg2rad(angle_coords)
-                        #         else:
-                        #             angle_coords_rad = angle_coords
-                                
-                        #         # Get start and end indices with valid angles
-                        #         start_idx = 0
-                        #         end_idx = len(x_valid) - 1
-                                
-                        #         # Find first valid angle from start
-                        #         while start_idx < len(angle_valid_mask) and not angle_valid_mask[start_idx]:
-                        #             start_idx += 1
-                                
-                        #         # Find last valid angle from end
-                        #         while end_idx >= 0 and not angle_valid_mask[end_idx]:
-                        #             end_idx -= 1
-                                
-                        #         # Create arrows at start and end if valid
-                        #         if start_idx < len(x_valid) and end_idx >= 0:
-                        #             arrow_color = (1.0, 0.9, 0.0, max(colors[start_idx, 3], 0.6))  # Yellow with opacity
-                                    
-                        #             # Create start arrow
-                        #             start_angle = angle_coords_rad[start_idx]
-                        #             start_x, start_y = x_valid[start_idx], y_valid[start_idx]
-                        #             start_end_x = start_x + arrow_length * np.cos(start_angle)
-                        #             start_end_y = start_y + arrow_length * np.sin(start_angle)
-                                    
-                        #             start_arrow = scene.visuals.Arrow(pos=np.array([[start_x, start_y], [start_end_x, start_end_y]]), arrows=np.array([[start_x, start_y, start_end_x, start_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
-                        #             start_arrow.order = 6
-                        #             state['trajectory_arrows'].append(start_arrow)
-                                    
-                        #             # Create end arrow (if different from start)
-                        #             if end_idx != start_idx:
-                        #                 end_angle = angle_coords_rad[end_idx]
-                        #                 end_x, end_y = x_valid[end_idx], y_valid[end_idx]
-                        #                 end_end_x = end_x + arrow_length * np.cos(end_angle)
-                        #                 end_end_y = end_y + arrow_length * np.sin(end_angle)
-                                        
-                        #                 end_arrow_color = (1.0, 0.9, 0.0, max(colors[end_idx, 3], 0.6))
-                        #                 end_arrow = scene.visuals.Arrow(pos=np.array([[end_x, end_y], [end_end_x, end_end_y]]), arrows=np.array([[end_x, end_y, end_end_x, end_end_y]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=end_arrow_color, arrow_color=end_arrow_color, width=1.5, method='agg', parent=state['posterior_2d_view'].scene)
-                        #                 end_arrow.order = 6
-                        #                 state['trajectory_arrows'].append(end_arrow)
-                                    
-                        #             print(f"DEBUG: Rendered {len(state['trajectory_arrows'])} Arrow instances (start/end) using angle source '{angle_column}'")
-                        #     else:
-                        #         # No valid angles or insufficient points - clear arrows
-                        #         for arrow in state['trajectory_arrows']:
-                        #             if arrow is not None:
-                        #                 arrow.parent = None
-                        #         state['trajectory_arrows'].clear()
-
-
-                        # else:
-                        #     # No angle column - clear arrows
-                        #     for arrow in state['trajectory_arrows']:
-                        #         if arrow is not None:
-                        #             arrow.parent = None
-                        #     state['trajectory_arrows'].clear()
-                        pass
-
-                    else:
-                        # No valid positions after filtering - hide the line if it exists
-                        if state['current_position_line'] is not None:
-                            state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
-                else:
-                    # No extended positions - hide the line and clear arrows
-                    if state['current_position_line'] is not None:
-                        state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
-                    for arrow in state['trajectory_arrows']:
-                        if arrow is not None:
-                            arrow.parent = None
-                    state['trajectory_arrows'].clear()
-            else:
-                # No position data columns - hide the line and clear arrows
-                if state['current_position_line'] is not None:
-                    state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
-                for arrow in state['trajectory_arrows']:
-                    if arrow is not None:
-                        arrow.parent = None
-                state['trajectory_arrows'].clear()
-        else:
-            # No position data or epoch times - hide the line and clear arrows
-            if state['current_position_line'] is not None:
-                state['current_position_line'].set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
-            for arrow in state['trajectory_arrows']:
-                if arrow is not None:
-                    arrow.parent = None
-            state['trajectory_arrows'].clear()
-        
-        # Add epoch information text above the posterior view
-        if epoch_start_t is not None and epoch_end_t is not None:
-            epoch_info_str = f'Epoch {new_epoch_idx + 1}/{num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
-            # Position text above the data area (y_max is the top of the data)
-            # Add extra space above for text
-            text_y_pos = y_max + (y_max - y_min) * 0.15  # 15% above the top
-            text_x_pos = (x_min + x_max) / 2  # Center horizontally
-            state['epoch_info_text'] = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=state['posterior_2d_view'].scene)
-            
-            # Update posterior 2D view camera to include space for text
-            y_range = y_max - y_min
-            state['posterior_2d_view'].camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
-        
-        # Render time bin grid (bottom half) - per-time-bin posteriors in a 2D grid layout
-        if p_x_given_n is not None and p_x_given_n.size > 0:
-            # p_x_given_n has shape (n_x_bins, n_y_bins, n_time_bins)
-            n_time_bins = p_x_given_n.shape[2]
-            n_bins_to_show = min(n_time_bins, state['max_time_bins_to_show'])
-            
-            # Generate time bin colors for view borders (same colormap as centroids/contours)
-            view_time_bin_colors = []
-            for t_idx in range(n_bins_to_show):
-                hue = (t_idx / max(n_time_bins, 1)) % 1.0  # Use n_time_bins for consistent colors with centroids
-                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-                view_time_bin_colors.append((rgb[0], rgb[1], rgb[2]))  # RGB tuple for border_color
-            
-            # Global normalization across all time bins
-            vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
-            
-            # Create views if not already created, or if count changed
-            if len(state['time_bin_views']) != n_bins_to_show:
-                # Clear existing views from grid
-                for view in state['time_bin_views']:
-                    if view is not None and hasattr(view, 'parent'):
-                        view.parent = None
-                state['time_bin_views'].clear()
-                
-                # Create new views in a single row with per-time-bin colored borders
-                for t_idx in range(n_bins_to_show):
-                    t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
-                    view = state['time_bin_grid'].add_view(row=0, col=t_idx, border_color=t_bin_border_color)
-                    view.camera = scene.PanZoomCamera(aspect=1)
-                    view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
-                    state['time_bin_views'].append(view)
-            
-            # Render each time bin in its view
-            for t_idx in range(n_bins_to_show):
-                # Get this time bin's 2D posterior (n_x_bins, n_y_bins) and transpose for vispy
-                slice_2d = p_x_given_n[:, :, t_idx].T.astype(np.float32)
-                
-                # Normalize to [0, 1]
-                if vol_max > vol_min:
-                    slice_2d = (slice_2d - vol_min) / (vol_max - vol_min)
-                
-                # Create image visual for this slice
-                view = state['time_bin_views'][t_idx]
-                slice_img = scene.visuals.Image(slice_2d, cmap='viridis', parent=view.scene)
-                
-                # Scale and position the image to fit the data extent
-                img_height, img_width = slice_2d.shape
-                scale_x_img = (x_max - x_min) / img_width if img_width > 0 else 1
-                scale_y_img = (y_max - y_min) / img_height if img_height > 0 else 1
-                slice_img.transform = scene.STTransform(scale=(scale_x_img, scale_y_img), translate=(x_min, y_min))
-                state['time_bin_images'].append(slice_img)
-                
-                # Add time bin label
-                label_y_pos = y_max + (y_max - y_min) * 0.08
-                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
-                state['time_bin_labels'].append(label)
-                
-                # Update camera to show label
-                view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
-        
-        # Render per-time-bin mask contours on all views (with higher z-order to render on top of images)
-        # Use 3D epoch_t_bins_high_prob_pos_mask for per-time-bin colored contours
-        if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
-            epoch_result_for_contours = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
-            if epoch_result_for_contours is not None and hasattr(epoch_result_for_contours, 'epoch_t_bins_high_prob_pos_mask') and epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask is not None:
-                per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask  # Shape: (N_XBINS, N_Y_BINS, N_TIME_BINS)
-                n_mask_t_bins = per_t_bin_mask.shape[2]
-                
-                # Generate time bin colors for contours (same colormap as centroids)
-                contour_time_bin_colors = np.zeros((n_mask_t_bins, 4), dtype=np.float32)
-                for t_idx in range(n_mask_t_bins):
-                    hue = (t_idx / max(n_mask_t_bins, 1)) % 1.0
-                    rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-                    contour_time_bin_colors[t_idx] = (rgb[0], rgb[1], rgb[2], 0.7)  # Slightly lower opacity for contours
-                
-                from skimage import measure
-                
-                # Render contours for each time bin with distinct colors
-                for t_idx in range(n_mask_t_bins):
-                    mask_slice = per_t_bin_mask[:, :, t_idx]
-                    if np.any(mask_slice):
-                        mask_transposed = mask_slice.T.astype(np.float32)
-                        contours = measure.find_contours(mask_transposed, level=0.5)
-                        
-                        # Get color for this time bin
-                        contour_color = tuple(contour_time_bin_colors[t_idx])
-                        
-                        # Convert contour coordinates from pixel space to world coordinates
-                        n_y_bins, n_x_bins = mask_transposed.shape
-                        for contour in contours:
-                            x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
-                            y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
-                            contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
-                            
-                            # Add colored contour to past view
-                            past_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['past_view'].scene)
-                            past_contour.order = 10
-                            state['past_mask_contours'].append(past_contour)
-                            
-                            # Add colored contour to posterior 2D view
-                            posterior_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['posterior_2d_view'].scene)
-                            posterior_contour.order = 10
-                            state['posterior_mask_contours'].append(posterior_contour)
-                            
-                            # Add colored contour to future view
-                            future_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['future_view'].scene)
-                            future_contour.order = 10
-                            state['future_mask_contours'].append(future_contour)
-                            
-                            # Add contour to corresponding time bin view (if within display range)
-                            if t_idx < len(state['time_bin_views']):
-                                time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=state['time_bin_views'][t_idx].scene)
-                                time_bin_contour.order = 10
-                                state['posterior_mask_contours'].append(time_bin_contour)
-
-
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # RIGHT PANE: FUTURE                                                                                                                                                                                                                                                                   #
-        # ==================================================================================================================================================================================================================================================================================== #
-        # Render Future Trajectories and collect data for timeline
-        future_trajectory_colors_and_times = []  # List of (base_rgb, mean_time) tuples for timeline
-        if 'future' in curr_matching_past_future_positions_df_dict:
-            future_positions_dict = curr_matching_past_future_positions_df_dict['future']
-            future_trajectory_items = list(future_positions_dict.items())
-            for idx, (epoch_id, positions_df) in enumerate(future_trajectory_items):
-                # Filter by angle match if required
-                if state['require_angle_match'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
-                    if not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
-                        continue  # Skip this trajectory - no angle match
-                if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
-                    x_coords = positions_df['x'].values
-                    y_coords = positions_df['y'].values
-                    valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
-                    if np.any(valid_mask):
-                        x_valid = x_coords[valid_mask]
-                        y_valid = y_coords[valid_mask]
-                        
-                        # Determine base color for this trajectory
-                        if state['color_matches_by_matching_angle'] and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
-                            matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
-                            valid_match_indices = matching_idx_values[matching_idx_values >= 0]
-                            if len(valid_match_indices) > 0:
-                                # Get segment row index from positions_df
-                                segment_row_idx = int(valid_match_indices[0])
-                                # Map segment row index to actual time bin index using epoch's centroids_df
-                                matched_t_idx = None
-                                if new_epoch_idx < len(state['epoch_flat_mask_future_past_result']):
-                                    curr_epoch_result = state['epoch_flat_mask_future_past_result'][new_epoch_idx]
-                                    if curr_epoch_result is not None and hasattr(curr_epoch_result, 'centroids_df') and curr_epoch_result.centroids_df is not None:
-                                        if hasattr(curr_epoch_result, 'a_centroids_search_segments_df') and curr_epoch_result.a_centroids_search_segments_df is not None:
-                                            search_df = curr_epoch_result.a_centroids_search_segments_df
-                                            if segment_row_idx < len(search_df):
-                                                actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
-                                                # Find first time bin with this segment_idx
-                                                matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
-                                                if len(matching_t_bins) > 0:
-                                                    matched_t_idx = matching_t_bins[0]  # First time bin in segment
-                                if matched_t_idx is not None and matched_t_idx < len(time_bin_colors):
-                                    base_rgb = tuple(time_bin_colors[matched_t_idx][:3])
-                                else:
-                                    base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Fallback to cyan
-                            else:
-                                base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Default cyan for non-matching
-                        else:
-                            # Fixed cyan color for all future trajectories (matches colorbar)
-                            base_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)
-                        
-                        # Calculate opacity based on time distance from epoch end using common normalization
-                        if epoch_end_t is not None and 't' in positions_df.columns:
-                            t_coords = positions_df['t'].values[valid_mask]
-                            # Store mean time for timeline tick - ALWAYS use cyan for future timeline ticks
-                            mean_time = np.mean(t_coords)
-                            timeline_rgb = colorsys.hsv_to_rgb(0.5, 0.8, 0.9)  # Always cyan for future
-                            future_trajectory_colors_and_times.append((timeline_rgb, mean_time))
-                            # Time relative to end: positive values (t > end_t)
-                            time_rel = t_coords - epoch_end_t
-                            # Absolute distance from end
-                            time_distance = np.abs(time_rel)
-                            # Normalize using common max distance, then map to [0.2, 1.0]
-                            if max_time_distance > 0:
-                                distance_normalized = time_distance / max_time_distance  # [0, 1]
-                                # Invert: closer to end (smaller distance) should be brighter
-                                # Map from [0, 1] to [0.2, 1.0]: 0 -> 1.0, 1 -> 0.2
-                                opacity = 1.0 - distance_normalized * 0.8  # Range from 1.0 (close) to 0.2 (distant)
-                            else:
-                                opacity = np.ones(len(x_valid)) * 0.8
-                            
-                            # Check for trajectory extensions (separate start and end)
-                            start_ext_seconds = state['past_future_trajectory_start_extension_seconds']
-                            end_ext_seconds = state['past_future_trajectory_end_extension_seconds']
-                            traj_t_min = np.min(t_coords)
-                            traj_t_max = np.max(t_coords)
-                            
-                            # Start extension (backward from traj_t_min) - solid start_end_extension_max_opacity
-                            if start_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                ext_start_t = traj_t_min - start_ext_seconds
-                                ext_mask = (state['curr_position_df']['t'] >= ext_start_t) & (state['curr_position_df']['t'] < traj_t_min)
-                                ext_positions = state['curr_position_df'][ext_mask]
-                                
-                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
-                                    ext_x = ext_positions['x'].values
-                                    ext_y = ext_positions['y'].values
-                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                                    if np.any(ext_valid_mask):
-                                        ext_x_valid = ext_x[ext_valid_mask]
-                                        ext_y_valid = ext_y[ext_valid_mask]
-                                        n_ext_points = len(ext_x_valid)
-                                        
-                                        # Prepend extended positions (they come before in time)
-                                        x_valid = np.concatenate([ext_x_valid, x_valid])
-                                        y_valid = np.concatenate([ext_y_valid, y_valid])
-                                        
-                                        # Start extension uses solid start_end_extension_max_opacity (no fade-in)
-                                        ext_opacity = np.ones(n_ext_points) * state['start_end_extension_max_opacity']
-                                        opacity = np.concatenate([ext_opacity, opacity])
-                            
-                            # End extension (forward from traj_t_max) - fade from start_end_extension_max_opacity to 0.0
-                            if end_ext_seconds > 0 and state['curr_position_df'] is not None and 't' in state['curr_position_df'].columns:
-                                ext_end_t = traj_t_max + end_ext_seconds
-                                ext_mask = (state['curr_position_df']['t'] > traj_t_max) & (state['curr_position_df']['t'] <= ext_end_t)
-                                ext_positions = state['curr_position_df'][ext_mask]
-                                
-                                if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
-                                    ext_x = ext_positions['x'].values
-                                    ext_y = ext_positions['y'].values
-                                    ext_t = ext_positions['t'].values
-                                    ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                                    if np.any(ext_valid_mask):
-                                        ext_x_valid = ext_x[ext_valid_mask]
-                                        ext_y_valid = ext_y[ext_valid_mask]
-                                        ext_t_valid = ext_t[ext_valid_mask]
-                                        n_ext_points = len(ext_x_valid)
-                                        
-                                        # Append extended positions (they come after in time)
-                                        x_valid = np.concatenate([x_valid, ext_x_valid])
-                                        y_valid = np.concatenate([y_valid, ext_y_valid])
-                                        
-                                        # End extension uses fade-out: start_end_extension_max_opacity -> 0.0
-                                        max_opacity = state['start_end_extension_max_opacity']
-                                        ext_distance = ext_t_valid - traj_t_max  # Distance from trajectory end
-                                        ext_distance_normalized = ext_distance / end_ext_seconds  # [0, 1]
-                                        # Fade from max_opacity to 0.0
-                                        ext_opacity = max_opacity * (1.0 - ext_distance_normalized)
-                                        opacity = np.concatenate([opacity, ext_opacity])
-                        else:
-                            opacity = np.ones(len(x_valid)) * 0.8
-                        
-                        # Create per-vertex colors with varying opacity
-                        n_points = len(x_valid)
-                        colors = np.ones((n_points, 4), dtype=np.float32)
-                        colors[:, 0] = base_rgb[0]  # R
-                        colors[:, 1] = base_rgb[1]  # G
-                        colors[:, 2] = base_rgb[2]  # B
-                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)  # A (opacity), allow fade to 0.0 for end extensions
-                        
-                        line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=state['future_view'].scene)
-                        line.order = 1  # Render above background (0) but below contours (10)
-                        line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))  # Additive blending
-                        state['future_lines'].append(line)
-                        
-                        # Draw debug arrow at trajectory temporal center if enabled
-                        if state['enable_debug_plot_trajectory_average_angle_arrows'] and 'segment_Vp_deg' in positions_df.columns:
-                            segment_angles = positions_df['segment_Vp_deg'].values
-                            valid_angles = segment_angles[~np.isnan(segment_angles)]
-                            if len(valid_angles) > 0:
-                                # Compute circular mean angle
-                                mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
-                                mean_angle_rad = np.radians(mean_angle_deg)
-                                
-                                # Find temporal center position
-                                center_idx = len(x_valid) // 2
-                                x_center = x_valid[center_idx]
-                                y_center = y_valid[center_idx]
-                                
-                                # Arrow size based on data scale
-                                data_scale = max(x_max - x_min, y_max - y_min)
-                                arrow_head_size = data_scale * 0.04
-                                arrow_length = arrow_head_size * 0.5
-                                
-                                x_end = x_center + (arrow_length * np.cos(mean_angle_rad))
-                                y_end = y_center + (arrow_length * np.sin(mean_angle_rad))
-                                
-                                debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=state['future_view'].scene)
-                                debug_arrow.order = 5
-                                state['trajectory_debug_arrows'].append(debug_arrow)
-        
-        # Render Combined Timeline Bar (full width, shows all trajectory ticks and current epoch)
-        timeline_bar_height = 1.0  # Normalized height
-        recording_t_min = state['recording_t_min']
-        recording_t_max = state['recording_t_max']
-        recording_duration = recording_t_max - recording_t_min
-        
-        if recording_duration > 0:
-            # Draw filled background bar (dark gray)
-            bar_fill = scene.visuals.Rectangle(center=((recording_t_min + recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=state['combined_timeline_view'].scene)
-            state['timeline_bar'] = bar_fill
-            
-            # Draw current epoch as a white rectangle
-            if epoch_start_t is not None and epoch_end_t is not None:
-                epoch_duration = epoch_end_t - epoch_start_t
-                epoch_center_t = (epoch_start_t + epoch_end_t) / 2
-                epoch_rect = scene.visuals.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=state['combined_timeline_view'].scene)
-                state['timeline_epoch_rect'] = epoch_rect
-                
-                # Draw downward-facing triangle marker above the epoch rectangle
-                triangle_height = timeline_bar_height * 0.35  # Small triangle
-                triangle_half_width = recording_duration * 0.008  # Scale width with recording duration
-                triangle_top_y = timeline_bar_height + triangle_height * 0.3  # Slightly above and overlapping top
-                triangle_bottom_y = timeline_bar_height - triangle_height * 0.3  # Overlap the top of the timeline bar
-                triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=state['combined_timeline_view'].scene)
-                state['timeline_epoch_triangle'] = epoch_triangle
-            
-            # Draw past trajectory ticks (full height)
-            for base_rgb, mean_time in past_trajectory_colors_and_times:
-                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick_color = (base_rgb[0], base_rgb[1], base_rgb[2], 1.0)
-                tick = scene.visuals.Line(pos=tick_pos, color=tick_color, width=2, parent=state['combined_timeline_view'].scene)
-                state['timeline_ticks'].append(tick)
-            
-            # Draw future trajectory ticks (full height)
-            for base_rgb, mean_time in future_trajectory_colors_and_times:
-                tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick_color = (base_rgb[0], base_rgb[1], base_rgb[2], 1.0)
-                tick = scene.visuals.Line(pos=tick_pos, color=tick_color, width=2, parent=state['combined_timeline_view'].scene)
-                state['timeline_ticks'].append(tick)
-            
-            # Set camera range for combined timeline view - no aspect ratio constraint
-            state['combined_timeline_view'].camera = scene.PanZoomCamera()
-            state['combined_timeline_view'].camera.set_range(x=(recording_t_min, recording_t_max), y=(0, timeline_bar_height))
-        
-        # Update title
-        state['canvas'].title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{num_epochs})'
-        state['canvas'].update()
-        QApplication.processEvents()  # Force Qt to process redraw
-    
-    def on_key_press(event):
-        """Handle keyboard events for epoch navigation."""
-        if event.key == 'Left':
-            update_epoch_display(state['current_epoch_idx'] - 1)
-        elif event.key == 'Right':
-            update_epoch_display(state['current_epoch_idx'] + 1)
-    
-    # Connect keyboard event handler - vispy uses events.connect() method
-    if hasattr(canvas.events, 'key_press'):
-        canvas.events.key_press.connect(on_key_press)
-    
-    # Add axes to all 2D views
-    for view in [past_view, posterior_2d_view, future_view]:
-        view.camera = scene.PanZoomCamera(aspect=1)
-        scene.visuals.GridLines(parent=view.scene)
-    
-    # Set up colorbar view camera
-    colorbar_view.camera = scene.PanZoomCamera(aspect=1)
-    
-    # Draw bounding boxes for each view (based on xbin/ybin extent)
-    x_min, x_max = xbin[0], xbin[-1]
-    y_min, y_max = ybin[0], ybin[-1]
-    # Create rectangle corners: bottom-left, bottom-right, top-right, top-left, back to bottom-left
-    bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
-    
-    # Add bounding box to each 2D view (white color, 2px width)
-    for view in [past_view, posterior_2d_view, future_view]:
-        bbox_line = scene.visuals.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
-    
-    # Set camera ranges based on data extent
-    extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-    # For past and future views, use standard extent
-    for view in [past_view, future_view]:
-        view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
-    # For posterior 2D view, expand y-range to include space for text above
-    y_range = extent[3] - extent[2]
-    posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
-    
-    # Setup combined timeline view camera - no aspect ratio constraint to fill the view
-    timeline_bar_height = 1.0  # Normalized height
-    recording_duration = recording_t_max - recording_t_min
-    
-    # Combined timeline view setup - camera will stretch to fill view
-    combined_timeline_view.camera = scene.PanZoomCamera()
-    combined_timeline_view.camera.set_range(x=(recording_t_min, recording_t_max), y=(0, timeline_bar_height))
-    
-    # Add update_epoch_display function reference to state for programmatic access
-    state['update_epoch_display'] = update_epoch_display
-    
-    # Initial render
-    update_epoch_display(active_epoch_idx)
-    
-    return main_window, canvas, state
 
 
 @function_attributes(short_name=None, tags=['vispy', 'export', 'screenshot', 'high-resolution'], input_requires=[], output_provides=[], uses=['render_predictive_decoding_with_vispy'], used_by=[], creation_date='2026-01-22', related_items=['render_predictive_decoding_with_vispy'])
@@ -8234,7 +7666,7 @@ def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Pa
     screenshots of all displayed views to an export folder.
     
     Args:
-        viewer_tuple: Tuple returned from render_predictive_decoding_with_vispy containing (main_window, canvas, state)
+        viewer_tuple: Tuple (main_window, canvas, state) from render_predictive_decoding_with_vispy, or a PredictiveDecodingVispyWidget instance.
         export_folder: Path to folder where images will be saved. Created if it doesn't exist.
         resolution_scale: Scale factor for high-res rendering (default: 2.0). Higher values produce larger images.
         export_individual_views: If True, export individual views (past, posterior, future) separately (default: False)
@@ -8270,7 +7702,9 @@ def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Pa
             """Save image array using PIL."""
             Image.fromarray(img_array).save(path)
     
-    # Extract components from viewer tuple
+    # Accept either (main_window, canvas, state) tuple or PredictiveDecodingVispyWidget instance
+    if hasattr(viewer_tuple, 'as_viewer_tuple'):
+        viewer_tuple = viewer_tuple.as_viewer_tuple()
     main_window, canvas, state = viewer_tuple
     
     # Validate and create export folder
