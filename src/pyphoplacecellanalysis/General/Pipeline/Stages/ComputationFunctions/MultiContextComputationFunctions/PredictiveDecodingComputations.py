@@ -5771,6 +5771,9 @@ class PredictiveDecodingDisplayWidget:
             # p_x_given_n = self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
             posterior_2d = np.sum(p_x_given_n, axis=2) ## collapse over time
 
+            # p_x_given_n = np.ascontiguousarray(p_x_given_n, dtype=np.float32) 
+            # posterior_2d = np.ascontiguousarray(posterior_2d, dtype=np.float32) 
+
         time_bin_posteriors = None
         num_time_bins_to_show: int = 0
         
@@ -7670,8 +7673,11 @@ class PredictiveDecodingVispyWidget:
             
         # Get posterior data
         p_x_given_n = self.a_flat_matching_results_list_ds.p_x_given_n_list[new_epoch_idx]
-        posterior_2d = np.sum(p_x_given_n, axis=2)
+        p_x_given_n = np.ascontiguousarray(p_x_given_n, dtype=np.float32)
         
+        posterior_2d = np.sum(p_x_given_n, axis=2)
+        posterior_2d = np.ascontiguousarray(posterior_2d, dtype=np.float32)
+
         # Generate time bin colors for use in trajectory and centroid coloring
         n_time_bins: int = p_x_given_n.shape[2]
         time_bin_colors = self._time_bin_colors(n_time_bins, alpha=0.9)
@@ -7808,7 +7814,8 @@ class PredictiveDecodingVispyWidget:
         
         # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
-            self.posterior_img = vz.Image(posterior_2d.T, cmap='viridis', parent=self.posterior_2d_view.scene)
+            img_data: NDArray = np.ascontiguousarray(posterior_2d.T, dtype=np.float32)
+            self.posterior_img = vz.Image(img_data, cmap='viridis', parent=self.posterior_2d_view.scene)
             self.posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
             
 
@@ -7948,10 +7955,13 @@ class PredictiveDecodingVispyWidget:
                                 an_arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
                                 # pos: Array of shape (..., 2) or (..., 3) specifying vertex coordinates of arrow body.
                                 a_pos = np.array([[x_start, y_start], [x_end, y_end]])
+
                                 ## arrows: A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the (x, y, z) coordinates of the first and second vertex of the arrow head. Remember that the second vertex is used as center point for the arrow head, and the first vertex is only used for determining the arrow head orientation.
                                 an_arrows = np.array([[x_start, y_start, x_end, y_end]])
                                 ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
                                 ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.                                
+                                a_pos = np.asarray(a_pos, dtype=np.float32)
+                                an_arrows = np.asarray(an_arrows, dtype=np.float32)
                                 arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
                                 arrow.order = 7
                                 self.centroid_arrows.append(arrow)
@@ -7979,8 +7989,12 @@ class PredictiveDecodingVispyWidget:
                                     arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
                                     # pos: Array of shape (..., 2) or (..., 3) specifying vertex coordinates of arrow body.
                                     pos = np.array([[x_start, y_start], [x_end, y_end]])
+                                    pos = np.asarray(pos, dtype=np.float32)
+                                    
                                     ## arrows: A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the (x, y, z) coordinates of the first and second vertex of the arrow head. Remember that the second vertex is used as center point for the arrow head, and the first vertex is only used for determining the arrow head orientation.
                                     arrows = np.array([[x_start, y_start, x_end, y_end]])
+                                    arrows = np.asarray(arrows, dtype=np.float32)
+                                    
                                     ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
                                     ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.
                                     arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
@@ -8014,10 +8028,10 @@ class PredictiveDecodingVispyWidget:
                     colors[:, :3] = 0.7
                     colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
                     if self.current_position_line is None:
-                        self.current_position_line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
+                        self.current_position_line = vz.Line(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
                         self.current_position_line.order = 5
                     else:
-                        self.current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
+                        self.current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors)
                 else:
                     if self.current_position_line is not None:
                         self.current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
@@ -8074,6 +8088,7 @@ class PredictiveDecodingVispyWidget:
                 slice_2d = p_x_given_n[:, :, t_idx].T.astype(np.float32)
                 if vol_max > vol_min:
                     slice_2d = (slice_2d - vol_min) / (vol_max - vol_min)
+                slice_2d: NDArray = np.ascontiguousarray(slice_2d, dtype=np.float32)
                 view = self.time_bin_views[t_idx]
                 slice_img = vz.Image(slice_2d, cmap='viridis', parent=view.scene)
                 img_height, img_width = slice_2d.shape
@@ -8161,7 +8176,7 @@ class PredictiveDecodingVispyWidget:
                 triangle_top_y = timeline_bar_height + triangle_height * 0.3
                 triangle_bottom_y = timeline_bar_height - triangle_height * 0.3
                 triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle: vz.Polygon = vz.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
+                epoch_triangle: vz.Polygon = vz.Polygon(pos=np.asarray(triangle_vertices, dtype=np.float32), color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_triangle = epoch_triangle
             for base_rgb, mean_time in past_trajectory_colors_and_times + future_trajectory_colors_and_times:
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
