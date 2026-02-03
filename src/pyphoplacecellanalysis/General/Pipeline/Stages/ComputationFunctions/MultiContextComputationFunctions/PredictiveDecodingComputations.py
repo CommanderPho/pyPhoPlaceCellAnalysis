@@ -5016,32 +5016,78 @@ class MaskDataSource:
             curr_matching_epochs_df_dict = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
             curr_matching_merged_segment_epochs_df_dict = good_merged_segment_epochs.pho.partition_df_dict('is_future_present_past') ## IDK if this is needed
             ## needs to overwrite: curr_matching_positions_df, curr_matching_epochs_df, curr_matching_epochs_df_dict, curr_matching_merged_segment_epochs_df_dict
-
-
+        ## END if should_filter_to_minimum...
+        
         curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {}
 
-        for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
-            a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
-            an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
-            if should_filter_to_minimum:
+
+        if should_filter_to_minimum:
+            # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+            for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_merged_segment_epochs_df_dict.items(): ## #TODO 2026-02-03 00:11: - [ ] uses `curr_matching_merged_segment_epochs_df_dict`
+                a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+                an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
                 if 'is_included_in_merged' not in a_curr_matching_positions_df.columns:
                     a_curr_epoch_is_included_in_merged = np.isin(a_curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], good_merged_segment_epochs['label'])
                     a_curr_matching_positions_df['is_included_in_merged'] = a_curr_epoch_is_included_in_merged
                     
                 ## DROP non-included
                 a_curr_matching_positions_df = a_curr_matching_positions_df[a_curr_matching_positions_df['is_included_in_merged']] ## reset indicies here or anything?
-            ## END if should_filter_to_minimum...
-            if len(a_curr_matching_positions_df) > 0:
-                a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
-                                                                                                                            override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
-                                                                                                                            drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+
+                if len(a_curr_matching_positions_df) > 0:
+                    a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
+                                                                                                                                override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
+                                                                                                                                drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+                
+                curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+                curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+            ## END for ...
             
+        else:
+            for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+                a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+                an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
+                if should_filter_to_minimum:
+                    if 'is_included_in_merged' not in a_curr_matching_positions_df.columns:
+                        a_curr_epoch_is_included_in_merged = np.isin(a_curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], good_merged_segment_epochs['label'])
+                        a_curr_matching_positions_df['is_included_in_merged'] = a_curr_epoch_is_included_in_merged
+                        
+                    ## DROP non-included
+                    a_curr_matching_positions_df = a_curr_matching_positions_df[a_curr_matching_positions_df['is_included_in_merged']] ## reset indicies here or anything?
+                    
+                ## END if should_filter_to_minimum...
+                if len(a_curr_matching_positions_df) > 0:
+                    a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
+                                                                                                                                override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
+                                                                                                                                drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+                
+                curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+                curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+            ## END for ...
 
-            curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
-            curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
 
-        ## END for ...
+        # ## OLD way
+        # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
+        #     a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
+        #     an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
+        #     if should_filter_to_minimum:
+        #         if 'is_included_in_merged' not in a_curr_matching_positions_df.columns:
+        #             a_curr_epoch_is_included_in_merged = np.isin(a_curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], good_merged_segment_epochs['label'])
+        #             a_curr_matching_positions_df['is_included_in_merged'] = a_curr_epoch_is_included_in_merged
+                    
+        #         ## DROP non-included
+        #         a_curr_matching_positions_df = a_curr_matching_positions_df[a_curr_matching_positions_df['is_included_in_merged']] ## reset indicies here or anything?
+
+        #     ## END if should_filter_to_minimum...
+        #     if len(a_curr_matching_positions_df) > 0:
+        #         a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
+        #                                                                                                                     override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
+        #                                                                                                                     drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
+
+        #     curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
+        #     curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
+        # ## END for ...
         
+
         curr_matching_past_future_positions_df_list: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {k:list(v.values()) for k, v in curr_matching_past_future_positions_df_dict.items()}
         ## OUTPUTS: curr_matching_past_future_positions_df_dict
         return {
@@ -6826,6 +6872,7 @@ class PredictiveDecodingVispyWidget:
     
     require_angle_match: bool = field(default=False)
     color_matches_by_matching_angle: bool = field(default=False)
+    color_matches_by_merged_epoch_t_bin_idx: bool = field(default=True)
     
     enable_debug_plot_trajectory_average_angle_arrows: bool = field(default=False)
     minimum_included_matching_sequence_length: Optional[int] = field(default=None)
@@ -7109,57 +7156,93 @@ class PredictiveDecodingVispyWidget:
             out[t_idx] = (rgb[0], rgb[1], rgb[2], alpha)
         return out
 
-    def _segment_row_to_time_bin_idx(self, segment_row_idx: int, epoch_idx: int) -> Optional[int]:
+    def _segment_row_to_time_bin_idx(self, segment_row_idx: int, epoch_idx: int, mode='centroids') -> Optional[int]:
         """Resolve segment row index to time bin index for the given epoch."""
         if self.epoch_flat_mask_future_past_result is None or epoch_idx >= len(self.epoch_flat_mask_future_past_result):
             return None
-        curr_epoch_result = self.epoch_flat_mask_future_past_result[epoch_idx]
-        if curr_epoch_result is None or not hasattr(curr_epoch_result, 'centroids_df') or curr_epoch_result.centroids_df is None:
-            return None
-        if not hasattr(curr_epoch_result, 'a_centroids_search_segments_df') or curr_epoch_result.a_centroids_search_segments_df is None:
-            return None
-        search_df = curr_epoch_result.a_centroids_search_segments_df
-        if segment_row_idx >= len(search_df):
-            return None
-        actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
-        matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
-        return int(matching_t_bins[0]) if len(matching_t_bins) > 0 else None
+        curr_epoch_result: MatchingPastFuturePositionsResult = self.epoch_flat_mask_future_past_result[epoch_idx]
+        
+        valid_modes_list = ['centroids', 'merged_segments']
+        assert mode in valid_modes_list, f'mode: "{mode}" not in valid_modes_list: {valid_modes_list}'
+        if mode == 'centroids':
+            if curr_epoch_result is None or not hasattr(curr_epoch_result, 'centroids_df') or curr_epoch_result.centroids_df is None:
+                return None
+            if not hasattr(curr_epoch_result, 'a_centroids_search_segments_df') or curr_epoch_result.a_centroids_search_segments_df is None:
+                return None
+            search_df = curr_epoch_result.a_centroids_search_segments_df
+            if segment_row_idx >= len(search_df):
+                return None
+            actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+            matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+            
+        elif mode == 'merged_segments':
+            if curr_epoch_result is None or not hasattr(curr_epoch_result, 'centroids_df') or curr_epoch_result.centroids_df is None:
+                return None
+            if not hasattr(curr_epoch_result, 'a_centroids_search_segments_df') or curr_epoch_result.a_centroids_search_segments_df is None:
+                return None
+            search_df = curr_epoch_result.a_centroids_search_segments_df
+            if segment_row_idx >= len(search_df):
+                return None
+            actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+            matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+            pass
+        
+        else:
+            raise NotImplementedError(f'mode: "{mode}" not implemented!')
 
-    def _extend_trajectory_xy_opacity(self, x_valid: np.ndarray, y_valid: np.ndarray, opacity: np.ndarray, t_coords: np.ndarray, traj_t_min: float, traj_t_max: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+
+        match_df: pd.DataFrame = curr_epoch_result.centroids_df
+        
+
+        
+
+        return int(matching_t_bins[0]) if len(matching_t_bins) > 0 else None
+    
+
+
+    def _extend_trajectory_xy_opacity(self, x_valid: np.ndarray, y_valid: np.ndarray, opacity: np.ndarray, t_valid: np.ndarray, traj_t_min: float, traj_t_max: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Apply start/end trajectory extensions from curr_position_df; return (x_valid, y_valid, opacity)."""
         if self.past_future_trajectory_start_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
             ext_start_t = traj_t_min - self.past_future_trajectory_start_extension_seconds
             ext_mask = (self.curr_position_df['t'] >= ext_start_t) & (self.curr_position_df['t'] < traj_t_min)
             ext_positions = self.curr_position_df[ext_mask]
-            if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns:
-                ext_x = ext_positions['x'].values
-                ext_y = ext_positions['y'].values
-                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                if np.any(ext_valid_mask):
-                    ext_x_valid = ext_x[ext_valid_mask]
-                    ext_y_valid = ext_y[ext_valid_mask]
-                    x_valid = np.concatenate([ext_x_valid, x_valid])
-                    y_valid = np.concatenate([ext_y_valid, y_valid])
-                    ext_opacity = np.ones(len(ext_x_valid)) * self.start_end_extension_max_opacity
-                    opacity = np.concatenate([ext_opacity, opacity])
-        if self.past_future_trajectory_end_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
-            ext_end_t = traj_t_max + self.past_future_trajectory_end_extension_seconds
-            ext_mask = (self.curr_position_df['t'] > traj_t_max) & (self.curr_position_df['t'] <= ext_end_t)
-            ext_positions = self.curr_position_df[ext_mask]
-            if len(ext_positions) > 0 and 'x' in ext_positions.columns and 'y' in ext_positions.columns and 't' in ext_positions.columns:
+            if (len(ext_positions) > 0) and ('x' in ext_positions.columns) and ('y' in ext_positions.columns) and ('t' in ext_positions.columns):
                 ext_x = ext_positions['x'].values
                 ext_y = ext_positions['y'].values
                 ext_t = ext_positions['t'].values
-                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                
+                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y) | np.isnan(ext_t))
                 if np.any(ext_valid_mask):
                     ext_x_valid = ext_x[ext_valid_mask]
                     ext_y_valid = ext_y[ext_valid_mask]
                     ext_t_valid = ext_t[ext_valid_mask]
+                    t_valid = np.concatenate([ext_t_valid, t_valid]) ## important that it updates 't_valid'
+                    x_valid = np.concatenate([ext_x_valid, x_valid])
+                    y_valid = np.concatenate([ext_y_valid, y_valid])
+                    ext_opacity = np.ones(len(ext_x_valid)) * self.start_end_extension_max_opacity
+                    opacity = np.concatenate([ext_opacity, opacity])
+                    
+        if self.past_future_trajectory_end_extension_seconds > 0 and self.curr_position_df is not None and ('t' in self.curr_position_df.columns):
+            ext_end_t = traj_t_max + self.past_future_trajectory_end_extension_seconds
+            ext_mask = (self.curr_position_df['t'] > traj_t_max) & (self.curr_position_df['t'] <= ext_end_t)
+            ext_positions = self.curr_position_df[ext_mask]
+            if (len(ext_positions) > 0) and ('x' in ext_positions.columns) and ('y' in ext_positions.columns) and ('t' in ext_positions.columns):
+                ext_x = ext_positions['x'].values
+                ext_y = ext_positions['y'].values
+                ext_t = ext_positions['t'].values
+                # ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
+                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y) | np.isnan(ext_t))
+                if np.any(ext_valid_mask):
+                    ext_x_valid = ext_x[ext_valid_mask]
+                    ext_y_valid = ext_y[ext_valid_mask]
+                    ext_t_valid = ext_t[ext_valid_mask]
+                    t_valid = np.concatenate([t_valid, ext_t_valid])  ## important that it updates 't_valid'
                     x_valid = np.concatenate([x_valid, ext_x_valid])
                     y_valid = np.concatenate([y_valid, ext_y_valid])
                     ext_opacity = self.start_end_extension_max_opacity * (1.0 - (ext_t_valid - traj_t_max) / self.past_future_trajectory_end_extension_seconds)
                     opacity = np.concatenate([opacity, ext_opacity])
-        return x_valid, y_valid, opacity
+        return t_valid, x_valid, y_valid, opacity
 
     def _detach_and_clear_visual_lists(self, list_attr_names: Sequence[str], single_ref_attr_names: Optional[Sequence[str]] = None) -> None:
         """Detach visuals from parent and clear list attributes; optionally clear single-ref attributes."""
@@ -7180,10 +7263,15 @@ class PredictiveDecodingVispyWidget:
     def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, lines_list: list, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int) -> None:
         """Render past or future trajectories into view; append to lines_list and trajectory_colors_and_times_out."""
         from vispy import scene
+        from vispy.color import Colormap
         import colorsys
+        
         for epoch_id, positions_df in list(positions_dict.items()):
             if self.require_angle_match and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns and not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
                 continue
+            
+            custom_cmap: Optional[Colormap] = None
+            
             if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
                 x_coords, y_coords = positions_df['x'].values, positions_df['y'].values
                 valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
@@ -7194,12 +7282,71 @@ class PredictiveDecodingVispyWidget:
                         valid_match_indices = matching_idx_values[matching_idx_values >= 0]
                         if len(valid_match_indices) > 0:
                             segment_row_idx = int(valid_match_indices[0])
-                            matched_t_idx = self._segment_row_to_time_bin_idx(segment_row_idx, new_epoch_idx)
+                            matched_t_idx = self._segment_row_to_time_bin_idx(segment_row_idx, new_epoch_idx, mode='centroids')
                             base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if (matched_t_idx is not None and matched_t_idx < len(time_bin_colors)) else colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
                         else:
                             base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                            
+                    elif self.color_matches_by_merged_epoch_t_bin_idx and 'matching_found_relevant_pos_epoch' in positions_df.columns:
+                        matching_idx_values = positions_df['matching_found_relevant_pos_epoch'].values
+                        valid_match_indices = matching_idx_values[matching_idx_values >= 0]
+                        valid_rel_match_indices = valid_match_indices - np.nanmin(valid_match_indices) ## get the count of each value
+                        n_total_valid_indicies: int = len(valid_rel_match_indices)
+                        
+                        valid_rel_match_indices_counts = {}
+                        valid_rel_match_indices_start_idxs = {}
+                        
+                        for i, v in enumerate(valid_rel_match_indices):
+                            if v not in valid_rel_match_indices_counts:
+                                valid_rel_match_indices_counts[v] = 1 ## initialize to 1
+                                valid_rel_match_indices_start_idxs[v] = i
+                            else:
+                                valid_rel_match_indices_counts[v] = valid_rel_match_indices_counts.get(v, 0) + 1 ## increment
+
+
+                        valid_rel_match_indices_REL_counts = {k:(float(v)/float(n_total_valid_indicies)) for k, v in valid_rel_match_indices_counts.items()}
+                        valid_rel_match_indices_REL_start_idxs = {k:(float(v)/float(n_total_valid_indicies-1)) for k, v in valid_rel_match_indices_start_idxs.items()} # -1 to get the last index
+
+                        n_time_bin_colors: int = np.shape(time_bin_colors)[0] #  np.shape(time_bin_colors): (6, 4)
+                        unique_valid_rel_match_indices: NDArray = np.unique(valid_rel_match_indices)
+                        n_unique_valid_rel_match_indices: int = len(unique_valid_rel_match_indices)
+                        print(f'\ttime_bin_colors: {time_bin_colors}')
+                        colors_from_NDArray: List[NDArray] = [time_bin_colors[i][:3] for i in np.arange(n_time_bin_colors)]
+                        print(f'\tcolors_from_NDArray: {colors_from_NDArray}')
+                        controls = None
+                        # controls = list(valid_rel_match_indices_REL_start_idxs.values()) ## just the acending counts
+                        # print(f'controls: {controls}')
+                        # controls = np.interp(np.linspace(0, 1.0, num=n_total_valid_indicies), controls, np.linspace(0, 1.0, num=n_time_bin_colors))
+                        # controls = controls[:n_time_bin_colors] + [1.0] ## the last has to be 1.0
+                        
+                        if controls is not None:
+                            print(f'\tcontrols: {controls}, len(controls): {len(controls)}')
+                            # assert len(controls) == n_time_bin_colors, f"len(controls): {len(controls)} != n_time_bin_colors: {n_time_bin_colors}"
+                            assert len(controls) == (n_time_bin_colors+1), f"len(controls): {len(controls)} != (n_time_bin_colors+1): {(n_time_bin_colors+1)}"
+                            custom_cmap = Colormap(colors=colors_from_NDArray, controls=controls, interpolation='zero') # , controls=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+                        else:
+                            custom_cmap = Colormap(colors=colors_from_NDArray)
+                            
+                        print(f'\tcustom_cmap: {custom_cmap}')
+                        #TODO 2026-02-03 01:37: - [ ] Set controls from the correct values
+                        base_rgb = None
+                        # assert n_unique_valid_rel_match_indices <= n_time_bin_colors, f"n_unique_valid_rel_match_indices: {n_unique_valid_rel_match_indices}, n_time_bin_colors: {n_time_bin_colors}, unique_valid_rel_match_indices: {unique_valid_rel_match_indices}" 
+                        # if len(valid_rel_match_indices) > 0:                            
+                        #     # Sample the colormap at each vertex (0 to 1 along the line)
+                        #     # t = np.linspace(0.0, 1.0, N)
+                        #     # t_coords = positions_df['t'].values[valid_mask]
+                        #     # n_points: int = len(x_valid)
+                        #     segment_row_idx = int(valid_match_indices[0])
+                        #     matched_t_idx = self._segment_row_to_time_bin_idx(segment_row_idx, new_epoch_idx, mode='merged_segments')
+                        #     matched_t_idx = valid_match_indices
+                        #     # base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if ((matched_t_idx is not None) and (matched_t_idx < len(time_bin_colors))) else colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                        # else:
+                        #     base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+
                     else:
                         base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                        
+
                     if epoch_anchor_t is not None and 't' in positions_df.columns:
                         t_coords = positions_df['t'].values[valid_mask]
                         mean_time = np.mean(t_coords)
@@ -7208,17 +7355,33 @@ class PredictiveDecodingVispyWidget:
                         time_distance = np.abs(time_rel)
                         opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
                         traj_t_min, traj_t_max = np.min(t_coords), np.max(t_coords)
-                        x_valid, y_valid, opacity = self._extend_trajectory_xy_opacity(x_valid, y_valid, opacity, t_coords, traj_t_min, traj_t_max)
+                        t_valid, x_valid, y_valid, opacity = self._extend_trajectory_xy_opacity(x_valid, y_valid, opacity, t_coords, traj_t_min, traj_t_max)
                     else:
                         opacity = np.ones(len(x_valid)) * 0.8
-                    n_points = len(x_valid)
+
+                    n_points: int = len(x_valid) ## changes after extension
+                    
                     colors = np.ones((n_points, 4), dtype=np.float32)
-                    colors[:, 0], colors[:, 1], colors[:, 2] = base_rgb[0], base_rgb[1], base_rgb[2]
-                    colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+                    if custom_cmap is None:
+                        colors[:, 0], colors[:, 1], colors[:, 2] = base_rgb[0], base_rgb[1], base_rgb[2]
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+                    else:
+                        ## have a valid colormap
+                        assert t_valid is not None
+                        vertex_colors = np.array(custom_cmap.map(t_valid), dtype=np.float32) # (n_points, 4)
+                        Assert.same_shape(vertex_colors, colors)
+                        colors[:, :3] = vertex_colors[:, :3]
+                        colors[:, 3] = vertex_colors[:, 3]
+                        ## overwrite with opacity values
+                        colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+
+
+
                     line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
                     line.order = 1
                     line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
                     lines_list.append(line)
+                    
                     if self.enable_debug_plot_trajectory_average_angle_arrows and 'segment_Vp_deg' in positions_df.columns:
                         segment_angles = positions_df['segment_Vp_deg'].values
                         valid_angles = segment_angles[~np.isnan(segment_angles)]
@@ -7269,7 +7432,7 @@ class PredictiveDecodingVispyWidget:
         posterior_2d = np.sum(p_x_given_n, axis=2)
         
         # Generate time bin colors for use in trajectory and centroid coloring
-        n_time_bins = p_x_given_n.shape[2]
+        n_time_bins: int = p_x_given_n.shape[2]
         time_bin_colors = self._time_bin_colors(n_time_bins, alpha=0.9)
         x_min, x_max = self.xbin[0], self.xbin[-1]
         y_min, y_max = self.ybin[0], self.ybin[-1]
@@ -7293,6 +7456,19 @@ class PredictiveDecodingVispyWidget:
         # ==================================================================================================================================================================================================================================================================================== #
         ## INPUTS: epoch_data (filtered data)
         curr_matching_past_future_positions_df_dict = {k: v for k, v in epoch_data['curr_matching_past_future_positions_df_dict'].items()}
+        curr_matching_good_merged_segment_epochs_df = epoch_data.get('curr_matching_good_merged_segment_epochs_df', None)
+        if curr_matching_good_merged_segment_epochs_df is not None:
+            ## use this 
+            curr_matching_good_merged_segment_epochs_df = curr_matching_good_merged_segment_epochs_df.reset_index(drop=True, inplace=False)
+            num_good_epochs: int = len(curr_matching_good_merged_segment_epochs_df)
+            print(f'curr_matching_good_merged_segment_epochs_df - num_good_epochs: {num_good_epochs}')
+
+            num_good_epochs_past_future = {k:len(v) for k, v in curr_matching_past_future_positions_df_dict.items()}
+            num_total_good_epochs_past_future: int = np.sum(list(num_good_epochs_past_future.values()))
+            print(f'\tnum_good_epochs_past_future: {num_good_epochs_past_future},\n\tnum_total_good_epochs_past_future: {num_total_good_epochs_past_future}')            
+            assert num_good_epochs == num_total_good_epochs_past_future, f'num_total_good_epochs_past_future: {num_total_good_epochs_past_future} != num_good_epochs: {num_good_epochs}'
+
+
         all_time_distances = []
         if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
             for epoch_id, positions_df in curr_matching_past_future_positions_df_dict['past'].items():
