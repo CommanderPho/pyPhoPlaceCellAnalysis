@@ -6941,9 +6941,9 @@ class PredictiveDecodingVispyWidget:
     posterior_img: Any = field(default=None)
     epoch_info_text: Any = field(default=None)
     current_position_line: Any = field(default=None)
-    timeline_bar: Any = field(default=None)
-    timeline_epoch_rect: Any = field(default=None)
-    timeline_epoch_triangle: Any = field(default=None)
+    timeline_bar: Optional[vz.Rectangle] = field(default=None)
+    timeline_epoch_rect: Optional[vz.Rectangle] = field(default=None)
+    timeline_epoch_triangle: Optional[vz.Polygon] = field(default=None)
     _last_trajectory_epoch_data: Optional[Dict[types.PastFutureCategory, Any]] = field(default=None)
 
 
@@ -7115,29 +7115,29 @@ class PredictiveDecodingVispyWidget:
         self.colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
         self.colorbar_view.height_max = 60
 
-        def on_slider_value_changed(value):
-            self.epoch_value_label.setText(f"{value}/{self.num_epochs}")
+        # def on_slider_value_changed(value):
+        #     self.epoch_value_label.setText(f"{value}/{self.num_epochs}")
 
-        def on_slider_released():
-            self.update_epoch_display(self.epoch_slider.value())
+        # def on_slider_released():
+        #     self.update_epoch_display(self.epoch_slider.value())
 
-        epoch_slider.valueChanged.connect(on_slider_value_changed)
-        epoch_slider.sliderReleased.connect(on_slider_released)
+        epoch_slider.valueChanged.connect(self.on_slider_value_changed)
+        epoch_slider.sliderReleased.connect(self.on_slider_released)
 
-        def on_key_press(event):
-            proposed_new_epoch: int = self.current_epoch_idx - 1
-            if (proposed_new_epoch < 0) or (proposed_new_epoch > (self.num_epochs-1)):
-                print('invalid index would be selected be key press. Skipping.')
-                return
-            else:                
-                if event.key == 'Left':
-                    self.update_epoch_display(self.current_epoch_idx - 1)
-                elif event.key == 'Right':
-                    self.update_epoch_display(self.current_epoch_idx + 1)
+        # def on_key_press(event):
+        #     proposed_new_epoch: int = self.current_epoch_idx - 1
+        #     if (proposed_new_epoch < 0) or (proposed_new_epoch > (self.num_epochs-1)):
+        #         print('invalid index would be selected be key press. Skipping.')
+        #         return
+        #     else:                
+        #         if event.key == 'Left':
+        #             self.update_epoch_display(self.current_epoch_idx - 1)
+        #         elif event.key == 'Right':
+        #             self.update_epoch_display(self.current_epoch_idx + 1)
 
 
         if hasattr(canvas.events, 'key_press'):
-            canvas.events.key_press.connect(on_key_press)
+            canvas.events.key_press.connect(self.on_key_press)
 
         for view in [self.past_view, self.posterior_2d_view, self.future_view]:
             view.camera = scene.PanZoomCamera(aspect=1)
@@ -7165,17 +7165,58 @@ class PredictiveDecodingVispyWidget:
     # Helper/Rendering Functions                                                                                                                                                                                                                                                           #
     # ==================================================================================================================================================================================================================================================================================== #
     def _clear_epoch_visuals(self):
-        self._detach_and_clear_visual_lists(
-            list_attr_names = [
-                'past_lines', 'future_lines',
-                'time_bin_images', 'time_bin_labels', ## required
-                'past_mask_contours', 'posterior_mask_contours', 'future_mask_contours',
-                'colorbar_rects', 'colorbar_texts', 'centroid_dots', 'centroid_arrows', 'timeline_ticks',
-                'trajectory_debug_arrows', # 'render_data_dict_list_dict', ## dict-of-lists
-            ],
-            single_ref_attr_names = ['posterior_img', 'epoch_info_text', 'timeline_bar', 'timeline_epoch_rect', 'timeline_epoch_triangle'],
-        )
+        # self._detach_and_clear_visual_lists(
+        list_attr_names = [
+            'past_lines', 'future_lines',
+            'time_bin_images', 'time_bin_labels', ## required
+            'past_mask_contours', 'posterior_mask_contours', 'future_mask_contours',
+            'colorbar_rects', 'colorbar_texts', 'centroid_dots', 'centroid_arrows', 'timeline_ticks',
+            'trajectory_debug_arrows', # 'render_data_dict_list_dict', ## dict-of-lists
+        ] #,
+        single_ref_attr_names = ['posterior_img', 'epoch_info_text', 'timeline_bar', 'timeline_epoch_rect', 'timeline_epoch_triangle'] #,
+        # )
         
+        for name in list_attr_names:
+            lst = getattr(self, name)
+            if isinstance(lst, (list, tuple)):
+                for item in lst:
+                    if item is not None:
+                        item.parent = None
+                lst.clear()
+                
+            elif isinstance(lst, dict):
+                ## handle dict of lists
+                for k, sub_list in lst.items():
+                    for item in sub_list:
+                        if item is not None:
+                            try:
+                                ## try the typical widget removal process
+                                item.parent = None
+                            except AttributeError as e:
+                                ## for clearing a data-dict such as 'render_data_dict_list_dict'
+                                ignored_variable_names = ['render_data_dict_list_dict']
+                                if (name in ignored_variable_names) or (k in ignored_variable_names):
+                                    pass
+                                else:
+                                    print(f'WARN: AttributeError e {e}')
+                                    # raise
+                            except Exception as e:
+                                raise
+                    ## END for item in sub_list...
+                    
+                    sub_list.clear() ## clear the sublist
+                ## END for k, sub_list in lst.items()...
+                lst.clear()
+            else:
+                raise ValueError(f'Unknown type type(lst): {type(lst)}, lst: {lst}')
+            
+        if single_ref_attr_names:
+            for name in single_ref_attr_names:
+                ref = getattr(self, name)
+                if ref is not None:
+                    ref.parent = None
+                setattr(self, name, None)
+                
 
     def _time_bin_colors(self, n_bins: int, alpha: float = 0.9) -> np.ndarray:
         """Return (n_bins, 4) float32 array of RGBA colors for time bins (hue cycled)."""
@@ -7206,31 +7247,24 @@ class PredictiveDecodingVispyWidget:
             matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
             
         elif mode == 'merged_segments':
-            if curr_epoch_result is None or not hasattr(curr_epoch_result, 'centroids_df') or curr_epoch_result.centroids_df is None:
-                return None
-            if not hasattr(curr_epoch_result, 'a_centroids_search_segments_df') or curr_epoch_result.a_centroids_search_segments_df is None:
-                return None
-            search_df = curr_epoch_result.a_centroids_search_segments_df
-            if segment_row_idx >= len(search_df):
-                return None
-            actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
-            matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
-            pass
+            raise NotImplementedError(f'mode: "merged_segments" not implemented!')
+            
+            # if curr_epoch_result is None or not hasattr(curr_epoch_result, 'centroids_df') or curr_epoch_result.centroids_df is None:
+            #     return None
+            # if not hasattr(curr_epoch_result, 'a_centroids_search_segments_df') or curr_epoch_result.a_centroids_search_segments_df is None:
+            #     return None
+            # search_df = curr_epoch_result.a_centroids_search_segments_df
+            # if segment_row_idx >= len(search_df):
+            #     return None
+            # actual_segment_idx = search_df.iloc[segment_row_idx]['segment_idx']
+            # matching_t_bins = curr_epoch_result.centroids_df[curr_epoch_result.centroids_df['segment_idx'] == actual_segment_idx].index
+            # pass
         
         else:
             raise NotImplementedError(f'mode: "{mode}" not implemented!')
 
-
-
-        match_df: pd.DataFrame = curr_epoch_result.centroids_df
-        
-
-        
-
         return int(matching_t_bins[0]) if len(matching_t_bins) > 0 else None
     
-
-
     def _extend_trajectory_xy_opacity(self, x_valid: np.ndarray, y_valid: np.ndarray, opacity: np.ndarray, t_valid: np.ndarray, traj_t_min: float, traj_t_max: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Apply start/end trajectory extensions from curr_position_df; return (x_valid, y_valid, opacity)."""
         if self.past_future_trajectory_start_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
@@ -7273,50 +7307,6 @@ class PredictiveDecodingVispyWidget:
                     ext_opacity = self.start_end_extension_max_opacity * (1.0 - (ext_t_valid - traj_t_max) / self.past_future_trajectory_end_extension_seconds)
                     opacity = np.concatenate([opacity, ext_opacity])
         return t_valid, x_valid, y_valid, opacity
-
-    def _detach_and_clear_visual_lists(self, list_attr_names: Union[Sequence[str], Dict[str, Sequence[str]]], single_ref_attr_names: Optional[Sequence[str]] = None) -> None:
-        """Detach visuals from parent and clear list attributes; optionally clear single-ref attributes."""
-        for name in list_attr_names:
-            lst = getattr(self, name)
-            if isinstance(lst, (list, tuple)):
-                for item in lst:
-                    if item is not None:
-                        item.parent = None
-                lst.clear()
-                
-            elif isinstance(lst, dict):
-                ## handle dict of lists
-                for k, sub_list in lst.items():
-                    for item in sub_list:
-                        if item is not None:
-                            try:
-                                ## try the typical widget removal process
-                                item.parent = None
-                            except AttributeError as e:
-                                ## for clearing a data-dict such as 'render_data_dict_list_dict'
-                                ignored_variable_names = ['render_data_dict_list_dict']
-                                if (name in ignored_variable_names) or (k in ignored_variable_names):
-                                    pass
-                                else:
-                                    print(f'WARN: AttributeError e {e}')
-                                    # raise
-                            except Exception as e:
-                                raise
-                    ## END for item in sub_list...
-                    
-                    sub_list.clear() ## clear the sublist
-                ## END for k, sub_list in lst.items()...
-                lst.clear()
-            else:
-                raise ValueError(f'Unknown type type(lst): {type(lst)}, lst: {lst}')
-            
-        if single_ref_attr_names:
-            for name in single_ref_attr_names:
-                ref = getattr(self, name)
-                if ref is not None:
-                    ref.parent = None
-                setattr(self, name, None)
-
 
     def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int,
                                  lines_list: Optional[List]=None, 
@@ -7925,7 +7915,9 @@ class PredictiveDecodingVispyWidget:
                             arrow.order = 7
                             self.centroid_arrows.append(arrow) ## there is only one here
 
-                        else:                        
+                        else:
+                            #TODO 2026-02-03 09:40: - [ ] Fallback to multiple independent vz.Arrow objects instead of a single one for compatibility
+                            
                             # for i in np.arange(n_centroids):
                             # for i, t_idx in enumerate(original_indices):
                             for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
@@ -7961,12 +7953,8 @@ class PredictiveDecodingVispyWidget:
                                 ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
                                 ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.                                
                                 arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
-                                # arrow = visuals.ArrowVisual(color='white', connect='segments', arrow_size=8)
-                                #TODO 2026-02-03 06:54: - [ ] try single `visuals.ArrowVisual` like in `arrows_quiver.py` example
                                 arrow.order = 7
                                 self.centroid_arrows.append(arrow)
-
-
 
                     else:
                         ## pre 2026-02-02 - arrow angle implementation to be used when use_new_centroid_arrows == False, updates: self.centroid_arrows               
@@ -8059,7 +8047,7 @@ class PredictiveDecodingVispyWidget:
         # ==================================================================================================================================================================================================================================================================================== #
         # Builds the self.time_bin_views if needed for each t-bin in the epoch                                                                                                                                                                                                                 #
         # ==================================================================================================================================================================================================================================================================================== #
-        ## Updates: self.time_bin_views
+        ## Updates: self.time_bin_views, self.time_bin_images
         if p_x_given_n is not None and p_x_given_n.size > 0:
             n_time_bins = p_x_given_n.shape[2]
             n_bins_to_show = min(n_time_bins, self.max_time_bins_to_show)
@@ -8123,15 +8111,15 @@ class PredictiveDecodingVispyWidget:
                             y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
                             contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
                             for view, cont_list in [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, self.posterior_mask_contours), (self.future_view, self.future_mask_contours)]:
-                                c = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
+                                c: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
                                 c.order = 10
                                 cont_list.append(c)
                             ## END for view, cont_list in [(self.past_v...
                             
                             ## TODO: why adding more contours here independently? `self.posterior_mask_contours` gets double modified I think!
                             if t_idx < len(self.time_bin_views):
-                                time_bin_contour = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
-                                time_bin_contour.order = 10
+                                time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
+                                time_bin_contour.order = 11
                                 self.posterior_mask_contours.append(time_bin_contour)
                             ## END if t_idx < len(self....
                             
@@ -8161,23 +8149,23 @@ class PredictiveDecodingVispyWidget:
         timeline_bar_height = 1.0
         recording_duration = self.recording_t_max - self.recording_t_min
         if recording_duration > 0:
-            bar_fill = vz.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
+            bar_fill: vz.Rectangle = vz.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
             self.timeline_bar = bar_fill
             if epoch_start_t is not None and epoch_end_t is not None:
                 epoch_duration = epoch_end_t - epoch_start_t
                 epoch_center_t = (epoch_start_t + epoch_end_t) / 2
-                epoch_rect = vz.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
+                epoch_rect: vz.Rectangle = vz.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_rect = epoch_rect
                 triangle_height = timeline_bar_height * 0.35
                 triangle_half_width = recording_duration * 0.008
                 triangle_top_y = timeline_bar_height + triangle_height * 0.3
                 triangle_bottom_y = timeline_bar_height - triangle_height * 0.3
                 triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle = vz.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
+                epoch_triangle: vz.Polygon = vz.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_triangle = epoch_triangle
             for base_rgb, mean_time in past_trajectory_colors_and_times + future_trajectory_colors_and_times:
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
+                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
                 self.timeline_ticks.append(tick)
             self.combined_timeline_view.camera = scene.PanZoomCamera()
             self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
@@ -8197,56 +8185,62 @@ class PredictiveDecodingVispyWidget:
             # 'curr_matching_past_future_positions_df_list': curr_matching_past_future_positions_df_list,
         
         if self.enable_table_widgets:
-            if (self.epoch_table_manager is not None) and (epoch_data is not None):
-                # QApplication.processEvents()
-                try:
-                    print(f'trying to update self.epoch_table_manager tables for new_epoch_idx: {new_epoch_idx}...')
-                    table_update_sources = {}                    
-                    curr_matching_epochs_df = epoch_data.get('curr_matching_epochs_df', None)
-                    curr_matching_good_merged_segment_epochs_df = epoch_data.get('curr_matching_good_merged_segment_epochs_df', None)
-                
-                    if (curr_matching_epochs_df is None):
-                        print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_epochs_df is None')
-                    else:
-                        a_matching_pos_merged_segment_epochs_df: pd.DataFrame = curr_matching_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[new_epoch_idx]
-                        if (a_matching_pos_merged_segment_epochs_df is not None) and (len(a_matching_pos_merged_segment_epochs_df) > 0):
-                            # table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
-                            table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_merged_segment_epochs_df
-                            
+            def _perform_async_deferred_update_table_widgets():
+                """ captures: self, epoch_data 
+                """
+                if (self.epoch_table_manager is not None) and (epoch_data is not None):
+                    # QApplication.processEvents()
+                    try:
+                        print(f'trying to update self.epoch_table_manager tables for new_epoch_idx: {new_epoch_idx}...')
+                        table_update_sources = {}                    
+                        curr_matching_epochs_df = epoch_data.get('curr_matching_epochs_df', None)
+                        curr_matching_good_merged_segment_epochs_df = epoch_data.get('curr_matching_good_merged_segment_epochs_df', None)
+                    
+                        if (curr_matching_epochs_df is None):
+                            print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_epochs_df is None')
+                        else:
+                            a_matching_pos_merged_segment_epochs_df: pd.DataFrame = curr_matching_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[new_epoch_idx]
+                            if (a_matching_pos_merged_segment_epochs_df is not None) and (len(a_matching_pos_merged_segment_epochs_df) > 0):
+                                # table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
+                                table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_merged_segment_epochs_df
+                                
 
-                    if (curr_matching_good_merged_segment_epochs_df is None):
-                        print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_good_merged_segment_epochs_df is None')
-                    else:
-                        a_matching_pos_epochs_df: pd.DataFrame = curr_matching_good_merged_segment_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[new_epoch_idx]
-                        if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-                            # table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
-                            table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_epochs_df
-                            
-                    if table_update_sources:
-                        visible_columns_dict = {
-                            'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
-                            'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-                        }
-                        print(f'\tperforming update_tables: len(table_update_sources): {len(table_update_sources)}, table_update_sources.keys(): {list(table_update_sources.keys())}, visible_columns_dict: {visible_columns_dict}')
-                        self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
-                        try:
-                            table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
-                            # table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_pos_epochs')
+                        if (curr_matching_good_merged_segment_epochs_df is None):
+                            print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_good_merged_segment_epochs_df is None')
+                        else:
+                            a_matching_pos_epochs_df: pd.DataFrame = curr_matching_good_merged_segment_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[new_epoch_idx]
+                            if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
+                                # table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
+                                table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_epochs_df
+                                
+                        if table_update_sources:
+                            visible_columns_dict = {
+                                'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
+                                'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
+                            }
+                            print(f'\tperforming update_tables: len(table_update_sources): {len(table_update_sources)}, table_update_sources.keys(): {list(table_update_sources.keys())}, visible_columns_dict: {visible_columns_dict}')
+                            self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
                             try:
-                                table.selectionModel().selectionChanged.disconnect(self._apply_trajectory_highlight_for_selected_row)
+                                table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
+                                # table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_pos_epochs')
+                                try:
+                                    table.selectionModel().selectionChanged.disconnect(self._apply_trajectory_highlight_for_selected_row)
+                                except Exception:
+                                    pass
+                                table.selectionModel().selectionChanged.connect(self._apply_trajectory_highlight_for_selected_row)
+                                self._apply_trajectory_highlight_for_selected_row()
                             except Exception:
                                 pass
-                            table.selectionModel().selectionChanged.connect(self._apply_trajectory_highlight_for_selected_row)
-                            self._apply_trajectory_highlight_for_selected_row()
-                        except Exception:
-                            pass
-                    else:
-                        print(f'\tWARN: no table_update_sources (empty)')
+                        else:
+                            print(f'\tWARN: no table_update_sources (empty)')
 
-                except Exception as e:
-                    print(f'\tERROR: encountered exception {e} while trying to update table widgets for new_epoch_idx: {new_epoch_idx}!')
-                    # raise e
-                    pass
+                    except Exception as e:
+                        print(f'\tERROR: encountered exception {e} while trying to update table widgets for new_epoch_idx: {new_epoch_idx}!')
+                        # raise e
+                        pass
+            # END def _perform_async_de...
+            print(F'scheduling `_perform_async_deferred_update_table_widgets(...)` on timer')
+            QtCore.QTimer.singleShot(0, _perform_async_deferred_update_table_widgets)
 
 
             ## OLDER: from unfiltered datsources
@@ -8289,6 +8283,32 @@ class PredictiveDecodingVispyWidget:
 
         ## unblock the epoch_slider       
         self.epoch_slider.blockSignals(False)
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # UI Events                                                                                                                                                                                                                                                                            #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+    def on_slider_value_changed(self, value):
+        print(f'on_slider_value_changed(value: {value})')
+        self.epoch_value_label.setText(f"{value}/{self.num_epochs}")
+
+    def on_slider_released(self):
+        print(f'on_slider_released()')
+        self.update_epoch_display(self.epoch_slider.value())
+
+
+    def on_key_press(self, event):
+        print(f'on_key_press(value: {event})')
+        proposed_new_epoch: int = self.current_epoch_idx - 1
+        if (proposed_new_epoch < 0) or (proposed_new_epoch > (self.num_epochs-1)):
+            print('invalid index would be selected be key press. Skipping.')
+            return
+        else:                
+            if event.key == 'Left':
+                self.update_epoch_display(self.current_epoch_idx - 1)
+            elif event.key == 'Right':
+                self.update_epoch_display(self.current_epoch_idx + 1)
 
 
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
