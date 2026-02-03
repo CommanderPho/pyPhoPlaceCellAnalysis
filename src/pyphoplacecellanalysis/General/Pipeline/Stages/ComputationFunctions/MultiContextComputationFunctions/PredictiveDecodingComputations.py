@@ -7002,16 +7002,17 @@ class PredictiveDecodingVispyWidget:
             self.past_future_trajectory_end_extension_seconds = 0.0
 
 
-    def get_state(self) -> dict:
-        return {
-            'num_epochs': self.num_epochs,
-            'epoch_slider': self.epoch_slider,
-            'epoch_value_label': self.epoch_value_label,
-            'update_epoch_display': self.update_epoch_display,
-        }
+    # def get_state(self) -> dict:
+    #     return {
+    #         'num_epochs': self.num_epochs,
+    #         'epoch_slider': self.epoch_slider,
+    #         'epoch_value_label': self.epoch_value_label,
+    #         'update_epoch_display': self.update_epoch_display,
+    #     }
 
-    def as_viewer_tuple(self) -> tuple:
-        return (self.main_window, self.canvas, self.get_state())
+    # def as_viewer_tuple(self) -> tuple:
+    #     return (self.main_window, self.canvas, self.get_state())
+    
 
     def buildUI(self):
         from vispy import app, scene
@@ -7104,10 +7105,16 @@ class PredictiveDecodingVispyWidget:
         epoch_slider.sliderReleased.connect(on_slider_released)
 
         def on_key_press(event):
-            if event.key == 'Left':
-                self.update_epoch_display(self.current_epoch_idx - 1)
-            elif event.key == 'Right':
-                self.update_epoch_display(self.current_epoch_idx + 1)
+            proposed_new_epoch: int = self.current_epoch_idx - 1
+            if (proposed_new_epoch < 0) or (proposed_new_epoch > (self.num_epochs-1)):
+                print('invalid index would be selected be key press. Skipping.')
+                return
+            else:                
+                if event.key == 'Left':
+                    self.update_epoch_display(self.current_epoch_idx - 1)
+                elif event.key == 'Right':
+                    self.update_epoch_display(self.current_epoch_idx + 1)
+
 
         if hasattr(canvas.events, 'key_press'):
             canvas.events.key_press.connect(on_key_press)
@@ -7115,6 +7122,7 @@ class PredictiveDecodingVispyWidget:
         for view in [self.past_view, self.posterior_2d_view, self.future_view]:
             view.camera = scene.PanZoomCamera(aspect=1)
             scene.visuals.GridLines(parent=view.scene)
+            
         self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
         x_min, x_max = self.xbin[0], self.xbin[-1]
         y_min, y_max = self.ybin[0], self.ybin[-1]
@@ -7131,6 +7139,7 @@ class PredictiveDecodingVispyWidget:
         self.combined_timeline_view.camera = scene.PanZoomCamera()
         self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
         self.update_epoch_display(self.active_epoch_idx)
+
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Helper/Rendering Functions                                                                                                                                                                                                                                                           #
@@ -7266,6 +7275,7 @@ class PredictiveDecodingVispyWidget:
         from vispy.color import Colormap
         import colorsys
         
+        enable_debug_logging: bool = False
         for epoch_id, positions_df in list(positions_dict.items()):
             if self.require_angle_match and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns and not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
                 continue
@@ -7306,13 +7316,16 @@ class PredictiveDecodingVispyWidget:
 
                         valid_rel_match_indices_REL_counts = {k:(float(v)/float(n_total_valid_indicies)) for k, v in valid_rel_match_indices_counts.items()}
                         valid_rel_match_indices_REL_start_idxs = {k:(float(v)/float(n_total_valid_indicies-1)) for k, v in valid_rel_match_indices_start_idxs.items()} # -1 to get the last index
-
+                        if enable_debug_logging:
+                            print(F'epoch_id: {epoch_id}')
                         n_time_bin_colors: int = np.shape(time_bin_colors)[0] #  np.shape(time_bin_colors): (6, 4)
                         unique_valid_rel_match_indices: NDArray = np.unique(valid_rel_match_indices)
                         n_unique_valid_rel_match_indices: int = len(unique_valid_rel_match_indices)
-                        print(f'\ttime_bin_colors: {time_bin_colors}')
+                        if enable_debug_logging:
+                            print(f'\ttime_bin_colors: {time_bin_colors}')
                         colors_from_NDArray: List[NDArray] = [time_bin_colors[i][:3] for i in np.arange(n_time_bin_colors)]
-                        print(f'\tcolors_from_NDArray: {colors_from_NDArray}')
+                        if enable_debug_logging:
+                            print(f'\tcolors_from_NDArray: {colors_from_NDArray}')
                         controls = None
                         # controls = list(valid_rel_match_indices_REL_start_idxs.values()) ## just the acending counts
                         # print(f'controls: {controls}')
@@ -7320,14 +7333,16 @@ class PredictiveDecodingVispyWidget:
                         # controls = controls[:n_time_bin_colors] + [1.0] ## the last has to be 1.0
                         
                         if controls is not None:
-                            print(f'\tcontrols: {controls}, len(controls): {len(controls)}')
+                            if enable_debug_logging:
+                                print(f'\tcontrols: {controls}, len(controls): {len(controls)}')
                             # assert len(controls) == n_time_bin_colors, f"len(controls): {len(controls)} != n_time_bin_colors: {n_time_bin_colors}"
                             assert len(controls) == (n_time_bin_colors+1), f"len(controls): {len(controls)} != (n_time_bin_colors+1): {(n_time_bin_colors+1)}"
                             custom_cmap = Colormap(colors=colors_from_NDArray, controls=controls, interpolation='zero') # , controls=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
                         else:
                             custom_cmap = Colormap(colors=colors_from_NDArray)
                             
-                        print(f'\tcustom_cmap: {custom_cmap}')
+                        if enable_debug_logging:
+                            print(f'\tcustom_cmap: {custom_cmap}')
                         #TODO 2026-02-03 01:37: - [ ] Set controls from the correct values
                         base_rgb = None
                         # assert n_unique_valid_rel_match_indices <= n_time_bin_colors, f"n_unique_valid_rel_match_indices: {n_unique_valid_rel_match_indices}, n_time_bin_colors: {n_time_bin_colors}, unique_valid_rel_match_indices: {unique_valid_rel_match_indices}" 
@@ -7368,7 +7383,13 @@ class PredictiveDecodingVispyWidget:
                     else:
                         ## have a valid colormap
                         assert t_valid is not None
-                        vertex_colors = np.array(custom_cmap.map(t_valid), dtype=np.float32) # (n_points, 4)
+                        t_rel_valid = deepcopy(t_valid) - t_valid[0] 
+                        t_rel_valid = t_rel_valid / np.ptp(t_rel_valid) ## scale between 0.0 and 1.0
+                        if enable_debug_logging:
+                            print(f'\tt_rel_valid: {t_rel_valid}')
+                        vertex_colors = np.array(custom_cmap.map(t_rel_valid), dtype=np.float32) # (n_points, 4)
+                        if enable_debug_logging:
+                            print(f'\tvertex_colors: {vertex_colors}')
                         Assert.same_shape(vertex_colors, colors)
                         colors[:, :3] = vertex_colors[:, :3]
                         colors[:, 3] = vertex_colors[:, 3]
@@ -7442,9 +7463,11 @@ class PredictiveDecodingVispyWidget:
                 if mask_2d is not None and mask_2d.size > 0:
                     img_height, img_width = mask_2d.T.shape
                 else:
-                    return
+                    pass
+                    # return
             else:
-                return
+                pass
+                # return
         else:
             img_height, img_width = posterior_2d.T.shape
         x_scale = (x_max - x_min) / img_width
@@ -7755,7 +7778,7 @@ class PredictiveDecodingVispyWidget:
 
 
         self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
-        self.canvas.update()
+        # self.canvas.update()
         # QApplication.processEvents()
         
 
@@ -7768,8 +7791,7 @@ class PredictiveDecodingVispyWidget:
         
         if self.enable_table_widgets:
             if (self.epoch_table_manager is not None) and (epoch_data is not None):
-                QApplication.processEvents()
-                
+                # QApplication.processEvents()
                 try:
                     print(f'trying to update self.epoch_table_manager tables for new_epoch_idx: {new_epoch_idx}...')
                     table_update_sources = {}                    
@@ -7840,7 +7862,7 @@ class PredictiveDecodingVispyWidget:
                             
 
         # self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
-        # self.canvas.update()
+        self.canvas.update()
         QApplication.processEvents()
 
 
