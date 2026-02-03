@@ -219,7 +219,7 @@ class TableManager:
         self.dock_items = {}  # Store dock items
         self.models = {}  # dict of SimplePandasModel objects
 
-    def update_tables(self, data_sources: Dict[str, pd.DataFrame]):
+    def update_tables(self, data_sources: Dict[str, pd.DataFrame], visible_columns_dict: Optional[Dict]=None):
         # Remove old dock items no longer present
         to_remove = []
         for name in self.dock_items.keys():
@@ -228,6 +228,14 @@ class TableManager:
         for name in to_remove:
             self.remove_table_dock(name)
 
+        if visible_columns_dict is not None:
+            for k, v in visible_columns_dict.items():
+                if k not in self.visible_columns_dict:
+                    self.visible_columns_dict[k] = list(set(v))
+                else:
+                    self.visible_columns_dict[k] = list(set(self.visible_columns_dict.get(k, []) + v)) ## add to existing, but only take uniques
+                    
+
         # Add or update tables
         for name, df in data_sources.items():
             if name not in self.dock_items:
@@ -235,6 +243,7 @@ class TableManager:
             else:
                 # Update existing table
                 self._update_table(self.dock_items[name], df)
+
 
     def add_table_dock(self, name: str, df: pd.DataFrame, dockSize=(500,100)):
         """Creates a new docked table widget
@@ -262,6 +271,7 @@ class TableManager:
         
         self.dock_items[name] = dDisplayItem
         self.models[name] = model
+        dDisplayItem.setTitle(f"{name} (rows: {df.shape[0]}×, cols: {df.shape[1]})")
         return dDisplayItem
 
     def remove_table_dock(self, name: str):
@@ -325,6 +335,7 @@ class TableManager:
 
         return (table, model)
 
+
     def _update_table(self, dock_item, df: pd.DataFrame):
         dock_children_widgets = dock_item.widgets
         assert len(dock_children_widgets) == 1, f"dock_children_widgets: {dock_children_widgets}, dock_item: {dock_item}"
@@ -332,6 +343,7 @@ class TableManager:
         model = self._fill_table(table, df)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
+        dock_item.setTitle(f"{dock_item.name()} (rows: {model.rowCount()}, cols: {model.columnCount()})")
         return model
 
     def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
