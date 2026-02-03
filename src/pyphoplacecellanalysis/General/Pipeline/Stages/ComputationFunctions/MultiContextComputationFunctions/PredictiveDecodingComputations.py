@@ -7058,15 +7058,29 @@ class PredictiveDecodingVispyWidget:
         # from vispy import app, scene
         # from qtpy import QtWidgets, QtCore
         self.current_epoch_idx = self.active_epoch_idx
-        canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
+
+        # Main Canvas Init ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
+        canvas = scene.SceneCanvas(show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy',
+            # keys='interactive',
+            autoswap=False, resizable=True, decorate=True, fullscreen=False,
+            # parent=self,
+        )
         self.canvas = canvas
+
+
+        # Build UI ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         main_window = QtWidgets.QMainWindow()
         main_window.setWindowTitle('Predictive Decoding Display - Vispy')
         self.main_window = main_window
         central_widget = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add Native Canvas Widget ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         main_layout.addWidget(canvas.native, stretch=1)
+        
+
         slider_widget = QtWidgets.QWidget()
         slider_layout = QtWidgets.QHBoxLayout(slider_widget)
         slider_label = QtWidgets.QLabel("Epoch:")
@@ -8237,8 +8251,9 @@ class PredictiveDecodingVispyWidget:
                                         past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
                                     ),  
         )
-        #TODO 2026-02-03 12:56: - [ ] Apply to self!
-        
+        for _k, _v in _update_dict.items():
+            setattr(self, _k, _v)
+
 
 
         # ==================================================================================================================================================================================================================================================================================== #
