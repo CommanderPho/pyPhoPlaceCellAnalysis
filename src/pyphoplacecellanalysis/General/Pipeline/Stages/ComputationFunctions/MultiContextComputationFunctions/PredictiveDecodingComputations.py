@@ -6855,6 +6855,8 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget im
 import colorsys
 from skimage import measure
 ## vispy
+import vispy
+import vispy as vp
 from vispy import scene
 # from vispy import app, scene
 # from vispy import app, gloo, visuals
