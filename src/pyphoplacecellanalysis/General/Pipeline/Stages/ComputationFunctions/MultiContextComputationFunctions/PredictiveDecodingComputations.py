@@ -4947,6 +4947,23 @@ class MaskDataSource:
     matching_pos_merged_segment_epochs_dfs_list: List[Optional[pd.DataFrame]] = field(default=None)
     # merged_segment_epochs: Optional[pd.DataFrame] = field(default=None)
 
+
+    @property
+    def num_epochs(self) -> int:
+        """The num_epochs property."""
+        return len(self.matching_pos_epochs_dfs_list)
+    
+
+    @property
+    def num_epoch_time_bins(self) -> NDArray:
+        """The num_epoch_time_bins property.
+        one per epoch
+        """
+        return np.array([np.shape(v)[-1] for v in self.p_x_given_n_list])
+        # self.decoded_result.p_x_given_n_list[an_epoch_idx]  # Shape: (n_x_bins, n_y_bins, n_time_bins)
+    
+    
+
     @classmethod
     def init_from_list_of_MatchingPastFuturePositionsResult(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], filter_epochs: pd.DataFrame, **kwargs) -> "MaskDataSource":
         a_new_ds = cls(
@@ -5020,7 +5037,6 @@ class MaskDataSource:
         
         curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {}
 
-
         if should_filter_to_minimum:
             # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
             for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_merged_segment_epochs_df_dict.items(): ## #TODO 2026-02-03 00:11: - [ ] uses `curr_matching_merged_segment_epochs_df_dict`
@@ -5063,7 +5079,6 @@ class MaskDataSource:
                 curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
                 curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
             ## END for ...
-
 
         # ## OLD way
         # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
@@ -6917,6 +6932,9 @@ class PredictiveDecodingVispyWidget:
     max_time_bins_to_show: int = field(default=12)
     enable_table_widgets: bool = field(default=False)
 
+    enable_multi_epoch_overview_display_mode: bool = field(default=False)
+    multi_epoch_overview_container: Optional[Dict] = field(default=None, metadata={'desc': "only used when `enable_multi_epoch_overview_display_mode == True`"}) ## only used when `enable_multi_epoch_overview_display_mode == True`
+    
 
     # Derived in setup()
     xbin: Optional[Any] = field(default=None)
@@ -7081,24 +7099,27 @@ class PredictiveDecodingVispyWidget:
         main_layout.addWidget(canvas.native, stretch=1)
         
 
-        slider_widget = QtWidgets.QWidget()
-        slider_layout = QtWidgets.QHBoxLayout(slider_widget)
-        slider_label = QtWidgets.QLabel("Epoch:")
-        epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        epoch_slider.setMinimum(0)
-        epoch_slider.setMaximum(max(0, self.num_epochs - 1))
-        epoch_slider.setValue(min(self.active_epoch_idx, self.num_epochs - 1))
-        epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        epoch_slider.setTickInterval(1)
-        epoch_value_label = QtWidgets.QLabel(f"{self.active_epoch_idx}/{self.num_epochs}")
-        epoch_value_label.setMinimumWidth(60)
-        self.epoch_slider = epoch_slider
-        self.epoch_value_label = epoch_value_label
-        slider_layout.addWidget(slider_label)
-        slider_layout.addWidget(epoch_slider, stretch=1)
-        slider_layout.addWidget(epoch_value_label)
-        main_layout.addWidget(slider_widget)
-        
+        if not self.enable_multi_epoch_overview_display_mode:
+            slider_widget = QtWidgets.QWidget()
+            slider_layout = QtWidgets.QHBoxLayout(slider_widget)
+            slider_label = QtWidgets.QLabel("Epoch:")
+            epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+            epoch_slider.setMinimum(0)
+            epoch_slider.setMaximum(max(0, self.num_epochs - 1))
+            epoch_slider.setValue(min(self.active_epoch_idx, self.num_epochs - 1))
+            epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+            epoch_slider.setTickInterval(1)
+            epoch_value_label = QtWidgets.QLabel(f"{self.active_epoch_idx}/{self.num_epochs}")
+            epoch_value_label.setMinimumWidth(60)
+            self.epoch_slider = epoch_slider
+            self.epoch_value_label = epoch_value_label
+            slider_layout.addWidget(slider_label)
+            slider_layout.addWidget(epoch_slider, stretch=1)
+            slider_layout.addWidget(epoch_value_label)
+            main_layout.addWidget(slider_widget)
+
+
+
         if self.enable_table_widgets:
             from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             table_container = QtWidgets.QWidget()
@@ -7141,62 +7162,158 @@ class PredictiveDecodingVispyWidget:
         main_window.setCentralWidget(central_widget)
         main_window.resize(1400, 950)
         main_window.show()
-        grid = canvas.central_widget.add_grid()
+        
+        grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid() # vispy.scene.widgets.grid.Grid
         self.grid = grid
-        self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
-        self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
-        self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
-        self.time_bin_grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
-        self.time_bin_grid.height_max = 120
-        self.combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
-        self.combined_timeline_view.height_max = 40
-        self.colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
-        self.colorbar_view.height_max = 60
-
-        # def on_slider_value_changed(value):
-        #     self.epoch_value_label.setText(f"{value}/{self.num_epochs}")
-
-        # def on_slider_released():
-        #     self.update_epoch_display(self.epoch_slider.value())
-
-        epoch_slider.valueChanged.connect(self.on_slider_value_changed)
-        epoch_slider.sliderReleased.connect(self.on_slider_released)
-
-        # def on_key_press(event):
-        #     proposed_new_epoch: int = self.current_epoch_idx - 1
-        #     if (proposed_new_epoch < 0) or (proposed_new_epoch > (self.num_epochs-1)):
-        #         print('invalid index would be selected be key press. Skipping.')
-        #         return
-        #     else:                
-        #         if event.key == 'Left':
-        #             self.update_epoch_display(self.current_epoch_idx - 1)
-        #         elif event.key == 'Right':
-        #             self.update_epoch_display(self.current_epoch_idx + 1)
-
-
-        if hasattr(canvas.events, 'key_press'):
-            canvas.events.key_press.connect(self.on_key_press)
-
-        for view in [self.past_view, self.posterior_2d_view, self.future_view]:
-            view.camera = scene.PanZoomCamera(aspect=1)
-            vz.GridLines(parent=view.scene)
+        
+        if not self.enable_multi_epoch_overview_display_mode:
+            # Default single epoch plotting mode with slider to control active epoch _____________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
+            self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
+    
+            self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
             
-        self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
-        x_min, x_max = self.xbin[0], self.xbin[-1]
-        y_min, y_max = self.ybin[0], self.ybin[-1]
-        bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
-        for view in [self.past_view, self.posterior_2d_view, self.future_view]:
-            vz.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
-        extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
-        for view in [self.past_view, self.future_view]:
-            view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
-        y_range = extent[3] - extent[2]
-        self.posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
-        timeline_bar_height = 1.0
-        recording_duration = self.recording_t_max - self.recording_t_min
-        self.combined_timeline_view.camera = scene.PanZoomCamera()
-        self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
-        self.update_epoch_display(self.active_epoch_idx)
+            self.time_bin_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
+            self.time_bin_grid.height_max = 120
+            
+            self.combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
+            self.combined_timeline_view.height_max = 40
+            self.colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
+            self.colorbar_view.height_max = 60
+
+
+            # Only when single-epoch mode ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            if hasattr(canvas.events, 'key_press'):
+                canvas.events.key_press.connect(self.on_key_press)
+
+            for view in [self.past_view, self.posterior_2d_view, self.future_view]:
+                view.camera = scene.PanZoomCamera(aspect=1)
+                vz.GridLines(parent=view.scene)
+                
+            self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
+            x_min, x_max = self.xbin[0], self.xbin[-1]
+            y_min, y_max = self.ybin[0], self.ybin[-1]
+            bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
+            for view in [self.past_view, self.posterior_2d_view, self.future_view]:
+                vz.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+            extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
+            for view in [self.past_view, self.future_view]:
+                view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
+            y_range = extent[3] - extent[2]
+            self.posterior_2d_view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2] - y_range * 0.05, extent[3] + y_range * 0.2))
+            timeline_bar_height = 1.0
+            recording_duration = self.recording_t_max - self.recording_t_min
+            self.combined_timeline_view.camera = scene.PanZoomCamera()
+            self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
+            self.update_epoch_display(self.active_epoch_idx)
+
+            assert epoch_slider is not None
+            epoch_slider.valueChanged.connect(self.on_slider_value_changed)
+            epoch_slider.sliderReleased.connect(self.on_slider_released)
+            
+            all_views = [self.past_view, self.future_view, self.posterior_2d_view, self.combined_timeline_view, self.colorbar_view]
+
+        else:
+            ## build all data at once
+            n_epochs: int = self.a_flat_matching_results_list_ds.num_epochs
+            epoch_indicies = np.arange(n_epochs)
+            epoch_data_list: List[Dict] = [self.a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length) for new_epoch_idx in epoch_indicies]
+            # epoch_data_list
+            
+            filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs
+            
+            _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: int = 10
+
+            ## get standard data:            
+            x_min, x_max = self.xbin[0], self.xbin[-1]
+            y_min, y_max = self.ybin[0], self.ybin[-1]
+        
+            multi_epoch_overview_container_render_dict_list = [] # {}
+            
+            if self.multi_epoch_overview_container is None:
+                self.multi_epoch_overview_container = {'a_posterior_2d_container_view_grid': [], 'a_posterior_2d_view': [], 'a_time_bin_grid': []} #[]
+        
+            # self.posterior_2d_container_view = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
+            # self.posterior_2d_container_view_grid = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
+            for idx, epoch_data in enumerate(epoch_data_list):
+                if idx >= _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER:
+                    # print(f'_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}')
+                    continue
+                else:
+                    print(f'idx: {idx} < _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}, so adding...')
+                
+                n_time_bins: int = self.a_flat_matching_results_list_ds.num_epoch_time_bins[idx]
+                # epoch_data
+                # Get posterior data
+                p_x_given_n = self.a_flat_matching_results_list_ds.p_x_given_n_list[idx]
+                p_x_given_n = np.ascontiguousarray(p_x_given_n, dtype=np.float32)
+                
+                posterior_2d = np.sum(p_x_given_n, axis=2)
+                posterior_2d = np.ascontiguousarray(posterior_2d, dtype=np.float32)
+
+                # Generate time bin colors for use in trajectory and centroid coloring
+                n_time_bins: int = p_x_given_n.shape[2]
+                time_bin_colors = self._time_bin_colors(n_time_bins, alpha=0.9)
+                
+                if idx < len(filter_epochs):
+                    epoch_row = filter_epochs.iloc[idx]
+                    epoch_start_t = epoch_row['start'] if 'start' in epoch_row else epoch_row.get('t_start', None)
+                    epoch_end_t = epoch_row['stop'] if 'stop' in epoch_row else epoch_row.get('t_stop', None)
+                else:
+                    epoch_start_t = None
+                    epoch_end_t = None
+
+                # ==================================================================================================================================================================================================================================================================================== #
+                # Build Views                                                                                                                                                                                                                                                                          #
+                # ==================================================================================================================================================================================================================================================================================== #
+                a_posterior_2d_container_view_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=idx, col=0, col_span=(1+n_time_bins), border_color='white') ## holds the epoch's two views
+                a_posterior_2d_view = a_posterior_2d_container_view_grid.add_view(row=0, col=0, col_span=1, border_color='gray')
+                a_posterior_2d_view.height_max = 120
+                a_time_bin_grid: vispy.scene.widgets.grid.Grid = a_posterior_2d_container_view_grid.add_grid(row=0, col=1, col_span=n_time_bins, border_color='gray')
+                a_time_bin_grid.height_max = 120
+                a_posterior_2d_container_view_grid.height_max = 120
+                self.multi_epoch_overview_container['a_posterior_2d_container_view_grid'].append(a_posterior_2d_container_view_grid)
+                self.multi_epoch_overview_container['a_posterior_2d_view'].append(a_posterior_2d_view)
+                self.multi_epoch_overview_container['a_time_bin_grid'].append(a_time_bin_grid)
+
+                _common_render_kwargs = dict(time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=idx)
+                
+                # ==================================================================================================================================================================================================================================================================================== #
+                # Begin Render                                                                                                                                                                                                                                                                         #
+                # ==================================================================================================================================================================================================================================================================================== #
+                if idx >= len(multi_epoch_overview_container_render_dict_list):
+                    ## create the empty dict
+                    _an_update_dict = dict(
+                        # centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
+                        # current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
+                        posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
+                        # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
+                        # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                        # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
+                    )
+                    # _an_update_dict = {}
+                    multi_epoch_overview_container_render_dict_list.append(_an_update_dict)
+                else:
+                    _an_update_dict = multi_epoch_overview_container_render_dict_list[idx]
+                
+                _an_update_dict = self._render_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d,
+                                        epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t,
+                                        **_common_render_kwargs,
+                                        _update_dict=_an_update_dict, #multi_epoch_overview_container_render_dict_list[idx],
+                )
+                multi_epoch_overview_container_render_dict_list[idx] = _an_update_dict ## update the existing
+                
+                # multi_epoch_overview_container_render_dict_list.append(_update_dict)
+                # for _k, _v in _update_dict.items():
+                #     setattr(self, _k, _v)
+                    
+            ## END for idx, epoch_data in enumerate(epoch_data_list)...
+
+    
+
+
+
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -7392,10 +7509,11 @@ class PredictiveDecodingVispyWidget:
 
         # Render Posterior Heatmap (2D view - top half)
         posterior_img = None # self.posterior_img
+        posterior_2d_view = _update_dict.get('posterior_2d_view', self.posterior_2d_view)
         
         if posterior_2d is not None and posterior_2d.size > 0:
             img_data: NDArray = np.ascontiguousarray(posterior_2d.T, dtype=np.float32)
-            posterior_img = vz.Image(img_data, cmap='viridis', parent=self.posterior_2d_view.scene)
+            posterior_img = vz.Image(img_data, cmap='viridis', parent=posterior_2d_view.scene)
             posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
         _update_dict.update(posterior_img=posterior_img)
 
@@ -7421,7 +7539,7 @@ class PredictiveDecodingVispyWidget:
                         t_idx = original_indices[i]
                         centroid_colors[i] = time_bin_colors[t_idx] if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
                     centroid_pos = np.column_stack([x_centroids, y_centroids]) # (N, 2)
-                    centroid_markers = vz.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=self.posterior_2d_view.scene)
+                    centroid_markers = vz.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=posterior_2d_view.scene)
                     centroid_markers.order = 8
                     centroid_dots.append(centroid_markers)
                     
@@ -7466,8 +7584,12 @@ class PredictiveDecodingVispyWidget:
                         pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()]) # ((2 * N), 2)
                         # arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_end', 'y_end']].to_numpy() # (N, 4)
                         arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy() # (N, 4)                        
-                        _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(lambda v: centroid_colors[v, :]).to_list() ## (N, 4)
-                        _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(lambda v: centroid_colors[v, :]).to_list()
+
+                        # _safe_color_map_fn = lambda v: centroid_colors[v, :]
+                        # _safe_color_map_fn = lambda t_idx: centroid_colors[t_idx, :] if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8) # IndexError: index 9 is out of bounds for axis 0 with size 9
+                        _safe_color_map_fn = lambda t_idx: centroid_colors[t_idx, :] if (t_idx < np.shape(centroid_colors)[0]) else (1.0, 1.0, 1.0, 0.8) # IndexError: index 9 is out of bounds for axis 0 with size 9
+                        _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(_safe_color_map_fn).to_list() ## (N, 4)
+                        _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(_safe_color_map_fn).to_list()
                         
                         vertex_point_color: NDArray = np.vstack([np.stack([v0, v1]) for v0, v1 in zip(_original_index_start_colors_list, _original_index_end_colors_list)]) # ((2 * N), 4)
                         Assert.same_length(vertex_point_color, pos)
@@ -7484,7 +7606,7 @@ class PredictiveDecodingVispyWidget:
                             # arrows = np.array([[x_start, y_start, x_end, y_end]])
                             ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
                             ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.
-                            # arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', connect="strip", parent=self.posterior_2d_view.scene) # NotImplementedError: Only 'strip' connection mode allowed for agg-method lines.
+                            # arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', connect="strip", parent=posterior_2d_view.scene) # NotImplementedError: Only 'strip' connection mode allowed for agg-method lines.
                             arrow: vz.Arrow = vz.Arrow(pos=pos,
                                                         arrows=arrows, arrow_color=arrow_color,
                                                         arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color,
@@ -7492,7 +7614,7 @@ class PredictiveDecodingVispyWidget:
                                                         # method='agg', connect="strip",
                                                         method='gl', connect="segments", ## works
                                                         # method='gl', connect="strip",
-                                                        parent=self.posterior_2d_view.scene)
+                                                        parent=posterior_2d_view.scene)
                             #   File "H:\TEMP\Spike3DEnv_ExploreUpgrade\Spike3DWorkEnv\Spike3D\.venv\lib\site-packages\vispy\visuals\line\arrow.py", line 98, in _prepare_vertex_data
                             #     v['color'][:] = color
                             # ValueError: could not broadcast input array from shape (10,4) into shape (5,4)
@@ -7541,7 +7663,7 @@ class PredictiveDecodingVispyWidget:
                                 ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.                                
                                 a_pos = np.asarray(a_pos, dtype=np.float32)
                                 an_arrows = np.asarray(an_arrows, dtype=np.float32)
-                                arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene)
                                 arrow.order = 7
                                 centroid_arrows.append(arrow)
 
@@ -7576,7 +7698,7 @@ class PredictiveDecodingVispyWidget:
                                     
                                     ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
                                     ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.
-                                    arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                    arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene)
                                     # arrow = visuals.ArrowVisual(color='white', connect='segments', arrow_size=8)
                                     #TODO 2026-02-03 06:54: - [ ] try single `visuals.ArrowVisual` like in `arrows_quiver.py` example
                                     
@@ -7612,7 +7734,7 @@ class PredictiveDecodingVispyWidget:
                     colors[:, :3] = 0.7
                     colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
                     if self.current_position_line is None:
-                        current_position_line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
+                        current_position_line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors, width=3, method='gl', parent=posterior_2d_view.scene)
                         current_position_line.order = 5
                     else:
                         current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors)
@@ -7640,9 +7762,9 @@ class PredictiveDecodingVispyWidget:
             epoch_info_str = f'Epoch {new_epoch_idx + 1}/{self.num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
             text_y_pos = y_max + (y_max - y_min) * 0.15
             text_x_pos = (x_min + x_max) / 2
-            epoch_info_text: vz.Text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=self.posterior_2d_view.scene)
+            epoch_info_text: vz.Text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=posterior_2d_view.scene)
             y_range = y_max - y_min
-            self.posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+            posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
         _update_dict.update(epoch_info_text=epoch_info_text)
 
 
@@ -7654,22 +7776,33 @@ class PredictiveDecodingVispyWidget:
         time_bin_labels = _update_dict.get('time_bin_labels', []) # self.time_bin_labels
         time_bin_images = _update_dict.get('time_bin_images', []) # self.time_bin_images
         
+        ## Uses:
+        time_bin_grid: vispy.scene.widgets.grid.Grid = _update_dict.get('time_bin_grid', self.time_bin_grid) 
+        for child in list(time_bin_grid.children):
+            time_bin_grid.remove_widget(child)
+                    
+
         if p_x_given_n is not None and p_x_given_n.size > 0:
             n_time_bins = p_x_given_n.shape[2]
             n_bins_to_show = min(n_time_bins, self.max_time_bins_to_show)
             view_time_bin_colors = self._time_bin_colors(n_bins_to_show, alpha=1.0)[:, :3]
             vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
             
-            if len(time_bin_views) != n_bins_to_show:
+            if (len(time_bin_views) != n_bins_to_show):
                 ## remove all existing:
-                for view in self.time_bin_views:
+                for view in time_bin_views:
                     if view is not None and hasattr(view, 'parent'):
                         view.parent = None
                 time_bin_views.clear()
+                
+                ## clear the grid's children:
+                for child in list(time_bin_grid.children):
+                    time_bin_grid.remove_widget(child)
+                    
                 ## create new (added to `self.time_bin_grid`):
                 for t_idx in range(n_bins_to_show):
                     t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
-                    view = self.time_bin_grid.add_view(row=0, col=t_idx, border_color=t_bin_border_color)
+                    view = time_bin_grid.add_view(row=0, col=t_idx, border_color=t_bin_border_color)
                     view.camera = scene.PanZoomCamera(aspect=1)
                     view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
                     time_bin_views.append(view)
@@ -7704,7 +7837,7 @@ class PredictiveDecodingVispyWidget:
         posterior_mask_contours = _update_dict.get('posterior_mask_contours', []) # self.posterior_mask_contours
         # active_posterior_contours_dict_list = [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, posterior_mask_contours), (self.future_view, self.future_mask_contours)]
         list_names = ['past_mask_contours', 'posterior_mask_contours', 'future_mask_contours']
-        active_posterior_contours_dict_list = [(self.past_view, _update_dict.get('past_mask_contours', [])), (self.posterior_2d_view, _update_dict.get('posterior_mask_contours', [])), (self.future_view, _update_dict.get('future_mask_contours', []))]
+        active_posterior_contours_dict_list = [(self.past_view, _update_dict.get('past_mask_contours', [])), (posterior_2d_view, _update_dict.get('posterior_mask_contours', [])), (self.future_view, _update_dict.get('future_mask_contours', []))]
         
         if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result)):
             epoch_result_for_contours = self.epoch_flat_mask_future_past_result[new_epoch_idx]
@@ -7725,14 +7858,17 @@ class PredictiveDecodingVispyWidget:
                             y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
                             contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
                             for view, cont_list in active_posterior_contours_dict_list:
-                                c: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
-                                c.order = 10
-                                cont_list.append(c)
+                                if view is not None:
+                                    c: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
+                                    c.order = 10
+                                    cont_list.append(c)
                             ## END for view, cont_list in [(self.past_v...
                             
                             ## TODO: why adding more contours here independently? `self.posterior_mask_contours` gets double modified I think!
-                            if t_idx < len(self.time_bin_views):
-                                time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
+                            # if t_idx < len(self.time_bin_views):
+                            #     time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
+                            if t_idx < len(time_bin_views):
+                                time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=time_bin_views[t_idx].scene)                            
                                 time_bin_contour.order = 11
                                 posterior_mask_contours.append(time_bin_contour)
                             ## END if t_idx < len(self....
@@ -7743,7 +7879,7 @@ class PredictiveDecodingVispyWidget:
             ## END if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result))...
             _update_dict.update(posterior_mask_contours=posterior_mask_contours)
             for (a_name, (a_view, a_cont_list)) in zip(list_names, active_posterior_contours_dict_list):
-                if (a_cont_list is not None):
+                if (a_view is not None) and (a_cont_list is not None):
                     _update_dict[a_name] = a_cont_list
 
             # self.posterior_mask_contours = posterior_mask_contours 
@@ -8117,7 +8253,6 @@ class PredictiveDecodingVispyWidget:
         x_min, x_max = self.xbin[0], self.xbin[-1]
         y_min, y_max = self.ybin[0], self.ybin[-1]
         
-
         # Get posterior data
         p_x_given_n = self.a_flat_matching_results_list_ds.p_x_given_n_list[new_epoch_idx]
         p_x_given_n = np.ascontiguousarray(p_x_given_n, dtype=np.float32)
