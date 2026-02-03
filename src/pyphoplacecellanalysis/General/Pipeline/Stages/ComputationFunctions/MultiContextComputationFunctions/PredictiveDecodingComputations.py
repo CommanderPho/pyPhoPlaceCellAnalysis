@@ -6850,9 +6850,13 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # ==================================================================================================================================================================================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
 import colorsys
+from skimage import measure
 ## vispy
 from vispy import scene
 # from vispy import app, scene
+# from vispy import app, gloo, visuals
+# from vispy.scene.visuals import Arrow, Markers, Line
+import vispy.scene.visuals as vz
 from vispy.color import Colormap
 from qtpy import QtWidgets, QtCore
 
@@ -7137,14 +7141,14 @@ class PredictiveDecodingVispyWidget:
 
         for view in [self.past_view, self.posterior_2d_view, self.future_view]:
             view.camera = scene.PanZoomCamera(aspect=1)
-            scene.visuals.GridLines(parent=view.scene)
+            vz.GridLines(parent=view.scene)
             
         self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
         x_min, x_max = self.xbin[0], self.xbin[-1]
         y_min, y_max = self.ybin[0], self.ybin[-1]
         bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
         for view in [self.past_view, self.posterior_2d_view, self.future_view]:
-            scene.visuals.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+            vz.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
         extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
         for view in [self.past_view, self.future_view]:
             view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
@@ -7163,7 +7167,8 @@ class PredictiveDecodingVispyWidget:
     def _clear_epoch_visuals(self):
         self._detach_and_clear_visual_lists(
             list_attr_names = [
-                'past_lines', 'time_bin_images', 'time_bin_labels', 'future_lines',
+                'past_lines', 'future_lines',
+                'time_bin_images', 'time_bin_labels', ## required
                 'past_mask_contours', 'posterior_mask_contours', 'future_mask_contours',
                 'colorbar_rects', 'colorbar_texts', 'centroid_dots', 'centroid_arrows', 'timeline_ticks',
                 'trajectory_debug_arrows', # 'render_data_dict_list_dict', ## dict-of-lists
@@ -7476,7 +7481,7 @@ class PredictiveDecodingVispyWidget:
                     # ==================================================================================================================================================================================================================================================================================== #
                     ## INPUTS: colors, x_valid, y_valid
                     
-                    line: scene.visuals.Line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
+                    line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
                     line.order = 1
                     # line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
                     lines_list.append(line)
@@ -7494,7 +7499,7 @@ class PredictiveDecodingVispyWidget:
                             arrow_length = arrow_head_size * 0.5
                             x_end = x_center + arrow_length * np.cos(mean_angle_rad)
                             y_end = y_center + arrow_length * np.sin(mean_angle_rad)
-                            debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=view.scene)
+                            debug_arrow = vz.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=view.scene)
                             debug_arrow.order = 5
                             trajectory_debug_arrows.append(debug_arrow)
         ## END for epoch_id, positions_df in list(positions_dict....
@@ -7513,16 +7518,19 @@ class PredictiveDecodingVispyWidget:
             
         for line in (self.past_lines or []) + (self.future_lines or []):
             if line is not None:
-                _backup_colors_data = getattr(line, '_backup_colors_data', None)
-                if (_backup_colors_data is not None):
-                    ## resture the colors
-                    line_data_kwargs['color'] = _backup_colors_data
-                    ## clear the backup
+                # ## try restore colors data:
+                # _backup_colors_data = getattr(line, '_backup_colors_data', None)
+                # if (_backup_colors_data is not None):
+                #     ## resture the colors
+                #     line_data_kwargs['color'] = _backup_colors_data
+                #     ## clear the backup
                 try:
                     line.set_data(**line_data_kwargs)
-                    if (_backup_colors_data is not None):
-                        ## clear the backup
-                        delattr(line, '_backup_colors_data')
+                    if line.order != 1:
+                        line.order = 1 ## restore default order                
+                    # if (_backup_colors_data is not None):
+                    #     ## clear the backup
+                    #     delattr(line, '_backup_colors_data')
                 except Exception:
                     pass
 
@@ -7608,9 +7616,9 @@ class PredictiveDecodingVispyWidget:
             self._clear_trajectory_highlight()
             return
         
-        _backup_colors_data = self.render_data_dict_list_dict.get(category)[label_idx].get('colors', None)
-        if _backup_colors_data is not None:        
-            self._last_trajectory_epoch_data['_backup_colors'] = _backup_colors_data
+        # _backup_colors_data = self.render_data_dict_list_dict.get(category)[label_idx].get('colors', None)
+        # if _backup_colors_data is not None:        
+        #     self._last_trajectory_epoch_data['_backup_colors'] = _backup_colors_data
 
         _selected_line_kwargs = dict(width=3,
                                      color='#FFFFFFFF',
@@ -7618,19 +7626,23 @@ class PredictiveDecodingVispyWidget:
         print(f'\tabout to highlight with label_idx: {label_idx}')
         self._clear_trajectory_highlight(has_valid_selection=has_valid_selection)
         try:
-            line: scene.visuals.Line = lines_list[label_idx]
+            line: vz.Line = lines_list[label_idx]
             if line is not None:
-                ## get existing colors
-                if _backup_colors_data is None:
-                    _backup_colors_data = deepcopy(line.colors) # copy from line            
-                ## set the backup data to the new value
-                setattr(line, '_backup_colors_data', deepcopy(_backup_colors_data))
+                # if getattr(line, '_backup_colors_data', None) is None:             
+                #     ## don't allow overwrite
+                #     ## get existing colors
+                #     # if _backup_colors_data is None:
+                #     _backup_colors_data = deepcopy(line.colors) # copy from line            
+                #     ## set the backup data to the new value
+                #     setattr(line, '_backup_colors_data', deepcopy(_backup_colors_data))
+
                 # line._backup_colors_data = deepcopy(_backup_colors_data)
                 # _backup_colors_data = getattr(line, '_backup_colors_data', None)
                 # if _backup_colors_data is not None:
                 #     ## resture the colors
                 ## set/replace the data
                 line.set_data(**_selected_line_kwargs)
+                line.order = 6
                 
         except Exception:
             pass
@@ -7644,7 +7656,6 @@ class PredictiveDecodingVispyWidget:
         if (new_epoch_idx < 0) or (new_epoch_idx >= self.num_epochs):
             return
 
-        from qtpy.QtWidgets import QApplication
         self.current_epoch_idx = new_epoch_idx
         self.epoch_slider.blockSignals(True)
         self.epoch_slider.setValue(new_epoch_idx)
@@ -7729,6 +7740,8 @@ class PredictiveDecodingVispyWidget:
                         time_rel = t_coords[valid_mask] - epoch_end_t
                         all_time_distances.extend(np.abs(time_rel).tolist())
                         
+
+        ## updates: self.colorbar_rects, self.colorbar_texts, self.colorbar_view
         max_time_distance = max(all_time_distances) if all_time_distances else 1.0
         print(f'max_time_distance: {max_time_distance}')
         if max_time_distance > 0:
@@ -7743,16 +7756,16 @@ class PredictiveDecodingVispyWidget:
                 rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
                 color = (rgb[0], rgb[1], rgb[2], opacity)
                 x_pos = i * segment_width
-                rect = scene.visuals.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene)
+                rect = vz.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene)
                 self.colorbar_rects.append(rect)
             label_times = [-max_time_distance, -max_time_distance/2, 0, max_time_distance/2, max_time_distance]
             label_positions = np.linspace(0, colorbar_width, len(label_times))
             for time_val, x_pos in zip(label_times, label_positions):
-                text = scene.visuals.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=self.colorbar_view.scene)
+                text = vz.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=self.colorbar_view.scene)
                 self.colorbar_texts.append(text)
-            title_past = scene.visuals.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
-            title_future = scene.visuals.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
-            title_opacity = scene.visuals.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=self.colorbar_view.scene)
+            title_past = vz.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_future = vz.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_opacity = vz.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=self.colorbar_view.scene)
             self.colorbar_texts.extend([title_past, title_future, title_opacity])
             self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
             self.colorbar_view.camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
@@ -7774,7 +7787,7 @@ class PredictiveDecodingVispyWidget:
                 self.full_position_background_line.clear()
                 bg_pos = np.column_stack([bg_x_valid, bg_y_valid])
                 for view in [self.past_view, self.posterior_2d_view, self.future_view]:
-                    line = scene.visuals.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=view.scene)
+                    line = vz.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=view.scene)
                     line.order = 0
                     self.full_position_background_line.append(line)
                     
@@ -7805,10 +7818,16 @@ class PredictiveDecodingVispyWidget:
         
         # Render Posterior Heatmap (2D view - top half)
         if posterior_2d is not None and posterior_2d.size > 0:
-            self.posterior_img = scene.visuals.Image(posterior_2d.T, cmap='viridis', parent=self.posterior_2d_view.scene)
+            self.posterior_img = vz.Image(posterior_2d.T, cmap='viridis', parent=self.posterior_2d_view.scene)
             self.posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
             
+
+        use_new_centroid_arrows: bool = True
+        use_single_arrows_object: bool = False
+
+        
         # Render centroid dots and arrows on posterior plot (main view only)
+        ## UPDATES: self.centroid_dots, self.centroid_arrows, self.centroid_dots
         if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
             epoch_result = self.epoch_flat_mask_future_past_result[new_epoch_idx]
             if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None and 'x' in epoch_result.centroids_df.columns and 'y' in epoch_result.centroids_df.columns and 'segment_idx' in epoch_result.centroids_df.columns:
@@ -7820,39 +7839,173 @@ class PredictiveDecodingVispyWidget:
                     x_centroids = x_min + x_pixel * x_scale
                     y_centroids = y_min + y_pixel * y_scale
                     original_indices = np.where(valid_mask)[0]
-                    n_centroids = len(x_centroids)
+                    n_centroids: int = len(x_centroids)
                     centroid_colors = np.zeros((n_centroids, 4), dtype=np.float32)
                     for i in range(n_centroids):
                         t_idx = original_indices[i]
                         centroid_colors[i] = time_bin_colors[t_idx] if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
-                    centroid_pos = np.column_stack([x_centroids, y_centroids])
-                    centroid_markers = scene.visuals.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=self.posterior_2d_view.scene)
-                    centroid_markers.order = 7
+                    centroid_pos = np.column_stack([x_centroids, y_centroids]) # (N, 2)
+                    centroid_markers = vz.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=self.posterior_2d_view.scene)
+                    centroid_markers.order = 8
                     self.centroid_dots.append(centroid_markers)
-                    if 'segment_Vp_deg' in centroids_df.columns:
-                        segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
-                        valid_angle_mask = ~np.isnan(segment_Vp_deg)
-                        if np.any(valid_angle_mask):
-                            data_scale = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
-                            arrow_head_size = data_scale * 0.05
-                            arrow_length = arrow_head_size * 0.3
-                            angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
-                            x_centroids_valid = x_centroids[valid_angle_mask]
-                            y_centroids_valid = y_centroids[valid_angle_mask]
-                            arrow_centroid_indices = np.where(valid_angle_mask)[0]
-                            for i in range(len(x_centroids_valid)):
-                                x_center = x_centroids_valid[i]
-                                y_center = y_centroids_valid[i]
-                                angle = angles_rad[i]
+                    
+                    ## used by both 
+                    data_scale: float = np.sqrt((x_max - x_min)**2 + (y_max - y_min)**2)
+                    arrow_head_size: float = data_scale * 0.05
+                    arrow_length: float = arrow_head_size * 0.3
+                    # data_scale, arrow_head_size, arrow_length:  used by both `use_new_centroid_arrows` mode and the legacy mode
+                    
+                    # New centroid arrow plotting mode: `use_new_centroid_arrows` ________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                    if use_new_centroid_arrows:
+                        # updates: self.centroid_arrows
+                        
+                        ## compute centroid offsets
+                        # pos_col_names = ['x', 'y']
+                        pos_col_names = ['x_start', 'y_start']
+                        arrow_centroids_df: pd.DataFrame = deepcopy(centroids_df[valid_mask]).rename(columns={'x':'x_pixel', 'y':'y_pixel'}, inplace=False)
+                        # arrow_centroids_df: pd.DataFrame = pd.DataFrame(centroid_pos, columns=pos_col_names) # new df
+                        arrow_centroids_df['x_start'] = x_centroids
+                        arrow_centroids_df['y_start'] = y_centroids
+                        arrow_centroids_df['original_indices'] = original_indices
+                        arrow_centroids_df[['x_start', 'y_start']] = arrow_centroids_df[pos_col_names] ## starts == 't'
+                        arrow_centroids_df[['x_end', 'y_end']] = arrow_centroids_df[pos_col_names].shift(-1) # + a_matching_positions_epochs_df['dt']
+                        arrow_centroids_df['original_index_start'] = arrow_centroids_df['original_indices'].astype(int)
+                        arrow_centroids_df[['original_index_end']] = arrow_centroids_df[['original_index_start']].shift(-1) # + a_matching_positions_epochs_df['dt']                    
+                        # arrow_centroids_df = arrow_centroids_df.iloc[:-1] ## drop the last row with the NaN
+                        arrow_centroids_df = arrow_centroids_df.dropna(axis='index', how='any', subset=['x_end', 'y_end', 'original_index_end'], inplace=False).reset_index(drop=True) # 
+                        arrow_centroids_df['original_index_end'] = arrow_centroids_df['original_index_end'].astype(int)
+                        
+                        # arrow_centroids_df['dx'] = (arrow_centroids_df['x_end'] - arrow_centroids_df['x_start']).abs()
+                        # arrow_centroids_df[['dx', 'dy']] = np.abs(arrow_centroids_df[['x_end', 'y_end']].to_numpy() - arrow_centroids_df[['x_start', 'y_start']].to_numpy()) # `.to_numpy()`` is required to prevent `ValueError: Columns must be same length as key``
+                        arrow_centroids_df[['dx', 'dy']] = (arrow_centroids_df[['x_end', 'y_end']].to_numpy() - arrow_centroids_df[['x_start', 'y_start']].to_numpy()) # `.to_numpy()`` is required to prevent `ValueError: Columns must be same length as key`
+                        
+                        distances_spatial = np.sqrt((arrow_centroids_df['dx'].to_numpy())**2 + (arrow_centroids_df['dt'].to_numpy())**2)
+                        arrow_centroids_df['dxdy_len'] = distances_spatial
+                        # arrow_centroids_df[['unit_dx', 'unit_dy']] = arrow_centroids_df[['dx', 'dy']].to_numpy() / arrow_centroids_df['dxdy_len'].to_numpy() # ValueError: operands could not be broadcast together with shapes (5,2) (5,)
+                        arrow_centroids_df[['unit_dx', 'unit_dy']] = arrow_centroids_df[['dx', 'dy']].to_numpy() / arrow_centroids_df['dxdy_len'].to_numpy()[:, None]
+                        # arrow_centroids_df[['unit_dx', 'unit_dy']] = arrow_centroids_df[['dx', 'dy']].div(arrow_centroids_df['dxdy_len'], axis=0)
+                        arrow_centroids_df[['x_mid', 'y_mid']] = (arrow_centroids_df[['x_start', 'y_start']].to_numpy() + arrow_centroids_df[['dx', 'dy']].to_numpy()) # `.to_numpy()`` is required to prevent `ValueError: Columns must be same length as key`
+                        
+                        # print(f'arrow_centroids_df: {arrow_centroids_df}')                        
+                        pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()]) # ((2 * N), 2)
+                        # arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_end', 'y_end']].to_numpy() # (N, 4)
+                        arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy() # (N, 4)                        
+                        _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(lambda v: centroid_colors[v, :]).to_list() ## (N, 4)
+                        _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(lambda v: centroid_colors[v, :]).to_list()
+                        
+                        vertex_point_color: NDArray = np.vstack([np.stack([v0, v1]) for v0, v1 in zip(_original_index_start_colors_list, _original_index_end_colors_list)]) # ((2 * N), 4)
+                        Assert.same_length(vertex_point_color, pos)
+                        arrow_color: NDArray = np.vstack(_original_index_start_colors_list) # (N, 4)
+                        Assert.same_length(arrow_color, arrows)
+                        
+                        if use_single_arrows_object:
+                            # centroid_idx = arrow_centroid_indices[i]
+                            # t_idx = original_indices[centroid_idx]
+                            # arrow_color = np.repeat([centroid_colors for ], repeats=2, axis=0) ## duplicate along the (N, ) axis to get # ((2 * N), 4)  # tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                            # pos: Array of shape (..., 2) or (..., 3) specifying vertex coordinates of arrow body.
+                            # pos = np.array([[x_start, y_start], [x_end, y_end]])
+                            ## arrows: A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the (x, y, z) coordinates of the first and second vertex of the arrow head. Remember that the second vertex is used as center point for the arrow head, and the first vertex is only used for determining the arrow head orientation.
+                            # arrows = np.array([[x_start, y_start, x_end, y_end]])
+                            ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
+                            ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.
+                            # arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', connect="strip", parent=self.posterior_2d_view.scene) # NotImplementedError: Only 'strip' connection mode allowed for agg-method lines.
+                            arrow: vz.Arrow = vz.Arrow(pos=pos,
+                                                        arrows=arrows, arrow_color=arrow_color,
+                                                        arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color,
+                                                        width=3.0,
+                                                        # method='agg', connect="strip",
+                                                        method='gl', connect="segments", ## works
+                                                        # method='gl', connect="strip",
+                                                        parent=self.posterior_2d_view.scene)
+                            #   File "H:\TEMP\Spike3DEnv_ExploreUpgrade\Spike3DWorkEnv\Spike3D\.venv\lib\site-packages\vispy\visuals\line\arrow.py", line 98, in _prepare_vertex_data
+                            #     v['color'][:] = color
+                            # ValueError: could not broadcast input array from shape (10,4) into shape (5,4)
+                            
+                            # arrow = visuals.ArrowVisual(color='white', connect='segments', arrow_size=8)
+                            arrow.order = 7
+                            self.centroid_arrows.append(arrow) ## there is only one here
+
+                        else:                        
+                            # for i in np.arange(n_centroids):
+                            # for i, t_idx in enumerate(original_indices):
+                            for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
+                                # centroid_idx = arrow_centroid_indices[i]
+                                t_idx = original_indices[i]
+                                a_row_dict = a_row._asdict()
+                                
+                                # x_center = arrow_centroids_df['x_start'].to_numpy()[i]
+                                # y_center = arrow_centroids_df['y_start'].to_numpy()[i]
+                                
+                                # unit_dx = arrow_centroids_df['unit_dx'].to_numpy()[i]
+                                # unit_dy = arrow_centroids_df['unit_dy'].to_numpy()[i]
+
+                                x_center = a_row_dict['x_start']
+                                y_center = a_row_dict['y_start']
+                            
+                                unit_dx = a_row_dict['unit_dx']
+                                unit_dy = a_row_dict['unit_dy']
+
+                                
+                                # angle = angles_rad[i]
                                 x_start, y_start = x_center, y_center
-                                x_end = x_center + arrow_length * np.cos(angle)
-                                y_end = y_center + arrow_length * np.sin(angle)
-                                centroid_idx = arrow_centroid_indices[i]
-                                t_idx = original_indices[centroid_idx]
-                                arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
-                                arrow = scene.visuals.Arrow(pos=np.array([[x_start, y_start], [x_end, y_end]]), arrows=np.array([[x_start, y_start, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                # x_end = x_center + arrow_length * np.cos(angle)
+                                # y_end = y_center + arrow_length * np.sin(angle)
+                                x_end = x_center + (unit_dx * arrow_length)
+                                y_end = y_center + (unit_dy * arrow_length)
+                                                            
+                                an_arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                                # pos: Array of shape (..., 2) or (..., 3) specifying vertex coordinates of arrow body.
+                                a_pos = np.array([[x_start, y_start], [x_end, y_end]])
+                                ## arrows: A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the (x, y, z) coordinates of the first and second vertex of the arrow head. Remember that the second vertex is used as center point for the arrow head, and the first vertex is only used for determining the arrow head orientation.
+                                an_arrows = np.array([[x_start, y_start, x_end, y_end]])
+                                ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
+                                ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.                                
+                                arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                # arrow = visuals.ArrowVisual(color='white', connect='segments', arrow_size=8)
+                                #TODO 2026-02-03 06:54: - [ ] try single `visuals.ArrowVisual` like in `arrows_quiver.py` example
                                 arrow.order = 7
                                 self.centroid_arrows.append(arrow)
+
+
+
+                    else:
+                        ## pre 2026-02-02 - arrow angle implementation to be used when use_new_centroid_arrows == False, updates: self.centroid_arrows               
+                        if 'segment_Vp_deg' in centroids_df.columns:
+                            segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
+                            valid_angle_mask = ~np.isnan(segment_Vp_deg)
+                            if np.any(valid_angle_mask):
+
+                                angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
+                                x_centroids_valid = x_centroids[valid_angle_mask]
+                                y_centroids_valid = y_centroids[valid_angle_mask]
+                                arrow_centroid_indices = np.where(valid_angle_mask)[0]
+                                for i in range(len(x_centroids_valid)):
+                                    x_center = x_centroids_valid[i]
+                                    y_center = y_centroids_valid[i]
+                                    angle = angles_rad[i]
+                                    x_start, y_start = x_center, y_center
+                                    x_end = x_center + arrow_length * np.cos(angle)
+                                    y_end = y_center + arrow_length * np.sin(angle)
+                                    centroid_idx = arrow_centroid_indices[i]
+                                    t_idx = original_indices[centroid_idx]
+                                    arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                                    # pos: Array of shape (..., 2) or (..., 3) specifying vertex coordinates of arrow body.
+                                    pos = np.array([[x_start, y_start], [x_end, y_end]])
+                                    ## arrows: A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the (x, y, z) coordinates of the first and second vertex of the arrow head. Remember that the second vertex is used as center point for the arrow head, and the first vertex is only used for determining the arrow head orientation.
+                                    arrows = np.array([[x_start, y_start, x_end, y_end]])
+                                    ## You add an arrow head by specifying two vertices v1 and v2 which represent the arrow body.
+                                    ## This visual will draw an arrow head using v2 as center point, and the orientation of the arrow head is automatically determined by calculating the direction vector between v1 and v2. The arrow head can be detached from arrow body.
+                                    arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=self.posterior_2d_view.scene)
+                                    # arrow = visuals.ArrowVisual(color='white', connect='segments', arrow_size=8)
+                                    #TODO 2026-02-03 06:54: - [ ] try single `visuals.ArrowVisual` like in `arrows_quiver.py` example
+                                    
+                                    arrow.order = 7
+                                    self.centroid_arrows.append(arrow)
+                                ## END for i in range(len(x_centroids_valid))...
+                                
+
+        # Updates: self.current_position_line, self.trajectory_arrows, self.posterior_2d_view
+        
         if self.curr_position_df is not None and epoch_start_t is not None and epoch_end_t is not None and 't' in self.curr_position_df.columns and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
             extended_start_t = epoch_start_t - self.current_traj_seconds_pre_post_extension
             extended_end_t = epoch_end_t + self.current_traj_seconds_pre_post_extension
@@ -7873,7 +8026,7 @@ class PredictiveDecodingVispyWidget:
                     colors[:, :3] = 0.7
                     colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
                     if self.current_position_line is None:
-                        self.current_position_line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
+                        self.current_position_line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=3, method='gl', parent=self.posterior_2d_view.scene)
                         self.current_position_line.order = 5
                     else:
                         self.current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]), color=colors)
@@ -7898,44 +8051,63 @@ class PredictiveDecodingVispyWidget:
             epoch_info_str = f'Epoch {new_epoch_idx + 1}/{self.num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
             text_y_pos = y_max + (y_max - y_min) * 0.15
             text_x_pos = (x_min + x_max) / 2
-            self.epoch_info_text = scene.visuals.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=self.posterior_2d_view.scene)
+            self.epoch_info_text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=self.posterior_2d_view.scene)
             y_range = y_max - y_min
             self.posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+            
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Builds the self.time_bin_views if needed for each t-bin in the epoch                                                                                                                                                                                                                 #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## Updates: self.time_bin_views
         if p_x_given_n is not None and p_x_given_n.size > 0:
             n_time_bins = p_x_given_n.shape[2]
             n_bins_to_show = min(n_time_bins, self.max_time_bins_to_show)
             view_time_bin_colors = self._time_bin_colors(n_bins_to_show, alpha=1.0)[:, :3]
             vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
+            
             if len(self.time_bin_views) != n_bins_to_show:
+                ## remove all existing:
                 for view in self.time_bin_views:
                     if view is not None and hasattr(view, 'parent'):
                         view.parent = None
                 self.time_bin_views.clear()
+                ## create new (added to `self.time_bin_grid`):
                 for t_idx in range(n_bins_to_show):
                     t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
                     view = self.time_bin_grid.add_view(row=0, col=t_idx, border_color=t_bin_border_color)
                     view.camera = scene.PanZoomCamera(aspect=1)
                     view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max))
                     self.time_bin_views.append(view)
+                ## END for t_idx in range(n_bins_to_show)...
+                
+            ## updates: self.time_bin_images, self.time_bin_labels
             for t_idx in range(n_bins_to_show):
                 slice_2d = p_x_given_n[:, :, t_idx].T.astype(np.float32)
                 if vol_max > vol_min:
                     slice_2d = (slice_2d - vol_min) / (vol_max - vol_min)
                 view = self.time_bin_views[t_idx]
-                slice_img = scene.visuals.Image(slice_2d, cmap='viridis', parent=view.scene)
+                slice_img = vz.Image(slice_2d, cmap='viridis', parent=view.scene)
                 img_height, img_width = slice_2d.shape
                 scale_x_img = (x_max - x_min) / img_width if img_width > 0 else 1
                 scale_y_img = (y_max - y_min) / img_height if img_height > 0 else 1
                 slice_img.transform = scene.STTransform(scale=(scale_x_img, scale_y_img), translate=(x_min, y_min))
                 self.time_bin_images.append(slice_img)
                 label_y_pos = y_max + (y_max - y_min) * 0.08
-                label = scene.visuals.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
+                label = vz.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
                 self.time_bin_labels.append(label)
                 view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
-        if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+            ## END for t_idx in range(n_bins_to_show)
+        ## END if p_x_given_n i...
+          
+
+        # Renders the contours _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        ## Updates: self.posterior_mask_contours
+        ## UPDATES: [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, self.posterior_mask_contours), (self.future_view, self.future_mask_contours)]
+        if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result)):
             epoch_result_for_contours = self.epoch_flat_mask_future_past_result[new_epoch_idx]
             if epoch_result_for_contours is not None and hasattr(epoch_result_for_contours, 'epoch_t_bins_high_prob_pos_mask') and epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask is not None:
-                from skimage import measure
+                
                 per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask
                 n_mask_t_bins = per_t_bin_mask.shape[2]
                 contour_time_bin_colors = self._time_bin_colors(n_mask_t_bins, alpha=0.7)
@@ -7943,7 +8115,7 @@ class PredictiveDecodingVispyWidget:
                     mask_slice = per_t_bin_mask[:, :, t_idx]
                     if np.any(mask_slice):
                         mask_transposed = mask_slice.T.astype(np.float32)
-                        contours = measure.find_contours(mask_transposed, level=0.5)
+                        contours: List[NDArray] = measure.find_contours(mask_transposed, level=0.5)
                         contour_color = tuple(contour_time_bin_colors[t_idx])
                         n_y_bins, n_x_bins = mask_transposed.shape
                         for contour in contours:
@@ -7951,14 +8123,22 @@ class PredictiveDecodingVispyWidget:
                             y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
                             contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
                             for view, cont_list in [(self.past_view, self.past_mask_contours), (self.posterior_2d_view, self.posterior_mask_contours), (self.future_view, self.future_mask_contours)]:
-                                c = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
+                                c = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
                                 c.order = 10
                                 cont_list.append(c)
+                            ## END for view, cont_list in [(self.past_v...
+                            
+                            ## TODO: why adding more contours here independently? `self.posterior_mask_contours` gets double modified I think!
                             if t_idx < len(self.time_bin_views):
-                                time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
+                                time_bin_contour = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
                                 time_bin_contour.order = 10
                                 self.posterior_mask_contours.append(time_bin_contour)
-                                
+                            ## END if t_idx < len(self....
+                            
+                        ## END for contour in contours...
+                        
+                ##  END for t_idx in range(n_mask_t_bins)...
+                
 
         # ==================================================================================================================================================================================================================================================================================== #
         # RIGHT PANE: FUTURE                                                                                                                                                                                                                                                                   #
@@ -7981,23 +8161,23 @@ class PredictiveDecodingVispyWidget:
         timeline_bar_height = 1.0
         recording_duration = self.recording_t_max - self.recording_t_min
         if recording_duration > 0:
-            bar_fill = scene.visuals.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
+            bar_fill = vz.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
             self.timeline_bar = bar_fill
             if epoch_start_t is not None and epoch_end_t is not None:
                 epoch_duration = epoch_end_t - epoch_start_t
                 epoch_center_t = (epoch_start_t + epoch_end_t) / 2
-                epoch_rect = scene.visuals.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
+                epoch_rect = vz.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_rect = epoch_rect
                 triangle_height = timeline_bar_height * 0.35
                 triangle_half_width = recording_duration * 0.008
                 triangle_top_y = timeline_bar_height + triangle_height * 0.3
                 triangle_bottom_y = timeline_bar_height - triangle_height * 0.3
                 triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle = scene.visuals.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
+                epoch_triangle = vz.Polygon(pos=triangle_vertices, color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_triangle = epoch_triangle
             for base_rgb, mean_time in past_trajectory_colors_and_times + future_trajectory_colors_and_times:
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick = scene.visuals.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
+                tick = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=2, parent=self.combined_timeline_view.scene)
                 self.timeline_ticks.append(tick)
             self.combined_timeline_view.camera = scene.PanZoomCamera()
             self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
