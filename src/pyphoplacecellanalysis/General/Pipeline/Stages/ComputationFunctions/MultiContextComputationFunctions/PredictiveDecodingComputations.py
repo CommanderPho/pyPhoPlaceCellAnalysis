@@ -6849,6 +6849,12 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # 2026-01-21 - Vispy                                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
+import colorsys
+## vispy
+from vispy import scene
+# from vispy import app, scene
+from vispy.color import Colormap
+from qtpy import QtWidgets, QtCore
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 @define(slots=False, repr=False, eq=False)
@@ -6922,7 +6928,9 @@ class PredictiveDecodingVispyWidget:
     colorbar_texts: List[Any] = field(default=Factory(list))
     centroid_dots: List[Any] = field(default=Factory(list))
     centroid_arrows: List[Any] = field(default=Factory(list))
-    trajectory_debug_arrows: List[Any] = field(default=Factory(list))
+    trajectory_debug_arrows: Dict[types.PastFutureCategory, List[Any]] = field(default=Factory(dict))
+    render_data_dict_list_dict: Dict[types.PastFutureCategory, List[Dict]] = field(default=Factory(dict))
+
     full_position_background_line: List[Any] = field(default=Factory(list))
     timeline_ticks: List[Any] = field(default=Factory(list))
     trajectory_arrows: List[Any] = field(default=Factory(list))
@@ -6932,7 +6940,7 @@ class PredictiveDecodingVispyWidget:
     timeline_bar: Any = field(default=None)
     timeline_epoch_rect: Any = field(default=None)
     timeline_epoch_triangle: Any = field(default=None)
-    _last_trajectory_epoch_data: Optional[Dict[str, Any]] = field(default=None)
+    _last_trajectory_epoch_data: Optional[Dict[types.PastFutureCategory, Any]] = field(default=None)
 
 
     
@@ -7019,8 +7027,8 @@ class PredictiveDecodingVispyWidget:
     
 
     def buildUI(self):
-        from vispy import app, scene
-        from qtpy import QtWidgets, QtCore
+        # from vispy import app, scene
+        # from qtpy import QtWidgets, QtCore
         self.current_epoch_idx = self.active_epoch_idx
         canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
         self.canvas = canvas
@@ -7154,21 +7162,21 @@ class PredictiveDecodingVispyWidget:
     # ==================================================================================================================================================================================================================================================================================== #
     def _clear_epoch_visuals(self):
         self._detach_and_clear_visual_lists(
-            [
+            list_attr_names = [
                 'past_lines', 'time_bin_images', 'time_bin_labels', 'future_lines',
                 'past_mask_contours', 'posterior_mask_contours', 'future_mask_contours',
-                'colorbar_rects', 'colorbar_texts', 'centroid_dots', 'centroid_arrows',
-                'trajectory_debug_arrows', 'timeline_ticks',
+                'colorbar_rects', 'colorbar_texts', 'centroid_dots', 'centroid_arrows', 'timeline_ticks',
+                'trajectory_debug_arrows', # 'render_data_dict_list_dict', ## dict-of-lists
             ],
-            single_ref_attr_names=['posterior_img', 'epoch_info_text', 'timeline_bar', 'timeline_epoch_rect', 'timeline_epoch_triangle'],
+            single_ref_attr_names = ['posterior_img', 'epoch_info_text', 'timeline_bar', 'timeline_epoch_rect', 'timeline_epoch_triangle'],
         )
+        
 
     def _time_bin_colors(self, n_bins: int, alpha: float = 0.9) -> np.ndarray:
         """Return (n_bins, 4) float32 array of RGBA colors for time bins (hue cycled)."""
         out = np.zeros((n_bins, 4), dtype=np.float32)
         for t_idx in range(n_bins):
             hue = (t_idx / max(n_bins, 1)) % 1.0
-            import colorsys
             rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
             out[t_idx] = (rgb[0], rgb[1], rgb[2], alpha)
         return out
@@ -7261,14 +7269,42 @@ class PredictiveDecodingVispyWidget:
                     opacity = np.concatenate([opacity, ext_opacity])
         return t_valid, x_valid, y_valid, opacity
 
-    def _detach_and_clear_visual_lists(self, list_attr_names: Sequence[str], single_ref_attr_names: Optional[Sequence[str]] = None) -> None:
+    def _detach_and_clear_visual_lists(self, list_attr_names: Union[Sequence[str], Dict[str, Sequence[str]]], single_ref_attr_names: Optional[Sequence[str]] = None) -> None:
         """Detach visuals from parent and clear list attributes; optionally clear single-ref attributes."""
         for name in list_attr_names:
             lst = getattr(self, name)
-            for item in lst:
-                if item is not None:
-                    item.parent = None
-            lst.clear()
+            if isinstance(lst, (list, tuple)):
+                for item in lst:
+                    if item is not None:
+                        item.parent = None
+                lst.clear()
+                
+            elif isinstance(lst, dict):
+                ## handle dict of lists
+                for k, sub_list in lst.items():
+                    for item in sub_list:
+                        if item is not None:
+                            try:
+                                ## try the typical widget removal process
+                                item.parent = None
+                            except AttributeError as e:
+                                ## for clearing a data-dict such as 'render_data_dict_list_dict'
+                                ignored_variable_names = ['render_data_dict_list_dict']
+                                if (name in ignored_variable_names) or (k in ignored_variable_names):
+                                    pass
+                                else:
+                                    print(f'WARN: AttributeError e {e}')
+                                    # raise
+                            except Exception as e:
+                                raise
+                    ## END for item in sub_list...
+                    
+                    sub_list.clear() ## clear the sublist
+                ## END for k, sub_list in lst.items()...
+                lst.clear()
+            else:
+                raise ValueError(f'Unknown type type(lst): {type(lst)}, lst: {lst}')
+            
         if single_ref_attr_names:
             for name in single_ref_attr_names:
                 ref = getattr(self, name)
@@ -7277,15 +7313,29 @@ class PredictiveDecodingVispyWidget:
                 setattr(self, name, None)
 
 
-    def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, lines_list: list, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int) -> None:
+    def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int,
+                                 lines_list: Optional[List]=None, 
+                                 trajectory_debug_arrows: Optional[List]=None,
+                                 render_data_dict_list: Optional[List]=None,
+                                 ):
         """Render past or future trajectories into view; append to lines_list and trajectory_colors_and_times_out."""
-        from vispy import scene
-        from vispy.color import Colormap
-        import colorsys
-        
+        # from vispy import scene
+        # from vispy.color import Colormap
         enable_debug_logging: bool = False
+        
+        if lines_list is None:
+            lines_list = []
+        if trajectory_debug_arrows is None:
+            trajectory_debug_arrows = [] ## new list
+        if render_data_dict_list is None:
+            render_data_dict_list = []
+        
+
         for epoch_id, positions_df in list(positions_dict.items()):
+            _curr_render_data_dict = dict(epoch_id=epoch_id)
+            
             if self.require_angle_match and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns and not (positions_df['centroid_pos_traj_matching_angle_idx'] >= 0).any():
+                render_data_dict_list.append(_curr_render_data_dict)
                 continue
             
             custom_cmap: Optional[Colormap] = None
@@ -7295,6 +7345,9 @@ class PredictiveDecodingVispyWidget:
                 valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
                 if np.any(valid_mask):
                     x_valid, y_valid = x_coords[valid_mask], y_coords[valid_mask]
+                    
+
+                    # Color Modes ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                     if self.color_matches_by_matching_angle and 'centroid_pos_traj_matching_angle_idx' in positions_df.columns:
                         matching_idx_values = positions_df['centroid_pos_traj_matching_angle_idx'].values
                         valid_match_indices = matching_idx_values[matching_idx_values >= 0]
@@ -7367,9 +7420,14 @@ class PredictiveDecodingVispyWidget:
                         #     base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
 
                     else:
-                        base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
-                        
+                        base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9) ## all the same (default) hue
+                        custom_cmap = None
 
+
+                    ## OUTPUTS: custom_cmap, base_rgb
+                    if base_rgb is not None:
+                        _curr_render_data_dict.update(base_rgb=base_rgb)
+                    
                     if epoch_anchor_t is not None and 't' in positions_df.columns:
                         t_coords = positions_df['t'].values[valid_mask]
                         mean_time = np.mean(t_coords)
@@ -7381,9 +7439,13 @@ class PredictiveDecodingVispyWidget:
                         t_valid, x_valid, y_valid, opacity = self._extend_trajectory_xy_opacity(x_valid, y_valid, opacity, t_coords, traj_t_min, traj_t_max)
                     else:
                         opacity = np.ones(len(x_valid)) * 0.8
+                        t_valid = np.linspace(0.0, 1.0, num=len(x_valid))
+                        
 
                     n_points: int = len(x_valid) ## changes after extension
-                    
+                    _curr_render_data_dict.update(t_valid=t_valid, x_valid=x_valid, y_valid=y_valid, opacity=opacity, n_points=n_points)
+
+
                     colors = np.ones((n_points, 4), dtype=np.float32)
                     if custom_cmap is None:
                         colors[:, 0], colors[:, 1], colors[:, 2] = base_rgb[0], base_rgb[1], base_rgb[2]
@@ -7393,6 +7455,7 @@ class PredictiveDecodingVispyWidget:
                         assert t_valid is not None
                         t_rel_valid = deepcopy(t_valid) - t_valid[0] 
                         t_rel_valid = t_rel_valid / np.ptp(t_rel_valid) ## scale between 0.0 and 1.0
+                        _curr_render_data_dict.update(t_rel_valid=t_rel_valid)
                         if enable_debug_logging:
                             print(f'\tt_rel_valid: {t_rel_valid}')
                         vertex_colors = np.array(custom_cmap.map(t_rel_valid), dtype=np.float32) # (n_points, 4)
@@ -7403,12 +7466,19 @@ class PredictiveDecodingVispyWidget:
                         colors[:, 3] = vertex_colors[:, 3]
                         ## overwrite with opacity values
                         colors[:, 3] = np.clip(opacity, 0.0, 1.0)
+                    ## OUTPUTS: colors
 
-
-
-                    line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
+                    _curr_render_data_dict.update(colors=colors) #, t_valid=t_valid, x_valid=x_valid, y_valid=y_valid, opacity=opacity, n_points=n_points)
+                    
+                    render_data_dict_list.append(_curr_render_data_dict)
+                    # ==================================================================================================================================================================================================================================================================================== #
+                    # Build the visuals to render                                                                                                                                                                                                                                                          #
+                    # ==================================================================================================================================================================================================================================================================================== #
+                    ## INPUTS: colors, x_valid, y_valid
+                    
+                    line: scene.visuals.Line = scene.visuals.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
                     line.order = 1
-                    line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
+                    # line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
                     lines_list.append(line)
                     
                     if self.enable_debug_plot_trajectory_average_angle_arrows and 'segment_Vp_deg' in positions_df.columns:
@@ -7426,20 +7496,39 @@ class PredictiveDecodingVispyWidget:
                             y_end = y_center + arrow_length * np.sin(mean_angle_rad)
                             debug_arrow = scene.visuals.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=view.scene)
                             debug_arrow.order = 5
-                            self.trajectory_debug_arrows.append(debug_arrow)
+                            trajectory_debug_arrows.append(debug_arrow)
+        ## END for epoch_id, positions_df in list(positions_dict....
+        
+        return lines_list, trajectory_debug_arrows, render_data_dict_list
 
 
-    def _clear_trajectory_highlight(self) -> None:
+    @function_attributes(short_name=None, tags=['selection', 'highlight', 'clear'], input_requires=[], output_provides=[], uses=[], used_by=['_apply_trajectory_highlight_for_selected_row'], creation_date='2026-02-03 04:42', related_items=[])
+    def _clear_trajectory_highlight(self, has_valid_selection: bool=False) -> None:
         """Reset all trajectory lines to default width; no-op on exception per line."""
+        if has_valid_selection:
+            line_data_kwargs = dict(width=0.1)
+        else:
+            ## no selection, default display
+            line_data_kwargs = dict(width=2.0)
+            
         for line in (self.past_lines or []) + (self.future_lines or []):
             if line is not None:
+                _backup_colors_data = getattr(line, '_backup_colors_data', None)
+                if (_backup_colors_data is not None):
+                    ## resture the colors
+                    line_data_kwargs['color'] = _backup_colors_data
+                    ## clear the backup
                 try:
-                    line.set_data(width=0.5)
+                    line.set_data(**line_data_kwargs)
+                    if (_backup_colors_data is not None):
+                        ## clear the backup
+                        delattr(line, '_backup_colors_data')
                 except Exception:
                     pass
 
 
-    def _apply_trajectory_highlight_for_selected_row(self) -> None:
+    @function_attributes(short_name=None, tags=['selection', 'highlight'], input_requires=[], output_provides=[], uses=['_clear_trajectory_highlight'], used_by=[], creation_date='2026-02-03 04:42', related_items=[])
+    def _apply_trajectory_highlight_for_selected_row(self, use_raw_idx: bool=True) -> None:
         """Highlight the trajectory line corresponding to the currently selected curr_merged_segment_epochs table row; clear highlight if no valid selection. Fails gracefully."""
         if not getattr(self, 'enable_table_widgets', False) or self.epoch_table_manager is None:
             return
@@ -7447,18 +7536,24 @@ class PredictiveDecodingVispyWidget:
             return
         try:
             table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
+            # table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_pos_epochs')
         except Exception:
             self._clear_trajectory_highlight()
             return
-        from qtpy import QtCore
+        # from qtpy import QtCore
         selected = table.selectionModel().selectedIndexes()
         if not selected:
             self._clear_trajectory_highlight()
             return
         row = selected[0].row()
-        if row < 0 or (model.rowCount() is not None and row >= model.rowCount()):
+        has_valid_selection: bool = not (row < 0 or ((model.rowCount() is not None) and (row >= model.rowCount())))
+        if not has_valid_selection:
             self._clear_trajectory_highlight()
             return
+        ## otherwise we have has_valid_selection
+        print(f'has_valid_selection: {has_valid_selection}')
+        
+        ## get the 'label' and 'category' columns from the dataframe/model for the currently selected row(s)
         label_col, is_future_col = None, None
         for col in range(model.columnCount()):
             h = model.headerData(col, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole)
@@ -7469,12 +7564,18 @@ class PredictiveDecodingVispyWidget:
         if label_col is None or is_future_col is None:
             self._clear_trajectory_highlight()
             return
-        label_val = model.index(row, label_col).data()
+        # Use either the label index or the raw idx:
+        if use_raw_idx:
+            label_val = row # use raw index
+        else:
+            label_val = model.index(row, label_col).data()
+
         category_val = model.index(row, is_future_col).data()
         if label_val is None:
             self._clear_trajectory_highlight()
             return
         category_str = str(category_val).strip().lower() if category_val is not None else ''
+        category: Optional[str] = None
         if 'future' in category_str:
             category = 'future'
         elif 'past' in category_str:
@@ -7486,21 +7587,51 @@ class PredictiveDecodingVispyWidget:
         if positions_dict is None:
             self._clear_trajectory_highlight()
             return
-        ordered_labels = list(positions_dict.keys())
-        try:
-            label_idx = ordered_labels.index(label_val)
-        except (ValueError, TypeError):
-            self._clear_trajectory_highlight()
-            return
+        
+
+        if use_raw_idx:
+            label_val = row # use raw index
+            label_idx = row
+        else:    
+            ordered_labels = list(positions_dict.keys()) # [2, 11, 14, 17, 21]
+            try:
+                label_idx = ordered_labels.index(label_val)
+            except (ValueError, TypeError):
+                self._clear_trajectory_highlight()
+                return
+            
+        ## OUTPUTS: label_idx
+            
         lines_list = self.past_lines if category == 'past' else self.future_lines
-        if label_idx < 0 or label_idx >= len(lines_list):
+        has_valid_label_index: bool = not ((label_idx < 0) or (label_idx >= len(lines_list)))
+        if not has_valid_label_index:
             self._clear_trajectory_highlight()
             return
-        self._clear_trajectory_highlight()
+        
+        _backup_colors_data = self.render_data_dict_list_dict.get(category)[label_idx].get('colors', None)
+        if _backup_colors_data is not None:        
+            self._last_trajectory_epoch_data['_backup_colors'] = _backup_colors_data
+
+        _selected_line_kwargs = dict(width=3,
+                                     color='#FFFFFFFF',
+                                      )
+        print(f'\tabout to highlight with label_idx: {label_idx}')
+        self._clear_trajectory_highlight(has_valid_selection=has_valid_selection)
         try:
-            line = lines_list[label_idx]
+            line: scene.visuals.Line = lines_list[label_idx]
             if line is not None:
-                line.set_data(width=10)
+                ## get existing colors
+                if _backup_colors_data is None:
+                    _backup_colors_data = deepcopy(line.colors) # copy from line            
+                ## set the backup data to the new value
+                setattr(line, '_backup_colors_data', deepcopy(_backup_colors_data))
+                # line._backup_colors_data = deepcopy(_backup_colors_data)
+                # _backup_colors_data = getattr(line, '_backup_colors_data', None)
+                # if _backup_colors_data is not None:
+                #     ## resture the colors
+                ## set/replace the data
+                line.set_data(**_selected_line_kwargs)
+                
         except Exception:
             pass
 
@@ -7512,8 +7643,7 @@ class PredictiveDecodingVispyWidget:
         """Update the display to show a different epoch."""
         if (new_epoch_idx < 0) or (new_epoch_idx >= self.num_epochs):
             return
-        from vispy import scene
-        import colorsys
+
         from qtpy.QtWidgets import QApplication
         self.current_epoch_idx = new_epoch_idx
         self.epoch_slider.blockSignals(True)
@@ -7662,7 +7792,11 @@ class PredictiveDecodingVispyWidget:
         # Render Past Trajectories and collect data for timeline
         past_trajectory_colors_and_times = []
         if 'past' in curr_matching_past_future_positions_df_dict:
-            self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict['past'], epoch_anchor_t=epoch_start_t, default_hue=0.0, view=self.past_view, lines_list=self.past_lines, trajectory_colors_and_times_out=past_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs)
+            curr_past_future_key_name: types.PastFutureCategory = 'past'
+            self.render_data_dict_list_dict[curr_past_future_key_name] = [] ## clear manually
+            self.past_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_start_t, default_hue=0.0, view=self.past_view, trajectory_colors_and_times_out=past_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
+                                                               lines_list=self.past_lines, trajectory_debug_arrows=self.trajectory_debug_arrows.get(curr_past_future_key_name, []), render_data_dict_list=self.render_data_dict_list_dict.get(curr_past_future_key_name, []),
+                                                           )
 
 
         # ==================================================================================================================================================================================================================================================================================== #
@@ -7832,7 +7966,11 @@ class PredictiveDecodingVispyWidget:
         # Render Future Trajectories and collect data for timeline
         future_trajectory_colors_and_times = []
         if 'future' in curr_matching_past_future_positions_df_dict:
-            self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict['future'], epoch_anchor_t=epoch_end_t, default_hue=0.5, view=self.future_view, lines_list=self.future_lines, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs)
+            curr_past_future_key_name: types.PastFutureCategory = 'future'
+            self.render_data_dict_list_dict[curr_past_future_key_name] = [] ## clear manually
+            self.future_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_end_t, default_hue=0.5, view=self.future_view, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
+                                                                lines_list=self.future_lines, trajectory_debug_arrows=self.trajectory_debug_arrows.get(curr_past_future_key_name, []), render_data_dict_list=self.render_data_dict_list_dict.get(curr_past_future_key_name, []),
+                                                             )
             
 
         # ==================================================================================================================================================================================================================================================================================== #
@@ -7892,14 +8030,17 @@ class PredictiveDecodingVispyWidget:
                     else:
                         a_matching_pos_merged_segment_epochs_df: pd.DataFrame = curr_matching_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[new_epoch_idx]
                         if (a_matching_pos_merged_segment_epochs_df is not None) and (len(a_matching_pos_merged_segment_epochs_df) > 0):
-                            table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
-                                    
+                            # table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
+                            table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_merged_segment_epochs_df
+                            
+
                     if (curr_matching_good_merged_segment_epochs_df is None):
                         print(f'\tERROR: new_epoch_idx: {new_epoch_idx} curr_matching_good_merged_segment_epochs_df is None')
                     else:
                         a_matching_pos_epochs_df: pd.DataFrame = curr_matching_good_merged_segment_epochs_df # self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[new_epoch_idx]
                         if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-                            table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
+                            # table_update_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
+                            table_update_sources['curr_merged_segment_epochs'] = a_matching_pos_epochs_df
                             
                     if table_update_sources:
                         visible_columns_dict = {
@@ -7910,6 +8051,7 @@ class PredictiveDecodingVispyWidget:
                         self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
                         try:
                             table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
+                            # table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_pos_epochs')
                             try:
                                 table.selectionModel().selectionChanged.disconnect(self._apply_trajectory_highlight_for_selected_row)
                             except Exception:
