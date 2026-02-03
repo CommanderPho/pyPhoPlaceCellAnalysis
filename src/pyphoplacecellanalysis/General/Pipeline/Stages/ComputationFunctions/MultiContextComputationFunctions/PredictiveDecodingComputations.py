@@ -6865,6 +6865,8 @@ class PredictiveDecodingVispyWidget:
     pf_decoder: BasePositionDecoder = field(default=None)
     decoded_result: DecodedFilterEpochsResult = field(default=None)
     active_epoch_idx: int = field(default=0)
+    
+
     current_traj_seconds_pre_post_extension: float = field(default=0.750)
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = field(default=(0.4, 1.0))
     start_end_extension_max_opacity: float = field(default=0.4)
@@ -6872,7 +6874,7 @@ class PredictiveDecodingVispyWidget:
     
     require_angle_match: bool = field(default=False)
     color_matches_by_matching_angle: bool = field(default=False)
-    color_matches_by_merged_epoch_t_bin_idx: bool = field(default=True)
+    color_matches_by_merged_epoch_t_bin_idx: bool = field(default=False)
     
     enable_debug_plot_trajectory_average_angle_arrows: bool = field(default=False)
     minimum_included_matching_sequence_length: Optional[int] = field(default=None)
@@ -7049,33 +7051,37 @@ class PredictiveDecodingVispyWidget:
             from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             table_container = QtWidgets.QWidget()
             table_container.setMaximumHeight(450)
-            epoch_table_manager = TableManager(table_container, visible_columns_dict={})
+            visible_columns_dict = {
+                'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
+                'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
+            }
+            epoch_table_manager = TableManager(table_container, visible_columns_dict=visible_columns_dict)
             self.epoch_table_manager = epoch_table_manager
             # filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs if self.a_flat_matching_results_list_ds is not None else self.a_decoded_filter_epochs_df
             
-            table_data_sources = {}
-            # if (filter_epochs is not None) and len(filter_epochs) > 0:
-            #     # idx = min(self.active_epoch_idx, len(filter_epochs) - 1)
-            #     # data_sources['active_epoch'] = filter_epochs.iloc[[idx]].copy()
-            #     # data_sources['segments'] = filter_epochs.copy()
-            #     pass
-            if (self.a_flat_matching_results_list_ds is not None):
-                a_matching_pos_merged_segment_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[self.active_epoch_idx]
-                if (a_matching_pos_merged_segment_epochs_df is not None) and len(a_matching_pos_merged_segment_epochs_df) > 0:
-                    table_data_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
+            # table_data_sources = {}
+            # # if (filter_epochs is not None) and len(filter_epochs) > 0:
+            # #     # idx = min(self.active_epoch_idx, len(filter_epochs) - 1)
+            # #     # data_sources['active_epoch'] = filter_epochs.iloc[[idx]].copy()
+            # #     # data_sources['segments'] = filter_epochs.copy()
+            # #     pass
+            # if (self.a_flat_matching_results_list_ds is not None):
+            #     a_matching_pos_merged_segment_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[self.active_epoch_idx]
+            #     if (a_matching_pos_merged_segment_epochs_df is not None) and len(a_matching_pos_merged_segment_epochs_df) > 0:
+            #         table_data_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
                                 
-                a_matching_pos_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[self.active_epoch_idx]
-                if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-                    table_data_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
+            #     a_matching_pos_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[self.active_epoch_idx]
+            #     if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
+            #         table_data_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
                     
-            # if self.curr_position_df is not None and len(self.curr_position_df) > 0:
-            #     data_sources['curr_position'] = self.curr_position_df.copy()
-            if table_data_sources:
-                visible_columns_dict = {
-                    'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
-                    'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-                }    
-                self.epoch_table_manager.update_tables(table_data_sources, visible_columns_dict=visible_columns_dict)
+            # # if self.curr_position_df is not None and len(self.curr_position_df) > 0:
+            # #     data_sources['curr_position'] = self.curr_position_df.copy()
+            # if table_data_sources:
+            #     visible_columns_dict = {
+            #         'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
+            #         'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
+            #     }    
+            #     self.epoch_table_manager.update_tables(table_data_sources, visible_columns_dict=visible_columns_dict)
                 
             main_layout.addWidget(table_container)
             
@@ -7816,7 +7822,8 @@ class PredictiveDecodingVispyWidget:
                         visible_columns_dict = {
                             'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
                             'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-                        }    
+                        }
+                        print(f'\tperforming update_tables: len(table_update_sources): {len(table_update_sources)}, table_update_sources.keys(): {list(table_update_sources.keys())}, visible_columns_dict: {visible_columns_dict}')
                         self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
                     else:
                         print(f'\tWARN: no table_update_sources (empty)')

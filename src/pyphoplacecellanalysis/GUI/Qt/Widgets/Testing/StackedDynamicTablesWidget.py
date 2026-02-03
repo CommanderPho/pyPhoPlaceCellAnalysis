@@ -18,7 +18,7 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.NestedDockAreaWidget imp
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableView, QMenu, QAction, QVBoxLayout, QWidget
-from PyQt5.QtCore import QAbstractTableModel, Qt
+from PyQt5.QtCore import QAbstractTableModel, Qt, pyqtSignal
 
 _table_stylesheet: str = '''
 /* General table styling */
@@ -124,6 +124,8 @@ QTableCornerButton::section {
 @metadata_attributes(short_name=None, tags=['epochs', 'tables', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:40', related_items=[])
 class CustomHeaderTableView(pg.QtWidgets.QTableView):
     """ QTableView with custom header and context menu for column visibility. """
+    sigVisibleColumnsChanged = pyqtSignal(list)
+
     def __init__(self, model=None, visible_columns=None):
         super().__init__()
         self._column_visibility_menu = QMenu(self)
@@ -176,6 +178,17 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
             self.column_actions.append(action)
             self._column_visibility_menu.addAction(action)
 
+        self._emit_visible_columns_changed()
+
+    def _emit_visible_columns_changed(self):
+        """ Build list of visible column names from current model and view state; emit sigVisibleColumnsChanged. """
+        model = self.model()
+        if model is None or model.columnCount() == 0:
+            self.sigVisibleColumnsChanged.emit([])
+            return
+        visible_names = [str(model.headerData(col, Qt.Horizontal, Qt.DisplayRole)) for col in range(model.columnCount()) if not self.isColumnHidden(col)]
+        self.sigVisibleColumnsChanged.emit(visible_names)
+
     def showColumnContextMenu(self, position):
         """ Show context menu for column visibility at the requested position. """
         header = self.horizontalHeader()
@@ -185,6 +198,7 @@ class CustomHeaderTableView(pg.QtWidgets.QTableView):
     def toggle_column(self, column, visible):
         """ Toggle visibility of the specified column. """
         self.setColumnHidden(column, not visible)
+        self._emit_visible_columns_changed()
 
 
 @metadata_attributes(short_name=None, tags=['table', 'manager', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-08 16:41', related_items=[])
@@ -219,7 +233,11 @@ class TableManager:
         self.dock_items = {}  # Store dock items
         self.models = {}  # dict of SimplePandasModel objects
 
+
+    @function_attributes(short_name=None, tags=['main', 'update', 'add', 'create'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-03 03:33', related_items=[])
     def update_tables(self, data_sources: Dict[str, pd.DataFrame], visible_columns_dict: Optional[Dict]=None):
+        """ can be used both to create new tables and update existing ones
+        """
         # Remove old dock items no longer present
         to_remove = []
         for name in self.dock_items.keys():
@@ -250,7 +268,7 @@ class TableManager:
 
             Uses: `self.visible_columns_dict` to try and determine what columns to display for this dataseries name
         """
-        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal')
+        display_config = CustomDockDisplayConfig(showCloseButton=True, orientation='horizontal', showTimelineSyncModeButton=False, showOptionsButton=True, showCollapseButton=False)
         
         # Create table widget
         visible_columns = self.visible_columns_dict.get(name, ['start', 'delta_aligned_start_t', 'label', 'unique_active_aclus'])
@@ -271,8 +289,10 @@ class TableManager:
         
         self.dock_items[name] = dDisplayItem
         self.models[name] = model
+        table.sigVisibleColumnsChanged.connect(lambda cols, n=name: self._on_table_visible_columns_changed(n, cols))
         dDisplayItem.setTitle(f"{name} (rows: {df.shape[0]}×, cols: {df.shape[1]})")
         return dDisplayItem
+
 
     def remove_table_dock(self, name: str):
         """Removes a docked table widget"""
@@ -280,6 +300,7 @@ class TableManager:
             dock_item = self.dock_items.pop(name)
             self.models.pop(name)
             self.dynamic_docked_widget_container.remove_display_dock(name)
+
 
     def find_table(self, name: str):
         """ returns all related components for a table
@@ -293,10 +314,12 @@ class TableManager:
         model = self.models[name]
         return table, dDisplayItem, model
 
+
     def highlight_row(self, name: str, row_index: int):
         # row_index = 2  # Row to highlight (0-based index)
         table, dDisplayItem, model = self.find_table(name=name)
         table.selectRow(row_index)
+
 
     def scroll_to_row(self, name: str, row_index: int):
         # row_index = 4  # Row to scroll to (0-based index)
@@ -307,6 +330,10 @@ class TableManager:
     # ==================================================================================================================== #
     # Private Methods                                                                                                      #
     # ==================================================================================================================== #
+    def _on_table_visible_columns_changed(self, name: str, visible_column_names: List[str]):
+        """ Persist table column visibility into visible_columns_dict when user or programmatic change occurs. """
+        self.visible_columns_dict[name] = list(visible_column_names)
+
     def _create_table(self, df: pd.DataFrame, visible_columns=None):
         headers: List[str] = [str(col) for col in df.columns]
         
@@ -337,14 +364,28 @@ class TableManager:
 
 
     def _update_table(self, dock_item, df: pd.DataFrame):
+        """ Uses current table column visibility (user choices) when present; otherwise uses `self.visible_columns_dict`. """
         dock_children_widgets = dock_item.widgets
         assert len(dock_children_widgets) == 1, f"dock_children_widgets: {dock_children_widgets}, dock_item: {dock_item}"
         table = dock_children_widgets[0]
+        name = dock_item.name()
+        # Prefer existing table visibility (user hand-picked columns); fall back to visible_columns_dict
+        current_model = table.model()
+        if current_model is not None and current_model.columnCount() > 0:
+            current_visible_names = [str(current_model.headerData(col, Qt.Horizontal, Qt.DisplayRole)) for col in range(current_model.columnCount()) if not table.isColumnHidden(col)]
+            included_visible_columns = [col for col in df.columns if col in current_visible_names]
+        else:
+            included_visible_columns = []
+        if not included_visible_columns:
+            visible_columns = self.visible_columns_dict.get(name, ['start', 'delta_aligned_start_t', 'label', 'unique_active_aclus'])
+            included_visible_columns = [col for col in df.columns if col in visible_columns]
+        table.visible_columns = included_visible_columns if included_visible_columns else None
         model = self._fill_table(table, df)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         dock_item.setTitle(f"{dock_item.name()} (rows: {model.rowCount()}, cols: {model.columnCount()})")
         return model
+
 
     def _fill_table(self, table, df: pd.DataFrame) -> SimplePandasModel:
         curr_model = SimplePandasModel(df.copy())
