@@ -6847,6 +6847,7 @@ class PredictiveDecodingVispyWidget:
     colorbar_view: Any = field(default=None)
     epoch_slider: Any = field(default=None)
     epoch_value_label: Any = field(default=None)
+    epoch_table_manager: Any = field(default=None)
     current_epoch_idx: int = field(default=0)
     # Mutable visual lists (cleared/repopulated in update_epoch_display)
     past_lines: List[Any] = field(default=Factory(list))
@@ -6914,6 +6915,7 @@ class PredictiveDecodingVispyWidget:
             decoded_result=decoded_result,
             active_epoch_idx=active_epoch_idx)
 
+
     def setup(self):
         if self.pf_decoder is None:
             raise ValueError("pf_decoder must be provided")
@@ -6938,6 +6940,7 @@ class PredictiveDecodingVispyWidget:
         else:
             self.past_future_trajectory_start_extension_seconds = 0.0
             self.past_future_trajectory_end_extension_seconds = 0.0
+
 
     def get_state(self) -> dict:
         return {
@@ -6980,6 +6983,17 @@ class PredictiveDecodingVispyWidget:
         slider_layout.addWidget(epoch_slider, stretch=1)
         slider_layout.addWidget(epoch_value_label)
         main_layout.addWidget(slider_widget)
+        from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
+        table_container = QtWidgets.QWidget()
+        table_container.setMaximumHeight(200)
+        epoch_table_manager = TableManager(table_container, visible_columns_dict={})
+        self.epoch_table_manager = epoch_table_manager
+        filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs if self.a_flat_matching_results_list_ds is not None else self.a_decoded_filter_epochs_df
+        if filter_epochs is not None and len(filter_epochs) > 0:
+            idx = min(self.active_epoch_idx, len(filter_epochs) - 1)
+            active_epoch_df = filter_epochs.iloc[[idx]].copy()
+            epoch_table_manager.update_tables({'active_epoch': active_epoch_df})
+        main_layout.addWidget(table_container)
         main_window.setCentralWidget(central_widget)
         main_window.resize(1400, 950)
         main_window.show()
@@ -7115,6 +7129,8 @@ class PredictiveDecodingVispyWidget:
         self._clear_epoch_visuals()
         epoch_data = self.a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length)
         filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs
+        if self.epoch_table_manager is not None and new_epoch_idx < len(filter_epochs):
+            self.epoch_table_manager.update_tables({'active_epoch': filter_epochs.iloc[[new_epoch_idx]].copy()})
         if new_epoch_idx < len(filter_epochs):
             epoch_row = filter_epochs.iloc[new_epoch_idx]
             epoch_start_t = epoch_row['start'] if 'start' in epoch_row else epoch_row.get('t_start', None)
@@ -7460,7 +7476,7 @@ class PredictiveDecodingVispyWidget:
                             if t_idx < len(self.time_bin_views):
                                 time_bin_contour = scene.visuals.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
                                 time_bin_contour.order = 10
-                                self.postererior_mask_contours.append(time_bin_contour)
+                                self.posterior_mask_contours.append(time_bin_contour)
         future_trajectory_colors_and_times = []
         if 'future' in curr_matching_past_future_positions_df_dict:
             future_positions_dict = curr_matching_past_future_positions_df_dict['future']
@@ -7653,7 +7669,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
         enable_debug_plot_trajectory_average_angle_arrows=enable_debug_plot_trajectory_average_angle_arrows,
         minimum_included_matching_sequence_length=minimum_included_matching_sequence_length,
         **kwargs)
-    return widget.as_viewer_tuple()
+    return widget # widget.as_viewer_tuple()
 
 
 
