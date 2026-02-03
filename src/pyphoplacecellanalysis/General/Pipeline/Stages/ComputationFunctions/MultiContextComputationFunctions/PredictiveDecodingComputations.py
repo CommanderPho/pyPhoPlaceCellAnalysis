@@ -6848,6 +6848,7 @@ def create_categorical_saturation_fade_color_fn(position_dfs: List[pd.DataFrame]
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-01-21 - Vispy                                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 @define(slots=False, repr=False, eq=False)
@@ -6906,7 +6907,7 @@ class PredictiveDecodingVispyWidget:
     colorbar_view: Any = field(default=None)
     epoch_slider: Any = field(default=None)
     epoch_value_label: Any = field(default=None)
-    epoch_table_manager: Any = field(default=None)
+    epoch_table_manager: Optional[TableManager] = field(default=None)
     current_epoch_idx: int = field(default=0)
     
     # Mutable visual lists (cleared/repopulated in update_epoch_display)
@@ -6931,6 +6932,7 @@ class PredictiveDecodingVispyWidget:
     timeline_bar: Any = field(default=None)
     timeline_epoch_rect: Any = field(default=None)
     timeline_epoch_triangle: Any = field(default=None)
+    _last_trajectory_epoch_data: Optional[Dict[str, Any]] = field(default=None)
 
 
     
@@ -7426,6 +7428,83 @@ class PredictiveDecodingVispyWidget:
                             debug_arrow.order = 5
                             self.trajectory_debug_arrows.append(debug_arrow)
 
+
+    def _clear_trajectory_highlight(self) -> None:
+        """Reset all trajectory lines to default width; no-op on exception per line."""
+        for line in (self.past_lines or []) + (self.future_lines or []):
+            if line is not None:
+                try:
+                    line.set_data(width=0.5)
+                except Exception:
+                    pass
+
+
+    def _apply_trajectory_highlight_for_selected_row(self) -> None:
+        """Highlight the trajectory line corresponding to the currently selected curr_merged_segment_epochs table row; clear highlight if no valid selection. Fails gracefully."""
+        if not getattr(self, 'enable_table_widgets', False) or self.epoch_table_manager is None:
+            return
+        if self._last_trajectory_epoch_data is None or 'curr_matching_past_future_positions_df_dict' not in self._last_trajectory_epoch_data:
+            return
+        try:
+            table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
+        except Exception:
+            self._clear_trajectory_highlight()
+            return
+        from qtpy import QtCore
+        selected = table.selectionModel().selectedIndexes()
+        if not selected:
+            self._clear_trajectory_highlight()
+            return
+        row = selected[0].row()
+        if row < 0 or (model.rowCount() is not None and row >= model.rowCount()):
+            self._clear_trajectory_highlight()
+            return
+        label_col, is_future_col = None, None
+        for col in range(model.columnCount()):
+            h = model.headerData(col, QtCore.Qt.Horizontal, QtCore.Qt.DisplayRole)
+            if h is not None and str(h).strip() == 'label':
+                label_col = col
+            if h is not None and str(h).strip() == 'is_future_present_past':
+                is_future_col = col
+        if label_col is None or is_future_col is None:
+            self._clear_trajectory_highlight()
+            return
+        label_val = model.index(row, label_col).data()
+        category_val = model.index(row, is_future_col).data()
+        if label_val is None:
+            self._clear_trajectory_highlight()
+            return
+        category_str = str(category_val).strip().lower() if category_val is not None else ''
+        if 'future' in category_str:
+            category = 'future'
+        elif 'past' in category_str:
+            category = 'past'
+        else:
+            self._clear_trajectory_highlight()
+            return
+        positions_dict = self._last_trajectory_epoch_data['curr_matching_past_future_positions_df_dict'].get(category)
+        if positions_dict is None:
+            self._clear_trajectory_highlight()
+            return
+        ordered_labels = list(positions_dict.keys())
+        try:
+            label_idx = ordered_labels.index(label_val)
+        except (ValueError, TypeError):
+            self._clear_trajectory_highlight()
+            return
+        lines_list = self.past_lines if category == 'past' else self.future_lines
+        if label_idx < 0 or label_idx >= len(lines_list):
+            self._clear_trajectory_highlight()
+            return
+        self._clear_trajectory_highlight()
+        try:
+            line = lines_list[label_idx]
+            if line is not None:
+                line.set_data(width=10)
+        except Exception:
+            pass
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Main Update Function                                                                                                                                                                                                                                                                 #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -7439,12 +7518,16 @@ class PredictiveDecodingVispyWidget:
         self.current_epoch_idx = new_epoch_idx
         self.epoch_slider.blockSignals(True)
         self.epoch_slider.setValue(new_epoch_idx)
-        self.epoch_slider.blockSignals(False)
+        # self.epoch_slider.blockSignals(False)
         self.epoch_value_label.setText(f"{new_epoch_idx}/{self.num_epochs}")
         self._clear_epoch_visuals() ## clear existing
         
         ## Get the epoch data (this performs the filtering by `minimum_included_matching_sequence_length` if set, etc
         epoch_data = self.a_flat_matching_results_list_ds._prepare_epoch_data(an_epoch_idx=new_epoch_idx, minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length)
+        try:
+            self._last_trajectory_epoch_data = {'curr_matching_past_future_positions_df_dict': epoch_data.get('curr_matching_past_future_positions_df_dict')} if epoch_data else None
+        except Exception:
+            self._last_trajectory_epoch_data = None
         filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs        
         if new_epoch_idx < len(filter_epochs):
             epoch_row = filter_epochs.iloc[new_epoch_idx]
@@ -7825,6 +7908,16 @@ class PredictiveDecodingVispyWidget:
                         }
                         print(f'\tperforming update_tables: len(table_update_sources): {len(table_update_sources)}, table_update_sources.keys(): {list(table_update_sources.keys())}, visible_columns_dict: {visible_columns_dict}')
                         self.epoch_table_manager.update_tables(table_update_sources, visible_columns_dict=visible_columns_dict)
+                        try:
+                            table, dDisplayItem, model = self.epoch_table_manager.find_table('curr_merged_segment_epochs')
+                            try:
+                                table.selectionModel().selectionChanged.disconnect(self._apply_trajectory_highlight_for_selected_row)
+                            except Exception:
+                                pass
+                            table.selectionModel().selectionChanged.connect(self._apply_trajectory_highlight_for_selected_row)
+                            self._apply_trajectory_highlight_for_selected_row()
+                        except Exception:
+                            pass
                     else:
                         print(f'\tWARN: no table_update_sources (empty)')
 
@@ -7870,7 +7963,10 @@ class PredictiveDecodingVispyWidget:
 
         # self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
         self.canvas.update()
-        QApplication.processEvents()
+        # QApplication.processEvents()
+
+        ## unblock the epoch_slider       
+        self.epoch_slider.blockSignals(False)
 
 
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
