@@ -7047,6 +7047,9 @@ class PredictiveDecodingVispyWidget:
         self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
         self.update_epoch_display(self.active_epoch_idx)
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Helper/Rendering Functions                                                                                                                                                                                                                                                           #
+    # ==================================================================================================================================================================================================================================================================================== #
     def _clear_epoch_visuals(self):
         self._detach_and_clear_visual_lists(
             [
@@ -7135,6 +7138,7 @@ class PredictiveDecodingVispyWidget:
                     ref.parent = None
                 setattr(self, name, None)
 
+
     def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, lines_list: list, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int) -> None:
         """Render past or future trajectories into view; append to lines_list and trajectory_colors_and_times_out."""
         from vispy import scene
@@ -7194,6 +7198,9 @@ class PredictiveDecodingVispyWidget:
                             debug_arrow.order = 5
                             self.trajectory_debug_arrows.append(debug_arrow)
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Main Update Function                                                                                                                                                                                                                                                                 #
+    # ==================================================================================================================================================================================================================================================================================== #
     def update_epoch_display(self, new_epoch_idx: int):
         """Update the display to show a different epoch."""
         if new_epoch_idx < 0 or new_epoch_idx >= self.num_epochs:
