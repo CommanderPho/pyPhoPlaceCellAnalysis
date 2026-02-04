@@ -78,13 +78,14 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 
 
+
 # #TODO 2026-01-22 13:44: - [ ] Comparing Directed to Scatttered
 
-Decoded Occupancy of only good events / compared to observed occupancy -- similar to the checks I did on the 1D track
+#TODO 2026-02-04 03:42: - [ ] Decoded Occupancy of only good events / compared to observed occupancy -- similar to the checks I did on the 1D track
 
-Do the directed PBEs need to follow the 
+    Do the directed PBEs need to follow the 
 
-During mid sleep, PBEs would be biased toward the more interesting 2D maze instead of htte environment measured.
+    During mid sleep, PBEs would be biased toward the more interesting 2D maze instead of htte environment measured.
 
 
 """
@@ -3791,11 +3792,13 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
-    def final_refine_single_epoch_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam', **kwargs) -> DecodedFilterEpochsResult:
+    def final_refine_single_decoder_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam', **kwargs) -> DecodedFilterEpochsResult:
         """
         Seems to just do the whole set of computations again after the filtering/masking
         
         History: 2026-01-21 "_filter_single_epoch_result" -> "final_refine_single_epoch_result_masks"
+        History 2026-02-03 "final_refine_single_epoch_result_masks" -> "final_refine_single_decoder_result_masks"
+        
         Uses:
             self.epochs_decoded_result_cache_dict
             
@@ -4027,7 +4030,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         })
 
         ## add the processed items to the dict too
-        self.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis'].update(_out_processed_items_list_dict)
+        self.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis'].update(_out_processed_items_list_dict) ## adds ['_out_epoch_flat_mask', '_out_processed_masks', '_out_epoch_flat_mask_future_past_result'] from `_out_processed_items_list_dict` to `masked_container.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis']`
         ### _out_epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = masked_container.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis']['_out_epoch_flat_mask_future_past_result']
 
         # for k, v in _out_processed_items_list_dict.items():
@@ -4831,7 +4834,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                     if an_epoch_name not in a_masked_container.debug_computed_dict:
                         a_masked_container.debug_computed_dict[an_epoch_name] = {}
                     
-                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_epoch_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=effective_fine_time_bin_size, a_decoder_name=an_epoch_name, **parallel_kwargs)
+                    active_epochs_result, custom_results_df_list, decoded_epoch_t_bins_promenence_result_obj = a_masked_container.final_refine_single_decoder_result_masks(curr_active_pipeline=owning_pipeline_reference, fine_decoding_t_bin_size=effective_fine_time_bin_size, a_decoder_name=an_epoch_name, **parallel_kwargs)
                     a_masked_container.debug_computed_dict[an_epoch_name].update({'active_epochs_result': active_epochs_result, 'custom_results_df_list': custom_results_df_list, 'decoded_epoch_t_bins_promenence_result_obj': decoded_epoch_t_bins_promenence_result_obj})
                     _epoch_elapsed = _time.perf_counter() - _epoch_start
                     print(f'[{_fn_name}]     Completed "{an_epoch_name}" in {_epoch_elapsed:.2f}s')
