@@ -6916,6 +6916,7 @@ vp.set_log_level('WARNING')
 # Enable full debug mode for the gloo layer
 # vp.config.update(debug=False, check_errors=True)
 
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
 
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
@@ -7880,7 +7881,7 @@ class PredictiveDecodingVispyWidget:
                     mask_slice = per_t_bin_mask[:, :, t_idx]
                     if np.any(mask_slice):
                         mask_transposed = mask_slice.T.astype(np.float32)
-                        contours: List[NDArray] = measure.find_contours(mask_transposed, level=0.5)
+                        contours: List[NDArray] = measure.find_contours(mask_transposed, level=0.5) # #TODO 2026-02-04 10:54: - [ ] Note that if we're recomputing them here we don't in general have the ones used for the calculations (the promenence-based ones)
                         contour_color = tuple(contour_time_bin_colors[t_idx])
                         n_y_bins, n_x_bins = mask_transposed.shape
                         for contour in contours:
