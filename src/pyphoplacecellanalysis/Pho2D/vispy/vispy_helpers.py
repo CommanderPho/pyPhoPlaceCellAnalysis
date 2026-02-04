@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence, cast
 import numpy as np
 import nptyping as ND
 from nptyping import NDArray
@@ -152,6 +152,9 @@ from pyphocorehelpers.assertion_helpers import Assert
 #         raise RuntimeError("No contour extraction backend available. Install scikit-image or opencv-python.")
 
 
+ContourItem = Tuple[NDArray, Tuple[float, float, float, float]]
+
+
 def _extract_contours_from_mask(mask: np.ndarray, level: float = 0.5) -> List[NDArray]:
     """Return list of (N, 2) arrays in (row, col) for binary mask. Requires scikit-image."""
     if not _HAS_SKIMAGE:
@@ -224,19 +227,25 @@ def _contour_colors_for_masks(n: int, color: Optional[Union[Tuple, str]] = None,
     return _colormap_colors(n, cmap_name="viridis", alpha=cmap_alpha)
 
 
-def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0), color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5) -> List[Tuple[NDArray, Tuple[float, float, float, float]]]:
-    """Return flat list of (pos, rgba) with pos (N, 2) in world (x, y). masks: list of 2D binary arrays or 3D (n_rows, n_cols, n_masks)."""
+def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0), color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5, return_per_mask: bool = False) -> Union[List[ContourItem], List[List[ContourItem]]]:
+    """Return flat list of (pos, rgba) or, if return_per_mask=True, one list per mask index. masks: list of 2D binary arrays or 3D (n_rows, n_cols, n_masks)."""
     arr = np.asarray(masks)
     if arr.ndim == 3:
-        n_rows, n_cols, n_masks = arr.shape
-        mask_list = [arr[:, :, i] for i in range(n_masks)]
+        if arr.shape[0] <= arr.shape[1] and arr.shape[0] <= arr.shape[2]:
+            n_masks, n_rows, n_cols = arr.shape[0], arr.shape[1], arr.shape[2]
+            mask_list = [arr[i, :, :] for i in range(n_masks)]
+        else:
+            n_rows, n_cols, n_masks = arr.shape[0], arr.shape[1], arr.shape[2]
+            mask_list = [arr[:, :, i] for i in range(n_masks)]
     else:
         mask_list = list(masks)
         if not mask_list:
-            return []
+            return [] if not return_per_mask else []
         n_rows, n_cols = np.asarray(mask_list[0]).shape[:2]
-    color_list = _contour_colors_for_masks(len(mask_list), color=color, colors=colors, cmap=cmap, cmap_alpha=cmap_alpha)
-    out: List[Tuple[NDArray, Tuple[float, float, float, float]]] = []
+    n_masks = len(mask_list)
+    color_list = _contour_colors_for_masks(n_masks, color=color, colors=colors, cmap=cmap, cmap_alpha=cmap_alpha)
+    out: List[ContourItem] = []
+    per_mask_out: List[List[ContourItem]] = [[] for _ in range(n_masks)]
     for idx, mask in enumerate(mask_list):
         m = np.asarray(mask, dtype=np.float64)
         nr, nc = m.shape[0], m.shape[1]
@@ -246,8 +255,10 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
         rgba = color_list[idx]
         for contour_rc in contour_arrays:
             pos = _contour_pixel_to_world(contour_rc, nr, nc, x_bounds, y_bounds)
-            out.append((pos, rgba))
-    return out
+            item = (pos, rgba)
+            out.append(item)
+            per_mask_out[idx].append(item)
+    return per_mask_out if return_per_mask else out
 
 
 def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10) -> List:
@@ -271,12 +282,9 @@ class VispyHelpers:
 
 
     @classmethod
-    def render_contours(cls, masks: Union[Sequence[NDArray], NDArray], 
-                         x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0),
-                         color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5, parents: Optional[Sequence[Node]] = None, line_width: float = 2.0, order: int = 10,
-                        ) -> Union[List[Tuple[NDArray, Tuple[float, float, float, float]]], Tuple[List[Tuple[NDArray, Tuple[float, float, float, float]]], List[List[Any]]]]:
+    def render_contours(cls, masks: Union[Sequence[NDArray], NDArray], x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0), color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5, parents: Optional[Sequence[Node]] = None, line_width: float = 2.0, order: int = 10) -> Union[List[ContourItem], Tuple[List[ContourItem], List[List[Any]]]]:
         """Decoupled contour rendering: takes masks and optional bounds/color/cmap; returns contour data and optionally creates Line visuals on given parents."""
-        contour_data = contours_from_masks(masks, x_bounds=x_bounds, y_bounds=y_bounds, color=color, colors=colors, cmap=cmap, cmap_alpha=cmap_alpha, level=level)
+        contour_data = cast(List[ContourItem], contours_from_masks(masks, x_bounds=x_bounds, y_bounds=y_bounds, color=color, colors=colors, cmap=cmap, cmap_alpha=cmap_alpha, level=level, return_per_mask=False))
         if parents is None:
             return contour_data
         line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order) for parent in parents]
@@ -334,7 +342,7 @@ if __name__ == '__main__':
     from vispy import app
 
     masks_list = make_random_gaussian_masks(n_masks=5, shape=(40, 60), seed=42)
-    contour_data = contours_from_masks(masks_list, cmap='viridis')
+    contour_data = cast(List[ContourItem], contours_from_masks(masks_list, cmap='viridis'))
     canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
     view = canvas.central_widget.add_view()
     view.camera = 'panzoom'

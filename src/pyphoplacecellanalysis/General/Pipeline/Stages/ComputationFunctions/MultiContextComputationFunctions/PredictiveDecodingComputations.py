@@ -6916,7 +6916,7 @@ vp.set_log_level('WARNING')
 # Enable full debug mode for the gloo layer
 # vp.config.update(debug=False, check_errors=True)
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals
 
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
@@ -7860,61 +7860,40 @@ class PredictiveDecodingVispyWidget:
         _update_dict.update(time_bin_views=time_bin_views, time_bin_labels=time_bin_labels, time_bin_images=time_bin_images)
         
 
-        # Renders the contours _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        ## Updates: self.posterior_mask_contours
-        ## UPDATES: [(past_view, past_mask_contours), (posterior_2d_view, posterior_mask_contours), (future_view, future_mask_contours)]; views from _update_dict. In multi-epoch there are no past/future views, so only central (and time-bin) views receive contours.
+        # Renders the contours (shared vispy_helpers API)
         past_view = _update_dict.get('past_view', self.past_view)
         future_view = _update_dict.get('future_view', self.future_view)
-        posterior_mask_contours = _update_dict.get('posterior_mask_contours', []) # self.posterior_mask_contours
+        posterior_2d_view = _update_dict.get('posterior_2d_view', self.posterior_2d_view)
+        posterior_mask_contours = _update_dict.get('posterior_mask_contours', [])
         list_names = ['past_mask_contours', 'posterior_mask_contours', 'future_mask_contours']
         active_posterior_contours_dict_list = [(past_view, _update_dict.get('past_mask_contours', [])), (posterior_2d_view, _update_dict.get('posterior_mask_contours', [])), (future_view, _update_dict.get('future_mask_contours', []))]
         views_and_lists_to_draw = [(v, c) for v, c in active_posterior_contours_dict_list if v is not None]
-        
         if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result)):
             epoch_result_for_contours = self.epoch_flat_mask_future_past_result[new_epoch_idx]
             if epoch_result_for_contours is not None and hasattr(epoch_result_for_contours, 'epoch_t_bins_high_prob_pos_mask') and epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask is not None:
-                
                 per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask
                 n_mask_t_bins = per_t_bin_mask.shape[2]
+                masks = [per_t_bin_mask[:, :, t_idx].T for t_idx in range(n_mask_t_bins)]
                 contour_time_bin_colors = self._time_bin_colors(n_mask_t_bins, alpha=0.7)
-                for t_idx in range(n_mask_t_bins):
-                    mask_slice = per_t_bin_mask[:, :, t_idx]
-                    if np.any(mask_slice):
-                        mask_transposed = mask_slice.T.astype(np.float32)
-                        contours: List[NDArray] = measure.find_contours(mask_transposed, level=0.5) # #TODO 2026-02-04 10:54: - [ ] Note that if we're recomputing them here we don't in general have the ones used for the calculations (the promenence-based ones)
-                        contour_color = tuple(contour_time_bin_colors[t_idx])
-                        n_y_bins, n_x_bins = mask_transposed.shape
-                        for contour in contours:
-                            x_world = x_min + (contour[:, 1] / n_x_bins) * (x_max - x_min)
-                            y_world = y_min + (contour[:, 0] / n_y_bins) * (y_max - y_min)
-                            contour_coords = np.column_stack([x_world, y_world]).astype(np.float32)
-                            for view, cont_list in views_and_lists_to_draw:
-                                c: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=view.scene)
-                                c.order = 10
-                                cont_list.append(c)
-                            ## END for view, cont_list in views_and_lists_to_draw
-                            
-                            ## TODO: why adding more contours here independently? `self.posterior_mask_contours` gets double modified I think!
-                            # if t_idx < len(self.time_bin_views):
-                            #     time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=self.time_bin_views[t_idx].scene)
-                            if t_idx < len(time_bin_views):
-                                time_bin_contour: vz.Line = vz.Line(pos=contour_coords, color=contour_color, width=2, parent=time_bin_views[t_idx].scene)                            
-                                time_bin_contour.order = 11
-                                posterior_mask_contours.append(time_bin_contour)
-                            ## END if t_idx < len(self....
-                            
-                        ## END for contour in contours...
-                        
-                ##  END for t_idx in range(n_mask_t_bins)...
-            ## END if self.epoch_flat_mask_future_past_result is not None and (new_epoch_idx < len(self.epoch_flat_mask_future_past_result))...
-            _update_dict.update(posterior_mask_contours=posterior_mask_contours)
-            for (a_name, (a_view, a_cont_list)) in zip(list_names, active_posterior_contours_dict_list):
-                if (a_view is not None) and (a_cont_list is not None):
-                    _update_dict[a_name] = a_cont_list
-
-            # self.posterior_mask_contours = posterior_mask_contours 
-        ## END if self.epoch_flat_mask_futu...
-        
+                colors = [tuple(contour_time_bin_colors[i]) for i in range(n_mask_t_bins)]
+                contour_data_per_mask = contours_from_masks(masks, x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=colors, level=0.5, return_per_mask=True)
+                contour_data_flat: List[ContourItem] = [item for sublist in contour_data_per_mask for item in sublist]
+                for view, cont_list in views_and_lists_to_draw:
+                    scene_parent = view.scene if view is not None else None
+                    if scene_parent is not None:
+                        lines = create_contour_line_visuals(contour_data_flat, scene_parent, line_width=2.0, order=10)
+                        cont_list.extend(lines)
+                ## for each t_bin_view
+                for t_idx in range(min(len(contour_data_per_mask), len(time_bin_views))):
+                    scene_parent = time_bin_views[t_idx].scene if time_bin_views[t_idx] is not None else None
+                    if scene_parent is not None:
+                        per_mask_contours: List[ContourItem] = contour_data_per_mask[t_idx]
+                        lines = create_contour_line_visuals(per_mask_contours, scene_parent, line_width=2.0, order=11)
+                        posterior_mask_contours.extend(lines)
+                _update_dict.update(posterior_mask_contours=posterior_mask_contours)
+                for (a_name, (a_view, a_cont_list)) in zip(list_names, active_posterior_contours_dict_list):
+                    if (a_view is not None) and (a_cont_list is not None):
+                        _update_dict[a_name] = a_cont_list
         return _update_dict
 
 
