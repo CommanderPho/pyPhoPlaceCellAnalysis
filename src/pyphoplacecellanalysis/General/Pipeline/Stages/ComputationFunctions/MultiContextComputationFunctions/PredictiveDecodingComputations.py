@@ -1990,7 +1990,23 @@ class MatchingPastFuturePositionsResult(ComputedResult):
 
         ## OUTPUTS: good_merged_segment_epochs, good_only_relevant_positions_df, good_only_matching_pos_epochs_df
         return (good_merged_segment_epochs, good_only_relevant_positions_df, good_only_matching_pos_epochs_df)
-    
+
+
+    @function_attributes(short_name=None, tags=['UNVALIDATED', 'UNTESTED', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-03 18:19', related_items=[])
+    def filtered_copy_by_min_sequence_length(self, minimum_included_matching_sequence_length: Optional[int] = None) -> "MatchingPastFuturePositionsResult":
+        """Returns a new instance containing only position sequences whose merged segment has num_epoch_t_bins >= minimum_included_matching_sequence_length. Does not modify self.
+        """
+        if self.merged_segment_epochs is None or minimum_included_matching_sequence_length is None or minimum_included_matching_sequence_length <= 0:
+            return attrs.evolve(self, relevant_positions_df=deepcopy(self.relevant_positions_df), matching_pos_epochs_df=deepcopy(self.matching_pos_epochs_df), merged_segment_epochs=deepcopy(self.merged_segment_epochs) if self.merged_segment_epochs is not None else None, matching_past_positions_df=deepcopy(self.matching_past_positions_df) if self.matching_past_positions_df is not None else None, matching_future_positions_df=deepcopy(self.matching_future_positions_df) if self.matching_future_positions_df is not None else None)
+        good_merged_segment_epochs, good_only_relevant_positions_df, good_only_matching_pos_epochs_df = self.get_filtered_by_min_seq_length(minimum_included_matching_sequence_length)
+        good_only_relevant_positions_df = good_only_relevant_positions_df.copy()
+        good_only_matching_pos_epochs_df = good_only_matching_pos_epochs_df.copy()
+        good_merged_segment_epochs = good_merged_segment_epochs.copy()
+        is_relevant_past = (good_only_relevant_positions_df['is_future_present_past'].values == 'past')
+        is_relevant_future = (good_only_relevant_positions_df['is_future_present_past'].values == 'future')
+        matching_past = good_only_relevant_positions_df[good_only_relevant_positions_df['is_future_present_past'] == 'past'].copy()
+        matching_future = good_only_relevant_positions_df[good_only_relevant_positions_df['is_future_present_past'] == 'future'].copy()
+        return attrs.evolve(self, relevant_positions_df=good_only_relevant_positions_df, matching_pos_epochs_df=good_only_matching_pos_epochs_df, merged_segment_epochs=good_merged_segment_epochs, matching_past_positions_df=matching_past, matching_future_positions_df=matching_future, is_relevant_past_times=is_relevant_past, is_relevant_future_times=is_relevant_future, n_relevant_past_times=int(np.sum(is_relevant_past)), n_relevant_future_times=int(np.sum(is_relevant_future)))
 
 
     # For serialization/pickling: ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -7287,9 +7303,8 @@ class PredictiveDecodingVispyWidget:
                         # centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
                         # current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
                         posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
-                        # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
-                        # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
-                        # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
+                        past_view=None, future_view=None,
+                        past_mask_contours=[], posterior_mask_contours=[], future_mask_contours=[],
                     )
                     # _an_update_dict = {}
                     multi_epoch_overview_container_render_dict_list.append(_an_update_dict)
