@@ -6949,12 +6949,15 @@ class PredictiveDecodingVispyWidget:
     enable_debug_plot_trajectory_average_angle_arrows: bool = field(default=False)
     minimum_included_matching_sequence_length: Optional[int] = field(default=None)
     
+
+    enable_full_vispy_debug_mode: bool = field(default=False)
+
     max_time_bins_to_show: int = field(default=12)
     enable_table_widgets: bool = field(default=False)
 
     enable_multi_epoch_overview_display_mode: bool = field(default=False)
-    multi_epoch_overview_container: Optional[Dict] = field(default=None, metadata={'desc': "only used when `enable_multi_epoch_overview_display_mode == True`"}) ## only used when `enable_multi_epoch_overview_display_mode == True`
-    
+    multi_epoch_overview_container_render_dict_list: Optional[Dict] = field(default=None, metadata={'desc': "only used when `enable_multi_epoch_overview_display_mode == True`"}) ## only used when `enable_multi_epoch_overview_display_mode == True`
+    MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: int = field(default=6, metadata={'desc': "only used when `enable_multi_epoch_overview_display_mode == True`"})
 
     # Derived in setup()
     xbin: Optional[Any] = field(default=None)
@@ -7009,10 +7012,28 @@ class PredictiveDecodingVispyWidget:
     _last_trajectory_epoch_data: Optional[Dict[types.PastFutureCategory, Any]] = field(default=None)
 
 
-    
-    
-
     def __attrs_post_init__(self):
+        
+        if self.enable_full_vispy_debug_mode:
+            # Vispy - Extreme Debugging __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            # Set the logging level to DEBUG or INFO
+            # vp.set_log_level('DEBUG')
+            vp.set_log_level('WARNING')
+            # # Optional: specifically tell VisPy to be more talkative about config
+            # vp.sys_info()
+            # Enable full debug mode for the gloo layer
+            vp.config.update(gl_debug=True)
+            # vp.config.update(gl_debug=False) # gl_debug=True, logging_level='DEBUG'
+            
+        else:
+            # Vispy - Normal Running/Development __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            # Set the logging level to DEBUG or INFO
+            vp.set_log_level('WARNING')
+            # Optional: specifically tell VisPy to be more talkative about config
+            # vp.sys_info()
+            # Enable full debug mode for the gloo layer
+            vp.config.update(gl_debug=False) # , check_errors=True
+
         if self.a_flat_matching_results_list_ds is None and self.epoch_flat_mask_future_past_result is not None and self.a_decoded_filter_epochs_df is not None:
             self.a_flat_matching_results_list_ds = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result, filter_epochs=self.a_decoded_filter_epochs_df)
         self.setup()
@@ -7242,25 +7263,28 @@ class PredictiveDecodingVispyWidget:
             
             filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs
             
-            _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: int = 25
-
+            row_max_height: int = 640
+            
             ## get standard data:            
             x_min, x_max = self.xbin[0], self.xbin[-1]
             y_min, y_max = self.ybin[0], self.ybin[-1]
         
             multi_epoch_overview_container_render_dict_list = [] # {}
             
-            if self.multi_epoch_overview_container is None:
-                self.multi_epoch_overview_container = {'a_posterior_2d_container_view_grid': [], 'a_posterior_2d_view': [], 'a_time_bin_grid': []} #[]
+            # if multi_epoch_overview_container is None:
+            
         
             # self.posterior_2d_container_view = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
             # self.posterior_2d_container_view_grid = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
             for idx, epoch_data in enumerate(epoch_data_list):
-                if idx >= _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER:
-                    # print(f'_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}')
+                ## make a new local only temp container dict
+                a_multi_epoch_overview_container = {'a_posterior_2d_container_view_grid': None, 'a_posterior_2d_view': None, 'a_time_bin_grid': None, 'an_update_dict': {}} #[]
+                
+                if idx >= self.MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER:
+                    # print(f'MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}')
                     continue
                 else:
-                    print(f'idx: {idx} < _MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {_MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}, so adding...')
+                    print(f'idx: {idx} < MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {self.MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}, so adding...')
                 
                 n_time_bins: int = self.a_flat_matching_results_list_ds.num_epoch_time_bins[idx]
                 # epoch_data
@@ -7288,50 +7312,71 @@ class PredictiveDecodingVispyWidget:
                 # ==================================================================================================================================================================================================================================================================================== #
                 a_posterior_2d_container_view_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=idx, col=0, col_span=(1+n_time_bins), border_color='white') ## holds the epoch's two views
                 a_posterior_2d_view = a_posterior_2d_container_view_grid.add_view(row=0, col=0, col_span=1, border_color='gray')
-                a_posterior_2d_view.height_max = 140
+                a_posterior_2d_view.height_max = row_max_height
                 a_time_bin_grid: vispy.scene.widgets.grid.Grid = a_posterior_2d_container_view_grid.add_grid(row=0, col=1, col_span=n_time_bins, border_color='gray')
-                a_time_bin_grid.height_max = 140
-                a_posterior_2d_container_view_grid.height_max = 140
-                self.multi_epoch_overview_container['a_posterior_2d_container_view_grid'].append(a_posterior_2d_container_view_grid)
-                self.multi_epoch_overview_container['a_posterior_2d_view'].append(a_posterior_2d_view)
-                self.multi_epoch_overview_container['a_time_bin_grid'].append(a_time_bin_grid)
+                a_time_bin_grid.height_max = row_max_height
+                a_posterior_2d_container_view_grid.height_max = row_max_height
+                a_multi_epoch_overview_container['a_posterior_2d_container_view_grid'] =a_posterior_2d_container_view_grid
+                a_multi_epoch_overview_container['a_posterior_2d_view'] = a_posterior_2d_view
+                a_multi_epoch_overview_container['a_time_bin_grid'] = a_time_bin_grid
 
                 _common_render_kwargs = dict(time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=idx)
                 
                 # ==================================================================================================================================================================================================================================================================================== #
                 # Begin Render                                                                                                                                                                                                                                                                         #
                 # ==================================================================================================================================================================================================================================================================================== #
-                if idx >= len(multi_epoch_overview_container_render_dict_list):
-                    ## create the empty dict
-                    _an_update_dict = dict(
-                        # centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
-                        # current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
-                        # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
-                        # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
-                        # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,  
-                        posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
-                        past_view=None, future_view=None,
-                        past_mask_contours=[], posterior_mask_contours=[], future_mask_contours=[],
-                    )
-                    # _an_update_dict = {}
-                    multi_epoch_overview_container_render_dict_list.append(_an_update_dict)
-                else:
-                    _an_update_dict = multi_epoch_overview_container_render_dict_list[idx]
+                # if idx >= len(multi_epoch_overview_container_render_dict_list):
+                #     ## create the empty dict
+                #     _an_update_dict = dict(
+                #         # centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
+                #         # current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
+                #         # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
+                #         # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                #         # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,  
+                #         posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
+                #         # past_view=None, future_view=None,
+                #         # past_mask_contours=[], posterior_mask_contours=[], future_mask_contours=[],
+                #     )
+                #     # _an_update_dict = {}
+                #     multi_epoch_overview_container_render_dict_list.append(_an_update_dict)
+                # else:
+                #     _an_update_dict = multi_epoch_overview_container_render_dict_list[idx]
                 
+                _an_update_dict = dict(
+                    # centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
+                    # current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
+                    # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
+                    # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                    # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,  
+                    posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
+                    # past_view=None, future_view=None,
+                    # past_mask_contours=[], posterior_mask_contours=[], future_mask_contours=[],
+                )
+            
                 _an_update_dict = self._render_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d,
                                         epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t,
                                         **_common_render_kwargs,
+                                        allow_use_self_properties=False, needs_clear_owned_views=False, 
                                         _update_dict=_an_update_dict, #multi_epoch_overview_container_render_dict_list[idx],
                 )
-                multi_epoch_overview_container_render_dict_list[idx] = _an_update_dict ## update the existing
+                # multi_epoch_overview_container_render_dict_list[idx] = _an_update_dict ## update the existing
+                a_multi_epoch_overview_container['an_update_dict'] = _an_update_dict
                 
+            
                 # multi_epoch_overview_container_render_dict_list.append(_update_dict)
                 # for _k, _v in _update_dict.items():
                 #     setattr(self, _k, _v)
                     
-            ## END for idx, epoch_data in enumerate(epoch_data_list)...
+                multi_epoch_overview_container_render_dict_list.append(a_multi_epoch_overview_container)
 
-    
+
+
+
+            ## END for idx, epoch_data in enumerate(epoch_data_list)...
+            print(f'\t finally updating self.multi_epoch_overview_container_render_dict_list... len(multi_epoch_overview_container_render_dict_list): {len(multi_epoch_overview_container_render_dict_list)}')
+            self.multi_epoch_overview_container_render_dict_list = multi_epoch_overview_container_render_dict_list ## finally update self
+            print(f'\tdone.')
+                
 
 
 
@@ -7491,6 +7536,7 @@ class PredictiveDecodingVispyWidget:
                              new_epoch_idx: int, epoch_start_t: float, epoch_end_t: float,
                              use_new_centroid_arrows: bool = True, use_single_arrows_object: bool = False,
                              _update_dict=None,
+                             allow_use_self_properties: bool=True, needs_clear_owned_views: bool=True, 
                              **kwargs,
                              ):
         """ updates the center view with the posteriors and time bins 
@@ -7533,12 +7579,17 @@ class PredictiveDecodingVispyWidget:
 
         # Render Posterior Heatmap (2D view - top half)
         posterior_img = None # self.posterior_img
-        posterior_2d_view = _update_dict.get('posterior_2d_view', self.posterior_2d_view)
         
+        posterior_2d_view = _update_dict.get('posterior_2d_view', None)
+        if (posterior_2d_view is None) and allow_use_self_properties:
+            posterior_2d_view = self.posterior_2d_view
+                    
+
         if posterior_2d is not None and posterior_2d.size > 0:
             img_data: NDArray = np.ascontiguousarray(posterior_2d.T, dtype=np.float32)
             posterior_img = vz.Image(img_data, cmap='viridis', parent=posterior_2d_view.scene)
             posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
+            posterior_img.order = 0
         _update_dict.update(posterior_img=posterior_img)
 
         # Render centroid dots and arrows on posterior plot (main view only)
@@ -7739,7 +7790,7 @@ class PredictiveDecodingVispyWidget:
 
         ## Uses: self.posterior_2d_view
         # Updates: self.current_position_line, self.trajectory_arrows, self.posterior_2d_view
-        current_position_line = _update_dict.get('current_position_line', None) # self.current_position_line
+        current_position_line = _update_dict.get('current_position_line', (self.current_position_line if allow_use_self_properties else None)) # self.current_position_line
         trajectory_arrows = _update_dict.get('trajectory_arrows', []) # self.trajectory_arrows
         epoch_info_text = _update_dict.get('epoch_info_text', None) # self.epoch_info_text
         
@@ -7762,7 +7813,7 @@ class PredictiveDecodingVispyWidget:
                     colors = np.ones((n_points, 4), dtype=np.float32)
                     colors[:, :3] = 0.7
                     colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
-                    if self.current_position_line is None:
+                    if current_position_line is None:
                         current_position_line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors, width=3, method='gl', parent=posterior_2d_view.scene)
                         current_position_line.order = 5
                     else:
@@ -7773,27 +7824,39 @@ class PredictiveDecodingVispyWidget:
             else:
                 if current_position_line is not None:
                     current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+                if needs_clear_owned_views:
+                    for arrow in trajectory_arrows:
+                        if arrow is not None:
+                            arrow.parent = None
+                    trajectory_arrows.clear()
+                else:
+                    print(f'WARN: cannot clean arrows')
+                    
+        else:
+            if current_position_line is not None:
+                current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
+            if needs_clear_owned_views:
                 for arrow in trajectory_arrows:
                     if arrow is not None:
                         arrow.parent = None
                 trajectory_arrows.clear()
-        else:
-            if current_position_line is not None:
-                current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
-            for arrow in trajectory_arrows:
-                if arrow is not None:
-                    arrow.parent = None
-            trajectory_arrows.clear()
+            else:
+                print(f'WARN: cannot clean arrows')
             
         _update_dict.update(current_position_line=current_position_line, trajectory_arrows=trajectory_arrows)
+        
+
+
 
         if epoch_start_t is not None and epoch_end_t is not None:
             epoch_info_str = f'Epoch {new_epoch_idx + 1}/{self.num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
             text_y_pos = y_max + (y_max - y_min) * 0.15
             text_x_pos = (x_min + x_max) / 2
-            epoch_info_text: vz.Text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=14, bold=True, anchor_x='center', anchor_y='bottom', parent=posterior_2d_view.scene)
+            epoch_info_text: vz.Text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=10, bold=False, anchor_x='center', anchor_y='bottom', parent=posterior_2d_view.scene)
             y_range = y_max - y_min
-            posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
+            if allow_use_self_properties:
+                posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2)) ## try to expand slightly so we can see the text
+                
         _update_dict.update(epoch_info_text=epoch_info_text)
 
 
@@ -7806,9 +7869,13 @@ class PredictiveDecodingVispyWidget:
         time_bin_images = _update_dict.get('time_bin_images', []) # self.time_bin_images
         
         ## Uses:
-        time_bin_grid: vispy.scene.widgets.grid.Grid = _update_dict.get('time_bin_grid', self.time_bin_grid) 
-        for child in list(time_bin_grid.children):
-            time_bin_grid.remove_widget(child)
+        time_bin_grid: vispy.scene.widgets.grid.Grid = _update_dict.get('time_bin_grid', None)
+        if (time_bin_grid is None) and allow_use_self_properties:
+            time_bin_grid = self.time_bin_grid
+
+            if needs_clear_owned_views:
+                for child in list(time_bin_grid.children):
+                    time_bin_grid.remove_widget(child)
                     
 
         if p_x_given_n is not None and p_x_given_n.size > 0:
@@ -7818,15 +7885,16 @@ class PredictiveDecodingVispyWidget:
             vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
             
             if (len(time_bin_views) != n_bins_to_show):
-                ## remove all existing:
-                for view in time_bin_views:
-                    if view is not None and hasattr(view, 'parent'):
-                        view.parent = None
-                time_bin_views.clear()
-                
-                ## clear the grid's children:
-                for child in list(time_bin_grid.children):
-                    time_bin_grid.remove_widget(child)
+                if needs_clear_owned_views:
+                    ## remove all existing:
+                    for view in time_bin_views:
+                        if view is not None and hasattr(view, 'parent'):
+                            view.parent = None
+                    time_bin_views.clear()
+                    
+                    ## clear the grid's children:
+                    for child in list(time_bin_grid.children):
+                        time_bin_grid.remove_widget(child)
                     
                 ## create new (added to `self.time_bin_grid`):
                 for t_idx in range(n_bins_to_show):
@@ -7845,6 +7913,7 @@ class PredictiveDecodingVispyWidget:
                 slice_2d: NDArray = np.ascontiguousarray(slice_2d, dtype=np.float32)
                 view = time_bin_views[t_idx]
                 slice_img = vz.Image(slice_2d, cmap='viridis', parent=view.scene)
+                slice_img.order = 0
                 img_height, img_width = slice_2d.shape
                 scale_x_img = (x_max - x_min) / img_width if img_width > 0 else 1
                 scale_y_img = (y_max - y_min) / img_height if img_height > 0 else 1
@@ -7853,17 +7922,23 @@ class PredictiveDecodingVispyWidget:
                 label_y_pos = y_max + (y_max - y_min) * 0.08
                 label = vz.Text(f't={t_idx}', pos=((x_min + x_max) / 2, label_y_pos), color='white', font_size=10, anchor_x='center', anchor_y='bottom', parent=view.scene)
                 time_bin_labels.append(label)
-                view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
+                
+                if allow_use_self_properties:
+                    view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max + (y_max - y_min) * 0.1))
+                    
             ## END for t_idx in range(n_bins_to_show)
         ## END if p_x_given_n i...
         
         _update_dict.update(time_bin_views=time_bin_views, time_bin_labels=time_bin_labels, time_bin_images=time_bin_images)
         
 
+        contour_render_kwargs = dict(fill=True)
+        
         # Renders the contours (shared vispy_helpers API)
-        past_view = _update_dict.get('past_view', self.past_view)
-        future_view = _update_dict.get('future_view', self.future_view)
-        posterior_2d_view = _update_dict.get('posterior_2d_view', self.posterior_2d_view)
+        past_view = _update_dict.get('past_view', (self.past_view if allow_use_self_properties else None))
+        future_view = _update_dict.get('future_view', (self.future_view if allow_use_self_properties else None))
+        posterior_2d_view = _update_dict.get('posterior_2d_view', (self.posterior_2d_view if allow_use_self_properties else None))
+        
         posterior_mask_contours = _update_dict.get('posterior_mask_contours', [])
         list_names = ['past_mask_contours', 'posterior_mask_contours', 'future_mask_contours']
         active_posterior_contours_dict_list = [(past_view, _update_dict.get('past_mask_contours', [])), (posterior_2d_view, _update_dict.get('posterior_mask_contours', [])), (future_view, _update_dict.get('future_mask_contours', []))]
@@ -7878,22 +7953,39 @@ class PredictiveDecodingVispyWidget:
                 colors = [tuple(contour_time_bin_colors[i]) for i in range(n_mask_t_bins)]
                 contour_data_per_mask = contours_from_masks(masks, x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=colors, level=0.5, return_per_mask=True)
                 contour_data_flat: List[ContourItem] = [item for sublist in contour_data_per_mask for item in sublist]
+                contour_order_main = 25
                 for view, cont_list in views_and_lists_to_draw:
                     scene_parent = view.scene if view is not None else None
                     if scene_parent is not None:
-                        lines = create_contour_line_visuals(contour_data_flat, scene_parent, line_width=2.0, order=10)
+                        lines, polygon_fills = create_contour_line_visuals(contour_data_flat, parent=scene_parent, line_width=2.0, order=contour_order_main, **contour_render_kwargs)
+                        cont_list.extend(polygon_fills)
                         cont_list.extend(lines)
+                        
+                print(f'len(posterior_mask_contours): {len(posterior_mask_contours)}, len(cont_list): {len(cont_list)}, n_mask_t_bins: {n_mask_t_bins}')
                 ## for each t_bin_view
+                contour_order_t_bins = 25
                 for t_idx in range(min(len(contour_data_per_mask), len(time_bin_views))):
                     scene_parent = time_bin_views[t_idx].scene if time_bin_views[t_idx] is not None else None
                     if scene_parent is not None:
                         per_mask_contours: List[ContourItem] = contour_data_per_mask[t_idx]
-                        lines = create_contour_line_visuals(per_mask_contours, scene_parent, line_width=2.0, order=11)
+                        lines, polygon_fills = create_contour_line_visuals(per_mask_contours, parent=scene_parent, line_width=2.0, order=contour_order_t_bins, **contour_render_kwargs)
+                        posterior_mask_contours.extend(polygon_fills)
                         posterior_mask_contours.extend(lines)
+                    else:
+                        print(f'\tWARNINGWARN: contours failing t_idx: {t_idx} - scene_parent is None')
+
+
+                # print(f'POST for t_idx in range(mi ... : len(posterior_mask_contours): {len(posterior_mask_contours)}, len(_update_dict["posterior_mask_contours"]): {len(_update_dict["posterior_mask_contours"])},')
+
                 _update_dict.update(posterior_mask_contours=posterior_mask_contours)
+
+                # print(f'\tlen(_update_dict["posterior_mask_contours"]): {len(_update_dict["posterior_mask_contours"])},')
+
                 for (a_name, (a_view, a_cont_list)) in zip(list_names, active_posterior_contours_dict_list):
                     if (a_view is not None) and (a_cont_list is not None):
                         _update_dict[a_name] = a_cont_list
+                        
+
         return _update_dict
 
 
@@ -8607,6 +8699,177 @@ class PredictiveDecodingVispyWidget:
                 self.update_epoch_display(self.current_epoch_idx + 1)
 
 
+
+    # EXPORT TO IMAGES ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    @function_attributes(short_name=None, tags=['vispy', 'export', 'screenshot', 'high-resolution'], input_requires=[], output_provides=[], uses=['render_predictive_decoding_with_vispy'], used_by=[], creation_date='2026-01-22', related_items=['render_predictive_decoding_with_vispy'])
+    def export_vispy_viewer_epochs(self, export_folder: Union[str, Path], export_individual_views: bool = False, epoch_indices: Optional[List[int]] = None,
+                                delay_between_epochs: float = 0.15, progress_print: bool = True) -> List[Path]:
+        """Export high-resolution renderings of all epoch views from the vispy predictive decoding viewer.
+        
+        Programmatically iterates through epoch indices, updates the display, and exports high-resolution 
+        screenshots of all displayed views to an export folder.
+        
+        Args:
+            viewer_tuple: Tuple (main_window, canvas, state) from render_predictive_decoding_with_vispy, or a PredictiveDecodingVispyWidget instance.
+            export_folder: Path to folder where images will be saved. Created if it doesn't exist.
+            resolution_scale: Scale factor for high-res rendering (default: 2.0). Higher values produce larger images.
+            export_individual_views: If True, export individual views (past, posterior, future) separately (default: False)
+            epoch_indices: Optional list of specific epoch indices to export. If None, exports all epochs.
+            delay_between_epochs: Delay in seconds after updating epoch display to allow rendering to stabilize (default: 0.15)
+            progress_print: If True, print progress messages during export (default: True)
+            
+        Returns:
+            List of Path objects for all exported image files
+            
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_vispy, export_vispy_viewer_epochs
+            
+            viewer = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, 
+                                                            a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                            curr_position_df=container.decoding_locality.pos_df, 
+                                                            pf_decoder=a_decoder, decoded_result=a_decoded_result)
+            
+            exported_files = export_vispy_viewer_epochs(viewer, export_folder='./exports', resolution_scale=2.0)
+        """
+        import time
+        from pathlib import Path
+        from qtpy.QtWidgets import QApplication
+        
+        # Try to import imageio for saving, fall back to PIL if not available
+        try:
+            from imageio import imwrite as save_image
+            _use_imageio = True
+        except ImportError:
+            from PIL import Image
+            _use_imageio = False
+            def save_image(path, img_array):
+                """Save image array using PIL."""
+                Image.fromarray(img_array).save(path)
+        
+
+        resolution_scale: float = 1.0 ## doesn't work at all
+
+        # Accept either (main_window, canvas, state) tuple or PredictiveDecodingVispyWidget instance
+        # if hasattr(widget_container, 'as_viewer_tuple'):
+        #     widget_container = widget_container.as_viewer_tuple()
+
+        # def as_viewer_tuple(self) -> tuple:
+        #     return (self.main_window, self.canvas, self.get_state())
+        
+        main_window = self.main_window
+        canvas = self.canvas
+        state = {
+                'num_epochs': self.num_epochs,
+                'epoch_slider': self.epoch_slider,
+                'epoch_value_label': self.epoch_value_label,
+                'update_epoch_display': self.update_epoch_display,
+            }
+        
+        
+        # Validate and create export folder
+        export_folder = Path(export_folder)
+        export_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Get number of epochs and determine which indices to export
+        num_epochs = state['num_epochs']
+        if epoch_indices is None:
+            epoch_indices = list(range(num_epochs))
+        else:
+            # Validate provided epoch indices
+            epoch_indices = [idx for idx in epoch_indices if 0 <= idx < num_epochs]
+        
+        if len(epoch_indices) == 0:
+            print("Warning: No valid epoch indices to export.")
+            return []
+        
+        # Get the update function from state
+        update_epoch_display = state.get('update_epoch_display')
+        if update_epoch_display is None:
+            raise ValueError("update_epoch_display function not found in state. Ensure you're using an updated version of render_predictive_decoding_with_vispy.")
+        
+        # Get canvas size for high-res rendering
+        canvas_width, canvas_height = canvas.size
+        high_res_width = int(canvas_width * resolution_scale)
+        high_res_height = int(canvas_height * resolution_scale)
+        
+        exported_files = []
+        total_epochs = len(epoch_indices)
+        
+        if progress_print:
+            print(f"Exporting {total_epochs} epochs to {export_folder} at {resolution_scale}x resolution ({high_res_width}x{high_res_height})...")
+        
+        for i, epoch_idx in enumerate(epoch_indices):
+            try:
+                if progress_print:
+                    print(f"  Exporting epoch {epoch_idx + 1}/{num_epochs} ({i + 1}/{total_epochs})...", end='', flush=True)
+                
+                # Update the epoch display programmatically
+                # Block slider signals to avoid recursive updates
+                state['epoch_slider'].blockSignals(True)
+                state['epoch_slider'].setValue(epoch_idx)
+                state['epoch_slider'].blockSignals(False)
+                
+                # Call the update function directly
+                update_epoch_display(epoch_idx)
+                
+                # Process Qt events to ensure rendering completes
+                QApplication.processEvents()
+                
+                # Small delay to allow rendering to stabilize
+                time.sleep(delay_between_epochs)
+                
+                # Process events again after delay
+                QApplication.processEvents()
+                
+                # Ensure canvas is updated
+                canvas.update()
+                QApplication.processEvents()
+                
+                # Render high-resolution screenshot
+                # vispy's render() returns RGBA numpy array with shape (height, width, 4)
+                img_array = canvas.render(size=(high_res_width, high_res_height))
+                
+                # Convert RGBA to RGB by dropping alpha channel (optional, keeps file size smaller)
+                # img_array = img_array[:, :, :3]
+                
+                # Flip vertically if needed (vispy may return origin at bottom-left)
+                # Check if image appears upside down and flip
+                # img_array = np.flipud(img_array) ## do not flip, otherwise it IS upside down
+                
+                # Save full canvas screenshot
+                full_filename = f"epoch_{epoch_idx:04d}_full.png"
+                full_path = export_folder / full_filename
+                save_image(str(full_path), img_array)
+                exported_files.append(full_path)
+                
+                if progress_print:
+                    print(f" saved to {full_filename}")
+                
+                # Export individual views if requested
+                if export_individual_views:
+                    # Note: Individual view export requires rendering each view separately
+                    # This is more complex and may require accessing view.scene directly
+                    # For now, we export the full canvas; individual view export can be added later
+                    pass
+                    
+            except Exception as e:
+                if progress_print:
+                    print(f" ERROR: {e}")
+                # Continue with next epoch even if this one fails
+                continue
+        
+        if progress_print:
+            print(f"Export complete. {len(exported_files)} files saved to {export_folder}")
+        
+        return exported_files
+
+
+
+
+
+
+
+
 @function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
     current_traj_seconds_pre_post_extension: float = 0.750, 
@@ -8678,151 +8941,4 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
     return widget # widget.as_viewer_tuple()
 
 
-
-
-@function_attributes(short_name=None, tags=['vispy', 'export', 'screenshot', 'high-resolution'], input_requires=[], output_provides=[], uses=['render_predictive_decoding_with_vispy'], used_by=[], creation_date='2026-01-22', related_items=['render_predictive_decoding_with_vispy'])
-def export_vispy_viewer_epochs(viewer_tuple: tuple, export_folder: Union[str, Path], resolution_scale: float = 1.0, export_individual_views: bool = False, epoch_indices: Optional[List[int]] = None, delay_between_epochs: float = 0.15, progress_print: bool = True) -> List[Path]:
-    """Export high-resolution renderings of all epoch views from the vispy predictive decoding viewer.
-    
-    Programmatically iterates through epoch indices, updates the display, and exports high-resolution 
-    screenshots of all displayed views to an export folder.
-    
-    Args:
-        viewer_tuple: Tuple (main_window, canvas, state) from render_predictive_decoding_with_vispy, or a PredictiveDecodingVispyWidget instance.
-        export_folder: Path to folder where images will be saved. Created if it doesn't exist.
-        resolution_scale: Scale factor for high-res rendering (default: 2.0). Higher values produce larger images.
-        export_individual_views: If True, export individual views (past, posterior, future) separately (default: False)
-        epoch_indices: Optional list of specific epoch indices to export. If None, exports all epochs.
-        delay_between_epochs: Delay in seconds after updating epoch display to allow rendering to stabilize (default: 0.15)
-        progress_print: If True, print progress messages during export (default: True)
-        
-    Returns:
-        List of Path objects for all exported image files
-        
-    Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import render_predictive_decoding_with_vispy, export_vispy_viewer_epochs
-        
-        viewer = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, 
-                                                        a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
-                                                        curr_position_df=container.decoding_locality.pos_df, 
-                                                        pf_decoder=a_decoder, decoded_result=a_decoded_result)
-        
-        exported_files = export_vispy_viewer_epochs(viewer, export_folder='./exports', resolution_scale=2.0)
-    """
-    import time
-    from pathlib import Path
-    from qtpy.QtWidgets import QApplication
-    
-    # Try to import imageio for saving, fall back to PIL if not available
-    try:
-        from imageio import imwrite as save_image
-        _use_imageio = True
-    except ImportError:
-        from PIL import Image
-        _use_imageio = False
-        def save_image(path, img_array):
-            """Save image array using PIL."""
-            Image.fromarray(img_array).save(path)
-    
-    # Accept either (main_window, canvas, state) tuple or PredictiveDecodingVispyWidget instance
-    if hasattr(viewer_tuple, 'as_viewer_tuple'):
-        viewer_tuple = viewer_tuple.as_viewer_tuple()
-    main_window, canvas, state = viewer_tuple
-    
-    # Validate and create export folder
-    export_folder = Path(export_folder)
-    export_folder.mkdir(parents=True, exist_ok=True)
-    
-    # Get number of epochs and determine which indices to export
-    num_epochs = state['num_epochs']
-    if epoch_indices is None:
-        epoch_indices = list(range(num_epochs))
-    else:
-        # Validate provided epoch indices
-        epoch_indices = [idx for idx in epoch_indices if 0 <= idx < num_epochs]
-    
-    if len(epoch_indices) == 0:
-        print("Warning: No valid epoch indices to export.")
-        return []
-    
-    # Get the update function from state
-    update_epoch_display = state.get('update_epoch_display')
-    if update_epoch_display is None:
-        raise ValueError("update_epoch_display function not found in state. Ensure you're using an updated version of render_predictive_decoding_with_vispy.")
-    
-    # Get canvas size for high-res rendering
-    canvas_width, canvas_height = canvas.size
-    high_res_width = int(canvas_width * resolution_scale)
-    high_res_height = int(canvas_height * resolution_scale)
-    
-    exported_files = []
-    total_epochs = len(epoch_indices)
-    
-    if progress_print:
-        print(f"Exporting {total_epochs} epochs to {export_folder} at {resolution_scale}x resolution ({high_res_width}x{high_res_height})...")
-    
-    for i, epoch_idx in enumerate(epoch_indices):
-        try:
-            if progress_print:
-                print(f"  Exporting epoch {epoch_idx + 1}/{num_epochs} ({i + 1}/{total_epochs})...", end='', flush=True)
-            
-            # Update the epoch display programmatically
-            # Block slider signals to avoid recursive updates
-            state['epoch_slider'].blockSignals(True)
-            state['epoch_slider'].setValue(epoch_idx)
-            state['epoch_slider'].blockSignals(False)
-            
-            # Call the update function directly
-            update_epoch_display(epoch_idx)
-            
-            # Process Qt events to ensure rendering completes
-            QApplication.processEvents()
-            
-            # Small delay to allow rendering to stabilize
-            time.sleep(delay_between_epochs)
-            
-            # Process events again after delay
-            QApplication.processEvents()
-            
-            # Ensure canvas is updated
-            canvas.update()
-            QApplication.processEvents()
-            
-            # Render high-resolution screenshot
-            # vispy's render() returns RGBA numpy array with shape (height, width, 4)
-            img_array = canvas.render(size=(high_res_width, high_res_height))
-            
-            # Convert RGBA to RGB by dropping alpha channel (optional, keeps file size smaller)
-            img_rgb = img_array[:, :, :3]
-            
-            # Flip vertically if needed (vispy may return origin at bottom-left)
-            # Check if image appears upside down and flip
-            img_rgb = np.flipud(img_rgb)
-            
-            # Save full canvas screenshot
-            full_filename = f"epoch_{epoch_idx:04d}_full.png"
-            full_path = export_folder / full_filename
-            save_image(str(full_path), img_rgb)
-            exported_files.append(full_path)
-            
-            if progress_print:
-                print(f" saved to {full_filename}")
-            
-            # Export individual views if requested
-            if export_individual_views:
-                # Note: Individual view export requires rendering each view separately
-                # This is more complex and may require accessing view.scene directly
-                # For now, we export the full canvas; individual view export can be added later
-                pass
-                
-        except Exception as e:
-            if progress_print:
-                print(f" ERROR: {e}")
-            # Continue with next epoch even if this one fails
-            continue
-    
-    if progress_print:
-        print(f"Export complete. {len(exported_files)} files saved to {export_folder}")
-    
-    return exported_files
 
