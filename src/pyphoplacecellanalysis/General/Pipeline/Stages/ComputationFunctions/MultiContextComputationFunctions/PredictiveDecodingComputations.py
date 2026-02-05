@@ -7207,7 +7207,12 @@ class PredictiveDecodingVispyWidget:
         grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid() # vispy.scene.widgets.grid.Grid
         self.grid = grid
         
+
+
         if not self.enable_multi_epoch_overview_display_mode:
+            # ==================================================================================================================================================================================================================================================================================== #
+            # SINGLE EPOCH VIEW WITH SLIDER                                                                                                                                                                                                                                                        #
+            # ==================================================================================================================================================================================================================================================================================== #
             # Default single epoch plotting mode with slider to control active epoch _____________________________________________________________________________________________________________________________________________________________________________________________________________ #
             self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
             self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
@@ -7255,6 +7260,10 @@ class PredictiveDecodingVispyWidget:
             # all_views = [self.past_view, self.future_view, self.posterior_2d_view, self.combined_timeline_view, self.colorbar_view]
 
         else:
+            # ==================================================================================================================================================================================================================================================================================== #
+            # MANY EPOCH VIEW AS STACKED GRID                                                                                                                                                                                                                                                      #
+            # ==================================================================================================================================================================================================================================================================================== #
+
             ## build all data at once
             n_epochs: int = self.a_flat_matching_results_list_ds.num_epochs
             epoch_indicies = np.arange(n_epochs)
@@ -7590,6 +7599,13 @@ class PredictiveDecodingVispyWidget:
             posterior_img = vz.Image(img_data, cmap='viridis', parent=posterior_2d_view.scene)
             posterior_img.transform = scene.STTransform(scale=(x_scale, y_scale), translate=(x_min, y_min))
             posterior_img.order = 0
+            posterior_img.opacity = 0.8
+            posterior_img.set_gl_state(
+                blend=True,
+                depth_test=True,
+                blend_func=('src_alpha', 'one_minus_src_alpha')
+            )
+
         _update_dict.update(posterior_img=posterior_img)
 
         # Render centroid dots and arrows on posterior plot (main view only)
