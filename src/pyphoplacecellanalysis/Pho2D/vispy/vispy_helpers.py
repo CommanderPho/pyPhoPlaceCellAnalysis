@@ -176,6 +176,15 @@ def _contour_pixel_to_world(contour_rc: NDArray, n_rows: int, n_cols: int, x_bou
     return np.column_stack([x_world, y_world]).astype(np.float32)
 
 
+def _ensure_closed_pos(pos: NDArray) -> NDArray:
+    """Return pos unchanged if first and last points are close; otherwise append first point to close the polygon."""
+    if len(pos) < 2:
+        return pos
+    if np.allclose(pos[0], pos[-1], atol=1e-6):
+        return pos
+    return np.vstack([pos, pos[0:1]]).astype(np.float32)
+
+
 def _color_to_rgba_tuple(c: Union[str, Tuple[float, float, float], Sequence], alpha: Optional[float] = None) -> Tuple[float, float, float, float]:
     """Return (r,g,b,a) tuple scaled 0..1. Accepts vispy color strings, matplotlib colors or RGB tuples."""
     try:
@@ -261,14 +270,22 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
     return per_mask_out if return_per_mask else out
 
 
-def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10) -> List:
-    """Create vispy Line visuals from contour data and attach to parent. Returns list of vz.Line."""
+def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
+    """Create vispy Line visuals from contour data and attach to parent. When fill=True, adds translucent Polygon fill (same RGB as line) behind each contour. Returns (lines, polygons) so callers can clear both on epoch change; polygons is empty when fill=False."""
     lines: List = []
+    polygons: List = []
+    alpha = fill_alpha if fill_alpha is not None else 0.3
     for pos, rgba in contour_data:
+        if fill and len(pos) >= 3:
+            pos_closed = _ensure_closed_pos(pos)
+            fill_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(alpha))
+            polygon = vz.Polygon(pos=pos_closed, color=fill_rgba, border_width=0, parent=parent)  # type: ignore[call-arg]
+            polygon.order = order - 1
+            polygons.append(polygon)
         line = vz.Line(pos=pos, color=rgba, width=line_width, parent=parent)  # type: ignore[call-arg]
         line.order = order
         lines.append(line)
-    return lines
+    return (lines, polygons)
 
 
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
@@ -282,17 +299,22 @@ class VispyHelpers:
 
 
     @classmethod
-    def render_contours(cls, masks: Union[Sequence[NDArray], NDArray], x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0), color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5, parents: Optional[Sequence[Node]] = None, line_width: float = 2.0, order: int = 10) -> Union[List[ContourItem], Tuple[List[ContourItem], List[List[Any]]]]:
-        """Decoupled contour rendering: takes masks and optional bounds/color/cmap; returns contour data and optionally creates Line visuals on given parents."""
+    def render_contours(cls, masks: Union[Sequence[NDArray], NDArray], x_bounds: Tuple[float, float] = (0.0, 1.0), y_bounds: Tuple[float, float] = (0.0, 1.0), color: Optional[Union[Tuple, str]] = None, colors: Optional[Sequence] = None, cmap: Optional[str] = None, cmap_alpha: float = 0.7, level: float = 0.5, parents: Optional[Sequence[Node]] = None, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Union[List[ContourItem], Tuple[List[ContourItem], List[List[Any]]]]:
+        """Decoupled contour rendering: takes masks and optional bounds/color/cmap; returns contour data and optionally creates Line (and optional Polygon fill) visuals on given parents."""
         contour_data = cast(List[ContourItem], contours_from_masks(masks, x_bounds=x_bounds, y_bounds=y_bounds, color=color, colors=colors, cmap=cmap, cmap_alpha=cmap_alpha, level=level, return_per_mask=False))
         if parents is None:
             return contour_data
-        line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order) for parent in parents]
+        line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order, fill=fill, fill_alpha=fill_alpha)[0] for parent in parents]
         return (contour_data, line_lists)
     
 
 
 
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Examples                                                                                                                                                                                                                                                                             #
+# ==================================================================================================================================================================================================================================================================================== #
 if __name__ == '__main__':
 
     def make_random_gaussian_masks(
@@ -348,5 +370,5 @@ if __name__ == '__main__':
     view.camera = 'panzoom'
     scene_parent = view.scene
     if scene_parent is not None:
-        create_contour_line_visuals(contour_data, scene_parent, line_width=2.0, order=10)
+        _lines, _polygons = create_contour_line_visuals(contour_data, scene_parent, line_width=2.0, order=10, fill=True, fill_alpha=0.3)
     app.run()
