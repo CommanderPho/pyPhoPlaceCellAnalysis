@@ -6367,6 +6367,10 @@ def multi_trajectory_color_plotter(position_dfs: List[pd.DataFrame], fixed_colum
     # Validate input
     if (position_dfs is None) or len(position_dfs) == 0:
         raise ValueError("position_dfs must be a non-empty list")
+    if isinstance(position_dfs, pd.DataFrame):
+       ## wrap
+       position_dfs = [position_dfs]
+        
     
     for i, df in enumerate(position_dfs):
         if 'x' not in df.columns or 'y' not in df.columns:

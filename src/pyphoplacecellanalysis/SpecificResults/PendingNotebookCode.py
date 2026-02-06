@@ -1159,25 +1159,6 @@ def interactive_p_x_given_n_slider(p_x_given_n: np.ndarray, xbin: Optional[np.nd
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-from pathlib import Path
-
 @function_attributes(short_name=None, tags=['fixup', 'CSV', 'epochs', 'paradigm', 'BAPUN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-17 18:14', related_items=[])
 def export_finalized_epochs_csvs(curr_active_pipeline):
     """ exports csvs

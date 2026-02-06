@@ -283,6 +283,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     return fig, out_axes_list
 
 
+#TODO 2026-02-05 18:13: - [ ] Note that there are general trajectory (not lap specific) versions at `plot_decoded_trajectories_2d`
 
 @function_attributes(short_name=None, tags=['lap','trajectories','3D','pyvista','qt','multiplotter','plotting','paginated'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_2d'])
 def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, included_lap_idxs=None, maximum_fixed_columns:int=5, single_combined_plot=True, lap_start_z = 0.0, lap_id_dependent_z_offset = 1.0, plot_stacked_arena_guides=False, existing_plotter=None, debug_print=False, **kwargs):
@@ -470,7 +471,7 @@ def plot_lap_trajectories_3d(sess, curr_num_subplots=1, active_page_index=0, inc
     
     return p, laps_pages
 
-@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=['_plot_helper_add_arrow'], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_lap_trajectories_3d'])
+@function_attributes(short_name=None, tags=['lap','trajectories','2D','matplotlib','plotting','paginated'], input_requires=[], output_provides=[], uses=['_plot_helper_add_arrow'], used_by=[], creation_date='2023-05-09 05:13', related_items=['plot_decoded_trajectories_2d', 'plot_lap_trajectories_3d'])
 def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fixed_columns = 2, fig_size_inches=(18.5, 26.5), use_time_gradient_line=True, arrow_concentration_kwargs=None, debug_print=False):
     """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
      
@@ -506,6 +507,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
 
     """    
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
     
     arrow_concentration_kwargs = dict(
         arrow_skip = 50, time_cmap='viridis',
@@ -522,6 +524,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
                     yield more    # yield more elements from the iterator
             yield chunk()         # in outer generator, yield next chunk
         
+
     def _subfn_build_epochs_multiplotter(nfields, linear_plot_data=None):
         """ captures: fixed_columns
         """
@@ -535,9 +538,13 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
             curr_row = row_column_indicies[0][a_linear_index]
             curr_col = row_column_indicies[1][a_linear_index]
             axs[curr_row][curr_col].plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
-            
+
+        ## SEt figure/window title            
+        perform_update_title_subtitle(fig=mp, ax=None, title_string="plot_lap_trajectories_2d") # , subtitle_string="TEST - SUBTITLE"
+        
         return mp, axs, linear_plotter_indicies, row_column_indicies
     
+
     def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epoch_time_ranges, use_time_gradient_line: bool=True):
         # Add the lap trajectory:
         _out_objs = {'line_artists': {}, 'line_markers': {}}

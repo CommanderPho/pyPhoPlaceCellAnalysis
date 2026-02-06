@@ -5229,12 +5229,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pycscope"
-version = "1.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/6a/fdda7d0b7c2ad0ad4e654ff47743aeff8827967f3dfe3c2edcec3632ee14/pycscope-1.2.1.tar.gz", hash = "sha256:3c6a08263be7a49e71bc8dc0b6c70b3667f6760f9220005a9d452dee8c524950", size = 55680, upload-time = "2013-03-16T09:21:20.864Z" }
-
-[[package]]
 name = "pydantic"
 version = "2.11.9"
 source = { registry = "https://pypi.org/simple" }
@@ -5655,7 +5649,6 @@ dependencies = [
     { name = "params" },
     { name = "pip" },
     { name = "pybursts" },
-    { name = "pycscope" },
     { name = "pyopengl-accelerate" },
     { name = "pyphocorehelpers" },
     { name = "pyqt-builder" },
@@ -5730,7 +5723,6 @@ requires-dist = [
     { name = "params", specifier = ">=0.9.0,<0.10" },
     { name = "pip", specifier = "~=24.0" },
     { name = "pybursts", git = "https://github.com/CommanderPho/pybursts.git?rev=master" },
-    { name = "pycscope", specifier = ">=1.2.1,<2" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.6,<4" },
     { name = "pyphocorehelpers", editable = "../pyPhoCoreHelpers" },
     { name = "pyqt-builder", specifier = ">=1.15.3,<2" },
