@@ -2958,6 +2958,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
         History: based off of plot_lap_trajectories_2d
+        
+        
+        
+        #TODO 2026-02-06 09:36: - [ ] This should be fully general and not need to relate to DECODED trajectories. I could be factored out display any trajectories without requiring a decoded result, right?
+            ## UPDATE: sad, it looks like it used to be: `plot_decoded_trajectories_2d`
+        
+        
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_decoded_trajectories_2d
@@ -3267,6 +3274,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         ## INPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
         # num_laps = len(epoch_ids)
+        if epoch_ids is None:
+            epoch_ids = np.arange(len(epochs_time_range_list))
+            
         valid_only_epoch_ids = [v for v in epoch_ids if v > -1] # epoch_ids: array([ 0,  1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]) -- here only the first 2 are valid
         num_valid_epochs: int = len(valid_only_epoch_ids) ## exclude the -1 entries
         
