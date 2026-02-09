@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence, cast
 import numpy as np
 import nptyping as ND
@@ -270,6 +271,60 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
     return per_mask_out if return_per_mask else out
 
 
+def heading_angle_to_rainbow_rgba(angle_deg: float, alpha: float = 1.0) -> Tuple[float, float, float, float]:
+    """Map heading angle in [0, 360) degrees to RGBA using ROYGBIV: 0°=red, 60°=yellow, 120°=green, 240°=blue, 300°=violet. Uses HSV with full saturation and value."""
+    h = (float(angle_deg) % 360.0) / 360.0
+    r, g, b = colorsys.hsv_to_rgb(h, 1.0, 1.0)
+    return (float(r), float(g), float(b), float(alpha))
+
+
+def heading_angles_to_rainbow_colors(heading_angles_deg: NDArray, alpha: float = 1.0) -> NDArray:
+    """Convert array of heading angles (degrees, 0–360) to (N, 4) RGBA array using ROYGBIV mapping."""
+    angles = np.asarray(heading_angles_deg, dtype=np.float64)
+    h = (angles % 360.0) / 360.0
+    n = len(h)
+    rgb = np.array([colorsys.hsv_to_rgb(hi, 1.0, 1.0) for hi in h], dtype=np.float32)
+    out = np.ones((n, 4), dtype=np.float32)
+    out[:, :3] = rgb
+    out[:, 3] = alpha
+    return out
+
+
+def headings_from_positions(pos: NDArray) -> NDArray:
+    """Compute heading (direction of travel) in degrees [0, 360) at each vertex from (N, 2) positions. Segment i is from pos[i] to pos[i+1]; vertex i gets that segment's heading; last vertex gets previous segment's heading."""
+    pos = np.asarray(pos, dtype=np.float64)
+    if pos.shape[0] < 2:
+        return np.full(max(1, pos.shape[0]), np.nan, dtype=np.float64)
+    d = np.diff(pos, axis=0)
+    angle_rad = np.arctan2(d[:, 1], d[:, 0])
+    angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
+    headings = np.empty(pos.shape[0], dtype=np.float64)
+    headings[0] = angle_deg[0]
+    headings[1:-1] = (angle_deg[:-1] + angle_deg[1:]) * 0.5
+    headings[-1] = angle_deg[-1]
+    return headings
+
+
+def create_heading_rainbow_line(pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
+    """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
+
+    from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import create_heading_rainbow_line
+
+
+    """
+    pos = np.asarray(pos, dtype=np.float32)
+    if pos.ndim == 1:
+        pos = pos.reshape(-1, 2)
+    if headings_deg is None:
+        headings_deg = headings_from_positions(pos)
+    else:
+        headings_deg = np.asarray(headings_deg, dtype=np.float64)
+    colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+    line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
+    line.order = order
+    return line
+
+
 def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
     """Create vispy Line visuals from contour data and attach to parent. When fill=True, adds translucent Polygon fill (same RGB as line) behind each contour. Returns (lines, polygons) so callers can clear both on epoch change; polygons is empty when fill=False."""
     lines: List = []
@@ -311,20 +366,12 @@ class VispyHelpers:
 
 
 
-
 # ==================================================================================================================================================================================================================================================================================== #
 # Examples                                                                                                                                                                                                                                                                             #
 # ==================================================================================================================================================================================================================================================================================== #
 if __name__ == '__main__':
 
-    def make_random_gaussian_masks(
-        n_masks: int = 5,
-        shape: tuple = (40, 60),
-        n_spots_range=(1, 4),
-        sigma_range=(2.0, 6.0),
-        threshold: float = 0.5,
-        seed: int = 0,
-    ):
+    def make_random_gaussian_masks(n_masks: int = 5, shape: tuple = (40, 60), n_spots_range=(1, 4), sigma_range=(2.0, 6.0), threshold: float = 0.5, seed: int = 0):
         """
         Generate binary masks containing random Gaussian spots.
 
@@ -361,6 +408,25 @@ if __name__ == '__main__':
         return masks
 
 
+    def example_heading_rainbow_line():
+        """Example: draw a path colored by heading (0°=red, ROYGBIV, 359°=violet). Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_heading_rainbow_line; example_heading_rainbow_line()\"."""
+        from vispy import app
+        t = np.linspace(0, 4 * np.pi, 200)
+        x = 0.3 * t * np.cos(t)
+        y = 0.3 * t * np.sin(t)
+        pos = np.column_stack([x, y]).astype(np.float32)
+        canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
+        view = canvas.central_widget.add_view()
+        view.camera = 'panzoom'
+        scene_parent = view.scene
+        if scene_parent is not None:
+            line = create_heading_rainbow_line(pos, parent=scene_parent, line_width=3.0, order=10)
+            line.set_gl_state('translucent', depth_test=False)
+        app.run()
+
+
+
+
     from vispy import app
 
     masks_list = make_random_gaussian_masks(n_masks=5, shape=(40, 60), seed=42)
@@ -372,3 +438,5 @@ if __name__ == '__main__':
     if scene_parent is not None:
         _lines, _polygons = create_contour_line_visuals(contour_data, scene_parent, line_width=2.0, order=10, fill=True, fill_alpha=0.3)
     app.run()
+
+
