@@ -271,6 +271,9 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
     return per_mask_out if return_per_mask else out
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# Heading Angles                                                                                                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
 def heading_angle_to_rainbow_rgba(angle_deg: float, alpha: float = 1.0) -> Tuple[float, float, float, float]:
     """Map heading angle in [0, 360) degrees to RGBA using ROYGBIV: 0°=red, 60°=yellow, 120°=green, 240°=blue, 300°=violet. Uses HSV with full saturation and value."""
     h = (float(angle_deg) % 360.0) / 360.0
@@ -310,6 +313,9 @@ def create_heading_rainbow_line(pos: NDArray, parent: Optional[Node] = None, hea
 
     from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import create_heading_rainbow_line
 
+    line, data_dict = create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
+    line.set_gl_state('translucent', depth_test=False)
+
 
     """
     pos = np.asarray(pos, dtype=np.float32)
@@ -320,9 +326,11 @@ def create_heading_rainbow_line(pos: NDArray, parent: Optional[Node] = None, hea
     else:
         headings_deg = np.asarray(headings_deg, dtype=np.float64)
     colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+    data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
+
     line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
     line.order = order
-    return line
+    return line, data_dict
 
 
 def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
