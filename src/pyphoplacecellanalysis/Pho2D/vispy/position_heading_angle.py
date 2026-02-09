@@ -34,7 +34,7 @@ from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_posit
 
 class HeadingColoredLine(scene.SceneCanvas):
     """ 
-	from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingColoredLine, CompassDemo, InteractiveHeadingLine
+    from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingColoredLine, CompassDemo, InteractiveHeadingLine
     """
     def __init__(self, **kwargs):
         scene.SceneCanvas.__init__(self, keys='interactive', size=(800, 600), **kwargs)
@@ -52,6 +52,61 @@ class HeadingColoredLine(scene.SceneCanvas):
         self.show()
 
 
+
+class CompassLegendItem:
+    """ from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import CompassLegendItem
+    
+    """
+    def __init__(self, view: scene.ViewBox, center = np.array([0.0, 0.0]), length = 0.6, 
+                 line_points: int = 20, line_width=2.0, **kwargs):
+        angles = np.linspace(0, 2 * np.pi, 9)[:-1]
+
+        all_positions = []
+        all_tangents = []
+
+        for i, angle in enumerate(angles):
+            line_length = length if i % 2 == 0 else length * 0.5
+            end = center + line_length * np.array([np.cos(angle), np.sin(angle)])
+
+            
+            t_ = np.linspace(0, 1, line_points)
+            x = center[0] + t_ * (end[0] - center[0])
+            y = center[1] + t_ * (end[1] - center[1])
+
+            positions = np.c_[x, y]
+            tangent = (end - center) / np.linalg.norm(end - center)
+            tangents = np.tile(tangent, (line_points, 1))
+
+            all_positions.append(positions)
+            all_tangents.append(tangents)
+
+            # break line
+            all_positions.append(np.array([[np.nan, np.nan]]))
+            all_tangents.append(np.array([[0.0, 0.0]]))
+
+        positions = np.vstack(all_positions).astype(np.float32)
+        tangents = np.vstack(all_tangents)
+
+        angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
+        angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
+        compass_deg = _heading_deg_to_compass_deg(angle_deg)
+
+        colors = heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+
+        self.line = scene.visuals.Line(
+            pos=positions,
+            color=colors,
+            width=line_width,
+            parent=view.scene
+        )
+        self.line.set_gl_state('translucent', depth_test=False)
+        self._data_dict = dict()
+        self._data_dict = dict(pos=positions, tangents=tangents,
+                               angle_deg=angle_deg, compass_deg=compass_deg,
+                    colors=colors)
+
+        
+    
 class CompassDemo(scene.SceneCanvas):
     """
     Demonstrates the heading-to-color mapping with lines pointing in cardinal directions
@@ -64,8 +119,9 @@ class CompassDemo(scene.SceneCanvas):
         angles = np.linspace(0, 2 * np.pi, 9)[:-1]
         all_positions = []
         all_tangents = []
-        for angle in angles:
-            end = center + length * np.array([np.cos(angle), np.sin(angle)])
+        for i, angle in enumerate(angles):
+            line_length = length if i % 2 == 0 else length * 0.5
+            end = center + line_length * np.array([np.cos(angle), np.sin(angle)])
             line_points = 20
             t_ = np.linspace(0, 1, line_points)
             x = center[0] + t_ * (end[0] - center[0])

@@ -411,8 +411,8 @@ class VispyHelpers:
 
     @classmethod
     def set_view_camera(cls, view, pos, padding: float = 0.05):
-        xmin, xmax = pos[:, 0].min(), pos[:, 0].max()
-        ymin, ymax = pos[:, 1].min(), pos[:, 1].max()
+        xmin, xmax = np.nanmin(pos[:, 0]), np.nanmax(pos[:, 0])
+        ymin, ymax = np.nanmin(pos[:, 1]), np.nanmax(pos[:, 1])
 
         pad_x = padding * (xmax - xmin)
         pad_y = padding * (ymax - ymin)
