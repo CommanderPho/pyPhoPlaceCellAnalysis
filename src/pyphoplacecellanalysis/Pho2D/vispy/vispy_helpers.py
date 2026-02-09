@@ -309,6 +309,21 @@ def headings_from_positions(pos: NDArray) -> NDArray:
 
 
 
+def _heading_deg_to_compass_deg(headings_deg):
+    """Convert atan2-style degrees (0=East) to compass (0=North)."""
+    return (np.asarray(headings_deg, dtype=np.float64) - 90.0 + 360.0) % 360.0
+
+
+def _positions_to_vertex_colors(pos):
+    """Compute per-vertex colors from positions using heading (North=Red)."""
+    headings_deg = headings_from_positions(pos)
+    compass_deg = _heading_deg_to_compass_deg(headings_deg)
+    return heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+
+
+
+
+
 
 
 def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
@@ -369,7 +384,10 @@ class VispyHelpers:
             headings_deg = headings_from_positions(pos)
         else:
             headings_deg = np.asarray(headings_deg, dtype=np.float64)
-        colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+            
+        # colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+        colors = _positions_to_vertex_colors(pos)
+
         data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
 
         line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
