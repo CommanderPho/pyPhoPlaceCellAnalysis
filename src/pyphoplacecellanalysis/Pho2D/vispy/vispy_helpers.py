@@ -285,9 +285,9 @@ def heading_angles_to_rainbow_colors(heading_angles_deg: NDArray, alpha: float =
     """Convert array of heading angles (degrees, 0–360) to (N, 4) RGBA array using ROYGBIV mapping."""
     angles = np.asarray(heading_angles_deg, dtype=np.float64)
     h = (angles % 360.0) / 360.0
-    n = len(h)
+    N = len(h)
     rgb = np.array([colorsys.hsv_to_rgb(hi, 1.0, 1.0) for hi in h], dtype=np.float32)
-    out = np.ones((n, 4), dtype=np.float32)
+    out = np.ones((N, 4), dtype=np.float32)
     out[:, :3] = rgb
     out[:, 3] = alpha
     return out
@@ -308,30 +308,7 @@ def headings_from_positions(pos: NDArray) -> NDArray:
     return headings
 
 
-@function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
-def create_heading_rainbow_line(pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
-    """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
 
-    from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import create_heading_rainbow_line
-
-    line, data_dict = create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
-    line.set_gl_state('translucent', depth_test=False)
-
-
-    """
-    pos = np.asarray(pos, dtype=np.float32)
-    if pos.ndim == 1:
-        pos = pos.reshape(-1, 2)
-    if headings_deg is None:
-        headings_deg = headings_from_positions(pos)
-    else:
-        headings_deg = np.asarray(headings_deg, dtype=np.float64)
-    colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
-    data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
-
-    line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
-    line.order = order
-    return line, data_dict
 
 
 def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
@@ -371,6 +348,172 @@ class VispyHelpers:
         line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order, fill=fill, fill_alpha=fill_alpha)[0] for parent in parents]
         return (contour_data, line_lists)
     
+
+
+    @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
+    @classmethod
+    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
+        """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
+
+        from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
+
+        line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
+        line.set_gl_state('translucent', depth_test=False)
+
+
+        """
+        pos = np.asarray(pos, dtype=np.float32)
+        if pos.ndim == 1:
+            pos = pos.reshape(-1, 2)
+        if headings_deg is None:
+            headings_deg = headings_from_positions(pos)
+        else:
+            headings_deg = np.asarray(headings_deg, dtype=np.float64)
+        colors = heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+        data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
+
+        line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
+        line.order = order
+        return line, data_dict
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Minor Helpers                                                                                                                                                                                                                                                                        #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @classmethod
+    def build_line_pos(cls, x, y):
+        N = len(x)
+        assert len(y) == N
+        pos = np.zeros((N, 2), dtype=np.float32)
+        # Base x trajectory
+        pos[:, 0] = x
+        # Base downward linear trend
+        pos[:, 1] = y
+        return pos
+
+    @classmethod
+    def set_view_camera(cls, view, pos, padding: float = 0.05):
+        xmin, xmax = pos[:, 0].min(), pos[:, 0].max()
+        ymin, ymax = pos[:, 1].min(), pos[:, 1].max()
+
+        pad_x = padding * (xmax - xmin)
+        pad_y = padding * (ymax - ymin)
+
+        view.camera.set_range(
+            x=(xmin - pad_x, xmax + pad_x),
+            y=(ymin - pad_y, ymax + pad_y),
+        )
+        return view
+
+
+
+    @classmethod
+    def generate_angular_shading_legend(cls, x_center: Tuple[float, float] = (0.0, 0.0), radius: float = 10.0) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Generates a 2D circle for showing the angle->color mapping 
+
+        Returns
+        -------
+        pos : (N, 2) float32 ndarray
+            Vertex positions
+        t : (N,) float32 ndarray
+            Normalized [0, 1] parameter (useful for colormaps)
+
+        Usage:
+
+            legend_pos, legend_headings_deg, legend_t = generate_angular_shading_legend(x_center=(0, 0), radius=20)
+
+        """
+        N = 360
+        loop_center_frac: float = 0.5
+        loop_width = 2.0 * radius
+        pos = np.zeros((N, 2), dtype=np.float32)
+
+        # # Base x trajectory
+        # pos[:, 0] = np.linspace(x_start, x_end, N)
+
+        # # Base downward linear trend
+        # pos[:, 1] = pos[:, 0]
+
+        # Loop placement
+        loop_center_idx = int(loop_center_frac * (N - 1))
+        loop_width = min(loop_width, N)
+        half_width = loop_width // 2
+
+        loop_start = int(round(max(0, loop_center_idx - half_width)))
+        loop_end = int(round(min(N, loop_start + loop_width)))
+        loop_width = loop_end - loop_start  # recompute in case clipped
+        loop_width = int(round(loop_width, ndigits=0))
+
+        # Parametric loop
+        theta = np.linspace(0.0, (2.0 * np.pi), loop_width, endpoint=True)
+
+        pos[loop_start:loop_end, 0] = radius * np.cos(theta)
+        pos[loop_start:loop_end, 1] = radius * np.sin(theta)
+
+        pos[loop_start:loop_end, 0] += x_center[0]
+        pos[loop_start:loop_end, 1] += x_center[1] 
+
+        # pos[loop_start:loop_end, 0] -= radius
+
+        # Colormap parameter
+        t = np.linspace(0.0, 1.0, N, dtype=np.float32)
+        headings_deg = np.linspace(0.0, 360.0, N, dtype=np.float32)
+
+        return pos, headings_deg, t
+
+
+    @classmethod
+    def generate_loop_de_loop_line(cls, N: int = 200, x_start: float = 10.0, x_end: float = 390.0, slope: float = -0.6, loop_center_frac: float = 0.5, loop_width: int = 80, loop_radius: float = 40.0, noise_scale: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Generates a 2D line that trends downward, performs a loop-de-loop,
+        and then continues downward.
+
+        Returns
+        -------
+        pos : (N, 2) float32 ndarray
+            Vertex positions
+        t : (N,) float32 ndarray
+            Normalized [0, 1] parameter (useful for colormaps)
+
+        Usage:
+
+            pos, t = generate_loop_de_loop_line(N=300, slope=-0.8, loop_center_frac=0.55, loop_width=100, loop_radius=50.0, noise_scale=2.0)
+
+        """
+        pos = np.zeros((N, 2), dtype=np.float32)
+
+        # Base x trajectory
+        pos[:, 0] = np.linspace(x_start, x_end, N)
+
+        # Base downward linear trend
+        pos[:, 1] = slope * pos[:, 0]
+
+        # Loop placement
+        loop_center_idx = int(loop_center_frac * (N - 1))
+        loop_width = min(loop_width, N)
+        half_width = loop_width // 2
+
+        loop_start = max(0, loop_center_idx - half_width)
+        loop_end = min(N, loop_start + loop_width)
+        loop_width = loop_end - loop_start  # recompute in case clipped
+
+        # Parametric loop
+        theta = np.linspace(0.0, 2.0 * np.pi, loop_width, endpoint=True)
+
+        pos[loop_start:loop_end, 0] += loop_radius * np.cos(theta)
+        pos[loop_start:loop_end, 1] += loop_radius * np.sin(theta)
+
+        pos[loop_start:loop_end, 0] -= loop_radius
+
+        # Optional noise
+        if noise_scale > 0.0:
+            pos[:, 1] += np.random.normal(scale=noise_scale, size=N)
+
+        # Colormap parameter
+        t = np.linspace(0.0, 1.0, N, dtype=np.float32)
+
+        return pos, t
 
 
 
