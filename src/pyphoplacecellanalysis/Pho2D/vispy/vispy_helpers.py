@@ -476,7 +476,9 @@ class VispyHelpers:
 
         # Colormap parameter
         t = np.linspace(0.0, 1.0, N, dtype=np.float32)
-        headings_deg = np.linspace(0.0, 360.0, N, dtype=np.float32)
+        # headings_deg = np.linspace(0.0, 360.0, N, dtype=np.float32)
+        
+        headings_deg = np.linspace(0.0, 360.0, N, dtype=np.float32) - 90.0
 
         return pos, headings_deg, t
 

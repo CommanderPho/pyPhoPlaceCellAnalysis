@@ -16,22 +16,26 @@ import numpy as np
 from vispy import app, scene
 from vispy.scene import visuals
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_positions, heading_angles_to_rainbow_colors
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_positions, heading_angles_to_rainbow_colors, _positions_to_vertex_colors, _heading_deg_to_compass_deg
 
-
-def _heading_deg_to_compass_deg(headings_deg):
-    """Convert atan2-style degrees (0=East) to compass (0=North)."""
-    return (np.asarray(headings_deg, dtype=np.float64) - 90.0 + 360.0) % 360.0
-
-
-def _positions_to_vertex_colors(pos):
-    """Compute per-vertex colors from positions using heading (North=Red)."""
-    headings_deg = headings_from_positions(pos)
-    compass_deg = _heading_deg_to_compass_deg(headings_deg)
-    return heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+# class AngularrColoredLine(scene.visuals.Line):
+#     def __init__(self, **kwargs):
+# 		t = np.linspace(0, 4 * np.pi, 1000)
+#         x = t * np.cos(t) * 0.1
+#         y = t * np.sin(t) * 0.1
+    
+#         self._positions = np.c_[x, y].astype(np.float32)
+#         self._colors = _positions_to_vertex_colors(self._positions)
+#         self._view = self.central_widget.add_view(camera='panzoom')
+#         self._view.camera.aspect = 1
+#         self._line = scene.visuals.Line(pos=self._positions, color=self._colors, width=2.0, parent=self._view.scene)
+#         self._line.set_gl_state('translucent', depth_test=False)
 
 
 class HeadingColoredLine(scene.SceneCanvas):
+    """ 
+	from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingColoredLine, CompassDemo, InteractiveHeadingLine
+    """
     def __init__(self, **kwargs):
         scene.SceneCanvas.__init__(self, keys='interactive', size=(800, 600), **kwargs)
         self.unfreeze()
