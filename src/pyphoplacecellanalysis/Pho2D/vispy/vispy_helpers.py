@@ -308,6 +308,7 @@ def headings_from_positions(pos: NDArray) -> NDArray:
     return headings
 
 
+@function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
 def create_heading_rainbow_line(pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
     """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
 
