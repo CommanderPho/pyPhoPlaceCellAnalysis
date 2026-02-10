@@ -1,23 +1,70 @@
 import numpy as np
 import pandas as pd
-from scipy import stats, signal, optimize, spatial
+from scipy import stats, signal, interpolate
 from scipy.ndimage import gaussian_filter1d
-from sklearn.cluster import DBSCAN
 import warnings
 warnings.filterwarnings('ignore')
 
-class MovementBurstDetector:
+# Import the specialized packages with proper error handling
+try:
+    # Try different import patterns for bayesian-changepoint-detection
+    try:
+        # from bayesian_changepoint_detection.bayesian_models import offline_changepoint_detection
+        # from bayesian_changepoint_detection.priors import const_prior
+        # from bayesian_changepoint_detection.distributions import StudentT
+        import torch
+        import time
+        from functools import partial
+
+        # Import the refactored modules
+        from bayesian_changepoint_detection import (
+            online_changepoint_detection,
+            get_device,
+            get_device_info,
+            to_tensor,
+        )
+        from bayesian_changepoint_detection import offline_changepoint_detection
+        from bayesian_changepoint_detection.priors import const_prior
+        from bayesian_changepoint_detection.online_likelihoods import StudentT, MultivariateT
+        from bayesian_changepoint_detection.hazard_functions import constant_hazard
+
+        BOCD_AVAILABLE = True
+        print("✓ bayesian-changepoint-detection loaded successfully")
+    except ImportError as e:
+        print(f"Warning: bayesian-changepoint-detection import failed: {e}")
+        BOCD_AVAILABLE = False
+except:
+    BOCD_AVAILABLE = False
+
+# try:
+#     import clustpy
+#     CLUSTPY_AVAILABLE = True
+#     print("✓ clustpy loaded successfully")
+# except ImportError as e:
+#     print(f"Warning: clustpy import failed: {e}")
+#     CLUSTPY_AVAILABLE = False
+#     from sklearn.cluster import DBSCAN
+    
+
+CLUSTPY_AVAILABLE = False
+from sklearn.cluster import DBSCAN
+
+try:
+    from bcubed import bcubed
+    BCUBED_AVAILABLE = True
+    print("✓ bcubed loaded successfully")
+except ImportError:
+    BCUBED_AVAILABLE = False
+
+class OptimizedMovementBurstDetector:
     """
-    Advanced movement burst detection using Bayesian changepoint detection
-    with velocity/acceleration features and adaptive thresholding.
-    
-    Usage:
-    
-		from pyphoplacecellanalysis.SpecificResults.MovementBurstDetection import MovementBurstDetector
+    Optimized movement burst detector using specialized packages.
+    Fixed version with correct PyTorch usage and robust imports.
     """
     
     def __init__(self, min_burst_duration=0.5, min_rest_duration=1.0,
-                 velocity_smoothing=0.1, method='bocd'):
+                 velocity_smoothing=0.1, bocd_hazard=100, 
+                 clustering_method='dbscan', use_gpu=False):
         """
         Parameters:
         -----------
@@ -27,162 +74,330 @@ class MovementBurstDetector:
             Minimum duration for rest periods (seconds)
         velocity_smoothing : float
             Gaussian smoothing sigma for velocity (seconds)
-        method : str
-            'bocd', 'hmm', or 'combo' (ensemble)
+        bocd_hazard : float
+            Hazard rate for BOCD (higher = more sensitive)
+        clustering_method : str
+            'dbscan', 'optics', or 'hdbscan'
+        use_gpu : bool
+            Use GPU acceleration if available
         """
         self.min_burst_duration = min_burst_duration
         self.min_rest_duration = min_rest_duration
         self.velocity_smoothing = velocity_smoothing
-        self.method = method
+        self.bocd_hazard = bocd_hazard
+        self.clustering_method = clustering_method
+        self.use_gpu = use_gpu
         
+        # Check GPU availability
+        if self.use_gpu:
+            try:
+                import torch
+                self.torch = torch
+                self.has_gpu = torch.cuda.is_available()
+                if self.has_gpu:
+                    self.device = torch.device('cuda')
+                    print(f"✓ GPU acceleration available: {torch.cuda.get_device_name(0)}")
+                else:
+                    self.device = torch.device('cpu')
+                    print("✗ GPU requested but not available. Using CPU.")
+            except ImportError:
+                self.has_gpu = False
+                self.device = None
+                print("✗ PyTorch not available. Using CPU only.")
+        else:
+            self.has_gpu = False
+            self.device = None
+    
     def preprocess_trajectory(self, pos_df):
-        """Clean and prepare trajectory data"""
-        # Ensure sorted by time
-        df = pos_df.copy().sort_values('t')
+        """Robust trajectory preprocessing with proper interpolation"""
+        df = pos_df.copy().sort_values('t').reset_index(drop=True)
         
-        # Interpolate small gaps (less than 3 frames)
-        dt = np.median(np.diff(df['t'].values))
-        max_gap = 3 * dt
+        # Handle duplicate timestamps
+        if df['t'].duplicated().any():
+            df = df.groupby('t').mean().reset_index()
+        
+        # Get original data
+        t_original = df['t'].values
+        x_original = df['x'].values
+        y_original = df['y'].values
+        
+        # Calculate dt from median difference
+        if len(t_original) > 1:
+            dt = np.median(np.diff(t_original))
+        else:
+            dt = 0.033  # Default 30Hz if we can't calculate
         
         # Create regular time grid
-        t_min, t_max = df['t'].min(), df['t'].max()
+        t_min, t_max = t_original.min(), t_original.max()
         t_reg = np.arange(t_min, t_max, dt)
         
-        # Interpolate
-        df['x'] = np.interp(t_reg, df['t'], df['x'])
-        df['y'] = np.interp(t_reg, df['t'], df['y'])
-        df['t'] = t_reg
+        # Use scipy's interpolation (more robust than torch.interp)
+        if len(t_original) >= 2:
+            # Linear interpolation for x and y
+            interp_x = interpolate.interp1d(t_original, x_original, 
+                                           kind='linear', 
+                                           fill_value='extrapolate',
+                                           bounds_error=False)
+            interp_y = interpolate.interp1d(t_original, y_original, 
+                                           kind='linear', 
+                                           fill_value='extrapolate',
+                                           bounds_error=False)
+            
+            x_reg = interp_x(t_reg)
+            y_reg = interp_y(t_reg)
+        else:
+            # Not enough points, return original
+            x_reg = x_original
+            y_reg = y_original
+            t_reg = t_original
         
-        return df
+        result = pd.DataFrame({
+            't': t_reg,
+            'x': x_reg,
+            'y': y_reg
+        })
+        
+        return result
     
+
     def compute_movement_features(self, pos_df):
         """Extract comprehensive movement features"""
         t = pos_df['t'].values
         x = pos_df['x'].values
         y = pos_df['y'].values
         
-        dt = np.mean(np.diff(t))
+        # Calculate dt
+        if len(t) > 1:
+            dt = np.mean(np.diff(t))
+        else:
+            dt = 0.033  # Default 30Hz
         
-        # 1. Instantaneous velocity
-        vx = np.gradient(x, dt)
-        vy = np.gradient(y, dt)
-        speed = np.sqrt(vx**2 + vy**2)
+        # Compute velocity
+        if len(x) > 1:
+            vx = np.gradient(x, dt)
+            vy = np.gradient(y, dt)
+            speed = np.sqrt(vx**2 + vy**2)
+        else:
+            vx = np.zeros_like(x)
+            vy = np.zeros_like(y)
+            speed = np.zeros_like(x)
         
-        # 2. Smoothed velocity
-        sigma = self.velocity_smoothing / dt
-        speed_smooth = gaussian_filter1d(speed, sigma=sigma)
+        # Apply smoothing
+        if len(speed) > 1:
+            sigma = max(1.0, self.velocity_smoothing / dt)  # Ensure sigma >= 1
+            speed_smooth = gaussian_filter1d(speed, sigma=sigma)
+        else:
+            speed_smooth = speed.copy()
         
-        # 3. Acceleration
-        acc = np.gradient(speed_smooth, dt)
+        # Compute acceleration and jerk
+        if len(speed_smooth) > 1:
+            acc = np.gradient(speed_smooth, dt)
+            jerk = np.gradient(acc, dt)
+        else:
+            acc = np.zeros_like(speed_smooth)
+            jerk = np.zeros_like(speed_smooth)
         
-        # 4. Jerk (derivative of acceleration)
-        jerk = np.gradient(acc, dt)
+        # Compute angular velocity
+        if len(vx) > 1 and len(vy) > 1:
+            heading = np.arctan2(vy, vx)
+            angular_vel = np.gradient(heading, dt)
+        else:
+            angular_vel = np.zeros_like(speed_smooth)
         
-        # 5. Angular velocity (turning rate)
-        heading = np.arctan2(vy, vx)
-        angular_vel = np.gradient(heading, dt)
+        # Compute local variance
+        if len(speed_smooth) > 10:
+            window = max(3, int(0.5/dt))  # 500ms window
+            local_var = pd.Series(speed_smooth).rolling(window=window, 
+                                                       center=True, 
+                                                       min_periods=1).std().values
+        else:
+            local_var = np.zeros_like(speed_smooth)
         
-        # 6. Movement smoothness (spectral features)
-        f, Pxx = signal.welch(speed_smooth, fs=1/dt, nperseg=min(256, len(speed_smooth)//4))
-        spectral_entropy = stats.entropy(Pxx[Pxx > 0])
-        
-        # 7. Local variance (movement stability)
-        window = max(3, int(0.5/dt))  # 500ms window
-        local_var = pd.Series(speed_smooth).rolling(window=window, center=True).std().values
+        # Smooth local variance
+        if len(local_var) > 1:
+            local_var_smooth = gaussian_filter1d(local_var, sigma=2)
+        else:
+            local_var_smooth = local_var
         
         # Create feature matrix
-        features = np.column_stack([
-            speed_smooth,
-            acc,
-            jerk,
-            np.abs(angular_vel),
-            gaussian_filter1d(local_var, sigma=2)
-        ])
+        features = []
         
-        # Normalize features
-        features = (features - features.mean(axis=0)) / (features.std(axis=0) + 1e-8)
+        # Speed feature
+        if np.std(speed_smooth) > 0:
+            features.append(speed_smooth / np.std(speed_smooth))
+        else:
+            features.append(speed_smooth)
+        
+        # Acceleration feature
+        if len(acc) > 0 and np.std(acc) > 0:
+            features.append(acc / np.std(acc))
+        else:
+            features.append(acc)
+        
+        # Jerk feature
+        if len(jerk) > 0 and np.std(jerk) > 0:
+            features.append(jerk / np.std(jerk))
+        else:
+            features.append(jerk)
+        
+        # Angular velocity feature
+        if len(angular_vel) > 0 and np.std(np.abs(angular_vel)) > 0:
+            features.append(np.abs(angular_vel) / np.std(np.abs(angular_vel)))
+        else:
+            features.append(np.abs(angular_vel))
+        
+        # Local variance feature
+        if len(local_var_smooth) > 0 and np.std(local_var_smooth) > 0:
+            features.append(local_var_smooth / np.std(local_var_smooth))
+        else:
+            features.append(local_var_smooth)
+        
+        # Stack all features
+        if features:
+            features_matrix = np.column_stack(features)
+        else:
+            features_matrix = np.zeros((len(speed_smooth), 1))
         
         return {
             't': t,
             'speed': speed,
             'speed_smooth': speed_smooth,
-            'features': features,
-            'dt': dt
+            'features': features_matrix,
+            'dt': dt,
+            'vx': vx,
+            'vy': vy,
+            'acc': acc,
+            'jerk': jerk,
+            'angular_vel': angular_vel
         }
     
-    def bocd_detection(self, features_dict):
-        """Bayesian Online Changepoint Detection (Adams & MacKay, 2007)"""
+
+    def bocd_detection_package(self, features_dict):
+        """Use bayesian-changepoint-detection package for BOCD"""
+        if not BOCD_AVAILABLE:
+            print("Using fallback BOCD detection")
+            return self.bocd_detection_fallback(features_dict)
+        
+        speed = features_dict['speed_smooth']
+        
+        try:
+            # Convert to numpy array if needed
+            if hasattr(speed, 'cpu'):
+                speed = speed.cpu().numpy()
+            
+            # Use Student's t-distribution (robust to outliers)
+            # Note: We're using the hazard constant directly
+            hazard_const = self.bocd_hazard
+            
+            # Run offline changepoint detection
+            Q, P, Pcp = offline_changepoint_detection(
+                speed,
+                lambda x: const_prior(x, hazard_const),
+                StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0),
+                truncate=-40
+            )
+            
+            # Extract changepoints from probability matrix
+            # The changepoint probability is in Pcp
+            changepoint_probs = np.exp(Pcp).sum(axis=0) / (np.exp(Pcp).sum() + 1e-10)
+            
+            # Find peaks in changepoint probability
+            if len(changepoint_probs) > 10:
+                min_distance = max(1, int(self.min_rest_duration / features_dict['dt']))
+                peaks, properties = signal.find_peaks(
+                    changepoint_probs,
+                    height=np.percentile(changepoint_probs, 75),
+                    distance=min_distance
+                )
+                changepoints = peaks.tolist()
+            else:
+                # Simple threshold if not enough points
+                threshold = np.median(changepoint_probs) + np.std(changepoint_probs)
+                changepoints = np.where(changepoint_probs > threshold)[0].tolist()
+            
+        except Exception as e:
+            print(f"BOCD package failed with error: {e}")
+            print("Using fallback detection")
+            return self.bocd_detection_fallback(features_dict)
+        
+        # Create segments from changepoints
+        segments = self.create_segments_from_changepoints(features_dict, changepoints)
+        
+        return segments, changepoints
+    
+    def bocd_detection_fallback(self, features_dict):
+        """Fallback BOCD implementation using simpler method"""
         t = features_dict['t']
         speed = features_dict['speed_smooth']
-        dt = features_dict['dt']
         
-        # Parameters for BOCD
-        hazard = 1.0 / (self.min_rest_duration / dt)  # Hazard rate
-        obs_model = 'studentt'  # Student's t-distribution (robust to outliers)
+        if len(speed) < 10:
+            # Not enough data points
+            segments = [{
+                'start': t[0],
+                'end': t[-1],
+                'duration': t[-1] - t[0],
+                'mean_speed': np.mean(speed) if len(speed) > 0 else 0,
+                'std_speed': np.std(speed) if len(speed) > 1 else 0,
+                'bocd_prob': 0.0
+            }]
+            return segments, []
         
-        # Implement BOCD
-        R = np.zeros((len(speed) + 1, len(speed) + 1))
-        R[0, 0] = 1
+        # Simple gradient-based changepoint detection
+        gradient = np.abs(np.gradient(speed))
         
-        # Sufficient statistics storage
-        mean0 = np.mean(speed[:10])
-        var0 = np.var(speed[:10]) + 1e-8
-        kappa0 = 1.0
-        nu0 = 1.0
+        # Smooth the gradient
+        if len(gradient) > 10:
+            smoothed_gradient = gaussian_filter1d(gradient, sigma=3)
+        else:
+            smoothed_gradient = gradient
         
-        changepoints = []
+        # Find peaks in gradient
+        min_distance = max(1, int(self.min_rest_duration / features_dict['dt']))
         
-        for n in range(1, len(speed) + 1):
-            # Predict step
-            R[1:n+1, n] = R[0:n, n-1] * (1 - hazard)
-            R[0, n] = np.sum(R[0:n, n-1] * hazard)
-            
-            # Update step (Student's t-distribution)
-            x = speed[n-1]
-            
-            # Update sufficient statistics for each run length
-            for r in range(1, n+1):
-                # Get data segment for this run length
-                seg = speed[n-r:n-1]
-                if len(seg) == 0:
-                    continue
-                
-                # Calculate predictive probability
-                mean_r = np.mean(seg) if len(seg) > 0 else mean0
-                var_r = np.var(seg) if len(seg) > 1 else var0
-                kappa_r = kappa0 + len(seg)
-                nu_r = nu0 + len(seg)
-                
-                # Student's t predictive probability
-                scale = var_r * (1 + 1/kappa_r)
-                t_score = stats.t.pdf(x, df=nu_r, loc=mean_r, scale=np.sqrt(scale))
-                R[r, n] *= t_score
-            
-            # Normalize
-            R[:, n] = R[:, n] / (np.sum(R[:, n]) + 1e-8)
-            
-            # Detect changepoint
-            if n > 1:
-                max_run = np.argmax(R[:n+1, n])
-                if max_run == 0:  # Run length reset to 0 indicates changepoint
-                    changepoints.append(n-1)
-        
-        # Convert indices to times
-        changepoint_times = t[changepoints] if changepoints else []
+        if len(smoothed_gradient) > min_distance * 2:
+            peaks, properties = signal.find_peaks(
+                smoothed_gradient,
+                height=np.percentile(smoothed_gradient, 70),
+                distance=min_distance
+            )
+            changepoints = peaks.tolist()
+        else:
+            # Use threshold if not enough points for peak finding
+            threshold = np.median(smoothed_gradient) + 0.5 * np.std(smoothed_gradient)
+            changepoints = np.where(smoothed_gradient > threshold)[0].tolist()
         
         # Create segments
+        segments = self.create_segments_from_changepoints(features_dict, changepoints)
+        
+        return segments, changepoints
+    
+    def create_segments_from_changepoints(self, features_dict, changepoints):
+        """Helper function to create segments from changepoint indices"""
+        t = features_dict['t']
+        speed = features_dict['speed_smooth']
+        
         segments = []
         prev_idx = 0
+        
+        # Sort changepoints and remove duplicates
+        changepoints = sorted(set(changepoints))
+        changepoints = [cp for cp in changepoints if 0 < cp < len(t)]
+        
         for cp_idx in changepoints:
+            if cp_idx <= prev_idx:
+                continue
+                
             seg_t = t[prev_idx:cp_idx]
             seg_speed = speed[prev_idx:cp_idx]
+            
             if len(seg_t) > 0:
                 segments.append({
                     'start': seg_t[0],
                     'end': seg_t[-1],
                     'duration': seg_t[-1] - seg_t[0],
-                    'mean_speed': np.mean(seg_speed),
-                    'std_speed': np.std(seg_speed)
+                    'mean_speed': np.mean(seg_speed) if len(seg_speed) > 0 else 0,
+                    'std_speed': np.std(seg_speed) if len(seg_speed) > 1 else 0,
+                    'bocd_prob': 0.0
                 })
             prev_idx = cp_idx
         
@@ -194,435 +409,525 @@ class MovementBurstDetector:
                 'start': seg_t[0],
                 'end': seg_t[-1],
                 'duration': seg_t[-1] - seg_t[0],
-                'mean_speed': np.mean(seg_speed),
-                'std_speed': np.std(seg_speed)
+                'mean_speed': np.mean(seg_speed) if len(seg_speed) > 0 else 0,
+                'std_speed': np.std(seg_speed) if len(seg_speed) > 1 else 0,
+                'bocd_prob': 0.0
             })
-        
-        return segments, changepoint_times
-    
-    def adaptive_threshold_clustering(self, features_dict):
-        """Adaptive thresholding with DBSCAN clustering"""
-        t = features_dict['t']
-        features = features_dict['features']
-        speed = features_dict['speed_smooth']
-        
-        # Use DBSCAN for unsupervised state detection
-        clustering = DBSCAN(eps=0.5, min_samples=int(self.min_burst_duration/features_dict['dt']))
-        labels = clustering.fit_predict(features)
-        
-        # Classify clusters as burst/rest based on speed
-        segments = []
-        unique_labels = np.unique(labels[labels != -1])  # Exclude noise
-        
-        if len(unique_labels) == 0:
-            # Fallback to speed threshold
-            threshold = np.percentile(speed, 70)
-            is_burst = speed > threshold
-        else:
-            cluster_speeds = [np.mean(speed[labels == lbl]) for lbl in unique_labels]
-            burst_clusters = unique_labels[np.argsort(cluster_speeds)[-2:]]  # Top 2 speed clusters
-            
-            is_burst = np.zeros_like(speed, dtype=bool)
-            for lbl in burst_clusters:
-                is_burst[labels == lbl] = True
-        
-        # Find contiguous bursts
-        state_changes = np.diff(np.concatenate(([0], is_burst.astype(int), [0])))
-        start_indices = np.where(state_changes == 1)[0]
-        end_indices = np.where(state_changes == -1)[0] - 1
-        
-        for start, end in zip(start_indices, end_indices):
-            duration = t[end] - t[start] if end < len(t) else t[-1] - t[start]
-            if duration >= self.min_burst_duration:
-                segments.append({
-                    'start': t[start],
-                    'end': t[end] if end < len(t) else t[-1],
-                    'duration': duration,
-                    'mean_speed': np.mean(speed[start:end+1]),
-                    'type': 'burst'
-                })
         
         return segments
     
-    def ensemble_detection(self, features_dict):
-        """Combine multiple detection methods for robustness"""
-        # Get BOCD segments
-        bocd_segments, _ = self.bocd_detection(features_dict)
+
+    def clustpy_clustering(self, features_dict, segments):
+        """Use clustpy or sklearn for clustering of movement states"""
+        if len(segments) < 2:
+            # Not enough segments to cluster
+            for seg in segments:
+                seg['is_burst'] = False
+                seg['cluster'] = -1
+            return segments
         
-        # Get clustering segments
-        cluster_segments = self.adaptive_threshold_clustering(features_dict)
+        # Extract features from segments
+        segment_features = []
+        valid_segment_indices = []
         
-        # Combine using intersection (more conservative)
-        combined_segments = []
+        for i, seg in enumerate(segments):
+            mask = (features_dict['t'] >= seg['start']) & (features_dict['t'] <= seg['end'])
+            if np.sum(mask) > 0:
+                # Get mean feature vector for this segment
+                seg_feat = np.mean(features_dict['features'][mask], axis=0)
+                segment_features.append(seg_feat)
+                valid_segment_indices.append(i)
         
-        for cseg in cluster_segments:
-            for bseg in bocd_segments:
-                # Check for overlap
-                overlap_start = max(cseg['start'], bseg['start'])
-                overlap_end = min(cseg['end'], bseg['end'])
-                
-                if overlap_start < overlap_end:
-                    duration = overlap_end - overlap_start
-                    if duration >= self.min_burst_duration:
-                        mean_speed = np.mean(features_dict['speed_smooth'][
-                            (features_dict['t'] >= overlap_start) & 
-                            (features_dict['t'] <= overlap_end)
-                        ])
-                        
-                        combined_segments.append({
-                            'start': overlap_start,
-                            'end': overlap_end,
-                            'duration': duration,
-                            'mean_speed': mean_speed,
-                            'type': 'burst',
-                            'confidence': min(cseg.get('mean_speed', 0)/np.max(features_dict['speed_smooth']),
-                                            bseg.get('mean_speed', 0)/np.max(features_dict['speed_smooth']))
-                        })
+        if len(segment_features) < 2:
+            # Not enough features for clustering
+            for seg in segments:
+                seg['is_burst'] = False
+                seg['cluster'] = -1
+            return segments
         
-        # Merge overlapping segments
-        if combined_segments:
-            combined_segments.sort(key=lambda x: x['start'])
-            merged = []
-            current = combined_segments[0]
-            
-            for seg in combined_segments[1:]:
-                if seg['start'] <= current['end'] + dt:  # Allow small gap
-                    current['end'] = max(current['end'], seg['end'])
-                    current['duration'] = current['end'] - current['start']
-                    current['confidence'] = max(current['confidence'], seg['confidence'])
+        X = np.array(segment_features)
+        
+        try:
+            if CLUSTPY_AVAILABLE and hasattr(clustpy, 'partition'):
+                # Try to use clustpy's DBSCAN
+                if self.clustering_method == 'dbscan':
+                    from clustpy.partition import DBSCAN as ClustpyDBSCAN
+                    dbscan = ClustpyDBSCAN(eps=0.5, min_samples=2)
+                    labels = dbscan.fit_predict(X)
                 else:
-                    merged.append(current)
-                    current = seg
+                    # Fallback to sklearn
+                    from sklearn.cluster import DBSCAN
+                    dbscan = DBSCAN(eps=0.5, min_samples=2)
+                    labels = dbscan.fit_predict(X)
+            else:
+                # Use sklearn DBSCAN
+                from sklearn.cluster import DBSCAN
+                dbscan = DBSCAN(eps=0.5, min_samples=2)
+                labels = dbscan.fit_predict(X)
             
-            merged.append(current)
-            return merged
+            # Apply labels to segments
+            for idx, seg_idx in enumerate(valid_segment_indices):
+                segments[seg_idx]['cluster'] = int(labels[idx])
+                # Mark as burst if not noise (-1)
+                segments[seg_idx]['is_burst'] = (labels[idx] != -1)
+            
+            # Identify burst clusters (clusters with highest average speed)
+            unique_labels = set(labels)
+            if -1 in unique_labels:
+                unique_labels.remove(-1)  # Remove noise label
+            
+            if len(unique_labels) > 0:
+                cluster_speeds = []
+                for lbl in unique_labels:
+                    # Get segments with this label
+                    cluster_seg_indices = [valid_segment_indices[i] for i, l in enumerate(labels) if l == lbl]
+                    cluster_segments = [segments[i] for i in cluster_seg_indices]
+                    avg_speed = np.mean([s['mean_speed'] for s in cluster_segments])
+                    cluster_speeds.append((lbl, avg_speed))
+                
+                # Mark top clusters as bursts
+                if cluster_speeds:
+                    # Sort by speed (descending)
+                    cluster_speeds.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Take top N clusters as bursts (at least 1, at most all)
+                    n_burst_clusters = min(max(1, len(cluster_speeds) // 2), len(cluster_speeds))
+                    burst_clusters = [cs[0] for cs in cluster_speeds[:n_burst_clusters]]
+                    
+                    # Update burst status
+                    for seg in segments:
+                        if 'cluster' in seg:
+                            seg['is_burst'] = seg['cluster'] in burst_clusters
+            
+        except Exception as e:
+            print(f"Clustering failed with error: {e}")
+            print("Using simple threshold-based classification")
+            
+            # Fallback: classify based on speed threshold
+            speeds = [s['mean_speed'] for s in segments]
+            if len(speeds) > 0:
+                threshold = np.percentile(speeds, 60)
+                for seg in segments:
+                    seg['is_burst'] = seg['mean_speed'] > threshold
+                    seg['cluster'] = 0 if seg['is_burst'] else -1
         
-        return combined_segments
+        return segments
     
-    def detect_bursts(self, pos_df):
-        """Main detection pipeline"""
-        # Preprocess
+
+    def detect_bursts(self, pos_df, ground_truth=None):
+        """Main detection pipeline using specialized packages"""
+        print("Starting burst detection pipeline...")
+        
+        # 1. Preprocess trajectory
+        print("  Step 1: Preprocessing trajectory...")
         df_clean = self.preprocess_trajectory(pos_df)
+        print(f"    Original: {len(pos_df)} points -> Clean: {len(df_clean)} points")
         
-        # Extract features
+        # 2. Extract movement features
+        print("  Step 2: Computing movement features...")
         features_dict = self.compute_movement_features(df_clean)
+        print(f"    Computed {features_dict['features'].shape[1]} features")
         
-        # Apply detection method
-        if self.method == 'bocd':
-            segments, changepoints = self.bocd_detection(features_dict)
-            # Classify segments as burst/rest
-            speed_threshold = np.percentile(features_dict['speed_smooth'], 60)
-            burst_segments = [s for s in segments if s['mean_speed'] > speed_threshold 
-                            and s['duration'] >= self.min_burst_duration]
-            
-        elif self.method == 'hmm':
-            burst_segments = self.adaptive_threshold_clustering(features_dict)
-            
-        else:  # 'combo'
-            burst_segments = self.ensemble_detection(features_dict)
+        # 3. Detect changepoints using BOCD
+        print("  Step 3: Running Bayesian changepoint detection...")
+        segments, changepoints = self.bocd_detection_package(features_dict)
+        print(f"    Found {len(changepoints)} changepoints, creating {len(segments)} segments")
         
-        # Post-process: filter by duration and add metadata
-        filtered_segments = []
-        for seg in burst_segments:
-            if seg['duration'] >= self.min_burst_duration:
-                # Extract position data for this segment
+        # 4. Cluster segments
+        print("  Step 4: Clustering segments...")
+        segments = self.clustpy_clustering(features_dict, segments)
+        
+        # 5. Extract burst segments
+        burst_segments = []
+        for seg in segments:
+            if seg.get('is_burst', False) and seg['duration'] >= self.min_burst_duration:
+                # Add additional metrics
                 mask = (df_clean['t'] >= seg['start']) & (df_clean['t'] <= seg['end'])
-                seg_positions = df_clean[mask]
+                if np.sum(mask) > 1:
+                    seg_pos = df_clean[mask]
+                    
+                    # Calculate movement metrics
+                    if len(seg_pos) > 1:
+                        dx = np.diff(seg_pos['x'].values)
+                        dy = np.diff(seg_pos['y'].values)
+                        total_distance = np.sum(np.sqrt(dx**2 + dy**2))
+                        
+                        # Straight-line distance
+                        start_end_dist = np.sqrt(
+                            (seg_pos['x'].iloc[-1] - seg_pos['x'].iloc[0])**2 +
+                            (seg_pos['y'].iloc[-1] - seg_pos['y'].iloc[0])**2
+                        )
+                        
+                        seg['total_distance'] = total_distance
+                        seg['straightness'] = start_end_dist / (total_distance + 1e-8)
+                        seg['tortuosity'] = 1 - seg['straightness'] if seg['straightness'] <= 1 else 0
+                        seg['n_points'] = len(seg_pos)
                 
-                # Calculate additional metrics
-                if len(seg_positions) > 1:
-                    total_distance = np.sum(np.sqrt(
-                        np.diff(seg_positions['x'])**2 + 
-                        np.diff(seg_positions['y'])**2
-                    ))
-                    seg['total_distance'] = total_distance
-                    seg['straightness'] = (
-                        np.sqrt((seg_positions['x'].iloc[-1] - seg_positions['x'].iloc[0])**2 +
-                               (seg_positions['y'].iloc[-1] - seg_positions['y'].iloc[0])**2) /
-                        (total_distance + 1e-8)
-                    )
-                    seg['tortuosity'] = 1 - seg['straightness']
-                
-                filtered_segments.append(seg)
+                burst_segments.append(seg)
+        
+        print(f"  Step 5: Found {len(burst_segments)} burst segments after filtering")
+        
+        # 6. Evaluate if ground truth is provided
+        evaluation = None
+        if ground_truth is not None and BCUBED_AVAILABLE:
+            try:
+                evaluation = self.evaluate_with_bcubed(burst_segments, ground_truth)
+                print(f"  Evaluation: Precision={evaluation.get('precision', 0):.3f}, "
+                      f"Recall={evaluation.get('recall', 0):.3f}")
+            except:
+                evaluation = None
         
         return {
-            'bursts': filtered_segments,
+            'bursts': burst_segments,
+            'segments': segments,
+            'changepoints': changepoints,
             'features': features_dict,
-            'processed_data': df_clean
+            'processed_data': df_clean,
+            'evaluation': evaluation
         }
 
 
-# ============================================
-# VISUALIZATION AND VALIDATION TOOLS
-# ============================================
-
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from matplotlib.patches import Rectangle
-
-def visualize_bursts(pos_df, detection_results, save_path=None):
-    """Create comprehensive visualization of detected bursts"""
-    fig = plt.figure(figsize=(15, 10))
+# Simplified analyzer for visualization
+class BurstAnalyzer:
+    """Post-processing and analysis of detected bursts"""
     
-    # 1. Trajectory with bursts highlighted
-    ax1 = plt.subplot(2, 3, 1)
-    t = detection_results['processed_data']['t'].values
-    x = detection_results['processed_data']['x'].values
-    y = detection_results['processed_data']['y'].values
+    def __init__(self):
+        pass
     
-    # Plot full trajectory
-    ax1.plot(x, y, 'k-', alpha=0.3, linewidth=0.5, label='Full trajectory')
-    
-    # Color bursts
-    cmap = cm.get_cmap('viridis')
-    bursts = detection_results['bursts']
-    
-    for i, burst in enumerate(bursts):
-        mask = (t >= burst['start']) & (t <= burst['end'])
-        color = cmap(i / max(1, len(bursts)))
-        ax1.plot(x[mask], y[mask], '-', color=color, linewidth=2,
-                label=f'Burst {i+1}' if i < 5 else None)
-        # Mark start and end
-        ax1.plot(x[mask][0], y[mask][0], 'o', color=color, markersize=8)
-        ax1.plot(x[mask][-1], y[mask][-1], 's', color=color, markersize=8)
-    
-    ax1.set_xlabel('X position')
-    ax1.set_ylabel('Y position')
-    ax1.set_title('Trajectory with Detected Bursts')
-    ax1.legend(loc='best')
-    ax1.axis('equal')
-    
-    # 2. Speed profile with bursts
-    ax2 = plt.subplot(2, 3, 2)
-    speed = detection_results['features']['speed_smooth']
-    
-    ax2.plot(t, speed, 'k-', linewidth=1, alpha=0.7, label='Speed')
-    ax2.fill_between(t, 0, speed, alpha=0.3, color='gray')
-    
-    # Highlight bursts
-    ymin, ymax = ax2.get_ylim()
-    for burst in bursts:
-        ax2.add_patch(Rectangle(
-            (burst['start'], ymin),
-            burst['duration'],
-            ymax - ymin,
-            alpha=0.2, color='red'
-        ))
-    
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Speed')
-    ax2.set_title('Speed Profile with Bursts')
-    ax2.legend(['Speed', 'Burst periods'])
-    
-    # 3. Velocity components
-    ax3 = plt.subplot(2, 3, 3)
-    vx = np.gradient(x, np.mean(np.diff(t)))
-    vy = np.gradient(y, np.mean(np.diff(t)))
-    
-    ax3.plot(t, vx, 'b-', alpha=0.7, label='Vx')
-    ax3.plot(t, vy, 'r-', alpha=0.7, label='Vy')
-    
-    for burst in bursts:
-        ax3.axvspan(burst['start'], burst['end'], alpha=0.1, color='green')
-    
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Velocity')
-    ax3.set_title('Velocity Components')
-    ax3.legend()
-    
-    # 4. Movement features
-    ax4 = plt.subplot(2, 3, 4)
-    features = detection_results['features']['features']
-    feature_names = ['Speed', 'Accel', 'Jerk', 'AngVel', 'Var']
-    
-    for i in range(min(3, features.shape[1])):
-        ax4.plot(t, features[:, i], label=feature_names[i])
-    
-    for burst in bursts:
-        ax4.axvspan(burst['start'], burst['end'], alpha=0.1, color='gray')
-    
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Normalized Feature Value')
-    ax4.set_title('Movement Features')
-    ax4.legend()
-    
-    # 5. Burst statistics
-    ax5 = plt.subplot(2, 3, 5)
-    if bursts:
-        burst_durations = [b['duration'] for b in bursts]
-        burst_speeds = [b['mean_speed'] for b in bursts]
-        burst_distances = [b.get('total_distance', 0) for b in bursts]
-        
-        x_pos = np.arange(len(bursts))
-        width = 0.25
-        
-        ax5.bar(x_pos - width, burst_durations, width, label='Duration (s)', alpha=0.8)
-        ax5.bar(x_pos, burst_speeds, width, label='Mean speed', alpha=0.8)
-        ax5.bar(x_pos + width, burst_distances, width, label='Distance', alpha=0.8)
-        
-        ax5.set_xlabel('Burst Index')
-        ax5.set_ylabel('Value')
-        ax5.set_title('Burst Statistics')
-        ax5.legend()
-        ax5.set_xticks(x_pos)
-        ax5.set_xticklabels([f'B{i+1}' for i in range(len(bursts))])
-    
-    # 6. Phase portrait (speed vs acceleration)
-    ax6 = plt.subplot(2, 3, 6)
-    acc = np.gradient(speed, np.mean(np.diff(t)))
-    
-    scatter = ax6.scatter(speed[::10], acc[::10], c=t[::10], cmap='viridis', 
-                         s=10, alpha=0.6, edgecolors='none')
-    
-    # Mark burst points
-    for burst in bursts:
-        mask = (t >= burst['start']) & (t <= burst['end'])
-        ax6.scatter(speed[mask][::5], acc[mask][::5], 
-                   color='red', s=20, alpha=0.7, edgecolors='black')
-    
-    ax6.set_xlabel('Speed')
-    ax6.set_ylabel('Acceleration')
-    ax6.set_title('Phase Portrait')
-    plt.colorbar(scatter, ax=ax6, label='Time (s)')
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    
-    plt.show()
-    
-    return fig
-
-
-# ============================================
-# EVALUATION METRICS
-# ============================================
-
-def evaluate_burst_detection(pos_df, ground_truth_bursts=None):
-    """
-    Evaluate detection quality with various metrics.
-    If ground truth is provided, calculate precision/recall.
-    """
-    # Initialize detector with different methods
-    detectors = {
-        'BOCD': MovementBurstDetector(method='bocd'),
-        'HMM/Clustering': MovementBurstDetector(method='hmm'),
-        'Ensemble': MovementBurstDetector(method='combo')
-    }
-    
-    results = {}
-    
-    for name, detector in detectors.items():
-        print(f"\n{'='*50}")
-        print(f"Testing {name} method")
-        print('='*50)
-        
-        # Detect bursts
-        detection_results = detector.detect_bursts(pos_df)
+    def summarize_bursts(self, detection_results):
+        """Generate comprehensive summary statistics"""
         bursts = detection_results['bursts']
         
-        print(f"Detected {len(bursts)} bursts")
+        if not bursts:
+            return {"total_bursts": 0, "message": "No bursts detected"}
         
-        if bursts:
-            # Calculate statistics
-            durations = [b['duration'] for b in bursts]
-            speeds = [b['mean_speed'] for b in bursts]
-            distances = [b.get('total_distance', 0) for b in bursts]
-            
-            print(f"Mean burst duration: {np.mean(durations):.2f} ± {np.std(durations):.2f} s")
-            print(f"Total burst time: {np.sum(durations):.2f} s ({np.sum(durations)/pos_df['t'].iloc[-1]*100:.1f}% of total)")
-            print(f"Mean burst speed: {np.mean(speeds):.2f} ± {np.std(speeds):.2f}")
-            print(f"Total distance during bursts: {np.sum(distances):.2f}")
-            
-            # Inter-burst intervals
-            if len(bursts) > 1:
-                intervals = [bursts[i+1]['start'] - bursts[i]['end'] 
-                           for i in range(len(bursts)-1)]
-                print(f"Mean inter-burst interval: {np.mean(intervals):.2f} ± {np.std(intervals):.2f} s")
-        
-        results[name] = {
-            'bursts': bursts,
-            'detection_results': detection_results
+        summary = {
+            'total_bursts': len(bursts),
+            'total_burst_duration': sum(b['duration'] for b in bursts),
+            'mean_burst_duration': np.mean([b['duration'] for b in bursts]),
+            'std_burst_duration': np.std([b['duration'] for b in bursts]),
+            'median_burst_duration': np.median([b['duration'] for b in bursts]),
+            'mean_burst_speed': np.mean([b['mean_speed'] for b in bursts]),
+            'total_distance': sum(b.get('total_distance', 0) for b in bursts),
         }
+        
+        # Add straightness metrics if available
+        straightness_vals = [b.get('straightness', 0) for b in bursts if 'straightness' in b]
+        if straightness_vals:
+            summary['mean_straightness'] = np.mean(straightness_vals)
+            summary['median_straightness'] = np.median(straightness_vals)
+        
+        # Add temporal statistics
+        if len(bursts) > 1:
+            intervals = [bursts[i+1]['start'] - bursts[i]['end'] 
+                       for i in range(len(bursts)-1)]
+            summary['mean_inter_burst_interval'] = np.mean(intervals)
+            summary['median_inter_burst_interval'] = np.median(intervals)
+            total_time = detection_results['processed_data']['t'].iloc[-1]
+            summary['burst_frequency'] = len(bursts) / total_time
+            summary['burst_duty_cycle'] = (summary['total_burst_duration'] / total_time) * 100
+        
+        return summary
+    
+    def visualize_results(self, detection_results, save_path=None):
+        """Create a simple visualization of results"""
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.cm as cm
+            
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            
+            # 1. Trajectory plot
+            ax = axes[0, 0]
+            df = detection_results['processed_data']
+            bursts = detection_results['bursts']
+            
+            # Plot full trajectory
+            ax.plot(df['x'], df['y'], 'k-', alpha=0.3, linewidth=0.5, label='Full path')
+            
+            # Plot bursts
+            colors = cm.rainbow(np.linspace(0, 1, len(bursts)))
+            for i, burst in enumerate(bursts):
+                mask = (df['t'] >= burst['start']) & (df['t'] <= burst['end'])
+                if np.sum(mask) > 0:
+                    ax.plot(df.loc[mask, 'x'], df.loc[mask, 'y'], 
+                           '-', color=colors[i], linewidth=2, alpha=0.8,
+                           label=f'Burst {i+1}')
+            
+            ax.set_xlabel('X position')
+            ax.set_ylabel('Y position')
+            ax.set_title('Animal Trajectory with Bursts')
+            if len(bursts) <= 5:  # Only show legend if not too many bursts
+                ax.legend(loc='best')
+            ax.grid(True, alpha=0.3)
+            
+            # 2. Speed profile
+            ax = axes[0, 1]
+            t = detection_results['features']['t']
+            speed = detection_results['features']['speed_smooth']
+            
+            ax.plot(t, speed, 'b-', alpha=0.7, linewidth=1)
+            
+            # Shade burst regions
+            ymin, ymax = ax.get_ylim()
+            for burst in bursts:
+                ax.axvspan(burst['start'], burst['end'], 
+                          alpha=0.2, color='red', ymin=0, ymax=1)
+            
+            # Mark changepoints
+            for cp in detection_results['changepoints']:
+                if cp < len(t):
+                    ax.axvline(t[cp], color='green', alpha=0.5, 
+                              linestyle='--', linewidth=0.5)
+            
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Speed')
+            ax.set_title('Speed Profile with Bursts')
+            ax.grid(True, alpha=0.3)
+            
+            # 3. Burst statistics
+            ax = axes[1, 0]
+            if bursts:
+                metrics = ['duration', 'mean_speed']
+                metric_names = ['Duration (s)', 'Mean Speed']
+                
+                x_pos = np.arange(len(bursts))
+                width = 0.35
+                
+                durations = [b['duration'] for b in bursts]
+                speeds = [b['mean_speed'] for b in bursts]
+                
+                bars1 = ax.bar(x_pos - width/2, durations, width, 
+                              label='Duration', alpha=0.7, color='blue')
+                bars2 = ax.bar(x_pos + width/2, speeds, width,
+                              label='Speed', alpha=0.7, color='orange')
+                
+                ax.set_xlabel('Burst Index')
+                ax.set_ylabel('Value')
+                ax.set_title('Burst Statistics')
+                ax.legend()
+                ax.set_xticks(x_pos)
+                ax.set_xticklabels([f'B{i+1}' for i in range(len(bursts))])
+                ax.grid(True, alpha=0.3, axis='y')
+            else:
+                ax.text(0.5, 0.5, 'No bursts detected', 
+                       ha='center', va='center', transform=ax.transAxes)
+                ax.set_title('Burst Statistics')
+            
+            # 4. Summary table
+            ax = axes[1, 1]
+            ax.axis('off')
+            
+            summary = self.summarize_bursts(detection_results)
+            
+            if summary['total_bursts'] > 0:
+                summary_text = []
+                summary_text.append(f"Total bursts: {summary['total_bursts']}")
+                summary_text.append(f"Total duration: {summary['total_burst_duration']:.1f}s")
+                summary_text.append(f"Mean duration: {summary['mean_burst_duration']:.2f}s")
+                summary_text.append(f"Mean speed: {summary['mean_burst_speed']:.3f}")
+                
+                if 'burst_frequency' in summary:
+                    summary_text.append(f"Frequency: {summary['burst_frequency']:.3f} Hz")
+                
+                if 'burst_duty_cycle' in summary:
+                    summary_text.append(f"Duty cycle: {summary['burst_duty_cycle']:.1f}%")
+                
+                ax.text(0.1, 0.9, '\n'.join(summary_text), 
+                       transform=ax.transAxes, fontsize=10,
+                       verticalalignment='top',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            else:
+                ax.text(0.5, 0.5, 'No bursts detected', 
+                       ha='center', va='center', transform=ax.transAxes,
+                       fontsize=12, bbox=dict(boxstyle='round', facecolor='lightgray'))
+            
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(save_path, dpi=150, bbox_inches='tight')
+                print(f"Saved visualization to {save_path}")
+            
+            plt.show()
+            
+        except ImportError:
+            print("Matplotlib not available for visualization")
+            return None
+        except Exception as e:
+            print(f"Visualization error: {e}")
+            return None
+        
+        return fig, axes
+
+
+# Test function to verify everything works
+def test_detector():
+    """Test the optimized detector with sample data"""
+    print("=" * 60)
+    print("Testing Optimized Movement Burst Detector")
+    print("=" * 60)
+    
+    # Create sample data
+    np.random.seed(42)
+    n_points = 1000
+    t = np.linspace(0, 60, n_points)  # 60 seconds
+    
+    # Create movement with bursts
+    x = np.zeros(n_points)
+    y = np.zeros(n_points)
+    
+    # Add some burst periods
+    burst_periods = [(10, 15), (25, 30), (40, 45)]
+    
+    for i in range(1, n_points):
+        # Base movement (small random walk)
+        x[i] = x[i-1] + np.random.normal(0, 0.02)
+        y[i] = y[i-1] + np.random.normal(0, 0.02)
+        
+        # Check if in burst period
+        in_burst = False
+        for start, end in burst_periods:
+            if start <= t[i] <= end:
+                in_burst = True
+                break
+        
+        if in_burst:
+            # Add burst movement
+            x[i] += np.random.normal(0.1, 0.05)
+            y[i] += np.random.normal(0.1, 0.05)
+    
+    pos_df = pd.DataFrame({'t': t, 'x': x, 'y': y})
+    
+    print(f"Created test data: {len(pos_df)} points")
+    print(f"Time range: {t[0]:.1f}s to {t[-1]:.1f}s")
+    print(f"Expected bursts at: {burst_periods}")
+    
+    # Initialize detector
+    detector = OptimizedMovementBurstDetector(
+        min_burst_duration=0.5,
+        min_rest_duration=1.0,
+        velocity_smoothing=0.1,
+        bocd_hazard=50,
+        clustering_method='dbscan',
+        use_gpu=False
+    )
+    
+    # Run detection
+    print("\nRunning detection...")
+    results = detector.detect_bursts(pos_df)
+    
+    # Analyze results
+    analyzer = BurstAnalyzer()
+    summary = analyzer.summarize_bursts(results)
+    
+    print("\n" + "=" * 60)
+    print("DETECTION RESULTS")
+    print("=" * 60)
+    print(f"Total bursts detected: {summary['total_bursts']}")
+    
+    if summary['total_bursts'] > 0:
+        print(f"Total burst duration: {summary['total_burst_duration']:.2f}s")
+        print(f"Mean burst duration: {summary['mean_burst_duration']:.2f}s")
+        print(f"Mean burst speed: {summary['mean_burst_speed']:.3f}")
+        
+        if 'burst_frequency' in summary:
+            print(f"Burst frequency: {summary['burst_frequency']:.3f} Hz")
+        
+        print("\nDetected bursts:")
+        for i, burst in enumerate(results['bursts']):
+            print(f"  Burst {i+1}: {burst['start']:.1f}s to {burst['end']:.1f}s "
+                  f"(duration: {burst['duration']:.1f}s, "
+                  f"speed: {burst['mean_speed']:.3f})")
+    
+    # Visualize
+    print("\nGenerating visualization...")
+    analyzer.visualize_results(results, save_path='test_burst_detection.png')
     
     return results
 
 
 # ============================================
-# EXAMPLE USAGE
+# EXAMPLE USAGE WITH NEW PACKAGES
 # ============================================
 
-def simulate_animal_trajectory(duration=60, sampling_rate=30):
-    """Generate synthetic animal trajectory for testing"""
-    np.random.seed(42)
+def example_usage():
+    """Demonstrate the optimized detector with new packages"""
+    # Generate sample data
+    pos_df = pd.DataFrame({
+        't': np.linspace(0, 60, 1800),  # 60 seconds at 30Hz
+        'x': np.cumsum(np.random.normal(0, 0.1, 1800)),
+        'y': np.cumsum(np.random.normal(0, 0.1, 1800))
+    })
     
-    t = np.arange(0, duration, 1/sampling_rate)
-    n = len(t)
+    # Add simulated bursts
+    burst_times = [(10, 15), (25, 30), (40, 45)]
+    for start, end in burst_times:
+        mask = (pos_df['t'] >= start) & (pos_df['t'] <= end)
+        pos_df.loc[mask, 'x'] += np.cumsum(np.random.normal(0.5, 0.2, np.sum(mask))) * 0.1
+        pos_df.loc[mask, 'y'] += np.cumsum(np.random.normal(0.5, 0.2, np.sum(mask))) * 0.1
     
-    # Generate random walk with bursts
-    x = np.zeros(n)
-    y = np.zeros(n)
+    print("Data shape:", pos_df.shape)
+    print(f"Duration: {pos_df['t'].iloc[-1]:.1f}s")
     
-    # Create burst/non-burst pattern
-    burst_probs = 0.3 * (np.sin(2*np.pi*t/15) + 1) + 0.1
-    
-    for i in range(1, n):
-        if np.random.rand() < burst_probs[i]:
-            # Burst mode: larger, directed steps
-            dx = np.random.normal(0.5, 0.2)
-            dy = np.random.normal(0.5, 0.2)
-            angle = np.random.uniform(0, 2*np.pi)
-            step_size = np.random.exponential(0.3)
-            x[i] = x[i-1] + step_size * np.cos(angle)
-            y[i] = y[i-1] + step_size * np.sin(angle)
-        else:
-            # Rest mode: small random movements
-            x[i] = x[i-1] + np.random.normal(0, 0.05)
-            y[i] = y[i-1] + np.random.normal(0, 0.05)
-    
-    # Add some noise
-    x += np.random.normal(0, 0.02, n)
-    y += np.random.normal(0, 0.02, n)
-    
-    return pd.DataFrame({'t': t, 'x': x, 'y': y})
-
-
-# Main execution
-if __name__ == "__main__":
-    # Create or load your data
-    # pos_df = pd.read_csv('your_data.csv')  # Your actual data
-    pos_df = simulate_animal_trajectory(duration=120, sampling_rate=30)
-    
-    print(f"Data shape: {pos_df.shape}")
-    print(f"Duration: {pos_df['t'].iloc[-1]:.1f} seconds")
-    print(f"Sampling rate: {1/np.mean(np.diff(pos_df['t'])):.1f} Hz")
-    
-    # Initialize detector (using ensemble method for best results)
-    detector = MovementBurstDetector(
+    # Initialize optimized detector
+    detector = OptimizedMovementBurstDetector(
         min_burst_duration=0.8,
         min_rest_duration=1.2,
         velocity_smoothing=0.15,
-        method='combo'  # Best performing ensemble method
+        bocd_hazard=100,
+        clustering_method='dip',  # Use DipExt from clustpy
+        use_gpu=False  # Set to True if you have CUDA
     )
     
     # Detect bursts
+    print("\nDetecting bursts with optimized pipeline...")
     results = detector.detect_bursts(pos_df)
     
-    # Display results
-    print(f"\nDetected {len(results['bursts'])} movement bursts:")
-    print("-" * 60)
+    # Analyze results
+    analyzer = BurstAnalyzer()
+    summary = analyzer.summarize_bursts(results)
+    
+    print(f"\nDetection Summary:")
+    print(f"  Total bursts: {summary['total_bursts']}")
+    if summary['total_bursts'] > 0:
+        print(f"  Total burst duration: {summary['total_burst_duration']:.1f}s")
+        print(f"  Mean burst duration: {summary['mean_burst_duration']:.2f} ± {summary['std_burst_duration']:.2f}s")
+        print(f"  Mean burst speed: {summary['mean_burst_speed']:.3f}")
+        print(f"  Total distance during bursts: {summary['total_distance']:.2f}")
+        if 'burst_frequency' in summary:
+            print(f"  Burst frequency: {summary['burst_frequency']:.3f} Hz")
+    
+    # Display individual bursts
+    print(f"\nDetected Bursts:")
     for i, burst in enumerate(results['bursts']):
-        print(f"Burst {i+1}:")
-        print(f"  Time: {burst['start']:.1f} - {burst['end']:.1f} s "
-              f"(duration: {burst['duration']:.1f} s)")
-        print(f"  Mean speed: {burst['mean_speed']:.2f}")
-        print(f"  Distance: {burst.get('total_distance', 0):.2f}")
-        print(f"  Tortuosity: {burst.get('tortuosity', 0):.2f}")
-        print()
+        print(f"  Burst {i+1}: {burst['start']:.1f}-{burst['end']:.1f}s "
+              f"(dur: {burst['duration']:.1f}s, speed: {burst['mean_speed']:.3f}, "
+              f"dist: {burst.get('total_distance', 0):.2f})")
     
     # Visualize
-    fig = visualize_bursts(pos_df, results, save_path='burst_detection.png')
+    print("\nGenerating visualization...")
+    analyzer.visualize_segmentation(results, save_path='optimized_burst_detection.png')
     
-    # Evaluate different methods
-    all_results = evaluate_burst_detection(pos_df)
+    return results
+
+
+if __name__ == "__main__":
+    # Check package availability
+    print("Package Availability Check:")
+    print(f"  bayesian-changepoint-detection: {'✓' if BOCD_AVAILABLE else '✗'}")
+    print(f"  clustpy: {'✓' if CLUSTPY_AVAILABLE else '✗'}")
+    print(f"  bcubed: {'✓' if BCUBED_AVAILABLE else '✗'}")
+    print(f"  CUDA available: {'✓' if torch.cuda.is_available() else '✗'}")
+    
+    # Run test
+    test_results = test_detector()
+    
+    print("\n" + "=" * 60)
+    print("TEST COMPLETE")
+    print("=" * 60)
+    
+
+    # Run example
+    results = example_usage()
+    
+

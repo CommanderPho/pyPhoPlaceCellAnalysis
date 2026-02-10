@@ -42,6 +42,9 @@ dependencies = [
     "cython",
     "neuropy",
     "pyphocorehelpers",
+    "numpy>=1.23.5",
+    "pyclustering>=0.10.1.2",
+    "bayesian-changepoint-detection[gpu]>=0.2.dev1",
 ]
 
 [dependency-groups]
@@ -68,7 +71,11 @@ gui = [
     "patchworklib>=0.5.2,<0.6",
     "pyqt-responsive-label>=0.0.3,<0.0.4",
 ]
-testing = ["mplcursors>=0.5.2,<0.6"]
+testing = [
+    "bcubed>=1.5",
+    "mplcursors>=0.5.2,<0.6",
+    "pyclustering>=0.10.1.2",
+]
 
 [tool.uv]
 default-groups = [

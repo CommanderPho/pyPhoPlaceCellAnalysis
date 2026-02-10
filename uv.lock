@@ -461,6 +461,12 @@ wheels = [
 ]
 
 [[package]]
+name = "bayesian-changepoint-detection"
+version = "0.2.dev1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/34/3d1d9aba8335b4bb7c1d6f2245e868cf4a6893bdfc802cb2f2cf35e6cf09/bayesian_changepoint_detection-0.2.dev1.tar.gz", hash = "sha256:97ca291d47f0cdd03e7f76739d8edc538cd7305a78df93e12a002ef51100f644", size = 4160, upload-time = "2019-08-12T07:48:10.566Z" }
+
+[[package]]
 name = "bcrypt"
 version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -502,6 +508,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/94/41/19be9fe17e4ffc5d10b7b67f10e459fc4eee6ffe9056a88de511920cfd8d/bcrypt-4.3.0-pp311-pypy311_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:bdc6a24e754a555d7316fa4774e64c6c3997d27ed2d1964d55920c7c227bc4ce", size = 280513, upload-time = "2025-02-28T01:24:02.243Z" },
     { url = "https://files.pythonhosted.org/packages/aa/73/05687a9ef89edebdd8ad7474c16d8af685eb4591c3c38300bb6aad4f0076/bcrypt-4.3.0-pp311-pypy311_pp73-manylinux_2_34_aarch64.whl", hash = "sha256:55a935b8e9a1d2def0626c4269db3fcd26728cbff1e84f0341465c31c4ee56d8", size = 274685, upload-time = "2025-02-28T01:24:04.512Z" },
     { url = "https://files.pythonhosted.org/packages/63/13/47bba97924ebe86a62ef83dc75b7c8a881d53c535f83e2c54c4bd701e05c/bcrypt-4.3.0-pp311-pypy311_pp73-manylinux_2_34_x86_64.whl", hash = "sha256:57967b7a28d855313a963aaea51bf6df89f833db4320da458e5b3c5ab6d4c938", size = 280110, upload-time = "2025-02-28T01:24:05.896Z" },
+]
+
+[[package]]
+name = "bcubed"
+version = "1.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/fd/bc5455e5cf3e3aa7cf36f9f7c5cf3c81c0a4fb36c4bff8982599e78f8458/bcubed-1.5.tar.gz", hash = "sha256:3dc67a6e4e925d4493ce6bc9747a64a48f84398f31b573f73776c9b836de6ae9", size = 3625, upload-time = "2019-01-17T11:12:04.615Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/c4/f06199a7de2236e92d3894672b1f8530d4fc1c02d7453d6c30e379fbce41/bcubed-1.5-py2.py3-none-any.whl", hash = "sha256:b465d0e27527f3834d0b053503868ac09b986853a4d8c14a1fa52a4cefd3ac29", size = 8670, upload-time = "2019-01-17T11:12:03.108Z" },
 ]
 
 [[package]]
@@ -5191,6 +5209,20 @@ version = "0.1.1"
 source = { git = "https://github.com/CommanderPho/pybursts.git?rev=master#1ba22ea6caa047676821f5c54ac548c022de67af" }
 
 [[package]]
+name = "pyclustering"
+version = "0.10.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4b/cf/6c1183d0c1e76df398d0808f78cabaedd87a1ca7548b9b03d51620ff55eb/pyclustering-0.10.1.2.tar.gz", hash = "sha256:8a98fd299fcc1e21b7b7c963275162dd7194aa3d921aa66d313775597cf833d1", size = 2575620, upload-time = "2020-11-25T22:41:20.453Z" }
+
+[[package]]
 name = "pycparser"
 version = "2.23"
 source = { registry = "https://pypi.org/simple" }
@@ -5627,6 +5659,7 @@ version = "0.3.6"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
+    { name = "bayesian-changepoint-detection" },
     { name = "cython" },
     { name = "deeptime" },
     { name = "dill", extra = ["graph"] },
@@ -5642,6 +5675,7 @@ dependencies = [
     { name = "napari-animated-gif-io" },
     { name = "napari-animation" },
     { name = "neuropy" },
+    { name = "numpy" },
     { name = "opencv-contrib-python" },
     { name = "pandas" },
     { name = "panel" },
@@ -5649,6 +5683,7 @@ dependencies = [
     { name = "params" },
     { name = "pip" },
     { name = "pybursts" },
+    { name = "pyclustering" },
     { name = "pyopengl-accelerate" },
     { name = "pyphocorehelpers" },
     { name = "pyqt-builder" },
@@ -5695,12 +5730,15 @@ gui = [
     { name = "qtawesome" },
 ]
 testing = [
+    { name = "bcubed" },
     { name = "mplcursors" },
+    { name = "pyclustering" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "attrs", specifier = ">=22.2.0,<23" },
+    { name = "bayesian-changepoint-detection", extras = ["gpu"], specifier = ">=0.2.dev1" },
     { name = "cython" },
     { name = "deeptime", specifier = ">=0.4.4,<0.5" },
     { name = "dill", extras = ["graph"], specifier = "==0.3.5.1" },
@@ -5716,6 +5754,7 @@ requires-dist = [
     { name = "napari-animated-gif-io", specifier = ">=0.1.2,<0.2" },
     { name = "napari-animation", specifier = ">=0.0.8,<0.0.9" },
     { name = "neuropy", editable = "../NeuroPy" },
+    { name = "numpy", specifier = ">=1.23.5" },
     { name = "opencv-contrib-python", specifier = ">=4.10.0.84,<5" },
     { name = "pandas", specifier = "==1.5.3" },
     { name = "panel", specifier = ">=1.2.3,<2" },
@@ -5723,6 +5762,7 @@ requires-dist = [
     { name = "params", specifier = ">=0.9.0,<0.10" },
     { name = "pip", specifier = "~=24.0" },
     { name = "pybursts", git = "https://github.com/CommanderPho/pybursts.git?rev=master" },
+    { name = "pyclustering", specifier = ">=0.10.1.2" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.6,<4" },
     { name = "pyphocorehelpers", editable = "../pyPhoCoreHelpers" },
     { name = "pyqt-builder", specifier = ">=1.15.3,<2" },
@@ -5762,7 +5802,11 @@ gui = [
     { name = "pyqt5-qt5", specifier = ">=5.15.2,<6" },
     { name = "qtawesome", specifier = ">=1.2.2,<2" },
 ]
-testing = [{ name = "mplcursors", specifier = ">=0.5.2,<0.6" }]
+testing = [
+    { name = "bcubed", specifier = ">=1.5" },
+    { name = "mplcursors", specifier = ">=0.5.2,<0.6" },
+    { name = "pyclustering", specifier = ">=0.10.1.2" },
+]
 
 [[package]]
 name = "pyproject-hooks"
