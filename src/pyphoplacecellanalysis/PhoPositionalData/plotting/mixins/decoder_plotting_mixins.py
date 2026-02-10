@@ -43,6 +43,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from itertools import islice
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualizationMixin, LineCollection, _plot_helper_add_arrow # plot_lap_trajectories_2d
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_positions, _heading_deg_to_compass_deg, heading_angles_to_rainbow_colors, _positions_to_vertex_colors
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -2259,7 +2260,40 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             return line, _out_markers
         else:
             return line, None
+
+
+    @classmethod
+    def _helper_add_gradient_angle_visualizing_line(cls, ax, t, x, y, add_markers=False, s=20.0, time_cmap='viridis', **LineCollection_kwargs):
+        """Adds a trajectory line colored by heading angle (North=red, ROYGBIV). Same semantics as Vispy create_heading_rainbow_line.
+
+        Line segments are colored by direction of travel; markers (if add_markers=True) are colored by per-vertex heading.
+        Parameters t and time_cmap are kept for API compatibility but are not used for coloring.
+
+        add_markers (bool): if True, draws points at each (x, y) position colored by heading at that vertex.
+
+        Example:
+            cls._helper_add_gradient_angle_visualizing_line(ax=axs[curr_row][curr_col], t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:])), x=laps_position_traces[curr_lap_id][0,:], y=laps_position_traces[curr_lap_id][1,:])
+        """
+        x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
+        assert len(x) == len(y), f"len(x): {len(x)} != len(y): {len(y)}"
+        if len(x) < 2:
+            return None, None
+        pos = np.column_stack([x, y])
+        d = np.diff(pos, axis=0)
+        angle_deg = (np.degrees(np.arctan2(d[:, 1], d[:, 0])) + 360.0) % 360.0
+        compass_deg = _heading_deg_to_compass_deg(angle_deg)
+        segment_colors = heading_angles_to_rainbow_colors(compass_deg, alpha=0.85)
+        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        lc = LineCollection(segments, colors=segment_colors, linewidth=2, alpha=0.85, **LineCollection_kwargs)
+        line = ax.add_collection(lc)
+        if add_markers:
+            vertex_colors = _positions_to_vertex_colors(pos)
+            _out_markers: PathCollection = ax.scatter(x=x, y=y, s=s, c=vertex_colors, marker='D')
+            return line, _out_markers
+        return line, None
         
+
 
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 06:29', related_items=[])
     @classmethod
