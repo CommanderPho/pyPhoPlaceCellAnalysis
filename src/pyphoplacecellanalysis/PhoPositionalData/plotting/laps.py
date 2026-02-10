@@ -627,8 +627,10 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
     epochs_position_traces_list = [epoch_pos_df[['x','y']].to_numpy().T for epoch_pos_df in epoch_specific_position_dfs]
     epochs_time_range_list = [[epoch_pos_df[['t']].to_numpy()[0].item(), epoch_pos_df[['t']].to_numpy()[-1].item()] for epoch_pos_df in epoch_specific_position_dfs]
     epoch_ids = deepcopy(sess.laps.lap_id)
+    n_epochs: int = len(epoch_ids)
     ## OUTPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
 
+    curr_num_subplots = min(curr_num_subplots, n_epochs) # if there are fewer epochs than subplots, reduce the number of subplots
 
     ## INPUTS: epoch_ids, epochs_time_range_list, epochs_position_traces_list, curr_position_df
     # num_laps = len(epoch_ids)
