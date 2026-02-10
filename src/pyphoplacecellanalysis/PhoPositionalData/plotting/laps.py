@@ -506,7 +506,7 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
 
 
     """    
-    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, RenderColoringMode
     from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
     
     arrow_concentration_kwargs = dict(
@@ -565,17 +565,35 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
                 curr_lap_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_epoch_id][0,:]))
                 # norm = plt.Normalize(curr_lap_timeseries.min(), curr_lap_timeseries.max())
 
+                # line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
+                #     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                #     x=epochs_position_traces[curr_epoch_id][0,:],
+                #     y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
+                # )
+
+
                 line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
                     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
                     x=epochs_position_traces[curr_epoch_id][0,:],
-                    y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
+                    y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, 
+                    line_color_scheme=RenderColoringMode.ANGLE,
+                    # time_cmap='viridis', #norm=norm,
                 )
+
+
+                # line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_angle_visualizing_line(ax=axs[curr_row][curr_col], 
+                #     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
+                #     x=epochs_position_traces[curr_epoch_id][0,:],
+                #     y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, #norm=norm,
+                # )
+
 
                 _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_concentrated_arrows_to_line(ax=axs[curr_row][curr_col], 
                     t=curr_lap_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
                     x=epochs_position_traces[curr_epoch_id][0,:],
                     y=epochs_position_traces[curr_epoch_id][1,:], 
                     speed=None,
+                    arrow_color_scheme=RenderColoringMode.ANGLE,
                     **arrow_concentration_kwargs
                 )
 
@@ -609,13 +627,10 @@ def plot_lap_trajectories_2d(sess, curr_num_subplots=5, active_page_index=0, fix
                 _out_objs['line_artists'][a_linear_index] = line
                 
 
-            
+            # add lap text label (title above axes, left-aligned)
+            axs[curr_row][curr_col].set_title(curr_lap_label_text, fontsize=10, loc='left')
 
-            
 
-            # add lap text label
-            axs[curr_row][curr_col].text(250, 126, curr_lap_label_text, horizontalalignment='right', size=12)
-            # PhoWidgetHelper.perform_add_text(p[curr_row, curr_col], curr_lap_label_text, name='lblLapIdIndicator')
         ## END for a_linear_index in linear_plotter_indicies...
         return _out_objs
 

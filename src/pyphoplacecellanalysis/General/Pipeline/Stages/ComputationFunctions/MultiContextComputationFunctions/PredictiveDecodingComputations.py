@@ -8171,8 +8171,8 @@ class PredictiveDecodingVispyWidget:
                     # Build the visuals to render                                                                                                                                                                                                                                                          #
                     # ==================================================================================================================================================================================================================================================================================== #
                     ## INPUTS: colors, x_valid, y_valid
-                    
-                    line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
+                    line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=np.column_stack([x_valid, y_valid]), parent=view.scene, line_width=2, order=1)
+                    # line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
                     line.order = 1
                     # line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
                     # line.push_gl_state('additive', depth_test=True)

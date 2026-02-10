@@ -47,8 +47,9 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualiza
 from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
 
 
-class ArrowColorScheme(str, Enum):
-    """How to color rendered path arrows: by speed (colormap) or by heading angle (ROYGBIV, North=Red)."""
+class RenderColoringMode(str, Enum):
+    """How to color rendered path elements (e.g. line segments, arrows): by time (colormap), by speed, or by heading angle (ROYGBIV, North=Red)."""
+    TIME = 'time'
     SPEED = 'speed'
     ANGLE = 'angle'
 
@@ -2231,8 +2232,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-06-18 06:22', related_items=[])
     @classmethod
-    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, time_cmap='viridis', **LineCollection_kwargs):
-        """ Adds a gradient line representing a timeseries of (x, y) positions.
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, 
+                line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, 
+                time_cmap='viridis', **LineCollection_kwargs,
+            ):
+        """ Adds a gradient line representing a timeseries of (x, y) positions. line_color_scheme: TIME (time colormap), ANGLE (heading ROYGBIV via HeadingAngleHelpers); str 'time'/'angle' also accepted.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
         
@@ -2244,7 +2248,11 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         )
 
         """
-        # Create a continuous norm to map from data points to colors
+        if isinstance(line_color_scheme, str):
+            line_color_scheme = RenderColoringMode(line_color_scheme)
+        if line_color_scheme == RenderColoringMode.ANGLE:
+            return cls._helper_add_gradient_angle_visualizing_line(ax, t, x, y, add_markers=add_markers, s=s, **LineCollection_kwargs)
+        # TIME (or SPEED): time-based colormap on segments
         assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
         norm = plt.Normalize(t.min(), t.max())
         # needs to be (numlines) x (points per line) x 2 (for x and y)
@@ -2329,13 +2337,15 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         _out_markers: PathCollection = ax.scatter(x=x, y=y, s=s, c=colors_arr, marker=marker, **scatter_kwargs)
         return _out_markers
 
+
+
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 07:40', related_items=[])
     @classmethod
     def _helper_add_concentrated_arrows_to_line(cls, ax, t, x, y, speed=None, time_cmap='viridis',
-                                                arrow_color_scheme: Union[ArrowColorScheme, str] = ArrowColorScheme.SPEED, arrow_skip: int=20,
+                                                arrow_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.SPEED, arrow_skip: int=20,
                                                 mutation_scale_multiplier = 40, mutation_scale_constant = 10, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
                                                 ) -> List[FancyArrowPatch]:
-        """ Adds arrows along a path. arrow_color_scheme: ArrowColorScheme.SPEED (time_cmap) or ArrowColorScheme.ANGLE (HeadingAngleHelpers, North=Red, ROYGBIV); str 'speed'/'angle' also accepted.
+        """ Adds arrows along a path. arrow_color_scheme: RenderColoringMode.TIME (time_cmap), SPEED (speed), or ANGLE (HeadingAngleHelpers, North=Red, ROYGBIV); str also accepted.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
         
@@ -2348,10 +2358,13 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         """
         if isinstance(arrow_color_scheme, str):
-            arrow_color_scheme = ArrowColorScheme(arrow_color_scheme)
+            arrow_color_scheme = RenderColoringMode(arrow_color_scheme)
         # Create a continuous norm to map from data points to colors
         assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
-        # norm = plt.Normalize(t.min(), t.max())
+        if arrow_color_scheme == RenderColoringMode.TIME:
+            norm = plt.Normalize(t.min(), t.max())
+        else:
+            norm = None
         if isinstance(time_cmap, str):
             time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
         # # Builds scatterplot markers (points) along the path
@@ -2380,14 +2393,16 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # scale arrow size by speed
             arrow_length = arrow_length_constant + (arrow_length_multiplier * spd_percent_max)
             mutation_scale = mutation_scale_constant + (mutation_scale_multiplier * spd_percent_max)
-            if arrow_color_scheme == ArrowColorScheme.SPEED:
+            if arrow_color_scheme == RenderColoringMode.TIME:
+                arrow_color = time_cmap(norm(t[i]))
+            elif arrow_color_scheme == RenderColoringMode.SPEED:
                 arrow_color = time_cmap(spd_percent_max)
-            elif arrow_color_scheme == ArrowColorScheme.ANGLE:
+            elif arrow_color_scheme == RenderColoringMode.ANGLE:
                 angle_deg = (np.degrees(np.arctan2(dy, dx)) + 360.0) % 360.0
                 compass_deg = float(np.asarray(HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)).flat[0])
                 arrow_color = HeadingAngleHelpers.heading_angle_to_rainbow_rgba(compass_deg, alpha=1.0)
             else:
-                raise ValueError(f"arrow_color_scheme must be {list(ArrowColorScheme)}, got {arrow_color_scheme!r}")
+                raise ValueError(f"arrow_color_scheme must be {list(RenderColoringMode)}, got {arrow_color_scheme!r}")
             arrow = FancyArrowPatch(
                 (x0, y0),
                 (x0 + dx * arrow_length, y0 + dy * arrow_length),
