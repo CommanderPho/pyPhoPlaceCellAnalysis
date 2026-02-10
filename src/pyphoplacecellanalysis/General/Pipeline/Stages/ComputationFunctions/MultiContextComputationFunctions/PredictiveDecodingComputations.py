@@ -3792,7 +3792,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['temp', 'from-notebook', 'prominence2d', 'locality'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-13 10:17', related_items=[])
-    def final_refine_single_decoder_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam', **kwargs) -> DecodedFilterEpochsResult:
+    def final_refine_single_decoder_result_masks(self, curr_active_pipeline, fine_decoding_t_bin_size: float = 0.025, a_decoder_name: types.DecoderName = 'roam', 
+                                                 use_parallel: bool=False, max_workers: int=1,
+                                                 **kwargs) -> DecodedFilterEpochsResult:
         """
         Seems to just do the whole set of computations again after the filtering/masking
         
@@ -3813,9 +3815,6 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence, PosteriorPeaksPeakProminence2dResult
-
-        use_parallel: bool = kwargs.pop('use_parallel', True)
-        max_workers: int = kwargs.pop('max_workers', 4)
 
         # Store original values for warning purposes
         use_parallel_requested = use_parallel
