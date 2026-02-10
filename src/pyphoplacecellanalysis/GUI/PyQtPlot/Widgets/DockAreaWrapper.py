@@ -197,10 +197,11 @@ class DockAreaWrapper(object):
         
         Usage:
             from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
 
             # active_root_main_widget = ipcDataExplorer.p.parentWidget()
             active_root_main_widget = ipcDataExplorer.p.window()
-            win, app = DockAreaWrapper.wrap_horizontally_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget)
+            laps_merged_out: GenericPyQtGraphContainer = DockAreaWrapper.wrap_horizontally_with_dockAreaWindow(active_root_main_widget, placefieldControlsContainerWidget)
 
         """                
         # build a win of type PhoDockAreaContainingWindow
