@@ -16,7 +16,7 @@ import numpy as np
 from vispy import app, scene
 from vispy.scene import visuals
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_positions, heading_angles_to_rainbow_colors, _positions_to_vertex_colors, _heading_deg_to_compass_deg
+from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
 
 # class AngularrColoredLine(scene.visuals.Line):
 #     def __init__(self, **kwargs):
@@ -25,11 +25,39 @@ from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import headings_from_posit
 #         y = t * np.sin(t) * 0.1
     
 #         self._positions = np.c_[x, y].astype(np.float32)
-#         self._colors = _positions_to_vertex_colors(self._positions)
+#         self._colors = HeadingAngleHelpers._positions_to_vertex_colors(self._positions)
 #         self._view = self.central_widget.add_view(camera='panzoom')
 #         self._view.camera.aspect = 1
 #         self._line = scene.visuals.Line(pos=self._positions, color=self._colors, width=2.0, parent=self._view.scene)
 #         self._line.set_gl_state('translucent', depth_test=False)
+
+
+class AngleColoredLineVisual(scene.visuals.Line):
+    """ A direct drop-in replacement for scene.Line
+    from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingColoredLine, CompassDemo, InteractiveHeadingLine
+    from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import AngleColoredLineVisual
+
+    line = AngleColoredLineVisual(pos=pos, color=vertex_colors, method='gl')
+    line.parent = view.scene
+
+    """
+    def __init__(self, *args, **kwargs):
+        scene.visuals.Line.__init__(self, *args, **kwargs)
+        self.unfreeze()
+        _colors = HeadingAngleHelpers._positions_to_vertex_colors(self.pos)
+        self.set_data(pos=self.pos, color=_colors)
+        # # initialize point markers
+        # self.markers = scene.visuals.Markers(parent=self)
+        # self.marker_colors = np.ones((len(self.pos), 4), dtype=np.float32)
+        # self.markers.set_data(pos=self.pos, symbol="s", edge_color="red", size=6)
+        # self.selected_point = None
+        # self.selected_index = -1
+        # # snap grid size
+        # self.gridsize = 10
+        self.set_gl_state('translucent', depth_test=False)
+        self.freeze()
+        
+
 
 
 class HeadingColoredLine(scene.SceneCanvas):
@@ -43,7 +71,7 @@ class HeadingColoredLine(scene.SceneCanvas):
         x = t * np.cos(t) * 0.1
         y = t * np.sin(t) * 0.1
         self._positions = np.c_[x, y].astype(np.float32)
-        self._colors = _positions_to_vertex_colors(self._positions)
+        self._colors = HeadingAngleHelpers._positions_to_vertex_colors(self._positions)
         self._view = self.central_widget.add_view(camera='panzoom')
         self._view.camera.aspect = 1
         self._line = scene.visuals.Line(pos=self._positions, color=self._colors, width=2.0, parent=self._view.scene)
@@ -59,6 +87,10 @@ class CompassLegendItem:
     """
     def __init__(self, view: scene.ViewBox, center = np.array([0.0, 0.0]), length = 0.6, 
                  line_points: int = 20, line_width=2.0, **kwargs):
+
+        self._data_dict = dict()
+
+
         angles = np.linspace(0, 2 * np.pi, 9)[:-1]
 
         all_positions = []
@@ -89,21 +121,21 @@ class CompassLegendItem:
 
         angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
         angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
-        compass_deg = _heading_deg_to_compass_deg(angle_deg)
+        compass_deg = HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)
 
-        colors = heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+        colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
 
-        self.line = scene.visuals.Line(
-            pos=positions,
-            color=colors,
-            width=line_width,
-            parent=view.scene
-        )
+        self.line = scene.visuals.Line(pos=positions, color=colors, width=line_width, parent=view.scene)
         self.line.set_gl_state('translucent', depth_test=False)
-        self._data_dict = dict()
+
+        # self.circle = scene.visuals.Ellipse(center=(float(center[0]), float(center[1])), radius=(circle_radius, circle_radius), color=None, border_width=int(circle_border_width), border_color=circle_color, parent=view.scene)
+        # self.circle.set_gl_state('translucent', depth_test=False)
+
+
         self._data_dict = dict(pos=positions, tangents=tangents,
                                angle_deg=angle_deg, compass_deg=compass_deg,
-                    colors=colors)
+                                colors=colors)
+
 
         
     
@@ -137,8 +169,8 @@ class CompassDemo(scene.SceneCanvas):
         tangents = np.vstack(all_tangents)
         angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
         angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
-        compass_deg = _heading_deg_to_compass_deg(angle_deg)
-        colors = heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+        compass_deg = HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)
+        colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
         self._view = self.central_widget.add_view(camera='panzoom')
         self._view.camera.aspect = 1
         self._line = scene.visuals.Line(pos=positions, color=colors, width=5.0, parent=self._view.scene)
@@ -207,7 +239,7 @@ class InteractiveHeadingLine(scene.SceneCanvas):
         if len(self.positions) < 2:
             return
         pos = np.array(self.positions, dtype=np.float32)
-        colors = _positions_to_vertex_colors(pos)
+        colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
         if self._line is None:
             self._line = scene.visuals.Line(pos=pos, color=colors, width=3.0, parent=self._view.scene)
             self._line.set_gl_state('translucent', depth_test=False)
