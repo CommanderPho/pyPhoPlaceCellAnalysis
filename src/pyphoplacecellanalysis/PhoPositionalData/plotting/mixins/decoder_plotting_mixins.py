@@ -12,6 +12,7 @@ import param
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
+from enum import Enum
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
 from typing_extensions import TypeAlias
@@ -44,6 +45,12 @@ from pyphocorehelpers.assertion_helpers import Assert
 from itertools import islice
 from pyphoplacecellanalysis.PhoPositionalData.plotting.laps import LapsVisualizationMixin, LineCollection, _plot_helper_add_arrow # plot_lap_trajectories_2d
 from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
+
+
+class ArrowColorScheme(str, Enum):
+    """How to color rendered path arrows: by speed (colormap) or by heading angle (ROYGBIV, North=Red)."""
+    SPEED = 'speed'
+    ANGLE = 'angle'
 
 
 import matplotlib.pyplot as plt
@@ -2325,10 +2332,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 07:40', related_items=[])
     @classmethod
     def _helper_add_concentrated_arrows_to_line(cls, ax, t, x, y, speed=None, time_cmap='viridis',
-                                                arrow_color_scheme: str = 'speed', arrow_skip: int=20,
+                                                arrow_color_scheme: Union[ArrowColorScheme, str] = ArrowColorScheme.SPEED, arrow_skip: int=20,
                                                 mutation_scale_multiplier = 40, mutation_scale_constant = 10, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
                                                 ) -> List[FancyArrowPatch]:
-        """ Adds a gradient line representing a timeseries of (x, y) positions.
+        """ Adds arrows along a path. arrow_color_scheme: ArrowColorScheme.SPEED (time_cmap) or ArrowColorScheme.ANGLE (HeadingAngleHelpers, North=Red, ROYGBIV); str 'speed'/'angle' also accepted.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
         
@@ -2340,6 +2347,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         )
 
         """
+        if isinstance(arrow_color_scheme, str):
+            arrow_color_scheme = ArrowColorScheme(arrow_color_scheme)
         # Create a continuous norm to map from data points to colors
         assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
         # norm = plt.Normalize(t.min(), t.max())
@@ -2371,12 +2380,19 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             # scale arrow size by speed
             arrow_length = arrow_length_constant + (arrow_length_multiplier * spd_percent_max)
             mutation_scale = mutation_scale_constant + (mutation_scale_multiplier * spd_percent_max)
-            
+            if arrow_color_scheme == ArrowColorScheme.SPEED:
+                arrow_color = time_cmap(spd_percent_max)
+            elif arrow_color_scheme == ArrowColorScheme.ANGLE:
+                angle_deg = (np.degrees(np.arctan2(dy, dx)) + 360.0) % 360.0
+                compass_deg = float(np.asarray(HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)).flat[0])
+                arrow_color = HeadingAngleHelpers.heading_angle_to_rainbow_rgba(compass_deg, alpha=1.0)
+            else:
+                raise ValueError(f"arrow_color_scheme must be {list(ArrowColorScheme)}, got {arrow_color_scheme!r}")
             arrow = FancyArrowPatch(
                 (x0, y0),
                 (x0 + dx * arrow_length, y0 + dy * arrow_length),
                 arrowstyle='-|>', mutation_scale=mutation_scale,
-                color=time_cmap(spd_percent_max),
+                color=arrow_color,
                 lw=arrow_lw
             )
             _out_markers[i] = arrow
