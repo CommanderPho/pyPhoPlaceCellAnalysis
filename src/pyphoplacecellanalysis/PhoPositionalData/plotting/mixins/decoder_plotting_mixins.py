@@ -1904,6 +1904,7 @@ def multi_DecodedTrajectoryMatplotlibPlotter_side_by_side(a_result2D: DecodedFil
     from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
     from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
     from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    
 
     # posterior_masking_value: float = 0.02 # for 2D
 
@@ -3034,7 +3035,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         
 
         Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_decoded_trajectories_2d
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DecodedTrajectoryMatplotlibPlotter
         
             fig, axs, laps_pages = plot_decoded_trajectories_2d(curr_position_df, epoch_specific_position_dfs=None, epoch_ids=None, curr_num_subplots=8, active_page_index=0, plot_actual_lap_lines=False)
 
