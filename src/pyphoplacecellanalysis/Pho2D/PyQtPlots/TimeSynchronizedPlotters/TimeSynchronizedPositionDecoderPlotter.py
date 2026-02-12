@@ -98,6 +98,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.setup()
         self.params.debug_print = True # self.enable_debug_print
         self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
+        self.params.show_posteriors = param_kwargs.pop('show_posteriors', True)
         
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
@@ -190,6 +191,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             self.ui.root_plot.addItem(self.ui.bg_imv, defaultPadding=0.0)  # add ImageItem to PlotItem
             
         self.ui.root_plot.addItem(self.ui.imv, defaultPadding=0.0)  # add ImageItem to PlotItem
+        if not self.params.show_posteriors:
+            self.ui.imv.setVisible(False)
         self.ui.root_plot.showAxes(True)
         self.ui.root_plot.hideButtons() # Hides the auto-scale button
         
@@ -437,6 +440,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except Exception as e:
                 ## Unexpected exception!
                 raise e
+
+        if not self.params.show_posteriors:
+            self.ui.imv.setVisible(False)
             
         ## Update the plot title if needed:
         curr_window_title_str: str = f'PositionDecoder -  '
@@ -451,35 +457,52 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
 
 
-    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
+    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
-        """Efficiently export a video from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
+        """Efficiently export a video or animated GIF from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
+        
+        Export format is determined automatically from output_path extension: .avi, .mp4, .mov for video (OpenCV);
+        .gif for animated GIF (imageio).
         
         This method iterates through time points, updates the plotter, captures frames using
-        pyqtgraph's ImageExporter, and saves them as a video using OpenCV.
+        pyqtgraph's ImageExporter, and saves them as video (OpenCV) or animated GIF (imageio).
         
         Args:
-            output_path: Path to save the output video file (e.g., 'output/videos/decoder_video.avi')
-            start_t: Start time for video export. If None, uses the first available time window center.
-            end_t: End time for video export. If None, uses the last available time window center.
-            fps: Frames per second for the output video (default: 30.0)
+            output_path: Path to save the output file. Extension selects format: .avi/.mp4/.mov (video) or .gif (animated GIF).
+            start_t: Start time for export. If None, uses the first available time window center.
+            end_t: End time for export. If None, uses the last available time window center.
+            fps: Frames per second for the output (default: 30.0)
             width: Width of exported frames in pixels. If None, uses current widget width.
             height: Height of exported frames in pixels. If None, uses current widget height.
             progress_print: Whether to print progress messages (default: True)
             debug_print: Whether to print debug information (default: False)
             
         Returns:
-            Path: Path to the saved video file
+            Path: Path to the saved file
             
         Usage:
             plotter = TimeSynchronizedPositionDecoderPlotter(...)
-            video_path = plotter.export_video('output/videos/decoder.avi', start_t=100.0, end_t=200.0, fps=30.0)
+            plotter.export_video('output/videos/decoder.avi', start_t=100.0, end_t=200.0, fps=30.0)
+            plotter.export_video('output/videos/decoder.gif', start_t=100.0, end_t=200.0, fps=10.0)
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from pyphoplacecellanalysis.External.pyqtgraph import functions as fn
         from pathlib import Path
-        import cv2
         import sys
+        
+        video_filepath = Path(output_path).resolve()
+        suffix = video_filepath.suffix.lower()
+        VIDEO_EXTENSIONS = {'.avi', '.mp4', '.mov'}
+        GIF_EXTENSIONS = {'.gif'}
+        if suffix in GIF_EXTENSIONS:
+            export_format = 'gif'
+        elif suffix in VIDEO_EXTENSIONS:
+            export_format = 'video'
+        else:
+            raise ValueError(f"Unsupported output extension '{suffix}'. Supported: video {VIDEO_EXTENSIONS}, animated GIF {GIF_EXTENSIONS}.")
+        
+        if export_format == 'video':
+            import cv2
         
         # Get time window centers
         time_window_centers = self.time_window_centers
@@ -533,7 +556,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
         if progress_print:
             total_available_frames = len(all_frame_indices)
-            print(f'Exporting video: {n_frames} frames (from {total_available_frames} available) from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f} at {fps} fps')
+            kind = 'animated GIF' if export_format == 'gif' else 'video'
+            print(f'Exporting {kind}: {n_frames} frames (from {total_available_frames} available) from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f} at {fps} fps')
         
         # Get widget dimensions
         if width is None or height is None:
@@ -567,6 +591,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             # Ensure contiguous uint8 array for OpenCV compatibility
             return np.ascontiguousarray(bgr, dtype=np.uint8)
         
+        def qimage_to_rgb(qimage):
+            return np.ascontiguousarray(qimage_to_bgr(qimage)[:, :, ::-1], dtype=np.uint8)
+        
         out = None  # Initialize to None for proper cleanup
         try:
             # Create ImageExporter for the root plot
@@ -583,52 +610,61 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             self.update(time_window_centers[first_frame_idx], defer_render=False)
             QtWidgets.QApplication.processEvents()
             first_qimage = exporter.export(toBytes=True)
-            first_bgr = qimage_to_bgr(first_qimage)
-            actual_height, actual_width = first_bgr.shape[:2]
+            if export_format == 'gif':
+                first_frame = qimage_to_rgb(first_qimage)
+            else:
+                first_bgr = qimage_to_bgr(first_qimage)
+                first_frame = first_bgr
+            actual_height, actual_width = first_frame.shape[:2]
             del first_qimage  # Free memory
             
             # Set up output path and directory
-            video_filepath = Path(output_path).resolve()
             video_parent_path = video_filepath.parent
             if not video_parent_path.exists():
                 if progress_print:
                     print(f'Creating output directory: {video_parent_path}')
                 video_parent_path.mkdir(parents=True, exist_ok=True)
             
-            # Initialize video writer with actual frame dimensions
-            fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
-            out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (actual_width, actual_height), isColor=True)
-            
-            if not out.isOpened():
-                raise RuntimeError(f"Failed to open video writer for {video_filepath}")
-            
-            # Write the first frame we already captured
-            out.write(first_bgr)
-            del first_bgr  # Free memory
-            
-            # Streaming capture and write: process remaining frames one at a time
-            progress_print_every_n_frames = max(1, n_frames // 20)
-            for i, frame_idx in enumerate(frame_indices):
-                if i == 0:
-                    # First frame already written
-                    if progress_print:
+            if export_format == 'gif':
+                import imageio
+                frames_list = [first_frame]
+                progress_print_every_n_frames = max(1, n_frames // 20)
+                for i, frame_idx in enumerate(frame_indices):
+                    if i == 0:
+                        if progress_print:
+                            print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+                        continue
+                    if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                         print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
-                    continue
-                    
-                if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
-                    print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
-                
-                # Update plotter to current time
-                t = time_window_centers[frame_idx]
-                self.update(t, defer_render=False)
-                
-                # Process events to ensure rendering
-                QtWidgets.QApplication.processEvents()
-                
-                # Capture frame and write directly to video
-                qimage = exporter.export(toBytes=True)
-                bgr_array = qimage_to_bgr(qimage)
-                out.write(bgr_array)
+                    t = time_window_centers[frame_idx]
+                    self.update(t, defer_render=False)
+                    QtWidgets.QApplication.processEvents()
+                    qimage = exporter.export(toBytes=True)
+                    frames_list.append(qimage_to_rgb(qimage))
+                duration_sec = 1.0 / fps if fps > 0 else 0.1
+                imageio.mimsave(str(video_filepath), frames_list, format='GIF', duration=duration_sec, loop=0)
+            else:
+                # Initialize video writer with actual frame dimensions
+                fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+                out = cv2.VideoWriter(str(video_filepath), fourcc, fps, (actual_width, actual_height), isColor=True)
+                if not out.isOpened():
+                    raise RuntimeError(f"Failed to open video writer for {video_filepath}")
+                out.write(first_bgr)
+                del first_bgr  # Free memory
+                progress_print_every_n_frames = max(1, n_frames // 20)
+                for i, frame_idx in enumerate(frame_indices):
+                    if i == 0:
+                        if progress_print:
+                            print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+                        continue
+                    if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
+                        print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
+                    t = time_window_centers[frame_idx]
+                    self.update(t, defer_render=False)
+                    QtWidgets.QApplication.processEvents()
+                    qimage = exporter.export(toBytes=True)
+                    bgr_array = qimage_to_bgr(qimage)
+                    out.write(bgr_array)
         finally:
             # Always close video writer (if opened) and restore debug print setting
             if out is not None:
@@ -636,7 +672,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             self.params.debug_print = original_debug_print
         
         if progress_print:
-            print(f'Video exported successfully to: {video_filepath}')
+            kind = 'Animated GIF' if export_format == 'gif' else 'Video'
+            print(f'{kind} exported successfully to: {video_filepath}')
         
         return video_filepath
 
