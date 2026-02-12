@@ -71,3 +71,4 @@ src/pyphoplacecellanalysis/External/test.hdf5
 **/.venv*
 
 typings
+src/pyphoplacecellanalysis/test_burst_detection.png

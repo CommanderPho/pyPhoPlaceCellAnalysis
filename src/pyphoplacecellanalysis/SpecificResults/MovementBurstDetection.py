@@ -1,9 +1,23 @@
 import numpy as np
 import pandas as pd
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing_extensions import TypeAlias
+import nptyping as ND
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
 from scipy import stats, signal, interpolate
 from scipy.ndimage import gaussian_filter1d
 import warnings
+from copy import deepcopy
 warnings.filterwarnings('ignore')
+
+import torch
+from functools import partial
+
+from neuropy.utils.mixins.dict_representable import overriding_dict_with
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+
 
 # Import the specialized packages with proper error handling
 try:
@@ -23,7 +37,7 @@ try:
             get_device_info,
             to_tensor,
         )
-        from bayesian_changepoint_detection import offline_changepoint_detection
+        from bayesian_changepoint_detection import offline_changepoint_detection, online_changepoint_detection
         from bayesian_changepoint_detection.priors import const_prior
         from bayesian_changepoint_detection.online_likelihoods import StudentT, MultivariateT
         from bayesian_changepoint_detection.hazard_functions import constant_hazard
@@ -64,7 +78,8 @@ class OptimizedMovementBurstDetector:
     
     def __init__(self, min_burst_duration=0.5, min_rest_duration=1.0,
                  velocity_smoothing=0.1, bocd_hazard=100, 
-                 clustering_method='dbscan', use_gpu=False):
+                 bocd_max_points=50000, downsample_for_bocd=True, # NEW
+                 clustering_method='dbscan', use_gpu=False, use_offline_detection: bool = False):
         """
         Parameters:
         -----------
@@ -85,8 +100,11 @@ class OptimizedMovementBurstDetector:
         self.min_rest_duration = min_rest_duration
         self.velocity_smoothing = velocity_smoothing
         self.bocd_hazard = bocd_hazard
+        self.bocd_max_points = bocd_max_points
+        self.downsample_for_bocd = downsample_for_bocd
         self.clustering_method = clustering_method
         self.use_gpu = use_gpu
+        self.use_offline_detection = use_offline_detection
         
         # Check GPU availability
         if self.use_gpu:
@@ -272,78 +290,302 @@ class OptimizedMovementBurstDetector:
         }
     
 
+    # def bocd_detection_package(self, features_dict):
+    #     """Use bayesian-changepoint-detection package for BOCD"""
+    #     if not BOCD_AVAILABLE:
+    #         print("Using fallback BOCD detection")
+    #         return self.bocd_detection_fallback(features_dict)
+        
+    #     speed = features_dict['speed_smooth']
+    #     t = features_dict['t']
+    #     dt = features_dict['dt']
+
+    #     original_length = len(speed)
+
+    #     # -------- Downsample if too large --------
+    #     if self.downsample_for_bocd and original_length > self.bocd_max_points:
+    #         factor = int(np.ceil(original_length / self.bocd_max_points))
+    #         speed_ds = speed[::factor]
+    #         t_ds = t[::factor]
+    #         dt_ds = dt * factor
+    #     else:
+    #         factor = 1
+    #         speed_ds = speed
+    #         t_ds = t
+    #         dt_ds = dt
+
+    #     # active_speed = speed
+    #     active_speed = speed_ds
+        
+    #     try:
+    #         # Ensure numpy
+    #         if hasattr(active_speed, 'cpu'):
+    #             speed = active_speed.cpu().numpy()
+    #         else:
+    #             speed = np.asarray(active_speed)
+
+    #         dt = features_dict['dt']
+    #         t = features_dict['t']
+    #         n = len(speed)
+
+    #         # ------------------------------
+    #         # HARD MEMORY GUARD
+    #         # ------------------------------
+    #         if self.use_offline_detection and n > 100000:
+    #             print("Offline BOCD disabled for large dataset. Using fallback.")
+    #             return self.bocd_detection_fallback(features_dict)
+
+    #         # ------------------------------
+    #         # OPTIONAL DOWNSAMPLING
+    #         # ------------------------------
+    #         if n > 50000:
+    #             factor = int(np.ceil(n / 50000))
+    #             speed_ds = speed[::factor]
+    #             dt_ds = dt * factor
+    #         else:
+    #             factor = 1
+    #             speed_ds = speed
+    #             dt_ds = dt
+
+    #         hazard_const = self.bocd_hazard
+
+    #         # ==========================================================
+    #         # OFFLINE BOCD (Quadratic — use carefully)
+    #         # ==========================================================
+    #         if self.use_offline_detection:
+
+    #             Q, P, Pcp = offline_changepoint_detection(
+    #                 speed_ds,
+    #                 lambda x: const_prior(x, hazard_const),
+    #                 StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0),
+    #                 truncate=-40
+    #             )
+
+    #             changepoint_probs = np.exp(Pcp).sum(axis=0)
+    #             changepoint_probs /= (np.sum(changepoint_probs) + 1e-10)
+
+    #             min_distance = max(1, int(self.min_rest_duration / dt_ds))
+
+    #             peaks, _ = signal.find_peaks(
+    #                 changepoint_probs,
+    #                 height=np.percentile(changepoint_probs, 75),
+    #                 distance=min_distance
+    #             )
+
+    #             changepoints = peaks.tolist()
+
+    #         # ==========================================================
+    #         # ONLINE BOCD (Memory Safe)
+    #         # ==========================================================
+    #         else:
+    #             hazard = constant_hazard(hazard_const)
+    #             likelihood = StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0)
+
+    #             R, maxes = online_changepoint_detection(speed_ds, hazard, likelihood)
+
+    #             # Changepoint occurs when run length resets to 0
+    #             changepoints = np.where(maxes == 0)[0].tolist()
+
+    #         # ------------------------------
+    #         # Rescale if downsampled
+    #         # ------------------------------
+    #         if factor > 1:
+    #             changepoints = [cp * factor for cp in changepoints]
+    #             changepoints = [cp for cp in changepoints if cp < n]
+
+    #     except Exception as e:
+    #         print(f"BOCD package failed with error: {e}")
+    #         print("Using fallback detection")
+    #         return self.bocd_detection_fallback(features_dict)
+        
+    #     # Map changepoints back to original resolution
+    #     changepoints = [cp * factor for cp in changepoints]
+
+    #     # Create segments from changepoints
+    #     segments = self.create_segments_from_changepoints(features_dict, changepoints)
+        
+    #     return segments, changepoints
+    
+
     def bocd_detection_package(self, features_dict):
-        """Use bayesian-changepoint-detection package for BOCD"""
+        """
+        Memory-safe BOCD wrapper.
+
+        - Uses ONLINE BOCD by default (O(N * run_length)).
+        - Falls back automatically if dataset is too large or errors occur.
+        - Optional downsampling before BOCD.
+        - Safe rescaling of changepoints back to original resolution.
+        """
+
         if not BOCD_AVAILABLE:
             print("Using fallback BOCD detection")
             return self.bocd_detection_fallback(features_dict)
-        
-        speed = features_dict['speed_smooth']
-        
+
+        # ------------------------------------------------------------------
+        # Extract core data
+        # ------------------------------------------------------------------
+        speed_full = features_dict['speed_smooth']
+        t_full = features_dict['t']
+        dt_full = features_dict['dt']
+
+        if hasattr(speed_full, 'cpu'):
+            speed_full = speed_full.cpu().numpy()
+        else:
+            speed_full = np.asarray(speed_full)
+
+        n_full = len(speed_full)
+
+        if n_full < 5:
+            return self.bocd_detection_fallback(features_dict)
+
+        # ------------------------------------------------------------------
+        # Hard safety guard for offline BOCD
+        # ------------------------------------------------------------------
+        if getattr(self, 'use_offline_detection', False) and n_full > 100000:
+            print("Offline BOCD disabled for large dataset. Using fallback.")
+            return self.bocd_detection_fallback(features_dict)
+
+        # ------------------------------------------------------------------
+        # Optional downsampling (only for BOCD step)
+        # ------------------------------------------------------------------
+        factor = 1
+        if getattr(self, 'downsample_for_bocd', True):
+            max_points = getattr(self, 'bocd_max_points', 50000)
+            if n_full > max_points:
+                factor = int(np.ceil(n_full / max_points))
+
+        speed_ds = speed_full[::factor]
+        dt_ds = dt_full * factor
+        n_ds = len(speed_ds)
+
         try:
-            # Convert to numpy array if needed
-            if hasattr(speed, 'cpu'):
-                speed = speed.cpu().numpy()
-            
-            # Use Student's t-distribution (robust to outliers)
-            # Note: We're using the hazard constant directly
             hazard_const = self.bocd_hazard
-            
-            # Run offline changepoint detection
-            Q, P, Pcp = offline_changepoint_detection(
-                speed,
-                lambda x: const_prior(x, hazard_const),
-                StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0),
-                truncate=-40
-            )
-            
-            # Extract changepoints from probability matrix
-            # The changepoint probability is in Pcp
-            changepoint_probs = np.exp(Pcp).sum(axis=0) / (np.exp(Pcp).sum() + 1e-10)
-            
-            # Find peaks in changepoint probability
-            if len(changepoint_probs) > 10:
-                min_distance = max(1, int(self.min_rest_duration / features_dict['dt']))
-                peaks, properties = signal.find_peaks(
-                    changepoint_probs,
-                    height=np.percentile(changepoint_probs, 75),
+
+            # ==============================================================
+            # OFFLINE BOCD (quadratic, use cautiously)
+            # ==============================================================
+            if getattr(self, 'use_offline_detection', False):
+
+                Q, P, Pcp = offline_changepoint_detection(
+                    speed_ds,
+                    lambda x: const_prior(x, hazard_const),
+                    StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0),
+                    truncate=-40
+                )
+
+                cp_prob = np.exp(Pcp).sum(axis=0)
+                cp_prob /= (np.sum(cp_prob) + 1e-12)
+
+                min_distance = max(1, int(self.min_rest_duration / dt_ds))
+
+                peaks, _ = signal.find_peaks(
+                    cp_prob,
+                    height=np.percentile(cp_prob, 75),
                     distance=min_distance
                 )
-                changepoints = peaks.tolist()
+
+                changepoints_ds = peaks.tolist()
+
+            # ==============================================================
+            # ONLINE BOCD (memory safe)
+            # ==============================================================
             else:
-                # Simple threshold if not enough points
-                threshold = np.median(changepoint_probs) + np.std(changepoint_probs)
-                changepoints = np.where(changepoint_probs > threshold)[0].tolist()
-            
+                hazard = partial(constant_hazard, hazard_const)
+
+                likelihood = StudentT(alpha=1.0, beta=1.0, kappa=1.0, mu=0.0)
+
+                # Some implementations optionally support max_run_length
+
+                # Ensure tensor
+                if not isinstance(speed_ds, torch.Tensor):
+                    speed_tensor = torch.as_tensor(speed_ds, dtype=torch.float32)
+                else:
+                    speed_tensor = speed_ds
+                    
+                likelihood = StudentT(
+                    alpha=1.0,
+                    beta=1.0,
+                    kappa=1.0,
+                    mu=0.0
+                )
+
+                R, changepoint_probs = online_changepoint_detection(
+                    speed_tensor,
+                    hazard,
+                    likelihood
+                )
+
+                # Convert to numpy
+                changepoint_probs = changepoint_probs.detach().cpu().numpy()
+
+                # Detect changepoints by threshold
+                changepoints_ds = np.where(changepoint_probs > 0.5)[0].tolist()
+
+                # Run-length reset indicates changepoint
+                # changepoints_ds = np.where(maxes == 0)[0].tolist()
+
+            # ------------------------------------------------------------------
+            # Rescale changepoints back to original resolution
+            # ------------------------------------------------------------------
+            if factor > 1:
+                changepoints = [cp * factor for cp in changepoints_ds]
+            else:
+                changepoints = changepoints_ds
+
+            # Ensure valid bounds
+            changepoints = [cp for cp in changepoints if 0 < cp < n_full]
+            changepoints = sorted(set(changepoints))
+
         except Exception as e:
             print(f"BOCD package failed with error: {e}")
             print("Using fallback detection")
             return self.bocd_detection_fallback(features_dict)
-        
-        # Create segments from changepoints
+
+        # ------------------------------------------------------------------
+        # Create segments
+        # ------------------------------------------------------------------
         segments = self.create_segments_from_changepoints(features_dict, changepoints)
-        
+
         return segments, changepoints
-    
+
+
     def bocd_detection_fallback(self, features_dict):
         """Fallback BOCD implementation using simpler method"""
         t = features_dict['t']
+        dt = features_dict['dt']
         speed = features_dict['speed_smooth']
+        original_length = len(speed)
+
+        # -------- Downsample if too large --------
+        if self.downsample_for_bocd and original_length > self.bocd_max_points:
+            factor = int(np.ceil(original_length / self.bocd_max_points))
+            speed_ds = speed[::factor]
+            t_ds = t[::factor]
+            dt_ds = dt * factor
+        else:
+            factor = 1
+            speed_ds = speed
+            t_ds = t
+            dt_ds = dt
+
+        # speed = features_dict['speed_smooth']
+        # active_speed = speed        
+        active_speed = speed_ds
         
-        if len(speed) < 10:
+        if len(active_speed) < 10:
             # Not enough data points
             segments = [{
                 'start': t[0],
                 'end': t[-1],
                 'duration': t[-1] - t[0],
-                'mean_speed': np.mean(speed) if len(speed) > 0 else 0,
-                'std_speed': np.std(speed) if len(speed) > 1 else 0,
+                'mean_speed': np.mean(active_speed) if len(active_speed) > 0 else 0,
+                'std_speed': np.std(active_speed) if len(active_speed) > 1 else 0,
                 'bocd_prob': 0.0
             }]
             return segments, []
         
         # Simple gradient-based changepoint detection
-        gradient = np.abs(np.gradient(speed))
+        gradient = np.abs(np.gradient(active_speed))
         
         # Smooth the gradient
         if len(gradient) > 10:
@@ -371,6 +613,9 @@ class OptimizedMovementBurstDetector:
         
         return segments, changepoints
     
+
+
+
     def create_segments_from_changepoints(self, features_dict, changepoints):
         """Helper function to create segments from changepoint indices"""
         t = features_dict['t']
@@ -514,6 +759,7 @@ class OptimizedMovementBurstDetector:
         return segments
     
 
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-11 08:48', related_items=[])
     def detect_bursts(self, pos_df, ground_truth=None):
         """Main detection pipeline using specialized packages"""
         print("Starting burst detection pipeline...")
@@ -759,6 +1005,143 @@ class BurstAnalyzer:
         
         return fig, axes
 
+
+
+
+
+
+@function_attributes(short_name=None, tags=['MAIN', 'bursts'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-11 08:19', related_items=[])
+def compute_movement_trajectories_from_bursts(curr_active_pipeline, epoch_names = ['sprinkle', 'roam'], **burst_detector_kwargs):
+    """ computes the new laps/run trajectories using burst-detection segmentation (baysian) 
+    
+
+    # OUTPUTS: Filter to see segmentation pattern
+    # Segment types identified: __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    # a) Burst segments: is_burst=True, typically higher mean speed
+    # b) Rest/non-burst segments: is_burst=False, lower mean speed
+    # c) Noise segments: cluster=-1 (if using DBSCAN)
+
+
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.MovementBurstDetection import compute_movement_trajectories_from_bursts
+    
+        _lap_burst_detection_results, _out_laps = compute_movement_trajectories_from_bursts(curr_active_pipeline)
+        
+    """
+    # import clustpy
+    # import bayesian_changepoint_detection
+    # # import bayesian_changepoint_detection.offline_changepoint_detection
+    # # bayesian_changepoint_detection.offline_changepoint_detection
+    # # Import the refactored modules
+    # from bayesian_changepoint_detection import (
+    #     online_changepoint_detection,
+    #     get_device,
+    #     get_device_info,
+    #     to_tensor,
+    # )
+    # from bayesian_changepoint_detection import offline_changepoint_detection
+    # from bayesian_changepoint_detection.priors import const_prior
+    # from bayesian_changepoint_detection.online_likelihoods import StudentT, MultivariateT
+    # from bayesian_changepoint_detection.hazard_functions import constant_hazard
+
+    from neuropy.core import Laps
+    # from pyphoplacecellanalysis.SpecificResults.MovementBurstDetection import OptimizedMovementBurstDetector, BurstAnalyzer
+
+    _lap_burst_detection_results: Dict[types.DecoderName, Any] = {}
+    _out_laps = {}
+    # widget_out_dict = {}
+
+    for an_epoch_name in epoch_names:
+        # k = 'roam'
+        # k = 'sprinkle'
+        # k = 'maze_GLOBAL'
+
+        a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
+        pos_df = a_sess.position.to_dataframe()
+        pos_df['speed_xy'] = np.sqrt(np.power(pos_df['velocity_x_smooth'], 2) +  np.power(pos_df['velocity_y_smooth'], 2))
+
+        ## INPUTS: pos_df
+        print(f"Data shape: {pos_df.shape}")
+        print(f"Duration: {pos_df['t'].iloc[-1]:.1f} seconds")
+        print(f"Sampling rate: {1/np.mean(np.diff(pos_df['t'])):.1f} Hz")
+
+
+        import traja
+        from traja.contrib import rdp
+        from traja import TrajaCollection
+
+        ## build all data at once
+        minimum_included_matching_sequence_length: int = 4
+
+        trajCol1: TrajaCollection = None
+
+
+        # Initialize the detector
+        detector = OptimizedMovementBurstDetector(
+            **overriding_dict_with(dict(
+            min_burst_duration=1.2,      # Minimum burst duration in seconds
+            min_rest_duration=0.3,       # Minimum rest period between bursts
+            velocity_smoothing=0.15,     # Smoothing for velocity calculation
+            bocd_hazard=120,             # Sensitivity of changepoint detection
+            # clustering_method='hdbscan',  # Clustering algorithm
+            # clustering_method='dbscan',  # Clustering algorithm
+            clustering_method='dip',  # Use DipExt from clustpy
+            use_gpu=False,             # Set to True if you have CUDA
+            ), **burst_detector_kwargs), ## USE THE USER'S PROVIDED KWARGS IF THEY EXIST, OTHERWISE FALL BACK TO THE DEFAULTS
+        )
+        # Run detection on your data
+        results = detector.detect_bursts(pos_df)
+        segments_epoch_df: pd.DataFrame = pd.DataFrame.from_records(results['segments'])
+        segments_epoch_df['segment_idx'] = segments_epoch_df.index.astype(int)
+        segments_epoch_df['maze_id'] = an_epoch_name
+        segments_epoch_df['label'] = segments_epoch_df.index.astype(str)
+        
+        results['segments_epoch_df'] = segments_epoch_df
+
+        # Loaded variable 'df' from kernel state
+        laps_df: pd.DataFrame = deepcopy(segments_epoch_df)[segments_epoch_df['is_burst']].sort_values(['start', 'end']).reset_index(drop=True) # segments_epoch_df.diff(axis='index')
+        laps_df['lap_idx'] = laps_df.index.astype(int)
+        laps_df['label'] = laps_df.index.astype(str)
+        laps_df['lap_id'] = (laps_df['lap_idx'] + 1) #laps_df.index.astype(int)
+        results['laps_df'] = laps_df
+
+        # for k, an_epoch_laps_df in laps_df.pho.partition_df_dict('maze_id').items():
+        if not hasattr(a_sess, '_BAK_laps'):
+            a_sess._BAK_laps = deepcopy(a_sess.laps) ## backup the old laps object
+
+        laps_df = laps_df.drop(columns=['maze_id', 'lap_dir'], inplace=False, errors='ignore')
+        results['laps_df'] = laps_df
+        
+        # _out_laps[k] = Laps.init_from_df(laps_df=laps_df)
+        _out_laps[an_epoch_name] = Laps(laps_df)
+        results['laps_obj'] = _out_laps[an_epoch_name]    
+        # curr_active_pipeline.filtered_sessions[k].laps = Laps.init_from_df(laps_df=laps_df)
+            
+        # OUTPUTS: _out_laps
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Kinda Irrelevant                                                                                                                                                                                                                                                                     #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # Analyze results
+        analyzer = BurstAnalyzer()
+        summary = analyzer.summarize_bursts(results)
+        
+        _lap_burst_detection_results[an_epoch_name] = (detector, results, analyzer, summary)
+    ## END for an_epoch_name in epoch_nam...
+    
+    ## OUTPUTS:  _lap_burst_detection_results, _out_laps
+    return _lap_burst_detection_results, _out_laps
+
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Examples/Testing                                                                                                                                                                                                                                                                     #
+# ==================================================================================================================================================================================================================================================================================== #
 
 # Test function to verify everything works
 def test_detector():

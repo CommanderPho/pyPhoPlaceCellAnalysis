@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence, cast
 import numpy as np
+import pandas as pd
 import nptyping as ND
 from nptyping import NDArray
 
@@ -295,6 +296,147 @@ def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], paren
     return (lines, polygons)
 
 
+def _extract_trajectory_segment_positions(segments: List[pd.DataFrame], x_col: str = 'x', y_col: str = 'y') -> Tuple[List[NDArray], List[pd.DataFrame]]:
+    """Extract (n_points, 2) float32 position arrays from each DataFrame. Drops NaN rows; omits segments with fewer than 2 points. Returns (pos_list, df_list) where df_list[i] is the DataFrame that produced pos_list[i]."""
+    pos_list: List[NDArray] = []
+    df_list: List[pd.DataFrame] = []
+    for df in segments:
+        x = df[x_col].values
+        y = df[y_col].values
+        mask = np.isfinite(x) & np.isfinite(y)
+        if not np.any(mask):
+            continue
+        x = np.asarray(x[mask], dtype=np.float32)
+        y = np.asarray(y[mask], dtype=np.float32)
+        pos = np.column_stack([x, y]).astype(np.float32)
+        if len(pos) >= 2:
+            pos_list.append(pos)
+            df_list.append(df)
+    return (pos_list, df_list)
+
+
+@metadata_attributes(short_name=None, tags=['vispy', 'scene', 'renderer', 'trajectory', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-11 15:44', related_items=[])
+class TrajectorySegmentsVisual(Node):
+    """Renders a list of 2D trajectory segments (List[pd.DataFrame]) on a single canvas with configurable per-segment styling. Each segment is a DataFrame with at least x and y columns (configurable via x_col, y_col). When all segments share the same line_width and method, uses a single vispy Line with a connect array for one draw call; when width or method differ per segment, uses one Line per segment under this node. Styling can be global (color, line_width, method) or per-segment via colors, line_widths, or segment_style(idx, df) returning a dict with color, width, method. Callers can set set_gl_state on .line (single-Line mode) or on each item in .lines (multi-Line mode). Example: seg_visual = TrajectorySegmentsVisual(segments, parent=view.scene, colors=['r','g','b'], line_width=1.5); seg_visual.set_data(new_segments) to update."""
+    def __init__(self, segments: List[pd.DataFrame], parent: Optional[Node] = None, *, x_col: str = 'x', y_col: str = 'y', color: Optional[Union[str, Tuple[float, float, float, float], Sequence]] = None, colors: Optional[Sequence] = None, line_width: float = 2.0, line_widths: Optional[Sequence[float]] = None, method: str = 'gl', segment_style: Optional[Callable[[int, pd.DataFrame], dict]] = None, order: int = 10) -> None:
+        super().__init__(parent=parent)
+        self._x_col = x_col
+        self._y_col = y_col
+        self._line_width = line_width
+        self._line_widths = line_widths
+        self._method = method
+        self._segment_style = segment_style
+        self._order = order
+        self._single_line_mode: Optional[bool] = None
+        self._line: Optional[Any] = None
+        self._lines: List[Any] = []
+        self._segments: List[pd.DataFrame] = []
+        self._segment_dfs: List[pd.DataFrame] = []
+        self._pos_list: List[NDArray] = []
+        self._last_color = color
+        self._last_colors = colors
+        self._build_styles_and_visuals(segments, color=color, colors=colors)
+
+
+    def _resolve_per_segment_styles(self, n: int, color: Optional[Union[str, Tuple, Sequence]] = None, colors: Optional[Sequence] = None) -> Tuple[List[Tuple[float, float, float, float]], List[float], List[str]]:
+        """Return (rgba_list, width_list, method_list) of length n. Uses segment_style callable if set; else color/colors and line_width/line_widths."""
+        rgba_list: List[Tuple[float, float, float, float]] = []
+        width_list: List[float] = []
+        method_list: List[str] = []
+        if self._segment_style is not None and self._segment_dfs:
+            for i in range(n):
+                df = self._segment_dfs[i] if i < len(self._segment_dfs) else pd.DataFrame()
+                style = self._segment_style(i, df)
+                c = style.get('color')
+                rgba_list.append(_color_to_rgba_tuple(c) if c is not None else (1.0, 1.0, 1.0, 1.0))
+                width_list.append(style.get('width', self._line_width))
+                method_list.append(style.get('method', self._method))
+            return (rgba_list, width_list, method_list)
+        if colors is not None:
+            rgba_list = [_color_to_rgba_tuple(c) for c in colors]
+            while len(rgba_list) < n:
+                rgba_list.append(rgba_list[-1] if rgba_list else (1.0, 1.0, 1.0, 1.0))
+        else:
+            base = _color_to_rgba_tuple(color) if color is not None else (1.0, 1.0, 1.0, 1.0)
+            rgba_list = [base] * n
+        if self._line_widths is not None:
+            width_list = list(self._line_widths)
+            while len(width_list) < n:
+                width_list.append(width_list[-1] if width_list else self._line_width)
+        else:
+            width_list = [self._line_width] * n
+        method_list = [self._method] * n
+        return (rgba_list[:n], width_list[:n], method_list[:n])
+
+
+    def _build_styles_and_visuals(self, segments: List[pd.DataFrame], color: Optional[Union[str, Tuple, Sequence]] = None, colors: Optional[Sequence] = None) -> None:
+        self._segments = list(segments)
+        self._pos_list, self._segment_dfs = _extract_trajectory_segment_positions(self._segments, self._x_col, self._y_col)
+        n = len(self._pos_list)
+        if n == 0:
+            self._single_line_mode = False
+            return
+        rgba_list, width_list, method_list = self._resolve_per_segment_styles(n, color=color, colors=colors)
+        uniform_width = all(w == width_list[0] for w in width_list)
+        uniform_method = all(m == method_list[0] for m in method_list)
+        use_single_line = uniform_width and uniform_method
+        self._single_line_mode = use_single_line
+        if use_single_line:
+            all_pos = np.vstack(self._pos_list).astype(np.float32)
+            connect_list: List[NDArray] = []
+            offset = 0
+            for pos in self._pos_list:
+                ni = len(pos)
+                for j in range(ni - 1):
+                    connect_list.append(np.array([[offset + j, offset + j + 1]], dtype=np.int32))
+                offset += ni
+            connect = np.vstack(connect_list).astype(np.int32) if connect_list else np.empty((0, 2), dtype=np.int32)
+            vertex_colors = np.zeros((len(all_pos), 4), dtype=np.float32)
+            offset = 0
+            for i, pos in enumerate(self._pos_list):
+                r, g, b, a = rgba_list[i]
+                vertex_colors[offset:offset + len(pos), :] = (r, g, b, a)
+                offset += len(pos)
+            self._line = vz.Line(pos=all_pos, color=vertex_colors, width=width_list[0], method=method_list[0], connect=connect, parent=self)
+            self._line.order = self._order
+            self._lines = []
+        else:
+            self._line = None
+            self._lines = []
+            for i, pos in enumerate(self._pos_list):
+                r, g, b, a = rgba_list[i]
+                line = vz.Line(pos=pos, color=(r, g, b, a), width=width_list[i], method=method_list[i], parent=self)
+                line.order = self._order
+                self._lines.append(line)
+
+
+    def set_data(self, segments: List[pd.DataFrame]) -> None:
+        """Update segments and refresh the Line(s) without creating a new visual. Preserves styling from construction."""
+        self._clear_visuals()
+        self._build_styles_and_visuals(segments, color=self._last_color, colors=self._last_colors)
+
+
+    def _clear_visuals(self) -> None:
+        if self._line is not None:
+            self._line.parent = None
+            self._line = None
+        for line in self._lines:
+            line.parent = None
+        self._lines = []
+
+
+    @property
+    def line(self) -> Optional[Any]:
+        """In single-Line mode, the single vz.Line; else None."""
+        return self._line
+
+
+    @property
+    def lines(self) -> List[Any]:
+        """In multi-Line mode, the list of vz.Line children; else empty."""
+        return self._lines
+
+
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispyHelpers:
     """ helpers for vispy
@@ -490,6 +632,28 @@ class VispyHelpers:
 
 
 
+def example_trajectory_segments_visual():
+    """Example: render 2D trajectory segments from List[pd.DataFrame] with per-segment colors. Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_trajectory_segments_visual; example_trajectory_segments_visual()\"."""
+    from vispy import app
+    t1 = np.linspace(0, 2 * np.pi, 80)
+    df1 = pd.DataFrame({'x': 0.2 * np.cos(t1), 'y': 0.2 * np.sin(t1)})
+    t2 = np.linspace(0, 2 * np.pi, 50)
+    df2 = pd.DataFrame({'x': 0.15 * np.cos(t2) + 0.3, 'y': 0.15 * np.sin(t2)})
+    df3 = pd.DataFrame({'x': np.linspace(-0.25, 0.25, 40), 'y': np.linspace(-0.2, 0.2, 40)})
+    segments = [df1, df2, df3]
+    canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
+    view = canvas.central_widget.add_view()
+    view.camera = 'panzoom'
+    seg_visual = TrajectorySegmentsVisual(segments, parent=view.scene, colors=['red', 'green', 'blue'], line_width=2.0, order=10)
+    if seg_visual.line is not None:
+        seg_visual.line.set_gl_state('translucent', depth_test=False)
+    else:
+        for line in seg_visual.lines:
+            line.set_gl_state('translucent', depth_test=False)
+    VispyHelpers.set_view_camera(view, np.vstack([df1[['x', 'y']].values, df2[['x', 'y']].values, df3[['x', 'y']].values]), padding=0.15)
+    app.run()
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # Examples                                                                                                                                                                                                                                                                             #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -553,14 +717,17 @@ if __name__ == '__main__':
 
     from vispy import app
 
-    masks_list = make_random_gaussian_masks(n_masks=5, shape=(40, 60), seed=42)
-    contour_data = cast(List[ContourItem], contours_from_masks(masks_list, cmap='viridis'))
-    canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
-    view = canvas.central_widget.add_view()
-    view.camera = 'panzoom'
-    scene_parent = view.scene
-    if scene_parent is not None:
-        _lines, _polygons = create_contour_line_visuals(contour_data, scene_parent, line_width=2.0, order=10, fill=True, fill_alpha=0.3)
-    app.run()
+    # masks_list = make_random_gaussian_masks(n_masks=5, shape=(40, 60), seed=42)
+    # contour_data = cast(List[ContourItem], contours_from_masks(masks_list, cmap='viridis'))
+    # canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
+    # view = canvas.central_widget.add_view()
+    # view.camera = 'panzoom'
+    # scene_parent = view.scene
+    # if scene_parent is not None:
+    #     _lines, _polygons = create_contour_line_visuals(contour_data, scene_parent, line_width=2.0, order=10, fill=True, fill_alpha=0.3)
+    #     # example_trajectory_segments_visual()
 
 
+    # app.run()
+
+    example_trajectory_segments_visual()
