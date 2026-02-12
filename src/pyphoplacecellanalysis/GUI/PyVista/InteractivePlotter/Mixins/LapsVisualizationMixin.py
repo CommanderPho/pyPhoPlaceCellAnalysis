@@ -27,7 +27,8 @@ class LapsVisualizationMixin:
     
     @staticmethod
     def _compute_laps_specific_position_dfs(session):
-        """ curr_position_df, lap_specific_position_dfs = _compute_laps_specific_position_dfs(sess)
+        """ Just segments the laps into positions 
+        curr_position_df, lap_specific_position_dfs = _compute_laps_specific_position_dfs(sess)
 
         Args:
             session (DataSession): [description]
