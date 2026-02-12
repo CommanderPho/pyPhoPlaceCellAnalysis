@@ -2008,7 +2008,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     """ plots a decoded 1D or 2D trajectory using matplotlib. 
 
     Usage:    
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, RenderColoringMode
 
         ## 2D:
         # Choose the ripple epochs to plot:
@@ -2235,7 +2235,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @classmethod
     def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, 
                 line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, 
-                time_cmap='viridis', **LineCollection_kwargs,
+                cmap='viridis', **LineCollection_kwargs,
             ):
         """ Adds a gradient line representing a timeseries of (x, y) positions. line_color_scheme: TIME (time colormap), ANGLE (heading ROYGBIV via HeadingAngleHelpers); str 'time'/'angle' also accepted.
 
@@ -2259,9 +2259,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # needs to be (numlines) x (points per line) x 2 (for x and y)
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        if isinstance(time_cmap, str):
-            time_cmap = plt.get_cmap(time_cmap)  # Choose a colormap
-        lc = LineCollection(segments, cmap=time_cmap, norm=norm, **LineCollection_kwargs)
+        if isinstance(cmap, str):
+            cmap = plt.get_cmap(cmap)  # Choose a colormap
+        lc = LineCollection(segments, cmap=cmap, norm=norm, **LineCollection_kwargs)
         # Set the values used for colormapping
         lc.set_array(t)
         lc.set_linewidth(2)
@@ -2270,7 +2270,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         if add_markers:
             # Builds scatterplot markers (points) along the path
-            colors_arr = time_cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
+            colors_arr = cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
             # segments_arr = line.get_segments() # (16, 2, 2)
             # len(a_most_likely_positions) # 17
             _out_markers: PathCollection = ax.scatter(x=x, y=y, s=s, c=colors_arr, marker='D')
@@ -2343,7 +2343,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-10-21 07:40', related_items=[])
     @classmethod
     def _helper_add_concentrated_arrows_to_line(cls, ax, t, x, y, speed=None, time_cmap='viridis',
-                                                arrow_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.SPEED, arrow_skip: int=20,
+                                                arrow_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, arrow_skip: int=20,
                                                 mutation_scale_multiplier = 40, mutation_scale_constant = 10, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
                                                 ) -> List[FancyArrowPatch]:
         """ Adds arrows along a path. arrow_color_scheme: RenderColoringMode.TIME (time_cmap), SPEED (speed), or ANGLE (HeadingAngleHelpers, North=Red, ROYGBIV); str also accepted.
@@ -2878,7 +2878,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         time_cmap = LinearSegmentedColormap.from_list("GreenToBlack", colors, N=25)
         
         # Use the helper to add a gradient line.
-        a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, time_cmap=time_cmap, zorder=0)
+        a_meas_pos_line, _meas_pos_out_markers = cls._helper_add_gradient_line(an_ax, t=a_measured_time_bin_centers, **pos_kwargs, add_markers=add_markers, cmap=time_cmap, zorder=0)
         
         return a_meas_pos_line, _meas_pos_out_markers
     
@@ -3012,7 +3012,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, line_opacity: float = 1.0, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -3047,11 +3047,12 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # _active_plot_fn = cls._helper_add_hdr_contours
         _active_posterior_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
 
+        arrow_opacity: float = kwargs.pop('arrow_opacity', line_opacity)
 
         if should_include_trajectory_arrows:
             arrow_concentration_kwargs = dict(
                 arrow_skip = 50, time_cmap='viridis',
-                mutation_scale_multiplier = 20, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5,
+                mutation_scale_multiplier = 20, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5, arrow_opacity=arrow_opacity,
             ) | (arrow_concentration_kwargs or {})
             print(f'arrow_concentration_kwargs: {arrow_concentration_kwargs}')
         
@@ -3222,13 +3223,18 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
                     if should_include_trajectory_arrows:
                         ## try to add some arrow markers, might be very bad performance
+                        _arrow_kwargs = {k: v for k, v in arrow_concentration_kwargs.items() if k != 'arrow_opacity'}
                         _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_concentrated_arrows_to_line(ax=axs[curr_row][curr_col], 
                             t=curr_epoch_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
                             x=epochs_position_traces[curr_epoch_id][0,:],
                             y=epochs_position_traces[curr_epoch_id][1,:], 
                             speed=None,
-                            **arrow_concentration_kwargs
+                            **_arrow_kwargs
                         )
+                        _line_alpha = plot_traj_kwargs.get('alpha', 0.85)
+                        _arrow_alpha = arrow_concentration_kwargs.get('arrow_opacity', _line_alpha)
+                        for _ar in _out_markers.values():
+                            _ar.set_alpha(_arrow_alpha)
                     
 
 
@@ -3409,7 +3415,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         if plot_actual_lap_lines:
             ## IDK what this is sadly, i think it's a reminant of the lap plotter?
-            _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, active_plot_mode=plot_mode, **kwargs)
+            _out_objs = _subfn_add_specific_epoch_trajectory(self.fig, self.axs, linear_plotter_indicies=self.linear_plotter_indicies, row_column_indicies=self.row_column_indicies, active_page_epochs_ids=active_page_epochs_ids, epochs_position_traces=epochs_position_traces, epochs_time_ranges=epochs_time_ranges, active_plot_mode=plot_mode, **{**kwargs, 'alpha': line_opacity})
             # plt.ylim((125, 152))
         else:
             _out_objs = None
