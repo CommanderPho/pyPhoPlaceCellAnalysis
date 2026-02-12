@@ -2062,7 +2062,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     ## MAIN PLOT FUNCTION:
     @function_attributes(short_name=None, tags=['main', 'plot', 'posterior', 'epoch', 'line', 'trajectory'], input_requires=[], output_provides=[], uses=['self._perform_add_decoded_posterior_and_trajectory'], used_by=['plot_epoch_with_slider_widget'], creation_date='2025-01-29 15:52', related_items=[])
-    def plot_epoch(self, an_epoch_idx: int, override_plot_linear_idx: Optional[int]=None, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None, should_post_hoc_fit_to_image_extent: bool = True, posterior_masking_value: float = 0.0025, debug_print:bool = False):
+    def plot_epoch(self, an_epoch_idx: int, override_plot_linear_idx: Optional[int]=None, time_bin_index: Optional[int]=None, include_most_likely_pos_line: Optional[bool]=None, override_ax=None, should_post_hoc_fit_to_image_extent: bool = True, posterior_masking_value: float = 0.0025, debug_print:bool = False, **kwargs):
         """ Main plotting function.
              Internally calls `self._perform_add_decoded_posterior_and_trajectory(...)` to do the plotting.
              
@@ -2144,7 +2144,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                                                                             should_post_hoc_fit_to_image_extent=should_post_hoc_fit_to_image_extent,
                                                                             posterior_masking_value=posterior_masking_value, 
                                                                             time_cmap=deepcopy(self.cmap),
-                                                                            debug_print=debug_print) # , allow_time_slider=True
+                                                                            debug_print=debug_print, line_start_lw=kwargs.pop('line_start_lw', 2), line_end_lw=kwargs.pop('line_end_lw', 2)) # , allow_time_slider=True 
 
 
         ## update the plot_data
@@ -2233,13 +2233,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
     # fig, axs, laps_pages = plot_lap_trajectories_2d(curr_active_pipeline.sess, curr_num_subplots=22, active_page_index=0)
     @function_attributes(short_name=None, tags=['matplotlib', 'helper', 'gradient', 'curve', 'line'], input_requires=[], output_provides=[], uses=[], used_by=['plot_lap_trajectories_2d'], creation_date='2025-06-18 06:22', related_items=[])
     @classmethod
-    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, 
+    def _helper_add_gradient_line(cls, ax, t, x, y, add_markers=False, s=20.0, line_start_lw: float = 0.3, line_end_lw: float = 1.0,
                 line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, 
                 cmap='viridis', **LineCollection_kwargs,
             ):
         """ Adds a gradient line representing a timeseries of (x, y) positions. line_color_scheme: TIME (time colormap), ANGLE (heading ROYGBIV via HeadingAngleHelpers); str 'time'/'angle' also accepted.
 
         add_markers (bool): if True, draws points at each (x, y) position colored the same as the underlying line.
+        line_start_lw / line_end_lw: line width at trajectory start/end; thickness scales linearly along the trajectory.
         
         
         cls._helper_add_gradient_line(ax=axs[curr_row][curr_col]],
@@ -2252,19 +2253,20 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         if isinstance(line_color_scheme, str):
             line_color_scheme = RenderColoringMode(line_color_scheme)
         if line_color_scheme == RenderColoringMode.ANGLE:
-            return cls._helper_add_gradient_angle_visualizing_line(ax, t, x, y, add_markers=add_markers, s=s, **LineCollection_kwargs)
+            return cls._helper_add_gradient_angle_visualizing_line(ax, t, x, y, add_markers=add_markers, s=s, line_start_lw=line_start_lw, line_end_lw=line_end_lw, **LineCollection_kwargs)
         # TIME (or SPEED): time-based colormap on segments
         assert len(t) == len(x), f"len(t): {len(t)} != len(x): {len(x)}"
         norm = plt.Normalize(t.min(), t.max())
         # needs to be (numlines) x (points per line) x 2 (for x and y)
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        n_segments = len(segments)
+        linewidths = np.linspace(line_start_lw, line_end_lw, n_segments) if n_segments else np.array([line_end_lw])
         if isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)  # Choose a colormap
-        lc = LineCollection(segments, cmap=cmap, norm=norm, **LineCollection_kwargs)
+        lc = LineCollection(segments, cmap=cmap, norm=norm, linewidths=linewidths, **LineCollection_kwargs)
         # Set the values used for colormapping
         lc.set_array(t)
-        lc.set_linewidth(2)
         lc.set_alpha(0.85)
         line = ax.add_collection(lc)
 
@@ -2280,13 +2282,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
     @classmethod
-    def _helper_add_gradient_angle_visualizing_line(cls, ax, t, x, y, add_markers=False, s=20.0, **LineCollection_kwargs):
+    def _helper_add_gradient_angle_visualizing_line(cls, ax, t, x, y, add_markers=False, s=20.0, line_start_lw: float = 0.3, line_end_lw: float = 1.0, **LineCollection_kwargs):
         """Adds a trajectory line colored by heading angle (North=red, ROYGBIV). Same semantics as Vispy create_heading_rainbow_line.
 
         Line segments are colored by direction of travel; markers (if add_markers=True) are colored by per-vertex heading.
         Parameters t and time_cmap are kept for API compatibility but are not used for coloring.
 
         add_markers (bool): if True, draws points at each (x, y) position colored by heading at that vertex.
+        line_start_lw / line_end_lw: line width at trajectory start/end; thickness scales linearly along the trajectory.
 
         Example:
             DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_angle_visualizing_line(ax=axs[curr_row][curr_col], t=np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:])), x=laps_position_traces[curr_lap_id][0,:], y=laps_position_traces[curr_lap_id][1,:])
@@ -2302,7 +2305,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         segment_colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=0.85)
         points = np.array([x, y]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
-        lc = LineCollection(segments, colors=segment_colors, linewidth=2, alpha=0.85, **LineCollection_kwargs)
+        n_segments = len(segments)
+        linewidths = np.linspace(line_start_lw, line_end_lw, n_segments) if n_segments else np.array([line_end_lw])
+        lc = LineCollection(segments, colors=segment_colors, linewidths=linewidths, alpha=0.85, **LineCollection_kwargs)
         line = ax.add_collection(lc)
         if add_markers:
             vertex_colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
@@ -2378,9 +2383,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             dist = np.sqrt(dx**2 + dy**2)
             dt = np.diff(t)
             # instantaneous speed magnitude
-            speed = np.concatenate([[0], dist / dt])
+            speed = np.concatenate([[0], dist / np.maximum(dt, 1e-9)])
             
         assert len(t) == len(speed), f"len(t): {len(t)} != len(speed): {len(speed)}"
+        # Use a robust reference speed (e.g. 95th percentile) so one spike doesn't make one arrow massive
+        _speed_finite = np.asarray(speed)[np.isfinite(speed)]
+        speed_ref = float(np.percentile(_speed_finite, 95)) if len(_speed_finite) > 0 else 1.0
+        if speed_ref <= 0:
+            speed_ref = 1.0
         # colors_arr = time_cmap(norm(t)) # line.get_colors() # (17, 4) -- this is not working!
         _out_markers = {}
         # --- Add Arrows along the path ---
@@ -2390,7 +2400,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
             x1, y1 = x[i+1], y[i+1]
             dx, dy = x1 - x0, y1 - y0
             spd = speed[i]
-            spd_percent_max = (spd / np.max(speed))
+            spd_percent_max = min((spd / speed_ref) if np.isfinite(spd) else 0.0, 1.0)
             # scale arrow size by speed
             arrow_length = arrow_length_constant + (arrow_length_multiplier * spd_percent_max)
             mutation_scale = mutation_scale_constant + (mutation_scale_multiplier * spd_percent_max)
@@ -2922,6 +2932,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # _active_plot_fn = cls._helper_add_heatmap
         # _active_plot_fn = cls._helper_add_hdr_contours
         _active_plot_fn = kwargs.pop('active_plot_fn', DecodedTrajectoryMatplotlibPlotter._helper_add_heatmap)
+        line_start_lw = kwargs.pop('line_start_lw', 0.3)
+        line_end_lw = kwargs.pop('line_end_lw', 1.0)
 
         
         # Delegate the posterior plotting functionality.
@@ -2989,10 +3001,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
             if not is_2D: # 1D case
                 # a_line = _helper_add_gradient_line(an_ax, t=a_time_bin_centers, x=a_most_likely_positions, y=np.full_like(a_time_bin_centers, fake_y_center))
-                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True, line_start_lw=line_start_lw, line_end_lw=line_end_lw)
             else:
                 # 2D case
-                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True)
+                a_line, _out_markers = cls._helper_add_gradient_line(an_ax, t=a_time_bin_centers, **pos_kwargs, add_markers=True, line_start_lw=line_start_lw, line_end_lw=line_end_lw)
         else:
             a_line, _out_markers = None, None
             
@@ -3206,10 +3218,14 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                     # needs to be (numlines) x (points per line) x 2 (for x and y)
                     points = np.array([epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:]]).T.reshape(-1, 1, 2)
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    line_start_lw = plot_traj_kwargs.get('line_start_lw', 0.3)
+                    line_end_lw = plot_traj_kwargs.get('line_end_lw', 1.0)
+                    n_segments = len(segments)
+                    linewidths = np.linspace(line_start_lw, line_end_lw, n_segments) if n_segments else np.array([line_end_lw])
                     lc = LineCollection(segments, cmap=cmap, norm=norm)
+                    lc.set_linewidth(linewidths)
                     # Set the values used for colormapping
                     lc.set_array(curr_epoch_timeseries)
-                    lc.set_linewidth(plot_traj_kwargs.get('linewidth', 2))
                     lc.set_alpha(plot_traj_kwargs.get('alpha', 0.85))
                     a_line = axs[curr_row][curr_col].add_collection(lc)
                     

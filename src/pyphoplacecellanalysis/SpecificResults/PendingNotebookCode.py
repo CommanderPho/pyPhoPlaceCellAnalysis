@@ -3037,8 +3037,7 @@ def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
 
 
 @function_attributes(short_name=None, tags=['GUI', 'dual-conteext', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-01 08:00', related_items=[])
-def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True,
-                                                           directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
+def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -3392,7 +3391,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         active_measured_positions = computation_result.sess.position.to_dataframe()
 
         ## Build the connected position plotter:
-        curr_position_decoder_plotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder, needs_background_image=True)
+        curr_position_decoder_plotter: TimeSynchronizedPositionDecoderPlotter = TimeSynchronizedPositionDecoderPlotter(active_one_step_decoder=active_one_step_decoder, active_two_step_decoder=active_two_step_decoder, needs_background_image=True, show_posteriors=show_posteriors)
         if active_measured_positions is not None:
             curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_all_time_pos_df = deepcopy(active_measured_positions)
             curr_position_decoder_plotter.params.AnimalTrajectoryPlottingMixin_filtered_pos_df = deepcopy(active_measured_positions)
