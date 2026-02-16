@@ -6940,7 +6940,6 @@ class PredictiveDecodingVispyWidget:
     decoded_result: DecodedFilterEpochsResult = field(default=None)
     active_epoch_idx: int = field(default=0)
     
-
     current_traj_seconds_pre_post_extension: float = field(default=0.750)
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = field(default=(0.4, 1.0))
     start_end_extension_max_opacity: float = field(default=0.4)
@@ -7105,18 +7104,6 @@ class PredictiveDecodingVispyWidget:
             self.past_future_trajectory_end_extension_seconds = 0.0
 
 
-    # def get_state(self) -> dict:
-    #     return {
-    #         'num_epochs': self.num_epochs,
-    #         'epoch_slider': self.epoch_slider,
-    #         'epoch_value_label': self.epoch_value_label,
-    #         'update_epoch_display': self.update_epoch_display,
-    #     }
-
-    # def as_viewer_tuple(self) -> tuple:
-    #     return (self.main_window, self.canvas, self.get_state())
-    
-
     def buildUI(self):
         # from vispy import app, scene
         # from qtpy import QtWidgets, QtCore
@@ -7164,7 +7151,6 @@ class PredictiveDecodingVispyWidget:
             main_layout.addWidget(slider_widget)
 
 
-
         if self.enable_table_widgets:
             from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             table_container = QtWidgets.QWidget()
@@ -7175,32 +7161,7 @@ class PredictiveDecodingVispyWidget:
             }
             epoch_table_manager = TableManager(table_container, visible_columns_dict=visible_columns_dict)
             self.epoch_table_manager = epoch_table_manager
-            # filter_epochs = self.a_flat_matching_results_list_ds.filter_epochs if self.a_flat_matching_results_list_ds is not None else self.a_decoded_filter_epochs_df
             
-            # table_data_sources = {}
-            # # if (filter_epochs is not None) and len(filter_epochs) > 0:
-            # #     # idx = min(self.active_epoch_idx, len(filter_epochs) - 1)
-            # #     # data_sources['active_epoch'] = filter_epochs.iloc[[idx]].copy()
-            # #     # data_sources['segments'] = filter_epochs.copy()
-            # #     pass
-            # if (self.a_flat_matching_results_list_ds is not None):
-            #     a_matching_pos_merged_segment_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_merged_segment_epochs_dfs_list[self.active_epoch_idx]
-            #     if (a_matching_pos_merged_segment_epochs_df is not None) and len(a_matching_pos_merged_segment_epochs_df) > 0:
-            #         table_data_sources['curr_merged_segment_epochs'] = a_matching_pos_merged_segment_epochs_df
-                                
-            #     a_matching_pos_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.matching_pos_epochs_dfs_list[self.active_epoch_idx]
-            #     if (a_matching_pos_epochs_df is not None) and len(a_matching_pos_epochs_df) > 0:
-            #         table_data_sources['curr_merged_pos_epochs'] = a_matching_pos_epochs_df
-                    
-            # # if self.curr_position_df is not None and len(self.curr_position_df) > 0:
-            # #     data_sources['curr_position'] = self.curr_position_df.copy()
-            # if table_data_sources:
-            #     visible_columns_dict = {
-            #         'curr_merged_segment_epochs': ['start', 'stop', 'is_future_present_past', 'epoch_t_idx', 'label', 'duration', 'num_epoch_t_bins', 'is_reversely_replayed', 'pre_merged_epoch_label'],
-            #         'curr_merged_pos_epochs': ['start', 'stop', 'is_future_present_past', 'label', 'duration'],
-            #     }    
-            #     self.epoch_table_manager.update_tables(table_data_sources, visible_columns_dict=visible_columns_dict)
-                
             main_layout.addWidget(table_container)
             
 
@@ -8404,11 +8365,11 @@ class PredictiveDecodingVispyWidget:
                 time.sleep(delay_between_epochs)
                 
                 # Process events again after delay
-                QApplication.processEvents()
+                # QApplication.processEvents()
                 
                 # Ensure canvas is updated
                 canvas.update()
-                QApplication.processEvents()
+                # QApplication.processEvents()
                 
                 # Render high-resolution screenshot
                 # vispy's render() returns RGBA numpy array with shape (height, width, 4)
