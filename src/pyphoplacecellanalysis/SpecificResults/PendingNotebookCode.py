@@ -134,125 +134,329 @@ from neuropy.core.position import PositionAccessor, Position, PositionComputedDa
 # 2026-02-16                                                                                                                                                                                                                                                                           #
 # ==================================================================================================================================================================================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-13 03:49', related_items=[])
-def do_plot_and_export_past_future_all(curr_active_pipeline, _container_container, a_ds, curr_epoch_idx: int = 8, sync_plotters=None, enable_render_videos: bool = True, minimum_included_matching_sequence_length: int = 4, epoch_flat_mask_future_past_result=None, directional_decoders_decode_result=None, **kwargs):
-    """Single self-contained function: plot and export past/future matching paths for a PBE (2D grid, vispy posteriors, videos). All imports and variables needed to run are inside or passed as arguments."""
-    import shutil
-    from pathlib import Path
-    from typing import List, Dict
-    import numpy as np
-    import pandas as pd
-    from neuropy.utils.indexing_helpers import flatten, PandasHelpers
-    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle, matplotlib_configuration_update
-    from neuropy.core.epoch import ensure_dataframe
-    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, RenderColoringMode
-    from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
-    from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_Bapun_decoders_window
-    from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingVispyWidget, render_predictive_decoding_with_vispy
-    from qtpy import QtWidgets
-    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
-    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-    from pyphocorehelpers.assertion_helpers import Assert
+import shutil
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter, RenderColoringMode
+from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.LapsVisualizationMixin import LapsVisualizationMixin
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.AnimalTrajectoryPlottingMixin import AnimalTrajectoryPlottingMixin
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_Bapun_decoders_window
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecodingVispyWidget, render_predictive_decoding_with_vispy
+from qtpy import QtWidgets
 
-    past_future_keys = ['future', 'past']
-    export_video_paths: List = []
-    exported_middle_pane_files = []
+xbin = a_decoder.xbin
+xbin_centers = a_decoder.xbin_centers
+ybin = a_decoder.ybin
+ybin_centers = a_decoder.ybin_centers
+
+## INPUTS: curr_epoch_idx
+def plot_matching_trajectories(a_ds, curr_position_df, curr_epoch_idx: int, minimum_included_matching_sequence_length: int = 4):
+    """ plots the matching trajectories for a given PBE 
+    
+    captures: xbin, ybin, xbin_Centers, ybin_centers
+    """
+    epoch_data = a_ds._prepare_epoch_data(an_epoch_idx=curr_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length)
+    # curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+    curr_matching_past_future_positions_df_list = epoch_data['curr_matching_past_future_positions_df_list']
+    ## OUTPUTS: curr_matching_past_future_positions_df_list
+    
+    past_future_all_found_path_epochs_df_dict = {}
+    # for a_past_future_key in curr_matching_past_future_positions_df_list:        
+    for a_past_future_key, found_item in curr_matching_past_future_positions_df_list.items():
+        # all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in curr_matching_past_future_positions_df_list[a_past_future_key]], columns=['start', 'end'])
+        all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in found_item], columns=['start', 'end'])
+        all_found_path_epochs_df['past_or_future'] = a_past_future_key
+        past_future_all_found_path_epochs_df_dict[a_past_future_key] = all_found_path_epochs_df
+
+    # all_found_path_epochs_df_merged: pd.DataFrame = PandasHelpers.safe_concat(past_future_all_found_path_epochs_df_dict.values())
+    # all_found_path_epochs_df_merged
+
+    curr_matching_past_future_positions_df_all_list: List[pd.DataFrame] = flatten([v for v in curr_matching_past_future_positions_df_list.values()])
+    # curr_matching_past_future_positions_df_all_list
+
+    ## OUTPUTS: curr_matching_past_future_positions_df_list, all_found_path_epochs_df_merged, curr_matching_past_future_positions_df_all_list
+    decoded_local_epochs_result = None ## NOT NEEDED
+
+    epoch_specific_position_dfs = curr_matching_past_future_positions_df_all_list
+    num_found_possible_path_matches: int = len(epoch_specific_position_dfs)
+    assert (num_found_possible_path_matches > 0), f"num_found_possible_path_matches: {num_found_possible_path_matches} for curr_epoch_idx: {curr_epoch_idx}"
+    ## INPUTS: epoch_specific_position_dfs
+    ## add an optional `arrow_opacity` to `arrow_concentration_kwargs` that can be used to further customize the arrows on their own. If it's not provided by the user, `line_opacity` is used
+    should_include_trajectory_arrows = True
+    # should_include_trajectory_arrows = False
+    arrow_concentration_kwargs = dict(
+                    arrow_skip = 30, time_cmap='magma', arrow_color_scheme = RenderColoringMode.TIME,
+                    mutation_scale_multiplier = 10, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5, 
+                    arrow_opacity = 0.5,
+                )
+    _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+
+    a_decoded_traj_plotter: DecodedTrajectoryMatplotlibPlotter = DecodedTrajectoryMatplotlibPlotter(a_result=decoded_local_epochs_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, rotate_to_vertical=True)
+    fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=curr_position_df, curr_num_subplots=num_found_possible_path_matches, active_page_index=0, 
+                                                                                        epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=None,
+                                                                                        plot_actual_lap_lines=True, should_include_trajectory_arrows=should_include_trajectory_arrows,
+                                                                                        arrow_concentration_kwargs=arrow_concentration_kwargs, line_opacity = 0.9,
+                                                                                        line_start_lw = 0.5, line_end_lw = 4.5, cmap='plasma', #cmap='magma', ## 'magma' is actually very important
+                                                                                        #  line_start_lw = 0.3, line_end_lw = 1.0,
+                                                                                        # line_start_lw = 0.3, line_end_lw = 25.0,
+                                                                                        use_theoretical_tracks_instead=False, fixed_columns=10)
+
+
+    figure_title: str = f'PBE[{curr_epoch_idx}]: num matching paths {num_found_possible_path_matches}'
+    perform_update_title_subtitle(fig=fig, ax=None, title_string=figure_title, #subtitle_string="TEST - SUBTITLE",
+                                )
+
+    # ax = axs[0][0]
+    # ax.set_aspect('auto')  # Adjust automatically based on data limits
+    # ax.set_adjustable('datalim')  # Ensure the aspect ratio respects the data limits
+    # ax.autoscale()  # Autoscale the view to fit data
+
+    fig.show()
+    
+    return a_decoded_traj_plotter, fig, axs, decoded_epochs_pages
+
+
+def render_for_epoch(a_ds, curr_epoch_idx: int, sync_plotters: Dict, curr_export_video_parent_folder: Path, minimum_included_matching_sequence_length=4):
+    """ renders all the past/future paths for a specific PBE idx and saves them out to video
+    """
+    export_video_paths = []
+    # past_future_keys = ['future', 'past']
+
+    epoch_data = a_ds._prepare_epoch_data(an_epoch_idx=curr_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length)
+    # curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
+    curr_matching_past_future_positions_df_list = epoch_data['curr_matching_past_future_positions_df_list']
+    ## OUTPUTS: curr_matching_past_future_positions_df_list
+
+    past_future_all_found_path_epochs_df_dict = {}
+    # for a_past_future_key in curr_matching_past_future_positions_df_list:        
+    for a_past_future_key, found_item in curr_matching_past_future_positions_df_list.items():
+        # all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in curr_matching_past_future_positions_df_list[a_past_future_key]], columns=['start', 'end'])
+        all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in found_item], columns=['start', 'end'])
+        all_found_path_epochs_df['past_or_future'] = a_past_future_key
+        past_future_all_found_path_epochs_df_dict[a_past_future_key] = all_found_path_epochs_df
+
+    all_found_path_epochs_df_merged: pd.DataFrame = PandasHelpers.safe_concat(past_future_all_found_path_epochs_df_dict.values())
+
+    ## OUTPUTS: all_found_path_epochs_df_merged
+    # all_found_path_epochs_df_merged
+    for a_row in all_found_path_epochs_df_merged.itertuples(index=True):
+        found_path_index: int = int(a_row.Index)
+        
+        for an_epoch_name, a_plotter in sync_plotters.items():
+            # export_extension = '.avi'
+            export_extension = '.gif'
+            an_export_video_path = curr_export_video_parent_folder.joinpath(f'found_{found_path_index}_decoder_{an_epoch_name}{export_extension}')
+            print(f'exporting to "{an_export_video_path}"')
+            # With custom settings
+            video_path = a_plotter.export_video(
+                output_path=an_export_video_path,
+                start_t=a_row.start,
+                end_t=a_row.end,
+                fps=24.0,
+                width=720,
+                height=720,
+                progress_print=True,
+                debug_print=False,
+            )
+            print(f'\texport to video_path: "{video_path.resolve().as_posix()}" complete.')
+            export_video_paths.append(video_path)
+            # export_video_paths[an_epoch_name] = video_path
+
+    print(f'done exporting all videos.')
+
+    return export_video_paths
+
+
+def _build_attached_plotters_once(curr_active_pipeline, active_2d_plot=None):
+    """ builds the two attached time-synced plotters that are used to render 2D data
+    Usage:
+        _out_container_new, sync_plotters = _build_attached_plotters_once(curr_active_pipeline=curr_active_pipeline, active_2d_plot=None)
+    """    
+    hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    _out_container_new: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=hardcoded_params.non_global_activity_session_names, fixed_window_duration = 1.0,
+        directional_decoders_decode_result=directional_decoders_decode_result,
+        controlling_widget=active_2d_plot, create_new_controlling_widget=False, show_posteriors=False,
+        # controlling_widget=active_2d_plot, create_new_controlling_widget=False, show_posteriors=False,
+    )
+
+    # active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
+    sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
+    win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
+    # a_sync_plotter: TimeSynchronizedPositionDecoderPlotter = sync_plotters['roam']
+    # a_sync_plotter.curr_position
+
+    # ## Disable debug print to speed up animation
+    # for a_plotter_name, a_plotter in sync_plotters.items():
+    #     a_plotter.params.debug_print = False
+
+
+    ## INPUTS: _out_container, active_2d_plot, _out_container, sync_plotters, 
+
+    for an_epoch_name, a_plotter in sync_plotters.items():
+        a_plotter.ui.root_plot.setTitle(f'PositionDecoder -  t = {a_plotter.last_window_time}')    
+        # a_plotter.params.drop_below_threshold = 1.0 ## DROP ALL SO NO POSTERIORS ARE SHOWN
+        a_plotter.ui.imv.setVisible(False)
+        
+        QtWidgets.QApplication.processEvents()
+        
+    return _out_container_new, sync_plotters
+
+
+@function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['render_for_epoch', 'plot_matching_trajectories', '_build_attached_plotters_once'], used_by=[], creation_date='2026-02-13 03:49', related_items=[])
+def do_plot_and_export_past_future_all(curr_active_pipeline, _container_container,
+                                        a_ds, curr_epoch_idx: int = 8, sync_plotters=None, enable_render_videos: bool = True, **kwargs):
+    """ main function, captures a lot
+    """
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN SINGLE `curr_epoch_idx`                                                                                                                                                                                                                                                        #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## OUTPUTS: curr_epoch_idx
+
+
+    # BUILD ALL OUTPUT FILE PATHS ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    export_video_paths = {}
 
     export_video_parent_folder = curr_active_pipeline.get_output_path().joinpath('videos').joinpath('past_future_matches').resolve()
     export_video_parent_folder.mkdir(exist_ok=True)
     export_video_parent_folder = export_video_parent_folder.joinpath('past_future_matches')
+    ## INPUTS: all_found_path_epochs_df_merged
     curr_epoch_export_parent_folder = export_video_parent_folder.joinpath(f'epoch_{curr_epoch_idx}')
     curr_epoch_export_parent_folder.mkdir(parents=True, exist_ok=True)
+
     print(f'curr_export_video_parent_folder: {curr_epoch_export_parent_folder}')
+    ## OUTPUTS: curr_export_video_parent_folder
+
     curr_export_images_parent_folder = curr_epoch_export_parent_folder.joinpath('posteriors')
     curr_export_images_parent_folder.mkdir(exist_ok=True)
-    active_out_middle_figure_path = curr_export_images_parent_folder.joinpath(f'plot_decoded_trajectories_2d_{curr_epoch_idx}')
 
-    epoch_data = a_ds._prepare_epoch_data(an_epoch_idx=curr_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length)
+    active_out_middle_figure_path = curr_export_images_parent_folder.joinpath(f'plot_decoded_trajectories_2d_{curr_epoch_idx}') # curr_active_pipeline.output_figure(final_context, fig, debug_print=True) 
+
+
+    # GET DATA FOR EPOCH _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    epoch_data = a_ds._prepare_epoch_data(an_epoch_idx=curr_epoch_idx)
+    # curr_matching_past_future_positions_df_dict = epoch_data['curr_matching_past_future_positions_df_dict']
     curr_matching_past_future_positions_df_list = epoch_data['curr_matching_past_future_positions_df_list']
+    ## OUTPUTS: curr_matching_past_future_positions_df_list
+
     past_future_all_found_path_epochs_df_dict = {}
     for a_past_future_key in past_future_keys:
         all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in curr_matching_past_future_positions_df_list[a_past_future_key]], columns=['start', 'end'])
         all_found_path_epochs_df['past_or_future'] = a_past_future_key
         past_future_all_found_path_epochs_df_dict[a_past_future_key] = all_found_path_epochs_df
+
     all_found_path_epochs_df_merged: pd.DataFrame = pd.concat(past_future_all_found_path_epochs_df_dict.values())
     curr_matching_past_future_positions_df_all_list: List[pd.DataFrame] = flatten([v for v in curr_matching_past_future_positions_df_list.values()])
     num_found_possible_path_matches: int = len(curr_matching_past_future_positions_df_all_list)
-    if num_found_possible_path_matches == 0:
-        raise ValueError(f"curr_epoch_idx: {curr_epoch_idx} has {num_found_possible_path_matches} num_found_possible_path_matches... wtf?")
 
+    # assert (num_found_possible_path_matches > 0), f"curr_epoch_idx: {curr_epoch_idx} has {num_found_possible_path_matches} num_found_possible_path_matches... wtf?"
+    if (num_found_possible_path_matches == 0):
+        raise ValueError(f"curr_epoch_idx: {curr_epoch_idx} has {num_found_possible_path_matches} num_found_possible_path_matches... wtf?")
+        
+    ## OUTPUTS: all_found_path_epochs_df_merged
+    # all_found_path_epochs_df_merged
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN RENDERING OUTPUT PATHS                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    # Usage from Container:
     a_t_bin_size: float = 0.025
+    # a_t_bin_size: float = 0.250
     a_decoder_name: str = 'roam'
     active_container = _container_container.masked_container
-    masked_container = active_container
     a_decoder = active_container.pf1D_Decoder_dict[a_decoder_name]
-    a_decoded_result = active_container.epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name]
-    a_decoded_filter_epochs_df: pd.DataFrame = a_decoded_result.filter_epochs
-    xbin, xbin_centers = a_decoder.xbin, a_decoder.xbin_centers
-    ybin, ybin_centers = a_decoder.ybin, a_decoder.ybin_centers
+    a_decoded_result = active_container.epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
+    # epoch_specific_position_dfs =  curr_active_pipeline.filtered_sessions[a_decoder_name].position.to_dataframe().pho.partition_df('lap')
 
     curr_position_df, _ = LapsVisualizationMixin._compute_laps_specific_position_dfs(curr_active_pipeline.sess)
     paradigm_df = ensure_dataframe(curr_active_pipeline.sess.paradigm)
     paradigm_df = paradigm_df[paradigm_df['label'].isin(['roam', 'sprinkle'])].reset_index(drop=True)
+    # paradigm_df
+    # Only get the positions on the relevant mazes:
     curr_position_df = curr_position_df.position.adding_maze_id_if_needed(active_maze_epochs_df=paradigm_df, no_interval_fill_value=np.nan)
     curr_position_df = curr_position_df[curr_position_df['maze_id'].notna()]
+    # curr_position_df
 
+    # curr_position_df = curr_position_df[curr_position_df['lap'] != np.nan]
+    # epoch_specific_position_dfs = [curr_position_df.groupby('lap').get_group(i)[['t','x','y','lin_pos']] for i in session.laps.lap_id] # dataframes split for each ID:
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2D Grid of possible paths                                                                                                                                                                                                                                                            #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    ## OUTPUTS: curr_position_df
     _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-    epoch_specific_position_dfs = curr_matching_past_future_positions_df_all_list
-    arrow_concentration_kwargs = dict(arrow_skip=30, time_cmap='magma', arrow_color_scheme=RenderColoringMode.TIME, mutation_scale_multiplier=10, mutation_scale_constant=1, arrow_length_multiplier=0.2, arrow_length_constant=0.05, arrow_lw=0.5, arrow_opacity=0.5)
-    a_decoded_traj_plotter: DecodedTrajectoryMatplotlibPlotter = DecodedTrajectoryMatplotlibPlotter(a_result=None, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers, rotate_to_vertical=True)
-    fig, axs, decoded_epochs_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=curr_position_df, curr_num_subplots=num_found_possible_path_matches, active_page_index=0, epoch_specific_position_dfs=epoch_specific_position_dfs, epoch_ids=None, plot_actual_lap_lines=True, should_include_trajectory_arrows=True, arrow_concentration_kwargs=arrow_concentration_kwargs, line_opacity=0.9, line_start_lw=0.5, line_end_lw=4.5, cmap='plasma', use_theoretical_tracks_instead=False, fixed_columns=10)
-    figure_title: str = f'PBE[{curr_epoch_idx}]: num matching paths {num_found_possible_path_matches}'
-    perform_update_title_subtitle(fig=fig, ax=None, title_string=figure_title)
-    fig.show()
-
+    ## PBE-specific setup
+    ## INPUTS: curr_epoch_idx
+    a_decoded_traj_plotter, fig, axs, decoded_epochs_pages = plot_matching_trajectories(a_ds=a_ds, curr_position_df=curr_position_df, curr_epoch_idx=curr_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length)
     final_context = curr_active_pipeline.build_display_context_for_filtered_session(filtered_session_name=a_decoder_name, display_fn_name='plot_decoded_trajectories_2d', curr_epoch_idx=curr_epoch_idx)
-    active_out_figure_paths = curr_active_pipeline.output_figure(final_context, fig, debug_print=True)
+    active_out_figure_paths = curr_active_pipeline.output_figure(final_context, fig, debug_print=True) 
+
+    ## made in wrong place, so copy to the correct one (`active_out_middle_figure_path`):
+
+    ## INPUTS: active_out_middle_figure_path
     active_out_figure_path: Path = active_out_figure_paths[0][0]
     Assert.path_exists(active_out_figure_path)
-    active_out_middle_figure_path = active_out_middle_figure_path.with_suffix(active_out_figure_path.suffix)
+    # active_out_middle_figure_path = active_out_figure_path
+    active_out_middle_figure_path = active_out_middle_figure_path.with_suffix(active_out_figure_path.suffix) ## set suffix to same as the input image
     print(f'copying active_out_figure_path: {active_out_figure_path} -> active_out_middle_figure_path: {active_out_middle_figure_path}')
     shutil.copy2(active_out_figure_path, active_out_middle_figure_path)
     print(f'\tdone.')
 
-    if epoch_flat_mask_future_past_result is not None:
-        long_found_paths_only_batch_overview_viewer: PredictiveDecodingVispyWidget = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df, curr_position_df=masked_container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result, show_full_position_background=False, current_traj_seconds_pre_post_extension=0.0, past_future_trajectory_extension_seconds={'start': 0.25, 'end': 0.5}, start_end_extension_max_opacity=0.4, require_angle_match=False, color_matches_by_matching_angle=False, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length, color_matches_by_merged_epoch_t_bin_idx=False, enable_table_widgets=False, active_epoch_idx=curr_epoch_idx, enable_multi_epoch_overview_display_mode=False, enable_full_vispy_debug_mode=False)
-        exported_middle_pane_files = long_found_paths_only_batch_overview_viewer.export_vispy_viewer_epochs(export_folder=curr_export_images_parent_folder, epoch_indices=[curr_epoch_idx])
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Render out the posterior info/contours (middle pane from vispy app version)                                                                                                                                                                                                          #
+    # ==================================================================================================================================================================================================================================================================================== #
 
+    ## INPUTS: curr_epoch_idx
+    long_found_paths_only_batch_overview_viewer: PredictiveDecodingVispyWidget = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                    curr_position_df = masked_container.decoding_locality.pos_df, 
+                                                    pf_decoder = a_decoder, decoded_result = a_decoded_result, 
+                                                    show_full_position_background = False, current_traj_seconds_pre_post_extension = 0.0, 
+                                                    #  past_future_trajectory_extension_seconds=0.750, 
+                                                    past_future_trajectory_extension_seconds={'start': 0.25, 'end': 0.5}, start_end_extension_max_opacity=0.4, 
+                                                    require_angle_match=False, color_matches_by_matching_angle=False,
+                                                    #  require_angle_match=True, color_matches_by_matching_angle=True,
+                                                    #  enable_debug_plot_trajectory_average_angle_arrows=True,
+                                                    minimum_included_matching_sequence_length = minimum_included_matching_sequence_length, ## this is what makes it used the filtered info
+                                                    color_matches_by_merged_epoch_t_bin_idx=False,
+                                                    enable_table_widgets=False,
+                                                    active_epoch_idx=curr_epoch_idx, enable_multi_epoch_overview_display_mode = False, enable_full_vispy_debug_mode=False,
+                                                    # active_epoch_idx=None, enable_multi_epoch_overview_display_mode = True, MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER=4, enable_full_vispy_debug_mode=False,
+    )
+    # long_found_paths_only_batch_overview_viewer
+
+
+    ## OUTPUTS: curr_export_video_parent_folder, curr_export_images_parent_folder
+    exported_middle_pane_files = long_found_paths_only_batch_overview_viewer.export_vispy_viewer_epochs(export_folder=curr_export_images_parent_folder, epoch_indices=[curr_epoch_idx])
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Render the video in here:                                                                                                                                                                                                                                                            #
+    # ==================================================================================================================================================================================================================================================================================== #
+    export_video_paths = {}
+    
     if enable_render_videos:
         if sync_plotters is None:
             print(f'WARNING: have no attached synced plotters, so building them.')
-            hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
-            _out_container_new: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=hardcoded_params.non_global_activity_session_names, fixed_window_duration=1.0, directional_decoders_decode_result=directional_decoders_decode_result, controlling_widget=None, create_new_controlling_widget=False, show_posteriors=False)
-            sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
-            for an_epoch_name, a_plotter in sync_plotters.items():
-                a_plotter.ui.root_plot.setTitle(f'PositionDecoder -  t = {a_plotter.last_window_time}')
-                a_plotter.ui.imv.setVisible(False)
-                QtWidgets.QApplication.processEvents()
-        render_epoch_data = a_ds._prepare_epoch_data(an_epoch_idx=curr_epoch_idx, minimum_included_matching_sequence_length=minimum_included_matching_sequence_length)
-        render_curr_matching_list = render_epoch_data['curr_matching_past_future_positions_df_list']
-        render_past_future_dict = {}
-        for a_past_future_key, found_item in render_curr_matching_list.items():
-            all_found_path_epochs_df = pd.DataFrame([(df['t'].min(), df['t'].max()) for df in found_item], columns=['start', 'end'])
-            all_found_path_epochs_df['past_or_future'] = a_past_future_key
-            render_past_future_dict[a_past_future_key] = all_found_path_epochs_df
-        render_all_found_merged: pd.DataFrame = PandasHelpers.safe_concat(render_past_future_dict.values())
-        for a_row in render_all_found_merged.itertuples(index=True):
-            found_path_index: int = int(a_row.Index)
-            for an_epoch_name, a_plotter in sync_plotters.items():
-                export_extension = '.gif'
-                an_export_video_path = curr_epoch_export_parent_folder.joinpath(f'found_{found_path_index}_decoder_{an_epoch_name}{export_extension}')
-                print(f'exporting to "{an_export_video_path}"')
-                video_path = a_plotter.export_video(output_path=an_export_video_path, start_t=a_row.start, end_t=a_row.end, fps=24.0, width=720, height=720, progress_print=True, debug_print=False)
-                print(f'\texport to video_path: "{video_path.resolve().as_posix()}" complete.')
-                export_video_paths.append(video_path)
-        print(f'done exporting all videos.')
+            _out_container_new, sync_plotters = _build_attached_plotters_once(curr_active_pipeline=curr_active_pipeline, active_2d_plot=None)
+
+        ## OUTPUTS: sync_plotters
+        ## INPUTS: curr_epoch_idx
+        ## INPUTS: curr_export_video_parent_folder, 
+
+        ## Output videos:
+        ## INPUTS: sync_plotters
+        
+        ## INPUTS: all_found_path_epochs_df_merged
+        export_video_paths = render_for_epoch(a_ds=a_ds, curr_epoch_idx=curr_epoch_idx, sync_plotters=sync_plotters, curr_export_video_parent_folder=curr_epoch_export_parent_folder)
     else:
         print(f'enable_render_videos is False, so skipping.')
-
+        
     return export_video_paths, exported_middle_pane_files, active_out_figure_path, a_decoded_traj_plotter, sync_plotters
 
 
