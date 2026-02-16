@@ -649,8 +649,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             
         print(f'building sampled and normalized outputs...')
         
-        if (self.gaussian_volume is None):
-            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+        # if (self.gaussian_volume is None):
+        #     self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
 
         if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
             self.build_normalized_outputs()
@@ -910,8 +910,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
 
-        if self.gaussian_volume is None:
-            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+        # if self.gaussian_volume is None:
+        #     self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
             
         if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
             _out = self.build_normalized_outputs()
@@ -930,7 +930,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
 
             ## compute the locality:
-            num_timestamps: int = np.shape(self.gaussian_volume)[-1]
+            # num_timestamps: int = np.shape(self.gaussian_volume)[-1]
             
             # Final correct POM __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
@@ -2385,7 +2385,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
                 self.locality_measures.gaussian_volume = None
         
         # Compute locality measures (handles gaussian_volume, p_x_given_n_dict, locality_measures_dict_dict)
-        self.locality_measures.compute()
+        self.locality_measures.compute() # #TODO 2026-02-16 18:01: - [ ] Is this what keeps crashing the kernel? Are these properties always used?
         
         # Build normalized outputs for moving average (unique to PredictiveDecoding)
         self.build_normalized_outputs()
