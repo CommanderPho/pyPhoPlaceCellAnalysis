@@ -8748,7 +8748,7 @@ class PredictiveDecodingVispyWidget:
                                                             curr_position_df=container.decoding_locality.pos_df, 
                                                             pf_decoder=a_decoder, decoded_result=a_decoded_result)
             
-            exported_files = export_vispy_viewer_epochs(viewer, export_folder='./exports', resolution_scale=2.0)
+            exported_files = export_vispy_viewer_epochs(viewer, export_folder='./exports')
         """
         import time
         from pathlib import Path

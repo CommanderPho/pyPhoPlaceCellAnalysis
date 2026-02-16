@@ -3024,7 +3024,7 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, line_opacity: float = 1.0, **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, line_opacity: float = 1.0, track_background_opacity: float = 0.03, trajectory_line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -3033,6 +3033,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         Plots in a paginated manner.
         
         use_theoretical_tracks_instead: bool = True - # if False, renders all positions the animal traversed over the entire session. Otherwise renders the theoretical (idaal) track.
+
+        track_background_opacity: float = 0.03 - Alpha for the maze/track background (0=transparent, 1=opaque). Applied to both theoretical and linear-plot-data backgrounds.
+
+        trajectory_line_color_scheme: RenderColoringMode.TIME (default) or ANGLE. Use ANGLE to color the trajectory by heading (ROYGBIV); makes doubling-back and direction changes much easier to see.
 
         ISSUE: `fixed_columns: int = 1` doesn't work due to indexing
 
@@ -3063,8 +3067,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
         if should_include_trajectory_arrows:
             arrow_concentration_kwargs = dict(
-                arrow_skip = 50, time_cmap='viridis',
-                mutation_scale_multiplier = 20, mutation_scale_constant = 1, arrow_length_multiplier = 0.2, arrow_length_constant = 0.05, arrow_lw = 0.5, arrow_opacity=arrow_opacity,
+                arrow_skip=30, time_cmap='viridis', arrow_color_scheme=RenderColoringMode.ANGLE,
+                mutation_scale_multiplier=20, mutation_scale_constant=1, arrow_length_multiplier=0.2, arrow_length_constant=0.05, arrow_lw=0.5, arrow_opacity=arrow_opacity,
             ) | (arrow_concentration_kwargs or {})
             print(f'arrow_concentration_kwargs: {arrow_concentration_kwargs}')
         
@@ -3078,8 +3082,9 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
         # try:
         if cmap is None:
             cmap = 'viridis'
-        
-    
+        if isinstance(trajectory_line_color_scheme, str):
+            trajectory_line_color_scheme = RenderColoringMode(trajectory_line_color_scheme)
+
         if (use_theoretical_tracks_instead and (sess is not None)):
             from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance, _perform_plot_matplotlib_2D_tracks
             long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(deepcopy(sess.config))
@@ -3187,10 +3192,10 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 an_ax.set_yticks([])
                 
                 if not use_theoretical_tracks_instead:
-                    background_track_shadings[a_linear_index] = an_ax.plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=0.2)
+                    background_track_shadings[a_linear_index] = an_ax.plot(linear_plot_data[a_linear_index][0,:], linear_plot_data[a_linear_index][1,:], c='k', alpha=track_background_opacity)
                 else:
                     # active_config = curr_active_pipeline.sess.config
-                    background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=self.rotate_to_vertical)
+                    background_track_shadings[a_linear_index] = _perform_plot_matplotlib_2D_tracks(long_track_inst=long_track_inst, short_track_inst=short_track_inst, ax=an_ax, rotate_to_vertical=self.rotate_to_vertical, track_background_opacity=track_background_opacity)
                 
             return fig, axs, linear_plotter_indicies, row_column_indicies, background_track_shadings
         
@@ -3212,30 +3217,23 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 valid_plotting_modes: List[str] = ['time_gradient', 'line', 'scatter']
                 # if use_time_gradient_line:
                 if active_plot_mode == 'time_gradient':
-                    # Create a continuous norm to map from data points to colors
                     curr_epoch_timeseries = np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(epochs_position_traces[curr_epoch_id][0,:]))
-                    norm = plt.Normalize(curr_epoch_timeseries.min(), curr_epoch_timeseries.max())
-                    # needs to be (numlines) x (points per line) x 2 (for x and y)
-                    points = np.array([epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:]]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     line_start_lw = plot_traj_kwargs.get('line_start_lw', 0.3)
                     line_end_lw = plot_traj_kwargs.get('line_end_lw', 1.0)
-                    n_segments = len(segments)
-                    linewidths = np.linspace(line_start_lw, line_end_lw, n_segments) if n_segments else np.array([line_end_lw])
-                    lc = LineCollection(segments, cmap=cmap, norm=norm)
-                    lc.set_linewidth(linewidths)
-                    # Set the values used for colormapping
-                    lc.set_array(curr_epoch_timeseries)
-                    lc.set_alpha(plot_traj_kwargs.get('alpha', 0.85))
-                    a_line = axs[curr_row][curr_col].add_collection(lc)
-                    
-
-                    #TODO 2026-01-22 13:03: - [ ] Why not use this?
-                    # line, _out_markers = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(ax=axs[curr_row][curr_col], 
-                    #     t=curr_epoch_timeseries, # np.linspace(curr_lap_time_range[0], curr_lap_time_range[-1], len(laps_position_traces[curr_lap_id][0,:]))
-                    #     x=epochs_position_traces[curr_epoch_id][0,:],
-                    #     y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, time_cmap='viridis', #norm=norm,
-                    # )
+                    _alpha = plot_traj_kwargs.get('alpha', 0.85)
+                    if trajectory_line_color_scheme == RenderColoringMode.ANGLE:
+                        a_line, _ = DecodedTrajectoryMatplotlibPlotter._helper_add_gradient_line(axs[curr_row][curr_col], t=curr_epoch_timeseries, x=epochs_position_traces[curr_epoch_id][0,:], y=epochs_position_traces[curr_epoch_id][1,:], add_markers=False, line_color_scheme=RenderColoringMode.ANGLE, line_start_lw=line_start_lw, line_end_lw=line_end_lw, alpha=_alpha)
+                    else:
+                        norm = plt.Normalize(curr_epoch_timeseries.min(), curr_epoch_timeseries.max())
+                        points = np.array([epochs_position_traces[curr_epoch_id][0,:], epochs_position_traces[curr_epoch_id][1,:]]).T.reshape(-1, 1, 2)
+                        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                        n_segments = len(segments)
+                        linewidths = np.linspace(line_start_lw, line_end_lw, n_segments) if n_segments else np.array([line_end_lw])
+                        lc = LineCollection(segments, cmap=cmap, norm=norm)
+                        lc.set_linewidth(linewidths)
+                        lc.set_array(curr_epoch_timeseries)
+                        lc.set_alpha(_alpha)
+                        a_line = axs[curr_row][curr_col].add_collection(lc)
 
                     if should_include_trajectory_arrows:
                         ## try to add some arrow markers, might be very bad performance

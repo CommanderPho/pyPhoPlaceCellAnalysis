@@ -461,12 +461,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bayesian-changepoint-detection"
-version = "0.2.dev1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c4/34/3d1d9aba8335b4bb7c1d6f2245e868cf4a6893bdfc802cb2f2cf35e6cf09/bayesian_changepoint_detection-0.2.dev1.tar.gz", hash = "sha256:97ca291d47f0cdd03e7f76739d8edc538cd7305a78df93e12a002ef51100f644", size = 4160, upload-time = "2019-08-12T07:48:10.566Z" }
-
-[[package]]
 name = "bcrypt"
 version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5659,7 +5653,6 @@ version = "0.3.6"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
-    { name = "bayesian-changepoint-detection" },
     { name = "cython" },
     { name = "deeptime" },
     { name = "dill", extra = ["graph"] },
@@ -5738,7 +5731,6 @@ testing = [
 [package.metadata]
 requires-dist = [
     { name = "attrs", specifier = ">=22.2.0,<23" },
-    { name = "bayesian-changepoint-detection", extras = ["gpu"], specifier = ">=0.2.dev1" },
     { name = "cython" },
     { name = "deeptime", specifier = ">=0.4.4,<0.5" },
     { name = "dill", extras = ["graph"], specifier = "==0.3.5.1" },

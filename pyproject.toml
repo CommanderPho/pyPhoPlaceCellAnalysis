@@ -44,7 +44,6 @@ dependencies = [
     "pyphocorehelpers",
     "numpy>=1.23.5",
     "pyclustering>=0.10.1.2",
-    "bayesian-changepoint-detection[gpu]>=0.2.dev1",
 ]
 
 [dependency-groups]

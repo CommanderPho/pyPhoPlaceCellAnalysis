@@ -1304,7 +1304,7 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
 
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'ax'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryMatplotlibPlotter'], creation_date='2024-04-16 16:51', related_items=[])
-def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True, rotate_to_vertical:bool=False):
+def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True, rotate_to_vertical:bool=False, track_background_opacity: Optional[float] = None):
     """ Plots both the long and the short track on a single matplotlib axes.
     
     Usage:
@@ -1335,13 +1335,14 @@ def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, sho
 
     
     """
+    track_alpha = 0.5 if track_background_opacity is None else track_background_opacity
     long_short_display_config_manager = LongShortDisplayConfigManager()
     long_epoch_matplotlib_config = long_short_display_config_manager.long_epoch_config.as_matplotlib_kwargs()
     long_kwargs = deepcopy(long_epoch_matplotlib_config)
-    long_kwargs = overriding_dict_with(lhs_dict=long_kwargs, **dict(linewidth=2, zorder=-99, alpha=0.5, facecolor='#0099ff07', edgecolor=long_kwargs['facecolor'], linestyle='dashed'))
+    long_kwargs = overriding_dict_with(lhs_dict=long_kwargs, **dict(linewidth=2, zorder=-99, alpha=track_alpha, facecolor='#0099ff07', edgecolor=long_kwargs['facecolor'], linestyle='dashed'))
     short_epoch_matplotlib_config = long_short_display_config_manager.short_epoch_config.as_matplotlib_kwargs()
     short_kwargs = deepcopy(short_epoch_matplotlib_config)
-    short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-98, alpha=0.5, facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], linestyle='dashed'))
+    short_kwargs = overriding_dict_with(lhs_dict=short_kwargs, **dict(linewidth=2, zorder=-98, alpha=track_alpha, facecolor='#f5161607', edgecolor=short_kwargs['facecolor'], linestyle='dashed'))
         
     # BEGIN PLOTTING _____________________________________________________________________________________________________ #
     long_out_tuple = long_track_inst.plot_rects(plot_item=ax, matplotlib_rect_kwargs_override=long_kwargs, rotate_to_vertical=rotate_to_vertical)
