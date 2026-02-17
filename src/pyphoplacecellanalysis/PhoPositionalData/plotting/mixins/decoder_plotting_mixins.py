@@ -4390,3 +4390,237 @@ class DecoderRenderingPyVistaMixin:
 
 
 
+    def plot_decoded_PBE_matching_past_future_results(self, an_epoch_idx: int = 4):
+        """ plots a single decoded PBE
+        """
+        import pyvista as pv
+        import pyvistaqt as pvqt
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from pyphoplacecellanalysis.Pho3D.PyVista.spikeAndPositions import perform_plot_flat_arena
+        from pyphoplacecellanalysis.GUI.PyVista.InteractivePlotter.Mixins.InteractivePlotterMixins import InteractivePyvistaPlotterBuildIfNeededMixin
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecoderRenderingPyVistaMixin
+
+
+        def plot_any_spline_literal(p, curr_lap_points, name=None, line_scalars=None, plot_data=None, **kwargs):
+            """ plots the position line 
+            
+            num_lap_samples = np.shape(curr_lap_position_traces)[1]
+            curr_lap_points = np.column_stack((curr_lap_position_traces[0,:], curr_lap_position_traces[1,:], curr_lap_position_traces[2, :])) # (N, 3)
+            plot_data, plot = plot_any_spline_literal(p, curr_lap_points, name=None, line_scalars=None, plot_data=None, )
+            
+            """
+            line = LapsVisualizationMixin.lines_from_points(curr_lap_points)
+            if line_scalars is not None:
+                line["scalars"] = line_scalars
+            else:      
+                # Color by time (index) as per original implementation
+                line["scalars"] = np.arange(line.n_points)
+
+            plot_data = (plot_data or {}) | {'name': name, 'curr_lap_points': curr_lap_points}
+
+            tube = line.tube(radius=0.1)
+            plot_data['tube'] = tube
+            
+            # Note: 'show_scalar_bar': False is set, so you won't see the legend unless changed to True
+            plot = p.add_mesh(tube, **({'name': name, 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'lighting': False, 'render': False} | kwargs))
+            return plot_data, plot
+
+
+        def plot_any_spline(p, curr_lap_position_traces, lap_start_z=0.9, time_to_z_range: float=10.0, name=None, color_by_speed=True, render_kwargs_dict=None, **kwargs):
+            """ plots the position line """
+            num_lap_samples = np.shape(curr_lap_position_traces)[1]
+            curr_lap_points = np.column_stack((curr_lap_position_traces[0,:], curr_lap_position_traces[1,:], curr_lap_position_traces[2, :])) # (N, 3)
+
+            ts = deepcopy(curr_lap_points[:, 2])
+            earliest_t: float = np.nanmin(ts)
+            time_range: float = np.ptp(ts)
+            print(f'time_range: {time_range}')
+            time_axis_scaling_factor: float = time_to_z_range / time_range
+            print(f'time_axis_scaling_factor: {time_axis_scaling_factor}')
+            times_to_z_pos_fn = lambda ts: ((ts - earliest_t) * time_axis_scaling_factor) + lap_start_z
+            curr_lap_points[:, 2] = ((ts - earliest_t) * time_axis_scaling_factor) + lap_start_z # np.array([0.9, 0.900204, 0.900409, ..., 100.9, 100.9, 100.9])
+
+            line = LapsVisualizationMixin.lines_from_points(curr_lap_points)
+            if color_by_speed:
+                # Compute Speed along the path
+                # 1. Calculate differences between consecutive points (dx, dy)
+                dx = np.diff(curr_lap_position_traces[0, :])
+                dy = np.diff(curr_lap_position_traces[1, :])
+                
+                # 2. Compute Euclidean distance (speed proxy, assuming constant sampling rate)
+                # If sampling rate is not constant, you would divide this by dt (time delta)
+                speed = np.sqrt(dx**2 + dy**2)
+                
+                # 3. Pad the array to match the number of points (diff reduces length by 1)
+                # We repeat the last speed value to maintain shape
+                speed = np.hstack((speed, speed[-1]))
+                line["scalars"] = speed
+            else:
+                # Color by time (index) as per original implementation
+                line["scalars"] = np.arange(line.n_points)
+
+            # if name is None:
+            #     plot_name = 'lap_location_trail_spline[{}]'.format(int(curr_lap_id))
+            # else:
+            #     plot_name = name
+
+            # trail_fade_values = np.linspace(0.0, 0.6, num_lap_samples)
+            # size_values = np.linspace(0.2, 0.6, num_lap_samples) # fade from a scale of 0.2 to 0.6
+
+            plot_data = {'name': name, 'times_to_z_pos_fn': times_to_z_pos_fn, 'time_range': time_range, 'earliest_t': earliest_t, 'num_lap_samples':num_lap_samples, 'curr_lap_position_traces': curr_lap_position_traces, 'curr_lap_points': curr_lap_points}
+            tube = line.tube(radius=0.1)
+            plot_data['tube'] = tube
+            
+            if (render_kwargs_dict is None) or (len(render_kwargs_dict) == 0):
+                # tube.plot(smooth_shading=True)
+                # color_map_name = 'bmy' # old
+                color_map_name = 'cividis' # 2023-05-09 and newer
+                # 'cmap': color_map_name, 
+                kwargs['cmap'] = color_map_name
+            else:
+                for k, v in render_kwargs_dict.items():
+                    kwargs[k] = v
+
+
+            # Note: 'show_scalar_bar': False is set, so you won't see the legend unless changed to True
+            plot = p.add_mesh(tube, **({'name': name, 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'lighting': False, 'render': False} | kwargs))
+            return plot_data, plot
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        plots = {}
+        plots_data = {}
+
+        plotter = pvqt.BackgroundPlotter()
+        # axes = pv.CubeAxesActor(camera=plotter.camera)
+        # axes.bounds = mesh.bounds
+        # plotter.add_actor(axes)
+        # axes = plotter.add_axes_at_origin()
+        plotter.background_color = pv.Color('paraview')
+
+        ## INPUTS: a_ds
+
+        curr_position_df: pd.DataFrame = deepcopy(a_ds.curr_position_df)
+
+        # linear track geometry is not used to build the arena model, meaning for linear tracks it won't look as good as the geometry version.
+        ## The track shape will be approximated from the positions and the positions of the spikes:
+        # plotter = self.p
+        ## INPUTS: plotter
+        # x = self.x
+        # y = self.y
+        x = curr_position_df['x'].to_numpy()
+        y = curr_position_df['y'].to_numpy()
+
+        plots['maze_bg'] = perform_plot_flat_arena(plotter, x, y, bShowSequenceTraversalGradient=False, smoothing=False)
+        plots_data['maze_bg'] = {'track_dims': None, 'maze_pdata': None}
+
+        lap_start_z = 0.9 
+        time_to_z_range = 100.0
+        position_stop_z: float = lap_start_z + time_to_z_range
+        render_kwargs_dict = {'color': [0.1, 0.1, 0.1], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True}
+
+        # _out = LapsVisualizationMixin.plot_lap_trajectory_path_spline(plotter, curr_lap_position_traces=xyt, curr_lap_id=-1, lap_start_z=0.9, lap_id_dependent_z_offset=0.45, color_by_speed=False)
+        xyt = curr_position_df[['x', 'y', 't']].to_numpy().T # np.shape(xyt): (3, 489104)
+        plot_data, plot_tube = plot_any_spline(plotter, curr_lap_position_traces=xyt, name='all_positions', lap_start_z=lap_start_z, time_to_z_range=time_to_z_range, color_by_speed=False, render_kwargs_dict=render_kwargs_dict) # , color='black'
+        plots_data['all_positions'] = plot_data
+        plots['all_positions'] = plot_tube
+
+        times_to_z_pos_fn = plots_data['all_positions']['times_to_z_pos_fn']
+        times_to_z_pos_fn
+
+        def _cleanup_epoch_linear_idx_actors(plotter, plots_data=None, plots=None):
+            """Removes the actors added by _on_update_epoch_linear_idx (PosteriorFilledContours and PBE path segments).
+            plots_data, plots = _cleanup_epoch_linear_idx_actors(plotter=plotter, plots_data=plots_data, plots=plots)
+            """
+            if plots_data is None:
+                plots_data = {}
+            if plots is None:
+                plots = {}
+
+            # 1) Remove PosteriorFilledContours (structure: {'contours': {sub_name: actor, ...}})
+            contour_plot = plots.pop('PosteriorFilledContours', None)
+            plots_data.pop('PosteriorFilledContours', None)
+            if contour_plot is not None and isinstance(contour_plot, dict) and 'contours' in contour_plot:
+                for sub_name, actor in contour_plot['contours'].items():
+                    if actor is not None:
+                        try:
+                            plotter.remove_actor(actor)
+                        except Exception:
+                            pass
+
+            # 2) Remove all PBE path segment actors (keys like PBE[0][past][0], PBE[0][future][1])
+            keys_to_remove = [k for k in plots if isinstance(k, str) and k.startswith('PBE[')]
+            for key in keys_to_remove:
+                actor_or_struct = plots.pop(key, None)
+                plots_data.pop(key, None)
+                if actor_or_struct is None:
+                    continue
+                try:
+                    if isinstance(actor_or_struct, dict) and 'main' in actor_or_struct:
+                        plotter.remove_actor(actor_or_struct['main'])
+                    else:
+                        plotter.remove_actor(actor_or_struct)
+                except Exception:
+                    pass
+
+            return plots_data, plots
+
+        def _on_update_epoch_linear_idx(plotter, a_ds, an_epoch_idx: int, times_to_z_pos_fn, plots_data=None, plots=None):
+            """ called to plot for a given PBE -- plots all potentially matching paths and such """
+            ## INPUTS: an_epoch_idx
+            if plots_data is None:
+                plots_data = {}
+            if plots is None:
+                plots = {}
+
+            an_active_PBE_epoch_row = a_ds.filter_epochs.iloc[an_epoch_idx]
+            # an_active_PBE_epoch_row.label
+            # an_active_PBE_epoch_row.original_epoch_idx
+            
+            plot_seg_key: str = f'PBE[{an_active_PBE_epoch_row.original_epoch_idx}]'
+            
+            an_epoch_mask = a_ds.epoch_t_bins_high_prob_pos_masks[an_epoch_idx] 
+            # an_epoch_mask ## an_epoch_mask.shape (41, 62, 5) - (n_x_bins, n_y_bins, n_t_bins)
+
+            xbin_centers = a_ds.xbin_centers
+            ybin_centers = a_ds.ybin_centers
+
+            # self.perform_update_plot_epoch_time_bin_range(self.curr_time_bin_index)
+            # active_plot_key: str = f'PBE[{an_active_PBE_epoch_row.original_epoch_idx}].PosteriorFilledContours'
+            active_plot_key: str = f'PosteriorFilledContours'
+            plots_data[active_plot_key], plots[active_plot_key] = DecoderRenderingPyVistaMixin.perform_plot_filled_contours(p=plotter, 
+                                                                                            xbin_centers=xbin_centers, ybin_centers=ybin_centers,
+                                                                                            posterior_p_x_given_n=an_epoch_mask, levels=1, cmap='viridis', opacity=0.95, contour_extrude_z=position_stop_z, name=f'PosteriorFilledContours')
+
+            
+            a_row_out_dict = a_ds._prepare_epoch_data(an_epoch_idx=an_active_PBE_epoch_row.original_epoch_idx, minimum_included_matching_sequence_length=4) ## an_active_PBE_epoch_row.original_epoch_idx == an_epoch_idx right?
+            curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = a_row_out_dict['curr_matching_past_future_positions_df_dict']
+            if 'past' not in curr_matching_past_future_positions_df_dict:
+                curr_matching_past_future_positions_df_dict['past'] = {}
+            if 'future' not in curr_matching_past_future_positions_df_dict:
+                curr_matching_past_future_positions_df_dict['future'] = {}
+            
+            for a_past_future_key, past_matching_position_df_dict in curr_matching_past_future_positions_df_dict.items():
+                # past_matching_position_df_dict = curr_matching_past_future_positions_df_dict.get('past', {})
+                for a_matched_position_segment_idx, a_matched_pos_segment_df in past_matching_position_df_dict.items():
+                    ## do all the past items
+                    a_matched_pos_segment_df['z'] = a_matched_pos_segment_df['t'].apply(times_to_z_pos_fn)
+                    render_kwargs_dict = {'color': [0.9, 0.9, 0.9], 'pbr': True, 'metallic': 0.1, 'roughness': 0.8, 'diffuse': 1, 'render': True}
+                    plot_seg_key: str = f'PBE[{an_active_PBE_epoch_row.original_epoch_idx}][{a_past_future_key}][{a_matched_position_segment_idx}]'
+                    print(f'plotting: "{plot_seg_key}"')
+                    # _out = LapsVisualizationMixin.plot_lap_trajectory_path_spline(plotter, curr_lap_position_traces=xyt, curr_lap_id=-1, lap_start_z=0.9, lap_id_dependent_z_offset=0.45, color_by_speed=False)
+                    xyz = a_matched_pos_segment_df[['x', 'y', 'z']].to_numpy().T # np.shape(xyt): (3, 489104)
+                    # plots_data[plot_seg_key], plots[plot_seg_key] = plot_any_spline(plotter, curr_lap_position_traces=xyz, name=plot_seg_key, color_by_speed=False, render_kwargs_dict=render_kwargs_dict) 
+                    curr_lap_points = np.column_stack((xyz[0,:], xyz[1,:], xyz[2, :])) # (N, 3)
+                    plots_data[plot_seg_key], plots[plot_seg_key] = plot_any_spline_literal(p=plotter, curr_lap_points=curr_lap_points, name=plot_seg_key, line_scalars=None, plot_data=dict(), **render_kwargs_dict)
+                ## END for a_matched_position_segment_idx, a_...
+                
+            ## END for a_past_future_key, past_matching_position_df_dict in curr_matching_past_future_positions_df_dict.items():        
+            return plots_data, plots
+
+        
+        plots_data, plots = _cleanup_epoch_linear_idx_actors(plotter=plotter, plots_data=plots_data, plots=plots)
+        plots_data, plots = _on_update_epoch_linear_idx(plotter=plotter, a_ds=a_ds, an_epoch_idx=an_epoch_idx, times_to_z_pos_fn=times_to_z_pos_fn, plots_data=plots_data, plots=plots)
