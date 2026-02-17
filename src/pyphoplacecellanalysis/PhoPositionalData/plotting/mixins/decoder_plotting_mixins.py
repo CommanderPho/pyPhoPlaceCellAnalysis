@@ -4278,7 +4278,7 @@ class DecoderRenderingPyVistaMixin:
 
 
     @classmethod
-    def perform_plot_filled_contours(cls, p, xbin_centers, ybin_centers, posterior_p_x_given_n, levels=10, cmap='viridis', opacity=0.75, name='PosteriorFilledContours', **kwargs):
+    def perform_plot_filled_contours(cls, p, xbin_centers, ybin_centers, posterior_p_x_given_n, levels=10, cmap='viridis', opacity=0.75, name='PosteriorFilledContours', contour_extrude_z=None, enable_contour_fill: bool=False, **kwargs):
         """ Plots filled contours of the posterior probability using PyVista.
 
         Args:
@@ -4290,6 +4290,7 @@ class DecoderRenderingPyVistaMixin:
             cmap (str): Colormap name.
             opacity (float): Opacity of the filled contours.
             name (str): Name for the mesh/actor.
+            contour_extrude_z (float, optional): If set, extrude the contour line upward along the z-axis by this amount to form a vertical surface (curtain).
             **kwargs: Additional keyword args for PyVista `add_mesh`.
 
         Returns:
@@ -4313,7 +4314,7 @@ class DecoderRenderingPyVistaMixin:
 
 
         def plot_single_t_bin_contour(mask_2d, sub_name: str, t_idx: int, n_t_bins: int):
-            """One contour per time bin, with a unique color per time bin. Captures: p, xbin_centers, ybin_centers, levels, cmap, opacity, name, kwargs."""
+            """One contour per time bin, with a unique color and translucent fill. Captures: p, xbin_centers, ybin_centers, levels, cmap, opacity, name, kwargs."""
             # Prepare regular grid for StructuredGrid
             nx, ny = len(xbin_centers), len(ybin_centers)
             X, Y = np.meshgrid(xbin_centers, ybin_centers, indexing='ij')
@@ -4338,8 +4339,22 @@ class DecoderRenderingPyVistaMixin:
             t_frac = t_idx / max(n_t_bins - 1, 1)
             color_rgb = np.array(cmap_lut(t_frac)[:3])
 
-            actor = p.add_mesh(contours, color=color_rgb, opacity=opacity, name=sub_name, **kwargs)
-            return contours, actor
+            filled = None
+            fill_actor = None
+            if enable_contour_fill:
+                # Translucent fill: threshold grid to region >= single_level, then add as shaded mesh
+                filled = grid.threshold(value=single_level, scalars="posterior")                
+                if filled.n_cells > 0:
+                    fill_actor = p.add_mesh(filled, color=color_rgb, opacity=opacity, name=sub_name + "_fill", **kwargs)
+                    
+            # Optional: extrude contour upward along z to form a vertical surface (curtain)
+            contour_surface_actor, contour_surface_mesh = None, None
+            if contour_extrude_z is not None and contours.n_cells > 0:
+                contour_surface_mesh = contours.extrude([0, 0, float(contour_extrude_z)], capping=False)
+                contour_surface_actor = p.add_mesh(contour_surface_mesh, color=color_rgb, opacity=opacity, name=sub_name + "_contour_surface", **kwargs)
+            # Contour line on top (same color, full opacity so boundary is visible)
+            line_actor = p.add_mesh(contours, color=color_rgb, opacity=1.0, name=sub_name, **kwargs)
+            return contours, fill_actor, line_actor, filled, contour_surface_actor, contour_surface_mesh
 
 
         # ==================================================================================================================================================================================================================================================================================== #
@@ -4361,9 +4376,15 @@ class DecoderRenderingPyVistaMixin:
             if not np.any(mask_2d):
                 continue
 
-            contours, actor = plot_single_t_bin_contour(mask_2d=mask_2d, sub_name=sub_name, t_idx=t_idx, n_t_bins=n_t_bins)
+            contours, fill_actor, line_actor, filled, contour_surface_actor, contour_surface_mesh = plot_single_t_bin_contour(mask_2d=mask_2d, sub_name=sub_name, t_idx=t_idx, n_t_bins=n_t_bins)
             data_dict['contours'][sub_name] = contours
-            plotActors['contours'][sub_name] = actor
+            plotActors['contours'][sub_name] = line_actor
+            if fill_actor is not None:
+                data_dict['contours'][sub_name + '_fill'] = filled
+                plotActors['contours'][sub_name + '_fill'] = fill_actor
+            if contour_surface_actor is not None and contour_surface_mesh is not None:
+                data_dict['contours'][sub_name + '_contour_surface'] = contour_surface_mesh
+                plotActors['contours'][sub_name + '_contour_surface'] = contour_surface_actor
 
         return plotActors, data_dict
 
