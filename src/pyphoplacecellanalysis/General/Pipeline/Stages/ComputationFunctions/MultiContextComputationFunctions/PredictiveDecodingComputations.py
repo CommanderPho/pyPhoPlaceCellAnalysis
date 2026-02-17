@@ -4736,7 +4736,7 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidge
 # from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedFigureController ## 
 
 @define(slots=False, repr=False, eq=False)
-class MaskDataSource:
+class MaskDataSource(AttrsBasedClassHelperMixin):
     """ provides data to its owner related to each epoch 
     """
     matching_pos_epochs_dfs_list: List = field() # self.container.predictive_decoding.matching_pos_epochs_dfs_list
@@ -4890,29 +4890,6 @@ class MaskDataSource:
                 curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
                 curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
             ## END for ...
-
-        # ## OLD way
-        # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():
-        #     a_curr_matching_positions_df = deepcopy(curr_matching_positions_df)
-        #     an_epoch_specific_past_position_dfs['label'] = an_epoch_specific_past_position_dfs['label'].astype(int)
-        #     if should_filter_to_minimum:
-        #         if 'is_included_in_merged' not in a_curr_matching_positions_df.columns:
-        #             a_curr_epoch_is_included_in_merged = np.isin(a_curr_matching_positions_df['matching_found_relevant_merged_pos_epoch'], good_merged_segment_epochs['label'])
-        #             a_curr_matching_positions_df['is_included_in_merged'] = a_curr_epoch_is_included_in_merged
-                    
-        #         ## DROP non-included
-        #         a_curr_matching_positions_df = a_curr_matching_positions_df[a_curr_matching_positions_df['is_included_in_merged']] ## reset indicies here or anything?
-
-        #     ## END if should_filter_to_minimum...
-        #     if len(a_curr_matching_positions_df) > 0:
-        #         a_curr_matching_positions_df = a_curr_matching_positions_df.time_point_event.adding_epochs_identity_column(epochs_df=an_epoch_specific_past_position_dfs, epoch_id_key_name=col_name,
-        #                                                                                                                     override_time_variable_name='t', epoch_label_column_name='label', no_interval_fill_value=-1, should_replace_existing_column=True,
-        #                                                                                                                     drop_non_epoch_events=True, overlap_behavior=OverlappingIntervalsFallbackBehavior.FALLBACK_TO_SLOW_SEARCH)
-
-        #     curr_matching_positions_df_dict: Dict[types.epoch_index, pd.DataFrame] = a_curr_matching_positions_df.pho.partition_df_dict(col_name)
-        #     curr_matching_past_future_positions_df_dict[a_past_future_name] = curr_matching_positions_df_dict
-        # ## END for ...
-        
 
         curr_matching_past_future_positions_df_list: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {k:list(v.values()) for k, v in curr_matching_past_future_positions_df_dict.items()}
         ## OUTPUTS: curr_matching_past_future_positions_df_dict
