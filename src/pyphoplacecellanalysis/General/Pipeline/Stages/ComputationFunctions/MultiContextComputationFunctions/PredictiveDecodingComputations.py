@@ -101,10 +101,6 @@ import nptyping as ND
 from nptyping import NDArray
 from scipy.interpolate import interp1d
 
-from neuropy.utils.misc import build_shuffled_ids, shuffle_ids # used in _SHELL_analyze_leave_one_out_decoding_results
-from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-
-
 # _debug_plot: bool = True
 _debug_plot: bool = False
 
