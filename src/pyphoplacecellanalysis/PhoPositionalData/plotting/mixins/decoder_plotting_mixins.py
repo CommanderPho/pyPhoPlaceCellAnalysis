@@ -3501,7 +3501,6 @@ class DecodedTrajectoryPyVistaPlotter(DecodedTrajectoryPlotter):
     enable_point_labels: bool = field(default=False)
     enable_plot_all_time_bins_in_epoch_mode: bool = field(default=False)
 
-
     slider_epoch = field(default=None)
     slider_epoch_time_bin = field(default=None)
     slider_epoch_time_bin_playback_checkbox = field(default=None)
@@ -4278,759 +4277,95 @@ class DecoderRenderingPyVistaMixin:
         return (plotActors, data_dict), (plotActors_CenterLabels, data_dict_CenterLabels)
 
 
+    @classmethod
+    def perform_plot_filled_contours(cls, p, xbin_centers, ybin_centers, posterior_p_x_given_n, levels=10, cmap='viridis', opacity=0.75, name='PosteriorFilledContours', **kwargs):
+        """ Plots filled contours of the posterior probability using PyVista.
 
-# ==================================================================================================================================================================================================================================================================================== #
-# Napari/3D                                                                                                                                                                                                                                                                            #
-# ==================================================================================================================================================================================================================================================================================== #
-@define(slots=False, eq=False)
-class DecodedTrajectoryNapariPlotter(DecodedTrajectoryPlotter):
-    """ plots decoded posteriors using Napari with sliders for epoch and time-bin.
-
-    Builds a 4D volume over (epoch, time_bin, xbin, ybin) and shows it as a Napari image layer.
-
-    Usage (example):
-
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryNapariPlotter
-        napari_plotter = DecodedTrajectoryNapariPlotter(a_result=a_result, xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers)
-        viewer, layer = napari_plotter.build_ui()
-
-    """
-
-    viewer: Optional["napari.viewer.Viewer"] = field(default=None)
-    image_layer: Any = field(default=None)
-    peak_contours_layer: Any = field(default=None)
-    peak_prominence_result: Optional[Any] = field(default=None)
-    custom_logging_widget: Optional[Any] = field(default=None, metadata={'desc': 'Custom dock widget for logging messages'})
-
-    posterior_volume: Optional[NDArray] = field(default=None)
-    time_bin_centers_matrix: Optional[NDArray] = field(default=None)
-
-    curr_epoch_idx: int = field(default=0)
-    curr_time_bin_index: int = field(default=0)
-
-    enable_plot_all_time_bins_in_epoch_mode: bool = field(default=False, metadata={'desc': 'if True, Napari time axis spans all time bins for all epochs; otherwise still the same but semantics may differ in callers.'})
-    
-    create_logging_dock: bool = field(default=False, metadata={'desc': 'If True, automatically creates a custom logging dock widget when build_ui() is called'})
-    logging_dock_area: str = field(default='bottom', metadata={'desc': 'Dock area placement for logging widget: left, right, top, or bottom'})
-    logging_dock_name: str = field(default='Custom Log', metadata={'desc': 'Name/title for the logging dock widget'})
-
-    @function_attributes(short_name=None, tags=['napari', 'posterior', 'volume', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryNapariPlotter.build_ui'], creation_date='2025-12-23 08:00', related_items=['DecodedTrajectoryPyVistaPlotter'])
-    def build_posterior_volume(self, desired_max_height: float = 50.0) -> Tuple[NDArray, NDArray]:
-        """Builds a 4D volume over (epoch, time_bin, xbin, ybin) suitable for Napari.
-
-        Uses the same logic as `_perform_get_curr_posterior` on `DecodedTrajectoryPyVistaPlotter`
-        to ensure scaling and 1D/2D handling matches the PyVista implementation.
+        Args:
+            p: The PyVista plotter instance to plot on.
+            xbin_centers (np.ndarray): array of x centers
+            ybin_centers (np.ndarray): array of y centers
+            posterior_p_x_given_n (np.ndarray): 2D array of posterior values (shape: [len(xbin_centers), len(ybin_centers)])
+            levels (int or list): Number of contour levels or list of scalar values.
+            cmap (str): Colormap name.
+            opacity (float): Opacity of the filled contours.
+            name (str): Name for the mesh/actor.
+            **kwargs: Additional keyword args for PyVista `add_mesh`.
 
         Returns:
-            posterior_volume: np.ndarray with shape (num_epochs, max_num_time_bins, n_xbins, n_ybins)
-            time_bin_centers_matrix: np.ndarray with shape (num_epochs, max_num_time_bins)
+            (dict, dict): ({'contours': actor}, {'contours': mesh})
         """
-        assert self.a_result is not None, "DecodedTrajectoryNapariPlotter requires `a_result`."
-        assert self.xbin_centers is not None, "DecodedTrajectoryNapariPlotter requires `xbin_centers`."
+        import numpy as np
+        import pyvista as pv
+        from matplotlib import cm as mpl_cm
 
-        num_epochs: int = self.num_filter_epochs
-        epoch_time_bin_counts: List[int] = []
-        for an_epoch_idx in np.arange(num_epochs):
-            time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
-            epoch_time_bin_counts.append(len(time_bin_centers))
-
-        self.epoch_time_bin_counts = epoch_time_bin_counts
-        max_num_time_bins: int = int(np.max(epoch_time_bin_counts))
-        n_xbins: int = len(self.xbin_centers)
-        if self.ybin_centers is not None:
-            n_ybins: int = len(self.ybin_centers)
+        is_3d: bool = False
+        if np.ndim(posterior_p_x_given_n) == 3:
+            n_x_bins, n_y_bins, n_t_bins = posterior_p_x_given_n.shape
+            is_3d = True
+        elif np.ndim(posterior_p_x_given_n) == 2:
+            n_x_bins, n_y_bins = posterior_p_x_given_n.shape
+            n_t_bins = 1
+            is_3d = False
         else:
-            # treat as 1D in y if not provided
-            n_ybins = 1
-
-        posterior_volume = np.zeros((num_epochs, max_num_time_bins, n_xbins, n_ybins), dtype=float)
-        time_bin_centers_matrix = np.full((num_epochs, max_num_time_bins), np.nan, dtype=float)
-
-        for an_epoch_idx in np.arange(num_epochs):
-            # replicate core of DecodedTrajectoryPyVistaPlotter._perform_get_curr_posterior
-            a_posterior_p_x_given_n_all_t = self.a_result.p_x_given_n_list[an_epoch_idx]
-            a_most_likely_positions = self.a_result.most_likely_positions_list[an_epoch_idx]
-            a_time_bin_centers = self.a_result.time_bin_containers[an_epoch_idx].centers
-            assert len(a_time_bin_centers) == len(a_most_likely_positions), f"len(a_time_bin_centers): {len(a_time_bin_centers)} != len(a_most_likely_positions): {len(a_most_likely_positions)}"
-
-            min_v = np.nanmin(a_posterior_p_x_given_n_all_t)
-            max_v = np.nanmax(a_posterior_p_x_given_n_all_t)
-            multiplier_factor: float = desired_max_height / (float(max_v) - float(min_v))
-
-            n_time_bins_for_epoch: int = epoch_time_bin_counts[an_epoch_idx]
-
-            for time_bin_index in np.arange(n_time_bins_for_epoch):
-                # slice per time bin using same ndim-conditional logic
-                if np.ndim(a_posterior_p_x_given_n_all_t) > 2:
-                    a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, :, int(time_bin_index)])
-                else:
-                    a_posterior_p_x_given_n = np.squeeze(a_posterior_p_x_given_n_all_t[:, int(time_bin_index)])
-
-                a_posterior_p_x_given_n = a_posterior_p_x_given_n * multiplier_factor
-
-                # ensure 2D matrix (n_xbins, n_ybins)
-                if np.ndim(a_posterior_p_x_given_n) == 1:
-                    a_posterior_p_x_given_n = np.atleast_2d(a_posterior_p_x_given_n).T
-
-                n_x, n_y = np.shape(a_posterior_p_x_given_n)
-                assert n_x == n_xbins, f"epoch {an_epoch_idx}, time_bin_index {time_bin_index}: n_x ({n_x}) != len(xbin_centers) ({n_xbins})"
-
-                if n_y != n_ybins:
-                    if (n_y == 1) and (n_ybins > 1):
-                        # tile single y across all available y-bins
-                        a_posterior_p_x_given_n = np.tile(a_posterior_p_x_given_n, (1, n_ybins))
-                        n_x, n_y = np.shape(a_posterior_p_x_given_n)
-                    else:
-                        raise AssertionError(f"epoch {an_epoch_idx}, time_bin_index {time_bin_index}: n_y ({n_y}) != len(ybin_centers) ({n_ybins}) and cannot be safely broadcast.")
-
-                posterior_volume[an_epoch_idx, int(time_bin_index), :, :] = a_posterior_p_x_given_n
-                time_bin_centers_matrix[an_epoch_idx, int(time_bin_index)] = a_time_bin_centers[int(time_bin_index)]
-
-        self.posterior_volume = posterior_volume
-        self.time_bin_centers_matrix = time_bin_centers_matrix
-        return posterior_volume, time_bin_centers_matrix
-
-
-    @function_attributes(short_name=None, tags=['napari', 'posterior', 'viewer', 'ui'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2025-12-23 08:05', related_items=['DecodedTrajectoryPyVistaPlotter', 'napari_from_layers_dict'])
-    def build_ui(self, viewer: Optional["napari.viewer.Viewer"] = None, layer_name: str = 'decoded_posterior', title: str = 'Decoded Posterior', create_logging_dock: Optional[bool] = None, logging_dock_area: Optional[str] = None, logging_dock_name: Optional[str] = None, **viewer_kwargs) -> Tuple["napari.viewer.Viewer", Any]:
-        """Builds the Napari viewer and image layer showing the decoded posterior.
-
-        If `viewer` is None, a new `napari.Viewer` is created. Otherwise the provided viewer is used.
-
-        Args:
-            viewer: Optional Napari viewer instance. If None, a new viewer is created.
-            layer_name: Name for the image layer (default: 'decoded_posterior')
-            title: Title for the Napari viewer window (default: 'Decoded Posterior')
-            create_logging_dock: If True, automatically creates a custom logging dock widget. 
-                                If None, uses the instance field value (default: None, uses self.create_logging_dock)
-            logging_dock_area: Dock area for logging widget ('left', 'right', 'top', 'bottom').
-                              If None, uses the instance field value (default: None, uses self.logging_dock_area)
-            logging_dock_name: Name for the logging dock widget.
-                              If None, uses the instance field value (default: None, uses self.logging_dock_name)
-            **viewer_kwargs: Additional keyword arguments passed to napari.Viewer()
-
-        Returns:
-            viewer: the Napari viewer instance
-            image_layer: the created image layer containing the posterior volume
-        """
-        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
-        import napari
-
-        posterior_volume, _ = self.build_posterior_volume()
-
-        if viewer is None:
-            viewer = napari.Viewer(title=title, **viewer_kwargs)
-
-        image_layer = viewer.add_image(posterior_volume, name=layer_name, colormap='viridis', blending='additive', interpolation='nearest')
-
-        # axes: (epoch, time_bin, xbin, ybin)
-        viewer.dims.axis_labels = ('epoch', 'time_bin', 'xbin', 'ybin')
-        # Ensure the epoch slider appears above the time_bin slider in the dims panel.
-        # In napari, the visual order of sliders is controlled by dims.order.
-        # Swapping the first two entries orders the corresponding sliders (epoch, time_bin).
-        viewer.dims.order = (1, 0, 2, 3)
-
-        # initialize current step
-        epoch_idx = int(self.curr_epoch_idx) if self.curr_epoch_idx is not None else 0
-        time_idx = int(self.curr_time_bin_index) if self.curr_time_bin_index is not None else 0
-        viewer.dims.current_step = (epoch_idx, time_idx, 0, 0)
-
-        self.viewer = viewer
-        self.image_layer = image_layer
-
-        # def _on_current_step_change(event):
-        #     """Keep internal indices synchronized with Napari sliders."""
-        #     if event is None:
-        #         return
-        #     if not hasattr(event, 'value'):
-        #         return
-        #     curr_step = event.value
-        #     if len(curr_step) >= 2:
-        #         self.curr_epoch_idx = int(curr_step[0])
-        #         self.curr_time_bin_index = int(curr_step[1])
-
-        # viewer.dims.events.current_step.connect(_on_current_step_change)
-
-        
-        viewer.dims.events.current_step.connect(self.on_current_step_change)
-
-        # Optionally create custom logging dock widget
-        # Use instance field values if parameters are None
-        should_create_dock = create_logging_dock if create_logging_dock is not None else self.create_logging_dock
-        dock_area = logging_dock_area if logging_dock_area is not None else self.logging_dock_area
-        dock_name = logging_dock_name if logging_dock_name is not None else self.logging_dock_name
-        
-        if should_create_dock:
-            self.add_custom_logging_dock(area=dock_area, name=dock_name)
-
-        return viewer, image_layer
-
-
-    def _log_to_console(self, message: str):
-        """Output message to both stdout and Napari Console (if available).
-        
-        Args:
-            message: The message string to output
-        """
-        # Always output to stdout (maintains existing behavior)
-        print(message)
-        
-        # Also output to Napari Console if viewer exists and console is available
-        if self.viewer is not None:
-            try:
-                # Try to access the Napari console widget
-                if hasattr(self.viewer, 'window') and self.viewer.window is not None:
-                    qt_viewer = getattr(self.viewer.window, '_qt_viewer', None)
-                    if qt_viewer is not None:
-                        dock_console = getattr(qt_viewer, 'dockConsole', None)
-                        if dock_console is not None:
-                            # Get the console widget
-                            console_widget = getattr(dock_console, 'widget', None)
-                            if console_widget is not None:
-                                # Try to get the IPython console kernel
-                                kernel = getattr(console_widget, 'kernel', None)
-                                if kernel is not None:
-                                    # Execute print statement in the console
-                                    kernel.execute(f"print({repr(message)})")
-                                else:
-                                    # Fallback: try to write directly to console output
-                                    console_output = getattr(console_widget, 'console', None)
-                                    if console_output is not None:
-                                        console_output.write(message + '\n')
-            except Exception:
-                # Silently fail if console access doesn't work - stdout output is sufficient
-                pass
-        
-        # Also output to custom logging widget if it exists
-        if self.custom_logging_widget is not None:
-            try:
-                # Try to call append_log method (for LogViewer-style widgets)
-                if hasattr(self.custom_logging_widget, 'append_log'):
-                    self.custom_logging_widget.append_log(message)
-                # Fallback: try write_to_log method (for LogViewer from codebase)
-                elif hasattr(self.custom_logging_widget, 'write_to_log'):
-                    self.custom_logging_widget.write_to_log(message)
-                # Fallback: try append method (for QTextEdit/QPlainTextEdit)
-                elif hasattr(self.custom_logging_widget, 'append'):
-                    self.custom_logging_widget.append(message)
-            except Exception:
-                # Silently fail if custom widget write doesn't work - stdout output is sufficient
-                pass
-
-
-    @function_attributes(short_name=None, tags=['napari', 'logging', 'dock', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-05 00:00', related_items=[])
-    def add_custom_logging_dock(self, area: str = 'bottom', name: str = 'Custom Log') -> Optional[Any]:
-        """Adds a custom scrolling text/console dock widget to the Napari window for logging.
-        
-        Creates a dock widget containing a read-only scrolling text area that displays log messages.
-        The widget is integrated with `_log_to_console()` method to automatically receive log messages.
-        
-        Args:
-            area: Dock area placement ('left', 'right', 'top', 'bottom'). Default is 'bottom'.
-            name: Name/title for the dock widget. Default is 'Custom Log'.
-            
-        Returns:
-            The created logging widget if successful, None if creation fails.
-            
-        Raises:
-            None - all errors are handled gracefully and logged as warnings.
-            
-        Usage:
-            logging_widget = napari_plotter.add_custom_logging_dock(area='bottom', name='Debug Log')
-            if logging_widget is not None:
-                print("Custom logging dock created successfully")
-        """
-        if self.viewer is None:
-            logger.warning("add_custom_logging_dock: viewer is None, cannot create dock widget")
-            return None
-        
-        try:
-            # Try to import Qt widgets
-            try:
-                from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets, QtCore
-            except ImportError:
-                # Fallback: try direct Qt import
-                try:
-                    from qtpy.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton
-                    from qtpy.QtCore import QTimer
-                    QtWidgets = type('QtWidgets', (), {
-                        'QWidget': QWidget,
-                        'QVBoxLayout': QVBoxLayout,
-                        'QTextEdit': QTextEdit,
-                        'QPushButton': QPushButton
-                    })()
-                    QtCore = type('QtCore', (), {'QTimer': QTimer})()
-                except ImportError:
-                    logger.warning("add_custom_logging_dock: Qt widgets not available, cannot create dock widget")
-                    return None
-            
-            # Create custom logging widget (similar to LogViewer but simpler)
-            class CustomLoggingWidget(QtWidgets.QWidget):
-                """Simple scrolling text widget for displaying log messages."""
-                def __init__(self, parent=None):
-                    super().__init__(parent)
-                    layout = QtWidgets.QVBoxLayout(self)
-                    layout.setContentsMargins(0, 0, 0, 0)
-                    
-                    # Create read-only text edit for log display
-                    self.log_display = QtWidgets.QTextEdit(self)
-                    self.log_display.setReadOnly(True)
-                    layout.addWidget(self.log_display)
-                    
-                    # Optional: Add clear button
-                    clear_button = QtWidgets.QPushButton('Clear Log', self)
-                    clear_button.clicked.connect(self.clear_log)
-                    layout.addWidget(clear_button)
-                
-                def append_log(self, message: str):
-                    """Append a message to the log display."""
-                    self.log_display.append(message)
-                    # Auto-scroll to bottom
-                    scrollbar = self.log_display.verticalScrollBar()
-                    scrollbar.setValue(scrollbar.maximum())
-                
-                def clear_log(self):
-                    """Clear the log display."""
-                    self.log_display.clear()
-            
-            # Create the widget instance
-            logging_widget = CustomLoggingWidget()
-            
-            # Add as dock widget to Napari window
-            if not hasattr(self.viewer, 'window') or self.viewer.window is None:
-                logger.warning("add_custom_logging_dock: viewer.window is not available")
-                return None
-            
-            try:
-                self.viewer.window.add_dock_widget(logging_widget, area=area, name=name)
-                self.custom_logging_widget = logging_widget
-                logger.debug(f"add_custom_logging_dock: Successfully created dock widget '{name}' in area '{area}'")
-                return logging_widget
-            except Exception as e:
-                logger.warning(f"add_custom_logging_dock: Failed to add dock widget: {e}")
-                return None
-                
-        except Exception as e:
-            logger.warning(f"add_custom_logging_dock: Failed to create custom logging dock widget: {e}")
-            return None
-
-
-    def on_current_step_change(self, event):
-        """Update Napari sliders to match internal state.
-        
-        This method should be called if internal state (curr_epoch_idx, curr_time_bin_index)
-        is modified programmatically to ensure the sliders reflect the current state.
-        
-        Returns:
-            bool: True if sliders were updated, False if viewer doesn't exist
-
-        Updates:
-            self.curr_epoch_idx, self.curr_time_bin_index
-
-        Called by `viewer.dims.events.current_step.connect(self.on_current_step_change)`
-        
-        """
-        either_did_change: bool = False
-        if event is None:
-            return either_did_change
-        if not hasattr(event, 'value'):
-            return either_did_change
-        curr_step = event.value
-        if len(curr_step) >= 2:
-            old_epoch_idx = deepcopy(self.curr_epoch_idx)
-            old_time_bin_idx = deepcopy(self.curr_time_bin_index)
-
-            new_epoch_idx = int(curr_step[0])
-            new_time_bin_index = int(curr_step[1])
-            
-            epoch_idx_did_change: bool = (old_epoch_idx != new_epoch_idx)
-            time_bin_index_did_change: bool = (old_time_bin_idx != new_time_bin_index)
-
-            either_did_change = (epoch_idx_did_change or time_bin_index_did_change)
-            
-            # self.curr_epoch_idx = int(curr_step[0])
-            # self.curr_time_bin_index = int(curr_step[1])
-
-            ## apply the change
-            self.curr_epoch_idx = new_epoch_idx
-            self.curr_time_bin_index = new_time_bin_index
-
-        if either_did_change:
-            self.sync_sliders_from_state(block_updates=True)
-
-        return either_did_change
+            raise ValueError(f'np.shape(posterior_p_x_given_n) should be 2 or 3, but it is: {np.shape(posterior_p_x_given_n)} which is unsupported.')
 
 
 
-    @function_attributes(short_name=None, tags=['napari', 'sync', 'state'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-05 00:00', related_items=[])
-    def sync_sliders_from_state(self, block_updates:bool=True):
-        """Update Napari sliders to match internal state.
-        
-        This method should be called if internal state (curr_epoch_idx, curr_time_bin_index)
-        is modified programmatically to ensure the sliders reflect the current state.
-        
-        Args:
-            block_updates: If True, temporarily blocks all event callbacks to prevent recursion.
-                          Default is True.
-        
-        Returns:
-            bool: True if sliders were updated, False if viewer doesn't exist
-        """
-        logger.debug(f"sync_sliders_from_state called: block_updates={block_updates}, viewer={'exists' if self.viewer is not None else 'None'}")
-        
-        if self.viewer is not None:
-            # Get current viewer state for comparison
-            current_viewer_step = tuple(self.viewer.dims.current_step) if hasattr(self.viewer.dims, 'current_step') else None
-            target_step = (
-                self.curr_epoch_idx if self.curr_epoch_idx is not None else 0,
-                self.curr_time_bin_index if self.curr_time_bin_index is not None else 0,
-                0,
-                0
-            )
-            
-            logger.debug(f"sync_sliders_from_state: current internal state (epoch={self.curr_epoch_idx}, time_bin={self.curr_time_bin_index})")
-            logger.debug(f"sync_sliders_from_state: current viewer step={current_viewer_step}, target step={target_step}")
-            
-            if block_updates:
-                # Block all callbacks temporarily to prevent recursion
-                logger.debug("sync_sliders_from_state: blocking current_step events to prevent recursion")
-                with self.viewer.dims.events.current_step.blocker():
-                    logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step}")
-                    try:
-                        self.viewer.dims.current_step = target_step
-                        
-                        # Verify the change was applied
-                        new_viewer_step = tuple(self.viewer.dims.current_step)
-                        if new_viewer_step[:2] == target_step[:2]:
-                            logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
-                        else:
-                            logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
-                    except Exception as e:
-                        logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
-                        raise
-                logger.debug("sync_sliders_from_state: unblocked current_step events")
+        def plot_single_t_bin_contour(mask_2d, sub_name: str, t_idx: int, n_t_bins: int):
+            """One contour per time bin, with a unique color per time bin. Captures: p, xbin_centers, ybin_centers, levels, cmap, opacity, name, kwargs."""
+            # Prepare regular grid for StructuredGrid
+            nx, ny = len(xbin_centers), len(ybin_centers)
+            X, Y = np.meshgrid(xbin_centers, ybin_centers, indexing='ij')
+            Z = np.zeros_like(X)
+
+            grid = pv.StructuredGrid(X, Y, Z)
+            grid["posterior"] = mask_2d.astype(float).flatten(order='F')
+
+            # Single contour level per time bin: one isosurface at the mid value
+            vmin, vmax = np.nanmin(mask_2d), np.nanmax(mask_2d)
+            if isinstance(levels, int):
+                single_level = (vmin + vmax) / 2.0
             else:
-                # Don't block, just set the value
-                logger.debug(f"sync_sliders_from_state: setting viewer.dims.current_step to {target_step} (not blocking)")
-                try:
-                    self.viewer.dims.current_step = target_step
-                    
-                    # Verify the change was applied
-                    new_viewer_step = tuple(self.viewer.dims.current_step)
-                    if new_viewer_step[:2] == target_step[:2]:
-                        logger.debug(f"sync_sliders_from_state: successfully updated viewer step to {new_viewer_step}")
-                    else:
-                        logger.warning(f"sync_sliders_from_state: viewer step mismatch! Expected {target_step[:2]}, got {new_viewer_step[:2]}")
-                except Exception as e:
-                    logger.error(f"sync_sliders_from_state: error setting viewer.dims.current_step: {e}", exc_info=True)
-                    raise
-            
-            return True
-        else:
-            logger.debug("sync_sliders_from_state: viewer is None, returning False")
-        return False
+                lev_arr = np.asarray(levels)
+                single_level = float(lev_arr[len(lev_arr) // 2]) if len(lev_arr) else (vmin + vmax) / 2.0
+            contour_levels = np.array([single_level])
+
+            contours = grid.contour(isosurfaces=contour_levels, scalars="posterior")
+
+            # Unique color for this time bin from the colormap
+            cmap_lut = mpl_cm.get_cmap(cmap, max(n_t_bins, 1))
+            t_frac = t_idx / max(n_t_bins - 1, 1)
+            color_rgb = np.array(cmap_lut(t_frac)[:3])
+
+            actor = p.add_mesh(contours, color=color_rgb, opacity=opacity, name=sub_name, **kwargs)
+            return contours, actor
 
 
-    @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
-    def add_peak_counts_layer(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", layer_name: str = 'peak_counts', colormap: str = 'plasma', blending: str = 'additive') -> Any:
-        """Adds the peak_counts.raw counter map from a PosteriorPeaksPeakProminence2dResult as a new Napari image layer.
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        plotActors = {'contours': {}}
+        data_dict = {'contours': {}}
 
-        The peak_counts.raw is a 2D array (n_xbins, n_ybins) that gets broadcast to match the posterior_volume
-        shape (num_epochs, max_num_time_bins, n_xbins, n_ybins) by repeating across all epochs and time bins.
-
-        Args:
-            peak_prominence_result: PosteriorPeaksPeakProminence2dResult object containing peak_counts
-            layer_name: Name for the Napari layer (default: 'peak_counts')
-            colormap: Colormap to use for the peak counts layer (default: 'plasma')
-            blending: Blending mode for the layer (default: 'additive')
-
-        Returns:
-            The created Napari image layer containing the peak counts volume
-
-        Raises:
-            AssertionError: If viewer or posterior_volume hasn't been built yet, or if coordinate dimensions don't match
-
-        Usage:
-            peak_counts_layer = napari_plotter.add_peak_counts_layer(peak_prominence_result=a_result_posterior_peaks)
-            peak_counts_layer
-        """
-        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
-        import napari
-        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, DecodedEpochIndex, DecodedEpochTimeBinIndex
-
-        # Ensure posterior_volume has been built
-        if self.posterior_volume is None:
-            self.build_posterior_volume()
-
-        # Ensure viewer exists
-        if self.viewer is None:
-            # If no viewer exists, create one (though typically build_ui should be called first)
-            self.viewer = napari.Viewer(title='Decoded Posterior')
-
-        # Extract peak_counts.raw (2D array: n_xbins, n_ybins)
-        peak_counts_2d = peak_prominence_result.peak_counts.raw
-
-        # Verify coordinate alignment
-        assert peak_prominence_result.xx is not None, "peak_prominence_result.xx (xbin_centers) is required"
-        assert peak_prominence_result.yy is not None, "peak_prominence_result.yy (ybin_centers) is required"
-        
-        # Check that dimensions match
-        posterior_shape = self.posterior_volume.shape  # (num_epochs, max_num_time_bins, n_xbins, n_ybins)
-        n_xbins_posterior = posterior_shape[2]
-        n_ybins_posterior = posterior_shape[3]
-        
-        peak_counts_shape = peak_counts_2d.shape
-        n_xbins_peaks = peak_counts_shape[0]
-        n_ybins_peaks = peak_counts_shape[1] if len(peak_counts_shape) > 1 else 1
-
-        assert n_xbins_peaks == n_xbins_posterior, f"xbin dimension mismatch: peak_counts has {n_xbins_peaks} xbins but posterior_volume has {n_xbins_posterior}"
-        assert n_ybins_peaks == n_ybins_posterior, f"ybin dimension mismatch: peak_counts has {n_ybins_peaks} ybins but posterior_volume has {n_ybins_posterior}"
-
-        # Broadcast 2D peak_counts to 4D shape: (num_epochs, max_num_time_bins, n_xbins, n_ybins)
-        num_epochs = posterior_shape[0]
-        max_num_time_bins = posterior_shape[1]
-        
-        # Use np.tile to repeat the 2D array across epochs and time bins
-        peak_counts_4d = np.tile(peak_counts_2d[np.newaxis, np.newaxis, :, :], (num_epochs, max_num_time_bins, 1, 1))
-
-        # Add as new Napari image layer
-        peak_counts_layer = self.viewer.add_image(peak_counts_4d, name=layer_name, colormap=colormap, blending=blending, interpolation='nearest')
-
-        return peak_counts_layer
-
-
-    @function_attributes(short_name=None, tags=['napari', 'peak-counts', 'posterior', 'layer'], input_requires=[], output_provides=[], uses=['DecodedTrajectoryNapariPlotter.build_posterior_volume'], used_by=[], creation_date='2026-01-05 00:00', related_items=['PosteriorPeaksPeakProminence2dResult'])
-    def add_peak_contours_layer(self, peak_prominence_result: "PosteriorPeaksPeakProminence2dResult", layer_name: str = 'peak_contours', 
-                                edge_color: str = 'transparent', face_color: str = '#ffaaff78', edge_width: float = 0.005,
-                                # edge_color: str = 'white', face_color: str = 'transparent', edge_width: float = 1.0,
-                                ) -> Any:
-        """Adds peak contours as a Napari shapes layer that updates dynamically when epoch and time_bin sliders change.
-
-        The contours are extracted from the peak_prominence_result and displayed as shapes that update
-        based on the current epoch and time_bin indices in the Napari viewer.
-
-        Args:
-            peak_prominence_result: PosteriorPeaksPeakProminence2dResult object containing peak contours
-            layer_name: Name for the Napari shapes layer (default: 'peak_contours')
-            edge_color: Color for contour edges (default: 'red')
-            face_color: Color for contour faces, use 'transparent' for no fill (default: 'transparent')
-            edge_width: Width of contour edges (default: 2.0)
-
-        Returns:
-            The created Napari shapes layer containing the peak contours
-
-        Usage:
-
-            contours_layer = napari_plotter.add_peak_contours_layer(peak_prominence_result=a_result_posterior_peaks)
-
-        """
-        # local import to avoid hard dependency if Napari is not installed in non-Napari contexts
-        import napari
-        from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult, DecodedEpochIndex, DecodedEpochTimeBinIndex, DecodedEpochTimeBinIndexTuple
-
-        # Ensure posterior_volume has been built
-        if self.posterior_volume is None:
-            self.build_posterior_volume()
-
-        # Ensure viewer exists
-        if self.viewer is None:
-            # If no viewer exists, create one (though typically build_ui should be called first)
-            self.viewer = napari.Viewer(title='Decoded Posterior')
-
-        # Store reference to peak_prominence_result for use in callback
-        self.peak_prominence_result = peak_prominence_result
-        self._log_to_console(f"[DEBUG] add_peak_contours_layer: Stored peak_prominence_result with {len(peak_prominence_result.results)} result entries")
-
-        # Capture log method reference for use in nested functions
-        log_to_console = self._log_to_console
-        
-        # Helper function to extract contours from peaks_dict and convert to Napari shape format
-        def extract_contours_from_peaks_dict(peaks_dict: Dict) -> List[NDArray]:
-            """Extract all contours from peaks_dict and convert matplotlib Path objects to Napari shape format.
-            
-            Converts world coordinates (xbin_centers, ybin_centers) to pixel coordinates that match
-            the image layer's coordinate system. Uses the plotter's xbin_centers/ybin_centers to ensure
-            coordinate system alignment.
-            
-            Args:
-                peaks_dict: Dictionary of peaks, each containing 'level_slices' with contour information
-                
-            Returns:
-                List of vertex arrays, each representing a contour shape for Napari in pixel coordinates
-            """
-            shapes_data = []
-            
-            # Use plotter's coordinate system to ensure alignment with image layer
-            xbin_centers_plotter = self.xbin_centers
-            ybin_centers_plotter = self.ybin_centers if self.ybin_centers is not None else np.array([0.0])
-            
-            # Helper function to convert world coordinate to pixel index using linear interpolation
-            def world_to_pixel_coord(world_coords: NDArray, bin_centers: NDArray) -> NDArray:
-                """Convert world coordinates to pixel indices using linear interpolation."""
-                if len(bin_centers) == 0:
-                    return np.zeros_like(world_coords)
-                if len(bin_centers) == 1:
-                    return np.zeros_like(world_coords)
-                
-                # Use searchsorted to find the bin index, then interpolate
-                # This handles both uniform and non-uniform bin spacing
-                indices = np.searchsorted(bin_centers, world_coords, side='right') - 1
-                indices = np.clip(indices, 0, len(bin_centers) - 2)  # -2 because we need at least 2 points for interpolation
-                
-                # Linear interpolation within the bin
-                lower_bounds = bin_centers[indices]
-                upper_bounds = bin_centers[indices + 1]
-                bin_widths = upper_bounds - lower_bounds
-                
-                # Avoid division by zero
-                bin_widths = np.where(bin_widths > 0, bin_widths, 1.0)
-                
-                # Interpolate position within bin (0.0 to 1.0)
-                frac = (world_coords - lower_bounds) / bin_widths
-                frac = np.clip(frac, 0.0, 1.0)
-                
-                # Convert to pixel coordinates (indices + fractional position within bin)
-                pixel_coords = indices.astype(float) + frac
-                return pixel_coords
-            
-            for peak_id, peak_info in peaks_dict.items():
-                level_slices = peak_info.get('level_slices', {})
-                log_to_console(f"[DEBUG] Peak {peak_id}: level_slices keys: {list(level_slices.keys())}")
-                for probe_lvl, slice_info in level_slices.items():
-                    contour = slice_info.get('contour', None)
-                    if contour is not None:
-                        # Convert matplotlib Path to vertices array
-                        # Path.vertices is Nx2 array of (x, y) coordinates in world coordinates
-                        vertices_world = contour.vertices
-                        log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has {len(vertices_world)} vertices")
-                        if len(vertices_world) > 0:
-                            # Convert from world coordinates to pixel coordinates
-                            vertices_pixel = np.zeros_like(vertices_world)
-                            vertices_pixel[:, 0] = world_to_pixel_coord(vertices_world[:, 0], xbin_centers_plotter)
-                            vertices_pixel[:, 1] = world_to_pixel_coord(vertices_world[:, 1], ybin_centers_plotter)
-                            
-                            # Ensure closed contour by adding first point at end if not already closed
-                            if len(vertices_pixel) > 1 and not np.allclose(vertices_pixel[0], vertices_pixel[-1], atol=1e-6):
-                                vertices_pixel = np.vstack([vertices_pixel, vertices_pixel[0:1]])
-                            shapes_data.append(vertices_pixel)
-                            log_to_console(f"[DEBUG] Added contour shape with {len(vertices_pixel)} vertices")
-                        else:
-                            log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: contour has 0 vertices, skipping")
-                    else:
-                        log_to_console(f"[DEBUG] Peak {peak_id}, level {probe_lvl}: no contour found")
-            log_to_console(f"[DEBUG] extract_contours_from_peaks_dict returning {len(shapes_data)} shapes")
-            return shapes_data
-
-        # Helper function to update contours based on current epoch and time_bin
-        def update_contours_for_current_indices(epoch_idx: int, time_bin_idx: int):
-            """Update the shapes layer with contours for the specified epoch and time_bin indices."""
-            log_to_console(f"[DEBUG] update_contours_for_current_indices called: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
-            if self.peak_contours_layer is None:
-                log_to_console(f"[DEBUG] peak_contours_layer is None, returning early")
-                return
-            # active_time_bin_id: int = (time_bin_idx + 1) 
-            active_time_bin_id: int = time_bin_idx # TODO: this is the right one
-            log_to_console(f"[DEBUG] active_time_bin_id = {active_time_bin_id} (time_bin_idx + 1)")
-            a_peaks_results: Dict[DecodedEpochTimeBinIndexTuple, Dict] = self.peak_prominence_result.results
-            a_epoch_t_bin_tuple: DecodedEpochTimeBinIndexTuple = (epoch_idx, active_time_bin_id)
-            log_to_console(f"[DEBUG] Looking for key: {a_epoch_t_bin_tuple}")
-            log_to_console(f"[DEBUG] Available keys in results (first 10): {list(a_peaks_results.keys())[:10]}")
-            log_to_console(f"[DEBUG] Total number of keys in results: {len(a_peaks_results)}")
-            
-            # Check if results exist for this epoch/time_bin combination
-            if a_epoch_t_bin_tuple not in a_peaks_results:
-                # No peaks for this combination, clear the layer
-                log_to_console(f"[DEBUG] Key {a_epoch_t_bin_tuple} NOT found in results. Clearing layer.")
-                self.peak_contours_layer.data = []
-                return
-            
-            log_to_console(f"[DEBUG] Key {a_epoch_t_bin_tuple} found in results!")
-            an_epoch_t_bin_peaks_result: Dict = a_peaks_results[a_epoch_t_bin_tuple]
-            peaks_dict = an_epoch_t_bin_peaks_result.get('peaks', {})
-            log_to_console(f"[DEBUG] peaks_dict keys: {list(peaks_dict.keys())}")
-            log_to_console(f"[DEBUG] Number of peaks in peaks_dict: {len(peaks_dict)}")
-            
-            if len(peaks_dict) == 0:
-                # Empty peaks dict, clear the layer
-                log_to_console(f"[DEBUG] peaks_dict is empty. Clearing layer.")
-                self.peak_contours_layer.data = []
-                return
-            
-            # Extract and convert contours
-            log_to_console(f"[DEBUG] Extracting contours from {len(peaks_dict)} peaks...")
-            shapes_data = extract_contours_from_peaks_dict(peaks_dict)
-            log_to_console(f"[DEBUG] Extracted {len(shapes_data)} contour shapes")
-            if len(shapes_data) > 0:
-                log_to_console(f"[DEBUG] First shape has {len(shapes_data[0])} vertices")
-            self.peak_contours_layer.data = shapes_data
-            log_to_console(f"[DEBUG] Updated peak_contours_layer.data with {len(shapes_data)} shapes")
-
-
-        def _on_current_step_change_contours(event):
-            """Update peak contours when epoch or time_bin slider changes.
-            
-            Uses internal state (self.curr_epoch_idx, self.curr_time_bin_index) which is
-            synchronized by the main event handler in build_ui, ensuring consistency.
-
-            Captures: update_contours_for_current_indices
-
-            """
-            log_to_console(f"[DEBUG] _on_current_step_change_contours callback triggered")
-            if event is None:
-                log_to_console(f"[DEBUG] event is None, returning")
-                return
-            if not hasattr(event, 'value'):
-                log_to_console(f"[DEBUG] event has no 'value' attribute, returning")
-                return
-            curr_step = event.value
-            log_to_console(f"[DEBUG] curr_step = {curr_step}, len = {len(curr_step) if hasattr(curr_step, '__len__') else 'N/A'}")
-            if len(curr_step) >= 2:
-                epoch_idx = int(curr_step[0])
-                time_bin_idx = int(curr_step[1])
-                log_to_console(f"[DEBUG] Extracted epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx} from curr_step")
-                update_contours_for_current_indices(epoch_idx, time_bin_idx)
+        for t_idx in range(n_t_bins):
+            # Extract the 2D boolean mask for the current time bin
+            if is_3d:
+                mask_2d = posterior_p_x_given_n[:, :, t_idx]
+                sub_name: str = f'{name}[{t_idx}]'
             else:
-                log_to_console(f"[DEBUG] curr_step length < 2, not updating. \n\tcurr_step: {curr_step}")
+                mask_2d = posterior_p_x_given_n
+                sub_name: str = name
 
-            # # Use internal state that is synchronized by the main handler
-            # epoch_idx = self.curr_epoch_idx if self.curr_epoch_idx is not None else 0
-            # time_bin_idx = self.curr_time_bin_index if self.curr_time_bin_index is not None else 0
-            # print(f"[DEBUG] Using synchronized state: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
-            # update_contours_for_current_indices(epoch_idx, time_bin_idx)
+            # Skip if the mask is empty (no True values) to avoid errors
+            if not np.any(mask_2d):
+                continue
+
+            contours, actor = plot_single_t_bin_contour(mask_2d=mask_2d, sub_name=sub_name, t_idx=t_idx, n_t_bins=n_t_bins)
+            data_dict['contours'][sub_name] = contours
+            plotActors['contours'][sub_name] = actor
+
+        return plotActors, data_dict
 
 
-        ## END def _on_current_step_change_contours(event)...
 
-
-        # Create initial empty shapes layer
-        shapes_layer = self.viewer.add_shapes(
-            data=[],
-            shape_type='path',
-            name=layer_name,
-            edge_color=edge_color,
-            face_color=face_color,
-            edge_width=edge_width
-        )
-        # Configure shapes layer to work with 4D volume
-        shapes_layer.editable = False  # Make non-editable since it's dynamically updated
-        # Ensure shapes layer uses the same coordinate system as the image layer
-        # Shapes will automatically be displayed in the current 2D slice (epoch, time_bin)
-        self.peak_contours_layer = shapes_layer
-
-        # Create callback function to update contours when sliders change
-
-        # Connect callback to slider changes
-        self.viewer.dims.events.current_step.connect(_on_current_step_change_contours)
-
-        # Display initial contours for current epoch/time_bin
-        # Read from actual slider positions to ensure sync with viewer state
-        curr_step = self.viewer.dims.current_step
-        epoch_idx = int(curr_step[0]) if len(curr_step) >= 1 else 0
-        time_bin_idx = int(curr_step[1]) if len(curr_step) >= 2 else 0
-        self._log_to_console(f"[DEBUG] Initial display from slider: epoch_idx={epoch_idx}, time_bin_idx={time_bin_idx}")
-        # Update internal state to match slider positions
-        self.curr_epoch_idx = epoch_idx
-        self.curr_time_bin_index = time_bin_idx
-        update_contours_for_current_indices(epoch_idx, time_bin_idx)
-
-        return shapes_layer, update_contours_for_current_indices
