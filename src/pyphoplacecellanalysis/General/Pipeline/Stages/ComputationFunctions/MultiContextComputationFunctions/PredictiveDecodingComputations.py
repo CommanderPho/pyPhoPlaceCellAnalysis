@@ -4846,7 +4846,7 @@ class MaskDataSource(AttrsBasedClassHelperMixin):
             ## needs to overwrite: curr_matching_positions_df, curr_matching_epochs_df, curr_matching_epochs_df_dict, curr_matching_merged_segment_epochs_df_dict
         ## END if should_filter_to_minimum...
         
-        curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {}
+        curr_matching_past_future_positions_df_dict: Dict[types.PastFutureCategory, Dict[types.epoch_index, pd.DataFrame]] = {'past': {}, 'future': {}}
 
         if should_filter_to_minimum:
             # for a_past_future_name, an_epoch_specific_past_position_dfs in curr_matching_epochs_df_dict.items():

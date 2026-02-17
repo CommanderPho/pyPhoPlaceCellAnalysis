@@ -86,10 +86,12 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                 y_centroids = y_min + y_pixel * y_scale
                 original_indices = np.where(valid_mask)[0]
                 n_centroids: int = len(x_centroids)
-                centroid_colors = np.zeros((n_centroids, 4), dtype=np.float32)
-                for i in range(n_centroids):
-                    t_idx = original_indices[i]
-                    centroid_colors[i] = time_bin_colors[t_idx] if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                n_time_bin_slots: int = max(len(time_bin_colors), int(np.max(original_indices)) + 1) if len(original_indices) > 0 else len(time_bin_colors)
+                color_by_time_bin = np.zeros((n_time_bin_slots, 4), dtype=np.float32)
+                color_by_time_bin[0:len(time_bin_colors)] = time_bin_colors
+                if n_time_bin_slots > len(time_bin_colors):
+                    color_by_time_bin[len(time_bin_colors):] = (1.0, 1.0, 1.0, 0.8)
+                centroid_colors = color_by_time_bin[original_indices]
                 centroid_pos = np.column_stack([x_centroids, y_centroids])
                 centroid_markers = vz.Markers(pos=centroid_pos, face_color=centroid_colors, size=8, edge_width=0, parent=posterior_2d_view.scene)
                 centroid_markers.order = 8
@@ -125,7 +127,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                         pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()])
                         arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy()
 
-                        _safe_color_map_fn = lambda t_idx: centroid_colors[t_idx, :] if (t_idx < np.shape(centroid_colors)[0]) else (1.0, 1.0, 1.0, 0.8)
+                        _safe_color_map_fn = lambda t_idx: tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
                         _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(_safe_color_map_fn).to_list()
                         _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(_safe_color_map_fn).to_list()
                         vertex_point_color: NDArray = np.vstack([np.stack([v0, v1]) for v0, v1 in zip(_original_index_start_colors_list, _original_index_end_colors_list)])
@@ -148,7 +150,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                 x_start, y_start = x_center, y_center
                                 x_end = x_center + (unit_dx * arrow_length)
                                 y_end = y_center + (unit_dy * arrow_length)
-                                an_arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                                an_arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
                                 a_pos = np.array([[x_start, y_start], [x_end, y_end]])
                                 an_arrows = np.array([[x_start, y_start, x_end, y_end]])
                                 a_pos = np.asarray(a_pos, dtype=np.float32)
@@ -175,7 +177,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                 y_end = y_center + arrow_length * np.sin(angle)
                                 centroid_idx = arrow_centroid_indices[i]
                                 t_idx = original_indices[centroid_idx]
-                                arrow_color = tuple(time_bin_colors[t_idx]) if t_idx < len(time_bin_colors) else (1.0, 1.0, 1.0, 0.8)
+                                arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
                                 pos = np.array([[x_start, y_start], [x_end, y_end]])
                                 pos = np.asarray(pos, dtype=np.float32)
                                 arrows = np.array([[x_start, y_start, x_end, y_end]])
