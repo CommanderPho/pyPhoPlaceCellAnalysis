@@ -4807,6 +4807,12 @@ class MaskDataSource(AttrsBasedClassHelperMixin):
 
         col_name: str = 'past_future_matching_pos_epoch_id'
 
+
+        curr_epoch_row: dict = self.filter_epochs.iloc[an_epoch_idx].to_dict() # {'start': 8122.6125, 'stop': 8122.887499999996, 'label': '15', 'duration': 0.2749999999959982, 'start_idx': nan, 'stop_idx': nan, 'original_epoch_idx': 15}
+        original_epoch_id: int = curr_epoch_row['original_epoch_idx']
+        print(f'original_epoch_id: {original_epoch_id}, curr_epoch_row: {curr_epoch_row}')
+        # curr_epoch_row['curr_epoch_row']
+        
         curr_matching_epochs_df: pd.DataFrame = self.matching_pos_epochs_dfs_list[an_epoch_idx]
         curr_matching_positions_df: pd.DataFrame = self.matching_pos_dfs_list[an_epoch_idx]
         curr_matching_epochs_df_dict: Dict[types.PastFutureCategory, pd.DataFrame] = curr_matching_epochs_df.pho.partition_df_dict('is_future_present_past')
@@ -4894,6 +4900,7 @@ class MaskDataSource(AttrsBasedClassHelperMixin):
         curr_matching_past_future_positions_df_list: Dict[types.PastFutureCategory, List[pd.DataFrame]] = {k:list(v.values()) for k, v in curr_matching_past_future_positions_df_dict.items()}
         ## OUTPUTS: curr_matching_past_future_positions_df_dict
         return {
+            'curr_epoch_row': curr_epoch_row, 
             'curr_matching_epochs_df': curr_matching_epochs_df,
             'curr_matching_positions_df': curr_matching_positions_df,
             'curr_matching_epochs_df_dict': curr_matching_epochs_df_dict,
