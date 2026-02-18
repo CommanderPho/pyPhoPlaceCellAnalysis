@@ -1176,11 +1176,16 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """
         non_local_locality_measures_epochs_df = decoding_locality_measures.get_non_local_epochs(merging_adjacent_max_separation_sec=0.5)
         render_scrollable_colored_table_from_dataframe(non_local_locality_measures_epochs_df)
-
+        Requires: self.locality_measures_df
         """
-        _out_locality_measures_df: pd.DataFrame = deepcopy(self.locality_measures_df)
+        if self.locality_measures_df is None or len(self.locality_measures_df) == 0:
+            ## rebuild
+            _out_locality_measures_df: pd.DataFrame = deepcopy(self.rebuild_locality_measures_df())
+        else:
+            _out_locality_measures_df: pd.DataFrame = deepcopy(self.locality_measures_df)
+            
         # _out_locality_measures_df['t'].diff() # 0.25
-        non_local_locality_measures_df = deepcopy(_out_locality_measures_df[_out_locality_measures_df['is_non_local_period']])
+        # non_local_locality_measures_df = deepcopy(_out_locality_measures_df[_out_locality_measures_df['is_non_local_period']])
         ## Compute adjacent epochs:
         non_local_locality_measures_epochs_df = _out_locality_measures_df.neuropy.detect_epoch_satisfying_condition(is_condition_satisfied = (_out_locality_measures_df['is_non_local_period'].to_numpy()), merging_adjacent_max_separation_sec=merging_adjacent_max_separation_sec, **kwargs)
         return non_local_locality_measures_epochs_df
