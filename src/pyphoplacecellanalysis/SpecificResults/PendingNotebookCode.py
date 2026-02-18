@@ -2383,6 +2383,7 @@ def build_bapun_all_epochs_df(curr_active_pipeline):
     # curr_laps_df = sess.laps.to_dataframe()
 
     curr_paradigm_df = ensure_dataframe(sess.paradigm)
+    curr_paradigm_df = curr_paradigm_df.epochs.adding_global_epoch_row()
     curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
     n_epochs: int = len(curr_paradigm_df)
     # epoch_color_strs: List[str] = generate_colors(n_epochs)
