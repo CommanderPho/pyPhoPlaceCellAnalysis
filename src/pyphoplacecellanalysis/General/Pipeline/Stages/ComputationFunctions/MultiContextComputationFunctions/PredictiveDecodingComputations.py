@@ -4506,7 +4506,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             print(f'[{_fn_name}] [PredictiveDecoding] Computing via .compute(sigma={sigma})... (this may take a while)')
             _compute_start = _time.perf_counter()
             # Compute predictive decoding outputs
-            # moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma)# #TODO 2026-02-16 18:19: - [ ] Removed to see if it still works
+            moving_avg_dict, moving_avg_meas_pos_overlap_dict, gaussian_volume = predictive_decoding.compute(sigma=sigma) # #TODO 2026-02-16 18:19: - [ ] Removed to see if it still works
             _compute_elapsed = _time.perf_counter() - _compute_start
             print(f'[{_fn_name}] [PredictiveDecoding] .compute() done! Elapsed: {_compute_elapsed:.2f}s')
             
