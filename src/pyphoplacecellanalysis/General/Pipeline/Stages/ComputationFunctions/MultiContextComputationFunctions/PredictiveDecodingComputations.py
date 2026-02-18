@@ -4811,9 +4811,10 @@ class MaskDataSource(AttrsBasedClassHelperMixin):
         ## from `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations.PredictiveDecodingDisplayWidget._prepare_epoch_data`
 
         col_name: str = 'past_future_matching_pos_epoch_id'
+        if not isinstance(an_epoch_idx, int):
+            an_epoch_idx = int(an_epoch_idx)
 
-
-        curr_epoch_row: dict = self.filter_epochs.iloc[an_epoch_idx].to_dict() # {'start': 8122.6125, 'stop': 8122.887499999996, 'label': '15', 'duration': 0.2749999999959982, 'start_idx': nan, 'stop_idx': nan, 'original_epoch_idx': 15}
+        curr_epoch_row: dict = self.filter_epochs.iloc[int(an_epoch_idx)].to_dict() # {'start': 8122.6125, 'stop': 8122.887499999996, 'label': '15', 'duration': 0.2749999999959982, 'start_idx': nan, 'stop_idx': nan, 'original_epoch_idx': 15}
         original_epoch_id: int = curr_epoch_row['original_epoch_idx']
         print(f'original_epoch_id: {original_epoch_id}, curr_epoch_row: {curr_epoch_row}')
         # curr_epoch_row['curr_epoch_row']
