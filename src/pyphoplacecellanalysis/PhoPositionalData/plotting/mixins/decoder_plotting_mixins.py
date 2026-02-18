@@ -4351,7 +4351,8 @@ class DecoderRenderingPyVistaMixin:
             contour_surface_actor, contour_surface_mesh = None, None
             if contour_extrude_z is not None and contours.n_cells > 0:
                 contour_surface_mesh = contours.extrude([0, 0, float(contour_extrude_z)], capping=False)
-                contour_surface_actor = p.add_mesh(contour_surface_mesh, color=color_rgb, opacity=opacity, name=sub_name + "_contour_surface", **kwargs)
+                contour_surface_actor = p.add_mesh(contour_surface_mesh, color=color_rgb, opacity=0.2, name=sub_name + "_contour_surface", edge_color=color_rgb, **kwargs) # "blue" show_edges=False, edge_opacity=1.0, 
+                
             # Contour line on top (same color, full opacity so boundary is visible)
             line_actor = p.add_mesh(contours, color=color_rgb, opacity=1.0, name=sub_name, **kwargs)
             return contours, fill_actor, line_actor, filled, contour_surface_actor, contour_surface_mesh
@@ -4418,7 +4419,7 @@ class DecoderRenderingPyVistaMixin:
             plot_data['tube'] = tube
             
             # Note: 'show_scalar_bar': False is set, so you won't see the legend unless changed to True
-            plot = p.add_mesh(tube, **({'name': name, 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'lighting': False, 'render': False} | kwargs))
+            plot = p.add_mesh(tube, **({'name': name, 'render_lines_as_tubes': False, 'show_scalar_bar': False, 'lighting': True, 'render': False} | kwargs))
             return plot_data, plot
 
 
@@ -4493,7 +4494,7 @@ class DecoderRenderingPyVistaMixin:
         lap_start_z = 0.9
         time_to_z_range = 100.0
         position_stop_z: float = lap_start_z + time_to_z_range
-        render_kwargs_dict = {'color': [0.1, 0.1, 0.1], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'render': True}
+        render_kwargs_dict = {'color': [0.1, 0.1, 0.1], 'pbr': True, 'metallic': 0.8, 'roughness': 0.5, 'diffuse': 1, 'opacity': 0.01, 'render': True}
         xyt = curr_position_df[['x', 'y', 't']].to_numpy().T
         plot_data, plot_tube = plot_any_spline(plotter, curr_lap_position_traces=xyt, name='all_positions', lap_start_z=lap_start_z, time_to_z_range=time_to_z_range, color_by_speed=False, render_kwargs_dict=render_kwargs_dict)
         plots_data['all_positions'] = plot_data
@@ -4545,7 +4546,10 @@ class DecoderRenderingPyVistaMixin:
             if plots is None:
                 plots = {}
 
+            a_ds.filter_epochs['original_epoch_idx'] = a_ds.filter_epochs['original_epoch_idx'].astype(int)
             an_active_PBE_epoch_row = a_ds.filter_epochs.iloc[an_epoch_idx]
+            # an_active_PBE_epoch_row.original_epoch_idx = int(an_active_PBE_epoch_row.original_epoch_idx)
+
             an_epoch_mask = a_ds.epoch_t_bins_high_prob_pos_masks[an_epoch_idx]
             xbin_centers = a_ds.xbin_centers
             ybin_centers = a_ds.ybin_centers
@@ -4563,7 +4567,7 @@ class DecoderRenderingPyVistaMixin:
             for a_past_future_key, past_matching_position_df_dict in curr_matching_past_future_positions_df_dict.items():
                 for a_matched_position_segment_idx, a_matched_pos_segment_df in past_matching_position_df_dict.items():
                     a_matched_pos_segment_df['z'] = a_matched_pos_segment_df['t'].apply(times_to_z_pos_fn)
-                    render_kwargs_dict = {'color': [0.9, 0.9, 0.9], 'pbr': True, 'metallic': 0.1, 'roughness': 0.8, 'diffuse': 1, 'render': True}
+                    render_kwargs_dict = {'color': [0.9, 0.2, 0.2], 'pbr': False, 'metallic': 0.1, 'roughness': 0.8, 'diffuse': 1, 'render': True, 'lighting': True, 'render_lines_as_tubes': True, 'line_width': 100.0}
                     plot_seg_key: str = f'PBE[{an_active_PBE_epoch_row.original_epoch_idx}][{a_past_future_key}][{a_matched_position_segment_idx}]'
                     print(f'plotting: "{plot_seg_key}"')
                     xyz = a_matched_pos_segment_df[['x', 'y', 'z']].to_numpy().T
@@ -4575,3 +4579,4 @@ class DecoderRenderingPyVistaMixin:
         plots_data, plots = _cleanup_epoch_linear_idx_actors(plotter=plotter, plots_data=plots_data, plots=plots)
         plots_data, plots = _on_update_epoch_linear_idx(plotter=plotter, a_ds=a_ds, an_epoch_idx=an_epoch_idx, times_to_z_pos_fn=times_to_z_pos_fn, plots_data=plots_data, plots=plots)
         plotter.show_bounds()
+        return plots_data, plots

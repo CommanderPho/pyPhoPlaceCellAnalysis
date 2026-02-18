@@ -1463,7 +1463,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     @classmethod
     def compute_temporal_sequentiality_measures(cls, self, alpha_epoch_masks: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_T_BINS"], np.bool_], epoch_promenence_tuples: List[Tuple[NDArray, NDArray, NDArray]], 
             xbin_centers: NDArray[ND.Shape["N_X_BINS"], np.floating], ybin_centers: NDArray[ND.Shape["N_Y_BINS"], np.floating],
-            computation_measure_name: str = 'temporal_sequentiality', min_val_epsilon: float = 1e-9, enable_debug_outputs:bool=True) -> Dict[str, NDArray]:
+            computation_measure_name: str = 'temporal_sequentiality', min_val_epsilon: float = 1e-9, enable_debug_outputs:bool=False) -> Dict[str, NDArray]:
         """Compute temporal sequentiality measures from spatial masks and peak locations.
         
         This function computes measures of temporal sequentiality in spatial-temporal data by:
