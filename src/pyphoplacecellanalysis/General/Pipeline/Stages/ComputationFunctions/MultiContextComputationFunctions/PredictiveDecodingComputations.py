@@ -525,8 +525,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             ## renormalize over context:
             norm_sums = np.nansum(a_context_included_pdf, axis=(0, 1))
             is_nonzero = np.nonzero(norm_sums)
-            for a_nonzero_idx in is_nonzero:
-                a_context_included_pdf[:, :, a_nonzero_idx] = a_context_included_pdf[:, :, a_nonzero_idx] / norm_sums[a_nonzero_idx]
+            a_context_included_pdf[:, :, is_nonzero] = a_context_included_pdf[:, :, is_nonzero] / norm_sums[is_nonzero]
             return a_context_included_pdf
 
 
