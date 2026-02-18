@@ -476,9 +476,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         if self.defer_compute_on_init:
             print('DecodingLocalityMeasures.__attrs_post_init__(...): init will not be performed because `self.defer_compute_on_init == True`.')
         else:
+            print('DecodingLocalityMeasures.__attrs_post_init__(...): self.perform_compute_on_load()...')
             self.perform_compute_on_load()
 
-        print(f'done.')
+        print(f'\tdone.')
 
 
     @classmethod
