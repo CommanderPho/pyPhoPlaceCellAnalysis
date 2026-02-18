@@ -2092,7 +2092,7 @@ class PeakPromenence:
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite'], input_requires=[], output_provides=[], uses=['cls.compute_2d_peak_prominence'], used_by=['cls.compute_posterior_peak_promenences'], creation_date='2025-12-23 08:44', related_items=[])
     @classmethod
-    def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: Union[float, List[float]] = 0.9, memory_warn_bytes: Optional[int] = None, memory_strict: bool = False):
+    def compute_2d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_YBINS, N_TBINS"], Any], alpha: Union[float, List[float]] = 0.9, memory_warn_bytes: Optional[int] = int(60 * 1024**3), memory_strict: bool = True):
         """ for a single posterior (from a single decoded epoch, etc) process each time bin
 
         epoch_promenences, epoch_masks = PeakPromenence.compute_2d_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
