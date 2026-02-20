@@ -563,6 +563,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         from pathlib import Path
         import sys
         
+
+        a_plotter.params.debug_print = debug_print
+        
         video_filepath = Path(output_path).resolve()
         suffix = video_filepath.suffix.lower()
         VIDEO_EXTENSIONS = {'.avi', '.mp4', '.mov'}
