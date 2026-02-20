@@ -31,9 +31,9 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
         self.central_widget = QtWidgets.QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # 🔥 Changed from QVBoxLayout → QGridLayout
-        self.layout = QtWidgets.QGridLayout()
-        self.central_widget.setLayout(self.layout)
+        # 🔥 Changed from QVBoxLayout → QGridLayout (name avoids shadowing QMainWindow.layout())
+        self.grid_layout = QtWidgets.QGridLayout()
+        self.central_widget.setLayout(self.grid_layout)
 
         self.image_items = []
         self.current_t_bins = []
@@ -47,7 +47,8 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
             plot_widget = pg.PlotWidget()
             plot_widget.setAspectLocked(True)
-            plot_widget.invertY(True)
+            # plot_widget.invertY(True)
+            plot_widget.invertY(False)
             plot_widget.hideAxis('left')
             plot_widget.hideAxis('bottom')
 
@@ -62,7 +63,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             row = an_epoch_idx // self.n_columns
             col = an_epoch_idx % self.n_columns
 
-            self.layout.addWidget(plot_widget, row, col)
+            self.grid_layout.addWidget(plot_widget, row, col)
 
             self.image_items.append((img_item, an_epoch_p_x_given_n, an_epoch_n_bins))
             self.current_t_bins.append(0)
@@ -95,7 +96,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
 
-    def export_grid_as_gif(self, output_path: str, frame_duration_ms: int = 50):
+    def export_grid_as_gif(self, output_path: str, frame_duration_ms: int = 50, render_passes: int = 5):
         """ Exports the entire animated grid as an animated GIF.
 
         Parameters
@@ -104,67 +105,50 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             Path to save GIF.
         frame_duration_ms : int
             Duration per frame in milliseconds.
+        render_passes : int
+            Number of Qt event processing passes per frame before grab (more = smoother capture).
         """
-
         import imageio
-        from PyQt5.QtGui import QImage
+        from pyqtgraph.Qt import QtGui
+
+        # Global min/max across all epochs so colormap is consistent (smoother than per-frame levels)
+        all_data = np.concatenate([p for _, p, _ in self.image_items], axis=2)
+        gmin, gmax = float(np.nanmin(all_data)), float(np.nanmax(all_data))
+        if gmax <= gmin:
+            gmax = gmin + 1.0
+        levels = (gmin, gmax)
 
         frames = []
-
-        # Determine maximum number of frames across all epochs
         max_n_bins = np.max(self.active_decoded_PBE_result.nbins)
-
-        # Save current state so we can restore later
         original_t_bins = self.current_t_bins.copy()
 
         for global_frame_idx in range(max_n_bins):
-
-            # Manually set each epoch to correct frame (looping behavior preserved)
             for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
-
                 img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
-
-                if global_frame_idx < an_epoch_n_bins:
-                    an_epoch_t_bin = global_frame_idx
-                else:
-                    an_epoch_t_bin = 0  # loop shorter epochs
-
+                an_epoch_t_bin = global_frame_idx if global_frame_idx < an_epoch_n_bins else 0
                 a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
+                img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=False, levels=levels)
 
-                img_item.setImage(
-                    a_t_bin_p_x_given_n.T,
-                    autoLevels=False,
-                    levels=(0, 1)
-                )
+            for _ in range(render_passes):
+                QtWidgets.QApplication.processEvents()
 
-            # Process Qt events so rendering completes
-            QtWidgets.QApplication.processEvents()
-
-            # Grab full window image
             qpixmap = self.grab()
-            qimage = qpixmap.toImage().convertToFormat(QImage.Format_RGBA8888)
-
-            width = qimage.width()
-            height = qimage.height()
-
+            qimage = qpixmap.toImage().convertToFormat(QtGui.QImage.Format_RGBA8888)
+            width, height = qimage.width(), qimage.height()
             ptr = qimage.bits()
             ptr.setsize(qimage.byteCount())
-            arr = np.array(ptr).reshape(height, width, 4)
+            arr = np.ascontiguousarray(np.array(ptr).reshape(height, width, 4).copy())
+            rgb = np.empty((height, width, 3), dtype=np.uint8)
+            alpha = arr[:, :, 3:4].astype(np.float32) / 255.0
+            rgb[:] = (arr[:, :, :3].astype(np.float32) * alpha + 255.0 * (1.0 - alpha)).astype(np.uint8)
+            frames.append(rgb)
 
-            frames.append(arr.copy())
-
-		## END for global_frame_idx in range(max_n_bins)
-        
-        # Restore previous animation state
         self.current_t_bins = original_t_bins
 
-        # Save GIF
-        imageio.mimsave(
-            output_path,
-            frames,
-            duration=frame_duration_ms / 1000.0,
-            loop=1
-        )
+        try:
+            imageio.mimsave(output_path, frames, format="GIF-PIL", duration=frame_duration_ms / 1000.0, loop=0, quantizer="nq", palettesize=256)
+        except Exception:
+            imageio.mimsave(output_path, frames, duration=frame_duration_ms / 1000.0, loop=0)
 
         print(f"Exported GIF to: {output_path}")
         
