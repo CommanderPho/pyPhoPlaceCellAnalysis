@@ -4,12 +4,8 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-import pyphoplacecellanalysis.External.pyqtgraph as pg
-# from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
-from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent
-from PyQt5.QtGui import QPainter
 
 @metadata_attributes(short_name=None, tags=['animated', 'PBE', 'loop'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-20 12:22', related_items=[])
 class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
@@ -17,7 +13,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
     
     Usage:
     
-        from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
+		from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
 
         app = pg.mkQApp('AnimatedLoopingPosteriorViewer') # QtWidgets.QApplication(sys.argv)
         viewer = AnimatedLoopingPosteriorViewer(active_decoded_PBE_result)
@@ -26,67 +22,28 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
 
     """
-    enable_debug_print: bool = False
-
-    def __init__(self, active_decoded_PBE_result, n_columns: int = 10, xbin=None, ybin=None, drop_below_threshold: float=0.0000001):
+    def __init__(self, active_decoded_PBE_result, n_columns: int = 10):
         super().__init__()
 
         self.active_decoded_PBE_result = active_decoded_PBE_result
         self.n_columns = n_columns
 
-        self.applicationName = 'AnimatedLoopingPosteriorViewer'
-        self.xbin = xbin
-        self.ybin = ybin
-        self.drop_below_threshold = drop_below_threshold
-        self.setup() ## call setup
-
-        self._buildGraphics()
-
-        # Timer for animation
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.update_frames)
-        self.timer.start(50)  # ms per frame
-
-
-    def setup(self):
-        # self.setup_spike_rendering_mixin() # NeuronIdentityAccessingMixin
-        self.app = pg.mkQApp(self.applicationName)
-        self.params = VisualizationParameters(self.applicationName, debug_view_mode=False, drop_below_threshold=self.drop_below_threshold) #  xbin=xbin, ybin=ybin, n_columns=n_columns
-        # self.params.shared_axis_order = 'row-major'
-        self.params.shared_axis_order = 'col-major'
-        # self.params.shared_axis_order = None # #TODO 2025-06-30 17:42: - [ ] was like this, but posteriors plotted seem wrong
-        self.params.decoded_time_bins_info_df = None
-        
-        ## Build the colormap to be used:
-        # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
-        # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
-        self.params.cmap = pg.colormap.get('viridis','matplotlib')
-        self.params.debug_view_mode = False
-        
-        self.params.image_margins = 0.0
-        self.params.image_bounds_extent, self.params.x_range, self.params.y_range = pyqtplot_build_image_bounds_extent(self.xbin, self.ybin, margin=self.params.image_margins, debug_print=self.enable_debug_print)
-        
-
-
-    def _buildGraphics(self):
-        """ basic """
         self.central_widget = QtWidgets.QWidget()
         self.setCentralWidget(self.central_widget)
 
         # 🔥 Changed from QVBoxLayout → QGridLayout
-        self.main_layout = QtWidgets.QGridLayout()
-        self.central_widget.setLayout(self.main_layout)
+        self.layout = QtWidgets.QGridLayout()
+        self.central_widget.setLayout(self.layout)
 
         self.image_items = []
         self.current_t_bins = []
 
-        debug_view_mode: bool = self.params.debug_view_mode
-
+        
         # Build one animated cell per epoch
-        for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
+        for an_epoch_idx in np.arange(active_decoded_PBE_result.n_epochs):
 
-            an_epoch_p_x_given_n = self.active_decoded_PBE_result.p_x_given_n_list[an_epoch_idx]
-            an_epoch_n_bins: int = self.active_decoded_PBE_result.nbins[an_epoch_idx]
+            an_epoch_p_x_given_n = active_decoded_PBE_result.p_x_given_n_list[an_epoch_idx]
+            an_epoch_n_bins: int = active_decoded_PBE_result.nbins[an_epoch_idx]
 
             plot_widget = pg.PlotWidget()
             plot_widget.setAspectLocked(True)
@@ -94,41 +51,26 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             plot_widget.hideAxis('left')
             plot_widget.hideAxis('bottom')
 
-            img_item = pg.ImageItem(border='w')
-            plot_widget.addItem(img_item, defaultPadding=0.0)
-            # img_item.setRange(QtCore.QRectF(*self.params.image_bounds_extent))
+            img_item = pg.ImageItem()
+            # lut = pg.colormap.get('viridis','matplotlib').getLookupTable(256)
+            # img_item = pg.ImageItem(lut=lut)
+            img_item.setColorMap(pg.colormap.get('viridis','matplotlib'))
 
-            # plot_widget.showAxes(False)
-            # plot_widget.hideButtons() # Hides the auto-scale button
-            
-            # # self.ui.root_plot.showAxes(False)        
-            plot_widget.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0)
-            # Sets only the panning limits:
-            plot_widget.setLimits(xMin=self.params.x_range[0], xMax=self.params.x_range[-1], yMin=self.params.y_range[0], yMax=self.params.y_range[-1])
-
-            plot_widget.setMouseEnabled(x=debug_view_mode, y=debug_view_mode)
-            plot_widget.setMenuEnabled(enableMenu=debug_view_mode)
-            
-            # Set the color map:
-            img_item.setColorMap(self.params.cmap)
-
-            if isinstance(self.params.cmap, NDArray):
-                img_item.setLookupTable(self.params.cmap, update=True)
-            else:
-                img_item.setLookupTable(self.params.cmap.getLookupTable(nPts=256), update=True)
+            plot_widget.addItem(img_item)
 
             # Compute grid position
             row = an_epoch_idx // self.n_columns
             col = an_epoch_idx % self.n_columns
 
-            self.main_layout.addWidget(plot_widget, row, col)
+            self.layout.addWidget(plot_widget, row, col)
 
             self.image_items.append((img_item, an_epoch_p_x_given_n, an_epoch_n_bins))
             self.current_t_bins.append(0)
-    ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
-
-
+        # Timer for animation
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_frames)
+        self.timer.start(50)  # ms per frame
 
     def update_frames(self):
         """ updates/animates the PBE frames """        
@@ -141,44 +83,14 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             if an_epoch_t_bin < an_epoch_n_bins:
                 a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
 
-                image = np.squeeze(a_t_bin_p_x_given_n).copy()
-                # image_title = f'{self.name}'
-            
-                if self.params.drop_below_threshold is not None:
-                    image[np.where(image < self.params.drop_below_threshold)] = np.nan # null out the low values if needed
-
-                is_all_nan = np.all(np.isnan(image))
-
                 # Optional normalization for better contrast
-                # img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=True)
-                # img_item.setImage(image, autoLevels=True)
+                img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=True)
+                # img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=False, levels=(0, 1))
 
-                ## get the image item to draw:
-                imv: pg.ImageItem = img_item
-                # imv.setCompositionMode(QPainter.CompositionMode_Plus) ## Set this mode so that the heatmap overlays the occupancy map
-                if is_all_nan:
-                    # Optimization: Don't just set data to None/NaN, actually remove it from the render pipeline
-                    if imv.isVisible():
-                        print(f'WARNING: is_all_nan == True for image. Hiding item.')
-                        imv.hide()
-                        # Optional: clear the image data to free memory if the object stays hidden for long
-                        # imv.clear() 
-                else:
-                    # Ensure it is visible if it was previously hidden
-                    if not imv.isVisible():
-                        imv.show()
-
-                    # Update Image:
-                    if self.params.shared_axis_order is None:
-                        imv.setImage(image, rect=self.params.image_bounds_extent)
-                    else:
-                        imv.setImage(image, rect=self.params.image_bounds_extent, axisOrder=self.params.shared_axis_order)
 
                 self.current_t_bins[an_epoch_idx] += 1
             else:
                 self.current_t_bins[an_epoch_idx] = 0
-
-
 
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
@@ -241,7 +153,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
             frames.append(arr.copy())
 
-        ## END for global_frame_idx in range(max_n_bins)
+		## END for global_frame_idx in range(max_n_bins)
         
         # Restore previous animation state
         self.current_t_bins = original_t_bins
