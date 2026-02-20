@@ -27,7 +27,6 @@ from neuropy.utils.efficient_interval_search import OverlappingIntervalsFallback
 from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 
 from neuropy.utils.misc import build_shuffled_ids # used in _SHELL_analyze_leave_one_out_decoding_results
-from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 from neuropy.utils.misc import split_array

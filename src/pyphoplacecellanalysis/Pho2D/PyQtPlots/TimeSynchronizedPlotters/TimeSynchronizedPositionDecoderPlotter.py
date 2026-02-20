@@ -10,6 +10,8 @@ from nptyping import NDArray
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.assertion_helpers import Assert
 from neuropy.utils.mixins.dict_representable import overriding_dict_with
+from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
+from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 # from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
@@ -99,11 +101,13 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.params.debug_print = True # self.enable_debug_print
         self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
         self.params.show_posteriors = param_kwargs.pop('show_posteriors', True)
-        
+        self.params.decoded_time_bins_info_df = param_kwargs.pop('decoded_time_bins_info_df', None) ## 
+
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
         self.params.posterior_variable_to_render = posterior_variable_to_render
         self.params.drop_below_threshold = drop_below_threshold
+        
         
         self.buildUI() # calls `self._buildGraphics()`
         self._update_plots()
@@ -117,11 +121,27 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # self.params.shared_axis_order = 'row-major'
         self.params.shared_axis_order = 'col-major'
         # self.params.shared_axis_order = None # #TODO 2025-06-30 17:42: - [ ] was like this, but posteriors plotted seem wrong
+        self.params.decoded_time_bins_info_df = None
         
         ## Build the colormap to be used:
         # self.params.cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
         # self.params.cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
         self.params.cmap = pg.colormap.get('viridis','matplotlib')
+        # self.params.cmap_PBE = pg.colormap.get('magma','matplotlib')
+        self.params.cmap_PBE = pg.colormap.get('brg','matplotlib')
+        
+        self.params.image_visual_display_config = {'default': dict(border=pg.mkPen('white', width=1), cmap=pg.colormap.get('viridis','matplotlib')),
+                                                   'PBE': dict(border=pg.mkPen('r', width=2), cmap=pg.colormap.get('brg','matplotlib')),
+        }
+
+        # curr_time_bin_type: str = 'default'
+        # curr_time_bin_type: str = 'PBE'        
+        # curr_time_bin_config: Dict = self.params.image_visual_display_config[curr_time_bin_type]
+        
+        # # plot_item.getAxis('left').setPen(curr_time_bin_config['axis']) # Change left axis color
+        # # plot_item.getAxis('bottom').setPen(curr_time_bin_config['axis']) # Change bottom axis color
+        # self.ui.imv.setBorder(curr_time_bin_config['border'])
+
         self.params.debug_view_mode = True
         
         self.params.image_margins = 0.0
@@ -310,6 +330,38 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         return (long_rects_outputs, short_rects_outputs)
 
 
+    def add_decoded_time_bin_info(self, curr_session):
+        """ adds a dataframe containing the decoded time bin windows and add informationa bout whether they occur during a lap or PBE so we can change the cmap potentially: 
+
+            curr_session = curr_active_pipeline.filtered_sessions['roam']
+
+        """
+        assert self.active_one_step_decoder is not None
+        ## Take the decoded time bin windows and add informationa bout whether they occur during a lap or PBE so we can change the cmap potentially:
+        decoded_time_bins_df: pd.DataFrame = pd.DataFrame(dict(t=self.active_one_step_decoder.time_window_centers))
+        decoded_time_bins_df['label'] = decoded_time_bins_df.index.astype(int)
+        decoded_time_bins_df['time_bin_id'] = decoded_time_bins_df.index.astype(int)
+        # decoded_time_bins_df
+
+        ## PBE ids:
+        pbe_epochs_df: pd.DataFrame = ensure_dataframe(curr_session.pbe)
+        pbe_epochs_df['label'] = pbe_epochs_df.index.astype(int)
+        # pbe_epochs_df
+        decoded_time_bins_df = decoded_time_bins_df.time_point_event.adding_epochs_identity_column(epochs_df=pbe_epochs_df, epoch_id_key_name='pbe_id', epoch_label_column_name='label', override_time_variable_name='t',
+                                                                                no_interval_fill_value=np.nan, should_replace_existing_column=True, drop_non_epoch_events=False)
+
+        ## Lap id:
+        laps_epochs_df: pd.DataFrame = curr_session.laps.to_dataframe()		   
+        laps_epochs_df['label'] = laps_epochs_df.index.astype(int)
+        # laps_epochs_df
+        decoded_time_bins_df = decoded_time_bins_df.time_point_event.adding_epochs_identity_column(epochs_df=laps_epochs_df, epoch_id_key_name='lap_id', epoch_label_column_name='lap_id', override_time_variable_name='t',
+                                                                                no_interval_fill_value=np.nan, should_replace_existing_column=True, drop_non_epoch_events=False)
+
+
+        ## OUTPUTS: decoded_time_bins_df
+        self.params.decoded_time_bins_info_df = decoded_time_bins_df
+
+        return decoded_time_bins_df
 
     # ==================================================================================================================== #
     # QT Slots                                                                                                             #
@@ -390,7 +442,28 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         if (curr_time_window_index is None) or (curr_t is None):
             print(f'WARN: TimeSynchronizedPositionDecoderPlotter._update_plots: curr_time_window_index: {curr_time_window_index}')
             return # return without updating
-        
+
+        curr_time_bin_type: str = 'default'
+        # curr_cmap = self.params.cmap
+        if self.params.decoded_time_bins_info_df is not None:
+            curr_time_window_info = self.params.decoded_time_bins_info_df.iloc[curr_time_window_index]
+            if (not pd.isna(curr_time_window_info['pbe_id'])):
+                ## is PBE
+                curr_time_bin_type = 'PBE'        
+                print(f'is_pbe!')
+                # curr_cmap = self.params.cmap_PBE
+                # self.ui.imv.setColorMap(self.params.cmap)
+
+
+        ## update the current colormap and border:
+        curr_time_bin_config: Dict = self.params.image_visual_display_config[curr_time_bin_type]
+        # plot_item.getAxis('left').setPen(curr_time_bin_config['axis']) # Change left axis color
+        # plot_item.getAxis('bottom').setPen(curr_time_bin_config['axis']) # Change bottom axis color
+        self.ui.imv.setBorder(curr_time_bin_config['border'])
+        self.ui.imv.setColorMap(curr_time_bin_config['cmap'])
+
+        # self.params.cmap = pg.colormap.get('viridis','matplotlib')
+
         # Assert.is_in(self.posterior_variable_to_render, allowed_variable_list=['p_x_given_n', 'p_x_given_n_and_x_prev'])
         # # self.posterior_variable_to_render: allowed values: ['p_x_given_n', 'p_x_given_n_and_x_prev', ...]
         # if self.posterior_variable_to_render == 'p_x_given_n':

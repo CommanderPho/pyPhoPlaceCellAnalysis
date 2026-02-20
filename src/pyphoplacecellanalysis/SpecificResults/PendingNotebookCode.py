@@ -3599,7 +3599,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         return _out_container
     
     
-    def _subfn_prepare_plotters_visually(sync_plotters):
+    def _subfn_prepare_plotters_visually(curr_active_pipeline, sync_plotters):
         """ make overlay of top plot render using a multiplicitive composition mode
         """
         ## Disable debug print to speed up animation
@@ -3641,6 +3641,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             traj_curve.setSymbolBrush(a_plotter.params.recent_position_trajectory_symbol_brush)
 
 
+            # a_plotter.active_one_step_decoder.time_window_centers ## find where these correspond to PBEs
+            decoded_time_bins_df = a_plotter.add_decoded_time_bin_info(curr_session = curr_active_pipeline.filtered_sessions[a_plotter_name])
+            
             QtWidgets.QApplication.processEvents()
             # win.repaint()
             
@@ -3793,9 +3796,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         ## Unpacking a result:
         a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
         all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
-        if not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
+        # if not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
+        if hasattr(all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
             all_context_filter_epochs_decoder_result = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
-
         try:
             marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
 
@@ -3914,7 +3917,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container.ui.sync_plotters
     win: PhoDockAreaContainingWindow = _out_container.ui.root_dockAreaWindow
 
-    _subfn_prepare_plotters_visually(_out_sync_plotters)
+    _subfn_prepare_plotters_visually(curr_active_pipeline=curr_active_pipeline, sync_plotters=_out_sync_plotters)
 
     # add_pbes_full_result_marginals(active_2d_plot, pbes_full_result)
     # add_session_epoch_intervals(active_2d_plot, curr_active_pipeline)
