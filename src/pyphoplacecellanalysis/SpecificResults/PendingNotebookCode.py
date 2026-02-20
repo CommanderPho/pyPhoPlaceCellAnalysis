@@ -3342,11 +3342,9 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
         ## Use `contextual_pf2D` to decode specific epochs:
         all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=0.75)
 
-
-        
         ## Build global result object
         global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={active_laps_decoding_time_bin_size:all_context_filter_epochs_decoder_result})
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={active_laps_decoding_time_bin_size:{'pseudo2D': all_context_filter_epochs_decoder_result}})
         curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
 
     """
@@ -3370,7 +3368,7 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
     # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
     # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
-    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
+    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=global_spikes_df.copy(), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
 
     all_context_filter_epochs_decoder_result.marginal_z_list = [DynamicContainer(p_x_given_n=None, most_likely_positions_2D=None) for i in np.arange(all_context_filter_epochs_decoder_result.num_filter_epochs)]
     # for a_p_x_given_n in all_context_filter_epochs_decoder_result.p_x_given_n_list:
@@ -3785,7 +3783,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     _out_sync_plotters = {}
     
 
-
+    marginal_z = None # #TODO 2026-02-19 16:58: - [ ] is this ever used?
     if directional_decoders_decode_result is not None:
         pf2D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         pseudo3D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
@@ -3795,7 +3793,18 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         ## Unpacking a result:
         a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
         all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
-        marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
+        if not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
+            all_context_filter_epochs_decoder_result = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
+
+        try:
+            marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
+
+        except AttributeError as e:
+            print(f'encountered error {e} when trying to get `all_context_filter_epochs_decoder_result.marginal_z`, skipping.')
+            pass
+        except Exception as e:
+            raise
+        
 
 
 
