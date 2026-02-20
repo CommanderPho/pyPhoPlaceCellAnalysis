@@ -51,7 +51,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             plot_widget.hideAxis('left')
             plot_widget.hideAxis('bottom')
 
-            img_item = pg.ImageItem()
+            img_item = pg.ImageItem(border='w')
             # lut = pg.colormap.get('viridis','matplotlib').getLookupTable(256)
             # img_item = pg.ImageItem(lut=lut)
             img_item.setColorMap(pg.colormap.get('viridis','matplotlib'))
