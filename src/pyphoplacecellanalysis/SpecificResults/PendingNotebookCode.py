@@ -2718,7 +2718,6 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
-
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
@@ -2776,6 +2775,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df)
     curr_active_pipeline.sess.laps._df = laps_df
     lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
+
+
+
+
 
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
