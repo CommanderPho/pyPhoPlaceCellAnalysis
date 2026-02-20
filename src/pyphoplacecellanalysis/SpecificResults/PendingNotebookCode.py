@@ -2765,10 +2765,21 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
     curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
 
-    print(f'computing linearized position for session using method="{linearization_method}"...')
-    sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
-    print(f'estimating the laps from the linear position...')
-    sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **(hardcoded_params.lap_estimation_parameters or {})) ## unfiltered session 
+
+    lap_estimation_parameters = (hardcoded_params.lap_estimation_parameters or {})
+    custom_lap_estimation_fn = lap_estimation_parameters.get('custom_lap_estimation_fn', None) ## defines a custom function to estimate the laps
+
+
+    if custom_lap_estimation_fn is None:
+        print(f'computing linearized position for session using method="{linearization_method}"...')
+        sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
+        print(f'estimating the laps from the linear position...')
+        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **lap_estimation_parameters) ## unfiltered session 
+    else:
+        print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
+        sess = custom_lap_estimation_fn(curr_active_pipeline.sess)
+
+
     laps_obj = curr_active_pipeline.sess.laps # Laps
     laps_df: pd.DataFrame = laps_obj.to_dataframe()
     print(f'estimating the maze_id to laps...')
@@ -2778,7 +2789,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
 
 
-
+    build_Bapun_Day4OpenField_laps_from_reward_zones
 
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
