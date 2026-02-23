@@ -178,8 +178,8 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         self.active_decoded_PBE_result = active_decoded_PBE_result
         self.n_columns = n_columns
 
-        self.central_widget = QtWidgets.QWidget()
-        self.setCentralWidget(self.central_widget)
+        # self.central_widget = QtWidgets.QWidget()
+        # self.setCentralWidget(self.central_widget)
 
         self.setup()
         self._build_graphics()        
@@ -198,16 +198,26 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
     def _build_graphics(self):
         """ builds the bank of animated cells """
         # 🔥 Changed from QVBoxLayout → QGridLayout (name avoids shadowing QMainWindow.layout())
-        self.grid_layout = QtWidgets.QGridLayout()
-        self.central_widget.setLayout(self.grid_layout)        
+        # self.grid_layout = QtWidgets.QGridLayout()
+        # self.central_widget.setLayout(self.grid_layout)    
+        self.graphics_layout_widget = pg.GraphicsLayoutWidget()
+        # self.central_widget.setLayout(self.graphics_layout_widget)
+        # self.central_widget.addWidget(self.graphics_layout_widget)
+        self.setCentralWidget(self.graphics_layout_widget)
+
 
         # Build one animated cell per epoch
         for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
-
             an_epoch_p_x_given_n = self.active_decoded_PBE_result.p_x_given_n_list[an_epoch_idx]
             an_epoch_n_bins: int = self.active_decoded_PBE_result.nbins[an_epoch_idx]
 
-            plot_widget = pg.PlotWidget()
+            # Compute grid position
+            row = an_epoch_idx // self.n_columns
+            col = an_epoch_idx % self.n_columns
+            
+            plot_widget = self.graphics_layout_widget.addPlot(row=row, col=col)
+            
+            # plot_widget = pg.PlotWidget()
             plot_widget.setAspectLocked(True)
             # plot_widget.invertY(True)
             plot_widget.invertY(False)
@@ -221,14 +231,10 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
             plot_widget.addItem(img_item)
 
-            # Compute grid position
-            row = an_epoch_idx // self.n_columns
-            col = an_epoch_idx % self.n_columns
-
-            self.grid_layout.addWidget(plot_widget, row, col)
-
+            # self.grid_layout.addWidget(plot_widget, row, col)
+            
             self.image_items.append((img_item, an_epoch_p_x_given_n, an_epoch_n_bins))
-            self.current_t_bins.append(0)
+            self.current_t_bins.append(an_epoch_n_bins)
             
 
 
