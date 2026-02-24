@@ -2383,8 +2383,11 @@ def build_bapun_all_epochs_df(curr_active_pipeline):
     # curr_laps_df = sess.laps.to_dataframe()
 
     curr_paradigm_df = ensure_dataframe(sess.paradigm)
-    curr_paradigm_df = curr_paradigm_df.epochs.adding_global_epoch_row()
-    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
+    global_epoch_name='maze_GLOBAL'
+    curr_paradigm_df = curr_paradigm_df.epochs.adding_global_epoch_row(global_epoch_name=global_epoch_name) # global_epoch_name='maze_GLOBAL', included_epoch_names=['maze']
+    # curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
+    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], [global_epoch_name]))] ## exclude the global epoch
+
     n_epochs: int = len(curr_paradigm_df)
     # epoch_color_strs: List[str] = generate_colors(n_epochs)
     epoch_color_strs: List[str] = [ColorFormatConverter.qColor_to_hexstring(v, include_alpha=False) for v in ColormapHelpers.mpl_to_pg_colormap(mpl_cmap_name='tab20', resolution=n_epochs).getColors(mode='qcolor')]
@@ -2721,7 +2724,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     from neuropy.analyses.placefields import Position
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
-
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset
  
 
     ## define lienarization kwargs:
@@ -2769,15 +2772,14 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     lap_estimation_parameters = (hardcoded_params.lap_estimation_parameters or {})
     custom_lap_estimation_fn = lap_estimation_parameters.get('custom_lap_estimation_fn', None) ## defines a custom function to estimate the laps
 
-
     if custom_lap_estimation_fn is None:
         print(f'computing linearized position for session using method="{linearization_method}"...')
         sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
         print(f'estimating the laps from the linear position...')
-        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **lap_estimation_parameters) ## unfiltered session 
+        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn'])) ## unfiltered session 
     else:
         print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
-        sess = custom_lap_estimation_fn(curr_active_pipeline.sess)
+        sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
 
 
     laps_obj = curr_active_pipeline.sess.laps # Laps
@@ -2787,9 +2789,6 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     curr_active_pipeline.sess.laps._df = laps_df
     lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
 
-
-
-    build_Bapun_Day4OpenField_laps_from_reward_zones
 
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
@@ -2882,11 +2881,9 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         
     
     # Estimate laps, is this working correctly? For Bapun OpenField 2025-12-12 it looks like the laps are only being found during 'sprinkle', the 2nd of the two epochs, and also for somee reason trailing into subsequent sleep.
-    for k, a_sess in curr_active_pipeline.filtered_sessions.items():
-        a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False, **(hardcoded_params.lap_estimation_parameters or {}))
-
-
-    
+    # for k, a_sess in curr_active_pipeline.filtered_sessions.items():
+    #     ## #TODO 2026-02-24 08:29: - [ ] This will overwrite the correct laps unfortunately.
+    #     a_sess = estimate_session_laps(a_sess, should_plot_laps_2d=False, **get_dict_subset((hardcoded_params.lap_estimation_parameters or {}), subset_excludelist=['custom_lap_estimation_fn']))
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Ready to compute                                                                                                                                                                                                                                                                     #
