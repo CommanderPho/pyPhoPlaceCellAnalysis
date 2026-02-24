@@ -4386,9 +4386,15 @@ def _perform_compute(active_decoded_filter_epochs_result: DecodedFilterEpochsRes
 
 @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['_perform_compute'], used_by=[], creation_date='2026-02-24 06:08', related_items=[])
 def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, masked_container, a_decoder_name = 'roam', masked_bin_fill_mode = 'nan_filled', decoding_time_bin_size: float = 0.100):
-    """ 
+    """ get all "laps" and classify them as top, middle, or bottom (based on their inflection direction?, or positions)?
+
+    Based off the observation from the 'roam' video that the periods in-between runs/laps seemed to pre-play the corners and edges of the roam box -- 
+        and which set of corners/edges were pre-played (upper/lower) seemed predictive of the path the animal's run took (upper/lower)
+
+    Usage:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import compute_pre_lap_activity_predictivity_top_v_bottom
 
+        
     """
     # a_decoder_name = 'roam'
     # # masked_bin_fill_mode = 'dropped'
