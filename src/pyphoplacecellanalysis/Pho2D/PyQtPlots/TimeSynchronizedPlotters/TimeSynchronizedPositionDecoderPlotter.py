@@ -449,8 +449,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             curr_time_window_info = self.params.decoded_time_bins_info_df.iloc[curr_time_window_index]
             if (not pd.isna(curr_time_window_info['pbe_id'])):
                 ## is PBE
-                curr_time_bin_type = 'PBE'        
-                print(f'is_pbe!')
+                curr_time_bin_type = 'PBE'
+                if self.params.debug_print:
+                    print(f'\tis_pbe!')
                 # curr_cmap = self.params.cmap_PBE
                 # self.ui.imv.setColorMap(self.params.cmap)
 
@@ -563,8 +564,28 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         from pathlib import Path
         import sys
         
+        # Disable debug printing during export for performance
+        original_debug_print: bool = self.params.debug_print
+        desired_debug_print: bool = debug_print
+        self.params.debug_print = desired_debug_print
+        ## update any additional image layers in the stack
+        for (a_stack_item_key, a_stack_item) in self.ui.plot_stack.items():
+            if desired_debug_print:
+                print(f'Update: a_stack_item_key: "{a_stack_item_key}", a_stack_item: {a_stack_item}')
+            try:
+                if (hasattr(a_stack_item, 'is_layer') and getattr(a_stack_item, 'is_layer', False)):
+                    a_stack_item.params.debug_print = desired_debug_print
+                    if desired_debug_print:
+                        print(f'\tupdate successful.')
+                else:
+                    if desired_debug_print:
+                        print(f'\tskipped!')
+            except (KeyError, AttributeError) as e:
+                print(f'\t encountered error "{e}" while trying to update item. Skipping.')
+            except Exception as e:
+                ## Unexpected exception!
+                raise
 
-        self.params.debug_print = debug_print
         
         video_filepath = Path(output_path).resolve()
         suffix = video_filepath.suffix.lower()
@@ -643,10 +664,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             if height is None:
                 height = widget_size.height()
         
-        # Disable debug printing during export for performance
-        original_debug_print = self.params.debug_print
-        self.params.debug_print = debug_print
-        
+
         # Helper to convert QImage to BGR array for OpenCV (contiguous uint8 for compatibility)
         def qimage_to_bgr(qimage):
             img_array = fn.ndarray_from_qimage(qimage)
