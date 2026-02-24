@@ -124,6 +124,45 @@ from scipy.ndimage import binary_dilation
 from scipy.ndimage import distance_transform_edt
 from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
 
+
+
+@function_attributes(short_name=None, tags=['OpenField', 'bapun', 'segmentation', 'laps', 'shapely'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-24 11:15', related_items=[])
+def _plot_shapely_lap_detect_maze(ax=None):
+    """ plot the detection regions used for detecting/segmenting laps
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _plot_shapely_lap_detect_maze
+
+    _out = _plot_shapely_lap_detect_maze(ax=ax)
+
+    """
+    from shapely import box
+    from shapely.geometry import LineString, Point
+    from shapely.plotting import plot_polygon, patch_from_polygon
+
+
+    xmin: float = -85.75619321393464
+    xmax: float = 112.57838773103435
+    ymin: float = -96.44772761274268
+    ymax: float = 98.6220528078153
+    bapun_Day4OpenField_grid_bin_bounds = box(xmin, ymin, xmax, ymax)
+
+    bapun_Day4OpenField_reward_zones = dict(    ## Define the two reward zones
+        zone1 = box(xmin, 0.0, -60.0, 40.0),  # box(minx, miny, maxx, maxy, ccw=True)
+        zone2 = box(80.0, 0.0, xmax, 40.0), # box(minx, miny, maxx, maxy, ccw=True)
+    )
+
+    ## Plot maze sections:
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    _out = {'maze': None, 'reward_zones': {}}
+    _out['maze'] = plot_polygon(bapun_Day4OpenField_grid_bin_bounds, ax=ax, color='darkgrey', add_points=False)
+    # perform_update_title_subtitle(
+    for k, a_zone in bapun_Day4OpenField_reward_zones.items():
+        _out['reward_zones'][k] = plot_polygon(a_zone, ax=ax, color='orange', add_points=False)
+
+    return _out
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-02-16                                                                                                                                                                                                                                                                           #
 # ==================================================================================================================================================================================================================================================================================== #
