@@ -385,6 +385,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         if gmax <= gmin:
             gmax = gmin + 1.0
         levels = (gmin, gmax)
+        print(f'levels: {levels}')
 
         self.timer.stop()
         self.current_t_bin_index = np.zeros(self.active_decoded_filter_epochs_result.n_epochs, dtype='uint16') ## reset to zeros
@@ -465,6 +466,8 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
         else:
             raise ValueError(f'mode: {mode} is unimplemented!')
+
+        self.timer.start()
 
 
 # if __name__ == "__main__":
