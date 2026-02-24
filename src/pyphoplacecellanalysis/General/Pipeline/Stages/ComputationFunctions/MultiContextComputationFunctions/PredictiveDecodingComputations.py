@@ -4240,6 +4240,293 @@ def validate_has_predictive_decoding_results(curr_active_pipeline, computation_f
     # return True
 
 
+from neuropy.utils.mixins.time_slicing import add_fully_overlapping_epochs_id_identity_to_epochs # #TODO 2026-02-19 17:06: - [ ] Use this actually
+from neuropy.utils.indexing_helpers import PandasHelpers
+import pandas as pd
+
+@function_attributes(short_name=None, tags=['helper', 'private'], input_requires=[], output_provides=[], uses=[], used_by=['compute_pre_lap_activity_predictivity_top_v_bottom'], creation_date='2026-02-24 06:08', related_items=[])
+def _perform_compute(active_decoded_filter_epochs_result: DecodedFilterEpochsResult, inbetween_laps_df: pd.DataFrame, y_midline: float, per_lap_avg_positions_df: pd.DataFrame, **kwargs):
+    #### Common (Both)
+    ## INPUTS: active_decoded_filter_epochs_result
+    all_x_marginals = [v['most_likely_positions_1D'] for v in active_decoded_filter_epochs_result.marginal_x_list]
+    all_y_marginals = [v['most_likely_positions_1D'] for v in active_decoded_filter_epochs_result.marginal_y_list]
+    # all_y_marginals
+
+    # active_decoded_filter_epochs_result.filter_epochs['n_time_bins'] = active_decoded_filter_epochs_result.nbins
+    # active_decoded_filter_epochs_result
+    ## INPUTS: active_decoded_PBE_result.filter_epochs
+
+    active_filter_epochs: pd.DataFrame = ensure_dataframe(active_decoded_filter_epochs_result.filter_epochs)
+    if 'n_time_bins' not in active_filter_epochs:
+        active_filter_epochs['n_time_bins'] = active_decoded_filter_epochs_result.nbins
+    if 'label' not in active_filter_epochs:
+        active_filter_epochs['label'] = active_filter_epochs.index.astype(int)
+
+
+    ## INPUTS: active_filter_epochs, inbetween_laps_df
+    epoch_id_key_name = 'inbetween_lap_id'
+    labels_column_name:str='label'
+    start_time_col_name: str='start'
+    end_time_col_name: str='stop'
+    no_interval_fill_value = np.nan
+
+    if epoch_id_key_name not in active_filter_epochs:
+        print(f'adding active_filter_epochs["{epoch_id_key_name}"] column')
+        active_filter_epochs[epoch_id_key_name] = no_interval_fill_value # all empty string to start
+        active_filter_epochs = add_fully_overlapping_epochs_id_identity_to_epochs(query_child_epochs = active_filter_epochs, potential_fully_enclosing_epochs_df = inbetween_laps_df, epoch_id_key_name = epoch_id_key_name,
+                                                                                        epoch_label_column_name=labels_column_name, start_time_col_name=start_time_col_name, end_time_col_name=end_time_col_name, no_interval_fill_value=no_interval_fill_value)
+        active_filter_epochs = active_filter_epochs[active_filter_epochs['inbetween_lap_id'].notna()] # Filter rows based on column: 'inbetween_lap_id'
+        # Change column type to uint64 for columns: 'inbetween_lap_id', 'label', 'original_epoch_idx'
+        active_filter_epochs = active_filter_epochs.astype({'inbetween_lap_id': 'uint64', 'label': 'uint64', 'original_epoch_idx': 'uint64'})
+        # per_time_bin_marignal_y_df
+        active_filter_epochs
+
+    ## build one for each decoded time bin:
+    out_collected_records = []
+    for a_row in active_filter_epochs.itertuples(index=True):
+        a_y_marginals = all_y_marginals[a_row.Index]
+        a_x_marginals = all_x_marginals[a_row.Index]
+        
+        for a_t_bin, a_most_likely_y in enumerate(a_y_marginals):
+            a_most_likely_x = a_x_marginals[a_t_bin]
+            a_record = {**a_row._asdict(), 't_bin_idx': a_t_bin, 'most_likely_y_pos': a_most_likely_y, 'most_likely_x_pos': a_most_likely_x}
+            out_collected_records.append(a_record)
+        
+
+    per_time_bin_marignals_df: pd.DataFrame = pd.DataFrame.from_records(out_collected_records).rename(columns=dict(Index='parent_index', label='parent_label')).drop(columns=['start_idx', 'stop_idx'], errors='ignore')
+    # per_time_bin_marignal_y_df['decoded_y_band_location'] = pd.cut(
+    #     per_time_bin_marignal_y_df['most_likely_y_pos'],
+    #     bins=[-float('inf'), y_lower, y_midline, float('inf')],
+    #     labels=['lower', 'middle', 'upper'],
+    #     ordered=True
+    # )
+
+    ## two-valued y-band (not allowing middle) -- #TODO 2026-02-19 19:09: - [ ] weaker claim than just looking at the upper/lower decoded bins
+
+    active_df_pos_dim_labels = ['x', 'y']
+    active_df_pos_dim_label_bin_dict = {'x': [-float('inf'), y_midline, float('inf')], ## #TODO 2026-02-20 16:27: - [ ] wrong
+                                    'y': [-float('inf'), y_midline, float('inf')],
+                                    }
+
+    for a_dim_label in active_df_pos_dim_labels:
+        per_time_bin_marignals_df[f'decoded_{a_dim_label}_band_location'] = pd.cut(
+            per_time_bin_marignals_df[f'most_likely_{a_dim_label}_pos'],
+            bins=active_df_pos_dim_label_bin_dict[a_dim_label], #[-float('inf'), y_midline, float('inf')],
+            labels=['lower', 'upper'],
+            ordered=True
+        )
+
+
+    ## OUTPUTS: per_time_bin_marignal_y_df
+    per_time_bin_marignals_df['label'] = per_time_bin_marignals_df.index.astype(int)
+    # per_time_bin_marignal_y_df
+
+    epoch_id_key_name = 'inbetween_lap_id'
+    if epoch_id_key_name not in per_time_bin_marignals_df:
+        ## INPUTS: per_time_bin_marignal_y_df, inbetween_laps_df        
+        labels_column_name:str='label'
+        start_time_col_name: str='start'
+        end_time_col_name: str='stop'
+        no_interval_fill_value = np.nan
+        per_time_bin_marignals_df[epoch_id_key_name] = no_interval_fill_value # all empty string to start
+        per_time_bin_marignals_df = add_fully_overlapping_epochs_id_identity_to_epochs(query_child_epochs = per_time_bin_marignals_df, potential_fully_enclosing_epochs_df = inbetween_laps_df, epoch_id_key_name = epoch_id_key_name,
+                                                                                        epoch_label_column_name=labels_column_name, start_time_col_name=start_time_col_name, end_time_col_name=end_time_col_name, no_interval_fill_value=no_interval_fill_value)
+        per_time_bin_marignals_df = per_time_bin_marignals_df[per_time_bin_marignals_df['inbetween_lap_id'].notna()] # Filter rows based on column: 'inbetween_lap_id'
+        # per_time_bin_marignals_df
+
+    per_time_bin_marignals_df
+    ## Determine the best 'decision' for which way the animal will go on the following lap (indicated by 'following_epoch_label'):
+    aggregate_methods = ['mode', 'last']
+
+    # Performed 2 aggregations grouped on column: 'inbetween_lap_id'
+    # inbetween_laps_aggrigate_decision_df = per_time_bin_marignal_y_df.groupby(['inbetween_lap_id']).agg(decoded_y_band_location_mode=('decoded_y_band_location', lambda s: s.value_counts().index[0]), decoded_y_band_location_last=('decoded_y_band_location', 'last')).reset_index() # .astype({'decoded_y_band_location_last': 'uint64', 'decoded_y_band_location_mode': 'uint64'})
+    inbetween_laps_aggrigate_decision_df = per_time_bin_marignals_df.groupby(['inbetween_lap_id']).agg(
+                                                                                            decoded_y_band_location_last=('decoded_y_band_location', 'last'), decoded_y_band_location_mode=('decoded_y_band_location', lambda s: s.value_counts().index[0]),
+                                                                                            decoded_x_band_location_last=('decoded_x_band_location', 'last'), decoded_x_band_location_mode=('decoded_x_band_location', lambda s: s.value_counts().index[0]),
+                                                                                            most_likely_y_pos_mean=('most_likely_y_pos', 'mean'), most_likely_y_pos_mode=('most_likely_y_pos', lambda s: s.value_counts().index[0]), most_likely_y_pos_last=('most_likely_y_pos', 'last'),
+                                                                                            most_likely_x_pos_mean=('most_likely_x_pos', 'mean'), most_likely_x_pos_mode=('most_likely_x_pos', lambda s: s.value_counts().index[0]), most_likely_x_pos_last=('most_likely_y_pos', 'last'),
+                                                                                            ).reset_index()
+
+    # Update to the proper the categorical dtypes for the 'band' variables:
+    # inbetween_laps_aggrigate_decision_df['decoded_y_band_location_mode'] = inbetween_laps_aggrigate_decision_df['decoded_y_band_location_mode'].astype(per_time_bin_marignal_y_df['decoded_y_band_location'].dtype) ## cast back to categorical type that is expected
+    for a_dim_label in active_df_pos_dim_labels:
+        for an_aggregate_mode in aggregate_methods:
+            inbetween_laps_aggrigate_decision_df[f'decoded_{a_dim_label}_band_location_{an_aggregate_mode}'] = inbetween_laps_aggrigate_decision_df[f'decoded_{a_dim_label}_band_location_{an_aggregate_mode}'].astype(per_time_bin_marignals_df[f'decoded_{a_dim_label}_band_location'].dtype) ## cast back to categorical type that is expected
+
+    inbetween_laps_aggrigate_decision_df
+    # inbetween_laps_aggrigate_decision_df.dtypes
+    ## Add the decision to the `inbetween_laps_df`:
+    inbetween_laps_df['label'] = inbetween_laps_df['label'].astype(int)
+    inbetween_laps_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(inbetween_laps_df, inbetween_laps_aggrigate_decision_df.rename(columns={'inbetween_lap_id': 'label'}, inplace=False), join_column_name='label')
+    inbetween_laps_df.sort_values(by=['start'], inplace=True) # Need to re-sort by timestamps once done
+    inbetween_laps_df
+    ## INPUTS: inbetween_laps_df, per_lap_avg_positions_df
+    # inbetween_laps_df['following_epoch_label'] ## look up on this, match to per_lap_avg_positions_df['label']
+
+    ## add ['y_band_location']
+    inbetween_laps_df = inbetween_laps_df.astype({'precceding_epoch_label': 'uint64', 'following_epoch_label': 'uint64', 'label': 'uint64'}) ## convert to dtypes match
+    inbetween_laps_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(inbetween_laps_df, per_lap_avg_positions_df[['lap', 'is_traj_upper', 'y_band_location', 'label']].rename(columns={'label': 'following_epoch_label'}, inplace=False).astype({'following_epoch_label': 'uint64'}), join_column_name='following_epoch_label').rename(columns={'lap': 'following_lap_id', 'y_band_location': 'next_lap_observed_y_band_loc'})
+    inbetween_laps_df['decoded_y_band_location_mode'] = inbetween_laps_df['decoded_y_band_location_mode'].astype(inbetween_laps_df['decoded_y_band_location_last'].dtype) ## cast back to categorical type that is expected
+    inbetween_laps_df.sort_values(by=['start'], inplace=True) # Need to re-sort by timestamps once done
+
+    ## Add columns about prediction correctness
+    does_mode_predict_y_band_loc = (inbetween_laps_df['decoded_y_band_location_mode'] == inbetween_laps_df['next_lap_observed_y_band_loc'])
+    does_last_predict_y_band_loc = (inbetween_laps_df['decoded_y_band_location_last'] == inbetween_laps_df['next_lap_observed_y_band_loc'])
+
+    inbetween_laps_df['does_mode_predict_y_band_loc'] = does_mode_predict_y_band_loc
+    inbetween_laps_df['does_last_predict_y_band_loc'] = does_last_predict_y_band_loc
+    ## Compute the percent correct for each predicition method:
+    percent_mode_predict_y_band_loc = inbetween_laps_df['does_mode_predict_y_band_loc'].sum() / len(inbetween_laps_df)
+    percent_last_predict_y_band_loc = inbetween_laps_df['does_last_predict_y_band_loc'].sum() / len(inbetween_laps_df)
+    print(f'percent_mode_predict_y_band_loc: {percent_mode_predict_y_band_loc}')
+    print(f'percent_last_predict_y_band_loc: {percent_last_predict_y_band_loc}')
+
+    return inbetween_laps_df, inbetween_laps_aggrigate_decision_df, active_filter_epochs, per_time_bin_marignals_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc)
+
+
+@function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['_perform_compute'], used_by=[], creation_date='2026-02-24 06:08', related_items=[])
+def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, masked_container, a_decoder_name = 'roam', masked_bin_fill_mode = 'nan_filled', decoding_time_bin_size: float = 0.100):
+    """ 
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import compute_pre_lap_activity_predictivity_top_v_bottom
+
+    """
+    from neuropy.utils.mixins.time_slicing import add_fully_overlapping_epochs_id_identity_to_epochs # #TODO 2026-02-19 17:06: - [ ] Use this actually
+    from neuropy.utils.indexing_helpers import PandasHelpers
+    import pandas as pd
+
+    # a_decoder_name = 'roam'
+    # # masked_bin_fill_mode = 'dropped'
+    # masked_bin_fill_mode = 'nan_filled'
+    # # decoding_time_bin_size: float = 0.250
+    # decoding_time_bin_size: float = 0.100
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Get actual laps to determine whether they're top or bottom:                                                                                                                                                                                                                          #
+    # ==================================================================================================================================================================================================================================================================================== #
+    # lap_only_pos_df: pd.DataFrame = deepcopy(masked_container.decoding_locality.pos_df[masked_container.decoding_locality.pos_df['lap'].notna()])
+
+    a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
+    curr_position_df: pd.DataFrame = masked_container.decoding_locality.pos_df
+
+    paradigm_df = ensure_dataframe(curr_active_pipeline.sess.paradigm)
+    paradigm_df = paradigm_df[paradigm_df['label'].isin(['roam', 'sprinkle'])].reset_index(drop=True)
+    # paradigm_df
+    # Only get the positions on the relevant mazes:
+    curr_position_df = curr_position_df.position.adding_maze_id_if_needed(active_maze_epochs_df=paradigm_df, no_interval_fill_value=np.nan)
+    curr_position_df = curr_position_df[curr_position_df['maze_id'].notna()]
+    curr_position_df = curr_position_df[curr_position_df['maze_id'] == 0] ## 'roam' only
+    # curr_position_df
+
+    # lap_only_pos_df: pd.DataFrame = deepcopy(masked_container.decoding_locality.pos_df[masked_container.decoding_locality.pos_df['lap'].notna()])
+    lap_only_pos_df: pd.DataFrame = deepcopy(curr_position_df[curr_position_df['lap'].notna()])
+    # OUTPUTS: lap_only_pos_df
+    # lap_only_pos_df
+
+    ## classify each lap as being either in the upper-half or lower-half. 
+    per_lap_avg_positions_df: pd.DataFrame = lap_only_pos_df.groupby(['lap']).agg(y_mode=('y', lambda s: s.value_counts().index[0]), y_mean=('y', 'mean'), y_min=('y', 'min'), y_max=('y', 'max'), lap_first=('lap', 'first')).reset_index().astype({'lap': 'uint64', 'lap_first': 'uint64'})
+
+    y_upper: float = 60.0
+    y_midline: float  = 20.0 
+    y_lower: float = -60.0 ## unfortunately not symmetric
+
+    ## Force the actual lap trajectories to be either 'lower' or 'upper', no middle allowed
+    per_lap_avg_positions_df['is_traj_upper'] = (per_lap_avg_positions_df['y_mean'] >= y_midline)
+    # per_lap_avg_positions_df['y_band_location'] = pd.cut(
+    #     per_lap_avg_positions_df['y_mean'],
+    #     bins=[-float('inf'), y_lower, y_midline, float('inf')],
+    #     labels=['lower', 'middle', 'upper'],
+    #     ordered=True
+    # )
+
+    per_lap_avg_positions_df['y_band_location'] = pd.cut(
+        per_lap_avg_positions_df['y_mean'],
+        bins=[-float('inf'), y_midline, float('inf')],
+        labels=['lower', 'upper'],
+        ordered=True
+    )
+
+    if 'label' not in per_lap_avg_positions_df.columns:
+        per_lap_avg_positions_df['label'] = per_lap_avg_positions_df.index.astype(int)
+
+    # OUTPUTS: per_lap_avg_positions_df
+    # per_lap_avg_positions_df
+
+
+    laps = curr_active_pipeline.filtered_sessions[a_decoder_name].laps
+    laps_df: pd.DataFrame = ensure_dataframe(laps.to_Epoch())
+    inbetween_laps_df: pd.DataFrame = laps_df.epochs.get_in_between(copy_metadata=True).epochs.modify_each_epoch_by(additive_factor=-0.0010) ## inset by 10ms on both sides
+    inbetween_laps_df
+    # laps_df
+
+    #### Whole Inbetween Laps Only
+    # ==================================================================================================================================================================================================================================================================================== #
+    # MARK: Compute for Laps:                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## Decode: inbetween_laps_df
+    a_decoded_inbetween_laps_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=inbetween_laps_df, decoding_time_bin_size=decoding_time_bin_size)
+    a_decoded_inbetween_laps_epochs_result.filter_epochs._df['inbetween_lap_id'] = a_decoded_inbetween_laps_epochs_result.filter_epochs._df['label'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+    a_decoded_inbetween_laps_epochs_result.filter_epochs._df['original_epoch_idx'] = a_decoded_inbetween_laps_epochs_result.filter_epochs._df['inbetween_lap_id'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+    # a_decoded_inbetween_laps_epochs_result
+    ## Mask by valid number of spikes:
+    a_masked_decoded_inbetween_laps_epochs_result, mask_index_tuple = a_decoded_inbetween_laps_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_decoder.spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
+    # (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list) = mask_index_tuple
+    ## Outputs: a_masked_decoded_PBEs_result
+    # active_decoded_filter_epochs_result: DecodedFilterEpochsResult = a_masked_decoded_inbetween_laps_epochs_result
+
+    ## OUTPUTS: a_masked_decoded_inbetween_laps_epochs_result, a_decoded_inbetween_laps_epochs_result
+
+    #### Whole Laps Only
+    # ==================================================================================================================================================================================================================================================================================== #
+    # MARK: Compute for Laps:                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## INPUTS: laps_df
+    ## Decode: laps_df
+    a_decoded_laps_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=laps_df, decoding_time_bin_size=decoding_time_bin_size)
+    a_decoded_laps_epochs_result.filter_epochs._df['lap_id'] = a_decoded_laps_epochs_result.filter_epochs._df['label'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+    a_decoded_laps_epochs_result.filter_epochs._df['original_epoch_idx'] = a_decoded_laps_epochs_result.filter_epochs._df['lap_id'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+    # a_decoded_laps_epochs_result
+    ## Mask by valid number of spikes:
+    a_masked_decoded_laps_epochs_result, mask_index_tuple = a_decoded_laps_epochs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_decoder.spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
+    # (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list) = mask_index_tuple
+    ## Outputs: a_masked_decoded_laps_epochs_result
+    # a_masked_decoded_laps_epochs_result: DecodedFilterEpochsResult = a_masked_decoded_laps_epochs_result
+
+    ## OUTPUTS: a_masked_decoded_laps_epochs_result, a_decoded_laps_epochs_result
+
+    #### PBEs Only
+    # ==================================================================================================================================================================================================================================================================================== #
+    # MARK: Compute for PBEs:                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+    a_decoded_PBEs_time_bins_size: float = 0.025
+    # time_bins_size: float = 0.250
+    a_decoded_PBEs_result: DecodedFilterEpochsResult = masked_container.epochs_decoded_result_cache_dict[a_decoded_PBEs_time_bins_size][a_decoder_name]
+    # active_decoded_filter_epochs_result: DecodedFilterEpochsResult = a_decoded_PBEs_result
+
+    ## Mask by valid number of spikes:
+    a_masked_decoded_PBEs_result, mask_index_tuple = a_decoded_PBEs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_decoder.spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
+    (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list) = mask_index_tuple
+    ## Outputs: a_masked_decoded_PBEs_result
+    # active_decoded_filter_epochs_result: DecodedFilterEpochsResult = a_masked_decoded_PBEs_result
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN MAIN COMPUTE                                                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+    perform_compute_kwargs = dict(per_lap_avg_positions_df=per_lap_avg_positions_df, y_midline=y_midline)
+
+    active_decoded_filter_epochs_result_dict = {'PBEs': a_masked_decoded_PBEs_result, 'intra-laps': a_masked_decoded_inbetween_laps_epochs_result, }
+    _out_results = {}
+
+    a_masked_decoded_inbetween_laps_epochs_result
+    for a_key, active_decoded_filter_epochs_result in active_decoded_filter_epochs_result_dict.items():
+        _out_results[a_key] = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_inbetween_laps_epochs_result, inbetween_laps_df=deepcopy(inbetween_laps_df), **perform_compute_kwargs)
+        # inbetween_laps_df, inbetween_laps_aggrigate_decision_df, active_filter_epochs, per_time_bin_marignals_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _out_results[a_key]
+
+    # inbetween_laps_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_inbetween_laps_epochs_result, inbetween_laps_df=inbetween_laps_df)
+    # inbetween_laps_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_PBEs_result, inbetween_laps_df=inbetween_laps_df)
+    return _out_results
+
+
+
 
 class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     """ functions related to sequence-based decoding computations. """
