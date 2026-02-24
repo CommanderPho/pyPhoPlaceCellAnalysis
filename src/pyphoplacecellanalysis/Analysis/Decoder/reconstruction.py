@@ -40,6 +40,7 @@ from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_sp
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.indexing_helpers import safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
@@ -1064,6 +1065,104 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             pos_bin_edges=pos_bin_edges
         )
         return result
+
+
+    @classmethod
+    def init_by_merging_multiple_epoch_results(cls, results_to_merge_list: List["DecodedFilterEpochsResult"]) -> "DecodedFilterEpochsResult":
+        """Merges several separate DecodedFilterEpochsResult objects into a single DecodedFilterEpochsResult
+
+        Returns:
+            DecodedFilterEpochsResult: A DecodedFilterEpochsResult containing a single epoch
+            
+        Usage:
+            single_epoch = decoded_result.get_result_for_epoch(0)
+            multi_epoch_result = DecodedFilterEpochsResult.from_single_epoch_result(
+                single_epoch, 
+                decoding_time_bin_size=0.05,
+                spkcount=spike_counts
+            )
+        """
+        if len(results_to_merge_list) == 0:
+            raise ValueError(f'results_to_merge_list: {results_to_merge_list} (empty).')
+        elif len(results_to_merge_list) == 1:
+            return deepcopy(results_to_merge_list[0]) ## just copy the only entry
+
+
+        merged_epochs = []
+        for src_obj_idx, a_results_to_merge_obj in enumerate(results_to_merge_list):
+            an_epochs = deepcopy(a_results_to_merge_obj.filter_epochs)
+            an_epochs['src_obj_idx'] = src_obj_idx ## for all rows, identifies which source it came from for re-filtering
+            merged_epochs.append(an_epochs)
+
+        # a_decoded_inbetween_laps_epochs_result.filter_epochs
+        merged_epochs = pd.concat(merged_epochs, ignore_index=True) # .reset_index(drop=True)
+        merged_epochs['unsorted_idx'] = np.arange(len(merged_epochs)) ## the pre-sorting index
+        merged_epochs = merged_epochs.sort_values(['start', 'stop']) # Sort by columns: 'start' (ascending), 'stop' (ascending)
+        merged_epochs['post_sorted_idx'] = np.arange(len(merged_epochs)) ## the pre-sorting index
+
+        ## sort_index
+        post_merge_sort_indicies = merged_epochs['unsorted_idx'].to_numpy() ## OUTPUTS: post_merge_sort_indicies
+        ## OUTPUTS: merged_epochs, post_merge_sort_indicies
+        ## post_merge_sort_indicies: can be used to sort the dumbly concatenated values 
+
+        result_list_field_names = ['most_likely_positions_list', 'p_x_given_n_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'nbins', 'time_bin_containers', 'time_bin_edges', 'spkcount'] # maps list names to single-epoch specific field names
+
+        a_results_to_merge_obj: "DecodedFilterEpochsResult" = results_to_merge_list[0] ## get the test object to merge
+
+        decoding_time_bin_sizes: List[float] = [a_results_to_merge_obj.decoding_time_bin_size for a_results_to_merge_obj in results_to_merge_list]
+        Assert.all_equal(*decoding_time_bin_sizes) ## require all have the same decoding time bin size so the time bin variables are meaningful when merged...
+        decoding_time_bin_size: float = decoding_time_bin_sizes[0]
+        out_result: "DecodedFilterEpochsResult" = cls(decoding_time_bin_size=decoding_time_bin_size, filter_epochs=merged_epochs, 
+            num_filter_epochs=len(merged_epochs),
+        )
+
+        for src_obj_idx, a_results_to_merge_obj in enumerate(results_to_merge_list):
+            for a_field_name in result_list_field_names:
+                a_field_value = getattr(a_results_to_merge_obj, a_field_name)
+                if len(a_field_value) > 0:
+                    # print(f'a_field_name: {a_field_name}')
+                    if not isinstance(a_field_value, list):
+                        a_field_value = a_field_value.tolist()
+
+                    extant_out_result_value = getattr(out_result, a_field_name)
+                    if extant_out_result_value is None:
+                        extant_out_result_value = []
+                        setattr(out_result, a_field_name, extant_out_result_value)
+                    else:
+                        if not isinstance(extant_out_result_value, list):
+                            ## convert to list first
+                            if isinstance(extant_out_result_value, NDArray):
+                                extant_out_result_value = extant_out_result_value.tolist() ## convert to list
+                                setattr(out_result, a_field_name, extant_out_result_value) ## convert in place to a list for continued extension
+                            else:
+                                raise TypeError(f'unknown type: {type(extant_out_result_value)}, extant_out_result_value: {extant_out_result_value}')
+
+                    # setattr(out_result, a_field_name, (getattr(out_result, a_field_name) + a_field_value))
+                    getattr(out_result, a_field_name).extend(a_field_value)
+                    # setattr(out_result, a_field_name, 
+            ## END for a_field_name in result_list_field_names...
+
+        ## END for src_obj_idx, a_results_to_merge_obj in enumerate(results_to_merge_list)...
+
+
+        NDArray_type_fields = ['nbins']
+        ## do the final sort pass using `out_result` and `post_merge_sort_indicies`:
+        ### NOTE: this must only be executed once (or else it will be mis-sorted)
+        for a_field_name in result_list_field_names:
+            extant_out_result_value = getattr(out_result, a_field_name)
+            if len(post_merge_sort_indicies) == len(extant_out_result_value):
+                extant_out_result_value = [extant_out_result_value[i] for i in post_merge_sort_indicies]
+                if a_field_name in NDArray_type_fields:
+                    extant_out_result_value = np.array(extant_out_result_value) ## convert to NDArray
+                setattr(out_result, a_field_name, extant_out_result_value)
+            else:
+                print(f'WARN: differing lengths of field "{a_field_name}" and len(post_merge_sort_indicies): {len(post_merge_sort_indicies)},  len(extant_out_result_value): {len(extant_out_result_value)}')
+            # setattr(out_result, a_field_name, getattr(out_result, a_field_name)[post_merge_sort_indicies])
+        ## END for a_field_name in result_list_field_names...
+
+        return out_result
+
+
     
     @function_attributes(short_name=None, tags=['single-epoch', 'indexing', 'start-time'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-18 07:36', related_items=['self.get_result_for_epoch'])
     def get_result_for_epoch_at_time(self, epoch_start_time: float) -> SingleEpochDecodedResult:
