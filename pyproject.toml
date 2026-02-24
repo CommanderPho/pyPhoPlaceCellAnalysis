@@ -56,6 +56,7 @@ dev = [
     "snakeviz>=2.1.1,<3",
     "pyan>=0.1.3,<0.2",
     "dvc[gdrive]>=3.59.0,<4",
+    "pyrefly>=0.54.0",
 ]
 gui = [
     "click>=8.1.3,<9",
