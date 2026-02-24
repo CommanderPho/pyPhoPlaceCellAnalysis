@@ -14,7 +14,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
     
     Usage:
     
-		from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
 
         app = pg.mkQApp('AnimatedLoopingPosteriorViewer') # QtWidgets.QApplication(sys.argv)
         viewer = AnimatedLoopingPosteriorViewer(active_decoded_PBE_result)
@@ -157,13 +157,13 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
 
 
-
+@metadata_attributes(short_name=None, tags=['NEW', 'replacement', 'higher-efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-23 19:14', related_items=[])
 class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
     """ Awesome, animated PBE viewer that loops over PBEs
     
     Usage:
     
-		from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer
 
         app = pg.mkQApp('AnimatedLoopingPosteriorViewer') # QtWidgets.QApplication(sys.argv)
         viewer = AnimatedLoopingPosteriorViewer(active_decoded_PBE_result)
@@ -175,9 +175,11 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
     def __init__(self, active_decoded_PBE_result, n_columns: int = 10):
         super().__init__()
 
-        self.active_decoded_PBE_result = active_decoded_PBE_result
+        self.active_decoded_filter_epochs_result = active_decoded_PBE_result
         self.n_columns = n_columns
-
+        max_n_t_bins: int = np.nanmax(self.active_decoded_filter_epochs_result.nbins) ## get the maximum number of t_bins in any epoch
+        self.max_n_t_bins = max_n_t_bins
+        
         # self.central_widget = QtWidgets.QWidget()
         # self.setCentralWidget(self.central_widget)
 
@@ -192,7 +194,9 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
     def setup(self):
         self.image_items = []
+        self.text_items = []
         self.current_t_bins = []
+        self.black_image_items = []
     
 
     def _build_graphics(self):
@@ -205,17 +209,17 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         # self.central_widget.addWidget(self.graphics_layout_widget)
         self.setCentralWidget(self.graphics_layout_widget)
 
-
         # Build one animated cell per epoch
-        for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
-            an_epoch_p_x_given_n = self.active_decoded_PBE_result.p_x_given_n_list[an_epoch_idx]
-            an_epoch_n_bins: int = self.active_decoded_PBE_result.nbins[an_epoch_idx]
+        for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
+            an_epoch_p_x_given_n = self.active_decoded_filter_epochs_result.p_x_given_n_list[an_epoch_idx]
+            an_epoch_n_bins: int = self.active_decoded_filter_epochs_result.nbins[an_epoch_idx]
 
             # Compute grid position
             row = an_epoch_idx // self.n_columns
             col = an_epoch_idx % self.n_columns
             
-            plot_widget = self.graphics_layout_widget.addPlot(row=row, col=col)
+            plot_title: str = f'{an_epoch_idx}'
+            plot_widget = self.graphics_layout_widget.addPlot(row=row, col=col) # , title=plot_title
             
             # plot_widget = pg.PlotWidget()
             plot_widget.setAspectLocked(True)
@@ -231,33 +235,58 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
             plot_widget.addItem(img_item)
 
+            ## Build text item to display title
+            txt_item: pg.TextItem = pg.TextItem(text=plot_title, color='#FFFFFF77', anchor=(1, 1))
+            plot_widget.addItem(txt_item)
+            img_rect = img_item.boundingRect()
+            txt_item.setPos(img_rect.right(), img_rect.bottom())
+
+            # a_black_image_item = np.zeros_like(an_epoch_p_x_given_n[:, :, 0])
+            a_black_image_item = np.full_like(an_epoch_p_x_given_n[:, :, 0], np.nan)
+            
+            self.black_image_items.append(a_black_image_item)
+
+            # img_item.addItem(txt_item)
             # self.grid_layout.addWidget(plot_widget, row, col)
-            
             self.image_items.append((img_item, an_epoch_p_x_given_n, an_epoch_n_bins))
-            self.current_t_bins.append(an_epoch_n_bins)
-            
+            # self.current_t_bins.append(an_epoch_n_bins)
+            self.current_t_bins.append(0) ## starting at zero
+            self.text_items.append(txt_item)
 
 
 
     def update_frames(self):
         """ updates/animates the PBE frames """        
-        for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
+        
+        max_n_t_bins: int = self.max_n_t_bins
+        
+
+        for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
 
             img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
 
-            an_epoch_t_bin = self.current_t_bins[an_epoch_idx]
+            an_epoch_t_bin: int = self.current_t_bins[an_epoch_idx] ## get current time bin iterator for this index
 
-            if an_epoch_t_bin < an_epoch_n_bins:
-                a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
+            if (an_epoch_t_bin < an_epoch_n_bins):
+                a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin] ## current time bin posterior
 
                 # Optional normalization for better contrast
-                img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=True)
+                img_item.setImage(a_t_bin_p_x_given_n, autoLevels=True)
                 # img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=False, levels=(0, 1))
-
 
                 self.current_t_bins[an_epoch_idx] += 1
             else:
-                self.current_t_bins[an_epoch_idx] = 0
+                ## BEHAVIOR: resets to zero and starts over, allowing them all to operate "out of sync"
+                # self.current_t_bins[an_epoch_idx] = 0 ## Resets to zero, I don't think this is desirable
+
+                if max_n_t_bins == self.current_t_bins[an_epoch_idx]:
+                    ## truely reset to zero (for all of them
+                    self.current_t_bins[an_epoch_idx] = 0 ## Resets to zero, I don't think this is desirable
+                else:                
+                    ## render a black frame and keep accruing:
+                    img_item.setImage(self.black_image_items[an_epoch_idx], autoLevels=True)
+                    self.current_t_bins[an_epoch_idx] += 1
+                
 
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
@@ -285,11 +314,11 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         levels = (gmin, gmax)
 
         frames = []
-        max_n_bins = np.max(self.active_decoded_PBE_result.nbins)
+        max_n_bins = np.max(self.active_decoded_filter_epochs_result.nbins)
         original_t_bins = self.current_t_bins.copy()
 
         for global_frame_idx in range(max_n_bins):
-            for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
+            for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
                 img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
                 an_epoch_t_bin = global_frame_idx if global_frame_idx < an_epoch_n_bins else 0
                 a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
