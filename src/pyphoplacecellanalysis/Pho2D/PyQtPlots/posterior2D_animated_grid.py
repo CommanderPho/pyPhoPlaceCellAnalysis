@@ -210,7 +210,8 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         self.text_items = []
         self.current_t_bin_index = []
         self.black_image_items = []
-    
+        self.epoch_description_list = []
+
 
     def _build_graphics(self):
         """ builds the bank of animated cells """
@@ -222,6 +223,12 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         # self.central_widget.addWidget(self.graphics_layout_widget)
         self.setCentralWidget(self.graphics_layout_widget)
 
+        has_epoch_descriptions: bool = False
+        if (self.active_decoded_filter_epochs_result.epoch_description_list is not None) and (len(self.active_decoded_filter_epochs_result.epoch_description_list) == self.active_decoded_filter_epochs_result.n_epochs):
+            ## has real epoch descriptions
+            has_epoch_descriptions = True
+            # self.epoch_description_list = self.active_decoded_filter_epochs_result.epoch_description_list
+
         # Build one animated cell per epoch
         for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
             an_epoch_p_x_given_n = self.active_decoded_filter_epochs_result.p_x_given_n_list[an_epoch_idx]
@@ -231,8 +238,14 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
             # Compute grid position
             row = an_epoch_idx // self.n_columns
             col = an_epoch_idx % self.n_columns
-            
-            plot_title: str = f'{an_epoch_idx}'
+
+            if has_epoch_descriptions:
+                plot_title: str = self.active_decoded_filter_epochs_result.epoch_description_list[an_epoch_idx]
+            else:
+                plot_title: str = f'{an_epoch_idx}'
+
+            self.epoch_description_list.append(plot_title)
+
             plot_widget = self.graphics_layout_widget.addPlot(row=row, col=col) # , title=plot_title
             
             # plot_widget = pg.PlotWidget()
@@ -313,7 +326,8 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
             ## update text items:
             txt_item = self.text_items[an_epoch_idx]
-            epoch_display_str: str = f"{an_epoch_idx}[{an_epoch_t_bin}/{an_epoch_n_bins}]"
+            an_epoch_desc_str: str = self.epoch_description_list[an_epoch_idx]
+            epoch_display_str: str = f"{an_epoch_desc_str}[{an_epoch_t_bin}/{an_epoch_n_bins}]"
             txt_item.setText(epoch_display_str)
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
