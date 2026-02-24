@@ -332,7 +332,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
 
-    def export_grid_as_gif(self, output_path: str, frame_duration_ms: int = 50, render_passes: int = 5, mode: AnimationExportMode=AnimationExportMode.separate_images):
+    def export_grid_as_gif(self, output_path: str, frame_duration_ms: int = 50, render_passes: int = 5, mode: AnimationExportMode=AnimationExportMode.separate_images, normalize_global: bool=False):
         """ Exports the entire animated grid as an animated GIF.
 
         Parameters
@@ -380,12 +380,16 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
             output_path = Path(output_path)
 
         # Global min/max across all epochs so colormap is consistent (smoother than per-frame levels)
-        all_data = np.concatenate([p for _, p, _ in self.image_items], axis=2)
-        gmin, gmax = float(np.nanmin(all_data)), float(np.nanmax(all_data))
-        if gmax <= gmin:
-            gmax = gmin + 1.0
-        levels = (gmin, gmax)
-        print(f'levels: {levels}')
+        if normalize_global:
+            all_data = np.concatenate([p for _, p, _ in self.image_items], axis=2)
+            gmin, gmax = float(np.nanmin(all_data)), float(np.nanmax(all_data))
+            if gmax <= gmin:
+                gmax = gmin + 1.0
+            levels = (gmin, gmax)
+            print(f'levels: {levels}')
+            setImage_kwargs = dict(autoLevels=False, levels=levels)
+        else:
+            setImage_kwargs = dict(autoLevels=True)
 
         self.timer.stop()
         self.current_t_bin_index = np.zeros(self.active_decoded_filter_epochs_result.n_epochs, dtype='uint16') ## reset to zeros
@@ -401,7 +405,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
                     img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
                     an_epoch_t_bin = global_frame_idx if (global_frame_idx < an_epoch_n_bins) else 0
                     a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
-                    img_item.setImage(a_t_bin_p_x_given_n, autoLevels=False, levels=levels)
+                    img_item.setImage(a_t_bin_p_x_given_n, **setImage_kwargs)
 
                 for _ in range(render_passes):
                     QtWidgets.QApplication.processEvents()
@@ -416,6 +420,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
                 alpha = arr[:, :, 3:4].astype(np.float32) / 255.0
                 rgb[:] = (arr[:, :, :3].astype(np.float32) * alpha + 255.0 * (1.0 - alpha)).astype(np.uint8)
                 frames.append(rgb)
+            ## END for global_frame_idx in range(max_n_bins)...
 
             self.current_t_bin_index = original_t_bins
 
@@ -437,7 +442,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
                 img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
                 for an_epoch_t_bin in np.arange(an_epoch_n_bins):
                     a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
-                    img_item.setImage(a_t_bin_p_x_given_n, autoLevels=False, levels=levels)
+                    img_item.setImage(a_t_bin_p_x_given_n, **setImage_kwargs)
                     QtWidgets.QApplication.processEvents() ## needed to refresh the view I think?
                     ## Seems super inefficient:
                     # qpixmap = img_item.grab()
