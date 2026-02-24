@@ -4390,10 +4390,6 @@ def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, mas
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import compute_pre_lap_activity_predictivity_top_v_bottom
 
     """
-    from neuropy.utils.mixins.time_slicing import add_fully_overlapping_epochs_id_identity_to_epochs # #TODO 2026-02-19 17:06: - [ ] Use this actually
-    from neuropy.utils.indexing_helpers import PandasHelpers
-    import pandas as pd
-
     # a_decoder_name = 'roam'
     # # masked_bin_fill_mode = 'dropped'
     # masked_bin_fill_mode = 'nan_filled'
@@ -4406,12 +4402,14 @@ def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, mas
     # lap_only_pos_df: pd.DataFrame = deepcopy(masked_container.decoding_locality.pos_df[masked_container.decoding_locality.pos_df['lap'].notna()])
 
     a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
-    curr_position_df: pd.DataFrame = masked_container.decoding_locality.pos_df
+    # curr_position_df: pd.DataFrame = masked_container.decoding_locality.pos_df
 
     paradigm_df = ensure_dataframe(curr_active_pipeline.sess.paradigm)
     paradigm_df = paradigm_df[paradigm_df['label'].isin(['roam', 'sprinkle'])].reset_index(drop=True)
     # paradigm_df
     # Only get the positions on the relevant mazes:
+    # curr_position_df: pd.DataFrame = masked_container.decoding_locality.pos_df
+    curr_position_df: pd.DataFrame = curr_active_pipeline.filtered_sessions['roam'].position.to_dataframe() # .decoding_locality.pos_df
     curr_position_df = curr_position_df.position.adding_maze_id_if_needed(active_maze_epochs_df=paradigm_df, no_interval_fill_value=np.nan)
     curr_position_df = curr_position_df[curr_position_df['maze_id'].notna()]
     curr_position_df = curr_position_df[curr_position_df['maze_id'] == 0] ## 'roam' only
@@ -4504,7 +4502,7 @@ def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, mas
 
     ## Mask by valid number of spikes:
     a_masked_decoded_PBEs_result, mask_index_tuple = a_decoded_PBEs_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=a_decoder.spikes_df, masked_bin_fill_mode=masked_bin_fill_mode)
-    (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list) = mask_index_tuple
+    # (is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list) = mask_index_tuple
     ## Outputs: a_masked_decoded_PBEs_result
     # active_decoded_filter_epochs_result: DecodedFilterEpochsResult = a_masked_decoded_PBEs_result
 
@@ -4516,14 +4514,14 @@ def compute_pre_lap_activity_predictivity_top_v_bottom(curr_active_pipeline, mas
     active_decoded_filter_epochs_result_dict = {'PBEs': a_masked_decoded_PBEs_result, 'intra-laps': a_masked_decoded_inbetween_laps_epochs_result, }
     _out_results = {}
 
-    a_masked_decoded_inbetween_laps_epochs_result
     for a_key, active_decoded_filter_epochs_result in active_decoded_filter_epochs_result_dict.items():
-        _out_results[a_key] = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_inbetween_laps_epochs_result, inbetween_laps_df=deepcopy(inbetween_laps_df), **perform_compute_kwargs)
+        print(f'epoch result: {a_key}:')
+        _out_results[a_key] = _perform_compute(active_decoded_filter_epochs_result=active_decoded_filter_epochs_result, inbetween_laps_df=deepcopy(inbetween_laps_df), **perform_compute_kwargs)
         # inbetween_laps_df, inbetween_laps_aggrigate_decision_df, active_filter_epochs, per_time_bin_marignals_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _out_results[a_key]
 
     # inbetween_laps_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_inbetween_laps_epochs_result, inbetween_laps_df=inbetween_laps_df)
     # inbetween_laps_df, (percent_mode_predict_y_band_loc, percent_last_predict_y_band_loc) = _perform_compute(active_decoded_filter_epochs_result=a_masked_decoded_PBEs_result, inbetween_laps_df=inbetween_laps_df)
-    return _out_results
+    return _out_results, per_lap_avg_positions_df
 
 
 
