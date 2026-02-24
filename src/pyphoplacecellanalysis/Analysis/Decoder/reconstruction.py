@@ -1090,7 +1090,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
         merged_epochs = []
         for src_obj_idx, a_results_to_merge_obj in enumerate(results_to_merge_list):
-            an_epochs = deepcopy(a_results_to_merge_obj.filter_epochs)
+            an_epochs = ensure_dataframe(a_results_to_merge_obj.filter_epochs)
             an_epochs['src_obj_idx'] = src_obj_idx ## for all rows, identifies which source it came from for re-filtering
             merged_epochs.append(an_epochs)
 
@@ -1159,6 +1159,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 print(f'WARN: differing lengths of field "{a_field_name}" and len(post_merge_sort_indicies): {len(post_merge_sort_indicies)},  len(extant_out_result_value): {len(extant_out_result_value)}')
             # setattr(out_result, a_field_name, getattr(out_result, a_field_name)[post_merge_sort_indicies])
         ## END for a_field_name in result_list_field_names...
+
+        out_result.filter_epochs = out_result.filter_epochs.reset_index(drop=True) ## reset index post-hoc
 
         return out_result
 
