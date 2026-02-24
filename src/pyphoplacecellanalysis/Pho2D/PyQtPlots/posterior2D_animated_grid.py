@@ -38,7 +38,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
         self.central_widget.setLayout(self.grid_layout)
 
         self.image_items = []
-        self.current_t_bins = []
+        self.current_t_bin_index = []
 
         
         # Build one animated cell per epoch
@@ -68,7 +68,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             self.grid_layout.addWidget(plot_widget, row, col)
 
             self.image_items.append((img_item, an_epoch_p_x_given_n, an_epoch_n_bins))
-            self.current_t_bins.append(0)
+            self.current_t_bin_index.append(0)
 
         # Timer for animation
         self.timer = QtCore.QTimer()
@@ -82,7 +82,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
             img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
 
-            an_epoch_t_bin = self.current_t_bins[an_epoch_idx]
+            an_epoch_t_bin = self.current_t_bin_index[an_epoch_idx]
 
             if an_epoch_t_bin < an_epoch_n_bins:
                 a_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, an_epoch_t_bin]
@@ -92,9 +92,9 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
                 # img_item.setImage(a_t_bin_p_x_given_n.T, autoLevels=False, levels=(0, 1))
 
 
-                self.current_t_bins[an_epoch_idx] += 1
+                self.current_t_bin_index[an_epoch_idx] += 1
             else:
-                self.current_t_bins[an_epoch_idx] = 0
+                self.current_t_bin_index[an_epoch_idx] = 0
 
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
@@ -123,7 +123,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
 
         frames = []
         max_n_bins = np.max(self.active_decoded_PBE_result.nbins)
-        original_t_bins = self.current_t_bins.copy()
+        original_t_bins = self.current_t_bin_index.copy()
 
         for global_frame_idx in range(max_n_bins):
             for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs):
@@ -146,7 +146,7 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
             rgb[:] = (arr[:, :, :3].astype(np.float32) * alpha + 255.0 * (1.0 - alpha)).astype(np.uint8)
             frames.append(rgb)
 
-        self.current_t_bins = original_t_bins
+        self.current_t_bin_index = original_t_bins
 
         try:
             imageio.mimsave(output_path, frames, format="GIF-PIL", duration=frame_duration_ms / 1000.0, loop=0, quantizer="nq", palettesize=256)
@@ -156,8 +156,14 @@ class AnimatedLoopingPosteriorViewer(QtWidgets.QMainWindow):
         print(f"Exported GIF to: {output_path}")
         
 
+class AnimationLoopMode(Enum):
+    """ controls how each independnent epoch loops (with coherent frames across all which go black when they run out, or item-wise. """
+    common_frame_indexing = auto()
+    individual_independent_looping = auto()
+
 
 class AnimationExportMode(Enum):
+    """ controls how animated gifs are exported """
     separate_images = auto()
     single_image = auto()
 
@@ -177,14 +183,16 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
 
 
     """
-    def __init__(self, active_decoded_PBE_result, n_columns: int = 10):
+    def __init__(self, active_decoded_filter_epochs_result, n_columns: int = 10, loop_mode: AnimationLoopMode=AnimationLoopMode.common_frame_indexing):
         super().__init__()
 
-        self.active_decoded_filter_epochs_result = active_decoded_PBE_result
+        self.active_decoded_filter_epochs_result = active_decoded_filter_epochs_result
         self.n_columns = n_columns
         max_n_t_bins: int = np.nanmax(self.active_decoded_filter_epochs_result.nbins) ## get the maximum number of t_bins in any epoch
         self.max_n_t_bins = max_n_t_bins
-        
+        self.loop_mode = loop_mode
+
+
         # self.central_widget = QtWidgets.QWidget()
         # self.setCentralWidget(self.central_widget)
 
@@ -218,6 +226,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
             an_epoch_p_x_given_n = self.active_decoded_filter_epochs_result.p_x_given_n_list[an_epoch_idx]
             an_epoch_n_bins: int = self.active_decoded_filter_epochs_result.nbins[an_epoch_idx]
+            an_epoch_single_t_bin_p_x_given_n = an_epoch_p_x_given_n[:, :, 0]
 
             # Compute grid position
             row = an_epoch_idx // self.n_columns
@@ -237,17 +246,24 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
             # lut = pg.colormap.get('viridis','matplotlib').getLookupTable(256)
             # img_item = pg.ImageItem(lut=lut)
             img_item.setColorMap(pg.colormap.get('viridis','matplotlib'))
+            img_item.setImage(an_epoch_single_t_bin_p_x_given_n, autoLevels=True) ## set initial image to get proper shape
 
             plot_widget.addItem(img_item)
 
             ## Build text item to display title
             txt_item: pg.TextItem = pg.TextItem(text=plot_title, color='#FFFFFF77', anchor=(1, 1))
+            ## Create text object, use HTML tags to specify color/size
+            # txt_item: pg.TextItem = pg.TextItem(html='<div style="text-align: center"><span style="color: #FFF;">This is the</span><br><span style="color: #FF0; font-size: 16pt;">PEAK</span></div>', anchor=(-0.3,0.5), angle=45, border='w', fill=(0, 0, 255, 100))
+            # plot.addItem(txt_item)
+            # txt_item.setPos(0, y.max())
+
             plot_widget.addItem(txt_item)
             img_rect = img_item.boundingRect()
-            txt_item.setPos(img_rect.right(), img_rect.bottom())
+            # txt_item.setPos(img_rect.right(), img_rect.bottom())
+            txt_item.setPos(img_rect.right(), img_rect.top()) ## .top() is the correct choice because the y-axis is flipped or something by default. This line actually positions the text at the bottom-right inside corner.
 
             # a_black_image_item = np.zeros_like(an_epoch_p_x_given_n[:, :, 0])
-            a_black_image_item = np.full_like(an_epoch_p_x_given_n[:, :, 0], np.nan)
+            a_black_image_item = np.full_like(an_epoch_single_t_bin_p_x_given_n, np.nan)
             
             self.black_image_items.append(a_black_image_item)
 
@@ -265,7 +281,6 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
         
         max_n_t_bins: int = self.max_n_t_bins
         
-
         for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
 
             img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
@@ -282,17 +297,24 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
                 self.current_t_bin_index[an_epoch_idx] += 1
             else:
                 ## BEHAVIOR: resets to zero and starts over, allowing them all to operate "out of sync"
-                # self.current_t_bins[an_epoch_idx] = 0 ## Resets to zero, I don't think this is desirable
-
-                if max_n_t_bins == self.current_t_bin_index[an_epoch_idx]:
-                    ## truely reset to zero (for all of them
+                if self.loop_mode.value == AnimationLoopMode.individual_independent_looping.value:
                     self.current_t_bin_index[an_epoch_idx] = 0 ## Resets to zero, I don't think this is desirable
-                else:                
-                    ## render a black frame and keep accruing:
-                    img_item.setImage(self.black_image_items[an_epoch_idx], autoLevels=True)
-                    self.current_t_bin_index[an_epoch_idx] += 1
-                
 
+                elif self.loop_mode.value == AnimationLoopMode.common_frame_indexing.value:
+                    if max_n_t_bins == self.current_t_bin_index[an_epoch_idx]:
+                        ## truly reset to zero (for all of them)
+                        self.current_t_bin_index[an_epoch_idx] = 0 ## Resets to zero
+                    else:                
+                        ## render a black frame and keep accruing:
+                        img_item.setImage(self.black_image_items[an_epoch_idx], autoLevels=True)
+                        self.current_t_bin_index[an_epoch_idx] += 1
+                else:
+                    raise NotImplementedError(f'unimplemented looping mode: {self.loop_mode}.')                
+
+            ## update text items:
+            txt_item = self.text_items[an_epoch_idx]
+            epoch_display_str: str = f"{an_epoch_idx}[{an_epoch_t_bin}/{an_epoch_n_bins}]"
+            txt_item.setText(epoch_display_str)
         ## END for an_epoch_idx in np.arange(self.active_decoded_PBE_result.n_epochs)...
 
 
@@ -307,6 +329,33 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
             Duration per frame in milliseconds.
         render_passes : int
             Number of Qt event processing passes per frame before grab (more = smoother capture).
+
+
+
+        Usage:
+
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorViewer, AnimatedLoopingPosteriorGraphicsGridViewer, AnimationExportMode
+
+            laps_viewer_app = pg.mkQApp('AnimatedLoopingPosteriorViewer - Laps') # QtWidgets.QApplication(sys.argv)
+            # laps_viewer: AnimatedLoopingPosteriorViewer = AnimatedLoopingPosteriorViewer(a_masked_decoded_laps_epochs_result)
+            laps_viewer: AnimatedLoopingPosteriorGraphicsGridViewer = AnimatedLoopingPosteriorGraphicsGridViewer(a_masked_decoded_laps_epochs_result)
+            # viewer = AnimatedLoopingPosteriorViewer(active_decoded_PBE_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, drop_below_threshold=None)
+            laps_viewer.resize(1000, 450)
+            laps_viewer.show()
+
+
+            ## Export to a single image .gif:
+            animated_epochs_export_folder = curr_active_pipeline.get_output_path().joinpath('videos', 'Laps')
+            animated_epochs_export_folder.mkdir(exist_ok=True)
+            animated_epochs_export_path = animated_epochs_export_folder.joinpath('single_file.gif')
+            laps_viewer.export_grid_as_gif(output_path=animated_epochs_export_path, render_passes=5, mode=AnimationExportMode.single_image)
+
+            ## Export to separate .gif images for each epoch:
+            animated_epochs_export_folder = curr_active_pipeline.get_output_path().joinpath('videos', 'Laps')
+            animated_epochs_export_folder.mkdir(exist_ok=True)
+            exported_image_paths = laps_viewer.export_grid_as_gif(output_path=animated_epochs_export_folder, mode=AnimationExportMode.separate_images)
+
+
         """
         import imageio
         from pyqtgraph.Qt import QtGui
@@ -368,7 +417,7 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
             for an_epoch_idx in np.arange(self.active_decoded_filter_epochs_result.n_epochs):
                 curr_epoch_label: str = f'epoch[{an_epoch_idx}]'
                 print(f'processing epoch: {curr_epoch_label}...')
-                curr_output_path = output_path.joinpath(curr_epoch_label)
+                curr_output_path = output_path.joinpath(f"{curr_epoch_label}.gif")
                 frames = [] ## reset frames for each epoch:
                 img_item, an_epoch_p_x_given_n, an_epoch_n_bins = self.image_items[an_epoch_idx]
                 for an_epoch_t_bin in np.arange(an_epoch_n_bins):
@@ -376,8 +425,8 @@ class AnimatedLoopingPosteriorGraphicsGridViewer(QtWidgets.QMainWindow):
                     img_item.setImage(a_t_bin_p_x_given_n, autoLevels=False, levels=levels)
                     QtWidgets.QApplication.processEvents() ## needed to refresh the view I think?
                     ## Seems super inefficient:
-                    qpixmap = img_item.grab()
-                    qimage = qpixmap.toImage().convertToFormat(QtGui.QImage.Format_RGBA8888)
+                    # qpixmap = img_item.grab()
+                    qimage = img_item.qimage.convertToFormat(QtGui.QImage.Format_RGBA8888)
                     width, height = qimage.width(), qimage.height()
                     ptr = qimage.bits()
                     ptr.setsize(qimage.byteCount())
