@@ -1,4 +1,98 @@
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 
+from matplotlib.collections import PathCollection
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, BasePositionDecoder
+    from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
+    from nptyping import NDArray
+
+from copy import deepcopy
+import param
+import numpy as np
+import pandas as pd
+from attrs import define, field, Factory
+from enum import Enum
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing import NewType
+from typing_extensions import TypeAlias
+import nptyping as ND
+from nptyping import NDArray
+import neuropy.utils.type_aliases as types
+decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
+epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
+DecoderName = NewType('DecoderName', str)
+from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from neuropy.utils.indexing_helpers import PandasHelpers
+
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
+
+from pyphocorehelpers.indexing_helpers import get_dict_subset
+from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
+
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.assertion_helpers import Assert
+
+# ==================================================================================================================== #
+# 2024-04-12 - Decoded Trajectory Plotting on Maze (1D & 2D) - Posteriors and Most Likely Position Paths               #
+# ==================================================================================================================== #
+
+from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
+
+
+class RenderColoringMode(str, Enum):
+    """How to color rendered path elements (e.g. line segments, arrows): by time (colormap), by speed, or by heading angle (ROYGBIV, North=Red)."""
+    TIME = 'time'
+    SPEED = 'speed'
+    ANGLE = 'angle'
+
+
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import FancyArrowPatch
+
+
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
+
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
+
+
+from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for safely_accepts_kwargs
+from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
+
+# ==================================================================================================================================================================================================================================================================================== #
+# TODO 2025-12-16 16:37: - [ ] AI-implemnented attempt to replace Aims to replace `SingleArtistMultiEpochBatchHelpers` with a much more efficient implementation                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+
+"""
+Optimized viewport-based rendering with image caching and adaptive bin sizing
+for decoded trajectory timeline visualization.
+
+This class efficiently renders only visible epochs, caches rendered thumbnails,
+and adapts bin size based on zoom level - similar to video editor timeline previews.
+"""
+
+from typing import TYPE_CHECKING, Optional, Tuple, Dict, List, Callable, Any
+import numpy as np
+import pandas as pd
+from copy import deepcopy
+from attrs import define, field, Factory
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for image rendering
+
+from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
+from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots # PyqtgraphRenderPlots
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 @metadata_attributes(short_name=None, tags=['OLD', '2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
