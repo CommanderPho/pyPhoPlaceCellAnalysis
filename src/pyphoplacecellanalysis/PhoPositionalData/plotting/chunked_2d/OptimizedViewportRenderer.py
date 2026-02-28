@@ -135,6 +135,23 @@ class OptimizedViewportRenderer:
     4. Multi-resolution support: Can render at different detail levels
     
     Usage:
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.OptimizedViewportRenderer import OptimizedViewportRenderer, ThumbnailCacheEntry, Viewport
+
+        renderer = OptimizedViewportRenderer(
+            frame_divided_epochs_result=frame_divided_epochs_result,
+            decoder=a_decoder,
+            active_ax=track_ax,
+            base_frame_divide_bin_size=0.5,
+            min_thumbnail_width_px=50,
+            max_thumbnails_per_viewport=100
+        )
+        
+        # Render for current viewport
+        viewport = Viewport(start_time=10.0, end_time=20.0, width_pixels=800, height_pixels=200)
+        artists, extent = renderer.render_viewport(viewport, posterior_masking_value=0.0025)
+
+
+    Pre 2026-usage:
         from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import OptimizedViewportRenderer, ThumbnailCacheEntry, Viewport
 
         renderer = OptimizedViewportRenderer(
@@ -148,8 +165,15 @@ class OptimizedViewportRenderer:
         # Render for current viewport
         viewport = Viewport(start_time=10.0, end_time=20.0, width_pixels=800, height_pixels=200)
         artists, extent = renderer.render_viewport(viewport, posterior_masking_value=0.0025)
+
+
     """
-    results2D: "DecodingResultND" = field()
+    # results2D: "DecodingResultND" = field()
+
+    frame_divided_epochs_result: "DecodedFilterEpochsResult" = field()
+    decoder: "BasePositionDecoder" = field()
+
+
     active_ax: Any = field()
     base_frame_divide_bin_size: float = field(default=0.5)
     rotate_to_vertical: bool = field(default=True)
@@ -177,13 +201,15 @@ class OptimizedViewportRenderer:
     @property
     def a_result2D(self) -> "DecodedFilterEpochsResult":
         """Get the decoded result for the active epoch"""
-        return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
-    
+        # return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
+        return self.frame_divided_epochs_result
+
     @property
     def a_new_global2D_decoder(self) -> "BasePositionDecoder":
         """Get the decoder for the active epoch"""
-        return self.results2D.decoders[self.active_epoch_name]
-    
+        # return self.results2D.decoders[self.active_epoch_name]
+        return self.decoder
+
     @property
     def num_filter_epochs(self) -> int:
         """Total number of frame division epochs"""

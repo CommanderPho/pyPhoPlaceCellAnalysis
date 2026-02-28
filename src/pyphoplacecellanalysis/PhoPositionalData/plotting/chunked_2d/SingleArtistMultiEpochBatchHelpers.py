@@ -1,3 +1,4 @@
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
@@ -79,7 +80,7 @@ This class efficiently renders only visible epochs, caches rendered thumbnails,
 and adapts bin size based on zoom level - similar to video editor timeline previews.
 """
 
-from typing import TYPE_CHECKING, Optional, Tuple, Dict, List, Callable, Any
+from typing import Optional, Tuple, Dict, List, Callable, Any
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -173,7 +174,11 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
     """
-    results2D: "DecodingResultND" = field()
+    # results2D: "DecodingResultND" = field()
+    frame_divided_epochs_result: "DecodedFilterEpochsResult" = field()
+    decoder: "BasePositionDecoder" = field()
+    pos_df: pd.DataFrame = field()
+
 
     active_ax: Any = field()
     frame_divide_bin_size: float = field()
@@ -200,11 +205,13 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
+        # return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
+        return self.frame_divided_epochs_result
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
-        return self.results2D.decoders[self.active_epoch_name]
+        # return self.results2D.decoders[self.active_epoch_name]
+        return self.decoder
 
     @property
     def desired_start_time_seconds(self) -> float:
@@ -282,11 +289,11 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
         if force_recompute is True:
-            print(f'force_recompute == True, so `self.stacked_flat_global_pos_df` will be rebuilt from scratch from `self.results2D.pos_df`...')
+            print(f'force_recompute == True, so `self.stacked_flat_global_pos_df` will be rebuilt from scratch from `self.pos_df`...')
             self.has_data_been_built = False
     
         if (self.stacked_flat_global_pos_df is None) or force_recompute:
-            self.stacked_flat_global_pos_df = deepcopy(self.results2D.pos_df)
+            self.stacked_flat_global_pos_df = deepcopy(self.pos_df)
 
         ## slice `stacked_flat_global_pos_df` by desired start/end indicies too:
         if (self.desired_epoch_end_idx is not None):
@@ -298,8 +305,8 @@ class SingleArtistMultiEpochBatchHelpers:
         # Validate that filtering didn't result in empty dataframe
         if len(self.stacked_flat_global_pos_df) == 0:
             # Get available indices for better error message
-            if hasattr(self, 'results2D') and self.results2D.pos_df is not None and 'global_frame_division_idx' in self.results2D.pos_df.columns:
-                available_indices = sorted(self.results2D.pos_df['global_frame_division_idx'].unique())
+            if hasattr(self, 'results2D') and self.pos_df is not None and 'global_frame_division_idx' in self.pos_df.columns:
+                available_indices = sorted(self.pos_df['global_frame_division_idx'].unique())
                 min_idx, max_idx = available_indices[0], available_indices[-1] if len(available_indices) > 0 else (None, None)
             else:
                 available_indices = []

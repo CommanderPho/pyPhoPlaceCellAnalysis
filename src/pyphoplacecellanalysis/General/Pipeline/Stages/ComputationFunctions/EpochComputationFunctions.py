@@ -726,11 +726,14 @@ class Compute_NonPBE_Epochs(ComputedResult):
         PBE_df: pd.DataFrame = ensure_dataframe(deepcopy(sess.pbe))
         laps_df = ensure_dataframe(deepcopy(sess.laps))
         
-        
+        ## Build up a new temporary epochs_df to make sure we can get the global df
+        _temp_epochs_df: pd.DataFrame = ensure_dataframe(sess.epochs)
 
-        ## Build up a new epoch
-        epochs_df: pd.DataFrame = deepcopy(sess.epochs).epochs.adding_global_epoch_row(global_epoch_name=global_epoch_name)
-        global_epoch_only_df: pd.DataFrame = epochs_df.epochs.label_slice(global_epoch_name)
+        if global_epoch_name not in _temp_epochs_df['label'].tolist():
+            ## needs global epoch, so call function:
+            _temp_epochs_df = _temp_epochs_df.epochs.adding_global_epoch_row(global_epoch_name=global_epoch_name, inplace=False) ## the added global epoch is wrong, but this is okay because we do a label slice for the correct name
+
+        global_epoch_only_df: pd.DataFrame = _temp_epochs_df.epochs.label_slice(global_epoch_name)
         
         # t_start, t_stop = epochs_df.epochs.t_start, epochs_df.epochs.t_stop
         global_epoch_only_non_PBE_epoch_df: pd.DataFrame = global_epoch_only_df.epochs.subtracting(PBE_df)
