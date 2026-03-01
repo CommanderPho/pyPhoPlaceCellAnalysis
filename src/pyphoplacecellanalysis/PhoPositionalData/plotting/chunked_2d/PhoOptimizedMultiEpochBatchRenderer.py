@@ -533,7 +533,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
         return pos_df, subdivided_epochs_df, maze_bounds_t, pos_tspace_df, (xt, yt)
 
 
-    @function_attributes(short_name=None, tags=['helper', 'pyqtgraph', 'display', 'renderer', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-01 07:13', related_items=[])
+    @function_attributes(short_name=None, tags=['helper', 'pyqtgraph', 'display', 'renderer', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=['cls.plot_all'], creation_date='2026-03-01 07:13', related_items=[])
     @classmethod
     def plot_decoded_posteriors_for_frames(cls, a_decoded_subdivided_epochs_result, subdivided_epochs_df, maze_bounds_t, 
             track_plot_item: Optional[pg.PlotItem]=None, extant_posterior_image_items=None, **kwargs,
@@ -831,6 +831,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
 
 
+    @function_attributes(short_name=None, tags=['helper', 'renderer', 'maze'], input_requires=[], output_provides=[], uses=[], used_by=['cls.plot_all'], creation_date='2026-02-29 00:01', related_items=[])
     @classmethod
     def plot_all_track_shapes(cls, subdivided_epochs_df, maze_bounds_t, track_plot_item: Optional[pg.PlotItem]=None):
         """ plots all track shapes
@@ -876,6 +877,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
         return track_shape_rects_item, maze_boundaries_path
 
 
+    @function_attributes(short_name=None, tags=['helper', 'renderer', 'maze'], input_requires=[], output_provides=[], uses=[], used_by=['cls.plot_all'], creation_date='2026-02-29 00:01', related_items=[])
     @classmethod
     def plot_all_animal_position_segments(cls, xt, yt, track_plot_item: Optional[pg.PlotItem]=None):
         """ Plots the animal positions for each frame
