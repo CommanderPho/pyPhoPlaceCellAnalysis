@@ -391,7 +391,10 @@ class PhoOptimizedMultiEpochBatchRenderer:
         drop_below_threshold = kwargs.pop('drop_below_threshold', 0.0025)
         shared_axis_order = 'col-major'
         posterior_img_opacity: float = kwargs.pop('posterior_img_opacity', 0.8)
-        posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_Plus)
+        # posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_Plus)
+        posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_SourceOver)
+        posterior_img_cmap = kwargs.pop('posterior_img_cmap', pg.colormap.get('viridis','matplotlib'))
+
         # QtGui.QPainter.CompositionMode_SourceOver   # default alpha blending
         # QtGui.QPainter.CompositionMode_Plus         # additive (great for heatmaps)
         # QtGui.QPainter.CompositionMode_Multiply     # darkens overlap
@@ -445,6 +448,11 @@ class PhoOptimizedMultiEpochBatchRenderer:
                     img_item.setOpacity(posterior_img_opacity)  # Set transparency for overlay
                 if posterior_img_composition_mode is not None:
                     img_item.setCompositionMode(posterior_img_composition_mode)
+
+                if posterior_img_cmap is not None:
+                    # Set the color map:
+                    img_item.setColorMap(posterior_img_cmap)
+
             else:
                 img_item = extant_posterior_image_items[epoch_idx]
 
@@ -679,7 +687,8 @@ class PhoOptimizedMultiEpochBatchRenderer:
         from pyqtgraph.functions import arrayToQPath
         animal_position_segments_path = arrayToQPath(xt, yt, connect='finite')
         animal_position_segments_item: pg.QtWidgets.QGraphicsPathItem = pg.QtWidgets.QGraphicsPathItem(animal_position_segments_path)
-        animal_position_segments_item.setPen(pg.mkPen('w'))
+        animal_position_segments_item.setPen(pg.mkPen('#FFFFFFBB'))
+        animal_position_segments_item.setZValue(9) ## in foreground
 
         if track_plot_item is None:
             track_plot_item = pg.plot()
