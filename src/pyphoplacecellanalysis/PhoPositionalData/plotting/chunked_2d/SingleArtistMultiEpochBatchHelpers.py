@@ -1,19 +1,14 @@
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
-from matplotlib.collections import PathCollection
 
 if TYPE_CHECKING:
     ## typehinting only imports here
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import DecodingResultND
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, BasePositionDecoder
-    from pyphoplacecellanalysis.External.peak_prominence2d import PosteriorPeaksPeakProminence2dResult
     from nptyping import NDArray
 
 from copy import deepcopy
-import param
 import numpy as np
 import pandas as pd
 from attrs import define, field, Factory
@@ -27,12 +22,8 @@ import neuropy.utils.type_aliases as types
 decoder_name: TypeAlias = str # a string that describes a decoder, such as 'LongLR' or 'ShortRL'
 epoch_split_key: TypeAlias = str # a string that describes a split epoch, such as 'train' or 'test'
 DecoderName = NewType('DecoderName', str)
-from neuropy.core.neuron_identities import NeuronIdentityAccessingMixin
-from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from neuropy.utils.indexing_helpers import PandasHelpers
-
-from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
@@ -45,9 +36,6 @@ from pyphocorehelpers.assertion_helpers import Assert
 # 2024-04-12 - Decoded Trajectory Plotting on Maze (1D & 2D) - Posteriors and Most Likely Position Paths               #
 # ==================================================================================================================== #
 
-from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
-
-
 class RenderColoringMode(str, Enum):
     """How to color rendered path elements (e.g. line segments, arrows): by time (colormap), by speed, or by heading angle (ROYGBIV, North=Red)."""
     TIME = 'time'
@@ -57,16 +45,11 @@ class RenderColoringMode(str, Enum):
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.patches import FancyArrowPatch
-
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult
 
-from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import MatplotlibRenderPlots
-
-
 from neuropy.utils.mixins.dict_representable import overriding_dict_with # required for safely_accepts_kwargs
-from pyphocorehelpers.geometry_helpers import point_tuple_mid_point, BoundsRect, is_point_in_rect
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # TODO 2025-12-16 16:37: - [ ] AI-implemnented attempt to replace Aims to replace `SingleArtistMultiEpochBatchHelpers` with a much more efficient implementation                                                                                                                       #
@@ -118,14 +101,14 @@ class SingleArtistMultiEpochBatchHelpers:
         ```
         
     
-    from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.SingleArtistMultiEpochBatchHelpers import SingleArtistMultiEpochBatchHelpers
     
     
     
     
     USAGE:
     
-        from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import SingleArtistMultiEpochBatchHelpers
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.SingleArtistMultiEpochBatchHelpers import SingleArtistMultiEpochBatchHelpers
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
         track_name: str = 'SingleArtistMultiEpochBatchTrack'
@@ -136,8 +119,15 @@ class SingleArtistMultiEpochBatchHelpers:
         # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
         desired_epoch_end_idx: Optional[int] = None
 
-        ## INPUTS: frame_divide_bin_size, results2D
-        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        ## INPUTS: frame_divide_bin_size, frame_divided_epochs_result, decoder, pos_df (or use init_from_results2D)
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(frame_divided_epochs_result=results2D.frame_divided_epochs_results[key], decoder=results2D.decoders[key], pos_df=results2D.pos_df, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        plots_data = batch_plot_helper.add_all_track_plots(global_session=global_session)
+
+
+
+    Pre 2026:
+        ## INPUTS: frame_divide_bin_size, frame_divided_epochs_result, decoder, pos_df (or use init_from_results2D)
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers.init_from_results2D(results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
         plots_data = batch_plot_helper.add_all_track_plots(global_session=global_session)
         
     
@@ -147,8 +137,8 @@ class SingleArtistMultiEpochBatchHelpers:
         # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
         desired_epoch_end_idx: Optional[int] = None
 
-        ## INPUTS: frame_divide_bin_size, results2D
-        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers(results2D=results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
+        ## INPUTS: frame_divide_bin_size, frame_divided_epochs_result, decoder, pos_df (or use init_from_results2D)
+        batch_plot_helper: SingleArtistMultiEpochBatchHelpers = SingleArtistMultiEpochBatchHelpers.init_from_results2D(results2D, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
 
         batch_plot_helper.shared_build_flat_stacked_data(force_recompute=True, debug_print=True)
 
@@ -174,11 +164,9 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
     """
-    # results2D: "DecodingResultND" = field()
     frame_divided_epochs_result: "DecodedFilterEpochsResult" = field()
     decoder: "BasePositionDecoder" = field()
     pos_df: pd.DataFrame = field()
-
 
     active_ax: Any = field()
     frame_divide_bin_size: float = field()
@@ -205,12 +193,11 @@ class SingleArtistMultiEpochBatchHelpers:
 
     @property
     def a_result2D(self) -> DecodedFilterEpochsResult:
-        # return self.results2D.frame_divided_epochs_results[self.active_epoch_name]
         return self.frame_divided_epochs_result
+
 
     @property
     def a_new_global2D_decoder(self) -> BasePositionDecoder:
-        # return self.results2D.decoders[self.active_epoch_name]
         return self.decoder
 
     @property
@@ -235,6 +222,12 @@ class SingleArtistMultiEpochBatchHelpers:
         #     ## determine the correct end-index            
         pass
     
+
+    @classmethod
+    def init_from_results2D(cls, results2D: "DecodingResultND", active_epoch_name: str = "global", **kwargs) -> "SingleArtistMultiEpochBatchHelpers":
+        key = DecoderName(active_epoch_name)
+        return cls(frame_divided_epochs_result=results2D.frame_divided_epochs_results[key], decoder=results2D.decoders[key], pos_df=results2D.pos_df, **kwargs)
+
 
     @function_attributes(short_name=None, tags=['data'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 16:07', related_items=[])
     def shared_build_flat_stacked_data(self, debug_print=False, should_expand_first_dim: bool=True, force_recompute:bool=False, desired_epoch_start_idx=None, desired_epoch_end_idx=None, **kwargs):
@@ -305,7 +298,7 @@ class SingleArtistMultiEpochBatchHelpers:
         # Validate that filtering didn't result in empty dataframe
         if len(self.stacked_flat_global_pos_df) == 0:
             # Get available indices for better error message
-            if hasattr(self, 'results2D') and self.pos_df is not None and 'global_frame_division_idx' in self.pos_df.columns:
+            if self.pos_df is not None and 'global_frame_division_idx' in self.pos_df.columns:
                 available_indices = sorted(self.pos_df['global_frame_division_idx'].unique())
                 min_idx, max_idx = available_indices[0], available_indices[-1] if len(available_indices) > 0 else (None, None)
             else:
@@ -533,15 +526,13 @@ class SingleArtistMultiEpochBatchHelpers:
         measured_pos_dock_track_ax.set_facecolor('#333333')
         
 
-
-        
         measured_pos_line_artist = measured_pos_dock_track_ax.scatter(active_stacked_flat_global_pos_df["global_frame_division_x_data_offset"], active_stacked_flat_global_pos_df["y_scaled"], color=active_stacked_flat_global_pos_df["color"].tolist())
         measured_pos_line_artist.set_alpha(0.85)
         measured_pos_line_artist.set_sizes([14])
 
         y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
-        frame_division_epoch_separator_vlines = active_ax.vlines(self.results2D.frame_divided_epochs_df['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
+        frame_division_epoch_separator_vlines = active_ax.vlines(self.frame_divided_epochs_result.filter_epochs['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
             if override_ax is None:
