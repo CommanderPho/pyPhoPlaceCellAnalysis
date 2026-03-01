@@ -756,7 +756,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
 
 
-    @function_attributes(short_name=None, tags=['MAIN', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-18 02:29', related_items=[])
+    @function_attributes(short_name=None, tags=['MAIN', 'WORKING'], input_requires=[], output_provides=[], uses=['self.shared_build_flat_stacked_data', 'self.add_track_shapes', 'self.add_position_posteriors', 'self.add_track_positions'], used_by=[], creation_date='2025-02-18 02:29', related_items=[])
     def add_all_track_plots(self, global_session, override_ax=None, posterior_masking_value=0.0025, debug_print=False, defer_draw:bool=False, **kwargs) -> RenderPlotsData:
         """ performs all plotting on the same axes """
         
