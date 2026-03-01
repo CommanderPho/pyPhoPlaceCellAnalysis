@@ -532,7 +532,7 @@ class SingleArtistMultiEpochBatchHelpers:
 
         y_axis_kwargs = dict(ymin=0.0, ymax=1.0)
         # y_axis_kwargs = dict(ymin=self.xbin_edges[0], ymax=self.xbin_edges[-1])
-        frame_division_epoch_separator_vlines = active_ax.vlines(self.frame_divided_epochs_result.filter_epochs['start'].to_numpy(), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
+        frame_division_epoch_separator_vlines = active_ax.vlines(np.asarray(self.frame_divided_epochs_result.filter_epochs['start']), **y_axis_kwargs, colors='white', linestyles='solid', label='frame_division_epoch_separator_vlines') # , data=None
 
         if not defer_draw:
             if override_ax is None:
