@@ -305,7 +305,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         # Performed 1 aggregation grouped on column: 'global_frame_division_idx'
         # pos_df = pos_df.groupby(['global_frame_division_idx']).agg(t_count=('t', 'count')).reset_index()
-        global_frame_split_row_indicies = np.cumsum(pos_df['global_frame_division_idx'].value_counts().to_numpy()).astype(int) # [600, 1200, 1800, ...] - the indicies at which to insert np.nan rows
+        global_frame_split_row_indicies = np.cumsum(pos_df[split_column_name].value_counts().to_numpy()).astype(int) # [600, 1200, 1800, ...] - the indicies at which to insert np.nan rows
 
         ## convert to relative position components (offsets)
         pos_df['xt'] = (np.abs(pos_df['x'] - xmin) * x_to_t_scale)
