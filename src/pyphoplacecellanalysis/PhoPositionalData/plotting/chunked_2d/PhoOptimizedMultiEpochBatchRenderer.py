@@ -329,6 +329,84 @@ class PhoOptimizedMultiEpochBatchRenderer:
         ## OUTPUTS: subdivided_epochs_df, maze_bounds_t, x, y
         return pos_df, subdivided_epochs_df, maze_bounds_t, (xt, yt)
 
+    @classmethod
+    def plot_decoded_posteriors_for_frames(cls, a_decoder, a_decoded_subdivided_epochs_result, pos_df, subdivided_epochs_df, maze_bounds_t, 
+            track_plot_item: Optional[pg.PlotItem]=None, extant_posterior_image_items=None, **kwargs,
+        ):
+        """ 
+        vaguely based off of `pyqtplot_plot_image_array`
+
+        Usage:
+
+            _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_decoded_posteriors_for_frames(a_decoder=a_decoder, a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result, pos_df=pos_df,
+                                                                        subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
+                                                                        pos_tspace_df=pos_tspace_df, #xt=xt, yt=yt,
+                                                                        track_plot_item=track_plot_item,
+                                                                    )
+
+        """
+        drop_below_threshold = kwargs.pop('drop_below_threshold', 0.0025)
+        shared_axis_order = 'col-major'
+        have_existing_img_items: bool = False
+        
+        # from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_common_setup
+        _out_dict = {}
+
+        # Interpret image data as row-major instead of col-major
+        # pg.setConfigOptions(imageAxisOrder='row-major')
+        num_decoded_epochs: int = a_decoded_subdivided_epochs_result.num_filter_epochs
+
+        if extant_posterior_image_items is not None:
+            assert len(extant_posterior_image_items) == num_decoded_epochs, f"len(extant_posterior_image_items): {len(extant_posterior_image_items)}, num_decoded_epochs: {num_decoded_epochs}"
+            # _out_dict['posterior_image_items'] = extant_posterior_image_items
+            have_existing_img_items = True
+        else:
+            extant_posterior_image_items = []
+            # _out_dict['posterior_image_items'] = extant_posterior_image_items
+
+        ## restrict to subrange
+        # ==================================================================================================================== #
+        # Plot the posterior heatmap                                                                                           #
+        # ==================================================================================================================== #
+        # custom_image_extent = [0.0, 1.0, 0.0, 1.0]
+        maze_bounds_t_arr = np.tile(maze_bounds_t, (num_decoded_epochs, 1)) # np.repmat(maze_bounds_t, shape=(num_decoded_epochs,))
+        rect_xt_positions = maze_bounds_t[0] + subdivided_epochs_df['start'].to_numpy()
+        maze_bounds_t_arr[:, 0] = rect_xt_positions
+        # maze_bounds_t_arr[:, 1] = maze_bounds_t_arr[:, 0] + maze_bounds_t_arr[:, 2]
+
+        # custom_image_extent = [self.desired_start_time_seconds, self.desired_end_time_seconds, 0.0, 1.0] ## n
+        # (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds)
+
+
+
+        for epoch_idx in np.arange(num_decoded_epochs):
+            epoch_n_t_bins: int = a_decoded_subdivided_epochs_result.nbins[epoch_idx]
+            img = a_decoded_subdivided_epochs_result.p_x_given_n_list[epoch_idx] # (n_x_bins, n_y_bins, epoch_n_t_bins)
+            if drop_below_threshold is not None:
+                # Create a masked array, masking values below the threshold
+                img = np.ma.masked_less(img, drop_below_threshold)
+
+            image_bounds_extent = np.squeeze(maze_bounds_t_arr[epoch_idx, :]) ## single bounds
+
+            ## need to collapse it over all epoch time bins:
+            img = np.nansum(img, axis=-1) / float(epoch_n_t_bins) ## (n_x_bins, n_y_bins)
+
+            if not have_existing_img_items:
+                ## create the new img_item:
+                img_item = pg.ImageItem(img)
+            else:
+                img_item = extant_posterior_image_items[epoch_idx]
+
+            img_item.setImage(img, rect=image_bounds_extent, autoLevels=False, axisOrder=shared_axis_order) # rect: [x, y, w, h] # , axisOrder='row-major'
+
+            if not have_existing_img_items:
+                track_plot_item.addItem(img_item, defaultPadding=0.0)
+                extant_posterior_image_items.append(img_item) # ['image_item']
+
+        ## END for epoch_idx in np.arange(num_decoded_bins)...
+        _out_dict['posterior_image_items'] = extant_posterior_image_items
+        return _out_dict
+
 
 
 
