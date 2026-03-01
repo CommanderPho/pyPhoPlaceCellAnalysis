@@ -84,6 +84,111 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 3D CMap Generation Helpers Temp                                                                                                                                                                                                                                                      #
+# ==================================================================================================================================================================================================================================================================================== #
+
+def create_3d_lut(n_t_bins, v_bins=256, cmap_name='viridis'):
+    """
+    Creates a 2D Lookup Table (LUT) mapping (v_idx, t_idx) -> RGBA.
+    Saturation and Alpha decrease as t_idx increases.
+    """
+    # 1. Get base colormap from PyQtGraph (returns 0-255 RGBA)
+    cmap = pg.colormap.get(cmap_name)
+    base_rgba = cmap.getLookupTable(0.0, 1.0, v_bins, alpha=True) 
+    
+    # Ensure it has 4 channels (fallback if the colormap only returns RGB)
+    if base_rgba.shape[1] == 3:
+        base_rgba = np.column_stack([base_rgba, np.full(v_bins, 255, dtype=base_rgba.dtype)])
+        
+    base_rgb = base_rgba[:, :3].astype(np.float32)
+    
+    # Calculate luminance to use for desaturating colors
+    # (Dot product with standard perceptual weights)
+    luminance = np.dot(base_rgb, [0.2989, 0.5870, 0.1140])[:, None] 
+    
+    # Initialize the 3D LUT: (v_bins, n_t_bins, 4 channels)
+    lut = np.zeros((v_bins, n_t_bins, 4), dtype=np.uint8)
+    
+    for t in range(n_t_bins):
+        # Scale factors: t=0 is 100%, t=max is heavily reduced
+        t_normalized = t / max(1, n_t_bins - 1)
+        sat_factor = 1.0 - 0.8 * t_normalized   # Saturation down to 20%
+        alpha_factor = 1.0 - 0.5 * t_normalized # Alpha down to 50%
+        
+        # Blend base RGB with pure grayscale luminance to desaturate
+        rgb_t = base_rgb * sat_factor + luminance * (1.0 - sat_factor)
+        lut[:, t, :3] = np.clip(rgb_t, 0, 255).astype(np.uint8)
+        
+        # Scale alpha
+        base_alpha = base_rgba[:, 3].astype(np.float32)
+        lut[:, t, 3] = np.clip(base_alpha * alpha_factor, 0, 255).astype(np.uint8)
+        
+        # CRITICAL: Mask out absolute zero values by forcing Alpha = 0 
+        # (Assuming v_idx=0 means 0 probability background)
+        lut[0, t, 3] = 0
+        
+    return lut
+
+def apply_3d_colormap(data_3d, lut):
+    """
+    Extremely efficient mapping of (X, Y, T) data -> (X, Y, T, 4) RGBA volume.
+    """
+    Nx, Ny, Nt = data_3d.shape
+    v_bins = lut.shape[0]
+    
+    # Scale float posteriors [0.0, 1.0] to integer indices [0, v_bins-1]
+    v_idx = np.clip((data_3d * (v_bins - 1)).astype(int), 0, v_bins - 1)
+    
+    # Create broadcastable t_idx: shape (1, 1, Nt)
+    # NumPy will automatically broadcast this against v_idx's shape (Nx, Ny, Nt)
+    t_idx = np.arange(Nt).reshape(1, 1, Nt)
+    
+    # Apply advanced indexing (Returns shape: Nx, Ny, Nt, 4)
+    rgba_volume = lut[v_idx, t_idx]
+    
+    return rgba_volume
+
+def composite_stack(rgba_volume):
+    """
+    Flattens the 4D RGBA volume into a 2D RGBA image by alpha-compositing
+    from bottom (t=0) to top (t=Nt-1).
+    """
+    # Convert to float [0, 1] for math
+    rgba = rgba_volume.astype(np.float32) / 255.0
+    
+    # Pre-multiply alpha to simplify standard "Over" compositing
+    rgb = rgba[..., :3] * rgba[..., 3:4]
+    a = rgba[..., 3:4]
+    
+    Nx, Ny, Nt, _ = rgba.shape
+    out_rgb = np.zeros((Nx, Ny, 3), dtype=np.float32)
+    out_a = np.zeros((Nx, Ny, 1), dtype=np.float32)
+    
+    # Python loop over T is perfectly fine here because standard T is small (e.g. 5-50),
+    # while the heavy lifting on the 2D spatial grid is fully vectorized.
+    for t in range(Nt):
+        src_rgb = rgb[:, :, t, :]
+        src_a = a[:, :, t, :]
+        
+        # Standard Alpha Blending: Out = Src + Dst * (1 - Src_Alpha)
+        out_rgb = src_rgb + out_rgb * (1.0 - src_a)
+        out_a = src_a + out_a * (1.0 - src_a)
+        
+    # Un-premultiply alpha to get standard RGB back
+    mask = out_a > 0
+    final_rgb = np.zeros_like(out_rgb)
+    final_rgb[mask[..., 0]] = out_rgb[mask[..., 0]] / out_a[mask[..., 0]]
+    
+    final_rgba = np.concatenate([final_rgb, out_a], axis=-1)
+    return (final_rgba * 255).astype(np.uint8)
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# PhoOptimizedMultiEpochBatchRenderer - main class                                                                                                                                                                                                                                     #
+# ==================================================================================================================================================================================================================================================================================== #
+
 @metadata_attributes(short_name=None, tags=['OLD', '2D_timeseries', '2D_posteriors', 'frames', 'UNFINISHED', 'KINDA-WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-19 00:00', related_items=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side'])
 @define(slots=False, eq=False)
 class PhoOptimizedMultiEpochBatchRenderer:
@@ -394,6 +499,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
         # posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_Plus)
         posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_SourceOver)
         posterior_img_cmap = kwargs.pop('posterior_img_cmap', pg.colormap.get('viridis','matplotlib'))
+        use_advanced_3D_cmap: bool = kwargs.pop('use_advanced_3D_cmap', True)
 
         # QtGui.QPainter.CompositionMode_SourceOver   # default alpha blending
         # QtGui.QPainter.CompositionMode_Plus         # additive (great for heatmaps)
@@ -438,8 +544,19 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
             image_bounds_extent = np.squeeze(maze_bounds_t_arr[epoch_idx, :]) ## single bounds
 
-            ## need to collapse it over all epoch time bins:
-            img = np.nansum(img, axis=-1) / float(epoch_n_t_bins) ## (n_x_bins, n_y_bins)
+            if not use_advanced_3D_cmap:
+                ## need to collapse it over all epoch time bins:
+                img = np.nansum(img, axis=-1) / float(epoch_n_t_bins) ## (n_x_bins, n_y_bins)
+            else:
+                # 1. Create the specialized 3D LUT
+                lut_3d = create_3d_lut(n_t_bins=epoch_n_t_bins, cmap_name='magma')                
+                # 2. Apply color mapping instantly using indexing
+                # print("Applying advanced color mapping...")
+                rgba_volume = apply_3d_colormap(img, lut_3d)
+                # 3. Composite into a single flat image
+                # print("Compositing stack...")
+                img = composite_stack(rgba_volume)
+
 
             if not have_existing_img_items:
                 ## create the new img_item:
@@ -449,9 +566,12 @@ class PhoOptimizedMultiEpochBatchRenderer:
                 if posterior_img_composition_mode is not None:
                     img_item.setCompositionMode(posterior_img_composition_mode)
 
-                if posterior_img_cmap is not None:
-                    # Set the color map:
-                    img_item.setColorMap(posterior_img_cmap)
+                if use_advanced_3D_cmap:
+                    pass
+                else:
+                    if posterior_img_cmap is not None:
+                        # Set the color map:
+                        img_item.setColorMap(posterior_img_cmap)
 
             else:
                 img_item = extant_posterior_image_items[epoch_idx]
