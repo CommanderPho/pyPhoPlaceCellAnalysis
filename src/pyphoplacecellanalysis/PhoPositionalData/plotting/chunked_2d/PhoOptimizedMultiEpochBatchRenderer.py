@@ -113,20 +113,32 @@ class PhoOptimizedMultiEpochBatchRenderer:
     
     USAGE:
     
+        from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
         from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PhoOptimizedMultiEpochBatchRenderer import PhoOptimizedMultiEpochBatchRenderer
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 
-        track_name: str = 'SingleArtistMultiEpochBatchTrack'
-        spike_raster_plt_2d: Spike2DRaster = spike_raster_window.spike_raster_plt_2d
-        track_ts_widget, track_fig, track_ax_list = spike_raster_plt_2d.add_new_matplotlib_render_plot_widget(name=track_name)
-        track_ax = track_ax_list[0]
-        desired_epoch_start_idx: int = 0
-        # desired_epoch_end_idx: int = int(round(1/frame_divide_bin_size)) * 60 * 8 # 8 minutes
-        desired_epoch_end_idx: Optional[int] = None
-
         ## INPUTS: frame_divide_bin_size, frame_divided_epochs_result, decoder, pos_df (or use init_from_results2D)
-        batch_plot_helper: PhoOptimizedMultiEpochBatchRenderer = PhoOptimizedMultiEpochBatchRenderer(frame_divided_epochs_result=results2D.frame_divided_epochs_results[key], decoder=results2D.decoders[key], pos_df=results2D.pos_df, active_ax=track_ax, frame_divide_bin_size=frame_divide_bin_size, desired_epoch_start_idx=desired_epoch_start_idx, desired_epoch_end_idx=desired_epoch_end_idx)
-        plots_data = batch_plot_helper.add_all_track_plots(global_session=global_session)
+
+        track_name: str = 'CustomBatch2Dto1DTimeline'
+        spike_raster_plt_2d: Spike2DRaster = spike_raster_window.spike_raster_plt_2d
+        a_time_sync_pyqtgraph_widget, track_root_graphics_layout_widget, track_plot_item, dDisplayItem = spike_raster_plt_2d.add_new_embedded_pyqtgraph_render_plot_widget(name=track_name, dockSize=(500,50), sync_mode=SynchronizedPlotMode.TO_WINDOW)
+
+        an_epoch_name: str = 'roam'
+        a_decoder = masked_container.pf1D_Decoder_dict[an_epoch_name]
+        a_result = masked_container.epochs_decoded_result_cache_dict[0.025][an_epoch_name]
+
+        subdivide_bin_size: float = 5.0  # seconds
+        split_column_name: str = 'global_frame_division_idx'
+        pos_df, subdivided_epochs_df, maze_bounds_t, pos_tspace_df, (xt, yt) = PhoOptimizedMultiEpochBatchRenderer.build_transforms_for_frames(a_decoder=a_decoder, pos_df=pos_df, subdivide_bin_size=subdivide_bin_size, split_column_name=split_column_name)
+        # subdivided_epochs_df
+        # pos_tspace_df
+
+        ## INPUTS: pos_df, subdivided_epochs_df, maze_bounds_t, (xt, yt)
+        _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_all(subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
+                                                                    pos_tspace_df=pos_tspace_df,# xt=xt, yt=yt,
+                                                                    a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
+                                                                    track_plot_item=track_plot_item,
+                                                                )
 
 
 
@@ -245,6 +257,22 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         subdivide_bin_size: float = 5.0  # seconds
 
+        Usage:
+
+            from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
+            from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PhoOptimizedMultiEpochBatchRenderer import PhoOptimizedMultiEpochBatchRenderer
+
+            an_epoch_name: str = 'roam'
+            a_decoder = masked_container.pf1D_Decoder_dict[an_epoch_name]
+            a_result = masked_container.epochs_decoded_result_cache_dict[0.025][an_epoch_name]
+
+            subdivide_bin_size: float = 5.0  # seconds
+            split_column_name: str = 'global_frame_division_idx'
+            pos_df, subdivided_epochs_df, maze_bounds_t, pos_tspace_df, (xt, yt) = PhoOptimizedMultiEpochBatchRenderer.build_transforms_for_frames(a_decoder=a_decoder, pos_df=pos_df, subdivide_bin_size=subdivide_bin_size, split_column_name=split_column_name)
+            subdivided_epochs_df
+            pos_tspace_df
+
+
         """
         pos_df, subdivided_time_windows, subdivided_epochs_df = pos_df.time_point_event.adding_fixed_length_chunk_columns(subdivide_bin_size=subdivide_bin_size,
                                                                             split_column_name=split_column_name, interval_start_t_col_name='frame_division_epoch_start_t', interval_stop_t_col_name='frame_division_epoch_stop_t',
@@ -319,18 +347,33 @@ class PhoOptimizedMultiEpochBatchRenderer:
         # ==================================================================================================================================================================================================================================================================================== #
         # insert NaNs between rows                                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
-        xt = pos_df['xt'].to_numpy()
-        yt = pos_df['yt'].to_numpy()
+        ## insert NaN rows into pos_df at split indices (same positions as xt/yt for consistent length):
+        pos_space_col_names: List[str] = ['t', 'x', 'y', 'xt', 'yt', split_column_name, 'frame_division_epoch_start_t', 'frame_division_epoch_stop_t']
+        # pos_tspace_df = pos_df[pos_space_col_names].values
+        vals = pos_df[pos_space_col_names].values
+        # Insert the NaNs into the underlying array
+        # (Note: axis=0 for rows)
+        inserted_vals = np.insert(vals.astype(float), global_frame_split_row_indicies, np.nan, axis=0) ## converts all to float
+        # Reconstruct the DataFrame
+        pos_tspace_df: pd.DataFrame = pd.DataFrame(inserted_vals, columns=pos_space_col_names)
+        xt = pos_tspace_df['xt'].to_numpy()
+        yt = pos_tspace_df['yt'].to_numpy()
 
-        ## insert the np.nan values to split the lines at each frame index split row:
-        xt = np.insert(xt, global_frame_split_row_indicies, np.nan)
-        yt = np.insert(yt, global_frame_split_row_indicies, np.nan)
+        # xt = pos_df['xt'].to_numpy()
+        # yt = pos_df['yt'].to_numpy()
 
+        # ## insert the np.nan values to split the lines at each frame index split row:
+        # xt = np.insert(xt, global_frame_split_row_indicies, np.nan)
+        # yt = np.insert(yt, global_frame_split_row_indicies, np.nan)     
+
+        
         ## OUTPUTS: subdivided_epochs_df, maze_bounds_t, x, y
-        return pos_df, subdivided_epochs_df, maze_bounds_t, (xt, yt)
+        return pos_df, subdivided_epochs_df, maze_bounds_t, pos_tspace_df, (xt, yt)
 
+
+    @function_attributes(short_name=None, tags=['helper', 'pyqtgraph', 'display', 'renderer', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-01 07:13', related_items=[])
     @classmethod
-    def plot_decoded_posteriors_for_frames(cls, a_decoder, a_decoded_subdivided_epochs_result, pos_df, subdivided_epochs_df, maze_bounds_t, 
+    def plot_decoded_posteriors_for_frames(cls, a_decoded_subdivided_epochs_result, subdivided_epochs_df, maze_bounds_t, 
             track_plot_item: Optional[pg.PlotItem]=None, extant_posterior_image_items=None, **kwargs,
         ):
         """ 
@@ -338,15 +381,24 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         Usage:
 
-            _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_decoded_posteriors_for_frames(a_decoder=a_decoder, a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result, pos_df=pos_df,
+            _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
                                                                         subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
                                                                         pos_tspace_df=pos_tspace_df, #xt=xt, yt=yt,
-                                                                        track_plot_item=track_plot_item,
+                                                                        extant_posterior_image_items=_out_dict.get('extant_posterior_image_items', None), track_plot_item=track_plot_item,
                                                                     )
 
         """
         drop_below_threshold = kwargs.pop('drop_below_threshold', 0.0025)
         shared_axis_order = 'col-major'
+        posterior_img_opacity: float = kwargs.pop('posterior_img_opacity', 0.8)
+        posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_Plus)
+        # QtGui.QPainter.CompositionMode_SourceOver   # default alpha blending
+        # QtGui.QPainter.CompositionMode_Plus         # additive (great for heatmaps)
+        # QtGui.QPainter.CompositionMode_Multiply     # darkens overlap
+        # QtGui.QPainter.CompositionMode_Screen       # lightens overlap
+        # QtGui.QPainter.CompositionMode_Overlay      # contrast-based blend
+
+
         have_existing_img_items: bool = False
         
         # from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import pyqtplot_build_image_bounds_extent, pyqtplot_common_setup
@@ -374,11 +426,6 @@ class PhoOptimizedMultiEpochBatchRenderer:
         maze_bounds_t_arr[:, 0] = rect_xt_positions
         # maze_bounds_t_arr[:, 1] = maze_bounds_t_arr[:, 0] + maze_bounds_t_arr[:, 2]
 
-        # custom_image_extent = [self.desired_start_time_seconds, self.desired_end_time_seconds, 0.0, 1.0] ## n
-        # (desired_epoch_start_idx, desired_epoch_end_idx), (desired_start_time_seconds, desired_end_time_seconds)
-
-
-
         for epoch_idx in np.arange(num_decoded_epochs):
             epoch_n_t_bins: int = a_decoded_subdivided_epochs_result.nbins[epoch_idx]
             img = a_decoded_subdivided_epochs_result.p_x_given_n_list[epoch_idx] # (n_x_bins, n_y_bins, epoch_n_t_bins)
@@ -394,10 +441,15 @@ class PhoOptimizedMultiEpochBatchRenderer:
             if not have_existing_img_items:
                 ## create the new img_item:
                 img_item = pg.ImageItem(img)
+                if posterior_img_opacity is not None:
+                    img_item.setOpacity(posterior_img_opacity)  # Set transparency for overlay
+                if posterior_img_composition_mode is not None:
+                    img_item.setCompositionMode(posterior_img_composition_mode)
             else:
                 img_item = extant_posterior_image_items[epoch_idx]
 
             img_item.setImage(img, rect=image_bounds_extent, autoLevels=False, axisOrder=shared_axis_order) # rect: [x, y, w, h] # , axisOrder='row-major'
+            # img_item.setZValue(1000)
 
             if not have_existing_img_items:
                 track_plot_item.addItem(img_item, defaultPadding=0.0)
@@ -407,6 +459,167 @@ class PhoOptimizedMultiEpochBatchRenderer:
         _out_dict['posterior_image_items'] = extant_posterior_image_items
         return _out_dict
 
+
+    # def pyqtplot_plot_image_array(xbin_edges, ybin_edges, images, occupancy, max_num_columns = 5, drop_below_threshold: float=0.0000001, app=None, parent_root_widget=None, root_render_widget=None, debug_print=False):
+    #     """ Plots an array of images provided in 'images' argument
+    #     images should be an nd.array with dimensions like: (10, 63, 63), where (N_Images, X_Dim, Y_Dim)
+    #         or (2, 5, 63, 63), where (N_Rows, N_Cols, X_Dim, Y_Dim)
+            
+    #     NOTES:
+    #         2022-09-29 - Extracted from Notebook
+    #             🚧 Needs subplot labels changed from Cell[i] to the appropriate standardized titles. Needs other minor refinements.
+    #             🚧 pyqtplot_plot_image_array needs major improvements to achieve feature pairity with display_all_pf_2D_pyqtgraph_binned_image_rendering, so probably just use display_all_pf_2D_pyqtgraph_binned_image_rendering.
+            
+    #     Example:
+    #         # Get flat list of images:
+    #         images = active_one_step_decoder.ratemap.normalized_tuning_curves # (43, 63, 63)
+    #         # images = active_one_step_decoder.ratemap.normalized_tuning_curves[0:40,:,:] # (43, 63, 63)
+    #         occupancy = active_one_step_decoder.ratemap.occupancy
+
+    #         app, win, plot_array, img_item_array, other_components_array = pyqtplot_plot_image_array(active_one_step_decoder.xbin, active_one_step_decoder.ybin, images, occupancy)
+    #         win.show()
+            
+            
+    #     # 🚧 TODO: COMPATIBILITY: replace compute_paginated_grid_config with standardized `_determine_best_placefield_2D_layout` block (see below):
+    #     ```
+    #     from neuropy.utils.matplotlib_helpers import _build_variable_max_value_label, enumTuningMap2DPlotMode, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout
+    #     nfigures, num_pages, included_combined_indicies_pages, page_grid_sizes, data_aspect_ratio, page_figure_sizes = _determine_best_placefield_2D_layout(xbin=active_pf_2D.xbin, ybin=active_pf_2D.ybin, included_unit_indicies=np.arange(active_pf_2D.ratemap.n_neurons),
+    #         **overriding_dict_with(lhs_dict={'subplots': (40, 3), 'fig_column_width': 8.0, 'fig_row_height': 1.0, 'resolution_multiplier': 1.0, 'max_screen_figure_size': (None, None), 'last_figure_subplots_same_layout': True, 'debug_print': True}, **figure_format_config)) 
+
+    #     print(f'nfigures: {nfigures}\ndata_aspect_ratio: {data_aspect_ratio}')
+    #     # Loop through each page/figure that's required:
+    #     for page_fig_ind, page_fig_size, page_grid_size in zip(np.arange(nfigures), page_figure_sizes, page_grid_sizes):
+    #         print(f'\tpage_fig_ind: {page_fig_ind}, page_fig_size: {page_fig_size}, page_grid_size: {page_grid_size}')
+    #         # print(f'\tincluded_combined_indicies_pages: {included_combined_indicies_pages}\npage_grid_sizes: {page_grid_sizes}\npage_figure_sizes: {page_figure_sizes}')
+    #     ```
+            
+            
+            
+    #     """
+    #     root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'pyqtplot_plot_image_array: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
+        
+    #     pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
+        
+    #     # cmap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 6), color=colors)
+    #     cmap = pg.colormap.get('jet','matplotlib') # prepare a linear color map
+
+    #     image_bounds_extent, x_range, y_range = pyqtplot_build_image_bounds_extent(xbin_edges, ybin_edges, margin=2.0, debug_print=debug_print)
+    #     # image_aspect_ratio, image_width_height_tuple = compute_data_aspect_ratio(x_range, y_range)
+    #     # print(f'image_aspect_ratio: {image_aspect_ratio} - xScale/yScale: {float(image_width_height_tuple.width) / float(image_width_height_tuple.height)}')
+        
+    #     # Compute Images:
+    #     included_unit_indicies = np.arange(np.shape(images)[0]) # include all unless otherwise specified
+    #     nMapsToShow = len(included_unit_indicies)
+
+    #     # Paging Management: Constrain the subplots values to just those that you need
+    #     subplot_no_pagination_configuration, included_combined_indicies_pages, page_grid_sizes = compute_paginated_grid_config(nMapsToShow, max_num_columns=max_num_columns, max_subplots_per_page=None, data_indicies=included_unit_indicies, last_figure_subplots_same_layout=True)
+    #     page_idx = 0 # page_idx is zero here because we only have one page:
+        
+    #     img_item_array = []
+    #     other_components_array = []
+    #     plot_array = []
+
+    #     for (a_linear_index, curr_row, curr_col, curr_included_unit_index) in included_combined_indicies_pages[page_idx]:
+    #         # Need to convert to page specific:
+    #         curr_page_relative_linear_index = np.mod(a_linear_index, int(page_grid_sizes[page_idx].num_rows * page_grid_sizes[page_idx].num_columns))
+    #         curr_page_relative_row = np.mod(curr_row, page_grid_sizes[page_idx].num_rows)
+    #         curr_page_relative_col = np.mod(curr_col, page_grid_sizes[page_idx].num_columns)
+    #         is_first_column = (curr_page_relative_col == 0)
+    #         is_first_row = (curr_page_relative_row == 0)
+    #         is_last_column = (curr_page_relative_col == (page_grid_sizes[page_idx].num_columns-1))
+    #         is_last_row = (curr_page_relative_row == (page_grid_sizes[page_idx].num_rows-1))
+    #         if debug_print:
+    #             print(f'a_linear_index: {a_linear_index}, curr_page_relative_linear_index: {curr_page_relative_linear_index}, curr_row: {curr_row}, curr_col: {curr_col}, curr_page_relative_row: {curr_page_relative_row}, curr_page_relative_col: {curr_page_relative_col}, curr_included_unit_index: {curr_included_unit_index}')
+
+    #         neuron_IDX = curr_included_unit_index
+    #         curr_cell_identifier_string = f'Cell[{neuron_IDX}]'
+    #         curr_plot_identifier_string = f'pyqtplot_plot_image_array.{curr_cell_identifier_string}'
+
+    #         # # Pre-filter the data:
+    #         image = _scale_current_placefield_to_acceptable_range(np.squeeze(images[a_linear_index,:,:]), occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+
+    #         # Build the image item:
+    #         img_item = pg.ImageItem(image=image, levels=(0,1))
+    #         #     # Viewbox version:
+    #         #     # vb = layout.addViewBox(lockAspect=False)
+    #         #     # # Build the ImageItem (which I'm guessing is like pg.ImageView) to add the image
+    #         #     # imv = pg.ImageItem() # Create it with the current image
+    #         #     # vb.addItem(imv) # add the item to the view box: why do we need the wrapping view box?
+    #         #     # vb.autoRange()
+            
+    #         # # plot mode:
+    #         curr_plot = root_render_widget.addPlot(row=curr_row, col=curr_col, title=curr_cell_identifier_string) # , name=curr_plot_identifier_string 
+    #         curr_plot.setObjectName(curr_plot_identifier_string)
+    #         curr_plot.showAxes(False)
+    #         if is_last_row:
+    #             curr_plot.showAxes('x', True)
+    #             curr_plot.showAxis('bottom', show=True)
+    #         else:
+    #             curr_plot.showAxes('x', False)
+    #             curr_plot.showAxis('bottom', show=False)
+                
+    #         if is_first_column:
+    #             curr_plot.showAxes('y', True)
+    #             curr_plot.showAxis('left', show=True)
+    #         else:
+    #             curr_plot.showAxes('y', False)
+    #             curr_plot.showAxis('left', show=False)
+            
+    #         curr_plot.hideButtons() # Hides the auto-scale button
+            
+    #         curr_plot.addItem(img_item, defaultPadding=0.0)  # add ImageItem to PlotItem
+    #         # curr_plot.setAspectLocked(lock=True, ratio=image_aspect_ratio)
+    #         # curr_plot.showAxes(True)
+    #         # curr_plot.showGrid(True, True, 0.7)
+    #         # curr_plot.setLabel('bottom', "Label to test offset")
+            
+    #         # # Overlay cell identifier text:
+    #         # curr_label = pg.TextItem(f'Cell[{neuron_IDX}]', color=(230, 230, 230))
+    #         # curr_label.setPos(30, 60)
+    #         # curr_label.setParentItem(img_item)
+    #         # # curr_plot.addItem(curr_label, ignoreBounds=True)
+    #         # curr_plot.addItem(curr_label)
+
+    #         # Update the image:
+    #         img_item.setImage(image, rect=image_bounds_extent, autoLevels=False) # rect: [x, y, w, h]
+    #         img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+
+    #         # curr_plot.set
+    #         # margin = 2.0
+    #         # curr_plot.setXRange(global_min_x-margin, global_max_x+margin)
+    #         # curr_plot.setYRange(global_min_y-margin, global_max_y+margin)
+    #         # curr_plot.setXRange(*x_range)
+    #         # curr_plot.setYRange(*y_range)
+    #         curr_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+    #         # Sets only the panning limits:
+    #         curr_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
+    #         # Link Axes to previous item:
+    #         if a_linear_index > 0:
+    #             prev_plot_item = plot_array[a_linear_index-1]
+    #             curr_plot.setXLink(prev_plot_item)
+    #             curr_plot.setYLink(prev_plot_item)
+                
+                
+    #         # Interactive Color Bar:
+    #         bar = pg.ColorBarItem(values= (0, 1), colorMap=cmap, width=5, interactive=False) # prepare interactive color bar
+    #         # Have ColorBarItem control colors of img and appear in 'plot':
+    #         bar.setImageItem(img_item, insert_in=curr_plot)
+
+    #         img_item_array.append(img_item)
+    #         plot_array.append(curr_plot)
+    #         other_components_array.append({'color_bar':bar}) # note this is a list of Dicts, one for every image
+            
+    #     # Post images loop:
+    #     enable_show = False
+        
+    #     if parent_root_widget is not None:
+    #         if enable_show:
+    #             parent_root_widget.show()
+            
+    #         parent_root_widget.setWindowTitle('pyqtplot image array')
+
+    #     # pg.exec()
+    #     return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array
 
 
 
@@ -475,8 +688,9 @@ class PhoOptimizedMultiEpochBatchRenderer:
         return animal_position_segments_item, animal_position_segments_path
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'figure', 'plot', 'render', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['cls.plot_all_track_shapes', 'cls.plot_decoded_posteriors_for_frames', 'cls.plot_all_animal_position_segments'], used_by=[], creation_date='2026-03-01 07:14', related_items=[])
     @classmethod
-    def plot_all(cls, subdivided_epochs_df, maze_bounds_t, xt, yt, track_plot_item: Optional[pg.PlotItem]=None):
+    def plot_all(cls, subdivided_epochs_df, maze_bounds_t, pos_tspace_df: pd.DataFrame, a_decoded_subdivided_epochs_result=None, track_plot_item: Optional[pg.PlotItem]=None, **kwargs):
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
         from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
@@ -500,16 +714,33 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         ## INPUTS: pos_df, subdivided_epochs_df, maze_bounds_t, (xt, yt)
         _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_all(subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
-                                                                    xt=xt, yt=yt, track_plot_item=track_plot_item,
+                                                                    pos_tspace_df=pos_tspace_df,# xt=xt, yt=yt, 
+                                                                    a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result, track_plot_item=track_plot_item,
                                                                 )
 
 
         """
+        _out_dict = {}
+        # pos_tspace_df: pd.DataFrame = pd.DataFrame(inserted_vals, columns=pos_space_col_names)
+        xt = pos_tspace_df['xt'].to_numpy()
+        yt = pos_tspace_df['yt'].to_numpy()
+
         ## INPUTS: track_plot_item
         track_shape_rects_item, maze_boundaries_path = cls.plot_all_track_shapes(subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t, track_plot_item=track_plot_item)
+        _out_dict.update(track_shape_rects_item=track_shape_rects_item, maze_boundaries_path=maze_boundaries_path)
+
+        if a_decoded_subdivided_epochs_result is not None:
+            extant_posterior_image_items = kwargs.pop('extant_posterior_image_items', None)
+            plotted_posterior_items_dict = cls.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
+                                                                        subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
+                                                                        extant_posterior_image_items=extant_posterior_image_items, track_plot_item=track_plot_item,
+                                                                    )
+            if plotted_posterior_items_dict is not None:
+                _out_dict['plotted_posterior_items_dict'] = plotted_posterior_items_dict
+
+
         animal_position_segments_item, animal_position_segments_path = cls.plot_all_animal_position_segments(xt=xt, yt=yt, track_plot_item=track_plot_item)
-        _out_dict = dict(track_shape_rects_item=track_shape_rects_item, maze_boundaries_path=maze_boundaries_path,
-                    animal_position_segments_item=animal_position_segments_item, animal_position_segments_path=animal_position_segments_path)
+        _out_dict.update(animal_position_segments_item=animal_position_segments_item, animal_position_segments_path=animal_position_segments_path)
         return _out_dict
 
     # ==================================================================================================================== #
