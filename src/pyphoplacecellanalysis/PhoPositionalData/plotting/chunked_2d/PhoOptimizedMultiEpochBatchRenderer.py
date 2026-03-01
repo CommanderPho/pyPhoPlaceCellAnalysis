@@ -88,7 +88,7 @@ logger = logging.getLogger(__name__)
 # 3D CMap Generation Helpers Temp                                                                                                                                                                                                                                                      #
 # ==================================================================================================================================================================================================================================================================================== #
 
-def create_3d_lut(n_t_bins, v_bins=256, cmap_name='viridis'):
+def create_3d_lut_saturation(n_t_bins, v_bins=256, cmap_name='viridis'):
     """
     Creates a 2D Lookup Table (LUT) mapping (v_idx, t_idx) -> RGBA.
     Saturation and Alpha decrease as t_idx increases.
@@ -130,6 +130,62 @@ def create_3d_lut(n_t_bins, v_bins=256, cmap_name='viridis'):
         
     return lut
 
+
+def create_3d_lut_cmaps_interp(n_t_bins, v_bins=256, cmap1_name='Reds', cmap2_name='Greens'):
+    """
+    Creates a 2D Lookup Table (LUT) mapping (v_idx, t_idx) -> RGBA.
+    Interpolates between two colormaps across t_idx.
+    Alpha smoothly decreases as t_idx increases for better 3D compositing.
+    """
+    # 1. Get base colormaps from PyQtGraph
+    # pg.colormap.get('viridis','matplotlib')
+    if isinstance(cmap1_name, str):
+        cmap1 = pg.colormap.get(cmap1_name,'matplotlib')
+    else:
+        cmap1 = cmap1_name ## assume direct cmap
+
+    if isinstance(cmap2_name, str):
+        cmap2 = pg.colormap.get(cmap2_name,'matplotlib')
+    else:
+        cmap2 = cmap2_name ## assume direct cmap
+
+    rgba1 = cmap1.getLookupTable(0.0, 1.0, v_bins, alpha=True) 
+    rgba2 = cmap2.getLookupTable(0.0, 1.0, v_bins, alpha=True)
+    
+    # Ensure they have 4 channels
+    if rgba1.shape[1] == 3:
+        rgba1 = np.column_stack([rgba1, np.full(v_bins, 255, dtype=rgba1.dtype)])
+    if rgba2.shape[1] == 3:
+        rgba2 = np.column_stack([rgba2, np.full(v_bins, 255, dtype=rgba2.dtype)])
+        
+    rgba1 = rgba1.astype(np.float32)
+    rgba2 = rgba2.astype(np.float32)
+    
+    # Initialize the 3D LUT: (v_bins, n_t_bins, 4 channels)
+    lut = np.zeros((v_bins, n_t_bins, 4), dtype=np.uint8)
+    
+    for t in range(n_t_bins):
+        # Scale factor: t=0 is 100% cmap1, t=max is 100% cmap2
+        t_normalized = t / max(1, n_t_bins - 1)
+        
+        # Linearly interpolate between the two colormaps
+        rgba_t = rgba1 * (1.0 - t_normalized) + rgba2 * t_normalized
+        
+        # Optional but recommended for stacking: scale alpha down as t increases
+        # so older time bins don't completely occlude newer ones
+        alpha_factor = 1.0 - 0.5 * t_normalized # Alpha down to 50%
+        rgba_t[:, 3] *= alpha_factor
+        
+        lut[:, t, :] = np.clip(rgba_t, 0, 255).astype(np.uint8)
+        
+        # CRITICAL: Mask out absolute zero values by forcing Alpha = 0 
+        # (Assuming v_idx=0 means 0 probability background)
+        lut[0, t, 3] = 0
+        
+    return lut
+
+
+
 def apply_3d_colormap(data_3d, lut):
     """
     Extremely efficient mapping of (X, Y, T) data -> (X, Y, T, 4) RGBA volume.
@@ -148,6 +204,7 @@ def apply_3d_colormap(data_3d, lut):
     rgba_volume = lut[v_idx, t_idx]
     
     return rgba_volume
+
 
 def composite_stack(rgba_volume):
     """
@@ -501,11 +558,30 @@ class PhoOptimizedMultiEpochBatchRenderer:
         posterior_img_cmap = kwargs.pop('posterior_img_cmap', pg.colormap.get('viridis','matplotlib'))
         use_advanced_3D_cmap: bool = kwargs.pop('use_advanced_3D_cmap', True)
 
+
+        global_max_v: float = np.nanmax([np.nanmax(v) for v in a_decoded_subdivided_epochs_result.p_x_given_n_list]) ## across all possible time bins
+        print(f'global_max_v: {global_max_v}')
+
         # QtGui.QPainter.CompositionMode_SourceOver   # default alpha blending
         # QtGui.QPainter.CompositionMode_Plus         # additive (great for heatmaps)
         # QtGui.QPainter.CompositionMode_Multiply     # darkens overlap
         # QtGui.QPainter.CompositionMode_Screen       # lightens overlap
         # QtGui.QPainter.CompositionMode_Overlay      # contrast-based blend
+        if use_advanced_3D_cmap:
+            # --- Define Custom Alpha-Only Colormaps ---
+            # Positions range from 0.0 to 1.0 (representing the v_idx mapping)
+            pos = np.array([0.0, 1.0])
+            # pos = np.array([0.5, global_max_v])
+            # min_cmap_occupancy: int = 0
+            min_cmap_occupancy: int = 100
+            max_cmap_occupancy: int = 255
+            # Custom "Alpha Red": R=255, G=0, B=0, Alpha mapping from 0 to 255
+            colors_red = np.array([[255, 0, 0, min_cmap_occupancy], [255, 0, 0, max_cmap_occupancy]], dtype=np.ubyte)
+            custom_cmap1 = pg.ColorMap(pos, colors_red)
+            
+            # Custom "Alpha Green": R=0, G=255, B=0, Alpha mapping from 0 to 255
+            colors_green = np.array([[0, 255, 0, min_cmap_occupancy], [0, 255, 0, max_cmap_occupancy]], dtype=np.ubyte)
+            custom_cmap2 = pg.ColorMap(pos, colors_green)
 
 
         have_existing_img_items: bool = False
@@ -549,7 +625,11 @@ class PhoOptimizedMultiEpochBatchRenderer:
                 img = np.nansum(img, axis=-1) / float(epoch_n_t_bins) ## (n_x_bins, n_y_bins)
             else:
                 # 1. Create the specialized 3D LUT
-                lut_3d = create_3d_lut(n_t_bins=epoch_n_t_bins, cmap_name='magma')                
+                # lut_3d = create_3d_lut_saturation(n_t_bins=epoch_n_t_bins, cmap_name='magma')
+                lut_3d = create_3d_lut_cmaps_interp(n_t_bins=epoch_n_t_bins,
+                                cmap1_name=custom_cmap1, cmap2_name=custom_cmap2,
+                            )
+
                 # 2. Apply color mapping instantly using indexing
                 # print("Applying advanced color mapping...")
                 rgba_volume = apply_3d_colormap(img, lut_3d)
