@@ -877,12 +877,12 @@ class PhoOptimizedMultiEpochBatchRenderer:
         return track_shape_rects_item, maze_boundaries_path
 
 
-    @function_attributes(short_name=None, tags=['helper', 'renderer', 'maze'], input_requires=[], output_provides=[], uses=[], used_by=['cls.plot_all'], creation_date='2026-02-29 00:01', related_items=[])
+    @function_attributes(short_name=None, tags=['helper', 'renderer', 'maze'], input_requires=[], output_provides=[], uses=[], used_by=['cls.plot_all'], creation_date='2026-02-29 00:01', related_items=['plot_all_animal_position_gradient_segments'])
     @classmethod
     def plot_all_animal_position_segments(cls, xt, yt, track_plot_item: Optional[pg.PlotItem]=None):
         """ Plots the animal positions for each frame
 
-            animal_position_segments_item, animal_position_segments_path = plot_all_animal_position_segments(x=x, y=y, track_plot_item=track_plot_item)
+            animal_position_segments_item, animal_position_segments_path = PhoOptimizedMultiEpochBatchRenderer.plot_all_animal_position_segments(x=x, y=y, track_plot_item=track_plot_item)
 
         """
         ## INPUTS: track_plot_item
