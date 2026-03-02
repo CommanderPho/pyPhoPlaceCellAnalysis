@@ -32,7 +32,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_m
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
-from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import PosteriorColormapEditorWidget
+from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import PosteriorColormapEditorWidget, PosteriorColormap2DEditorWidget
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -411,7 +411,8 @@ class PhoOptimizedMultiEpochBatchRenderer:
         posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_SourceOver)
         posterior_img_cmap = kwargs.pop('posterior_img_cmap', pg.colormap.get('viridis','matplotlib'))
         use_advanced_3D_cmap: bool = kwargs.pop('use_advanced_3D_cmap', True)
-
+        custom_cmap1 = kwargs.pop('custom_cmap1', None)
+        custom_cmap2 = kwargs.pop('custom_cmap2', None)
 
         global_max_v: float = np.nanmax([np.nanmax(v) for v in a_decoded_subdivided_epochs_result.p_x_given_n_list]) ## across all possible time bins
         print(f'global_max_v: {global_max_v}')
@@ -422,20 +423,20 @@ class PhoOptimizedMultiEpochBatchRenderer:
         # QtGui.QPainter.CompositionMode_Screen       # lightens overlap
         # QtGui.QPainter.CompositionMode_Overlay      # contrast-based blend
         if use_advanced_3D_cmap:
-            # --- Define Custom Alpha-Only Colormaps ---
-            # Positions range from 0.0 to 1.0 (representing the v_idx mapping)
-            pos = np.array([0.0, 1.0])
-            # pos = np.array([0.5, global_max_v])
-            # min_cmap_occupancy: int = 0
-            min_cmap_occupancy: int = 100
-            max_cmap_occupancy: int = 255
-            # Custom "Alpha Red": R=255, G=0, B=0, Alpha mapping from 0 to 255
-            colors_red = np.array([[255, 0, 0, min_cmap_occupancy], [255, 0, 0, max_cmap_occupancy]], dtype=np.ubyte)
-            custom_cmap1 = pg.ColorMap(pos, colors_red)
-            
-            # Custom "Alpha Green": R=0, G=255, B=0, Alpha mapping from 0 to 255
-            colors_green = np.array([[0, 255, 0, min_cmap_occupancy], [0, 255, 0, max_cmap_occupancy]], dtype=np.ubyte)
-            custom_cmap2 = pg.ColorMap(pos, colors_green)
+            if custom_cmap1 is None or custom_cmap2 is None:
+                # --- Define Custom Alpha-Only Colormaps ---
+                # Positions range from 0.0 to 1.0 (representing the v_idx mapping)
+                pos = np.array([0.0, 1.0])
+                # pos = np.array([0.5, global_max_v])
+                # min_cmap_occupancy: int = 0
+                min_cmap_occupancy: int = 100
+                max_cmap_occupancy: int = 255
+                # Custom "Alpha Red": R=255, G=0, B=0, Alpha mapping from 0 to 255
+                colors_red = np.array([[255, 0, 0, min_cmap_occupancy], [255, 0, 0, max_cmap_occupancy]], dtype=np.ubyte)
+                custom_cmap1 = pg.ColorMap(pos, colors_red)
+                # Custom "Alpha Green": R=0, G=255, B=0, Alpha mapping from 0 to 255
+                colors_green = np.array([[0, 255, 0, min_cmap_occupancy], [0, 255, 0, max_cmap_occupancy]], dtype=np.ubyte)
+                custom_cmap2 = pg.ColorMap(pos, colors_green)
 
 
         have_existing_img_items: bool = False
@@ -893,16 +894,30 @@ class PhoOptimizedMultiEpochBatchRenderer:
             create_colormap_editor = kwargs.pop('create_colormap_editor', True)
             posterior_colormap_initial_cmap = kwargs.pop('posterior_colormap_initial_cmap', None)
             colormap_editor_container = kwargs.pop('colormap_editor_container', None)
+            use_advanced_3D_cmap = kwargs.pop('use_advanced_3D_cmap', True)
             plotted_posterior_items_dict = cls.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
                                                                         subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
                                                                         extant_posterior_image_items=extant_posterior_image_items, track_plot_item=track_plot_item,
+                                                                        use_advanced_3D_cmap=use_advanced_3D_cmap,
                                                                     )
             if plotted_posterior_items_dict is not None:
                 _out_dict['plotted_posterior_items_dict'] = plotted_posterior_items_dict
                 posterior_image_items = plotted_posterior_items_dict.get('posterior_image_items')
                 if create_colormap_editor and posterior_image_items:
-                    editor = PosteriorColormapEditorWidget(image_items=posterior_image_items, initial_cmap=posterior_colormap_initial_cmap)
-                    _out_dict['posterior_colormap_editor'] = editor
+                    if use_advanced_3D_cmap:
+                        editor = PosteriorColormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
+                        _out_dict['posterior_colormap_editor'] = editor
+
+                        def _reapply_advanced_colormap():
+                            cls.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
+                                    subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
+                                    extant_posterior_image_items=posterior_image_items, track_plot_item=track_plot_item,
+                                    use_advanced_3D_cmap=True, custom_cmap1=editor.getCmap1(), custom_cmap2=editor.getCmap2())
+
+                        editor.sigAdvancedColormapChanged.connect(_reapply_advanced_colormap)
+                    else:
+                        editor = PosteriorColormapEditorWidget(image_items=posterior_image_items, initial_cmap=posterior_colormap_initial_cmap)
+                        _out_dict['posterior_colormap_editor'] = editor
                     if colormap_editor_container is not None:
                         if isinstance(colormap_editor_container, QtWidgets.QLayout):
                             colormap_editor_container.addWidget(editor)

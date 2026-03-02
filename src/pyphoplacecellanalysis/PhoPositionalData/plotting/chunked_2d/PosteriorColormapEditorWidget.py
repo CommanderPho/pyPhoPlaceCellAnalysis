@@ -13,6 +13,9 @@ import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
 from pyphoplacecellanalysis.External.pyqtgraph.graphicsItems.GradientEditorItem import GradientEditorItem
 
+from pyphocorehelpers.gui.Qt.color_helpers import create_3d_lut_saturation, create_3d_lut_cmaps_interp, apply_3d_colormap, composite_stack
+
+
 # Default preset names (matplotlib source)
 DEFAULT_PRESET_NAMES = ('viridis', 'magma', 'plasma', 'inferno', 'jet', 'cividis', 'turbo')
 
@@ -300,7 +303,12 @@ class PosteriorColormap2DEditorWidget(QtWidgets.QWidget):
         if self._preview_lut_builder is None:
             return
         try:
-            lut = self._preview_lut_builder(self._n_t_bins_preview, self._cmap1, self._cmap2)
+            # Preferred path: builder with named cmap args (e.g. create_3d_lut_cmaps_interp)
+            try:
+                lut = self._preview_lut_builder(n_t_bins=self._n_t_bins_preview, cmap1_name=self._cmap1, cmap2_name=self._cmap2)
+            except TypeError:
+                # Fallback for simple signature: (n_t_bins, cmap1, cmap2)
+                lut = self._preview_lut_builder(self._n_t_bins_preview, self._cmap1, self._cmap2)
         except Exception:
             return
         if lut is None or lut.size == 0:
@@ -376,6 +384,60 @@ from silx.gui.dialog.ColormapDialog import ColormapDialog
 from silx.gui.colors import Colormap
 from silx.gui.plot.ColorBar import ColorBarWidget
 
+def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
+    """
+    captures: create_3d_lut_cmaps_interp
+
+    def _reapply_advanced_colormap():
+        cls.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
+                subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
+                extant_posterior_image_items=posterior_image_items, track_plot_item=track_plot_item,
+                use_advanced_3D_cmap=True, custom_cmap1=editor.getCmap1(), custom_cmap2=editor.getCmap2())
+
+    reapply_advanced_colormap_fn = _reapply_advanced_colormap
+    _out_dict = 
+
+    """
+    custom_cmap1 = kwargs.pop('custom_cmap1', None)
+    custom_cmap2 = kwargs.pop('custom_cmap2', None)
+    _out_dict = {}
+
+    if custom_cmap1 is None or custom_cmap2 is None:
+        # --- Define Custom Alpha-Only Colormaps ---
+        # Positions range from 0.0 to 1.0 (representing the v_idx mapping)
+        pos = np.array([0.0, 1.0])
+        # pos = np.array([0.5, global_max_v])
+        # min_cmap_occupancy: int = 0
+        min_cmap_occupancy: int = 100
+        max_cmap_occupancy: int = 255
+        # Custom "Alpha Red": R=255, G=0, B=0, Alpha mapping from 0 to 255
+        colors_red = np.array([[255, 0, 0, min_cmap_occupancy], [255, 0, 0, max_cmap_occupancy]], dtype=np.ubyte)
+        custom_cmap1 = pg.ColorMap(pos, colors_red)
+        # Custom "Alpha Green": R=0, G=255, B=0, Alpha mapping from 0 to 255
+        colors_green = np.array([[0, 255, 0, min_cmap_occupancy], [0, 255, 0, max_cmap_occupancy]], dtype=np.ubyte)
+        custom_cmap2 = pg.ColorMap(pos, colors_green)
+
+    _out_dict['custom_cmap1'] = custom_cmap1
+    _out_dict['custom_cmap2'] = custom_cmap2
+
+    ## have custom_cmap1, custom_cmap2:
+    editor = PosteriorColormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
+    _out_dict['posterior_colormap_editor'] = editor
+
+    if reapply_advanced_colormap_fn is None:
+        def on_reapply_advanced_colormap_fn():
+            print(f'reapply_advanced_colormap_fn():')
+
+        reapply_advanced_colormap_fn = on_reapply_advanced_colormap_fn
+
+    ## set callback:
+    editor.sigAdvancedColormapChanged.connect(reapply_advanced_colormap_fn)
+
+    return _out_dict
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Simple Silx Example                                                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
 class ColormapDialogExample(qt.QMainWindow):
     """PlotWidget with an ad hoc toolbar and a colorbar"""
 
@@ -601,6 +663,26 @@ class ColormapDialogExample(qt.QMainWindow):
             dialog.setData(self.data)
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# Examples:                                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+
+
+
+
+def example_pyqtgraph_colormap_widget_2D_main():
+    """
+
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import ColormapDialogExample, example_silx_colormap_widget_2D_main
+
+    """
+    app = qt.QApplication([])
+
+    # Create the ad hoc plot widget and change its default colormap
+    _out_dict = get_default_cmaps()
+    editor = _out_dict['posterior_colormap_editor']
+    editor.show()
+    app.exec()
 def example_silx_colormap_widget_2D_main():
     """
 
@@ -617,7 +699,8 @@ def example_silx_colormap_widget_2D_main():
 
 
 if __name__ == '__main__':
-    example_silx_colormap_widget_2D_main()
+    # example_silx_colormap_widget_2D_main() ## Silx
+    # example_pyqtgraph_colormap_widget_2D_main() ## PyQtGraph
 
 
 __all__ = ['PosteriorColormapEditorWidget', 'PosteriorColormap2DEditorWidget', 'DEFAULT_PRESET_NAMES',
