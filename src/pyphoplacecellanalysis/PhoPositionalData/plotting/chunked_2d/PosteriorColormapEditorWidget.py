@@ -520,6 +520,21 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
             gw.sigGradientChangeFinished.connect(functools.partial(self._on_gradient_finished, i))
         mainLayout.addWidget(cmap_panel)
         self.setCentralWidget(mainWidget)
+        self.colorEditor.sigAdvancedColormapChanged.connect(self._sync_1d_widgets_from_editor)
+
+
+    def _sync_1d_widgets_from_editor(self, cmap1, cmap2):
+        """Update the two 1D GradientWidgets and colormap_1D_list when the 2D editor dropdowns change."""
+        self.colormap_1D_list[0] = cmap1
+        self.colormap_1D_list[1] = cmap2
+        for gw in self.gradient_widgets:
+            gw.blockSignals(True)
+        try:
+            self.gradient_widgets[0].setColorMap(cmap1)
+            self.gradient_widgets[1].setColorMap(cmap2)
+        finally:
+            for gw in self.gradient_widgets:
+                gw.blockSignals(False)
 
 
     def _on_gradient_finished(self, index: int, _gradient_item=None):
