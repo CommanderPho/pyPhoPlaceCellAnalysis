@@ -1,10 +1,11 @@
+import sys
 from collections import OrderedDict
 
 import numpy as np
 
 from .. import functions as fn
 from .. import parametertree as ptree
-from ..Qt import QtCore
+from ..Qt import QtCore, QtWidgets
 
 __all__ = ['ColorMapWidget']
 
@@ -272,3 +273,22 @@ class EnumColorMapItem(ptree.types.GroupParameter):
         #colors[mask] = nanColor
         
         return colors
+
+
+
+if __name__ == '__main__':
+
+    app = QtWidgets.QApplication(sys.argv)
+
+    w = ColorMapWidget()
+    w.setFields([
+        ('x', {'mode': 'range', 'units': 'm', 'defaults': {'colormap': 'viridis'}}),
+        ('y', {'mode': 'range', 'units': 'm'}),
+        ('label', {'mode': 'enum', 'values': [0, 1, 2]}),
+    ])
+    w.addColorMap('x')
+    w.addColorMap('y')
+    w.setWindowTitle('ColorMapWidget Example')
+    w.show()
+
+    sys.exit(app.exec())
