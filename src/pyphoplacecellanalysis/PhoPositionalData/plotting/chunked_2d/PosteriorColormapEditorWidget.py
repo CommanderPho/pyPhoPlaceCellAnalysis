@@ -383,6 +383,47 @@ from silx.gui import qt
 from silx.gui.dialog.ColormapDialog import ColormapDialog
 from silx.gui.colors import Colormap
 from silx.gui.plot.ColorBar import ColorBarWidget
+from silx.gui.colors import Colormap as SilxColormap
+
+
+class _HashableLUTColormap(Colormap):
+    """Silx Colormap wrapper that returns LUT as list of tuples so ColormapNameComboBox's icon cache (tuple(colors)) is hashable."""
+
+    def getColormapLUT(self, copy=True):
+        lut = super().getColormapLUT(copy=copy)
+        if lut is None:
+            return None
+        lut = np.asarray(lut)
+        if lut.ndim == 1:
+            lut = lut.reshape(-1, 4)
+        return [tuple(int(x) for x in row) for row in lut]
+
+
+def _pg_colormap_to_silx_colormap(pg_cmap) -> Colormap:
+    """Convert pyqtgraph ColorMap to silx.gui.colors.Colormap for ColormapDialog.setColormap()."""
+    lut = pg_cmap.getLookupTable(start=0.0, stop=1.0, nPts=256, alpha=True, mode=pg_cmap.BYTE)
+    return _HashableLUTColormap(name=None, colors=lut)
+
+
+def pg_to_silx_colormap_dense(pg_colormap: pg.ColorMap,
+                              n_colors: int = 256,
+                              vmin: float = None,
+                              vmax: float = None) -> SilxColormap:
+    # Sample dense LUT from pg
+    lut = pg_colormap.getLookupTable(nPts=n_colors, mode='byte')
+
+    lut = np.asarray(lut, dtype=np.uint8)
+
+    silx_cmap = SilxColormap(
+        name=None,
+        colors=lut,
+        vmin=vmin,
+        vmax=vmax,
+        normalization='linear'
+    )
+
+    return silx_cmap
+
 
 def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     """
@@ -434,6 +475,80 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     editor.sigAdvancedColormapChanged.connect(reapply_advanced_colormap_fn)
 
     return _out_dict
+
+
+class EditableColormap2DEditorWidget(qt.QMainWindow):
+    """EditableColormap2DEditorWidget presents a 2D colormap in a child PosteriorColormap2DEditorWidget, but also features editable widgets (provided by two separate 1D silx's ColormapDialog) widgets. 
+        All is contained in a PlotWidget with an ad hoc toolbar and a colorbar
+
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import EditableColormap2DEditorWidget
+
+        editable_editor: EditableColormap2DEditorWidget = EditableColormap2DEditorWidget()
+        editable_editor.show()
+
+    """
+
+    def __init__(self, custom_cmap1=None, custom_cmap2=None, parent=None):
+        super(EditableColormap2DEditorWidget, self).__init__(parent)
+
+        _out_dict = get_default_cmaps(custom_cmap1=custom_cmap1, custom_cmap2=custom_cmap2)
+        self.colorEditor: PosteriorColormap2DEditorWidget = _out_dict['posterior_colormap_editor']
+        # editor.show()
+        custom_cmap1 = _out_dict['custom_cmap1']
+        custom_cmap2 = _out_dict['custom_cmap2']
+
+
+        self.setWindowTitle("EditableColormap2DEditorWidget dialog example")
+
+        # self.colormap1 = custom_cmap1 # Colormap(custom_cmap1) # Colormap("viridis")
+        # self.colormap2 = custom_cmap2 # Colormap(custom_cmap2) #Colormap("gray")
+
+        # self.colorBar = ColorBarWidget(self)
+
+        self.colormap_1D_list = [custom_cmap1, custom_cmap2]
+        self.colorDialogs = []
+
+        # options = qt.QWidget(self)
+        # options.setLayout(qt.QVBoxLayout())
+        # self.createOptions(options.layout())
+
+        # editor_pane = qt.QWidget(self)
+        # editor_pane.setLayout(qt.QVBoxLayout())
+        # self.createOptions(editor_pane.layout())
+
+        ## INPUTS: editor
+
+        mainWidget = qt.QWidget(self)
+        mainWidget.setLayout(qt.QHBoxLayout())
+        mainWidget.layout().addWidget(self.colorEditor)
+        mainWidget.layout().addSpacing(10)
+
+        # mainWidget.layout().addWidget(self.colorBar)
+        self.mainWidget = mainWidget
+
+        self.setCentralWidget(mainWidget)
+        self.createColorDialog()
+        self.createColorDialog()
+
+
+    def createColorDialog(self):
+        newDialog = ColormapDialog(self)
+        newDialog.finished.connect(functools.partial(self.removeColorDialog, newDialog))
+        ## register the callback to update
+        new_dialog_idx: int = len(self.colorDialogs)
+        self.colorDialogs.append(newDialog)
+        self.mainWidget.layout().addWidget(newDialog)
+        ## #TODO 2026-03-02 15:07: - [ ] update the self.colorEditor
+        # self.colorBar.setColormap(self.colormap_1D_list[new_dialog_idx])
+        newDialog.setColormap(_pg_colormap_to_silx_colormap(self.colormap_1D_list[new_dialog_idx]))
+        # for dialog, a_cmap in zip(self.colorDialogs, self.colormap_1D_list):
+        #     dialog.setColormap(a_cmap)
+
+
+    def removeColorDialog(self, dialog, result):
+        self.colorDialogs.remove(dialog)
+
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # Simple Silx Example                                                                                                                                                                                                                                                                  #
@@ -683,6 +798,30 @@ def example_pyqtgraph_colormap_widget_2D_main():
     editor = _out_dict['posterior_colormap_editor']
     editor.show()
     app.exec()
+
+
+def example_combined_editable_colormap_widget_2D_main():
+    """
+
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import ColormapDialogExample, example_silx_colormap_widget_2D_main
+    from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import EditableColormap2DEditorWidget
+
+    editable_editor: EditableColormap2DEditorWidget = EditableColormap2DEditorWidget()
+    editable_editor.show()
+
+    """
+    app = qt.QApplication([])
+
+    # Create the ad hoc plot widget and change its default colormap
+    editable_editor: EditableColormap2DEditorWidget = EditableColormap2DEditorWidget()
+    editable_editor.show()
+
+    app.exec()
+
+
+
+
+
 def example_silx_colormap_widget_2D_main():
     """
 
@@ -701,6 +840,7 @@ def example_silx_colormap_widget_2D_main():
 if __name__ == '__main__':
     # example_silx_colormap_widget_2D_main() ## Silx
     # example_pyqtgraph_colormap_widget_2D_main() ## PyQtGraph
+    example_combined_editable_colormap_widget_2D_main() # combined
 
 
 __all__ = ['PosteriorColormapEditorWidget', 'PosteriorColormap2DEditorWidget', 'DEFAULT_PRESET_NAMES',
