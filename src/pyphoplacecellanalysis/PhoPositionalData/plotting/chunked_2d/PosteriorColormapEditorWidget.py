@@ -477,9 +477,8 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     return _out_dict
 
 
-class EditableColormap2DEditorWidget(qt.QMainWindow):
-    """EditableColormap2DEditorWidget presents a 2D colormap in a child PosteriorColormap2DEditorWidget, but also features editable widgets (provided by two separate 1D silx's ColormapDialog) widgets. 
-        All is contained in a PlotWidget with an ad hoc toolbar and a colorbar
+class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
+    """EditableColormap2DEditorWidget presents a 2D colormap in a child PosteriorColormap2DEditorWidget, with two pg GradientWidgets for editing the 1D colormaps (early t / late t).
 
         from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import EditableColormap2DEditorWidget
 
@@ -493,60 +492,43 @@ class EditableColormap2DEditorWidget(qt.QMainWindow):
 
         _out_dict = get_default_cmaps(custom_cmap1=custom_cmap1, custom_cmap2=custom_cmap2)
         self.colorEditor: PosteriorColormap2DEditorWidget = _out_dict['posterior_colormap_editor']
-        # editor.show()
         custom_cmap1 = _out_dict['custom_cmap1']
         custom_cmap2 = _out_dict['custom_cmap2']
 
-
-        self.setWindowTitle("EditableColormap2DEditorWidget dialog example")
-
-        # self.colormap1 = custom_cmap1 # Colormap(custom_cmap1) # Colormap("viridis")
-        # self.colormap2 = custom_cmap2 # Colormap(custom_cmap2) #Colormap("gray")
-
-        # self.colorBar = ColorBarWidget(self)
+        self.setWindowTitle("EditableColormap2DEditorWidget")
 
         self.colormap_1D_list = [custom_cmap1, custom_cmap2]
-        self.colorDialogs = []
+        self.gradient_widgets: List[pg.GradientWidget] = []
 
-        # options = qt.QWidget(self)
-        # options.setLayout(qt.QVBoxLayout())
-        # self.createOptions(options.layout())
+        mainWidget = QtWidgets.QWidget(self)
+        mainLayout = QtWidgets.QHBoxLayout()
+        mainWidget.setLayout(mainLayout)
+        mainLayout.addWidget(self.colorEditor)
+        mainLayout.addSpacing(10)
 
-        # editor_pane = qt.QWidget(self)
-        # editor_pane.setLayout(qt.QVBoxLayout())
-        # self.createOptions(editor_pane.layout())
-
-        ## INPUTS: editor
-
-        mainWidget = qt.QWidget(self)
-        mainWidget.setLayout(qt.QHBoxLayout())
-        mainWidget.layout().addWidget(self.colorEditor)
-        mainWidget.layout().addSpacing(10)
-
-        # mainWidget.layout().addWidget(self.colorBar)
-        self.mainWidget = mainWidget
-
+        cmap_panel = QtWidgets.QWidget(self)
+        cmap_panel.setLayout(QtWidgets.QVBoxLayout())
+        for i, (label_text, cmap) in enumerate(zip(("Cmap 1 (early t)", "Cmap 2 (late t)"), self.colormap_1D_list)):
+            container = QtWidgets.QWidget(self)
+            container.setLayout(QtWidgets.QVBoxLayout())
+            container.layout().addWidget(QtWidgets.QLabel(label_text))
+            gw = pg.GradientWidget(self, orientation='bottom')
+            gw.setColorMap(cmap)
+            container.layout().addWidget(gw)
+            cmap_panel.layout().addWidget(container)
+            self.gradient_widgets.append(gw)
+            gw.sigGradientChangeFinished.connect(functools.partial(self._on_gradient_finished, i))
+        mainLayout.addWidget(cmap_panel)
         self.setCentralWidget(mainWidget)
-        self.createColorDialog()
-        self.createColorDialog()
 
 
-    def createColorDialog(self):
-        newDialog = ColormapDialog(self)
-        newDialog.finished.connect(functools.partial(self.removeColorDialog, newDialog))
-        ## register the callback to update
-        new_dialog_idx: int = len(self.colorDialogs)
-        self.colorDialogs.append(newDialog)
-        self.mainWidget.layout().addWidget(newDialog)
-        ## #TODO 2026-03-02 15:07: - [ ] update the self.colorEditor
-        # self.colorBar.setColormap(self.colormap_1D_list[new_dialog_idx])
-        newDialog.setColormap(_pg_colormap_to_silx_colormap(self.colormap_1D_list[new_dialog_idx]))
-        # for dialog, a_cmap in zip(self.colorDialogs, self.colormap_1D_list):
-        #     dialog.setColormap(a_cmap)
-
-
-    def removeColorDialog(self, dialog, result):
-        self.colorDialogs.remove(dialog)
+    def _on_gradient_finished(self, index: int, _gradient_item=None):
+        cmap = self.gradient_widgets[index].colorMap()
+        self.colormap_1D_list[index] = cmap
+        if index == 0:
+            self.colorEditor.setCmap1(cmap, emit=True)
+        else:
+            self.colorEditor.setCmap2(cmap, emit=True)
 
 
 
