@@ -32,6 +32,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_m
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
+from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import PosteriorColormapEditorWidget
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -541,6 +542,10 @@ class PhoOptimizedMultiEpochBatchRenderer:
         """ 
         vaguely based off of `pyqtplot_plot_image_array`
 
+        Note: posterior_img_cmap (and any PosteriorColormapEditorWidget) applies only when
+        use_advanced_3D_cmap=False. When use_advanced_3D_cmap=True (default), posteriors are
+        precomputed RGBA and ImageItem colormap has no effect.
+
         Usage:
 
             _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
@@ -898,6 +903,96 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         return animal_position_segments_item, animal_position_segments_path
 
+    @function_attributes(short_name=None, tags=['helper', 'openGL', 'camera'], input_requires=[], output_provides=[], uses=[], used_by=['plot_all_animal_position_gradient_segments'], creation_date='2026-03-01', related_items=[])
+    @classmethod
+    def gl_zoom_to_points(cls, gl_view, xt, yt, padding=1.1, min_distance=1.0):
+        """Frame the GL view on the given XY points (z assumed 0). Set opts['center'] before setCameraPosition so the camera actually looks at the data."""
+        xt = np.asarray(xt)
+        yt = np.asarray(yt)
+        xmin, xmax = xt.min(), xt.max()
+        ymin, ymax = yt.min(), yt.max()
+        x_range = xmax - xmin
+        y_range = ymax - ymin
+        max_range = max(x_range, y_range, 1e-9)
+        center_x = (xmin + xmax) / 2.0
+        center_y = (ymin + ymax) / 2.0
+        distance = max(max_range * padding, min_distance)
+        gl_view.opts['center'] = pg.Vector(center_x, center_y, 0)
+        gl_view.setCameraPosition(pos=None, distance=distance, elevation=90, azimuth=0)
+        gl_view.update()
+
+    @function_attributes(short_name=None, tags=['helper', 'ALT', 'position', 'gradiant', 'openGL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-01 09:50', related_items=['plot_all_animal_position_segments'])
+    @classmethod
+    def plot_all_animal_position_gradient_segments(cls, t, xt, yt, track_plot_item: Optional[pg.opengl.GLViewWidget]=None):
+        """ 
+        Plots the animal positions using a per-vertex timestamp colormap
+        rendered with GLLinePlotItem.
+
+        animal_position_segments_item = PhoOptimizedMultiEpochBatchRenderer.plot_all_animal_position_gradient_segments(
+            t=t, xt=xt, yt=yt, # track_plot_item=track_plot_item
+        )
+        """
+        # import pyqtgraph.opengl as gl
+        import pyphoplacecellanalysis.External.pyqtgraph.opengl as gl
+
+        # Ensure numpy arrays
+        xt = np.asarray(xt)
+        yt = np.asarray(yt)
+
+        assert xt.shape == yt.shape, "xt and yt must have same shape"
+
+        n_points = xt.shape[0]
+        if n_points < 2:
+            raise ValueError("Need at least 2 points to draw a line.")
+
+        print(f'n_points: {n_points}')
+        # ------------------------------------------------------------------
+        # Timestamp normalization (using index as time proxy)
+        # ------------------------------------------------------------------
+        if t is None:
+            t = np.arange(n_points, dtype=float)
+
+        assert len(t) == len(xt), f"len(t): {len(t)}, len(xt): {len(xt)}"
+
+        t_norm = (t - t.min()) / (t.max() - t.min() + 1e-12)
+
+        # ------------------------------------------------------------------
+        # Colormap (viridis default, change if desired)
+        # ------------------------------------------------------------------
+        # cmap = pg.colormap.get('viridis')
+        # colors = cmap.map(t_norm, mode='float')  # (N,4) RGBA float32
+
+        colors = (1.0,1.0,1.0,1.0) # pg.mkColor('w')
+        # ------------------------------------------------------------------
+        # Build 3D positions (z=0)
+        # ------------------------------------------------------------------
+        pos = np.column_stack((xt, yt, np.zeros_like(xt))) # (N,3) array of floats specifying point locations
+        print(f'np.shape(pos): {np.shape(pos)}')
+
+        animal_position_segments_item = gl.GLLinePlotItem(
+            pos=pos,
+            color=colors,
+            width=2.0,
+            mode='line_strip',
+            antialias=True
+        )
+
+        # Foreground ordering (OpenGL depth-based, but still useful)
+        # animal_position_segments_item.setGLOptions('opaque')
+
+        # ------------------------------------------------------------------
+        # Create GL view if needed
+        # ------------------------------------------------------------------
+        if track_plot_item is None:
+            track_plot_item = gl.GLViewWidget()
+            track_plot_item.show()
+
+        track_plot_item.addItem(animal_position_segments_item)
+
+        cls.gl_zoom_to_points(track_plot_item, xt, yt)
+
+        return animal_position_segments_item
+
 
     @function_attributes(short_name=None, tags=['MAIN', 'figure', 'plot', 'render', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['cls.plot_all_track_shapes', 'cls.plot_decoded_posteriors_for_frames', 'cls.plot_all_animal_position_segments'], used_by=[], creation_date='2026-03-01 07:14', related_items=[])
     @classmethod
@@ -924,10 +1019,14 @@ class PhoOptimizedMultiEpochBatchRenderer:
         track_plot_item
 
         ## INPUTS: pos_df, subdivided_epochs_df, maze_bounds_t, (xt, yt)
+        ## Pass colormap_editor_container so the posterior colormap editor is added to the track dock and visible.
         _out_dict = PhoOptimizedMultiEpochBatchRenderer.plot_all(subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
                                                                     pos_tspace_df=pos_tspace_df,# xt=xt, yt=yt, 
                                                                     a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result, track_plot_item=track_plot_item,
+                                                                    colormap_editor_container=a_time_sync_pyqtgraph_widget,
                                                                 )
+        ## Editor is created by default (create_colormap_editor=True) and added when colormap_editor_container is passed.
+        ## Only affects 2D mode (use_advanced_3D_cmap=False); when True, posteriors are RGBA and the editor has no effect.
 
 
         """
@@ -942,12 +1041,28 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         if a_decoded_subdivided_epochs_result is not None:
             extant_posterior_image_items = kwargs.pop('extant_posterior_image_items', None)
+            create_colormap_editor = kwargs.pop('create_colormap_editor', True)
+            posterior_colormap_initial_cmap = kwargs.pop('posterior_colormap_initial_cmap', None)
+            colormap_editor_container = kwargs.pop('colormap_editor_container', None)
             plotted_posterior_items_dict = cls.plot_decoded_posteriors_for_frames(a_decoded_subdivided_epochs_result=a_decoded_subdivided_epochs_result,
                                                                         subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t,
                                                                         extant_posterior_image_items=extant_posterior_image_items, track_plot_item=track_plot_item,
                                                                     )
             if plotted_posterior_items_dict is not None:
                 _out_dict['plotted_posterior_items_dict'] = plotted_posterior_items_dict
+                posterior_image_items = plotted_posterior_items_dict.get('posterior_image_items')
+                if create_colormap_editor and posterior_image_items:
+                    editor = PosteriorColormapEditorWidget(image_items=posterior_image_items, initial_cmap=posterior_colormap_initial_cmap)
+                    _out_dict['posterior_colormap_editor'] = editor
+                    if colormap_editor_container is not None:
+                        if isinstance(colormap_editor_container, QtWidgets.QLayout):
+                            colormap_editor_container.addWidget(editor)
+                        elif isinstance(colormap_editor_container, QtWidgets.QWidget):
+                            layout = colormap_editor_container.layout()
+                            if layout is None:
+                                layout = QtWidgets.QVBoxLayout(colormap_editor_container)
+                                colormap_editor_container.setLayout(layout)
+                            layout.addWidget(editor)
 
 
         animal_position_segments_item, animal_position_segments_path = cls.plot_all_animal_position_segments(xt=xt, yt=yt, track_plot_item=track_plot_item)
