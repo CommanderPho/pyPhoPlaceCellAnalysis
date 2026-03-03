@@ -422,10 +422,21 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     return _out_dict
 
 
-@metadata_attributes(short_name=None, tags=['MAIN', 'colormap', 'widget', 'interactive', 'plot', 'customization', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PosteriorColormap2DEditorWidget'], used_by=[], creation_date='2026-03-02 18:34', related_items=[])
+# @metadata_attributes(short_name=None, tags=['MAIN', 'colormap', 'widget', 'interactive', 'plot', 'customization', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PosteriorColormap2DEditorWidget'], used_by=[], creation_date='2026-03-02 18:34', related_items=[])
 class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
     """EditableColormap2DEditorWidget presents a 2D colormap in a child PosteriorColormap2DEditorWidget, with two pg GradientWidgets for editing the 1D colormaps (early t / late t).
 
+    Main Variables:
+
+        Data:
+            self.colormap_1D_list
+
+        UI/Widgets:
+            self.colorEditor2D: Colormap2DEditorWidget
+            self.gradient_widgets
+
+
+    Usage:
         from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import EditableColormap2DEditorWidget
 
         editable_editor: EditableColormap2DEditorWidget = EditableColormap2DEditorWidget()
@@ -439,7 +450,7 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
         super(EditableColormap2DEditorWidget, self).__init__(parent)
 
         _out_dict = get_default_cmaps(custom_cmap1=custom_cmap1, custom_cmap2=custom_cmap2)
-        self.colorEditor: Colormap2DEditorWidget = _out_dict['posterior_colormap_editor']
+        self.colorEditor2D: Colormap2DEditorWidget = _out_dict['posterior_colormap_editor']
         custom_cmap1 = _out_dict['custom_cmap1']
         custom_cmap2 = _out_dict['custom_cmap2']
 
@@ -451,7 +462,7 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
         mainWidget = QtWidgets.QWidget(self)
         mainLayout = QtWidgets.QHBoxLayout()
         mainWidget.setLayout(mainLayout)
-        mainLayout.addWidget(self.colorEditor)
+        mainLayout.addWidget(self.colorEditor2D)
         mainLayout.addSpacing(10)
 
         cmap_panel = QtWidgets.QWidget(self)
@@ -460,7 +471,7 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
             container = QtWidgets.QWidget(self)
             container.setLayout(QtWidgets.QVBoxLayout())
             container.layout().addWidget(QtWidgets.QLabel(label_text))
-            gw = pg.GradientWidget(self, orientation='bottom')
+            gw = pg.GradientWidget(self, orientation='right', tickPen='white')
             gw.setColorMap(cmap)
             container.layout().addWidget(gw)
             cmap_panel.layout().addWidget(container)
@@ -468,8 +479,8 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
             gw.sigGradientChangeFinished.connect(functools.partial(self._on_gradient_finished, i))
         mainLayout.addWidget(cmap_panel)
         self.setCentralWidget(mainWidget)
-        self.colorEditor.sigAdvancedColormapChanged.connect(self._sync_1d_widgets_from_editor)
-        self.colorEditor.sigAdvancedColormapChanged.connect(self._forward_sig_advanced_colormap_changed)
+        self.colorEditor2D.sigAdvancedColormapChanged.connect(self._sync_1d_widgets_from_editor)
+        self.colorEditor2D.sigAdvancedColormapChanged.connect(self._forward_sig_advanced_colormap_changed)
 
 
     def _forward_sig_advanced_colormap_changed(self, cmap1, cmap2):
@@ -477,34 +488,39 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
 
 
     def getCmap1(self):
-        return self.colorEditor.getCmap1()
+        return self.colorEditor2D.getCmap1()
 
 
     def getCmap2(self):
-        return self.colorEditor.getCmap2()
+        return self.colorEditor2D.getCmap2()
 
 
     def _sync_1d_widgets_from_editor(self, cmap1, cmap2):
         """Update the two 1D GradientWidgets and colormap_1D_list when the 2D editor dropdowns change."""
         self.colormap_1D_list[0] = cmap1
         self.colormap_1D_list[1] = cmap2
-        for gw in self.gradient_widgets:
-            gw.blockSignals(True)
+        for gw1D in self.gradient_widgets:
+            gw1D.blockSignals(True)
         try:
             self.gradient_widgets[0].setColorMap(cmap1)
             self.gradient_widgets[1].setColorMap(cmap2)
         finally:
-            for gw in self.gradient_widgets:
-                gw.blockSignals(False)
+            for gw1D in self.gradient_widgets:
+                gw1D.blockSignals(False)
 
 
     def _on_gradient_finished(self, index: int, _gradient_item=None):
+        """ called when one of the 1D gradient editors editing finished """
+        print(f'EditableColormap2DEditorWidget._on_gradient_finished(index: {index})')
         cmap = self.gradient_widgets[index].colorMap()
         self.colormap_1D_list[index] = cmap
         if index == 0:
-            self.colorEditor.setCmap1(cmap, emit=True)
+            self.colorEditor2D.setCmap1(cmap, emit=False)
         else:
-            self.colorEditor.setCmap2(cmap, emit=True)
+            self.colorEditor2D.setCmap2(cmap, emit=False)
+
+        ## emit a changed event
+        self.sigAdvancedColormapChanged.emit(*self.colormap_1D_list)
 
 
 
