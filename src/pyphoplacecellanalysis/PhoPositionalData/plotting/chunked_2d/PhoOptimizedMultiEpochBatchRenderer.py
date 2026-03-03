@@ -347,6 +347,24 @@ class PhoOptimizedMultiEpochBatchRenderer:
         # pos_df = pos_df.groupby(['global_frame_division_idx']).agg(t_count=('t', 'count')).reset_index()
         global_frame_split_row_indicies = np.cumsum(pos_df[split_column_name].value_counts().to_numpy()).astype(int) # [600, 1200, 1800, ...] - the indicies at which to insert np.nan rows
 
+        # flip x/y position before transforming so the line segments are plotted correctly ___________________________________________________________________________________________________________________________________________________________________________________________________ #
+        def subfn_swap_variables(x, y):
+            ## swap x/y so thee plotted line is correct with the heatmap
+            # xt_copy = xt.copy()
+            # xt = yt.copy()
+            # yt = xt_copy.copy()
+            # return xt.copy(), yt.copy()
+            return y.copy(), x.copy()
+
+        xmin, ymin = subfn_swap_variables(xmin, ymin) ## swap xmin/ymin
+        x_to_t_scale, y_to_yt_scale = subfn_swap_variables(x_to_t_scale, y_to_yt_scale) ## swap xmin/ymin
+
+        ## flip x/y position before transforming:
+        pos_df['_x_copy'] = pos_df['x'].copy()
+        pos_df['x'] = pos_df['y'].copy()
+        pos_df['y'] = pos_df['_x_copy'].copy()
+        pos_df = pos_df.drop(columns=['_x_copy'], inplace=False)
+
         ## convert to relative position components (offsets)
         pos_df['xt'] = (np.abs(pos_df['x'] - xmin) * x_to_t_scale)
         pos_df['yt'] = (np.abs(pos_df['y'] - ymin) * y_to_yt_scale)
@@ -741,6 +759,12 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         """
         ## INPUTS: track_plot_item
+        # ## swap x/y so thee plotted line is correct with the heatmap
+        # xt_copy = xt.copy()
+        # xt = yt.copy()
+        # yt = xt_copy.copy()
+
+
         from pyqtgraph.functions import arrayToQPath
         animal_position_segments_path = arrayToQPath(xt, yt, connect='finite')
         animal_position_segments_item: pg.QtWidgets.QGraphicsPathItem = pg.QtWidgets.QGraphicsPathItem(animal_position_segments_path)
@@ -881,9 +905,15 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         """
         _out_dict = {}
+
         # pos_tspace_df: pd.DataFrame = pd.DataFrame(inserted_vals, columns=pos_space_col_names)
         xt = pos_tspace_df['xt'].to_numpy()
         yt = pos_tspace_df['yt'].to_numpy()
+
+
+        # ## swap x/y so thee plotted line is correct with the heatmap
+        # xt = pos_tspace_df['yt'].to_numpy()
+        # yt = pos_tspace_df['xt'].to_numpy()
 
         ## INPUTS: track_plot_item
         track_shape_rects_item, maze_boundaries_path = cls.plot_all_track_shapes(subdivided_epochs_df=subdivided_epochs_df, maze_bounds_t=maze_bounds_t, track_plot_item=track_plot_item)
