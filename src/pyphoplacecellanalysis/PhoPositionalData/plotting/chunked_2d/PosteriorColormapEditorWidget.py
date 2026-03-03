@@ -7,7 +7,7 @@ are precomputed RGBA and this editor has no effect.
 """
 
 from typing import Callable, List, Optional, Tuple, Union
-
+import functools
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
@@ -196,7 +196,7 @@ class PosteriorColormapEditorWidget(QtWidgets.QWidget):
 # ==================================================================================================================================================================================================================================================================================== #
 # 2D Colormaps                                                                                                                                                                                                                                                                         #
 # ==================================================================================================================================================================================================================================================================================== #
-class PosteriorColormap2DEditorWidget(QtWidgets.QWidget):
+class Colormap2DEditorWidget(QtWidgets.QWidget):
     """
     Widget for editing the advanced_3D_cmap format: shows a 2D gradient preview
     (value x time -> RGBA) and two 1D colormap selectors (cmap1 = early t, cmap2 = late t).
@@ -384,7 +384,7 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     _out_dict['custom_cmap2'] = custom_cmap2
 
     ## have custom_cmap1, custom_cmap2:
-    editor = PosteriorColormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
+    editor = Colormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
     _out_dict['posterior_colormap_editor'] = editor
 
     if reapply_advanced_colormap_fn is None:
@@ -399,6 +399,7 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
     return _out_dict
 
 
+@metadata_attributes(short_name=None, tags=['MAIN', 'colormap', 'widget', 'interactive', 'plot', 'customization', 'pyqtgraph'], input_requires=[], output_provides=[], uses=['PosteriorColormap2DEditorWidget'], used_by=[], creation_date='2026-03-02 18:34', related_items=[])
 class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
     """EditableColormap2DEditorWidget presents a 2D colormap in a child PosteriorColormap2DEditorWidget, with two pg GradientWidgets for editing the 1D colormaps (early t / late t).
 
@@ -409,11 +410,13 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
 
     """
 
+    sigAdvancedColormapChanged = QtCore.Signal(object, object)
+
     def __init__(self, custom_cmap1=None, custom_cmap2=None, parent=None):
         super(EditableColormap2DEditorWidget, self).__init__(parent)
 
         _out_dict = get_default_cmaps(custom_cmap1=custom_cmap1, custom_cmap2=custom_cmap2)
-        self.colorEditor: PosteriorColormap2DEditorWidget = _out_dict['posterior_colormap_editor']
+        self.colorEditor: Colormap2DEditorWidget = _out_dict['posterior_colormap_editor']
         custom_cmap1 = _out_dict['custom_cmap1']
         custom_cmap2 = _out_dict['custom_cmap2']
 
@@ -443,6 +446,19 @@ class EditableColormap2DEditorWidget(QtWidgets.QMainWindow):
         mainLayout.addWidget(cmap_panel)
         self.setCentralWidget(mainWidget)
         self.colorEditor.sigAdvancedColormapChanged.connect(self._sync_1d_widgets_from_editor)
+        self.colorEditor.sigAdvancedColormapChanged.connect(self._forward_sig_advanced_colormap_changed)
+
+
+    def _forward_sig_advanced_colormap_changed(self, cmap1, cmap2):
+        self.sigAdvancedColormapChanged.emit(cmap1, cmap2)
+
+
+    def getCmap1(self):
+        return self.colorEditor.getCmap1()
+
+
+    def getCmap2(self):
+        return self.colorEditor.getCmap2()
 
 
     def _sync_1d_widgets_from_editor(self, cmap1, cmap2):
