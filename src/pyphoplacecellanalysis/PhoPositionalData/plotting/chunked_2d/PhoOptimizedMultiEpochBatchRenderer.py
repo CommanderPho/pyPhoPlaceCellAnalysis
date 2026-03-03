@@ -445,7 +445,8 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
         """
         drop_below_threshold = kwargs.pop('drop_below_threshold', 0.0025)
-        shared_axis_order = 'col-major'
+        # shared_axis_order = 'col-major' ## Was working but didn't match pos traj
+        shared_axis_order = 'row-major'
         posterior_img_opacity: float = kwargs.pop('posterior_img_opacity', 0.8)
         # posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_Plus)
         posterior_img_composition_mode = kwargs.pop('posterior_img_composition_mode', QtGui.QPainter.CompositionMode_SourceOver)
