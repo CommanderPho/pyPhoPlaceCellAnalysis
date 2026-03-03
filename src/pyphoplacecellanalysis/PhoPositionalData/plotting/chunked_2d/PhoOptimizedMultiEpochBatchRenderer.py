@@ -347,17 +347,17 @@ class PhoOptimizedMultiEpochBatchRenderer:
         # pos_df = pos_df.groupby(['global_frame_division_idx']).agg(t_count=('t', 'count')).reset_index()
         global_frame_split_row_indicies = np.cumsum(pos_df[split_column_name].value_counts().to_numpy()).astype(int) # [600, 1200, 1800, ...] - the indicies at which to insert np.nan rows
 
-        # flip x/y position before transforming so the line segments are plotted correctly ___________________________________________________________________________________________________________________________________________________________________________________________________ #
-        def subfn_swap_variables(x, y):
-            ## swap x/y so thee plotted line is correct with the heatmap
-            # xt_copy = xt.copy()
-            # xt = yt.copy()
-            # yt = xt_copy.copy()
-            # return xt.copy(), yt.copy()
-            return y.copy(), x.copy()
+        # # flip x/y position before transforming so the line segments are plotted correctly ___________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # def subfn_swap_variables(x, y):
+        #     ## swap x/y so thee plotted line is correct with the heatmap
+        #     # xt_copy = xt.copy()
+        #     # xt = yt.copy()
+        #     # yt = xt_copy.copy()
+        #     # return xt.copy(), yt.copy()
+        #     return y.copy(), x.copy()
 
-        xmin, ymin = subfn_swap_variables(xmin, ymin) ## swap xmin/ymin
-        x_to_t_scale, y_to_yt_scale = subfn_swap_variables(x_to_t_scale, y_to_yt_scale) ## swap xmin/ymin
+        # xmin, ymin = subfn_swap_variables(xmin, ymin) ## swap xmin/ymin
+        # x_to_t_scale, y_to_yt_scale = subfn_swap_variables(x_to_t_scale, y_to_yt_scale) ## swap xmin/ymin
 
         ## flip x/y position before transforming:
         pos_df['_x_copy'] = pos_df['x'].copy()
@@ -381,7 +381,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
         pos_space_col_names: List[str] = ['t', 'x', 'y', 'xt', 'yt', split_column_name, 'frame_division_epoch_start_t', 'frame_division_epoch_stop_t']
         # pos_tspace_df = pos_df[pos_space_col_names].values
         vals = pos_df[pos_space_col_names].values
-        # Insert the NaNs into the underlying array
+        # Insert the NaNs into the underlying array __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         # (Note: axis=0 for rows)
         inserted_vals = np.insert(vals.astype(float), global_frame_split_row_indicies, np.nan, axis=0) ## converts all to float
         # Reconstruct the DataFrame
