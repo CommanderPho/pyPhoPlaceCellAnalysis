@@ -734,7 +734,10 @@ class PhoOptimizedMultiEpochBatchRenderer:
         rect_xt_positions = maze_bounds_t[0] + subdivided_epochs_df['start'].to_numpy() ## offset by the origin of each frame start, and then by the global tmin
         num_rects: int = len(rect_xt_positions)
         print(f'len(rect_xt_positions): {len(rect_xt_positions)}')
-        assert num_rects < 1500, f'num_rects: {num_rects} should be less than 1500 as not to lock up the viewer...'
+        # max_num_rects: int = 1500
+        max_num_rects: int = 6000
+
+        assert num_rects < max_num_rects, f'num_rects: {num_rects} should be less than {max_num_rects} as not to lock up the viewer...'
         maze_boundaries_path: QtGui.QPainterPath = build_rect_paths(rect_xt_positions, y0=maze_bounds_t[1], width=maze_bounds_t[2], height=maze_bounds_t[3])
 
         # plot = pg.plot()
