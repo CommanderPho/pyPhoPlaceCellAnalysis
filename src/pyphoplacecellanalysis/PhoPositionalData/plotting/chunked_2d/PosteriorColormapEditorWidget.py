@@ -37,13 +37,13 @@ ADVANCED_CMAP_PRESET_NAMES = ('Alpha Red', 'Alpha Green', 'Reds', 'Greens', 'Blu
 def _make_alpha_red_cmap(min_alpha: int = 100, max_alpha: int = 255):
     pos = np.array([0.0, 1.0])
     colors = np.array([[255, 0, 0, min_alpha], [255, 0, 0, max_alpha]], dtype=np.ubyte)
-    return pg.ColorMap(pos, colors)
+    return pg.ColorMap(pos, colors, name='Alpha Red')
 
 
 def _make_alpha_green_cmap(min_alpha: int = 100, max_alpha: int = 255):
     pos = np.array([0.0, 1.0])
     colors = np.array([[0, 255, 0, min_alpha], [0, 255, 0, max_alpha]], dtype=np.ubyte)
-    return pg.ColorMap(pos, colors)
+    return pg.ColorMap(pos, colors, name='Alpha Green')
 
 
 def _get_advanced_cmap_preset(name: str):
@@ -204,6 +204,7 @@ class Colormap2DEditorWidget(QtWidgets.QWidget):
     Emits sigAdvancedColormapChanged(cmap1, cmap2) so the renderer can re-apply without re-decoding.
     Does not import the renderer; preview is built via the callable preview_lut_builder.
     """
+    _PREVIEW_COMPACT_HEIGHT_THRESHOLD = 100
 
     sigAdvancedColormapChanged = QtCore.Signal(object, object)
 
@@ -252,6 +253,7 @@ class Colormap2DEditorWidget(QtWidgets.QWidget):
             row1.addWidget(self._n_t_spin)
 
         self._gl_widget = pg.GraphicsLayoutWidget(parent=self)
+        self._gl_widget.setMinimumHeight(120)
         self._plot_item = self._gl_widget.addPlot(0, 0, title="Value × time (2D LUT preview)")
         self._preview_image = pg.ImageItem()
         self._plot_item.addItem(self._preview_image)
@@ -261,6 +263,26 @@ class Colormap2DEditorWidget(QtWidgets.QWidget):
 
         self._sync_combos_from_cmaps()
         self._refresh_preview()
+        self._preview_compact = False
+
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        h = self.height()
+        compact = h < self._PREVIEW_COMPACT_HEIGHT_THRESHOLD
+        if compact == self._preview_compact:
+            return
+        self._preview_compact = compact
+        if compact:
+            self._plot_item.setTitle(None)
+            self._plot_item.hideAxis('left')
+            self._plot_item.hideAxis('bottom')
+        else:
+            self._plot_item.setTitle("Value × time (2D LUT preview)")
+            self._plot_item.showAxis('left', True)
+            self._plot_item.showAxis('bottom', True)
+            self._plot_item.setLabel('left', 'value')
+            self._plot_item.setLabel('bottom', 'time bin')
 
 
     def _sync_combos_from_cmaps(self):
@@ -376,16 +398,16 @@ def get_default_cmaps(reapply_advanced_colormap_fn=None, **kwargs):
         max_cmap_occupancy: int = 255
         # Custom "Alpha Red": R=255, G=0, B=0, Alpha mapping from 0 to 255
         colors_red = np.array([[255, 0, 0, min_cmap_occupancy], [255, 0, 0, max_cmap_occupancy]], dtype=np.ubyte)
-        custom_cmap1 = pg.ColorMap(pos, colors_red)
+        custom_cmap1 = pg.ColorMap(pos, colors_red, name='Alpha Red')
         # Custom "Alpha Green": R=0, G=255, B=0, Alpha mapping from 0 to 255
         colors_green = np.array([[0, 255, 0, min_cmap_occupancy], [0, 255, 0, max_cmap_occupancy]], dtype=np.ubyte)
-        custom_cmap2 = pg.ColorMap(pos, colors_green)
+        custom_cmap2 = pg.ColorMap(pos, colors_green, name='Alpha Green')
 
     _out_dict['custom_cmap1'] = custom_cmap1
     _out_dict['custom_cmap2'] = custom_cmap2
 
     ## have custom_cmap1, custom_cmap2:
-    editor = Colormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
+    editor = Colormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16, initial_cmap1=custom_cmap1, initial_cmap2=custom_cmap2)
     _out_dict['posterior_colormap_editor'] = editor
 
     if reapply_advanced_colormap_fn is None:
