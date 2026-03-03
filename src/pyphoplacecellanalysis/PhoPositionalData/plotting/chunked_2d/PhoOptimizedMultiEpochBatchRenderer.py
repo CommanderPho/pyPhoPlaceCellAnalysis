@@ -32,7 +32,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_m
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
-from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import Colormap1DEditorWidget, PosteriorColormap2DEditorWidget, EditableColormap2DEditorWidget
+from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import Colormap1DEditorWidget, EditableColormap2DEditorWidget
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
