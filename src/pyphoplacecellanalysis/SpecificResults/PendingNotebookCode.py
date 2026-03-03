@@ -126,6 +126,110 @@ from neuropy.core.position import PositionAccessor, Position, PositionComputedDa
 
 
 
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-03-03 - Occupancy and Position Novelty                                                                                                                                                                                                                                          #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
+class PositionNovelty:
+    """
+
+    Prompt: "scientific literature scores for indicating the novelty of a given 2D path through an environment"
+    
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionNovelty
+
+        pos_df = PositionNovelty.run_all(pos_df=pos_df, k=5)
+    """
+    
+    @classmethod
+    def novelty_search_score(cls, pos_df: pd.DataFrame, k: int = 5) -> pd.Series:
+        """
+        Lehman & Stanley (2011) Novelty Search score.
+
+        For each position, novelty = mean Euclidean distance to its k nearest
+        neighbors across the *full* archive (all positions, non-causal).
+        Higher score → the point lies in a sparsely visited region of space.
+
+        Parameters
+        ----------
+        pos_df : DataFrame with columns ['x', 'y']
+        k      : number of nearest neighbors
+
+        Returns
+        -------
+        pd.Series of novelty scores (column name: 'novelty_lehman')
+        """
+        coords = pos_df[['x', 'y']].values
+        effective_k = min(k, len(coords) - 1)  # guard for small datasets
+
+        nbrs = NearestNeighbors(n_neighbors=effective_k + 1, algorithm='ball_tree')
+        nbrs.fit(coords)
+        distances, _ = nbrs.kneighbors(coords)
+
+        # Column 0 is always self (distance = 0.0) — skip it
+        scores = distances[:, 1:effective_k + 1].mean(axis=1)
+        return pd.Series(scores, index=pos_df.index, name='novelty_lehman')
+
+
+    @classmethod
+    def knn_visited_score(cls, pos_df: pd.DataFrame, k: int = 5) -> pd.Series:
+        """
+        kNN Distance to Visited States (causal / online novelty).
+
+        For each position at time t, novelty = mean distance to its k nearest
+        neighbors among *only previously visited* positions (indices 0..t-1).
+        Score naturally decays as regions are revisited.
+
+        t=0  → NaN  (no history yet)
+        t<k  → mean over all available prior points (< k neighbors)
+
+        Parameters
+        ----------
+        pos_df : DataFrame with columns ['x', 'y'], ordered by time
+        k      : number of nearest neighbors to consider
+
+        Returns
+        -------
+        pd.Series of novelty scores (column name: 'novelty_knn_visited')
+        """
+        coords = pos_df[['x', 'y']].values
+        n = len(coords)
+        scores = np.full(n, np.nan)
+
+        for t in range(1, n):
+            past = coords[:t]                              # causal: only history
+            diffs = past - coords[t]
+            dists = np.sqrt((diffs ** 2).sum(axis=1))
+
+            actual_k = min(k, t)
+            # np.partition is O(n) — faster than full sort for large histories
+            scores[t] = np.partition(dists, actual_k - 1)[:actual_k].mean()
+
+        return pd.Series(scores, index=pos_df.index, name='novelty_knn_visited')
+
+
+    @classmethod
+    def run_all(cls, pos_df: pd.DataFrame, k=5, run_knn_visited: bool=True, **kwargs) -> pd.DataFrame:
+        pos_df['novelty_lehman']      = cls.novelty_search_score(pos_df, k=k, **kwargs)
+        if run_knn_visited:
+            pos_df['novelty_knn_visited'] = cls.knn_visited_score(pos_df, k=k, **kwargs)
+        return pos_df
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Pre 2026-03-03 - IDK                                                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+
 @function_attributes(short_name=None, tags=['OpenField', 'bapun', 'segmentation', 'laps', 'shapely'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-24 11:15', related_items=[])
 def _plot_shapely_lap_detect_maze(ax=None):
     """ plot the detection regions used for detecting/segmenting laps
