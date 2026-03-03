@@ -193,21 +193,22 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
 
     """
-    frame_divided_epochs_result: "DecodedFilterEpochsResult" = field()
-    decoder: "BasePositionDecoder" = field()
+    decoder: BasePositionDecoder = field()
+
     pos_df: pd.DataFrame = field()
 
-    active_ax: Any = field()
+    # active_ax: Any = field()
     frame_divide_bin_size: float = field()
-    rotate_to_vertical: bool = field(default=True)
+    # rotate_to_vertical: bool = field(default=True)
     
-    desired_epoch_start_idx: int = field(default=0)
-    desired_epoch_end_idx: Optional[int] = field(default=None)
+    # desired_epoch_start_idx: int = field(default=0)
+    # desired_epoch_end_idx: Optional[int] = field(default=None)
 
-    stacked_flat_global_pos_df: pd.DataFrame = field(default=None, init=False)
+    # stacked_flat_global_pos_df: pd.DataFrame = field(default=None, init=False)
+    frame_divided_epochs_result: DecodedFilterEpochsResult = field(default=None)
 
     has_data_been_built: bool = field(default=False)
-    active_epoch_name: str = field(default='global')
+    # active_epoch_name: str = field(default='global')
     
 
     @property
@@ -256,6 +257,27 @@ class PhoOptimizedMultiEpochBatchRenderer:
     def init_from_results2D(cls, results2D: "DecodingResultND", active_epoch_name: str = "global", **kwargs) -> "PhoOptimizedMultiEpochBatchRenderer":
         key = DecoderName(active_epoch_name)
         return cls(frame_divided_epochs_result=results2D.frame_divided_epochs_results[key], decoder=results2D.decoders[key], pos_df=results2D.pos_df, **kwargs)
+
+    @classmethod
+    def init_from_modern(cls, a_decoder, pos_df, subdivide_bin_size: float = 5.0, split_column_name: str = 'global_frame_division_idx',
+                                        x_padding_pct: float = 0.05, y_padding_pct: float = 0.05,
+                                ):
+
+        pos_df, subdivided_epochs_df, maze_bounds_t, pos_tspace_df, (xt, yt) = cls.build_transforms_for_frames(a_decoder=a_decoder, pos_df=pos_df, subdivide_bin_size=subdivide_bin_size, split_column_name=split_column_name)
+        # ==================================================================================================================================================================================================================================================================================== #
+        # MARK: Compute for subdivided_epochs_df:                                                                                                                                                                                                                                                              #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## INPUTS: subdivided_epochs_df
+        ## Decode: laps_df
+        decoding_time_bin_size: float = 0.050 # 50ms
+        # decoding_time_bin_size: float = 0.250 # 250ms
+        # decoding_time_bin_size: float = 0.075 # 75ms
+        a_decoded_subdivided_epochs_result: DecodedFilterEpochsResult = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=subdivided_epochs_df, decoding_time_bin_size=decoding_time_bin_size)
+
+        obj = cls(frame_divided_epochs_result=a_decoded_subdivided_epochs_result, decoder=decoder, pos_df=pos_df, active_ax=None, frame_divide_bin_size=subdivide_bin_size)
+
+
+        return obj
 
 
     @function_attributes(short_name=None, tags=['MAIN', 'pure', 'static'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-28 22:01', related_items=[])
