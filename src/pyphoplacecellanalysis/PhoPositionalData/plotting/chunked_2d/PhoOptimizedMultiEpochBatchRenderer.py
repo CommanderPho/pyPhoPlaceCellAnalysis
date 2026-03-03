@@ -499,9 +499,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
             else:
                 # 1. Create the specialized 3D LUT
                 # lut_3d = create_3d_lut_saturation(n_t_bins=epoch_n_t_bins, cmap_name='magma')
-                lut_3d = create_3d_lut_cmaps_interp(n_t_bins=epoch_n_t_bins,
-                                cmap1_name=custom_cmap1, cmap2_name=custom_cmap2,
-                            )
+                lut_3d = create_3d_lut_cmaps_interp(n_t_bins=epoch_n_t_bins, cmap1_name=custom_cmap1, cmap2_name=custom_cmap2)
 
                 # 2. Apply color mapping instantly using indexing
                 # print("Applying advanced color mapping...")
