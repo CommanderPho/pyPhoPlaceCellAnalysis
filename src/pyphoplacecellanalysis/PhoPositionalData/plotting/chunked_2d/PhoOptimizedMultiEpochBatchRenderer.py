@@ -32,7 +32,7 @@ from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_m
 
 from pyphocorehelpers.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtWidgets
-from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import PosteriorColormapEditorWidget, PosteriorColormap2DEditorWidget
+from pyphoplacecellanalysis.PhoPositionalData.plotting.chunked_2d.PosteriorColormapEditorWidget import Colormap1DEditorWidget, PosteriorColormap2DEditorWidget, EditableColormap2DEditorWidget
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -391,7 +391,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
         """ 
         vaguely based off of `pyqtplot_plot_image_array`
 
-        Note: posterior_img_cmap (and any PosteriorColormapEditorWidget) applies only when
+        Note: posterior_img_cmap (and any EditableColormap2DEditorWidget) applies only when
         use_advanced_3D_cmap=False. When use_advanced_3D_cmap=True (default), posteriors are
         precomputed RGBA and ImageItem colormap has no effect.
 
@@ -905,7 +905,7 @@ class PhoOptimizedMultiEpochBatchRenderer:
                 posterior_image_items = plotted_posterior_items_dict.get('posterior_image_items')
                 if create_colormap_editor and posterior_image_items:
                     if use_advanced_3D_cmap:
-                        editor = PosteriorColormap2DEditorWidget(preview_lut_builder=create_3d_lut_cmaps_interp, n_t_bins_preview=16)
+                        editor = EditableColormap2DEditorWidget()
                         _out_dict['posterior_colormap_editor'] = editor
 
                         def _reapply_advanced_colormap():
@@ -916,7 +916,8 @@ class PhoOptimizedMultiEpochBatchRenderer:
 
                         editor.sigAdvancedColormapChanged.connect(_reapply_advanced_colormap)
                     else:
-                        editor = PosteriorColormapEditorWidget(image_items=posterior_image_items, initial_cmap=posterior_colormap_initial_cmap)
+                        #TODO 2026-03-02 19:30: - [ ] WARN: Untested, this is just a weird 1D editor
+                        editor = Colormap1DEditorWidget(image_items=posterior_image_items, initial_cmap=posterior_colormap_initial_cmap)
                         _out_dict['posterior_colormap_editor'] = editor
                     if colormap_editor_container is not None:
                         if isinstance(colormap_editor_container, QtWidgets.QLayout):

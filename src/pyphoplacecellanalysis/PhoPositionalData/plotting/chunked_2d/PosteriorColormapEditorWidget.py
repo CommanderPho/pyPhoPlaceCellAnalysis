@@ -60,7 +60,8 @@ def _get_advanced_cmap_preset(name: str):
 # ==================================================================================================================================================================================================================================================================================== #
 # Standard 1D Colormaps                                                                                                                                                                                                                                                                #
 # ==================================================================================================================================================================================================================================================================================== #
-class PosteriorColormapEditorWidget(QtWidgets.QWidget):
+@metadata_attributes(short_name=None, tags=['UNUSED', 'not-tested'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-02 19:29', related_items=[])
+class Colormap1DEditorWidget(QtWidgets.QWidget):
     """
     Widget combining a ColorBarItem (interactive level range) and a preset dropdown
     to drive the colormap of posterior heatmap ImageItems. Optionally includes a
