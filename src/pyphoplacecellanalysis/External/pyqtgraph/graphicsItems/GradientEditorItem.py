@@ -611,6 +611,8 @@ class GradientEditorItem(TickSliderItem):
         self.setTickColor(self.currentTick, self.currentTickColor)
         
     def currentColorAccepted(self):
+        if self.currentTick is not None and self.colorDialog.currentColor().isValid():
+            self.setTickColor(self.currentTick, self.colorDialog.currentColor())
         self.sigGradientChangeFinished.emit(self)
         
     def tickClicked(self, tick, ev):
