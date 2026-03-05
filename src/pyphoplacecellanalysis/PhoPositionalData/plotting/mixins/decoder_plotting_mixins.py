@@ -1253,7 +1253,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
     @function_attributes(short_name=None, tags=['main', 'plot'], input_requires=[], output_provides=[], uses=[], used_by=['multi_DecodedTrajectoryMatplotlibPlotter_side_by_side', 'self.plot_decoded_laps_2d'], creation_date='2025-06-30 12:58', related_items=[])
     def plot_decoded_trajectories_2d(self, curr_position_df: pd.DataFrame, epoch_specific_position_dfs: List[pd.DataFrame], epoch_ids: NDArray, sess=None, curr_num_subplots=10, active_page_index=0, plot_actual_lap_lines:bool=False, fixed_columns: int = 2, use_theoretical_tracks_instead: bool = True, existing_ax=None, axes_inset_locators_list=None, cmap=None,
-                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, line_opacity: float = 1.0, track_background_opacity: float = 0.03, trajectory_line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME, **kwargs):
+                                    posteriors=None, plot_mode: str='time_gradient', should_include_trajectory_arrows: bool=False, arrow_concentration_kwargs=None, line_opacity: float = 1.0, track_background_opacity: float = 0.03, trajectory_line_color_scheme: Union[RenderColoringMode, str] = RenderColoringMode.TIME,
+                                    override_title_formatter_fn=None, **kwargs):
         """ Plots a MatplotLib 2D Figure with each lap being shown in one of its subplots
         
         Called to setup the graph.
@@ -1431,17 +1432,20 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
 
 
         def _subfn_add_specific_epoch_trajectory(p, axs, linear_plotter_indicies, row_column_indicies, active_page_epochs_ids, epochs_position_traces, epochs_time_ranges, active_plot_mode: str ='time_gradient', **plot_traj_kwargs):
-            """ captures: cmap, should_include_trajectory_arrows
+            """ captures: cmap, should_include_trajectory_arrows, override_title_formatter_fn
             """
-
-
             # Add the lap trajectory:
             for a_linear_index in linear_plotter_indicies:
                 curr_epoch_id = active_page_epochs_ids[a_linear_index]
                 curr_row = row_column_indicies[0][a_linear_index]
                 curr_col = row_column_indicies[1][a_linear_index]
                 curr_lap_time_range = epochs_time_ranges[curr_epoch_id]
-                curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_epoch_id, curr_lap_time_range[0], curr_lap_time_range[1])
+                # if 'override_title_formatter_fn' in plot_traj_kwargs:
+                if override_title_formatter_fn is not None:
+                    curr_lap_label_text = override_title_formatter_fn(curr_epoch_id)
+                else:
+                    curr_lap_label_text = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_epoch_id, curr_lap_time_range[0], curr_lap_time_range[1])
+
                 curr_lap_num_points = len(epochs_position_traces[curr_epoch_id][0,:])
                 valid_plotting_modes: List[str] = ['time_gradient', 'line', 'scatter']
                 # if use_time_gradient_line:
