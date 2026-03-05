@@ -127,6 +127,126 @@ from neuropy.core.position import PositionAccessor, Position, PositionComputedDa
 
 
 
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
+
+@function_attributes(short_name=None, tags=['lap', 'binned_pos'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
+def compute_lap_binned_occupancies(a_sess, a_decoder):
+    """ Returns the occupancies during each lap
+    
+    Usage:
+    
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_lap_binned_occupancies
+
+        ## INPUTS: a_sess, active_pos_df
+        an_epoch_name: str = 'roam'
+        a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
+
+        occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
+        lap_occupancy_seconds_dict
+
+    """
+    a_lap_occupancy_matricies_dict: Dict[str, Any] = {}
+    
+    a_sess.position.fixup_legacy()
+    active_pos_df: pd.DataFrame = a_sess.position.to_dataframe()
+
+    a_laps_obj: Laps = a_sess.laps
+    laps_df: pd.DataFrame = ensure_dataframe(a_laps_obj)
+    a_lap_occupancy_matricies_dict['laps_df'] = laps_df
+    
+    position_sampling_rate_Hz: float = a_sess.position_sampling_rate
+    mean_sampling_rate_sec: float = 1.0/position_sampling_rate_Hz
+    # mean_sampling_rate_sec: float = a_sess.position.to_dataframe().t.diff().mean() ## mean sampling rate
+
+    ## OUTPUTS: novel_only_laps_df
+    a_lap_only_pos_df: pd.DataFrame = active_pos_df.dropna(subset=['lap'], inplace=False)
+    a_lap_only_pos_df['lap'] = a_lap_only_pos_df['lap'].astype(int)
+    ## compute the occupany of only and plot that:
+    a_lap_only_pos_df: pd.DataFrame = a_lap_only_pos_df.position.adding_binned_position_columns(xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin)
+
+    occupancy_counts_df_dict: Dict[types.epoch_index, pd.DataFrame] = {}
+    lap_occupancy_n_samples_dict: Dict[types.epoch_index, NDArray] = {}
+    lap_occupancy_seconds_dict: Dict[types.epoch_index, NDArray] = {}
+
+    laps_unique_ids = a_lap_only_pos_df.lap.unique()
+    n_laps: int = len(laps_unique_ids)
+    lap_id_to_matrix_IDX_map = dict(zip(laps_unique_ids, np.arange(n_laps)))
+
+    curr_position_df_split = a_lap_only_pos_df.pho.partition_df_dict(partitionColumn='lap')
+    # occupancy_counts_df_dict = {k:v.groupby(['binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index() for k, v in curr_position_df_split.items()}
+
+    # for a_spikes_df in split_spikes_dfs:
+    for a_lap, a_lap_pos_df in curr_position_df_split.items():
+    # for a_lap, an_occupancy_counts_df in occupancy_counts_df_dict.items():
+
+        an_occupancy_counts_df = a_lap_pos_df.groupby(['binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index()
+        occupancy_counts_df_dict[a_lap] = an_occupancy_counts_df
+        a_position_binned_activity_matr = np.zeros(shape=(len(a_decoder.xbin_centers), len(a_decoder.ybin_centers)), dtype='uint64')
+        
+        an_occupancy_counts_df = an_occupancy_counts_df[an_occupancy_counts_df['t_count'] > 0] ## pre filter so there's less iteration needed
+        for a_row in an_occupancy_counts_df.itertuples():
+            a_position_binned_activity_matr[(a_row.binned_x-1), (a_row.binned_y-1)] += a_row.t_count
+        
+        lap_occupancy_n_samples_dict[a_lap] = a_position_binned_activity_matr
+        lap_occupancy_seconds_dict[a_lap] = a_position_binned_activity_matr.astype(float) * mean_sampling_rate_sec
+        
+    ## OUTPUTS: occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict
+    
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Compute Aggregated Results (Matricies)                                                                                                                                                                                                                                               #
+    # ==================================================================================================================================================================================================================================================================================== #
+    
+    a_lap_occupancy_matricies_dict['lap_occupancy_n_samples_dict'] = lap_occupancy_n_samples_dict
+    a_lap_occupancy_matricies_dict['lap_occupancy_seconds_dict'] = lap_occupancy_seconds_dict
+
+    lap_occupancy_seconds_stack: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_LAPS"], Any] = np.stack(list(lap_occupancy_seconds_dict.values()), axis=-1) ## get as list
+    # lap_occupancy_seconds_stack.shape # (41, 62, 11) - (n_x_bins, n_y_bins, n_laps)
+
+    a_lap_occupancy_matricies_dict['lap_occupancy_seconds_stack'] = lap_occupancy_seconds_stack
+    
+    laps_only_occupancy_seconds_cum: NDArray = np.cumsum(lap_occupancy_seconds_stack, axis=-1)
+
+    ## fully vectorized version:
+    is_visited_mask = lap_occupancy_seconds_stack > 0
+    a_lap_occupancy_matricies_dict['is_visited_mask'] = is_visited_mask
+    
+    first_visited_lap = np.argmax(is_visited_mask, axis=2)
+    a_lap_occupancy_matricies_dict['first_visited_lap'] = first_visited_lap
+
+    first_visit_mask = is_visited_mask & (np.cumsum(is_visited_mask, axis=2) == 1)
+    a_lap_occupancy_matricies_dict['first_visit_mask'] = first_visit_mask
+    
+    first_visit_occupancy = lap_occupancy_seconds_stack * first_visit_mask
+    a_lap_occupancy_matricies_dict['first_visit_occupancy'] = first_visit_occupancy
+    
+    total_laps_occupancy_sec: NDArray[ND.Shape["N_X_BINS, N_Y_BINS"], Any] = np.nansum(lap_occupancy_seconds_stack, axis=-1)
+    a_lap_occupancy_matricies_dict['total_laps_occupancy_sec'] = total_laps_occupancy_sec
+    # np.sum(first_visit_mask)
+
+    ## INPUTS: is_visited_mask
+    # is_visited_mask.shape (41, 62, n_laps)
+
+    # 1. Calculate the cumulative sum (number of laps that have entered that bin, cummulatively)
+    visit_cumsum = np.cumsum(is_visited_mask.astype(int), axis=2)
+    # 2. A "new visit" is the exact lap where cumsum == 1 AND it was actually visited
+    is_new_visit_masks = (visit_cumsum == 1) & (is_visited_mask > 0) ## any subsequent lap after the first one (where the count becomes one) should be zeroed out
+
+    ## OUTPUTS: is_new_visit_masks
+    a_lap_occupancy_matricies_dict['is_new_visit_masks'] = is_new_visit_masks
+
+    lap_novelty_score: NDArray[ND.Shape["N_LAPS"], Any] = np.nansum(is_new_visit_masks, axis=(0, 1)) ## sum over all positions during each lap to get the lap novelty score, meaning the number of *new* bins explored during that lap
+    a_lap_occupancy_matricies_dict['lap_novelty_score'] = lap_novelty_score
+
+    # Add to the laps_df (which is propagated back to the sess object) ___________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    a_laps_obj.update_columns(columns=pd.DataFrame({'lap_id': laps_df.lap_id, 'lap_novelty_score': lap_novelty_score}), join_on='lap_id', fill_value=np.nan, inplace=True)
+
+    return occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict
+
 
 
 
@@ -222,6 +342,68 @@ class PositionNovelty:
         if run_knn_visited:
             pos_df['novelty_knn_visited'] = cls.knn_visited_score(pos_df, k=k, **kwargs)
         return pos_df
+
+
+
+    @function_attributes(short_name=None, tags=['novelty', 'rarity', 'laps'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-04 12:09', related_items=[])
+    @classmethod
+    def compute_position_novelty(cls, active_pos_df: pd.DataFrame, laps_df: pd.DataFrame):
+        """Computes the novelty for each position in `active_pos_df` using two different methods and creates two new columns:
+
+        The 'novelty_knn_visited' producing function is slow (~20m), while the 'novelty_lehman' one is fast (~2m)
+        
+        `active_pos_df`: ['novelty_lehman', 'novelty_knn_visited']
+        `laps_df`: ['novelty_lehman_max', 'novelty_lehman_p90', 'novelty_knn_max', 'novelty_knn_p90']
+        
+        Usage:
+
+            from neuropy.core.position import PositionAccessor, Position
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionNovelty
+
+            ## Single filtered_sess an_epoch_name:
+            # an_epoch_name: str = 'sprinkle'
+
+            for an_epoch_name in ['roam', 'sprinkle']:
+                a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
+                a_sess.position = a_sess.position.fixup_legacy()
+                pos_df = a_sess.position.to_dataframe()
+                laps_df: pd.DataFrame = ensure_dataframe(a_sess.laps)
+
+                pos_df['speed_xy'] = np.sqrt(np.power(pos_df['velocity_x_smooth'], 2) +  np.power(pos_df['velocity_y_smooth'], 2))
+                
+                if ('novelty_knn_visited' not in pos_df) or ('novelty_lehman_p90' not in laps_df):
+                    print(f'needs recompute for {an_epoch_name}')
+                    active_pos_df, laps_df = PositionNovelty.compute_position_novelty(active_pos_df=pos_df, laps_df=laps_df) ## adds columns: ['novelty_lehman_max', 'novelty_lehman_p90', 'novelty_knn_max', 'novelty_knn_p90'] to laps_df
+                    ## update the internal dataframes of the session to keep the changes:
+                    a_sess.laps._df = laps_df.copy()
+                    a_sess.position._df = active_pos_df.copy()
+
+            # 1m 46s
+
+            ## OUTPUTS: active_pos_df
+            # active_pos_df
+
+        """
+        # pos_df = cls.run_all(pos_df=pos_df, k=5)
+        active_pos_df = cls.run_all(pos_df=active_pos_df, k=5)
+        
+        ## 15m 53 s
+        # Performed 4 aggregations grouped on column: 'lap'
+        lap_novelty_scores_df: pd.DataFrame = active_pos_df.groupby(['lap']).agg(novelty_lehman_mean=('novelty_lehman', 'mean'), novelty_lehman_max=('novelty_lehman', 'max'), novelty_lehman_min=('novelty_lehman', 'min'), # max: Best for finding laps with ANY highly unique segment
+                                                    novelty_lehman_sum=('novelty_lehman', 'sum'), novelty_lehman_p90=('novelty_lehman', lambda x: x.quantile(0.90)), # Best for robustness against single-point outliers
+                                                    novelty_knn_max=('novelty_knn_visited', 'max'), novelty_knn_p90=('novelty_knn_visited', lambda x: x.quantile(0.90)), # Best for robustness against single-point outliers
+                                                    ).reset_index()
+
+        ## OUTPUTS: lap_novelty_scores_df
+
+        
+        assert len(laps_df) == len(lap_novelty_scores_df), f"len(laps_df): {len(laps_df)}, len(lap_novelty_scores_df): {len(lap_novelty_scores_df)}"
+
+        columns_to_add = ['novelty_lehman_max', 'novelty_lehman_p90', 'novelty_knn_max', 'novelty_knn_p90']
+        laps_df[columns_to_add] = lap_novelty_scores_df[columns_to_add].copy()
+        
+        ## OUTPUTS: laps_df, active_pos_df
+        return active_pos_df, laps_df
 
 
 
@@ -942,7 +1124,7 @@ class PosteriorMaskPostProcessing:
         assert len(time_window_centers) == np.shape(a_centroids)[0]
         centroids_df: pd.DataFrame = pd.DataFrame(a_centroids, columns=['x', 'y'])
         centroids_df['t'] = time_window_centers
-        centroids_df = PosteriorMaskPostProcessing.add_angular_movement_dir(epoch_centroids=a_centroids, epoch_time_window_centers=time_window_centers)
+        centroids_df = cls.add_angular_movement_dir(epoch_centroids=a_centroids, epoch_time_window_centers=time_window_centers)
         centroids_df = centroids_df.position.adding_segmented_trajectories_columns(disable_segmentation=True)
         return centroids_df ## has ['dir_angle_binned', 'approx_dir_degrees']
 
