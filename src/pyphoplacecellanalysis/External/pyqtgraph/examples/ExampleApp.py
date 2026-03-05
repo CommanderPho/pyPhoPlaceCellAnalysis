@@ -358,9 +358,9 @@ class ExampleLoader(QtWidgets.QMainWindow):
         self.populateTree(self.ui.exampleTree.invisibleRootItem(), utils.examples_)
         self.ui.exampleTree.expandAll()
 
-        self.resize(1000,500)
+        self.resize(1250, 500)
         self.show()
-        self.ui.splitter.setSizes([250,750])
+        self.ui.splitter.setSizes([500, 750])
 
         self.oldText = self.ui.codeView.toPlainText()
         self.ui.loadBtn.clicked.connect(self.loadFile)
