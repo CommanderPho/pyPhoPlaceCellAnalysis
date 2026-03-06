@@ -2664,21 +2664,16 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
 
 
 
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
-from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
-
-
-
-# @METADA
-
 
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-12-10 Bapun Proper Epochs and additional Computations                                                                                                                                                                                                                           #
 # ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
+from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
@@ -2770,9 +2765,6 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_l
     a_rect_item: IntervalRectsItem = _added_items_dict['RootPlot']['rect_item']
 
     return a_rect_item, an_interval_ds
-
-
-
 
 
 
