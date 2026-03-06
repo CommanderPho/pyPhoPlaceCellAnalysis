@@ -2670,7 +2670,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResu
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 
-import ot ## used to compute the earth-mover's distance
+
 
 # @METADA
 
