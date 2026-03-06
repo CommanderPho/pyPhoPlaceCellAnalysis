@@ -145,7 +145,7 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
         an_epoch_name: str = 'roam'
         a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
 
-        occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
+        occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
         lap_occupancy_seconds_dict
 
     """
@@ -337,7 +337,7 @@ class PositionNovelty:
 
 
     @classmethod
-    def run_all(cls, pos_df: pd.DataFrame, k=5, run_knn_visited: bool=True, **kwargs) -> pd.DataFrame:
+    def run_all(cls, pos_df: pd.DataFrame, k=5, run_knn_visited: bool = False, **kwargs) -> pd.DataFrame:
         pos_df['novelty_lehman']      = cls.novelty_search_score(pos_df, k=k, **kwargs)
         if run_knn_visited:
             pos_df['novelty_knn_visited'] = cls.knn_visited_score(pos_df, k=k, **kwargs)
