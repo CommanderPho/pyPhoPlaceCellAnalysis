@@ -124,13 +124,17 @@ from scipy.ndimage import binary_dilation
 from scipy.ndimage import distance_transform_edt
 from neuropy.core.position import PositionAccessor, Position, PositionComputedDataMixin
 
-
+from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
 
 
 @function_attributes(short_name=None, tags=['lap', 'binned_pos'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
@@ -151,7 +155,7 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     """
     a_lap_occupancy_matricies_dict: Dict[str, Any] = {}
     
-    a_sess.position.fixup_legacy()
+    _ = a_sess.position.fixup_legacy()
     active_pos_df: pd.DataFrame = a_sess.position.to_dataframe()
 
     a_laps_obj: Laps = a_sess.laps
@@ -175,6 +179,9 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     laps_unique_ids = a_lap_only_pos_df.lap.unique()
     n_laps: int = len(laps_unique_ids)
     lap_id_to_matrix_IDX_map = dict(zip(laps_unique_ids, np.arange(n_laps)))
+    a_lap_occupancy_matricies_dict['laps_unique_ids'] = laps_unique_ids
+    a_lap_occupancy_matricies_dict['lap_id_to_matrix_IDX_map'] = lap_id_to_matrix_IDX_map
+
 
     curr_position_df_split = a_lap_only_pos_df.pho.partition_df_dict(partitionColumn='lap')
     # occupancy_counts_df_dict = {k:v.groupby(['binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index() for k, v in curr_position_df_split.items()}
@@ -215,12 +222,15 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     is_visited_mask = lap_occupancy_seconds_stack > 0
     a_lap_occupancy_matricies_dict['is_visited_mask'] = is_visited_mask
     
+    lap_num_visited_unique_bins = np.nansum(is_visited_mask, axis=(0, 1)) ## number of unique visited bins
+    
     first_visited_lap = np.argmax(is_visited_mask, axis=2)
     a_lap_occupancy_matricies_dict['first_visited_lap'] = first_visited_lap
 
     first_visit_mask = is_visited_mask & (np.cumsum(is_visited_mask, axis=2) == 1)
     a_lap_occupancy_matricies_dict['first_visit_mask'] = first_visit_mask
     
+    ## time spent in each bin
     first_visit_occupancy = lap_occupancy_seconds_stack * first_visit_mask
     a_lap_occupancy_matricies_dict['first_visit_occupancy'] = first_visit_occupancy
     
@@ -241,9 +251,26 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
 
     lap_novelty_score: NDArray[ND.Shape["N_LAPS"], Any] = np.nansum(is_new_visit_masks, axis=(0, 1)) ## sum over all positions during each lap to get the lap novelty score, meaning the number of *new* bins explored during that lap
     a_lap_occupancy_matricies_dict['lap_novelty_score'] = lap_novelty_score
+    
+    a_lap_occupancy_matricies_dict['lap_novelty_ratio_score'] = lap_novelty_score / lap_num_visited_unique_bins ## divide by the total number of unique (to the lap) bins in each lap, given the ratio of the bins that were new
 
+    #TODO 2026-03-05 11:56: - [ ] Could improve further by adding a dilation radius to the animal's path, so we're effectively only looking at times that they traversed a new *area* of the track, not just a path that was slightly different than there previous one
+    
     # Add to the laps_df (which is propagated back to the sess object) ___________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    a_laps_obj.update_columns(columns=pd.DataFrame({'lap_id': laps_df.lap_id, 'lap_novelty_score': lap_novelty_score}), join_on='lap_id', fill_value=np.nan, inplace=True)
+    lap_df_columns_to_add_dict = {'lap_novelty_score': lap_novelty_score, 'lap_novelty_ratio_score': a_lap_occupancy_matricies_dict['lap_novelty_ratio_score']}
+    for k, v in lap_df_columns_to_add_dict.items():
+        a_laps_obj.update_columns(columns=pd.DataFrame({'lap_id': laps_df.lap_id, f"{k}": v}), join_on='lap_id', fill_value=np.nan, inplace=True)
+    
+    # a_laps_obj.update_columns(columns=pd.DataFrame({'lap_id': laps_df.lap_id, 'lap_novelty_score': lap_novelty_score}), join_on='lap_id', fill_value=np.nan, inplace=True)
+
+    """
+    is_new_visit_masks = a_lap_occupancy_matricies_dict['is_new_visit_masks']
+    lap_novelty_ratio_score = a_lap_occupancy_matricies_dict['lap_novelty_ratio_score']
+    lap_novelty_score = a_lap_occupancy_matricies_dict['lap_novelty_score']
+    is_visited_mask = a_lap_occupancy_matricies_dict['is_visited_mask']
+    
+
+    """
 
     return occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict
 
@@ -404,6 +431,135 @@ class PositionNovelty:
         
         ## OUTPUTS: laps_df, active_pos_df
         return active_pos_df, laps_df
+
+
+
+    
+    @function_attributes(short_name=None, tags=['UNFINSHED', 'laps', 'lap-occupanies'], input_requires=[], output_provides=[], uses=['compute_lap_binned_occupancies'], used_by=[], creation_date='2026-03-05 17:03', related_items=[])
+    @classmethod
+    def compute_all_laps_occupancies(cls, curr_active_pipeline, masked_container):
+        """ Factored out of notebook
+
+                compute_all_laps_occupancies(curr_active_pipeline=curr_active_pipeline, masked_container=_container_container.masked_container,      )
+                
+        """
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # novelty_metric_col: str = 'novelty_lehman_p90'
+        # novelty_metric_col: str = 'novelty_knn_p90'
+
+        _fig_out_dict = {}
+        widget_out_dict = {}
+
+        for an_epoch_name in ['roam', 'sprinkle']:
+
+            a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
+            _ = a_sess.position.fixup_legacy()
+            active_pos_df = a_sess.position.to_dataframe()
+            laps_df: pd.DataFrame = ensure_dataframe(a_sess.laps)
+
+            lap_novelty_score: NDArray = laps_df['lap_novelty_score'].to_numpy()
+            
+            def override_title_formatter_fn(curr_epoch_id) -> str:
+                """ captures `laps_df` to get the data needed for the title """
+                included_lap_info_columns = ['lap_novelty_score']
+                curr_lap_info = laps_df[laps_df['lap_id'] == curr_epoch_id]
+                assert len(curr_lap_info) == 1
+                curr_lap_info: Dict = curr_lap_info.iloc[0].to_dict() # {'lap_dir': 0, 'start': 7449.502388840895, 'stop': 7467.4107279169175, 'duration': 17.908339076022457, 'label': '1', 'lap_id': 1, 'novelty_lehman_max': 0.4827321516328119, 'novelty_lehman_p90': 0.2796114892604357, 'novelty_knn_max': 1.7460081712930897, 'novelty_knn_p90': 0.9879667712313558, 'lap_novelty_score': 125}
+                curr_lap_label_text: str = 'Epoch[{}]: t({:.2f}, {:.2f})'.format(curr_epoch_id, curr_lap_info['start'], curr_lap_info['stop'])
+                for a_col_name in included_lap_info_columns:
+                    curr_lap_label_text = curr_lap_label_text + f' {curr_lap_info[a_col_name]}'
+                return curr_lap_label_text
+                
+            
+            # novel_only_laps_df: pd.DataFrame = laps_df[laps_df[novelty_metric_col] > laps_df[novelty_metric_col].quantile(0.6)]
+            # novel_only_laps_df ## 11/107 rows
+
+            ## OUTPUTS: novel_only_laps_df
+            a_lap_only_pos_df: pd.DataFrame = active_pos_df.dropna(subset=['lap'], inplace=False)
+            a_lap_only_pos_df['lap'] = a_lap_only_pos_df['lap'].astype(int)
+
+            ## add 'is_novel' column to `a_lap_only_pos_df`
+            # a_lap_only_pos_df['is_novel'] = a_lap_only_pos_df['lap'].isin(novel_only_laps_df['lap_id'])
+
+            # curr_position_df_dict = a_lap_only_pos_df.pho.partition_df_dict('is_novel')
+            # novel_only_lap_only_pos_df = a_lap_only_pos_df[a_lap_only_pos_df['lap'].isin(novel_only_laps_df['lap_id'])]
+            
+            # OUTPUTS: novel_only_lap_only_pos_df,  a_lap_only_pos_df
+
+
+            ## #TODO 2026-03-03 17:54: - [ ] Got `novel_only_lap_only_pos_df`, but forgot the point :[
+
+            
+            a_decoder = masked_container.pf1D_Decoder_dict[an_epoch_name]
+            # a_result2D: DecodedFilterEpochsResult = decoded_local_epochs_result.frame_divided_epochs_results[an_epoch_name]
+            ## INPUTS: directional_laps_results, decoder_ripple_filter_epochs_decoder_result_dict
+            xbin = deepcopy(a_decoder.xbin)
+            xbin_centers = deepcopy(a_decoder.xbin_centers)
+            ybin_centers = deepcopy(a_decoder.ybin_centers)
+            ybin = deepcopy(a_decoder.ybin)
+
+            ## compute the occupancies per lap:
+            occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
+            ## OUTPUTS: lap_occupancy_seconds_dict
+
+            plotter_kwargs = dict(xbin=xbin, xbin_centers=xbin_centers, ybin=ybin, ybin_centers=ybin_centers)
+            plot_lap_trajectories_2d_kwargs = dict(
+                # curr_num_subplots=(6*5), 
+                should_include_trajectory_arrows=True,
+                active_page_index=0, fixed_columns = 8,
+                plot_mode='time_gradient', #'line', 
+                override_title_formatter_fn=override_title_formatter_fn,
+            )
+
+
+            curr_position_df = deepcopy(a_lap_only_pos_df)
+
+            # for is_novel_key, curr_position_df in curr_position_df_dict.items():
+            # a_novelty_key: str = {True: 'novel', False: 'non-novel'}[is_novel_key]
+            
+            ## 2D:
+            # Choose the ripple epochs to plot:\
+            a_result: DecodedFilterEpochsResult = None # a_decoded_filter_epochs_decoder_result_dict['long'] # 2D
+            # curr_position_df_split = curr_position_df.pho.partition_df_dict(partitionColumn='lap')
+
+            # curr_position_df_dict = {'novel': novel_only_lap_only_pos_df, 'non-novel': }
+            # curr_position_df
+            
+            identifier_key: str = f'{an_epoch_name}'
+            # identifier_key: str = f'{an_epoch_name} - {a_novelty_key}'
+            
+            lap_ids, partitioned_dfs_list = curr_position_df.pho.partition(partitionColumn='lap')
+            
+            active_lap_occupancy_seconds_dict = get_dict_subset(lap_occupancy_seconds_dict, subset_includelist=lap_ids, subset_excludelist=None)
+            
+            assert len(active_lap_occupancy_seconds_dict) == len(lap_ids)
+            
+
+            num_filter_epochs: int = len(lap_ids) # a_result.num_filter_epochs
+            print(f'k: {identifier_key} has num_filter_epochs: {num_filter_epochs}, len(lap_ids): {len(lap_ids)}')
+            a_decoded_traj_plotter = DecodedTrajectoryMatplotlibPlotter(a_result=a_result, **plotter_kwargs)
+            fig, axs, laps_pages = a_decoded_traj_plotter.plot_decoded_trajectories_2d(curr_position_df=curr_position_df, epoch_specific_position_dfs=partitioned_dfs_list, epoch_ids=lap_ids,
+                                                                                    curr_num_subplots=num_filter_epochs,
+                                                                                    **plot_lap_trajectories_2d_kwargs, # active_page_index=0, fixed_columns=10,
+                                                                                    posteriors=active_lap_occupancy_seconds_dict,
+                                                                                    plot_actual_lap_lines=True, use_theoretical_tracks_instead=False)
+            
+
+
+            # lap_occupancy_seconds_dict
+
+            _fig_out_dict[an_epoch_name] = GenericMatplotlibContainer.init_from_matplotlib_objects(name=f'splitTrajectories[{identifier_key}]', figures=[fig], axes=axs, plots_data={'laps_pages': laps_pages})
+
+            p3, axs, laps_pages3 = _fig_out_dict[an_epoch_name].fig, _fig_out_dict[an_epoch_name].axes, _fig_out_dict[an_epoch_name].plots_data.laps_pages
+            perform_update_title_subtitle(fig=_fig_out_dict[an_epoch_name].fig, ax=None, title_string=f"{identifier_key} - 2d runs", subtitle_string=f"{identifier_key}")
+
+            # widget_out_dict[an_epoch_name] = p3.canvas.parent()
+
 
 
 
