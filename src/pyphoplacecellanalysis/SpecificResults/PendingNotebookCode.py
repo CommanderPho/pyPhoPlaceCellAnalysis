@@ -149,7 +149,7 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
         an_epoch_name: str = 'roam'
         a_sess = curr_active_pipeline.filtered_sessions[an_epoch_name]
 
-        occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
+        occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
         lap_occupancy_seconds_dict
 
     """
@@ -364,7 +364,7 @@ class PositionNovelty:
 
 
     @classmethod
-    def run_all(cls, pos_df: pd.DataFrame, k=5, run_knn_visited: bool=True, **kwargs) -> pd.DataFrame:
+    def run_all(cls, pos_df: pd.DataFrame, k=5, run_knn_visited: bool = False, **kwargs) -> pd.DataFrame:
         pos_df['novelty_lehman']      = cls.novelty_search_score(pos_df, k=k, **kwargs)
         if run_knn_visited:
             pos_df['novelty_knn_visited'] = cls.knn_visited_score(pos_df, k=k, **kwargs)
@@ -2820,21 +2820,16 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
 
 
 
-from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
-from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
-from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
-from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
-from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
-
-import ot ## used to compute the earth-mover's distance
-
-# @METADA
-
 
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-12-10 Bapun Proper Epochs and additional Computations                                                                                                                                                                                                                           #
 # ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
+from pyphoplacecellanalysis.General.Mixins.PickleSerializableMixin import PickleSerializableMixin
+from pyphoplacecellanalysis.General.Model.ComputationResults import ComputedResult
+from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, serialized_field, serialized_attribute_field, non_serialized_field, custom_define
+from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin, HDF_Converter
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs, inline_mkColor
 from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import IntervalsDatasource
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
@@ -2926,9 +2921,6 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_l
     a_rect_item: IntervalRectsItem = _added_items_dict['RootPlot']['rect_item']
 
     return a_rect_item, an_interval_ds
-
-
-
 
 
 
