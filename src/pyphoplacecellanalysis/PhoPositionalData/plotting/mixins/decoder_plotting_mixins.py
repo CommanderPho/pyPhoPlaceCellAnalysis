@@ -52,6 +52,7 @@ class RenderColoringMode(str, Enum):
     TIME = 'time'
     SPEED = 'speed'
     ANGLE = 'angle'
+    STATIC = 'static' ## not changing as a function of a property
 
 
 import matplotlib.pyplot as plt
@@ -641,6 +642,8 @@ class DecodedTrajectoryMatplotlibPlotter(DecodedTrajectoryPlotter):
                 angle_deg = (np.degrees(np.arctan2(dy, dx)) + 360.0) % 360.0
                 compass_deg = float(np.asarray(HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)).flat[0])
                 arrow_color = HeadingAngleHelpers.heading_angle_to_rainbow_rgba(compass_deg, alpha=1.0)
+            elif arrow_color_scheme == RenderColoringMode.STATIC:
+                arrow_color = '#333333BB'
             else:
                 raise ValueError(f"arrow_color_scheme must be {list(RenderColoringMode)}, got {arrow_color_scheme!r}")
             arrow = FancyArrowPatch(
