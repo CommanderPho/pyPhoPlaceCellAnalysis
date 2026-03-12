@@ -283,8 +283,25 @@ class BinnedOccupancyComparisons:
 
     occ_comp: BinnedOccupancyComparisons = BinnedOccupancyComparisons()
         
+    ## from masked_container:
     across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row) = occ_comp.plot_decoded_and_measured_occupancies(curr_active_pipeline=curr_active_pipeline, masked_container=masked_container)
+
+    ## from separate:
+    across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row) = occ_comp.plot_decoded_and_measured_occupancies(curr_active_pipeline=curr_active_pipeline,
+                                                                                            pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict,
+                                                                                            epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict,
+                                                                                        )
+                                                                                        
+                                                                                        
     
+    ## from separate:
+    across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row) = occ_comp.plot_decoded_and_measured_occupancies(curr_active_pipeline=curr_active_pipeline,
+                                                                                            pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict,
+                                                                                            epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict,
+                                                                                        )
+                                                                                        
+                                                                                        
+                                                                                        
     
     """
     ## DO ONCE:
@@ -292,8 +309,21 @@ class BinnedOccupancyComparisons:
     
     
     @function_attributes(short_name=None, tags=['GREAT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-03 16:32', related_items=[])
-    def plot_decoded_and_measured_occupancies(self, curr_active_pipeline, masked_container): 
-        """ plots a comparison between decoded occupancy during various periods and observed """
+    def plot_decoded_and_measured_occupancies(self, curr_active_pipeline, 
+                                              pf1D_Decoder_dict=None, epochs_decoded_result_cache_dict=None, masked_container=None,
+                                              extant_pbe_decoding_time_bin_size: float = 0.025): 
+        """ plots a comparison between decoded occupancy during various periods and observed 
+        
+        pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict
+        epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict
+        """
+        if masked_container is not None:
+            assert pf1D_Decoder_dict is None
+            assert epochs_decoded_result_cache_dict is None
+            ## set fromt he masked_container:
+            pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict
+            epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict
+
 
         decoder_cache = self.decoder_cache
         
@@ -318,7 +348,7 @@ class BinnedOccupancyComparisons:
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
         
-        time_bins_size: float = 0.025
+        # extant_pbe_decoding_time_bin_size: float = 0.025
 
         win = pg.GraphicsLayoutWidget(title="Decoded PBE Occupancy (Roam vs Sprinkle)")
         
@@ -331,8 +361,8 @@ class BinnedOccupancyComparisons:
         curr_row: int = 0
         for a_decoder_name in ['roam', 'sprinkle']:
             pbes_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].pbe)
-            a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
-            decoded_PBEs_result: DecodedFilterEpochsResult = masked_container.epochs_decoded_result_cache_dict[time_bins_size][a_decoder_name]
+            a_decoder = pf1D_Decoder_dict[a_decoder_name]
+            decoded_PBEs_result: DecodedFilterEpochsResult = epochs_decoded_result_cache_dict[extant_pbe_decoding_time_bin_size][a_decoder_name]
             n_timebins, flat_time_bin_containers, timebins_p_x_given_n = decoded_PBEs_result.flatten()
             cumm_flattened_p_x_given_n = np.nansum(timebins_p_x_given_n, axis=-1)
             cumm_flattened_p_x_given_n = cumm_flattened_p_x_given_n / float(n_timebins)
@@ -344,8 +374,8 @@ class BinnedOccupancyComparisons:
 
 
         # Plot measured occupancy as a separate row: _________________________________________________________________________ #
-        occupancy_roam = masked_container.pf1D_Decoder_dict['roam'].pf.occupancy
-        occupancy_sprinkle = masked_container.pf1D_Decoder_dict['sprinkle'].pf.occupancy
+        occupancy_roam = pf1D_Decoder_dict['roam'].pf.occupancy
+        occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.occupancy
         column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
@@ -359,7 +389,7 @@ class BinnedOccupancyComparisons:
 
         for a_decoder_name in ['roam', 'sprinkle']:
             laps_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].laps.to_dataframe())
-            a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
+            a_decoder = pf1D_Decoder_dict[a_decoder_name]
 
             if a_decoder_name not in decoder_cache['laps'][decoding_time_bin_size]:
                 decoder_cache['laps'][decoding_time_bin_size][a_decoder_name] = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=laps_df, decoding_time_bin_size=decoding_time_bin_size)
@@ -378,8 +408,8 @@ class BinnedOccupancyComparisons:
 
 
         # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
-        occupancy_roam = masked_container.pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
-        occupancy_sprinkle = masked_container.pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
+        occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
+        occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
         column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
@@ -1103,7 +1133,7 @@ def _plot_shapely_lap_detect_maze(ax=None):
 
 #     for a_decoder_name in included_epoch_names:
 #         a_decoder = masked_container.pf1D_Decoder_dict[a_decoder_name]
-#         a_decoded_result = masked_container.epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
+#         a_decoded_result = epochs_decoded_result_cache_dict[a_t_bin_size][a_decoder_name] # DecodedFilterEpochsResult
 #         a_decoded_filter_epochs_df: pd.DataFrame = a_decoded_result.filter_epochs
 #         decoder_epoch_flat_mask_future_past_result_dict[a_decoder_name] = masked_container.debug_computed_dict[a_decoder_name]['prominence_future_past_analysis']['_out_epoch_flat_mask_future_past_result']
 #         ## updates: decoder_flat_matching_results_list_ds_dict
