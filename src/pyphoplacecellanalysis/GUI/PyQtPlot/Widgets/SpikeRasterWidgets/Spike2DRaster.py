@@ -2050,7 +2050,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         return saved_output_pdf_path
 
 
-
+    @function_attributes(short_name=None, tags=['MAIN', 'export', 'all-tracks', 'track', 'pdf', 'image', 'file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-12 11:20', related_items=[])
     def export_all_tracks_to_image(self, custom_figure_output_path=None, curr_active_pipeline=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
         """Export all timeline tracks from this widget to a paged PDF.
 
@@ -2077,6 +2077,11 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             # In a notebook, with an existing Spike2DRaster widget and pipeline:
             out_path = Path('outputs/figures').resolve()
             active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=out_path, curr_active_pipeline=curr_active_pipeline)
+
+            
+            out_path = None
+            _render_export_all_time_tracks = active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=out_path, curr_active_pipeline=curr_active_pipeline)
+            _render_export_all_time_tracks
 
         """
         # ==================================================================================================================================================================================================================================================================================== #
