@@ -305,7 +305,7 @@ class BinnedOccupancyComparisons:
     
     """
     ## DO ONCE:
-    decoder_cache: dict[str, dict] = field(default={'laps': {}})
+    decoder_cache: dict[str, dict] = field(default={'laps': {}, 'pbe': {}})
     
     
     @function_attributes(short_name=None, tags=['GREAT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-03 16:32', related_items=[])
@@ -350,19 +350,39 @@ class BinnedOccupancyComparisons:
         
         # extant_pbe_decoding_time_bin_size: float = 0.025
 
-        win = pg.GraphicsLayoutWidget(title="Decoded PBE Occupancy (Roam vs Sprinkle)")
+        win = pg.GraphicsLayoutWidget(title="BinnedOccupancyComparisons - Decoded/Measured Occupancy (Roam vs Sprinkle)")
         
 
         across_all_time_bin_p_x_given_n_dict = {}
 
         cmap = pg.colormap.get('viridis')  # added
 
+        if extant_pbe_decoding_time_bin_size not in decoder_cache['pbe']:
+            decoder_cache['pbe'][extant_pbe_decoding_time_bin_size] = {} ## INIT
+
+
         # Plot decoded PBES __________________________________________________________________________________________________ #
         curr_row: int = 0
         for a_decoder_name in ['roam', 'sprinkle']:
             pbes_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].pbe)
             a_decoder = pf1D_Decoder_dict[a_decoder_name]
-            decoded_PBEs_result: DecodedFilterEpochsResult = epochs_decoded_result_cache_dict[extant_pbe_decoding_time_bin_size][a_decoder_name]
+            decoded_PBEs_result: DecodedFilterEpochsResult = epochs_decoded_result_cache_dict.get(extant_pbe_decoding_time_bin_size, {}).get(a_decoder_name, None)
+
+            if decoded_PBEs_result is None:
+                # Needs recompute using the decoder __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                if a_decoder_name not in decoder_cache['pbe'][extant_pbe_decoding_time_bin_size]:
+                    print(f'\tperforming recompute for PBEs for epoch {a_decoder_name}...')
+                    decoder_cache['pbe'][extant_pbe_decoding_time_bin_size][a_decoder_name] = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=pbes_df, decoding_time_bin_size=extant_pbe_decoding_time_bin_size)
+                    
+                decoded_PBEs_result: DecodedFilterEpochsResult = decoder_cache['pbe'][extant_pbe_decoding_time_bin_size][a_decoder_name]
+                decoded_PBEs_result.filter_epochs._df['pbe_id'] = decoded_PBEs_result.filter_epochs._df['label'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+                # decoded_PBEs_result.filter_epochs._df['original_epoch_idx'] = decoded_PBEs_result.filter_epochs._df['pbe_id'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+                
+            # END ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            
+            ## OUTPUTS: decoded_PBEs_result
+            assert decoded_PBEs_result is not None, f"decoded_PBEs_result is None even after computation was supposedly done!"
+
             n_timebins, flat_time_bin_containers, timebins_p_x_given_n = decoded_PBEs_result.flatten()
             cumm_flattened_p_x_given_n = np.nansum(timebins_p_x_given_n, axis=-1)
             cumm_flattened_p_x_given_n = cumm_flattened_p_x_given_n / float(n_timebins)
