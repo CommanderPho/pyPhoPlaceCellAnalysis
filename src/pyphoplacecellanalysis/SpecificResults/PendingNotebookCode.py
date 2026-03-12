@@ -337,7 +337,7 @@ class BinnedOccupancyComparisons:
                 img_item.setLookupTable(cmap.getLookupTable())
                 vb.addItem(img_item)
                 vb.setAspectLocked(True)
-                cbar = pg.ColorBarItem(colorMap=cmap, label=title, values=(np.nanmin(image_data), np.nanmax(image_data)))
+                cbar = pg.ColorBarItem(colorMap=cmap, label=title, values=(np.nanmin(image_data), np.nanmax(image_data)), rounding=None) # , limits=(0.0, None)
                 cbar.setImageItem(img_item)
                 win.addItem(cbar, row=(curr_row + 1), col=col_idx*2 + 1)
                 
