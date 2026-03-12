@@ -1780,7 +1780,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
         if included_computation_filter_names is None:
-            _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+            global_epoch_name = self.find_Global_epoch_name()
             included_computation_filter_names = [global_epoch_name] # use only the global epoch: e.g. ['maze']
             if progress_print:
                 print(f'Running batch_extended_computations(...) with global_epoch_name: "{global_epoch_name}"')

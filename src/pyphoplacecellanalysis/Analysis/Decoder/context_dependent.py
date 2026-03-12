@@ -1129,6 +1129,13 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             del curr_active_pipeline.global_computation_results.computed_data['EpochComputations'] ## drop the old result
 
         curr_active_pipeline.reload_default_computation_functions()
+        
+        curr_sess_format_name: str = curr_active_pipeline.get_session_format_name()
+        if (curr_sess_format_name.lower() != 'kdiba'):
+            _perform_comp_kwargs = dict(fail_on_exception=False) # expect 'merged_directional_placefields' to fail on Bapun sessions
+        else:
+            _perform_comp_kwargs = dict(fail_on_exception=True)
+
         ## perform the computation either way:
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring', 'non_PBE_epochs_results'],
@@ -1136,13 +1143,17 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                                                                                     {'same_thresh_fraction_of_track': 0.05, 'max_ignore_bins': 2, 'use_bin_units_instead_of_realworld': False, 'max_jump_distance_cm': 60.0},
                                                                                      dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=True, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
                                                                                 ], ## END KWARGS LIST
-                                                                                enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                                                                                enabled_filter_names=None, debug_print=False, **_perform_comp_kwargs)
         curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False) ## just checking
 
 
         session_name: str = curr_active_pipeline.session_name
-        t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
         
+        if (curr_sess_format_name.lower() == 'kdiba'):
+            t_start, t_delta, t_end = curr_active_pipeline.find_LongShortDelta_times()
+        else:
+            t_delta = None ## important        
+
         ## Unpack the results:
         # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
 
@@ -1243,7 +1254,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
             time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
             assert time_column_name in a_df
-            a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
+            if (t_delta is not None):
+                a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
+                
             a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
             a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
 
@@ -1297,7 +1310,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
             time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
             assert time_column_name in a_df
-            a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
+            if (t_delta is not None):
+                a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
+                
             a_df = a_df.across_session_identity.add_session_df_columns(session_name=session_name, time_bin_size=epochs_decoding_time_bin_size, curr_session_t_delta=t_delta, time_col=time_column_name)
             a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k] = a_df
 
