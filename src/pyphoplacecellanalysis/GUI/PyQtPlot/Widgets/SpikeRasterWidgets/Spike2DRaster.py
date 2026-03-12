@@ -23,7 +23,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
+
 
 # For Dynamic Plot Widget Adding
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
@@ -2123,7 +2123,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         print(f'\t trying "_render_export_all_time_tracks"')
         try:
             import pyphoplacecellanalysis.External.pyqtgraph as pg
-            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
+            # from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
             from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
 
