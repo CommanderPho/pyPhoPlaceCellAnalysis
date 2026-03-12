@@ -23,7 +23,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.gui.Qt.ExceptionPrintingSlot import pyqtExceptionPrintingSlot
-
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
 
 # For Dynamic Plot Widget Adding
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
@@ -2051,6 +2051,113 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
 
+    def export_all_tracks_to_image(self, custom_figure_output_path=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
+        # ==================================================================================================================================================================================================================================================================================== #
+        # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        
+        _render_export_all_time_tracks = {}
+        
+
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+        
+        print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+        print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+        if custom_figure_output_path is None:
+            custom_figure_output_path = self.collected_outputs_path
+            
+
+        assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+        
+        custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+        
+        # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
+        # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
+        test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+        print(f'\ttest_display_output_path: "{test_display_output_path}"')
+
+        print(f'\t trying "_render_export_all_time_tracks"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+            from PyQt5.QtCore import QTimer
+
+            
+            # For PlotWidget
+            pg.setConfigOptions(useOpenGL=True)
+            pg.setConfigOption('antialias', False)
+            # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+            global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
+            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
+            
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+
+
+            def _perform_output_figure_delayed():
+                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
+                print(f'\t_perform_output_figure_delayed() running inside timer!')     
+                if custom_fig_man is not None:
+                    print(f'custom_fig_man is not None! Custom output path will be used!')
+                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+                else:
+                    raise NotImplementedError(f'needs displayman!')
+
+                relative_data_output_parent_folder = Path('data').resolve()
+                Assert.path_exists(relative_data_output_parent_folder)
+
+                ## INPUTS: im_posterior_x_stack, track_labels, 
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
+                ## Export the wrapped tracks:
+                included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
+                track_labels: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
+                saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(self, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
+                print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
+                _render_export_all_time_tracks.update({'fig_save_path': saved_output_pdf_path})
+                print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
+
+
+
+            # Run after a 0.5 second delay
+            _render_export_all_time_tracks.update({'fig_save_path': None})
+            
+            print(f'_render_export_all_time_tracks: WAITING to call `_perform_output_figure_delayed`...')
+            # QTimer.singleShot(1800, _perform_output_figure_delayed) # 1.8 sec
+
+            print(f"_render_export_all_time_tracks: I got the QApplication: {app}")
+
+            ## the above `_setup_spike_raster_window_for_debugging` does some rendering asynchronously, so I need to wait until all of that is finished before moving foward and rendering to output...
+            # num_process_wait_cycles: int = 20
+            # for i in range(num_process_wait_cycles):
+            #     print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
+            #     app.processEvents()
+            #     time.sleep(0.05)  # 50ms per pass
+
+
+            print(f'waiting until complete....')
+            block_until_render_complete()
+            print(f'\tblock_until_render_complete is done. Continuing execution.')
+
+
+            # print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
+            # _perform_output_figure_delayed()
+            print(f'\t\t_render_export_all_time_tracks: done.')
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
+            # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
+            if fail_on_exception_for_debugging:
+                raise
+            else:
+                pass
 
     
 # Start Qt event loop unless running in interactive mode.
