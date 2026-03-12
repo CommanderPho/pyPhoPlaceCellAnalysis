@@ -1,0 +1,75 @@
+name: Python AST Commit Summarizer
+
+# Generates a structural summary (added/modified/deleted/moved classes and
+# functions) for every commit in a user-supplied date range by parsing
+# Python source files with the built-in ``ast`` module.
+# No external API keys are required.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start date (YYYY-MM-DD) — commits on or after this date"
+        required: true
+        default: "2025-01-01"
+      end_date:
+        description: "End date (YYYY-MM-DD) — commits on or before this date"
+        required: true
+        default: "2025-12-31"
+      branch:
+        description: "Branch to analyse (leave blank for HEAD / default branch)"
+        required: false
+        default: ""
+      output_format:
+        description: "Output format: 'text' or 'json'"
+        required: false
+        default: "text"
+      show_empty:
+        description: "Show commits with no structural changes? ('true' / 'false')"
+        required: false
+        default: "false"
+
+jobs:
+  summarize:
+    name: Summarize Python symbol changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history is required for git diff between commits
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run AST commit summarizer
+        id: summarize
+        run: |
+          BRANCH_ARG=""
+          if [ -n "${{ github.event.inputs.branch }}" ]; then
+            BRANCH_ARG="--branch ${{ github.event.inputs.branch }}"
+          fi
+
+          EMPTY_ARG=""
+          if [ "${{ github.event.inputs.show_empty }}" = "true" ]; then
+            EMPTY_ARG="--show-empty"
+          fi
+
+          python scripts/git_commit_summary.py \
+            --repo . \
+            --since "${{ github.event.inputs.start_date }}" \
+            --until "${{ github.event.inputs.end_date }}" \
+            --output "${{ github.event.inputs.output_format }}" \
+            $BRANCH_ARG \
+            $EMPTY_ARG \
+            | tee /tmp/commit_summary.${{ github.event.inputs.output_format }}
+
+      - name: Upload summary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-summary-${{ github.event.inputs.start_date }}_${{ github.event.inputs.end_date }}
+          path: /tmp/commit_summary.${{ github.event.inputs.output_format }}
+          retention-days: 30
