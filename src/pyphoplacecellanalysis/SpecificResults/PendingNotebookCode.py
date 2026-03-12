@@ -3445,6 +3445,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     # ==================================================================================================================================================================================================================================================================================== #
     active_session_computation_configs = active_data_mode_registered_class.build_default_computation_configs(sess=curr_active_pipeline.sess, time_bin_size=time_bin_size)
 
+    #TODO 2026-03-12 15:28: - [ ] Existing overrides for grid bin bounds:
     # grid_bin_bounds=(((-83.33747881216672, 110.15967332926644), (-94.89955475226206, 97.07387994733473)))
 
     if hardcoded_params.grid_bin_bounds is not None:
@@ -3452,12 +3453,33 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         # curr_active_pipeline.update_parameters(grid_bin_bounds = hardcoded_params.grid_bin_bounds)
         curr_active_pipeline.sess.config.grid_bin_bounds = hardcoded_params.grid_bin_bounds # (((-120.0, 120.0), (-120.0, 120.0)))
 
+        #TODO 2026-03-12 15:28: - [ ] Added overrides for grid bin bounds
+        grid_bin_bounds = hardcoded_params.grid_bin_bounds
+        x_min, x_max = grid_bin_bounds[0][0], grid_bin_bounds[0][1]
+        y_min, y_max = grid_bin_bounds[1][0], grid_bin_bounds[1][1]
+        float_x_cm = (x_max - x_min) / 2.0
+        float_y_cm = (y_max - y_min) / 2.0
+
+        # Common grid for all epochs so decoders share xbin/ybin
+        common_grid_bin_bounds = (((x_min, x_max), (y_min, y_max)))  # e.g. from hardcoded_params or global position
+        common_grid_bin = (float_x_cm, float_y_cm)  # same bin size in cm for both axes
+
+        for a_config in active_session_computation_configs:
+            a_config.pf_params.grid_bin_bounds = common_grid_bin_bounds
+            a_config.pf_params.grid_bin = common_grid_bin
+
+
+    #TODO 2026-03-12 15:27: - [ ] was commented out:
     # override_parameters_flat_keypaths_dict = {'grid_bin_bounds': (((-120.0, 120.0), (-120.0, 120.0))), # 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
     # 										#   'sess.config.preprocessing_parameters.laps.use_direction_dependent_laps': False, # lap_estimation_parameters
     #                                         }
 
-    # curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+    # override_parameters_flat_keypaths_dict = {'grid_bin_bounds': common_grid_bin_bounds, # 'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
+    # 										#   'sess.config.preprocessing_parameters.laps.use_direction_dependent_laps': False, # lap_estimation_parameters
+    #                                         }
 
+    # curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
+    # # AttributeError: Attribute 'grid_bin_bounds' not found in '<ComputationKWargParameters ComputationKWargParameters00279>'
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Update computation_epochs to be only the maze ones                                                                                                                                                                                                                                   #
@@ -3519,7 +3541,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
         a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(**linearization_kwargs)
         
-    
+
+
+
+
     # Estimate laps, is this working correctly? For Bapun OpenField 2025-12-12 it looks like the laps are only being found during 'sprinkle', the 2nd of the two epochs, and also for somee reason trailing into subsequent sleep.
     # for k, a_sess in curr_active_pipeline.filtered_sessions.items():
     #     ## #TODO 2026-02-24 08:29: - [ ] This will overwrite the correct laps unfortunately.
