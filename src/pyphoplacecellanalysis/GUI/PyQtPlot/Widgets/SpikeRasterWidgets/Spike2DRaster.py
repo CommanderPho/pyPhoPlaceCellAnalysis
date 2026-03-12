@@ -2051,31 +2051,37 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
 
-    def export_all_tracks_to_image(self, custom_figure_output_path=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
+    def export_all_tracks_to_image(self, custom_figure_output_path=None, curr_active_pipeline=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
         # ==================================================================================================================================================================================================================================================================================== #
         # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
-        
+        from pathlib import Path
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+
         _render_export_all_time_tracks = {}
-        
+
+        curr_active_pipeline = curr_active_pipeline or getattr(self, 'owning_pipeline', None)
+        if curr_active_pipeline is None:
+            raise ValueError("export_all_tracks_to_image requires curr_active_pipeline (or self.owning_pipeline). Pass pipeline or set widget.owning_pipeline.")
 
         curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
-        CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+        BATCH_DATE_TO_USE = getattr(self, 'BATCH_DATE_TO_USE', '')
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}" if BATCH_DATE_TO_USE else curr_session_name
         print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
-        
+
         print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-        print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+        print(f'export_all_tracks_to_image(session: {curr_session_name}, ...)')
         if custom_figure_output_path is None:
-            custom_figure_output_path = self.collected_outputs_path
-            
+            custom_figure_output_path = getattr(self, 'collected_outputs_path', None)
+        if custom_figure_output_path is None:
+            raise ValueError("export_all_tracks_to_image requires custom_figure_output_path or self.collected_outputs_path.")
 
         assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
-        
+
         custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
-        
-        # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
-        # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
-        test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
+
+        display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+        test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
         print(f'\ttest_display_output_path: "{test_display_output_path}"')
 
         print(f'\t trying "_render_export_all_time_tracks"')
@@ -2084,18 +2090,10 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
             from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
             from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
-            from PyQt5.QtCore import QTimer
 
-            
             # For PlotWidget
             pg.setConfigOptions(useOpenGL=True)
             pg.setConfigOption('antialias', False)
-            # _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
-            global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
-            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
-            
-            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
-
 
             def _perform_output_figure_delayed():
                 ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
@@ -2127,25 +2125,12 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             _render_export_all_time_tracks.update({'fig_save_path': None})
             
             print(f'_render_export_all_time_tracks: WAITING to call `_perform_output_figure_delayed`...')
-            # QTimer.singleShot(1800, _perform_output_figure_delayed) # 1.8 sec
-
-            print(f"_render_export_all_time_tracks: I got the QApplication: {app}")
-
-            ## the above `_setup_spike_raster_window_for_debugging` does some rendering asynchronously, so I need to wait until all of that is finished before moving foward and rendering to output...
-            # num_process_wait_cycles: int = 20
-            # for i in range(num_process_wait_cycles):
-            #     print(f'\t\t_render_export_all_time_tracks: process wait loop[{i}/{num_process_wait_cycles}]')
-            #     app.processEvents()
-            #     time.sleep(0.05)  # 50ms per pass
-
 
             print(f'waiting until complete....')
             block_until_render_complete()
             print(f'\tblock_until_render_complete is done. Continuing execution.')
 
-
-            # print(f'_render_export_all_time_tracks: Calling "_perform_output_figure_delayed" after delay')
-            # _perform_output_figure_delayed()
+            _perform_output_figure_delayed()
             print(f'\t\t_render_export_all_time_tracks: done.')
             ## INPUT: `_out` -- _a_trial_by_trial_window
 
