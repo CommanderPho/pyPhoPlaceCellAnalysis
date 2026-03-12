@@ -2099,14 +2099,20 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
         print(f'export_all_tracks_to_image(session: {curr_session_name}, ...)')
         if custom_figure_output_path is None:
-            raise ValueError("export_all_tracks_to_image requires custom_figure_output_path.")
+            # figure_output_location = FigureOutputLocation.SESSION_OUTPUT_FOLDER
+            figure_output_location = FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER
+            make_folder_if_needed = True
+        else:
+            figure_output_location = FigureOutputLocation.CUSTOM
+            make_folder_if_needed = False
+        #     raise ValueError("export_all_tracks_to_image requires custom_figure_output_path.")
 
-        assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+        # assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
 
-        custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+        custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=figure_output_location, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
 
         display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
-        test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+        test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=make_folder_if_needed)
         print(f'\ttest_display_output_path: "{test_display_output_path}"')
 
         print(f'\t trying "_render_export_all_time_tracks"')
@@ -2125,7 +2131,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 print(f'\t_perform_output_figure_delayed() running inside timer!')     
                 if custom_fig_man is not None:
                     print(f'custom_fig_man is not None! Custom output path will be used!')
-                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False)
+                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=make_folder_if_needed)
                     print(f'\ttest_display_output_path: "{test_display_output_path}"')
                 else:
                     raise NotImplementedError(f'needs displayman!')
@@ -2161,6 +2167,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
             # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
             # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
+            return _render_export_all_time_tracks
+        
 
         except Exception as e:
             print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
@@ -2168,6 +2176,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 raise
             else:
                 pass
+                return _render_export_all_time_tracks
+            
 
     
 # Start Qt event loop unless running in interactive mode.
