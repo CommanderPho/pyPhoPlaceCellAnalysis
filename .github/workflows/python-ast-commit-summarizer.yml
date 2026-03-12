@@ -33,6 +33,8 @@ jobs:
   summarize:
     name: Summarize Python symbol changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository (full history)
