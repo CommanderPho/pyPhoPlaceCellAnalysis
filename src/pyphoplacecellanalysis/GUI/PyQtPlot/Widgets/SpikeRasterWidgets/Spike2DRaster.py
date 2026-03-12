@@ -2052,6 +2052,33 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
 
 
     def export_all_tracks_to_image(self, custom_figure_output_path=None, curr_active_pipeline=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
+        """Export all timeline tracks from this widget to a paged PDF.
+
+        Renders the current docked tracks (after blocking until render is complete), then calls
+        `FigureToImageHelpers.export_wrapped_tracks_to_paged_df` to write a PDF under the path
+        derived from the pipeline's display context and the given output folder.
+
+        Args:
+            custom_figure_output_path: Parent directory for the output PDF. Required.
+            curr_active_pipeline: Pipeline used for session name and display context. Defaults to `self.owning_pipeline`.
+            fail_on_exception_for_debugging: If True, re-raise on exception; otherwise catch and continue.
+            **additional_marginal_overlaying_measured_position_kwargs: Forwarded to the export helper. May include
+                `included_track_dock_identifiers` (list of dock names to include) and `track_labels` (list of labels).
+
+        Raises:
+            ValueError: If `curr_active_pipeline` (or `owning_pipeline`) is None, or if `custom_figure_output_path`
+                is None or does not exist.
+
+        Usage:
+
+            from pathlib import Path
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+
+            # In a notebook, with an existing Spike2DRaster widget and pipeline:
+            out_path = Path('outputs/figures').resolve()
+            active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=out_path, curr_active_pipeline=curr_active_pipeline)
+
+        """
         # ==================================================================================================================================================================================================================================================================================== #
         # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
@@ -2072,9 +2099,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
         print(f'export_all_tracks_to_image(session: {curr_session_name}, ...)')
         if custom_figure_output_path is None:
-            custom_figure_output_path = getattr(self, 'collected_outputs_path', None)
-        if custom_figure_output_path is None:
-            raise ValueError("export_all_tracks_to_image requires custom_figure_output_path or self.collected_outputs_path.")
+            raise ValueError("export_all_tracks_to_image requires custom_figure_output_path.")
 
         assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
 
