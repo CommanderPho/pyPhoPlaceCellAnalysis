@@ -130,11 +130,6 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
-from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
-from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-
 
 @function_attributes(short_name=None, tags=['lap', 'binned_pos', '2026-03-13_lap_up_down_deflection_score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
 def compute_lap_binned_occupancies(a_sess, a_decoder):
