@@ -136,11 +136,18 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
-
-
-@function_attributes(short_name=None, tags=['lap', 'binned_pos'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
+@function_attributes(short_name=None, tags=['lap', 'binned_pos', '2026-03-13_lap_up_down_deflection_score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
 def compute_lap_binned_occupancies(a_sess, a_decoder):
     """ Returns the occupancies during each lap
+    
+    # Also adds the `2026-03-13_lap_up_down_deflection_score` ____________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    reeturns a numbeer for each lap indicating the degree of positive or negative deflection from the reward equator (midline passing through both reward wells)
+    1. conveert lap position binned_y to equator_binned_y by subtracting the equator bin number.
+    2. for each x-value, find the most-extreme (positive or negative) binned_y that the animal visits during that and get a mask
+    3. take the sum of these y-values to approximate the area under the curve.
+    
+    Adds columns:  ['lap_aoc_score', 'lap_ptp_y_span', 'lap_aoc_norm_score']
+    
     
     Usage:
     
@@ -153,6 +160,8 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
         occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict = compute_lap_binned_occupancies(a_sess=a_sess, a_decoder=a_decoder)
         lap_occupancy_seconds_dict
 
+        
+    
     """
     a_lap_occupancy_matricies_dict: Dict[str, Any] = {}
     
@@ -177,19 +186,46 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     lap_occupancy_n_samples_dict: Dict[types.epoch_index, NDArray] = {}
     lap_occupancy_seconds_dict: Dict[types.epoch_index, NDArray] = {}
 
+    lap_aoc_score_dict: Dict[types.epoch_index, float] = {}
+    lap_ptp_y_span_dict: Dict[types.epoch_index, float] = {}
+
+
     laps_unique_ids = a_lap_only_pos_df.lap.unique()
     n_laps: int = len(laps_unique_ids)
     lap_id_to_matrix_IDX_map = dict(zip(laps_unique_ids, np.arange(n_laps)))
     a_lap_occupancy_matricies_dict['laps_unique_ids'] = laps_unique_ids
     a_lap_occupancy_matricies_dict['lap_id_to_matrix_IDX_map'] = lap_id_to_matrix_IDX_map
 
-
+    ## add the equator relative binned_y positions
+    binned_y_ids = np.arange(len(a_decoder.ybin_centers)) + 1
+    equator_binned_y_id: int = np.median(binned_y_ids)
+    max_aoc_score: float = binned_y_ids[-1] * len(a_decoder.xbin_centers) ## visiting every possible x-bin at a maximum value, used to normalize
+    
+    binned_y_equator_ids = binned_y_ids - equator_binned_y_id
+    a_lap_only_pos_df['binned_y_equator_rel'] = a_lap_only_pos_df['binned_y'].astype(int) - equator_binned_y_id ## subtract off the equator
+    a_lap_only_pos_df['binned_y_abs_distance_from_equator'] = np.abs(a_lap_only_pos_df['binned_y_equator_rel'].to_numpy())
+    
     curr_position_df_split = a_lap_only_pos_df.pho.partition_df_dict(partitionColumn='lap')
     # occupancy_counts_df_dict = {k:v.groupby(['binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index() for k, v in curr_position_df_split.items()}
 
+
     # for a_spikes_df in split_spikes_dfs:
     for a_lap, a_lap_pos_df in curr_position_df_split.items():
-    # for a_lap, an_occupancy_counts_df in occupancy_counts_df_dict.items():
+        # np.unique(a_lap_pos_df['binned_y_equator_rel'])
+        # _temp_lap_pos_df = deepcopy(a_lap_pos_df).set_index('binned_x')
+        # _temp_lap_pos_df = a_lap_pos_df.groupby(['binned_x']).agg(binned_y_equator_idxmax=('binned_y_abs_distance_from_equator', 'idxmax'), binned_y_equator_rel_max=('binned_y_abs_distance_from_equator', 'max')).reset_index()
+
+        ## approximate area-under thee curve AoC by summing up the most extreme y-values
+        _temp_lap_pos_df = (
+            a_lap_pos_df
+            .sort_values(['binned_x', 'binned_y_abs_distance_from_equator'], ascending=[True, False])
+            .drop_duplicates('binned_x')
+            .loc[:, ['binned_x', 'binned_y_equator_rel']]
+        )
+        a_lap_aoc_score: float = np.nansum(_temp_lap_pos_df['binned_y_equator_rel'].to_numpy()) 
+        a_lap_ptp_y_span: float = np.ptp(a_lap_pos_df['binned_y_equator_rel']) ## how many y-bins the rat spans during this lap
+        lap_aoc_score_dict[a_lap] = a_lap_aoc_score
+        lap_ptp_y_span_dict[a_lap] = a_lap_ptp_y_span
 
         an_occupancy_counts_df = a_lap_pos_df.groupby(['binned_x', 'binned_y']).agg(t_count=('t', 'count')).reset_index()
         occupancy_counts_df_dict[a_lap] = an_occupancy_counts_df
@@ -202,8 +238,10 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
         lap_occupancy_n_samples_dict[a_lap] = a_position_binned_activity_matr
         lap_occupancy_seconds_dict[a_lap] = a_position_binned_activity_matr.astype(float) * mean_sampling_rate_sec
         
-    ## OUTPUTS: occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict
-    
+    ## OUTPUTS: occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, lap_aoc_score_dict, lap_ptp_y_span_dict
+
+    a_lap_occupancy_matricies_dict['lap_aoc_score_dict'] = lap_aoc_score_dict    
+    a_lap_occupancy_matricies_dict['lap_ptp_y_span_dict'] = lap_ptp_y_span_dict
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Compute Aggregated Results (Matricies)                                                                                                                                                                                                                                               #
@@ -258,7 +296,10 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     #TODO 2026-03-05 11:56: - [ ] Could improve further by adding a dilation radius to the animal's path, so we're effectively only looking at times that they traversed a new *area* of the track, not just a path that was slightly different than there previous one
     
     # Add to the laps_df (which is propagated back to the sess object) ___________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    lap_df_columns_to_add_dict = {'lap_novelty_score': lap_novelty_score, 'lap_novelty_ratio_score': a_lap_occupancy_matricies_dict['lap_novelty_ratio_score']}
+    lap_df_columns_to_add_dict = {'lap_novelty_score': lap_novelty_score, 'lap_novelty_ratio_score': a_lap_occupancy_matricies_dict['lap_novelty_ratio_score'],
+                                  'lap_aoc_score': np.array(list(lap_aoc_score_dict.values())), 'lap_ptp_y_span': np.array(list(lap_ptp_y_span_dict.values())),
+                                  'lap_aoc_norm_score': (np.array(list(lap_aoc_score_dict.values())) / max_aoc_score), # 'lap_ptp_y_span_norm': np.array(list(lap_ptp_y_span_dict.values())),
+                                  }
     for k, v in lap_df_columns_to_add_dict.items():
         a_laps_obj.update_columns(columns=pd.DataFrame({'lap_id': laps_df.lap_id, f"{k}": v}), join_on='lap_id', fill_value=np.nan, inplace=True)
     
@@ -274,6 +315,7 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     """
 
     return occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict
+
 
 @define(slots=False, eq=False)
 class BinnedOccupancyComparisons:
