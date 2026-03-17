@@ -2083,7 +2083,7 @@ class PositionLikePosteriorScoring:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures
         
 
-        a_masked_filtered_decoded_local_epochs_result: DecodedFilterEpochsResult = deepcopy(decoded_local_epochs_result)
+        a_masked_filtered_decoded_local_epochs_result: DecodedFilterEpochsResult = decoded_local_epochs_result # PROBABLY DO NOT NEED deepcopy(decoded_local_epochs_result)
         a_masked_filtered_decoded_local_epochs_result.filter_epochs = ensure_dataframe(a_masked_filtered_decoded_local_epochs_result.filter_epochs) ## convert to epoch_df
 
         ## INPUTS: container
@@ -2095,7 +2095,7 @@ class PositionLikePosteriorScoring:
         ## INPUTS: flat_p_x_given_n_list
         # decoded_local_epochs_result.filter_epochs.reset_index(drop=True, inplace=True)
         
-        p_x_given_n_list: List[NDArray] = deepcopy(a_masked_filtered_decoded_local_epochs_result.p_x_given_n_list) # a List[NDArray]
+        # p_x_given_n_list: List[NDArray] = deepcopy(a_masked_filtered_decoded_local_epochs_result.p_x_given_n_list) # a List[NDArray] -- this is the issue -- 1-element list with list[0] of shape: [(41, 63, 2, 259870)]
         # flat_p_x_given_n_list = flatten(p_x_given_n_list)
 
         # epoch_idx_list = [np.array([epoch_idx] * len(t_bin_values)) for epoch_idx, t_bin_values in enumerate(p_x_given_n_list)]
@@ -2103,7 +2103,8 @@ class PositionLikePosteriorScoring:
             ## 2026-03-17 - Strangely the on the lab machine even when paused in here, memory continues to increase until system memory is reached (but execution wasn't forcefully teerminated during debugging at least).
         
         ## flatten all epochs across time bins
-        flat_p_x_given_n_list = np.concatenate(p_x_given_n_list, axis=2) # (41, 63, 1508)
+        flat_p_x_given_n_list: NDArray = np.concatenate(a_masked_filtered_decoded_local_epochs_result.p_x_given_n_list, axis=2) # (41, 63, 1508)
+        # flat_p_x_given_n_list: NDArray = np.concatenate(p_x_given_n_list, axis=2) # (41, 63, 1508)
 
         if (np.ndim(flat_p_x_given_n_list) > 3):
             ## split by epoch
