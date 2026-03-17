@@ -78,10 +78,12 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         epoch_result = epoch_flat_mask_future_past_result[new_epoch_idx]
         if epoch_result is not None and hasattr(epoch_result, 'centroids_df') and epoch_result.centroids_df is not None and 'x' in epoch_result.centroids_df.columns and 'y' in epoch_result.centroids_df.columns and 'segment_idx' in epoch_result.centroids_df.columns:
             centroids_df = epoch_result.centroids_df
-            valid_mask = ~(np.isnan(centroids_df['x'].values) | np.isnan(centroids_df['y'].values))
+            centroid_x_values = np.asarray(centroids_df['x'].to_numpy(), dtype=np.float64)
+            centroid_y_values = np.asarray(centroids_df['y'].to_numpy(), dtype=np.float64)
+            valid_mask = np.isfinite(centroid_x_values) & np.isfinite(centroid_y_values)
             if np.any(valid_mask):
-                x_pixel = centroids_df['x'].values[valid_mask]
-                y_pixel = centroids_df['y'].values[valid_mask]
+                x_pixel = centroid_x_values[valid_mask]
+                y_pixel = centroid_y_values[valid_mask]
                 x_centroids = x_min + x_pixel * x_scale
                 y_centroids = y_min + y_pixel * y_scale
                 original_indices = np.where(valid_mask)[0]
@@ -121,48 +123,50 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                         else:
                             distances_spatial = np.sqrt((arrow_centroids_df['dx'].to_numpy())**2 + (arrow_centroids_df['dy'].to_numpy())**2)
                         arrow_centroids_df['dxdy_len'] = distances_spatial
-                        arrow_centroids_df[['unit_dx', 'unit_dy']] = arrow_centroids_df[['dx', 'dy']].to_numpy() / arrow_centroids_df['dxdy_len'].to_numpy()[:, None]
-                        arrow_centroids_df[['x_mid', 'y_mid']] = (arrow_centroids_df[['x_start', 'y_start']].to_numpy() + arrow_centroids_df[['dx', 'dy']].to_numpy())
+                        arrow_centroids_df = arrow_centroids_df[np.isfinite(arrow_centroids_df['dxdy_len']) & (arrow_centroids_df['dxdy_len'] > 0.0)].copy()
+                        if len(arrow_centroids_df) > 0:
+                            arrow_centroids_df[['unit_dx', 'unit_dy']] = arrow_centroids_df[['dx', 'dy']].to_numpy() / arrow_centroids_df['dxdy_len'].to_numpy()[:, None]
+                            arrow_centroids_df[['x_mid', 'y_mid']] = (arrow_centroids_df[['x_start', 'y_start']].to_numpy() + arrow_centroids_df[['dx', 'dy']].to_numpy())
 
-                        pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()])
-                        arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy()
+                            pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()])
+                            arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy()
 
-                        _safe_color_map_fn = lambda t_idx: tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
-                        _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(_safe_color_map_fn).to_list()
-                        _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(_safe_color_map_fn).to_list()
-                        vertex_point_color: NDArray = np.vstack([np.stack([v0, v1]) for v0, v1 in zip(_original_index_start_colors_list, _original_index_end_colors_list)])
-                        Assert.same_length(vertex_point_color, pos)
-                        arrow_color: NDArray = np.vstack(_original_index_start_colors_list)
-                        Assert.same_length(arrow_color, arrows)
+                            _safe_color_map_fn = lambda t_idx: tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
+                            _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(_safe_color_map_fn).to_list()
+                            _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(_safe_color_map_fn).to_list()
+                            vertex_point_color: NDArray = np.vstack([np.stack([v0, v1]) for v0, v1 in zip(_original_index_start_colors_list, _original_index_end_colors_list)])
+                            Assert.same_length(vertex_point_color, pos)
+                            arrow_color: NDArray = np.vstack(_original_index_start_colors_list)
+                            Assert.same_length(arrow_color, arrows)
 
-                        if use_single_arrows_object:
-                            arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_color=arrow_color, arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color, width=3.0, method='gl', connect='segments', parent=posterior_2d_view.scene)
-                            arrow.order = 7
-                            centroid_arrows.append(arrow)
-                        else:
-                            for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
-                                t_idx = original_indices[i]
-                                a_row_dict = a_row._asdict()
-                                x_center = a_row_dict['x_start']
-                                y_center = a_row_dict['y_start']
-                                unit_dx = a_row_dict['unit_dx']
-                                unit_dy = a_row_dict['unit_dy']
-                                x_start, y_start = x_center, y_center
-                                x_end = x_center + (unit_dx * arrow_length)
-                                y_end = y_center + (unit_dy * arrow_length)
-                                an_arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
-                                a_pos = np.array([[x_start, y_start], [x_end, y_end]])
-                                an_arrows = np.array([[x_start, y_start, x_end, y_end]])
-                                a_pos = np.asarray(a_pos, dtype=np.float32)
-                                an_arrows = np.asarray(an_arrows, dtype=np.float32)
-                                arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene)
+                            if use_single_arrows_object:
+                                arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_color=arrow_color, arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color, width=3.0, method='gl', connect='segments', parent=posterior_2d_view.scene)
                                 arrow.order = 7
                                 centroid_arrows.append(arrow)
+                            else:
+                                for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
+                                    t_idx = original_indices[i]
+                                    a_row_dict = a_row._asdict()
+                                    x_center = a_row_dict['x_start']
+                                    y_center = a_row_dict['y_start']
+                                    unit_dx = a_row_dict['unit_dx']
+                                    unit_dy = a_row_dict['unit_dy']
+                                    x_start, y_start = x_center, y_center
+                                    x_end = x_center + (unit_dx * arrow_length)
+                                    y_end = y_center + (unit_dy * arrow_length)
+                                    an_arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
+                                    a_pos = np.array([[x_start, y_start], [x_end, y_end]])
+                                    an_arrows = np.array([[x_start, y_start, x_end, y_end]])
+                                    a_pos = np.asarray(a_pos, dtype=np.float32)
+                                    an_arrows = np.asarray(an_arrows, dtype=np.float32)
+                                    arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene)
+                                    arrow.order = 7
+                                    centroid_arrows.append(arrow)
 
                 else:
                     if 'segment_Vp_deg' in centroids_df.columns:
-                        segment_Vp_deg = centroids_df['segment_Vp_deg'].values[valid_mask]
-                        valid_angle_mask = ~np.isnan(segment_Vp_deg)
+                        segment_Vp_deg = np.asarray(centroids_df['segment_Vp_deg'].to_numpy(), dtype=np.float64)[valid_mask]
+                        valid_angle_mask = np.isfinite(segment_Vp_deg)
                         if np.any(valid_angle_mask):
                             angles_rad = np.deg2rad(segment_Vp_deg[valid_angle_mask])
                             x_centroids_valid = x_centroids[valid_angle_mask]
@@ -198,11 +202,11 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         extended_mask = (curr_position_df['t'] >= extended_start_t) & (curr_position_df['t'] <= extended_end_t)
         extended_positions = curr_position_df[extended_mask]
         if len(extended_positions) > 0:
-            x_coords = extended_positions['x'].values
-            y_coords = extended_positions['y'].values
-            t_coords = extended_positions['t'].values
-            valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords) | np.isnan(t_coords))
-            if np.any(valid_mask):
+            x_coords = np.asarray(extended_positions['x'].to_numpy(), dtype=np.float64)
+            y_coords = np.asarray(extended_positions['y'].to_numpy(), dtype=np.float64)
+            t_coords = np.asarray(extended_positions['t'].to_numpy(), dtype=np.float64)
+            valid_mask = np.isfinite(x_coords) & np.isfinite(y_coords) & np.isfinite(t_coords)
+            if np.count_nonzero(valid_mask) >= 2:
                 x_valid = x_coords[valid_mask]
                 y_valid = y_coords[valid_mask]
                 t_valid = t_coords[valid_mask]
@@ -211,11 +215,16 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                 colors = np.ones((n_points, 4), dtype=np.float32)
                 colors[:, :3] = 0.7
                 colors[:, 3] = np.where(within_epoch_mask, 1.0, 0.2)
-                if current_position_line is None:
-                    current_position_line = vz.Line(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors, width=3, method='gl', parent=posterior_2d_view.scene)
-                    current_position_line.order = 5
-                else:
-                    current_position_line.set_data(pos=np.column_stack([x_valid, y_valid]).astype(np.float32), color=colors)
+                current_pos = np.ascontiguousarray(np.column_stack([x_valid, y_valid]), dtype=np.float32)
+                current_colors = np.ascontiguousarray(colors, dtype=np.float32)
+                if (current_pos.shape[0] >= 2) and (current_colors.shape[0] == current_pos.shape[0]) and np.all(np.isfinite(current_pos)) and np.all(np.isfinite(current_colors)):
+                    if current_position_line is None:
+                        current_position_line = vz.Line(pos=current_pos, color=current_colors, width=3, method='gl', parent=posterior_2d_view.scene)
+                        current_position_line.order = 5
+                    else:
+                        current_position_line.set_data(pos=current_pos, color=current_colors)
+                elif current_position_line is not None:
+                    current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))
             else:
                 if current_position_line is not None:
                     current_position_line.set_data(pos=np.array([], dtype=np.float32).reshape(0, 2), color=np.array([], dtype=np.float32).reshape(0, 4))

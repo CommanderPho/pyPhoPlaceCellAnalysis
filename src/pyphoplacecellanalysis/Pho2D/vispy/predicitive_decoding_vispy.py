@@ -77,9 +77,14 @@ vp.set_log_level('WARNING')
 # Enable full debug mode for the gloo layer
 # vp.config.update(debug=False, check_errors=True)
 
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MatchingPastFuturePositionsResult, MaskDataSource
+
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_decoding_central_view import render_central_view as render_predictive_decoding_central_view
 
+
+## missing imports: MatchingPastFuturePositionsResult, BasePositionDecoder, MaskDataSource
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 @define(slots=False, repr=False, eq=False)
@@ -112,6 +117,7 @@ class PredictiveDecodingVispyWidget:
     
 
     enable_full_vispy_debug_mode: bool = field(default=False)
+    enable_line_render_debug_logging: bool = field(default=True)
 
     max_time_bins_to_show: int = field(default=12)
     enable_table_widgets: bool = field(default=False)
@@ -199,6 +205,7 @@ class PredictiveDecodingVispyWidget:
             self.a_flat_matching_results_list_ds = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result, filter_epochs=self.a_decoded_filter_epochs_df)
         self.setup()
         self.buildUI()
+
 
     @classmethod
     def init_from_list(cls, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
@@ -364,7 +371,8 @@ class PredictiveDecodingVispyWidget:
             y_min, y_max = self.ybin[0], self.ybin[-1]
             bbox_vertices = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max], [x_min, y_min]], dtype=np.float32)
             for view in [self.past_view, self.posterior_2d_view, self.future_view]:
-                vz.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+                bbox_line = vz.Line(pos=bbox_vertices, color='white', width=2, parent=view.scene)
+                self._debug_log_line_visual(bbox_line, context='buildUI_bbox', pos=bbox_vertices)
             extent = (self.xbin[0], self.xbin[-1], self.ybin[0], self.ybin[-1])
             for view in [self.past_view, self.future_view]:
                 view.camera.set_range(x=(extent[0], extent[1]), y=(extent[2], extent[3]))
@@ -581,6 +589,27 @@ class PredictiveDecodingVispyWidget:
             out[t_idx] = (rgb[0], rgb[1], rgb[2], alpha)
         return out
 
+    def _debug_log_line_visual(self, line: Any, context: str, pos: Optional[np.ndarray] = None, colors: Optional[np.ndarray] = None, extra: Optional[Dict[str, Any]] = None) -> None:
+        """Logs line id and finite stats so crash addresses can be mapped to source visuals."""
+        if not (self.enable_line_render_debug_logging or self.enable_full_vispy_debug_mode):
+            return
+        parts: List[str] = [f'context={context}', f'line_id={hex(id(line)) if line is not None else "None"}']
+        if pos is not None:
+            pos_arr = np.asarray(pos)
+            parts.append(f'pos_shape={pos_arr.shape}')
+            parts.append(f'pos_finite={bool(np.all(np.isfinite(pos_arr)))}')
+            if pos_arr.size > 0:
+                parts.append(f'pos_min={float(np.nanmin(pos_arr)):.6f}')
+                parts.append(f'pos_max={float(np.nanmax(pos_arr)):.6f}')
+        if colors is not None:
+            color_arr = np.asarray(colors)
+            parts.append(f'color_shape={color_arr.shape}')
+            parts.append(f'color_finite={bool(np.all(np.isfinite(color_arr)))}')
+        if extra is not None:
+            for k, v in extra.items():
+                parts.append(f'{k}={v}')
+        print('[VISPY_LINE_DEBUG] ' + ' | '.join(parts))
+
     def _segment_row_to_time_bin_idx(self, segment_row_idx: int, epoch_idx: int, mode='centroids') -> Optional[int]:
         """Resolve segment row index to time bin index for the given epoch."""
         if self.epoch_flat_mask_future_past_result is None or epoch_idx >= len(self.epoch_flat_mask_future_past_result):
@@ -619,18 +648,18 @@ class PredictiveDecodingVispyWidget:
 
         return int(matching_t_bins[0]) if len(matching_t_bins) > 0 else None
     
-    def _extend_trajectory_xy_opacity(self, x_valid: np.ndarray, y_valid: np.ndarray, opacity: np.ndarray, t_valid: np.ndarray, traj_t_min: float, traj_t_max: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _extend_trajectory_xy_opacity(self, x_valid: np.ndarray, y_valid: np.ndarray, opacity: np.ndarray, t_valid: np.ndarray, traj_t_min: float, traj_t_max: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Apply start/end trajectory extensions from curr_position_df; return (x_valid, y_valid, opacity)."""
         if self.past_future_trajectory_start_extension_seconds > 0 and self.curr_position_df is not None and 't' in self.curr_position_df.columns:
             ext_start_t = traj_t_min - self.past_future_trajectory_start_extension_seconds
             ext_mask = (self.curr_position_df['t'] >= ext_start_t) & (self.curr_position_df['t'] < traj_t_min)
             ext_positions = self.curr_position_df[ext_mask]
             if (len(ext_positions) > 0) and ('x' in ext_positions.columns) and ('y' in ext_positions.columns) and ('t' in ext_positions.columns):
-                ext_x = ext_positions['x'].values
-                ext_y = ext_positions['y'].values
-                ext_t = ext_positions['t'].values
+                ext_x = np.asarray(ext_positions['x'].to_numpy(), dtype=np.float64)
+                ext_y = np.asarray(ext_positions['y'].to_numpy(), dtype=np.float64)
+                ext_t = np.asarray(ext_positions['t'].to_numpy(), dtype=np.float64)
                 
-                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y) | np.isnan(ext_t))
+                ext_valid_mask = np.isfinite(ext_x) & np.isfinite(ext_y) & np.isfinite(ext_t)
                 if np.any(ext_valid_mask):
                     ext_x_valid = ext_x[ext_valid_mask]
                     ext_y_valid = ext_y[ext_valid_mask]
@@ -646,11 +675,10 @@ class PredictiveDecodingVispyWidget:
             ext_mask = (self.curr_position_df['t'] > traj_t_max) & (self.curr_position_df['t'] <= ext_end_t)
             ext_positions = self.curr_position_df[ext_mask]
             if (len(ext_positions) > 0) and ('x' in ext_positions.columns) and ('y' in ext_positions.columns) and ('t' in ext_positions.columns):
-                ext_x = ext_positions['x'].values
-                ext_y = ext_positions['y'].values
-                ext_t = ext_positions['t'].values
-                # ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y))
-                ext_valid_mask = ~(np.isnan(ext_x) | np.isnan(ext_y) | np.isnan(ext_t))
+                ext_x = np.asarray(ext_positions['x'].to_numpy(), dtype=np.float64)
+                ext_y = np.asarray(ext_positions['y'].to_numpy(), dtype=np.float64)
+                ext_t = np.asarray(ext_positions['t'].to_numpy(), dtype=np.float64)
+                ext_valid_mask = np.isfinite(ext_x) & np.isfinite(ext_y) & np.isfinite(ext_t)
                 if np.any(ext_valid_mask):
                     ext_x_valid = ext_x[ext_valid_mask]
                     ext_y_valid = ext_y[ext_valid_mask]
@@ -722,9 +750,9 @@ class PredictiveDecodingVispyWidget:
             custom_cmap: Optional[Colormap] = None
             
             if len(positions_df) > 0 and 'x' in positions_df.columns and 'y' in positions_df.columns:
-                x_coords, y_coords = positions_df['x'].values, positions_df['y'].values
-                valid_mask = ~(np.isnan(x_coords) | np.isnan(y_coords))
-                if np.any(valid_mask):
+                x_coords, y_coords = np.asarray(positions_df['x'].to_numpy(), dtype=np.float64), np.asarray(positions_df['y'].to_numpy(), dtype=np.float64)
+                valid_mask = np.isfinite(x_coords) & np.isfinite(y_coords)
+                if np.count_nonzero(valid_mask) >= 2:
                     x_valid, y_valid = x_coords[valid_mask], y_coords[valid_mask]
                     
 
@@ -810,14 +838,23 @@ class PredictiveDecodingVispyWidget:
                         _curr_render_data_dict.update(base_rgb=base_rgb)
                     
                     if epoch_anchor_t is not None and 't' in positions_df.columns:
-                        t_coords = positions_df['t'].values[valid_mask]
-                        mean_time = np.mean(t_coords)
-                        trajectory_colors_and_times_out.append((colorsys.hsv_to_rgb(default_hue, 0.8, 0.9), mean_time))
-                        time_rel = t_coords - epoch_anchor_t
-                        time_distance = np.abs(time_rel)
-                        opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
-                        traj_t_min, traj_t_max = np.min(t_coords), np.max(t_coords)
-                        t_valid, x_valid, y_valid, opacity = self._extend_trajectory_xy_opacity(x_valid, y_valid, opacity, t_coords, traj_t_min, traj_t_max)
+                        t_coords = np.asarray(positions_df['t'].to_numpy(), dtype=np.float64)[valid_mask]
+                        valid_time_mask = np.isfinite(t_coords)
+                        if np.count_nonzero(valid_time_mask) >= 2:
+                            t_coords = t_coords[valid_time_mask]
+                            x_valid = x_valid[valid_time_mask]
+                            y_valid = y_valid[valid_time_mask]
+                            mean_time = float(np.mean(t_coords))
+                            if np.isfinite(mean_time):
+                                trajectory_colors_and_times_out.append((colorsys.hsv_to_rgb(default_hue, 0.8, 0.9), mean_time))
+                            time_rel = t_coords - epoch_anchor_t
+                            time_distance = np.abs(time_rel)
+                            opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
+                            traj_t_min, traj_t_max = float(np.min(t_coords)), float(np.max(t_coords))
+                            t_valid, x_valid, y_valid, opacity = self._extend_trajectory_xy_opacity(x_valid, y_valid, opacity, t_coords, traj_t_min, traj_t_max)
+                        else:
+                            opacity = np.ones(len(x_valid)) * 0.8
+                            t_valid = np.linspace(0.0, 1.0, num=len(x_valid))
                     else:
                         opacity = np.ones(len(x_valid)) * 0.8
                         t_valid = np.linspace(0.0, 1.0, num=len(x_valid))
@@ -834,8 +871,12 @@ class PredictiveDecodingVispyWidget:
                     else:
                         ## have a valid colormap
                         assert t_valid is not None
-                        t_rel_valid = deepcopy(t_valid) - t_valid[0] 
-                        t_rel_valid = t_rel_valid / np.ptp(t_rel_valid) ## scale between 0.0 and 1.0
+                        t_rel_valid = deepcopy(t_valid) - t_valid[0]
+                        t_rel_valid_span = np.ptp(t_rel_valid)
+                        if np.isfinite(t_rel_valid_span) and (t_rel_valid_span > 0.0):
+                            t_rel_valid = t_rel_valid / t_rel_valid_span ## scale between 0.0 and 1.0
+                        else:
+                            t_rel_valid = np.zeros_like(t_rel_valid, dtype=np.float64)
                         _curr_render_data_dict.update(t_rel_valid=t_rel_valid)
                         if enable_debug_logging:
                             print(f'\tt_rel_valid: {t_rel_valid}')
@@ -856,19 +897,28 @@ class PredictiveDecodingVispyWidget:
                     # Build the visuals to render                                                                                                                                                                                                                                                          #
                     # ==================================================================================================================================================================================================================================================================================== #
                     ## INPUTS: colors, x_valid, y_valid
-                    line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=np.column_stack([x_valid, y_valid]), parent=view.scene, line_width=2, order=1)
-                    # line: vz.Line = vz.Line(pos=np.column_stack([x_valid, y_valid]), color=colors, width=2, parent=view.scene)
+                    trajectory_pos = np.ascontiguousarray(np.column_stack([x_valid, y_valid]), dtype=np.float32)
+                    trajectory_colors = np.ascontiguousarray(colors, dtype=np.float32)
+                    if (trajectory_pos.shape[0] < 2) or (trajectory_colors.shape[0] != trajectory_pos.shape[0]) or (not np.all(np.isfinite(trajectory_pos))) or (not np.all(np.isfinite(trajectory_colors))):
+                        if self.enable_line_render_debug_logging or self.enable_full_vispy_debug_mode:
+                            print(f'[VISPY_LINE_DEBUG] context=trajectory_skipped | reason=invalid_line_buffers | pos_shape={trajectory_pos.shape} | color_shape={trajectory_colors.shape} | epoch_id={epoch_id} | new_epoch_idx={new_epoch_idx}')
+                        continue
+                    line: vz.Line = vz.Line(pos=trajectory_pos, color=trajectory_colors, width=2, method='gl', parent=view.scene)
                     line.order = 1
                     # line.set_gl_state(blend=True, blend_func=('src_alpha', 'one'))
                     # line.push_gl_state('additive', depth_test=True)
                     # line.push_gl_state('translucent', depth_test=True)
                     line.set_gl_state('translucent', depth_test=True)
+                    self._debug_log_line_visual(line, context='trajectory_line', pos=trajectory_pos, colors=trajectory_colors, extra={'epoch_id': epoch_id, 'new_epoch_idx': new_epoch_idx, 'n_points': n_points})
                     
                     lines_list.append(line)
+                else:
+                    if self.enable_line_render_debug_logging or self.enable_full_vispy_debug_mode:
+                        print(f'[VISPY_LINE_DEBUG] context=trajectory_skipped | reason=insufficient_valid_xy | valid_count={int(np.count_nonzero(valid_mask))} | total_count={len(valid_mask)} | epoch_id={epoch_id} | new_epoch_idx={new_epoch_idx}')
                     
                     if self.enable_debug_plot_trajectory_average_angle_arrows and 'segment_Vp_deg' in positions_df.columns:
                         segment_angles = positions_df['segment_Vp_deg'].values
-                        valid_angles = segment_angles[~np.isnan(segment_angles)]
+                        valid_angles = segment_angles[np.isfinite(segment_angles)]
                         if len(valid_angles) > 0:
                             mean_angle_deg = np.degrees(np.arctan2(np.mean(np.sin(np.radians(valid_angles))), np.mean(np.cos(np.radians(valid_angles)))))
                             mean_angle_rad = np.radians(mean_angle_deg)
@@ -1135,16 +1185,16 @@ class PredictiveDecodingVispyWidget:
         if 'past' in curr_matching_past_future_positions_df_dict and epoch_start_t is not None:
             for epoch_id, positions_df in curr_matching_past_future_positions_df_dict['past'].items():
                 if len(positions_df) > 0 and 't' in positions_df.columns:
-                    t_coords = positions_df['t'].values
-                    valid_mask = ~np.isnan(t_coords)
+                    t_coords = np.asarray(positions_df['t'].to_numpy(), dtype=np.float64)
+                    valid_mask = np.isfinite(t_coords)
                     if np.any(valid_mask):
                         time_rel = t_coords[valid_mask] - epoch_start_t
                         all_time_distances.extend(np.abs(time_rel).tolist())
         if 'future' in curr_matching_past_future_positions_df_dict and epoch_end_t is not None:
             for epoch_id, positions_df in curr_matching_past_future_positions_df_dict['future'].items():
                 if len(positions_df) > 0 and 't' in positions_df.columns:
-                    t_coords = positions_df['t'].values
-                    valid_mask = ~np.isnan(t_coords)
+                    t_coords = np.asarray(positions_df['t'].to_numpy(), dtype=np.float64)
+                    valid_mask = np.isfinite(t_coords)
                     if np.any(valid_mask):
                         time_rel = t_coords[valid_mask] - epoch_end_t
                         all_time_distances.extend(np.abs(time_rel).tolist())
@@ -1181,10 +1231,10 @@ class PredictiveDecodingVispyWidget:
             
 
         if self.show_full_position_background and self.curr_position_df is not None and 'x' in self.curr_position_df.columns and 'y' in self.curr_position_df.columns:
-            bg_x = self.curr_position_df['x'].values
-            bg_y = self.curr_position_df['y'].values
-            bg_valid_mask = ~(np.isnan(bg_x) | np.isnan(bg_y))
-            if np.any(bg_valid_mask):
+            bg_x = np.asarray(self.curr_position_df['x'].to_numpy(), dtype=np.float64)
+            bg_y = np.asarray(self.curr_position_df['y'].to_numpy(), dtype=np.float64)
+            bg_valid_mask = np.isfinite(bg_x) & np.isfinite(bg_y)
+            if np.count_nonzero(bg_valid_mask) >= 2:
                 bg_x_valid, bg_y_valid = bg_x[bg_valid_mask], bg_y[bg_valid_mask]
                 n_bg_points = len(bg_x_valid)
                 bg_colors = np.ones((n_bg_points, 4), dtype=np.float32)
@@ -1198,6 +1248,7 @@ class PredictiveDecodingVispyWidget:
                 for view in [self.past_view, self.posterior_2d_view, self.future_view]:
                     line = vz.Line(pos=bg_pos, color=bg_colors, width=1, method='gl', parent=view.scene)
                     line.order = 0
+                    self._debug_log_line_visual(line, context='full_position_background_line', pos=bg_pos, colors=bg_colors, extra={'new_epoch_idx': new_epoch_idx})
                     self.full_position_background_line.append(line)
                     
 
@@ -1275,8 +1326,11 @@ class PredictiveDecodingVispyWidget:
                 epoch_triangle: vz.Polygon = vz.Polygon(pos=np.asarray(triangle_vertices, dtype=np.float32), color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_triangle = epoch_triangle
             for base_rgb, mean_time in (past_trajectory_colors_and_times + future_trajectory_colors_and_times):
+                if not np.isfinite(mean_time):
+                    continue
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, parent=self.combined_timeline_view.scene)
+                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='agg', parent=self.combined_timeline_view.scene)
+                self._debug_log_line_visual(tick, context='timeline_tick', pos=tick_pos, extra={'new_epoch_idx': new_epoch_idx, 'mean_time': float(mean_time)})
                 self.timeline_ticks.append(tick)
             self.combined_timeline_view.camera = scene.PanZoomCamera()
             self.combined_timeline_view.camera.set_range(x=(self.recording_t_min, self.recording_t_max), y=(0, timeline_bar_height))
@@ -1567,6 +1621,77 @@ class PredictiveDecodingVispyWidget:
         
         return exported_files
 
+
+
+
+@function_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
+def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], a_decoded_filter_epochs_df: pd.DataFrame, curr_position_df: pd.DataFrame, pf_decoder: BasePositionDecoder, decoded_result: DecodedFilterEpochsResult, active_epoch_idx: int = 0,
+    current_traj_seconds_pre_post_extension: float = 0.750, 
+    past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = (0.4, 1.0), 
+    start_end_extension_max_opacity: float = 0.4, show_full_position_background: bool = False, 
+    require_angle_match: bool = False, color_matches_by_matching_angle: bool=False, enable_debug_plot_trajectory_average_angle_arrows: bool=False,
+    minimum_included_matching_sequence_length: Optional[int] = None,
+    **kwargs) -> PredictiveDecodingVispyWidget:
+    """Standalone function that renders predictive decoding data using vispy instead of the widget.
+    
+    Takes the same inputs as PredictiveDecodingDisplayWidget.init_from_datasource but uses vispy
+    to render all the data in an interactive visualization.
+    
+    Keyboard controls:
+        Left Arrow: Navigate to previous epoch
+        Right Arrow: Navigate to next epoch
+    
+    Args:
+        epoch_flat_mask_future_past_result: List of MatchingPastFuturePositionsResult objects
+        a_decoded_filter_epochs_df: DataFrame with filter epochs
+        curr_position_df: DataFrame with current position data
+        pf_decoder: BasePositionDecoder instance
+        decoded_result: DecodedFilterEpochsResult instance
+        active_epoch_idx: Initial epoch index to display (default: 0)
+        current_traj_seconds_pre_post_extension: Seconds to extend current epoch trajectory before/after epoch bounds (default: 0.750). Positions outside epoch are rendered with 0.2 alpha.
+        past_future_trajectory_extension_seconds: Seconds to extend past/future trajectories beyond their computed bounds (default: 0.0).
+            Can be a single float (applies to both start and end) or a tuple (start_extension, end_extension).
+            Start extensions are rendered with solid start_end_extension_max_opacity. End extensions fade out from 
+            start_end_extension_max_opacity to 0.0, visually indicating trajectory direction.
+        start_end_extension_max_opacity: Maximum opacity for trajectory extensions (default: 0.2). Start extensions use this as solid opacity,
+            end extensions fade from this value to 0.0.
+        show_full_position_background: If True, renders the entire position dataframe as a faint (0.2 alpha) grey line behind past/future trajectories (default: False).
+        require_angle_match: If True, only display trajectories whose direction aligns with the decoded posterior centroid direction (centroid_pos_traj_matching_angle_idx >= 0). Default: False.
+        color_matches_by_matching_angle: If True, trajectories that have a valid angle match (centroid_pos_traj_matching_angle_idx >= 0) 
+            will be colored using the corresponding time bin's color instead of the default red (past) or cyan (future). Default: True.
+        enable_debug_plot_trajectory_average_angle_arrows: If True, draws small arrows at the temporal center of each 
+            past/future trajectory indicating the trajectory's representative direction (circular mean of segment_Vp_deg). Default: True.
+        **kwargs: Additional keyword arguments
+        
+    Returns:
+        Tuple of (main_window, canvas, state) for compatibility with export_vispy_viewer_epochs.
+
+    Usage:
+
+        from pyphoplacecellanalysis.Pho2D.vispy.predicitive_decoding_vispy import render_predictive_decoding_with_vispy, PredictiveDecodingVispyWidget
+
+        viewer: PredictiveDecodingVispyWidget = render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result=_out_epoch_flat_mask_future_past_result, a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+                                                        curr_position_df=container.decoding_locality.pos_df, pf_decoder=a_decoder, decoded_result=a_decoded_result)
+
+    Implemented via PredictiveDecodingVispyWidget.init_from_list(...); returns (main_window, canvas, state) for compatibility.
+    """
+    widget = PredictiveDecodingVispyWidget.init_from_list(
+        epoch_flat_mask_future_past_result=epoch_flat_mask_future_past_result,
+        a_decoded_filter_epochs_df=a_decoded_filter_epochs_df,
+        curr_position_df=curr_position_df,
+        pf_decoder=pf_decoder,
+        decoded_result=decoded_result,
+        active_epoch_idx=active_epoch_idx,
+        current_traj_seconds_pre_post_extension=current_traj_seconds_pre_post_extension,
+        past_future_trajectory_extension_seconds=past_future_trajectory_extension_seconds,
+        start_end_extension_max_opacity=start_end_extension_max_opacity,
+        show_full_position_background=show_full_position_background,
+        require_angle_match=require_angle_match,
+        color_matches_by_matching_angle=color_matches_by_matching_angle,
+        enable_debug_plot_trajectory_average_angle_arrows=enable_debug_plot_trajectory_average_angle_arrows,
+        minimum_included_matching_sequence_length=minimum_included_matching_sequence_length,
+        **kwargs)
+    return widget # widget.as_viewer_tuple()
 
 
 

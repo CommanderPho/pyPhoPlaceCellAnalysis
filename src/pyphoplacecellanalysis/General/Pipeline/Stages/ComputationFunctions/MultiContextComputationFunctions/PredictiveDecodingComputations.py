@@ -5033,6 +5033,10 @@ from pyphoplacecellanalysis.GUI.Qt.Widgets.PaginationCtrl.PaginationControlWidge
 @define(slots=False, repr=False, eq=False)
 class MaskDataSource(AttrsBasedClassHelperMixin):
     """ provides data to its owner related to each epoch 
+    
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MaskDataSource
+    
+    
     """
     matching_pos_epochs_dfs_list: List = field() # self.container.predictive_decoding.matching_pos_epochs_dfs_list
     matching_pos_dfs_list: List = field() # = self.container.predictive_decoding.matching_pos_dfs_list
