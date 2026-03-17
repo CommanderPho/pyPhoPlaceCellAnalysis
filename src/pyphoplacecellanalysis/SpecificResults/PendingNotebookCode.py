@@ -2099,7 +2099,7 @@ class PositionLikePosteriorScoring:
         # flat_p_x_given_n_list = flatten(p_x_given_n_list)
 
         # epoch_idx_list = [np.array([epoch_idx] * len(t_bin_values)) for epoch_idx, t_bin_values in enumerate(p_x_given_n_list)]
-        epoch_idx_list = [np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)] ## this is where memory usage seems to ramp way up and when I pause debug execution it seems to hang here.
+        # epoch_idx_list = [np.array([epoch_idx] * a_n_bins) for epoch_idx, a_n_bins in enumerate(a_masked_filtered_decoded_local_epochs_result.nbins)] ## this is where memory usage seems to ramp way up and when I pause debug execution it seems to hang here.
             ## 2026-03-17 - Strangely the on the lab machine even when paused in here, memory continues to increase until system memory is reached (but execution wasn't forcefully teerminated during debugging at least).
         
         ## flatten all epochs across time bins
