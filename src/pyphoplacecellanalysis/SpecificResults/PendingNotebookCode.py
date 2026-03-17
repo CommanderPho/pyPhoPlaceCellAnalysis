@@ -2048,30 +2048,36 @@ class PositionLikePosteriorScoring:
         return scoring_results
 
 
-    @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
+    @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior', 'MEMORY_LEAK', 'BUG'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
     @classmethod
     def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None, normalization_across_epochs_epoch_names: Optional[List]=None) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
-        """
-        decoding_time_bin_size = 0.025
-        an_epoch_name = 'roam'
-        decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
+        """ filters the provided decoded time bins into position-like bins only based on a specific position_like_score_cutoff value and a few other filtering criteria.
+        
+        FAULT - Memory leak on linux
+            2026-03-17 - Core problem function that exhausts memory on linux (both Lab and Supercomputer) but not on Windows.
+        
+        Usage:
+            
+            decoding_time_bin_size = 0.025
+            an_epoch_name = 'roam'
+            decoded_local_epochs_result = container.epochs_decoded_result_cache_dict[decoding_time_bin_size].get(an_epoch_name, None)
 
-        xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
-        ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
+            xbin = np.array([-85.7562, -80.9188, -76.0813, -71.2439, -66.4065, -61.569, -56.7316, -51.8942, -47.0568, -42.2193, -37.3819, -32.5445, -27.707, -22.8696, -18.0322, -13.1948, -8.35733, -3.5199, 1.31753, 6.15495, 10.9924, 15.8298, 20.6672, 25.5047, 30.3421, 35.1795, 40.017, 44.8544, 49.6918, 54.5292, 59.3667, 64.2041, 69.0415, 73.879, 78.7164, 83.5538, 88.3912, 93.2287, 98.0661, 102.904, 107.741, 112.578])
+            ybin = np.array([-96.4477, -93.3514, -90.255, -87.1587, -84.0623, -80.966, -77.8697, -74.7733, -71.677, -68.5806, -65.4843, -62.3879, -59.2916, -56.1952, -53.0989, -50.0025, -46.9062, -43.8099, -40.7135, -37.6172, -34.5208, -31.4245, -28.3281, -25.2318, -22.1354, -19.0391, -15.9427, -12.8464, -9.75005, -6.6537, -3.55736, -0.46101, 2.63534, 5.73168, 8.82803, 11.9244, 15.0207, 18.1171, 21.2134, 24.3098, 27.4061, 30.5024, 33.5988, 36.6951, 39.7915, 42.8878, 45.9842, 49.0805, 52.1769, 55.2732, 58.3696, 61.4659, 64.5622, 67.6586, 70.7549, 73.8513, 76.9476, 80.044, 83.1403, 86.2367, 89.333, 92.4294, 95.5257, 98.6221])
 
-        
-        
-        ## try to get the relevant entries:
-        # active_idx_to_epoch_idx_map = {i:int(a_row.label) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
-        epoch_idx_to_active_idx_map = {int(a_row.original_epoch_idx):i for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
-        original_epoch_idxs = active_epochs_df['original_epoch_idx'].to_numpy() ## get the original index
-        original_epoch_idx_to_linear_idx_map = active_epochs_df['original_epoch_idx'].map(epoch_idx_to_active_idx_map).to_dict()
-        assert len(original_epoch_idxs) == len(original_epoch_idx_to_linear_idx_map), f"cannot adapt indicies, have to give up. len(original_epoch_idxs): {len(original_epoch_idxs)}, len(v): {len(original_epoch_idx_to_linear_idx_map)}"
-        active_linear_idxs = np.array(list(original_epoch_idx_to_linear_idx_map.values()))
-        assert len(active_epochs_df) == len(active_linear_idxs), f"cannot adapt indicies, have to give up. len(active_epochs_df): {len(active_epochs_df)}, len(active_linear_idxs): {len(active_linear_idxs)}"
-        target_key: str = f"{computed_df_col_name_prefix}{k}"
-        active_epochs_df[target_key] = v[active_linear_idxs] # ValueError: Length of values (103) does not match length of index (93)
-        
+            
+            
+            ## try to get the relevant entries:
+            # active_idx_to_epoch_idx_map = {i:int(a_row.label) for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+            epoch_idx_to_active_idx_map = {int(a_row.original_epoch_idx):i for i, a_row in enumerate(ensure_dataframe(decoded_local_epochs_result.filter_epochs).itertuples(index=True))}
+            original_epoch_idxs = active_epochs_df['original_epoch_idx'].to_numpy() ## get the original index
+            original_epoch_idx_to_linear_idx_map = active_epochs_df['original_epoch_idx'].map(epoch_idx_to_active_idx_map).to_dict()
+            assert len(original_epoch_idxs) == len(original_epoch_idx_to_linear_idx_map), f"cannot adapt indicies, have to give up. len(original_epoch_idxs): {len(original_epoch_idxs)}, len(v): {len(original_epoch_idx_to_linear_idx_map)}"
+            active_linear_idxs = np.array(list(original_epoch_idx_to_linear_idx_map.values()))
+            assert len(active_epochs_df) == len(active_linear_idxs), f"cannot adapt indicies, have to give up. len(active_epochs_df): {len(active_epochs_df)}, len(active_linear_idxs): {len(active_linear_idxs)}"
+            target_key: str = f"{computed_df_col_name_prefix}{k}"
+            active_epochs_df[target_key] = v[active_linear_idxs] # ValueError: Length of values (103) does not match length of index (93)
+            
         
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures

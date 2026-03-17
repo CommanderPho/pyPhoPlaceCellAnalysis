@@ -4615,7 +4615,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         _phase1_start_time = _time.perf_counter()
         print(f'[{_fn_name}] --- PHASE 1: Loading and masking decoded results ---')
 
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded'])
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(owning_pipeline_reference.global_computation_results.computed_data['DirectionalDecodersDecoded']) ## slow, like 30 seconds, seeems to use >10GB memory (maybe much more, but doesn't crash things out
         spikes_df: pd.DataFrame = directional_decoders_decode_result.spikes_df
         print(f'[{_fn_name}] Loaded DirectionalDecodersDecoded (deepcopy). spikes_df shape: {spikes_df.shape}')
             
@@ -4635,7 +4635,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 if mask_position_like_time_score_cutoff:
                     a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None,
                                                                                                                                         xbin=a_decoder.xbin, ybin=a_decoder.ybin, normalization_across_epochs_epoch_names=epoch_names,
-                                                                                                                                     )
+                                                                                                                                     ) # TODO 2026-03-17 - Crash point on lab linux machine, surprisingly
                 else:
                     a_masked_result = a_result_decoded
 
