@@ -1,4 +1,3 @@
-from io import StringIO
 import time
 import sys
 from copy import deepcopy
@@ -8,7 +7,6 @@ import pandas as pd
 
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidgets # pyqtgraph is only currently used for its Qt imports
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 import vedo
 from vedo import Mesh, Cone, Cross3D, Plotter, printc, Glyph
@@ -19,9 +17,6 @@ from vedo import Volume, ProgressBar, show, settings, printc
 
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer
 from pyphocorehelpers.gui.Vedo.vedo_helpers import VedoHelpers # for vedo_get_camera_debug_info
-
-# import qdarkstyle
-
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import debug_print_axes_locations
@@ -366,6 +361,8 @@ class Spike3DRaster_Vedo(VedoSpecificTimeCurvesMixin, SpikeRasterBase):
         
     def _buildGraphics(self, local_enable_debug_print=False):
         """ Implementors must override this method to build the main graphics object and add it at layout position (0, 0)"""
+        from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+
         # vedo_qt_main_window = MainVedoPlottingWindow() # Create the main window with the vedo plotter
         self.ui.vtkWidget = QVTKRenderWindowInteractor(self.ui.frame)
         # Create renderer and add the vedo objects and callbacks
