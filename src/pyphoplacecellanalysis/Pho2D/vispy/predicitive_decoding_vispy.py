@@ -2075,10 +2075,10 @@ class Volumentric2DTimeSeriesPlotter:
         return np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
 
 
-    def _build_posterior_plane_from_rgba(self, img_rgba: NDArray, time_value: float, visual_name: str = "posterior") -> vz.Image:
-        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene, name=visual_name)
+    def _build_posterior_plane_from_img(self, img: NDArray, time_value: float, visual_name: str = "posterior", **vzImageKwargs) -> vz.Image:
+        posterior_plane = vz.Image(data=img, parent=self.view.scene, name=visual_name, **vzImageKwargs)
         posterior_plane.order = 20
-        n_y, n_x = img_rgba.shape[:2]
+        n_y, n_x = img.shape[:2]
         x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
         y_scale = float((self.ybin[-1] - self.ybin[0]) / max(n_y, 1))
         z_val = float((float(time_value) - self.t_min) * self.z_scale)
@@ -2090,9 +2090,15 @@ class Volumentric2DTimeSeriesPlotter:
 
 
     def _build_posterior_plane_from_2d(self, decoded_posterior_2d: NDArray, time_value: float, visual_name: str = "posterior") -> vz.Image:
-        posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
-        img_rgba = self._posterior_2d_to_rgba(posterior_2d=posterior_2d)
-        return self._build_posterior_plane_from_rgba(img_rgba=img_rgba, time_value=time_value, visual_name=visual_name)
+        # posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
+        # img_rgba = self._posterior_2d_to_rgba(posterior_2d=posterior_2d)
+        # return self._build_posterior_plane_from_img(img=img_rgba, time_value=time_value, visual_name=visual_name)
+        ## raw
+        return self._build_posterior_plane_from_img(img=decoded_posterior_2d, time_value=time_value, visual_name=visual_name, cmap='viridis')
+
+    
+        
+
 
 
     def _refresh_scene_tree(self):
@@ -2127,7 +2133,8 @@ class Volumentric2DTimeSeriesPlotter:
         identifier = str(unique_identifier) if unique_identifier is not None else self._next_decoded_posterior_key()
         if len(identifier) == 0:
             identifier = self._next_decoded_posterior_key()
-        posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
+        # posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
+        posterior_2d = decoded_posterior_2d.copy()
         existing_item = self.decoded_posteriors_by_key.get(identifier, None)
         if existing_item is not None:
             if not bool(replace_if_exists):
@@ -2225,7 +2232,7 @@ class Volumentric2DTimeSeriesPlotter:
             box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene, name=curr_epoch_identifier)
             # box.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
             box.set_gl_state('translucent', depth_test=False, cull_face=False)
-            # box.order = 10
+            box.order = 10
             transform = scene.transforms.MatrixTransform()
             transform.translate((x_center, y_center, z_center))
             # transform.translate((x_center, z_center, y_center))
