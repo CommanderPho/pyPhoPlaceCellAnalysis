@@ -57,7 +57,7 @@ from vispy import scene
 # from vispy import app, gloo, visuals
 # from vispy.scene.visuals import Arrow, Markers, Line
 import vispy.scene.visuals as vz
-from vispy.color import Colormap
+from vispy.color import Colormap, Color
 from qtpy import QtWidgets, QtCore
 
 # # Vispy - Extreme Debugging __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -1695,3 +1695,301 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 
+
+# Volumetric 2D time-series plotter using vispy
+@define(slots=False, repr=False, eq=False)
+class Volumentric2DTimeSeriesPlotter:
+    """plots a 3D volume that represents a rat in a 2D open-field arena (x-, y- axis) over time (z-axis) 
+	It renders:
+	- The animal's 2D position over time as a curve
+	- plotting 2D decoded position posteriors at a certain time bin as a plane
+	
+	It features
+	- highlighting of certain time ranges - highlights the volume along the z-axis
+        - can color the curve according to the range color
+		- can add labels along the x=0, y=0 planes visually indicate the region in question
+		
+        
+    Usage:
+    
+        from pyphoplacecellanalysis.Pho2D.vispy.predicitive_decoding_vispy import Volumentric2DTimeSeriesPlotter
+    
+        viewer_3d: Volumentric2DTimeSeriesPlotter = Volumentric2DTimeSeriesPlotter.init_from_position_and_decoder(curr_position_df=curr_position_df, xbin=xbin, ybin=ybin, p_x_given_n=p_x_given_n, t_bin_edges=t_bin_edges, highlight_epochs=highlight_epochs)
+    """
+
+    curr_position_df: pd.DataFrame = field(default=None)
+    xbin: NDArray = field(default=None)
+    ybin: NDArray = field(default=None)
+    p_x_given_n: Optional[NDArray] = field(default=None)
+    t_bin_edges: Optional[NDArray] = field(default=None)
+    highlight_epochs: Optional[pd.DataFrame] = field(default=None)
+    active_t_bin_idx: int = field(default=0)
+
+    t_min: float = field(default=0.0)
+    t_max: float = field(default=1.0)
+    z_scale: float = field(default=1.0)
+    pos3d: Optional[NDArray] = field(default=None)
+
+    canvas: Any = field(default=None)
+    main_window: Any = field(default=None)
+    view: Any = field(default=None)
+    position_line: Any = field(default=None)
+    posterior_plane: Any = field(default=None)
+    highlight_boxes: List[Any] = field(default=Factory(list))
+    highlight_labels: List[Any] = field(default=Factory(list))
+    t_bin_slider: Optional[Any] = field(default=None)
+    t_bin_value_label: Optional[Any] = field(default=None)
+    arena_wireframe_lines: List[Any] = field(default=Factory(list))
+
+
+    def __attrs_post_init__(self):
+        self.setup()
+        self.buildUI()
+
+
+    @classmethod
+    def init_from_position_and_decoder(cls, curr_position_df: pd.DataFrame, xbin: NDArray, ybin: NDArray, p_x_given_n: Optional[NDArray]=None, t_bin_edges: Optional[NDArray]=None, highlight_epochs: Optional[pd.DataFrame] = None, **kwargs) -> "Volumentric2DTimeSeriesPlotter":
+        return cls(curr_position_df=curr_position_df, xbin=xbin, ybin=ybin, p_x_given_n=p_x_given_n, t_bin_edges=t_bin_edges, highlight_epochs=highlight_epochs, **kwargs)
+
+
+    @property
+    def n_t_bins(self) -> int:
+        if self.p_x_given_n is None:
+            return 0
+        return int(np.shape(self.p_x_given_n)[2])
+
+
+    @property
+    def z_max(self) -> float:
+        return float((self.t_max - self.t_min) * self.z_scale)
+
+
+    def setup(self):
+        if self.curr_position_df is None:
+            raise ValueError("curr_position_df must be provided")
+        missing_cols = {'t', 'x', 'y'} - set(self.curr_position_df.columns)
+        if len(missing_cols) > 0:
+            raise ValueError(f"curr_position_df missing required columns: {missing_cols}")
+        if self.xbin is None or self.ybin is None:
+            raise ValueError("xbin and ybin must be provided")
+
+        self.xbin = np.ascontiguousarray(np.asarray(self.xbin, dtype=np.float32))
+        self.ybin = np.ascontiguousarray(np.asarray(self.ybin, dtype=np.float32))
+
+        t_vals = np.asarray(self.curr_position_df['t'].to_numpy(), dtype=np.float32)
+        x_vals = np.asarray(self.curr_position_df['x'].to_numpy(), dtype=np.float32)
+        y_vals = np.asarray(self.curr_position_df['y'].to_numpy(), dtype=np.float32)
+        valid_mask = np.isfinite(t_vals) & np.isfinite(x_vals) & np.isfinite(y_vals)
+        t_vals = t_vals[valid_mask]
+        x_vals = x_vals[valid_mask]
+        y_vals = y_vals[valid_mask]
+        if t_vals.size < 2:
+            raise ValueError("curr_position_df must contain at least two valid samples")
+
+        self.t_min = float(np.nanmin(t_vals))
+        self.t_max = float(np.nanmax(t_vals))
+        t_duration = max(self.t_max - self.t_min, 1e-6)
+        self.z_scale = float((self.xbin[-1] - self.xbin[0]) / t_duration)
+        z_vals = (t_vals - self.t_min) * self.z_scale
+        self.pos3d = np.ascontiguousarray(np.column_stack((x_vals, y_vals, z_vals)), dtype=np.float32)
+
+        if self.p_x_given_n is not None:
+            self.p_x_given_n = np.ascontiguousarray(np.asarray(self.p_x_given_n, dtype=np.float32))
+            if self.p_x_given_n.ndim != 3:
+                raise ValueError("p_x_given_n must be 3D with shape (n_xbins, n_ybins, n_tbins)")
+            if self.t_bin_edges is None:
+                self.t_bin_edges = np.linspace(self.t_min, self.t_max, self.n_t_bins + 1, dtype=np.float32)
+        if self.t_bin_edges is not None:
+            self.t_bin_edges = np.ascontiguousarray(np.asarray(self.t_bin_edges, dtype=np.float32))
+        if self.n_t_bins > 0:
+            self.active_t_bin_idx = self._clamp_t_bin_idx(self.active_t_bin_idx)
+
+
+    def buildUI(self):
+        canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title='Volumetric 2D Time-Series Viewer', autoswap=False, resizable=True, decorate=True, fullscreen=False)
+        self.canvas = canvas
+
+        main_window = QtWidgets.QMainWindow()
+        main_window.setWindowTitle('Volumetric 2D Time-Series Viewer')
+        self.main_window = main_window
+        central_widget = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(canvas.native, stretch=1)
+
+        if self.n_t_bins > 0:
+            slider_widget = QtWidgets.QWidget()
+            slider_layout = QtWidgets.QHBoxLayout(slider_widget)
+            slider_layout.addWidget(QtWidgets.QLabel("t-bin:"))
+            t_bin_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+            t_bin_slider.setMinimum(0)
+            t_bin_slider.setMaximum(max(0, self.n_t_bins - 1))
+            t_bin_slider.setValue(self.active_t_bin_idx)
+            t_bin_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+            t_bin_slider.setTickInterval(1)
+            t_bin_value_label = QtWidgets.QLabel(f"{self.active_t_bin_idx}/{max(0, self.n_t_bins - 1)}")
+            t_bin_value_label.setMinimumWidth(90)
+            slider_layout.addWidget(t_bin_slider, stretch=1)
+            slider_layout.addWidget(t_bin_value_label)
+            main_layout.addWidget(slider_widget)
+            self.t_bin_slider = t_bin_slider
+            self.t_bin_value_label = t_bin_value_label
+            t_bin_slider.valueChanged.connect(self.on_slider_value_changed)
+
+        main_window.setCentralWidget(central_widget)
+        main_window.resize(1400, 950)
+        main_window.show()
+
+        self.view = canvas.central_widget.add_view()
+        self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)
+        vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
+        vz.XYZAxis(parent=self.view.scene)
+
+        self._build_arena_wireframe()
+        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.9), width=2.0, parent=self.view.scene)
+
+        if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
+            self._build_highlight_bands()
+
+        if self.n_t_bins > 0:
+            self.update_active_t_bin(self.active_t_bin_idx)
+
+        if hasattr(canvas.events, 'key_press'):
+            canvas.events.key_press.connect(self.on_key_press)
+
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        self.view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max), z=(0.0, self.z_max))
+
+
+    def _build_arena_wireframe(self):
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        z0, z1 = 0.0, self.z_max
+        lower = np.array([[x_min, y_min, z0], [x_max, y_min, z0], [x_max, y_max, z0], [x_min, y_max, z0], [x_min, y_min, z0]], dtype=np.float32)
+        upper = np.array([[x_min, y_min, z1], [x_max, y_min, z1], [x_max, y_max, z1], [x_min, y_max, z1], [x_min, y_min, z1]], dtype=np.float32)
+        self.arena_wireframe_lines.append(vz.Line(pos=lower, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene))
+        self.arena_wireframe_lines.append(vz.Line(pos=upper, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene))
+        for xy in [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]:
+            edge = np.array([[xy[0], xy[1], z0], [xy[0], xy[1], z1]], dtype=np.float32)
+            self.arena_wireframe_lines.append(vz.Line(pos=edge, color=(0.8, 0.8, 0.8, 0.5), width=1.0, parent=self.view.scene))
+
+
+    def _clamp_t_bin_idx(self, t_bin_idx: int) -> int:
+        if self.n_t_bins <= 0:
+            return 0
+        return int(np.clip(int(t_bin_idx), 0, self.n_t_bins - 1))
+
+
+    def _t_bin_center(self, t_bin_idx: int) -> float:
+        idx = self._clamp_t_bin_idx(t_bin_idx)
+        if self.t_bin_edges is not None and np.size(self.t_bin_edges) >= (idx + 2):
+            return float((self.t_bin_edges[idx] + self.t_bin_edges[idx + 1]) * 0.5)
+        if self.n_t_bins > 0:
+            return float(np.linspace(self.t_min, self.t_max, self.n_t_bins, dtype=np.float32)[idx])
+        return float(self.t_min)
+
+
+    def _build_posterior_plane(self, t_bin_idx: int):
+        if self.p_x_given_n is None or self.n_t_bins <= 0:
+            return
+        idx = self._clamp_t_bin_idx(t_bin_idx)
+        img = np.asarray(self.p_x_given_n[:, :, idx].T, dtype=np.float32)
+        img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
+        img_min = float(np.min(img))
+        img_max = float(np.max(img))
+        if img_max > img_min:
+            img_norm = (img - img_min) / (img_max - img_min)
+        else:
+            img_norm = np.zeros_like(img, dtype=np.float32)
+        cmap = Colormap(['black', 'red', 'yellow', 'white'])
+        img_rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
+        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene)
+
+        n_y, n_x = img_rgba.shape[:2]
+        x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
+        y_scale = float((self.ybin[-1] - self.ybin[0]) / max(n_y, 1))
+        t_bin_center = self._t_bin_center(idx)
+        z_val = float((t_bin_center - self.t_min) * self.z_scale)
+        transform = scene.transforms.MatrixTransform()
+        transform.scale((x_scale, y_scale, 1.0))
+        transform.translate((float(self.xbin[0]), float(self.ybin[0]), z_val))
+        posterior_plane.transform = transform
+        self.posterior_plane = posterior_plane
+
+
+    def update_active_t_bin(self, t_bin_idx: int):
+        if self.n_t_bins <= 0:
+            return
+        idx = self._clamp_t_bin_idx(t_bin_idx)
+        if self.posterior_plane is not None:
+            self.posterior_plane.parent = None
+            self.posterior_plane = None
+        self._build_posterior_plane(idx)
+        self.active_t_bin_idx = idx
+        if self.t_bin_value_label is not None:
+            self.t_bin_value_label.setText(f"{idx}/{max(0, self.n_t_bins - 1)}")
+
+
+    def _to_rgba(self, color_value: Any, alpha: float = 0.15) -> Tuple[float, float, float, float]:
+        if color_value is None:
+            return (0.2, 0.8, 1.0, alpha)
+        try:
+            rgba = Color(color_value).rgba
+            return (float(rgba[0]), float(rgba[1]), float(rgba[2]), alpha)
+        except Exception:
+            return (0.2, 0.8, 1.0, alpha)
+
+
+    def _build_highlight_bands(self):
+        if self.highlight_epochs is None or len(self.highlight_epochs) == 0:
+            return
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        x_width = float(max(x_max - x_min, 1e-6))
+        y_width = float(max(y_max - y_min, 1e-6))
+        x_center = 0.5 * (x_min + x_max)
+        y_center = 0.5 * (y_min + y_max)
+
+        for idx, row in self.highlight_epochs.iterrows():
+            if ('start' not in row) or ('stop' not in row):
+                continue
+            start_t = float(row['start'])
+            stop_t = float(row['stop'])
+            z0 = float((start_t - self.t_min) * self.z_scale)
+            z1 = float((stop_t - self.t_min) * self.z_scale)
+            z_low, z_high = float(min(z0, z1)), float(max(z0, z1))
+            z_depth = float(max(z_high - z_low, 1e-4))
+            z_center = float(0.5 * (z_low + z_high))
+            rgba = self._to_rgba(row.get('color', None), alpha=0.15)
+            edge_rgba = (rgba[0], rgba[1], rgba[2], 0.35)
+
+            box = vz.Box(width=x_width, height=y_width, depth=z_depth, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
+            transform = scene.transforms.MatrixTransform()
+            transform.translate((x_center, y_center, z_center))
+            box.transform = transform
+            self.highlight_boxes.append(box)
+
+            label_text = str(row.get('label', f"range_{idx}"))
+            label_pos = np.array([[x_min, y_min, z_center]], dtype=np.float32)
+            label = vz.Text(text=label_text, color=edge_rgba, pos=label_pos, font_size=10, anchor_x='left', anchor_y='center', parent=self.view.scene)
+            self.highlight_labels.append(label)
+
+
+    # Interaction/UI Events
+    def on_key_press(self, event):
+        key_name = str(event.key)
+        if key_name not in {'Left', 'Right'}:
+            return
+        if self.n_t_bins <= 0:
+            return
+        step = -1 if key_name == 'Left' else 1
+        next_idx = self._clamp_t_bin_idx(self.active_t_bin_idx + step)
+        if self.t_bin_slider is not None:
+            self.t_bin_slider.setValue(next_idx)
+        else:
+            self.update_active_t_bin(next_idx)
+
+
+    def on_slider_value_changed(self, value: int):
+        self.update_active_t_bin(value)
