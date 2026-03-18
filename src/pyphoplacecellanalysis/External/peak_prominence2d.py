@@ -2122,40 +2122,57 @@ class PeakPromenence:
                 raise MemoryError(msg)
             warn(msg)
 
+        # --- Batch maximum_filter and local_max across all time bins (single C-level pass) ---
+        neighborhood_2d = ndimage.generate_binary_structure(2, 2)
+        neighborhood_3d = neighborhood_2d[:, :, np.newaxis]  # (3,3,1) — 2D connectivity only, no t-axis bleeding
+        max_filtered = ndimage.maximum_filter(a_p_x_given_n, footprint=neighborhood_3d)
+        local_max_3d = (a_p_x_given_n == max_filtered)
+        del max_filtered
+        slice_mins = np.min(a_p_x_given_n, axis=(0, 1))  # (n_t_bins,)
+        local_max_3d &= (a_p_x_given_n > slice_mins[np.newaxis, np.newaxis, :])
+
         # Preallocate output masks (one 3D array per alpha); write directly by t_idx to avoid list-of-2D + stack.
         epoch_masks: List[NDArray] = [np.zeros((n_x_bins, n_y_bins, n_t_bins), dtype=bool) for _ in alpha]
         epoch_promenence_tuples: List[Tuple] = []
 
-        # Reusable buffers and invariant structure (same connectivity as ndimage.label default: 4-connected).
-        structure = ndimage.generate_binary_structure(2, 1)
+        # Reusable buffers
+        structure = ndimage.generate_binary_structure(2, 1)  # 4-connected for binary_propagation
         threshold_buf = np.empty((n_x_bins, n_y_bins), dtype=bool)
-        seed_buf = np.zeros((n_x_bins, n_y_bins), dtype=bool)
+        prop_seed_buf = np.zeros((n_x_bins, n_y_bins), dtype=bool)
+        recon_seed_buf = np.empty((n_x_bins, n_y_bins), dtype=a_p_x_given_n.dtype)
 
         def _subfn_dominant_peak_mask_at_alpha(Z_2d: NDArray, peak_coords: NDArray, peak_heights: NDArray, a_peak_idx: int, an_alpha: float, out_threshold: NDArray, out_seed: NDArray) -> NDArray:
             px, py = int(peak_coords[a_peak_idx, 0]), int(peak_coords[a_peak_idx, 1])
-            peak_height_max: float = float(peak_heights[a_peak_idx])
-            np.greater_equal(Z_2d, an_alpha * peak_height_max, out=out_threshold)
+            np.greater_equal(Z_2d, an_alpha * float(peak_heights[a_peak_idx]), out=out_threshold)
             out_seed.fill(False)
             out_seed[px, py] = True
             return ndimage.binary_propagation(out_seed, mask=out_threshold, structure=structure)
 
         for t_idx in range(n_t_bins):
             Z_2d = a_p_x_given_n[:, :, t_idx]
-            peak_coords, prominences = cls.compute_2d_peak_prominence(Z_2d=Z_2d)
+            local_max_slice = local_max_3d[:, :, t_idx]  # view, zero-copy
 
+            peak_coords = np.argwhere(local_max_slice)
             if peak_coords.size == 0:
-                epoch_promenence_tuples.append((peak_coords, prominences, np.array([])))
+                epoch_promenence_tuples.append((peak_coords, np.array([]), np.array([])))
                 continue
 
             peak_heights = Z_2d[peak_coords[:, 0], peak_coords[:, 1]]
-            dominant_peak_idx: int = int(np.argmax(peak_heights))
 
+            # Prominence via morphological reconstruction (must remain per-slice)
+            np.copyto(recon_seed_buf, Z_2d)
+            recon_seed_buf[local_max_slice] = -np.inf
+            reconstructed = reconstruction(recon_seed_buf, Z_2d, method="dilation")
+            prominences = peak_heights - reconstructed[peak_coords[:, 0], peak_coords[:, 1]]
+
+            dominant_peak_idx: int = int(np.argmax(peak_heights))
             for an_alpha_idx, an_alpha in enumerate(alpha):
-                a_dominant_peak_mask = _subfn_dominant_peak_mask_at_alpha(Z_2d=Z_2d, peak_coords=peak_coords, peak_heights=peak_heights, a_peak_idx=dominant_peak_idx, an_alpha=an_alpha, out_threshold=threshold_buf, out_seed=seed_buf)
+                a_dominant_peak_mask = _subfn_dominant_peak_mask_at_alpha(Z_2d=Z_2d, peak_coords=peak_coords, peak_heights=peak_heights, a_peak_idx=dominant_peak_idx, an_alpha=an_alpha, out_threshold=threshold_buf, out_seed=prop_seed_buf)
                 epoch_masks[an_alpha_idx][:, :, t_idx] = a_dominant_peak_mask
 
             epoch_promenence_tuples.append((peak_coords, prominences, peak_heights))
 
+        del local_max_3d
         return epoch_promenence_tuples, epoch_masks
 
 
