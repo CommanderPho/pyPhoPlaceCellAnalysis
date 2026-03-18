@@ -1754,6 +1754,9 @@ class Volumentric2DTimeSeriesPlotter:
     debug_nearest_pos3d_idx: Optional[int] = field(default=None)
     debug_crosshair_snap_max_pixel_distance: float = field(default=16.0)
 
+    posterior_contours_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
+    posterior_contours_counter: int = field(default=0)
+
     debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
 
@@ -2054,6 +2057,48 @@ class Volumentric2DTimeSeriesPlotter:
                 return key
 
 
+    def _next_posterior_contour_key(self) -> str:
+        while True:
+            self.posterior_contours_counter = int(self.posterior_contours_counter) + 1
+            key = f"posterior_contour_{self.posterior_contours_counter:04d}"
+            if key not in self.posterior_contours_by_key:
+                return key
+
+
+    def _build_posterior_contours_3d(self, per_t_bin_mask: NDArray, t_bin_edges_for_contours: Optional[NDArray] = None, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5) -> List[Any]:
+        """Build 3D contour line visuals from a per-time-bin boolean mask array.
+
+        per_t_bin_mask: (n_xbins, n_ybins, n_tbins) boolean/float mask array.
+        Each time-bin slice is contoured in 2D then lifted to the corresponding z-height.
+        Returns the flat list of vz.Line visuals created (parented to self.view.scene).
+        """
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        n_tbins = int(per_t_bin_mask.shape[2])
+        line_visuals: List[Any] = []
+        for t_idx in range(n_tbins):
+            if t_bin_edges_for_contours is not None and len(t_bin_edges_for_contours) >= (t_idx + 2):
+                t_center = float((t_bin_edges_for_contours[t_idx] + t_bin_edges_for_contours[t_idx + 1]) * 0.5)
+            elif self.t_bin_edges is not None and len(self.t_bin_edges) >= (t_idx + 2):
+                t_center = float((self.t_bin_edges[t_idx] + self.t_bin_edges[t_idx + 1]) * 0.5)
+            else:
+                t_center = float(self.t_min + (t_idx + 0.5) * ((self.t_max - self.t_min) / max(n_tbins, 1)))
+            z_val = float((t_center - self.t_min) * self.z_scale)
+            hue = (t_idx / max(n_tbins, 1)) % 1.0
+            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+            t_color = (rgb[0], rgb[1], rgb[2], contour_alpha)
+            mask_2d = per_t_bin_mask[:, :, t_idx].T
+            contour_items: List[ContourItem] = contours_from_masks([mask_2d], x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=[t_color], level=level, return_per_mask=False)
+            for pos_2d, rgba in contour_items:
+                if len(pos_2d) < 2:
+                    continue
+                pos_3d = np.column_stack([pos_2d, np.full(len(pos_2d), z_val, dtype=np.float32)]).astype(np.float32)
+                line = vz.Line(pos=pos_3d, color=rgba, width=line_width, parent=self.view.scene, name=f'Contour[t={t_idx}]')
+                line.order = 22
+                line_visuals.append(line)
+        return line_visuals
+
+
     def _normalize_posterior_2d(self, decoded_posterior_2d: NDArray) -> NDArray:
         posterior_2d = np.asarray(decoded_posterior_2d, dtype=np.float32)
         if posterior_2d.ndim != 2:
@@ -2073,7 +2118,7 @@ class Volumentric2DTimeSeriesPlotter:
         else:
             img_norm = np.zeros_like(img, dtype=np.float32)
         cmap = get_colormap('viridis')
-        rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
+        rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32).reshape(*img_norm.shape, 4)  # cmap.map flattens input; restore (H, W, 4)
         rgba[nan_mask, 3] = 0.0                               # 2. zero alpha where NaN was
         return rgba
 
@@ -2190,6 +2235,69 @@ class Volumentric2DTimeSeriesPlotter:
             if posterior_plane is not None:
                 posterior_plane.parent = None
         self.decoded_posteriors_by_key = {}
+        self._refresh_scene_tree()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Posterior Contours (3D)                                                                                                                                                                                                                                                               #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def add_posterior_contours(self, per_t_bin_mask: NDArray, t_bin_edges: Optional[NDArray] = None, unique_identifier: Optional[str] = None, visible: bool = True, replace_if_exists: bool = True, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5) -> str:
+        """Add 3D contour lines from a per-time-bin boolean mask (n_xbins, n_ybins, n_tbins). Returns the assigned key."""
+        identifier = str(unique_identifier) if unique_identifier is not None else self._next_posterior_contour_key()
+        if len(identifier) == 0:
+            identifier = self._next_posterior_contour_key()
+        existing = self.posterior_contours_by_key.get(identifier, None)
+        if existing is not None:
+            if not bool(replace_if_exists):
+                raise KeyError(f"posterior contour key already exists: '{identifier}'")
+            self.remove_posterior_contours(unique_identifier=identifier)
+        line_visuals = self._build_posterior_contours_3d(per_t_bin_mask=np.asarray(per_t_bin_mask), t_bin_edges_for_contours=t_bin_edges, line_width=line_width, contour_alpha=contour_alpha, level=level)
+        for lv in line_visuals:
+            lv.visible = bool(visible)
+        self.posterior_contours_by_key[identifier] = {'unique_identifier': identifier, 'line_visuals': line_visuals, 'visible': bool(visible)}
+        self._refresh_scene_tree()
+        return identifier
+
+
+    def get_posterior_contours(self, unique_identifier: str) -> Optional[Dict[str, Any]]:
+        return self.posterior_contours_by_key.get(str(unique_identifier), None)
+
+
+    def list_posterior_contour_keys(self) -> List[str]:
+        return list(self.posterior_contours_by_key.keys())
+
+
+    def set_posterior_contours_visibility(self, unique_identifier: str, is_visible: bool) -> bool:
+        item = self.get_posterior_contours(unique_identifier=unique_identifier)
+        if item is None:
+            return False
+        item['visible'] = bool(is_visible)
+        for lv in item.get('line_visuals', []):
+            if lv is not None:
+                lv.visible = bool(is_visible)
+        return True
+
+
+    def remove_posterior_contours(self, unique_identifier: str) -> bool:
+        item = self.posterior_contours_by_key.pop(str(unique_identifier), None)
+        if item is None:
+            return False
+        for lv in item.get('line_visuals', []):
+            if lv is not None:
+                lv.parent = None
+        self._refresh_scene_tree()
+        return True
+
+
+    def clear_posterior_contours(self):
+        if len(self.posterior_contours_by_key) == 0:
+            return
+        for item in self.posterior_contours_by_key.values():
+            for lv in item.get('line_visuals', []):
+                if lv is not None:
+                    lv.parent = None
+        self.posterior_contours_by_key = {}
         self._refresh_scene_tree()
 
 
