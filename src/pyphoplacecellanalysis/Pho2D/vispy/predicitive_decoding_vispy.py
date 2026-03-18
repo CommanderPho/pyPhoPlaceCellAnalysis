@@ -1740,6 +1740,8 @@ class Volumentric2DTimeSeriesPlotter:
 
     position_line: Any = field(default=None)
     posterior_plane: Any = field(default=None)
+    decoded_posteriors_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
+    decoded_posterior_counter: int = field(default=0)
     highlight_boxes: List[Any] = field(default=Factory(list))
     highlight_labels: List[Any] = field(default=Factory(list))
     t_bin_slider: Optional[Any] = field(default=None)
@@ -2044,11 +2046,24 @@ class Volumentric2DTimeSeriesPlotter:
         return float(self.t_min)
 
 
-    def _build_posterior_plane(self, t_bin_idx: int):
-        if self.p_x_given_n is None or self.n_t_bins <= 0:
-            return
-        idx = self._clamp_t_bin_idx(t_bin_idx)
-        img = np.asarray(self.p_x_given_n[:, :, idx].T, dtype=np.float32)
+    def _next_decoded_posterior_key(self) -> str:
+        while True:
+            self.decoded_posterior_counter = int(self.decoded_posterior_counter) + 1
+            key = f"decoded_posterior_{self.decoded_posterior_counter:04d}"
+            if key not in self.decoded_posteriors_by_key:
+                return key
+
+
+    def _normalize_posterior_2d(self, decoded_posterior_2d: NDArray) -> NDArray:
+        posterior_2d = np.asarray(decoded_posterior_2d, dtype=np.float32)
+        if posterior_2d.ndim != 2:
+            raise ValueError(f"decoded_posterior_2d must be 2D with shape (n_xbins, n_ybins) or (n_ybins, n_xbins), got shape: {np.shape(posterior_2d)}")
+        posterior_2d = np.nan_to_num(posterior_2d, nan=0.0, posinf=0.0, neginf=0.0)
+        return np.ascontiguousarray(posterior_2d, dtype=np.float32)
+
+
+    def _posterior_2d_to_rgba(self, posterior_2d: NDArray) -> NDArray:
+        img = np.asarray(posterior_2d.T, dtype=np.float32)
         img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
         img_min = float(np.min(img))
         img_max = float(np.max(img))
@@ -2057,18 +2072,41 @@ class Volumentric2DTimeSeriesPlotter:
         else:
             img_norm = np.zeros_like(img, dtype=np.float32)
         cmap = Colormap(['black', 'red', 'yellow', 'white'])
-        img_rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
-        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene, name=f'posterior')
+        return np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
 
+
+    def _build_posterior_plane_from_rgba(self, img_rgba: NDArray, time_value: float, visual_name: str = "posterior") -> vz.Image:
+        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene, name=visual_name)
+        posterior_plane.order = 20
         n_y, n_x = img_rgba.shape[:2]
         x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
         y_scale = float((self.ybin[-1] - self.ybin[0]) / max(n_y, 1))
-        t_bin_center = self._t_bin_center(idx)
-        z_val = float((t_bin_center - self.t_min) * self.z_scale)
+        z_val = float((float(time_value) - self.t_min) * self.z_scale)
         transform = scene.transforms.MatrixTransform()
         transform.scale((x_scale, y_scale, 1.0))
         transform.translate((float(self.xbin[0]), float(self.ybin[0]), z_val))
         posterior_plane.transform = transform
+        return posterior_plane
+
+
+    def _build_posterior_plane_from_2d(self, decoded_posterior_2d: NDArray, time_value: float, visual_name: str = "posterior") -> vz.Image:
+        posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
+        img_rgba = self._posterior_2d_to_rgba(posterior_2d=posterior_2d)
+        return self._build_posterior_plane_from_rgba(img_rgba=img_rgba, time_value=time_value, visual_name=visual_name)
+
+
+    def _refresh_scene_tree(self):
+        if self.scene_tree_widget is not None:
+            self.scene_tree_widget.rebuild()
+
+
+    def _build_posterior_plane(self, t_bin_idx: int):
+        if self.p_x_given_n is None or self.n_t_bins <= 0:
+            return
+        idx = self._clamp_t_bin_idx(t_bin_idx)
+        t_bin_center = self._t_bin_center(idx)
+        posterior_2d = np.asarray(self.p_x_given_n[:, :, idx], dtype=np.float32)
+        posterior_plane = self._build_posterior_plane_from_2d(decoded_posterior_2d=posterior_2d, time_value=t_bin_center, visual_name='posterior')
         self.posterior_plane = posterior_plane
 
 
@@ -2083,6 +2121,65 @@ class Volumentric2DTimeSeriesPlotter:
         self.active_t_bin_idx = idx
         if self.t_bin_value_label is not None:
             self.t_bin_value_label.setText(f"{idx}/{max(0, self.n_t_bins - 1)}")
+
+
+    def add_decoded_posterior(self, decoded_posterior_2d: NDArray, time_value: float, unique_identifier: Optional[str] = None, visible: bool = True, replace_if_exists: bool = True) -> str:
+        identifier = str(unique_identifier) if unique_identifier is not None else self._next_decoded_posterior_key()
+        if len(identifier) == 0:
+            identifier = self._next_decoded_posterior_key()
+        posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
+        existing_item = self.decoded_posteriors_by_key.get(identifier, None)
+        if existing_item is not None:
+            if not bool(replace_if_exists):
+                raise KeyError(f"decoded posterior key already exists: '{identifier}'")
+            self.remove_decoded_posterior(unique_identifier=identifier)
+        posterior_plane = self._build_posterior_plane_from_2d(decoded_posterior_2d=posterior_2d, time_value=float(time_value), visual_name=f"posterior[{identifier}]")
+        posterior_plane.visible = bool(visible)
+        self.decoded_posteriors_by_key[identifier] = {'unique_identifier': identifier, 'time_value': float(time_value), 'decoded_posterior_2d': posterior_2d, 'posterior_plane': posterior_plane, 'visible': bool(visible)}
+        self._refresh_scene_tree()
+        return identifier
+
+
+    def get_decoded_posterior(self, unique_identifier: str) -> Optional[Dict[str, Any]]:
+        return self.decoded_posteriors_by_key.get(str(unique_identifier), None)
+
+
+    def list_decoded_posterior_keys(self) -> List[str]:
+        return list(self.decoded_posteriors_by_key.keys())
+
+
+    def set_decoded_posterior_visibility(self, unique_identifier: str, is_visible: bool) -> bool:
+        item = self.get_decoded_posterior(unique_identifier=unique_identifier)
+        if item is None:
+            return False
+        posterior_plane = item.get('posterior_plane', None)
+        if posterior_plane is None:
+            return False
+        item['visible'] = bool(is_visible)
+        posterior_plane.visible = bool(is_visible)
+        return True
+
+
+    def remove_decoded_posterior(self, unique_identifier: str) -> bool:
+        item = self.decoded_posteriors_by_key.pop(str(unique_identifier), None)
+        if item is None:
+            return False
+        posterior_plane = item.get('posterior_plane', None)
+        if posterior_plane is not None:
+            posterior_plane.parent = None
+        self._refresh_scene_tree()
+        return True
+
+
+    def clear_decoded_posteriors(self):
+        if len(self.decoded_posteriors_by_key) == 0:
+            return
+        for item in self.decoded_posteriors_by_key.values():
+            posterior_plane = item.get('posterior_plane', None)
+            if posterior_plane is not None:
+                posterior_plane.parent = None
+        self.decoded_posteriors_by_key = {}
+        self._refresh_scene_tree()
 
 
     def _to_rgba(self, color_value: Any, alpha: float = 0.15) -> Tuple[float, float, float, float]:
@@ -2126,6 +2223,9 @@ class Volumentric2DTimeSeriesPlotter:
 
             # box = vz.Box(width=x_width, height=y_width, depth=z_depth, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
             box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene, name=curr_epoch_identifier)
+            # box.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
+            box.set_gl_state('translucent', depth_test=False, cull_face=False)
+            # box.order = 10
             transform = scene.transforms.MatrixTransform()
             transform.translate((x_center, y_center, z_center))
             # transform.translate((x_center, z_center, y_center))
