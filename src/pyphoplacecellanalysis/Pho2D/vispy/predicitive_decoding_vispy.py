@@ -57,7 +57,7 @@ from vispy import scene
 # from vispy import app, gloo, visuals
 # from vispy.scene.visuals import Arrow, Markers, Line
 import vispy.scene.visuals as vz
-from vispy.color import Colormap, Color
+from vispy.color import Colormap, Color, get_colormap
 from qtpy import QtWidgets, QtCore
 
 # # Vispy - Extreme Debugging __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -2064,6 +2064,7 @@ class Volumentric2DTimeSeriesPlotter:
 
     def _posterior_2d_to_rgba(self, posterior_2d: NDArray) -> NDArray:
         img = np.asarray(posterior_2d.T, dtype=np.float32)
+        nan_mask = np.isnan(img)                              # 1. capture NaN positions BEFORE replacing
         img = np.nan_to_num(img, nan=0.0, posinf=0.0, neginf=0.0)
         img_min = float(np.min(img))
         img_max = float(np.max(img))
@@ -2071,13 +2072,16 @@ class Volumentric2DTimeSeriesPlotter:
             img_norm = (img - img_min) / (img_max - img_min)
         else:
             img_norm = np.zeros_like(img, dtype=np.float32)
-        cmap = Colormap(['black', 'red', 'yellow', 'white'])
-        return np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
+        cmap = get_colormap('viridis')
+        rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
+        rgba[nan_mask, 3] = 0.0                               # 2. zero alpha where NaN was
+        return rgba
 
 
     def _build_posterior_plane_from_img(self, img: NDArray, time_value: float, visual_name: str = "posterior", **vzImageKwargs) -> vz.Image:
         posterior_plane = vz.Image(data=img, parent=self.view.scene, name=visual_name, **vzImageKwargs)
         posterior_plane.order = 20
+        posterior_plane.set_gl_state('translucent', depth_test=True)
         n_y, n_x = img.shape[:2]
         x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
         y_scale = float((self.ybin[-1] - self.ybin[0]) / max(n_y, 1))
@@ -2091,10 +2095,10 @@ class Volumentric2DTimeSeriesPlotter:
 
     def _build_posterior_plane_from_2d(self, decoded_posterior_2d: NDArray, time_value: float, visual_name: str = "posterior") -> vz.Image:
         # posterior_2d = self._normalize_posterior_2d(decoded_posterior_2d=decoded_posterior_2d)
-        # img_rgba = self._posterior_2d_to_rgba(posterior_2d=posterior_2d)
-        # return self._build_posterior_plane_from_img(img=img_rgba, time_value=time_value, visual_name=visual_name)
-        ## raw
-        return self._build_posterior_plane_from_img(img=decoded_posterior_2d, time_value=time_value, visual_name=visual_name, cmap='viridis')
+        img_rgba = self._posterior_2d_to_rgba(posterior_2d=decoded_posterior_2d)
+        return self._build_posterior_plane_from_img(img=img_rgba, time_value=time_value, visual_name=visual_name)
+        # ## raw
+        # return self._build_posterior_plane_from_img(img=decoded_posterior_2d, time_value=time_value, visual_name=visual_name, cmap='viridis')
 
     
         

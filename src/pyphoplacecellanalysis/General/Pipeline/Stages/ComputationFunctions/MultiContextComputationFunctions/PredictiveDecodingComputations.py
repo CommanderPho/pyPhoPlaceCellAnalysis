@@ -1035,10 +1035,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             non_local_locality_measures_df
             
         """
-        _out_locality_measures_df: pd.DataFrame = deepcopy(self.perform_build_locality_measures_df(locality_measures_dict_dict=self.locality_measures_dict_dict, time_window_centers=self.time_window_centers, paradigm_epochs_df=self.paradigm_epochs_df,
-                                                                                                    xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers))
-        self.locality_measures_df = deepcopy(_out_locality_measures_df)
-
+        self.locality_measures_df = self.perform_build_locality_measures_df(locality_measures_dict_dict=self.locality_measures_dict_dict, time_window_centers=self.time_window_centers, paradigm_epochs_df=self.paradigm_epochs_df,
+                                                                                                    xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers)
         return self.locality_measures_df
 
 
