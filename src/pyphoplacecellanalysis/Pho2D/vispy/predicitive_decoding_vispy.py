@@ -1740,6 +1740,12 @@ class Volumentric2DTimeSeriesPlotter:
     t_bin_slider: Optional[Any] = field(default=None)
     t_bin_value_label: Optional[Any] = field(default=None)
     arena_wireframe_lines: List[Any] = field(default=Factory(list))
+    coordinate_axes_lines: List[Any] = field(default=Factory(list))
+    coordinate_axes_labels: List[Any] = field(default=Factory(list))
+    debug_crosshair_lines: List[Any] = field(default=Factory(list))
+    debug_is_shift_hover_enabled: bool = field(default=False)
+    debug_nearest_pos3d_idx: Optional[int] = field(default=None)
+    debug_crosshair_snap_max_pixel_distance: float = field(default=16.0)
 
 
     def __attrs_post_init__(self):
@@ -1776,22 +1782,7 @@ class Volumentric2DTimeSeriesPlotter:
         self.xbin = np.ascontiguousarray(np.asarray(self.xbin, dtype=np.float32))
         self.ybin = np.ascontiguousarray(np.asarray(self.ybin, dtype=np.float32))
 
-        t_vals = np.asarray(self.curr_position_df['t'].to_numpy(), dtype=np.float32)
-        x_vals = np.asarray(self.curr_position_df['x'].to_numpy(), dtype=np.float32)
-        y_vals = np.asarray(self.curr_position_df['y'].to_numpy(), dtype=np.float32)
-        valid_mask = np.isfinite(t_vals) & np.isfinite(x_vals) & np.isfinite(y_vals)
-        t_vals = t_vals[valid_mask]
-        x_vals = x_vals[valid_mask]
-        y_vals = y_vals[valid_mask]
-        if t_vals.size < 2:
-            raise ValueError("curr_position_df must contain at least two valid samples")
-
-        self.t_min = float(np.nanmin(t_vals))
-        self.t_max = float(np.nanmax(t_vals))
-        t_duration = max(self.t_max - self.t_min, 1e-6)
-        self.z_scale = float((self.xbin[-1] - self.xbin[0]) / t_duration)
-        z_vals = (t_vals - self.t_min) * self.z_scale
-        self.pos3d = np.ascontiguousarray(np.column_stack((x_vals, y_vals, z_vals)), dtype=np.float32)
+        self.build_position_trajectory_curve()
 
         if self.p_x_given_n is not None:
             self.p_x_given_n = np.ascontiguousarray(np.asarray(self.p_x_given_n, dtype=np.float32))
@@ -1803,6 +1794,7 @@ class Volumentric2DTimeSeriesPlotter:
             self.t_bin_edges = np.ascontiguousarray(np.asarray(self.t_bin_edges, dtype=np.float32))
         if self.n_t_bins > 0:
             self.active_t_bin_idx = self._clamp_t_bin_idx(self.active_t_bin_idx)
+
 
 
     def buildUI(self):
@@ -1843,10 +1835,11 @@ class Volumentric2DTimeSeriesPlotter:
         self.view = canvas.central_widget.add_view()
         self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)
         vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
-        vz.XYZAxis(parent=self.view.scene)
+        self._build_coordinate_axes()
 
         self._build_arena_wireframe()
         self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.9), width=2.0, parent=self.view.scene)
+        self._build_debug_crosshairs()
 
         if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
             self._build_highlight_bands()
@@ -1856,6 +1849,12 @@ class Volumentric2DTimeSeriesPlotter:
 
         if hasattr(canvas.events, 'key_press'):
             canvas.events.key_press.connect(self.on_key_press)
+        if hasattr(canvas.events, 'key_release'):
+            canvas.events.key_release.connect(self.on_key_release)
+        if hasattr(canvas.events, 'mouse_move'):
+            canvas.events.mouse_move.connect(self.on_mouse_move)
+        if hasattr(canvas.events, 'mouse_leave'):
+            canvas.events.mouse_leave.connect(self.on_mouse_leave)
 
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
@@ -1873,6 +1872,141 @@ class Volumentric2DTimeSeriesPlotter:
         for xy in [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]:
             edge = np.array([[xy[0], xy[1], z0], [xy[0], xy[1], z1]], dtype=np.float32)
             self.arena_wireframe_lines.append(vz.Line(pos=edge, color=(0.8, 0.8, 0.8, 0.5), width=1.0, parent=self.view.scene))
+
+
+    def _build_coordinate_axes(self):
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        z0, z1 = 0.0, self.z_max
+        x_range = float(max(x_max - x_min, 1e-6))
+        y_range = float(max(y_max - y_min, 1e-6))
+        z_range = float(max(z1 - z0, 1e-6))
+        origin = np.array([x_min, y_min, z0], dtype=np.float32)
+
+        x_axis = np.vstack((origin, np.array([x_max, y_min, z0], dtype=np.float32)))
+        y_axis = np.vstack((origin, np.array([x_min, y_max, z0], dtype=np.float32)))
+        z_axis = np.vstack((origin, np.array([x_min, y_min, z1], dtype=np.float32)))
+        self.coordinate_axes_lines.append(vz.Line(pos=x_axis, color=(1.0, 0.25, 0.25, 1.0), width=2.5, parent=self.view.scene))
+        self.coordinate_axes_lines.append(vz.Line(pos=y_axis, color=(0.25, 1.0, 0.25, 1.0), width=2.5, parent=self.view.scene))
+        self.coordinate_axes_lines.append(vz.Line(pos=z_axis, color=(0.25, 0.5, 1.0, 1.0), width=2.5, parent=self.view.scene))
+
+        x_offset = 0.02 * x_range
+        y_offset = 0.02 * y_range
+        z_offset = 0.02 * z_range
+        x_label_pos = np.array([[x_max + x_offset, y_min, z0]], dtype=np.float32)
+        y_label_pos = np.array([[x_min, y_max + y_offset, z0]], dtype=np.float32)
+        z_label_pos = np.array([[x_min, y_min, z1 + z_offset]], dtype=np.float32)
+        self.coordinate_axes_labels.append(vz.Text(text='X', color=(1.0, 0.25, 0.25, 1.0), pos=x_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
+        self.coordinate_axes_labels.append(vz.Text(text='Y', color=(0.25, 1.0, 0.25, 1.0), pos=y_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
+        self.coordinate_axes_labels.append(vz.Text(text='Z', color=(0.25, 0.5, 1.0, 1.0), pos=z_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
+
+
+    def build_position_trajectory_curve(self):
+        """ builds the 2D+t position trajectory of the animal using self.curr_position_df
+        Uses:
+            self.curr_position_df
+        Updates:
+            self.t_min, self.t_max, self.z_scale, self.pos3d
+            
+        """
+        t_vals = np.asarray(self.curr_position_df['t'].to_numpy(), dtype=np.float32)
+        x_vals = np.asarray(self.curr_position_df['x'].to_numpy(), dtype=np.float32)
+        y_vals = np.asarray(self.curr_position_df['y'].to_numpy(), dtype=np.float32)
+        valid_mask = np.isfinite(t_vals) & np.isfinite(x_vals) & np.isfinite(y_vals)
+        t_vals = t_vals[valid_mask]
+        x_vals = x_vals[valid_mask]
+        y_vals = y_vals[valid_mask]
+        if t_vals.size < 2:
+            raise ValueError("curr_position_df must contain at least two valid samples")
+
+        new_t_min: float = float(np.nanmin(t_vals))
+        self.t_min = min((self.t_min or 0.0), new_t_min) ## update t_max if needed
+
+        new_t_max: float = float(np.nanmax(t_vals))
+        self.t_max = max((self.t_max or 1.0), new_t_max) ## update t_max if needed
+        
+        t_duration = max(self.t_max - self.t_min, 1e-6)
+        self.z_scale = float((self.xbin[-1] - self.xbin[0]) / t_duration)
+        
+
+        z_vals = (t_vals - self.t_min) * self.z_scale
+        self.pos3d = np.ascontiguousarray(np.column_stack((x_vals, y_vals, z_vals)), dtype=np.float32)
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Debug Crosshairs                                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def _build_debug_crosshairs(self):
+        """Builds hidden XYZ crosshair lines used for Shift-hover debugging."""
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        x_half = float(max((x_max - x_min) * 0.02, 1e-3))
+        y_half = float(max((y_max - y_min) * 0.02, 1e-3))
+        z_half = float(max(self.z_max * 0.02, 1e-3))
+        center = np.array([x_min, y_min, 0.0], dtype=np.float32)
+        x_line = np.array([[center[0] - x_half, center[1], center[2]], [center[0] + x_half, center[1], center[2]]], dtype=np.float32)
+        y_line = np.array([[center[0], center[1] - y_half, center[2]], [center[0], center[1] + y_half, center[2]]], dtype=np.float32)
+        z_line = np.array([[center[0], center[1], center[2] - z_half], [center[0], center[1], center[2] + z_half]], dtype=np.float32)
+        self.debug_crosshair_lines.append(vz.Line(pos=x_line, color=(1.0, 0.2, 0.2, 0.95), width=2.5, parent=self.view.scene))
+        self.debug_crosshair_lines.append(vz.Line(pos=y_line, color=(0.2, 1.0, 0.2, 0.95), width=2.5, parent=self.view.scene))
+        self.debug_crosshair_lines.append(vz.Line(pos=z_line, color=(0.2, 0.55, 1.0, 0.95), width=2.5, parent=self.view.scene))
+        self._hide_debug_crosshairs()
+
+
+    def _set_debug_crosshairs_position(self, center_xyz: NDArray):
+        if len(self.debug_crosshair_lines) != 3:
+            return
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        x_half = float(max((x_max - x_min) * 0.02, 1e-3))
+        y_half = float(max((y_max - y_min) * 0.02, 1e-3))
+        z_half = float(max(self.z_max * 0.02, 1e-3))
+        x, y, z = float(center_xyz[0]), float(center_xyz[1]), float(center_xyz[2])
+        self.debug_crosshair_lines[0].set_data(pos=np.array([[x - x_half, y, z], [x + x_half, y, z]], dtype=np.float32))
+        self.debug_crosshair_lines[1].set_data(pos=np.array([[x, y - y_half, z], [x, y + y_half, z]], dtype=np.float32))
+        self.debug_crosshair_lines[2].set_data(pos=np.array([[x, y, z - z_half], [x, y, z + z_half]], dtype=np.float32))
+        for a_line in self.debug_crosshair_lines:
+            a_line.visible = True
+
+
+    def _hide_debug_crosshairs(self):
+        for a_line in self.debug_crosshair_lines:
+            a_line.visible = False
+        self.debug_nearest_pos3d_idx = None
+
+
+    def _event_has_shift_modifier(self, event) -> bool:
+        modifiers = list(getattr(event, 'modifiers', []) or [])
+        return any(str(a_mod) == 'Shift' for a_mod in modifiers)
+
+
+    def _nearest_pos3d_idx_from_canvas_pos(self, canvas_pos: NDArray) -> Optional[int]:
+        if self.pos3d is None or np.shape(self.pos3d)[0] == 0:
+            return None
+        if self.view is None or self.canvas is None:
+            return None
+        try:
+            scene_to_canvas = self.view.scene.node_transform(self.canvas.scene)
+            mapped = np.asarray(scene_to_canvas.map(self.pos3d), dtype=np.float32)
+        except Exception:
+            return None
+        if np.ndim(mapped) != 2 or np.shape(mapped)[0] == 0:
+            return None
+        if np.shape(mapped)[1] < 2:
+            return None
+        mapped_xy = mapped[:, :2]
+        finite_mask = np.isfinite(mapped_xy[:, 0]) & np.isfinite(mapped_xy[:, 1])
+        if not np.any(finite_mask):
+            return None
+        valid_xy = mapped_xy[finite_mask]
+        valid_indices = np.flatnonzero(finite_mask)
+        dx = valid_xy[:, 0] - float(canvas_pos[0])
+        dy = valid_xy[:, 1] - float(canvas_pos[1])
+        distances_sq = (dx * dx) + (dy * dy)
+        nearest_local_idx = int(np.argmin(distances_sq))
+        if float(distances_sq[nearest_local_idx]) > float(self.debug_crosshair_snap_max_pixel_distance * self.debug_crosshair_snap_max_pixel_distance):
+            return None
+        return int(valid_indices[nearest_local_idx])
 
 
     def _clamp_t_bin_idx(self, t_bin_idx: int) -> int:
@@ -1942,6 +2076,9 @@ class Volumentric2DTimeSeriesPlotter:
 
 
     def _build_highlight_bands(self):
+        """ builds bands for intervals defined in self.highlight_epochs
+        
+        """
         if self.highlight_epochs is None or len(self.highlight_epochs) == 0:
             return
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
@@ -1959,19 +2096,22 @@ class Volumentric2DTimeSeriesPlotter:
             z0 = float((start_t - self.t_min) * self.z_scale)
             z1 = float((stop_t - self.t_min) * self.z_scale)
             z_low, z_high = float(min(z0, z1)), float(max(z0, z1))
-            z_depth = float(max(z_high - z_low, 1e-4))
+            z_size = float(max(z_high - z_low, 1e-4))
             z_center = float(0.5 * (z_low + z_high))
             rgba = self._to_rgba(row.get('color', None), alpha=0.15)
             edge_rgba = (rgba[0], rgba[1], rgba[2], 0.35)
 
-            box = vz.Box(width=x_width, height=y_width, depth=z_depth, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
+            # box = vz.Box(width=x_width, height=y_width, depth=z_depth, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
+            box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
             transform = scene.transforms.MatrixTransform()
             transform.translate((x_center, y_center, z_center))
+            # transform.translate((x_center, z_center, y_center))
             box.transform = transform
             self.highlight_boxes.append(box)
 
             label_text = str(row.get('label', f"range_{idx}"))
             label_pos = np.array([[x_min, y_min, z_center]], dtype=np.float32)
+            # label_pos = np.array([[x_min, z_center, y_min]], dtype=np.float32)
             label = vz.Text(text=label_text, color=edge_rgba, pos=label_pos, font_size=10, anchor_x='left', anchor_y='center', parent=self.view.scene)
             self.highlight_labels.append(label)
 
@@ -1979,6 +2119,9 @@ class Volumentric2DTimeSeriesPlotter:
     # Interaction/UI Events
     def on_key_press(self, event):
         key_name = str(event.key)
+        if key_name == 'Shift':
+            self.debug_is_shift_hover_enabled = True
+            return
         if key_name not in {'Left', 'Right'}:
             return
         if self.n_t_bins <= 0:
@@ -1989,6 +2132,49 @@ class Volumentric2DTimeSeriesPlotter:
             self.t_bin_slider.setValue(next_idx)
         else:
             self.update_active_t_bin(next_idx)
+
+
+    def on_key_release(self, event):
+        key_name = str(event.key)
+        if key_name != 'Shift':
+            return
+        self.debug_is_shift_hover_enabled = False
+        self._hide_debug_crosshairs()
+        if self.canvas is not None:
+            self.canvas.update()
+
+
+    def on_mouse_move(self, event):
+        if self.canvas is None:
+            return
+        if self.pos3d is None:
+            return
+        if not (self.debug_is_shift_hover_enabled or self._event_has_shift_modifier(event)):
+            if self.debug_nearest_pos3d_idx is not None:
+                self._hide_debug_crosshairs()
+                self.canvas.update()
+            return
+        event_pos = getattr(event, 'pos', None)
+        if event_pos is None:
+            return
+        canvas_pos = np.asarray(event_pos, dtype=np.float32)
+        if np.shape(canvas_pos)[0] < 2:
+            return
+        nearest_idx = self._nearest_pos3d_idx_from_canvas_pos(canvas_pos=canvas_pos)
+        if nearest_idx is None:
+            if self.debug_nearest_pos3d_idx is not None:
+                self._hide_debug_crosshairs()
+                self.canvas.update()
+            return
+        self.debug_nearest_pos3d_idx = int(nearest_idx)
+        self._set_debug_crosshairs_position(center_xyz=self.pos3d[self.debug_nearest_pos3d_idx, :])
+        self.canvas.update()
+
+
+    def on_mouse_leave(self, event):
+        self._hide_debug_crosshairs()
+        if self.canvas is not None:
+            self.canvas.update()
 
 
     def on_slider_value_changed(self, value: int):

@@ -438,6 +438,117 @@ class TrajectorySegmentsVisual(Node):
 
 
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
+class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
+    """Qt tree widget that displays a vispy scene graph hierarchy.
+    
+    from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispySceneTreeWidget
+    
+    from pyphoplacecellanalysis.Pho2D.vispy.predicitive_decoding_vispy import Volumentric2DTimeSeriesPlotter
+    viewer_3d = Volumentric2DTimeSeriesPlotter.init_from_position_and_decoder(curr_position_df=curr_position_df, xbin=xbin, ybin=ybin, p_x_given_n=p_x_given_n, t_bin_edges=t_bin_edges, highlight_epochs=highlight_epochs)
+    scene_tree_widget = VispySceneTreeWidget(root_node=viewer_3d.canvas.scene, canvas=viewer_3d.canvas)
+    scene_tree_widget.show()
+    
+    """
+
+    def __init__(self, root_node: Node, canvas: Optional[scene.SceneCanvas] = None, parent: Optional[Any] = None):
+        super().__init__(parent=parent)
+        self._root_node = root_node
+        self._canvas = canvas
+        self._is_rebuilding = False
+        self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
+        self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
+        self._unchecked_state = getattr(QtCore.Qt, 'Unchecked', QtCore.Qt.CheckState.Unchecked)
+        self._item_is_user_checkable = getattr(QtCore.Qt, 'ItemIsUserCheckable', QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+        self._item_is_enabled = getattr(QtCore.Qt, 'ItemIsEnabled', QtCore.Qt.ItemFlag.ItemIsEnabled)
+        self._init_ui()
+        self.rebuild()
+
+
+    def _init_ui(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        controls_layout = QtWidgets.QHBoxLayout()
+        self.refresh_button = QtWidgets.QPushButton('Refresh')
+        controls_layout.addWidget(cast(Any, self.refresh_button))
+        controls_layout.addStretch(1)
+        layout.addLayout(cast(Any, controls_layout))
+
+        self.tree = QtWidgets.QTreeWidget()
+        self.tree.setColumnCount(6)
+        self.tree.setHeaderLabels(['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Transform'])
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setSortingEnabled(False)
+        header = self.tree.header()
+        if header is not None:
+            resize_to_contents = getattr(QtWidgets.QHeaderView, 'ResizeToContents', QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+            stretch_mode = getattr(QtWidgets.QHeaderView, 'Stretch', QtWidgets.QHeaderView.ResizeMode.Stretch)
+            header_any = cast(Any, header)
+            header_any.setStretchLastSection(False)
+            header_any.setSectionResizeMode(0, resize_to_contents)
+            header_any.setSectionResizeMode(1, stretch_mode)
+            header_any.setSectionResizeMode(2, resize_to_contents)
+            header_any.setSectionResizeMode(3, resize_to_contents)
+            header_any.setSectionResizeMode(4, resize_to_contents)
+            header_any.setSectionResizeMode(5, resize_to_contents)
+        layout.addWidget(cast(Any, self.tree), stretch=1)
+
+        self.refresh_button.clicked.connect(self.rebuild)
+        self.tree.itemChanged.connect(self._on_item_changed)
+
+
+    def rebuild(self) -> None:
+        self._is_rebuilding = True
+        self.tree.blockSignals(True)
+        self.tree.clear()
+        self._populate(node=self._root_node, parent_item=None)
+        self.tree.expandToDepth(3)
+        self.tree.blockSignals(False)
+        self._is_rebuilding = False
+
+
+    def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
+        node_type = node.__class__.__name__
+        node_name = '' if node.name is None else str(node.name)
+        node_visible = bool(getattr(node, 'visible', True))
+        node_order = str(getattr(node, 'order', ''))
+        node_opacity_val = getattr(node, 'opacity', None)
+        if isinstance(node_opacity_val, (float, int)):
+            node_opacity = f'{float(node_opacity_val):0.3f}'
+        else:
+            node_opacity = ''
+        transform_obj = getattr(node, 'transform', None)
+        transform_name = '' if transform_obj is None else transform_obj.__class__.__name__
+        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, transform_name])
+        item.setData(0, self._user_role, node)
+        item.setFlags(item.flags() | self._item_is_user_checkable | self._item_is_enabled)
+        item.setCheckState(2, self._checked_state if node_visible else self._unchecked_state)
+        if parent_item is None:
+            self.tree.addTopLevelItem(item)
+        else:
+            cast(Any, parent_item).addChild(item)
+        for child in list(node.children):
+            self._populate(node=child, parent_item=item)
+
+
+    def _on_item_changed(self, item: Any, column: int) -> None:
+        if self._is_rebuilding:
+            return
+        if column != 2:
+            return
+        node = item.data(0, self._user_role)
+        if node is None:
+            return
+        is_checked = (item.checkState(2) == self._checked_state)
+        try:
+            node.visible = bool(is_checked)
+            if self._canvas is not None:
+                self._canvas.update()
+        except Exception:
+            pass
+
+
+@metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispyHelpers:
     """ helpers for vispy
     
@@ -455,6 +566,49 @@ class VispyHelpers:
             return contour_data
         line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order, fill=fill, fill_alpha=fill_alpha)[0] for parent in parents]
         return (contour_data, line_lists)
+
+
+    @classmethod
+    def create_scene_tree_widget(cls, canvas: scene.SceneCanvas, parent: Optional[Any] = None) -> VispySceneTreeWidget:
+        """Create a Qt scene-tree inspector widget rooted at `canvas.scene`."""
+        return VispySceneTreeWidget(root_node=canvas.scene, canvas=canvas, parent=parent)
+
+
+    @classmethod
+    def create_viewport_overlay_text(cls, canvas: scene.SceneCanvas, text: str = 'Overlay', color: Union[str, Tuple[float, float, float, float]] = 'white', font_size: float = 12.0, bold: bool = False, anchor_x: str = 'left', anchor_y: str = 'top', margin: Tuple[float, float] = (12.0, 12.0), order: int = 10_000, parent: Optional[Node] = None) -> Any:
+        """Create viewport-fixed text in pixel space (top-left by default) that does not move with camera pan/zoom. Returns the Text visual."""
+        overlay_parent = canvas.scene if parent is None else parent
+        overlay_text = vz.Text(text=text, pos=(0.0, 0.0), color=color, font_size=font_size, bold=bold, anchor_x=anchor_x, anchor_y=anchor_y, parent=overlay_parent)  # type: ignore[call-arg]
+        overlay_text.order = order
+
+        def _update_overlay_text_position(event=None):
+            width, height = canvas.size
+            margin_x, margin_y = margin
+            if anchor_x == 'left':
+                x_pos = float(margin_x)
+            elif anchor_x == 'center':
+                x_pos = (float(width) * 0.5) + float(margin_x)
+            else:
+                x_pos = float(width) - float(margin_x)
+            if anchor_y == 'top':
+                y_pos = float(height) - float(margin_y)
+            elif anchor_y == 'center':
+                y_pos = (float(height) * 0.5) + float(margin_y)
+            else:
+                y_pos = float(margin_y)
+            overlay_text.pos = np.array([x_pos, y_pos], dtype=np.float32)
+
+        def _disconnect_overlay_resize_handler():
+            try:
+                canvas.events.resize.disconnect(_update_overlay_text_position)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+        canvas.events.resize.connect(_update_overlay_text_position)  # type: ignore[attr-defined]
+        _update_overlay_text_position()
+        overlay_text._viewport_overlay_update_position = _update_overlay_text_position
+        overlay_text._viewport_overlay_disconnect = _disconnect_overlay_resize_handler
+        return overlay_text
     
 
 
@@ -651,6 +805,45 @@ def example_trajectory_segments_visual():
         for line in seg_visual.lines:
             line.set_gl_state('translucent', depth_test=False)
     VispyHelpers.set_view_camera(view, np.vstack([df1[['x', 'y']].values, df2[['x', 'y']].values, df3[['x', 'y']].values]), padding=0.15)
+    app.run()
+
+
+def example_viewport_overlay_text():
+    """Example: draw viewport-fixed top-left text that stays in place while panning/zooming. Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_viewport_overlay_text; example_viewport_overlay_text()\"."""
+    from vispy import app
+    t = np.linspace(0, 6 * np.pi, 600)
+    x = 0.18 * t * np.cos(t)
+    y = 0.18 * t * np.sin(t)
+    pos = np.column_stack([x, y]).astype(np.float32)
+    canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
+    view = canvas.central_widget.add_view()
+    view.camera = 'panzoom'
+    line = vz.Line(pos=pos, color=(0.2, 0.8, 1.0, 1.0), width=2.0, method='gl', parent=view.scene)  # type: ignore[call-arg]
+    line.order = 10
+    line.set_gl_state('translucent', depth_test=False)
+    VispyHelpers.set_view_camera(view, pos, padding=0.15)
+    _overlay_text = VispyHelpers.create_viewport_overlay_text(canvas=canvas, text='Overlay: fixed to viewport top-left', color='white', font_size=12.0, bold=True, margin=(14.0, 14.0))
+    app.run()
+
+
+def example_scene_tree_widget():
+    """Example: show a Qt scene-tree inspector for a vispy scene. Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_scene_tree_widget; example_scene_tree_widget()\"."""
+    from vispy import app
+    canvas = scene.SceneCanvas(keys='interactive', size=(1100, 700), show=True, title='Vispy Scene Tree Example')
+    view = canvas.central_widget.add_view()
+    view.camera = 'turntable'
+    axis = vz.XYZAxis(parent=view.scene)
+    axis.order = 5
+    sphere = vz.Sphere(radius=0.55, method='latitude', parent=view.scene)
+    sphere.color = Color((0.4, 0.8, 1.0, 0.9)).rgba
+    sphere.order = 10
+    label = vz.Text(text='Sphere', pos=(0.0, 0.0, 0.75), color='white', font_size=12.0, parent=view.scene)  # type: ignore[call-arg]
+    label.order = 20
+    tree_widget = VispyHelpers.create_scene_tree_widget(canvas=canvas)
+    tree_widget.setWindowTitle('Vispy Scene Tree')
+    tree_widget.resize(700, 520)
+    tree_widget.show()
+    canvas._scene_tree_widget = tree_widget
     app.run()
 
 
