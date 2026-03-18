@@ -80,8 +80,10 @@ vp.set_log_level('WARNING')
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MatchingPastFuturePositionsResult, MaskDataSource
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals, VispySceneTreeWidget
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_decoding_central_view import render_central_view as render_predictive_decoding_central_view
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
 
 ## missing imports: MatchingPastFuturePositionsResult, BasePositionDecoder, MaskDataSource
@@ -1697,6 +1699,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 # Volumetric 2D time-series plotter using vispy
+@metadata_attributes(short_name=None, tags=['vispy', 'qt', '3D', 'Bapun', 'ACTIVE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-18 05:41', related_items=[])
 @define(slots=False, repr=False, eq=False)
 class Volumentric2DTimeSeriesPlotter:
     """plots a 3D volume that represents a rat in a 2D open-field arena (x-, y- axis) over time (z-axis) 
@@ -1733,6 +1736,8 @@ class Volumentric2DTimeSeriesPlotter:
     canvas: Any = field(default=None)
     main_window: Any = field(default=None)
     view: Any = field(default=None)
+    scene_tree_widget: VispySceneTreeWidget = field(default=None)
+
     position_line: Any = field(default=None)
     posterior_plane: Any = field(default=None)
     highlight_boxes: List[Any] = field(default=Factory(list))
@@ -1747,6 +1752,8 @@ class Volumentric2DTimeSeriesPlotter:
     debug_nearest_pos3d_idx: Optional[int] = field(default=None)
     debug_crosshair_snap_max_pixel_distance: float = field(default=16.0)
 
+    debug_xyz_axes: vz.XYZAxis = field(default=None)
+    gridlines: vz.GridLines = field(default=None)
 
     def __attrs_post_init__(self):
         self.setup()
@@ -1782,7 +1789,7 @@ class Volumentric2DTimeSeriesPlotter:
         self.xbin = np.ascontiguousarray(np.asarray(self.xbin, dtype=np.float32))
         self.ybin = np.ascontiguousarray(np.asarray(self.ybin, dtype=np.float32))
 
-        self.build_position_trajectory_curve()
+        self.setup_position_trajectory_curves()
 
         if self.p_x_given_n is not None:
             self.p_x_given_n = np.ascontiguousarray(np.asarray(self.p_x_given_n, dtype=np.float32))
@@ -1798,16 +1805,20 @@ class Volumentric2DTimeSeriesPlotter:
 
 
     def buildUI(self):
-        canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title='Volumetric 2D Time-Series Viewer', autoswap=False, resizable=True, decorate=True, fullscreen=False)
+        title = 'Volumetric 2D Time-Series Viewer'
+        canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
         self.canvas = canvas
-
-        main_window = QtWidgets.QMainWindow()
-        main_window.setWindowTitle('Volumetric 2D Time-Series Viewer')
-        self.main_window = main_window
-        central_widget = QtWidgets.QWidget()
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(canvas.native, stretch=1)
+        self.view = canvas.central_widget.add_view()
+        self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)        
+        self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
+        self.scene_tree_widget.setMaximumWidth(320)
+        self.scene_tree_widget.setMinimumWidth(200)
+        root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
+        self.main_window = root_dockAreaWindow
+        viewer_central_widget = QtWidgets.QWidget()
+        viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
+        viewer_layout.setContentsMargins(0, 0, 0, 0)
+        viewer_layout.addWidget(canvas.native, stretch=1)
 
         if self.n_t_bins > 0:
             slider_widget = QtWidgets.QWidget()
@@ -1823,22 +1834,29 @@ class Volumentric2DTimeSeriesPlotter:
             t_bin_value_label.setMinimumWidth(90)
             slider_layout.addWidget(t_bin_slider, stretch=1)
             slider_layout.addWidget(t_bin_value_label)
-            main_layout.addWidget(slider_widget)
+            viewer_layout.addWidget(slider_widget, stretch=0)
             self.t_bin_slider = t_bin_slider
             self.t_bin_value_label = t_bin_value_label
             t_bin_slider.valueChanged.connect(self.on_slider_value_changed)
 
-        main_window.setCentralWidget(central_widget)
-        main_window.resize(1400, 950)
-        main_window.show()
 
-        self.view = canvas.central_widget.add_view()
-        self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)
-        vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
+        viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
+        _, viewer_dock_item = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
+        
+        _custom_dock_coloring_fn = CustomDockDisplayConfig.build_custom_get_colors_fn(fg_color='#ffffff', bg_color="#aaa344", border_color="#998A33")
+        scene_tree_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=_custom_dock_coloring_fn)
+        _, _scene_tree_dock_item = root_dockAreaWindow.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
+        root_dockAreaWindow.resize(1400, 950)
+        
+
+        # Something to give 3D context (axis from 0 to 1)
+        self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
+        self.gridlines = vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
         self._build_coordinate_axes()
 
         self._build_arena_wireframe()
-        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.9), width=2.0, parent=self.view.scene)
+        ## Graphics
+        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.9), width=2.0, parent=self.view.scene, name='Pos<x,y,t>')        
         self._build_debug_crosshairs()
 
         if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
@@ -1859,7 +1877,9 @@ class Volumentric2DTimeSeriesPlotter:
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
         self.view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max), z=(0.0, self.z_max))
-
+        self.scene_tree_widget.rebuild()
+        root_dockAreaWindow.show()
+        
 
     def _build_arena_wireframe(self):
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
@@ -1867,11 +1887,11 @@ class Volumentric2DTimeSeriesPlotter:
         z0, z1 = 0.0, self.z_max
         lower = np.array([[x_min, y_min, z0], [x_max, y_min, z0], [x_max, y_max, z0], [x_min, y_max, z0], [x_min, y_min, z0]], dtype=np.float32)
         upper = np.array([[x_min, y_min, z1], [x_max, y_min, z1], [x_max, y_max, z1], [x_min, y_max, z1], [x_min, y_min, z1]], dtype=np.float32)
-        self.arena_wireframe_lines.append(vz.Line(pos=lower, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene))
-        self.arena_wireframe_lines.append(vz.Line(pos=upper, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene))
+        self.arena_wireframe_lines.append(vz.Line(pos=lower, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene, name=f'Arena[lower]'))
+        self.arena_wireframe_lines.append(vz.Line(pos=upper, color=(0.8, 0.8, 0.8, 0.7), width=1.5, parent=self.view.scene, name=f'Arena[upper]'))
         for xy in [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]:
             edge = np.array([[xy[0], xy[1], z0], [xy[0], xy[1], z1]], dtype=np.float32)
-            self.arena_wireframe_lines.append(vz.Line(pos=edge, color=(0.8, 0.8, 0.8, 0.5), width=1.0, parent=self.view.scene))
+            self.arena_wireframe_lines.append(vz.Line(pos=edge, color=(0.8, 0.8, 0.8, 0.5), width=1.0, parent=self.view.scene)) ## TODO: name? , name=f'Arena[lower]'
 
 
     def _build_coordinate_axes(self):
@@ -1886,9 +1906,9 @@ class Volumentric2DTimeSeriesPlotter:
         x_axis = np.vstack((origin, np.array([x_max, y_min, z0], dtype=np.float32)))
         y_axis = np.vstack((origin, np.array([x_min, y_max, z0], dtype=np.float32)))
         z_axis = np.vstack((origin, np.array([x_min, y_min, z1], dtype=np.float32)))
-        self.coordinate_axes_lines.append(vz.Line(pos=x_axis, color=(1.0, 0.25, 0.25, 1.0), width=2.5, parent=self.view.scene))
-        self.coordinate_axes_lines.append(vz.Line(pos=y_axis, color=(0.25, 1.0, 0.25, 1.0), width=2.5, parent=self.view.scene))
-        self.coordinate_axes_lines.append(vz.Line(pos=z_axis, color=(0.25, 0.5, 1.0, 1.0), width=2.5, parent=self.view.scene))
+        self.coordinate_axes_lines.append(vz.Line(pos=x_axis, color=(1.0, 0.25, 0.25, 1.0), width=2.5, parent=self.view.scene, name='Axes<X>'))
+        self.coordinate_axes_lines.append(vz.Line(pos=y_axis, color=(0.25, 1.0, 0.25, 1.0), width=2.5, parent=self.view.scene, name='Axes<Y>'))
+        self.coordinate_axes_lines.append(vz.Line(pos=z_axis, color=(0.25, 0.5, 1.0, 1.0), width=2.5, parent=self.view.scene, name='Axes<Z>'))
 
         x_offset = 0.02 * x_range
         y_offset = 0.02 * y_range
@@ -1896,12 +1916,12 @@ class Volumentric2DTimeSeriesPlotter:
         x_label_pos = np.array([[x_max + x_offset, y_min, z0]], dtype=np.float32)
         y_label_pos = np.array([[x_min, y_max + y_offset, z0]], dtype=np.float32)
         z_label_pos = np.array([[x_min, y_min, z1 + z_offset]], dtype=np.float32)
-        self.coordinate_axes_labels.append(vz.Text(text='X', color=(1.0, 0.25, 0.25, 1.0), pos=x_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
-        self.coordinate_axes_labels.append(vz.Text(text='Y', color=(0.25, 1.0, 0.25, 1.0), pos=y_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
-        self.coordinate_axes_labels.append(vz.Text(text='Z', color=(0.25, 0.5, 1.0, 1.0), pos=z_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene))
+        self.coordinate_axes_labels.append(vz.Text(text='X', color=(1.0, 0.25, 0.25, 1.0), pos=x_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<X>_lbl'))
+        self.coordinate_axes_labels.append(vz.Text(text='Y', color=(0.25, 1.0, 0.25, 1.0), pos=y_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<Y>_lbl'))
+        self.coordinate_axes_labels.append(vz.Text(text='Z', color=(0.25, 0.5, 1.0, 1.0), pos=z_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<Z>_lbl'))
 
 
-    def build_position_trajectory_curve(self):
+    def setup_position_trajectory_curves(self):
         """ builds the 2D+t position trajectory of the animal using self.curr_position_df
         Uses:
             self.curr_position_df
@@ -1928,9 +1948,9 @@ class Volumentric2DTimeSeriesPlotter:
         t_duration = max(self.t_max - self.t_min, 1e-6)
         self.z_scale = float((self.xbin[-1] - self.xbin[0]) / t_duration)
         
-
         z_vals = (t_vals - self.t_min) * self.z_scale
         self.pos3d = np.ascontiguousarray(np.column_stack((x_vals, y_vals, z_vals)), dtype=np.float32)
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2038,7 +2058,7 @@ class Volumentric2DTimeSeriesPlotter:
             img_norm = np.zeros_like(img, dtype=np.float32)
         cmap = Colormap(['black', 'red', 'yellow', 'white'])
         img_rgba = np.ascontiguousarray(cmap.map(img_norm), dtype=np.float32)
-        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene)
+        posterior_plane = vz.Image(data=img_rgba, parent=self.view.scene, name=f'posterior')
 
         n_y, n_x = img_rgba.shape[:2]
         x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
@@ -2093,6 +2113,9 @@ class Volumentric2DTimeSeriesPlotter:
                 continue
             start_t = float(row['start'])
             stop_t = float(row['stop'])
+            curr_label: str = row.get('label', f"range_{idx}")
+            curr_epoch_identifier: str = f'Epoch[{curr_label}]'
+
             z0 = float((start_t - self.t_min) * self.z_scale)
             z1 = float((stop_t - self.t_min) * self.z_scale)
             z_low, z_high = float(min(z0, z1)), float(max(z0, z1))
@@ -2102,17 +2125,30 @@ class Volumentric2DTimeSeriesPlotter:
             edge_rgba = (rgba[0], rgba[1], rgba[2], 0.35)
 
             # box = vz.Box(width=x_width, height=y_width, depth=z_depth, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
-            box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene)
+            box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene, name=curr_epoch_identifier)
             transform = scene.transforms.MatrixTransform()
             transform.translate((x_center, y_center, z_center))
             # transform.translate((x_center, z_center, y_center))
             box.transform = transform
             self.highlight_boxes.append(box)
 
-            label_text = str(row.get('label', f"range_{idx}"))
+            label_text = curr_label
             label_pos = np.array([[x_min, y_min, z_center]], dtype=np.float32)
+            # label_pos = np.array([[x_center, y_center, z_center]], dtype=np.float32) ## GOOD
+            # label_pos = np.array([[x_center, y_center, z_center]], dtype=np.float32)
+            
+            # label_pos = np.array([[0.1, 0.1, 0.1]], dtype=np.float32)
+            text_rgba = self._to_rgba(row.get('color', None), alpha=0.8)
+            # text_rgba = 'white'
             # label_pos = np.array([[x_min, z_center, y_min]], dtype=np.float32)
-            label = vz.Text(text=label_text, color=edge_rgba, pos=label_pos, font_size=10, anchor_x='left', anchor_y='center', parent=self.view.scene)
+            # label = vz.Text(text=label_text, color=edge_rgba, pos=label_pos, font_size=10, anchor_x='left', anchor_y='center', parent=self.view.scene)
+            # label = vz.Text(text=label_text, color=text_rgba, pos=label_pos, font_size=12, anchor_x='left', anchor_y='bottom', parent=self.view.scene, name=f'{curr_epoch_identifier}_lbl')
+            print(f'label_text: "{label_text}", label_pos: {label_pos}')
+            # label = vz.Text(text=label_text, color=text_rgba, pos=label_pos, font_size=12, anchor_x='left', anchor_y='bottom', parent=self.view.scene, name=f'{curr_epoch_identifier}_lbl')
+            label = vz.Text(text=label_text, color=text_rgba, pos=label_pos, rotation=-90, font_size=3000, parent=self.view.scene, name=f'{curr_epoch_identifier}_lbl')
+            # label_transform = scene.transforms.MatrixTransform()
+            # label_transform.translate((x_center, y_center, z_center))
+            # label.transform = label_transform
             self.highlight_labels.append(label)
 
 

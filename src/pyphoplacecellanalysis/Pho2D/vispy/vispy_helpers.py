@@ -10,7 +10,7 @@ from vispy import scene
 from vispy.scene import visuals
 # from vispy.scene import Node
 from vispy.scene.node import Node
-from vispy.visuals.transforms import STTransform
+from vispy.visuals.transforms import STTransform, NullTransform, MatrixTransform
 
 from vispy.color import Color
 from vispy.util.transforms import translate
@@ -437,6 +437,58 @@ class TrajectorySegmentsVisual(Node):
         return self._lines
 
 
+def _format_transform_vector(values: Any, max_dims: int = 3, precision: int = 2) -> str:
+    """Format transform vector values for compact tree display."""
+    try:
+        arr = np.asarray(values, dtype=np.float64).reshape(-1)
+    except Exception:
+        return '(?)'
+    if arr.size <= 0:
+        return '()'
+    clipped = arr[:max_dims]
+    joined = ', '.join(f'{float(v):0.{precision}f}' for v in clipped)
+    return f'({joined})'
+
+
+def _extract_matrix_translation(matrix_obj: Any) -> Optional[np.ndarray]:
+    """Extract x/y/z translation from a 4x4 affine matrix."""
+    try:
+        matrix = np.asarray(matrix_obj, dtype=np.float64)
+    except Exception:
+        return None
+    if matrix.shape != (4, 4):
+        return None
+    col_translation = matrix[:3, 3]
+    row_translation = matrix[3, :3]
+    if np.linalg.norm(col_translation) > 0.0 or np.allclose(row_translation, 0.0):
+        return col_translation
+    return row_translation
+
+
+def render_transform_column(node: Node) -> str:
+    """Default Transform-column renderer with location summary."""
+    transform_obj = getattr(node, 'transform', None)
+    if transform_obj is None:
+        return ''
+    if isinstance(transform_obj, NullTransform):
+        return 'NullTransform (identity)'
+    if isinstance(transform_obj, STTransform):
+        translate_text = _format_transform_vector(getattr(transform_obj, 'translate', None))
+        scale_text = _format_transform_vector(getattr(transform_obj, 'scale', None))
+        return f'STTransform t{translate_text} s{scale_text}'
+    if isinstance(transform_obj, MatrixTransform):
+        matrix = getattr(transform_obj, 'matrix', None)
+        if matrix is not None:
+            matrix_arr = np.asarray(matrix, dtype=np.float64)
+            if matrix_arr.shape == (4, 4) and np.allclose(matrix_arr, np.eye(4)):
+                return 'MatrixTransform (identity)'
+            translation = _extract_matrix_translation(matrix_arr)
+            if translation is not None:
+                return f'MatrixTransform t{_format_transform_vector(translation)}'
+        return 'MatrixTransform'
+    return transform_obj.__class__.__name__
+
+
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     """Qt tree widget that displays a vispy scene graph hierarchy.
@@ -447,20 +499,30 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     viewer_3d = Volumentric2DTimeSeriesPlotter.init_from_position_and_decoder(curr_position_df=curr_position_df, xbin=xbin, ybin=ybin, p_x_given_n=p_x_given_n, t_bin_edges=t_bin_edges, highlight_epochs=highlight_epochs)
     scene_tree_widget = VispySceneTreeWidget(root_node=viewer_3d.canvas.scene, canvas=viewer_3d.canvas)
     scene_tree_widget.show()
-    
+
+    # The default 'Transform' column renderer includes location details for
+    # NullTransform, STTransform, and MatrixTransform.
+
+    # Optional custom renderer registration:
+    # scene_tree_widget.register_column_renderer('Transform', render_transform_column)
+    # scene_tree_widget.register_column_renderer('Name', lambda n: f"{n.__class__.__name__}:{getattr(n, 'name', '')}")
+
     """
 
-    def __init__(self, root_node: Node, canvas: Optional[scene.SceneCanvas] = None, parent: Optional[Any] = None):
+    def __init__(self, root_node: Node, canvas: Optional[scene.SceneCanvas] = None, parent: Optional[Any] = None, column_renderers: Optional[Dict[str, Callable[[Node], str]]] = None):
         super().__init__(parent=parent)
         self._root_node = root_node
         self._canvas = canvas
         self._is_rebuilding = False
+        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Transform']
+        self._user_column_renderers = dict(column_renderers or {})
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
         self._unchecked_state = getattr(QtCore.Qt, 'Unchecked', QtCore.Qt.CheckState.Unchecked)
         self._item_is_user_checkable = getattr(QtCore.Qt, 'ItemIsUserCheckable', QtCore.Qt.ItemFlag.ItemIsUserCheckable)
         self._item_is_enabled = getattr(QtCore.Qt, 'ItemIsEnabled', QtCore.Qt.ItemFlag.ItemIsEnabled)
         self._init_ui()
+        self.setWindowTitle('VispySceneTreeWidget')
         self.rebuild()
 
 
@@ -475,7 +537,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setColumnCount(6)
-        self.tree.setHeaderLabels(['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Transform'])
+        self.tree.setHeaderLabels(self._column_headers)
         self.tree.setAlternatingRowColors(True)
         self.tree.setUniformRowHeights(True)
         self.tree.setSortingEnabled(False)
@@ -497,6 +559,44 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self.tree.itemChanged.connect(self._on_item_changed)
 
 
+    def _get_default_column_renderers(self) -> Dict[str, Callable[[Node], str]]:
+        def _render_type(node: Node) -> str:
+            return node.__class__.__name__
+
+        def _render_name(node: Node) -> str:
+            node_name = getattr(node, 'name', None)
+            return '' if node_name is None else str(node_name)
+
+        def _render_order(node: Node) -> str:
+            return str(getattr(node, 'order', ''))
+
+        def _render_opacity(node: Node) -> str:
+            node_opacity_val = getattr(node, 'opacity', None)
+            if isinstance(node_opacity_val, (float, int)):
+                return f'{float(node_opacity_val):0.3f}'
+            return ''
+
+        return {'Type': _render_type, 'Name': _render_name, 'Order': _render_order, 'Opacity': _render_opacity, 'Transform': render_transform_column}
+
+
+    def _get_cell_text(self, column_name: str, node: Node) -> str:
+        renderers = self._get_default_column_renderers()
+        renderers.update(self._user_column_renderers)
+        renderer = renderers.get(column_name, None)
+        if renderer is None:
+            return ''
+        try:
+            return str(renderer(node))
+        except Exception:
+            return ''
+
+
+    def register_column_renderer(self, column_name: str, renderer: Callable[[Node], str]) -> None:
+        """Register or override a renderer for a text column name."""
+        self._user_column_renderers[column_name] = renderer
+        self.rebuild()
+
+
     def rebuild(self) -> None:
         self._is_rebuilding = True
         self.tree.blockSignals(True)
@@ -508,18 +608,13 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
 
     def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
-        node_type = node.__class__.__name__
-        node_name = '' if node.name is None else str(node.name)
         node_visible = bool(getattr(node, 'visible', True))
-        node_order = str(getattr(node, 'order', ''))
-        node_opacity_val = getattr(node, 'opacity', None)
-        if isinstance(node_opacity_val, (float, int)):
-            node_opacity = f'{float(node_opacity_val):0.3f}'
-        else:
-            node_opacity = ''
-        transform_obj = getattr(node, 'transform', None)
-        transform_name = '' if transform_obj is None else transform_obj.__class__.__name__
-        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, transform_name])
+        node_type = self._get_cell_text(column_name='Type', node=node)
+        node_name = self._get_cell_text(column_name='Name', node=node)
+        node_order = self._get_cell_text(column_name='Order', node=node)
+        node_opacity = self._get_cell_text(column_name='Opacity', node=node)
+        transform_text = self._get_cell_text(column_name='Transform', node=node)
+        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, transform_text])
         item.setData(0, self._user_role, node)
         item.setFlags(item.flags() | self._item_is_user_checkable | self._item_is_enabled)
         item.setCheckState(2, self._checked_state if node_visible else self._unchecked_state)
