@@ -188,6 +188,33 @@ def _ensure_closed_pos(pos: NDArray) -> NDArray:
     return np.vstack([pos, pos[0:1]]).astype(np.float32)
 
 
+def _triangulate_polygon_2d(pos_2d: NDArray) -> Optional[NDArray]:
+    """Triangulate a closed 2D polygon, returning (M, 3) int32 face indices or None on failure.
+
+    Tries vispy's built-in ear-clipping triangulation first; falls back to a simple fan
+    triangulation (works correctly for convex contours, approximate for concave ones).
+    pos_2d must be (N, 2) with N >= 3. The polygon should be closed (first == last) or open;
+    the function handles both cases.
+    """
+    pts = np.asarray(pos_2d, dtype=np.float32)
+    if pts.ndim != 2 or pts.shape[1] != 2 or pts.shape[0] < 3:
+        return None
+    if np.allclose(pts[0], pts[-1], atol=1e-6):
+        pts = pts[:-1]
+    n = len(pts)
+    if n < 3:
+        return None
+    try:
+        from vispy.geometry.triangulation import triangulate as _vispy_triangulate
+        vertices_out, faces_out = _vispy_triangulate(pts)
+        if faces_out is not None and len(faces_out) >= 1:
+            return np.asarray(faces_out, dtype=np.int32)
+    except Exception:
+        pass
+    faces = np.column_stack([np.zeros(n - 2, dtype=np.int32), np.arange(1, n - 1, dtype=np.int32), np.arange(2, n, dtype=np.int32)])
+    return faces
+
+
 def _color_to_rgba_tuple(c: Union[str, Tuple[float, float, float], Sequence], alpha: Optional[float] = None) -> Tuple[float, float, float, float]:
     """Return (r,g,b,a) tuple scaled 0..1. Accepts vispy color strings, matplotlib colors or RGB tuples."""
     try:

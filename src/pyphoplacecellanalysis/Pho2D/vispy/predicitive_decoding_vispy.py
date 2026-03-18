@@ -80,7 +80,7 @@ vp.set_log_level('WARNING')
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MatchingPastFuturePositionsResult, MaskDataSource
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals, VispySceneTreeWidget
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals, VispySceneTreeWidget, _ensure_closed_pos, _triangulate_polygon_2d
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_decoding_central_view import render_central_view as render_predictive_decoding_central_view
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
@@ -1861,7 +1861,7 @@ class Volumentric2DTimeSeriesPlotter:
 
         self._build_arena_wireframe()
         ## Graphics
-        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.9), width=2.0, parent=self.view.scene, name='Pos<x,y,t>')        
+        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.65), width=1.0, parent=self.view.scene, name='Pos<x,y,t>')        
         self._build_debug_crosshairs()
 
         if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
@@ -2049,6 +2049,9 @@ class Volumentric2DTimeSeriesPlotter:
         return float(self.t_min)
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Contour Peak Promenences                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
     def _next_decoded_posterior_key(self) -> str:
         while True:
             self.decoded_posterior_counter = int(self.decoded_posterior_counter) + 1
@@ -2065,17 +2068,20 @@ class Volumentric2DTimeSeriesPlotter:
                 return key
 
 
-    def _build_posterior_contours_3d(self, per_t_bin_mask: NDArray, t_bin_edges_for_contours: Optional[NDArray] = None, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5) -> List[Any]:
-        """Build 3D contour line visuals from a per-time-bin boolean mask array.
+    def _build_posterior_contours_3d(self, per_t_bin_mask: NDArray, t_bin_edges_for_contours: Optional[NDArray] = None, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5, fill: bool = True, fill_alpha: float = 0.25) -> Tuple[List[Any], List[Any]]:
+        """Build 3D contour line visuals (and optional filled meshes) from a per-time-bin boolean mask array.
 
         per_t_bin_mask: (n_xbins, n_ybins, n_tbins) boolean/float mask array.
         Each time-bin slice is contoured in 2D then lifted to the corresponding z-height.
-        Returns the flat list of vz.Line visuals created (parented to self.view.scene).
+        When fill=True, each contour is also rendered as a translucent vz.Mesh using the
+        same RGB as the line with alpha=fill_alpha (default 0.25).
+        Returns (line_visuals, fill_visuals) lists of vispy visuals parented to self.view.scene.
         """
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
         n_tbins = int(per_t_bin_mask.shape[2])
         line_visuals: List[Any] = []
+        fill_visuals: List[Any] = []
         for t_idx in range(n_tbins):
             if t_bin_edges_for_contours is not None and len(t_bin_edges_for_contours) >= (t_idx + 2):
                 t_center = float((t_bin_edges_for_contours[t_idx] + t_bin_edges_for_contours[t_idx + 1]) * 0.5)
@@ -2096,9 +2102,22 @@ class Volumentric2DTimeSeriesPlotter:
                 line = vz.Line(pos=pos_3d, color=rgba, width=line_width, parent=self.view.scene, name=f'Contour[t={t_idx}]')
                 line.order = 22
                 line_visuals.append(line)
-        return line_visuals
+                if fill and len(pos_2d) >= 3:
+                    faces = _triangulate_polygon_2d(pos_2d)
+                    if faces is not None and len(faces) >= 1:
+                        closed_2d = _ensure_closed_pos(pos_2d)
+                        verts_3d = np.column_stack([closed_2d, np.full(len(closed_2d), z_val, dtype=np.float32)]).astype(np.float32)
+                        fill_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(fill_alpha))
+                        mesh = vz.Mesh(vertices=verts_3d, faces=faces, color=fill_rgba, parent=self.view.scene, name=f'ContourFill[t={t_idx}]')
+                        mesh.order = 21
+                        mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
+                        fill_visuals.append(mesh)
+        return (line_visuals, fill_visuals)
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Posterior Planes                                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
     def _normalize_posterior_2d(self, decoded_posterior_2d: NDArray) -> NDArray:
         posterior_2d = np.asarray(decoded_posterior_2d, dtype=np.float32)
         if posterior_2d.ndim != 2:
@@ -2242,8 +2261,8 @@ class Volumentric2DTimeSeriesPlotter:
     # Posterior Contours (3D)                                                                                                                                                                                                                                                               #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    def add_posterior_contours(self, per_t_bin_mask: NDArray, t_bin_edges: Optional[NDArray] = None, unique_identifier: Optional[str] = None, visible: bool = True, replace_if_exists: bool = True, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5) -> str:
-        """Add 3D contour lines from a per-time-bin boolean mask (n_xbins, n_ybins, n_tbins). Returns the assigned key."""
+    def add_posterior_contours(self, per_t_bin_mask: NDArray, t_bin_edges: Optional[NDArray] = None, unique_identifier: Optional[str] = None, visible: bool = True, replace_if_exists: bool = True, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5, fill: bool = True, fill_alpha: float = 0.25) -> str:
+        """Add 3D contour lines (and optional filled meshes) from a per-time-bin boolean mask (n_xbins, n_ybins, n_tbins). Returns the assigned key."""
         identifier = str(unique_identifier) if unique_identifier is not None else self._next_posterior_contour_key()
         if len(identifier) == 0:
             identifier = self._next_posterior_contour_key()
@@ -2252,10 +2271,12 @@ class Volumentric2DTimeSeriesPlotter:
             if not bool(replace_if_exists):
                 raise KeyError(f"posterior contour key already exists: '{identifier}'")
             self.remove_posterior_contours(unique_identifier=identifier)
-        line_visuals = self._build_posterior_contours_3d(per_t_bin_mask=np.asarray(per_t_bin_mask), t_bin_edges_for_contours=t_bin_edges, line_width=line_width, contour_alpha=contour_alpha, level=level)
+        line_visuals, fill_visuals = self._build_posterior_contours_3d(per_t_bin_mask=np.asarray(per_t_bin_mask), t_bin_edges_for_contours=t_bin_edges, line_width=line_width, contour_alpha=contour_alpha, level=level, fill=fill, fill_alpha=fill_alpha)
         for lv in line_visuals:
             lv.visible = bool(visible)
-        self.posterior_contours_by_key[identifier] = {'unique_identifier': identifier, 'line_visuals': line_visuals, 'visible': bool(visible)}
+        for fv in fill_visuals:
+            fv.visible = bool(visible)
+        self.posterior_contours_by_key[identifier] = {'unique_identifier': identifier, 'line_visuals': line_visuals, 'fill_visuals': fill_visuals, 'visible': bool(visible)}
         self._refresh_scene_tree()
         return identifier
 
@@ -2276,6 +2297,9 @@ class Volumentric2DTimeSeriesPlotter:
         for lv in item.get('line_visuals', []):
             if lv is not None:
                 lv.visible = bool(is_visible)
+        for fv in item.get('fill_visuals', []):
+            if fv is not None:
+                fv.visible = bool(is_visible)
         return True
 
 
@@ -2286,6 +2310,9 @@ class Volumentric2DTimeSeriesPlotter:
         for lv in item.get('line_visuals', []):
             if lv is not None:
                 lv.parent = None
+        for fv in item.get('fill_visuals', []):
+            if fv is not None:
+                fv.parent = None
         self._refresh_scene_tree()
         return True
 
@@ -2297,6 +2324,9 @@ class Volumentric2DTimeSeriesPlotter:
             for lv in item.get('line_visuals', []):
                 if lv is not None:
                     lv.parent = None
+            for fv in item.get('fill_visuals', []):
+                if fv is not None:
+                    fv.parent = None
         self.posterior_contours_by_key = {}
         self._refresh_scene_tree()
 
