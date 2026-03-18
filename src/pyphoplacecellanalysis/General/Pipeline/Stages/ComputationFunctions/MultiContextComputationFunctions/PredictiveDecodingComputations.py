@@ -99,6 +99,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any, NewType
 import nptyping as ND
 from nptyping import NDArray
 from scipy.interpolate import interp1d
+from scipy import sparse as scipy_sparse
 
 # _debug_plot: bool = True
 _debug_plot: bool = False
@@ -401,6 +402,169 @@ class EventEpochsDebugger:
         return fig
 
 
+class SparseGaussianVolume:
+    """Memory-efficient representation of a 3D Gaussian volume where >90% of entries are near-zero.
+
+    Stores each (n_x, n_y) time-slice as a scipy.sparse.csr_matrix, typically achieving >90% memory reduction
+    compared to a dense (n_x, n_y, n_t) float64 array.
+
+    Supports the element-wise operations used by compute_locality_measures_for_posterior and PredictiveDecoding.compute:
+      - Element-wise multiplication with dense 3D arrays (via __mul__/__rmul__)
+      - Masked threshold operations that produce int arrays or per-timestep sums
+      - Marginal sums along spatial axes (for COM / distance calculations)
+      - Conversion back to dense via to_dense()
+
+    Usage:
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import SparseGaussianVolume
+
+        sparse_vol = SparseGaussianVolume.build_from_positions(xbin_centers, ybin_centers, new_positions, sigma)
+        dense_vol = sparse_vol.to_dense()  # backward-compatible full array
+    """
+
+    __slots__ = ('_slices', '_shape', '_dtype')
+
+    def __init__(self, slices: List[scipy_sparse.csr_matrix], shape: Tuple[int, int, int], dtype=np.float64):
+        self._slices = slices
+        self._shape = shape
+        self._dtype = dtype
+
+
+    @property
+    def shape(self) -> Tuple[int, int, int]:
+        return self._shape
+
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+
+    @property
+    def n_time_bins(self) -> int:
+        return self._shape[2]
+
+
+    def __len__(self) -> int:
+        return self._shape[2]
+
+
+    @property
+    def nbytes_sparse(self) -> int:
+        """Approximate memory used by sparse representation."""
+        return sum((s.data.nbytes + s.indices.nbytes + s.indptr.nbytes) for s in self._slices)
+
+
+    @property
+    def nbytes_dense_equivalent(self) -> int:
+        """Memory that the equivalent dense array would require."""
+        return int(np.prod(self._shape)) * np.dtype(self._dtype).itemsize
+
+
+    @property
+    def compression_ratio(self) -> float:
+        nb_sparse = self.nbytes_sparse
+        return self.nbytes_dense_equivalent / nb_sparse if nb_sparse > 0 else float('inf')
+
+
+    def to_dense(self) -> np.ndarray:
+        """Reconstruct the full dense (n_x, n_y, n_t) array."""
+        out = np.zeros(self._shape, dtype=self._dtype)
+        for t, s in enumerate(self._slices):
+            out[:, :, t] = s.toarray()
+        return out
+
+
+    def __mul__(self, other):
+        """Element-wise multiplication: SparseGaussianVolume * dense_3d → SparseGaussianVolume."""
+        if isinstance(other, np.ndarray):
+            if other.shape != self._shape:
+                raise ValueError(f"Shape mismatch: {self._shape} vs {other.shape}")
+            new_slices = [self._slices[t].multiply(other[:, :, t]) for t in range(self._shape[2])]
+            new_slices = [scipy_sparse.csr_matrix(s) for s in new_slices]
+            return SparseGaussianVolume(new_slices, self._shape, self._dtype)
+        if isinstance(other, SparseGaussianVolume):
+            new_slices = [self._slices[t].multiply(other._slices[t]) for t in range(self._shape[2])]
+            new_slices = [scipy_sparse.csr_matrix(s) for s in new_slices]
+            return SparseGaussianVolume(new_slices, self._shape, self._dtype)
+        return NotImplemented
+
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+
+    def multiply_mask_threshold_to_int(self, mask_3d: np.ndarray, threshold: float) -> np.ndarray:
+        """Compute ((self * mask_3d) > threshold).astype(int) as dense 3D int array."""
+        n_x, n_y, n_t = self._shape
+        result = np.zeros((n_x, n_y, n_t), dtype=np.int32)
+        for t in range(n_t):
+            product = self._slices[t].multiply(mask_3d[:, :, t])
+            result[:, :, t] = (product.toarray() > threshold).astype(np.int32)
+        return result
+
+
+    def multiply_mask_threshold_sum_spatial(self, mask_3d: np.ndarray, threshold: float) -> np.ndarray:
+        """Compute np.nansum(((self * mask_3d) > threshold).astype(int), axis=(0,1)) per timestep.
+        Returns shape (n_t,) without allocating the full 3D intermediate.
+        """
+        n_t = self._shape[2]
+        result = np.empty(n_t, dtype=np.int64)
+        for t in range(n_t):
+            product = self._slices[t].multiply(mask_3d[:, :, t])
+            result[t] = int((np.asarray(product.data) > threshold).sum())
+        return result
+
+
+    def marginal_sums(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute marginal sums along each spatial axis for all time steps.
+        Returns (marg_x: (n_x, n_t), marg_y: (n_y, n_t)) equivalent to
+        (np.sum(vol, axis=1), np.sum(vol, axis=0)).
+        """
+        n_x, n_y, n_t = self._shape
+        marg_x = np.zeros((n_x, n_t), dtype=self._dtype)
+        marg_y = np.zeros((n_y, n_t), dtype=self._dtype)
+        for t in range(n_t):
+            s = self._slices[t]
+            marg_x[:, t] = np.asarray(s.sum(axis=1)).ravel()
+            marg_y[:, t] = np.asarray(s.sum(axis=0)).ravel()
+        return marg_x, marg_y
+
+
+    @classmethod
+    def build_from_positions(cls, xbin_centers: np.ndarray, ybin_centers: np.ndarray, new_positions: np.ndarray, sigma: float, sparsity_threshold: float = 1e-9, chunk_size: int = 2000) -> 'SparseGaussianVolume':
+        """Build the sparse Gaussian volume in memory-efficient chunks.
+
+        For each position at each time step, a 2D Gaussian centered at that position
+        is evaluated on the (xbin_centers x ybin_centers) grid. Values below
+        sparsity_threshold are dropped, and each time-slice is stored as a csr_matrix.
+
+        Peak memory ≈ n_x * n_y * chunk_size * 8 bytes (vs n_x * n_y * n_t * 8 for dense).
+        """
+        n_x = len(xbin_centers)
+        n_y = len(ybin_centers)
+        n_t = len(new_positions)
+        x = xbin_centers
+        y = ybin_centers
+        X, Y = np.meshgrid(x, y, indexing='ij')  # (n_x, n_y)
+        grid_stack = np.stack([X, Y], axis=-1)[:, :, np.newaxis, :]  # (n_x, n_y, 1, 2)
+
+        two_sigma_sq = 2.0 * sigma * sigma
+        slices: List[scipy_sparse.csr_matrix] = []
+
+        for chunk_start in range(0, n_t, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_t)
+            pos_chunk = new_positions[chunk_start:chunk_end]  # (chunk_len, 2)
+            pos_stack = pos_chunk[np.newaxis, np.newaxis, :, :]  # (1, 1, chunk_len, 2)
+            dist_sq = np.sum((grid_stack - pos_stack) ** 2, axis=-1)  # (n_x, n_y, chunk_len)
+            gauss_chunk = np.exp(-dist_sq / two_sigma_sq)
+            gauss_chunk[gauss_chunk < sparsity_threshold] = 0.0
+            for t_local in range(chunk_end - chunk_start):
+                slices.append(scipy_sparse.csr_matrix(gauss_chunk[:, :, t_local]))
+
+        return cls(slices, shape=(n_x, n_y, n_t), dtype=np.float64)
+
+
+
 @define(slots=False, repr=False, eq=False)
 class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
     """ Handles computing information about how the current decoded position relates to the present position (e.g. is it local, non-local, etc)
@@ -433,7 +597,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     
     ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
     sigma: Optional[float] = serialized_attribute_field(default=None, is_computable=True)
-    gaussian_volume: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating] = serialized_field(default=None, is_computable=True)
+    gaussian_volume: Optional[Union[NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating], 'SparseGaussianVolume']] = serialized_field(default=None, is_computable=True)
 
     p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=None, is_computable=True)
 
@@ -582,11 +746,13 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     
 
 
-    def _build_sampled_pos_with_gaussian_spread(self, sigma: Optional[float] = None):
-        """ Computed for each position in `self.new_positions`
+    def _build_sampled_pos_with_gaussian_spread(self, sigma: Optional[float] = None) -> 'SparseGaussianVolume':
+        """ Computed for each position in `self.new_positions`.
+        Returns a SparseGaussianVolume that stores each time-slice as a sparse matrix,
+        achieving >90% memory reduction when most Gaussian values are near-zero.
         
         gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
-        np.shape(gaussian_volume) # (42, 64, 103948)
+        gaussian_volume.shape # (42, 64, 103948)
         
         Args:
             sigma: Optional sigma value. If None, uses self.sigma (must be set)
@@ -596,38 +762,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             if self.sigma is None:
                 raise ValueError("sigma must be provided either as argument or set on self.sigma")
             sigma = self.sigma
-        
-        # 1. Setup the Grid
-        # Ensure x_bounds/y_bounds match the physical extent of _obj.moving_avg
-        # Example: x_bounds = (0, 100), y_bounds = (0, 150)
-        x = deepcopy(self.xbin_centers) # np.linspace(x_bounds[0], x_bounds[1], n_x_bins) 
-        y = deepcopy(self.ybin_centers) # np.linspace(y_bounds[0], y_bounds[1], n_y_bins)
-        X, Y = np.meshgrid(x, y, indexing='ij')  # Shape: (41, 63)
 
-        # np.shape(X)
-        # np.shape(Y)
-        # np.shape(x)
-
-        # 2. Prepare for Broadcasting
-        # Grid shape: (41, 63, 1, 2) 
-        # We add a dimension at index 2 to broadcast against time
-        grid_stack = np.stack([X, Y], axis=-1)[:, :, np.newaxis, :]
-
-        # Position shape: (1, 1, n_target_times, 2)
-        # We add dimensions at indices 0 and 1 to broadcast against the grid
-        pos_stack = self.new_positions[np.newaxis, np.newaxis, :, :]
-
-        # 3. Calculate Gaussian (Vectorized)
-        # The subtraction broadcasts to shape (41, 63, n_target_times, 2)
-        # Summing over the last axis (coordinates) gives squared distance
-        dist_sq = np.sum((grid_stack - pos_stack)**2, axis=-1)
-
-        # Apply Gaussian function
-        # sigma must be in the same physical units as the bounds/positions
-        gaussian_volume = np.exp(-dist_sq / (2 * sigma**2))
-
-        # Result: gaussian_volume.shape is (41, 63, n_target_times)
-        return gaussian_volume
+        return SparseGaussianVolume.build_from_positions(xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers, new_positions=self.new_positions, sigma=sigma)
 
 
     def perform_compute_on_load(self):
@@ -664,14 +800,14 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['compute', 'locality', 'static'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-23 21:00', related_items=[])
-    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: NDArray=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, alpha_list = [0.8], enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=False) -> Dict[str, Any]:
+    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: Optional[Union[NDArray, 'SparseGaussianVolume']]=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, alpha_list = [0.8], enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=False) -> Dict[str, Any]:
         """Computes all locality measures for a given posterior probability distribution.
         
         This is a completely independent classmethod that can be called without an instance.
         
         Args:
             a_p_x_given_n: NDArray with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the posterior probability distribution
-            gaussian_volume: NDArray with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the gaussian spread volume
+            gaussian_volume: NDArray or SparseGaussianVolume with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the gaussian spread volume
             xbin_centers: NDArray - x-axis bin centers
             ybin_centers: NDArray - y-axis bin centers
             n_total_pos_bins: Optional[int] - total number of position bins (computed from xbin_centers/ybin_centers if None)
@@ -706,20 +842,15 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             Computes the Euclidean distance between the expected positions (COM) of 
             two 2D probability distributions using vectorized weighted averages.
             """
-            # 1. Get Shapes
-            # Assuming shape is (Rows/H, Cols/W, Time)
-            pdf_obj = gaussian_volume
             pdf_cmp = a_p_x_given_n
-            
-            # 2. Calculate Marginals to simplify COM calculation
-            # Sum over columns (axis 1) to get mass distribution along rows (Height/x_bins)
-            # Shape becomes (H, T)
-            marg_x_obj = np.sum(pdf_obj, axis=1)
-            marg_x_cmp = np.sum(pdf_cmp, axis=1)
 
-            # Sum over rows (axis 0) to get mass distribution along columns (Width/y_bins)
-            # Shape becomes (W, T)
-            marg_y_obj = np.sum(pdf_obj, axis=0)
+            if isinstance(gaussian_volume, SparseGaussianVolume):
+                marg_x_obj, marg_y_obj = gaussian_volume.marginal_sums()
+            else:
+                marg_x_obj = np.sum(gaussian_volume, axis=1)
+                marg_y_obj = np.sum(gaussian_volume, axis=0)
+
+            marg_x_cmp = np.sum(pdf_cmp, axis=1)
             marg_y_cmp = np.sum(pdf_cmp, axis=0)
 
             # 3. Compute Expected Position (Weighted Average of Bin Centers)
@@ -780,7 +911,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             if enable_debug_outputs:
                 debug_dict['mask_overlap_masks'] = is_high_prob_mask            
 
-            result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            if isinstance(gaussian_volume, SparseGaussianVolume):
+                result_dict[a_computation_measure_name] = gaussian_volume.multiply_mask_threshold_to_int(is_high_prob_mask, min_val_epsilon)
+            else:
+                result_dict[a_computation_measure_name] = ((gaussian_volume * is_high_prob_mask) > min_val_epsilon).astype(int)
 
 
 
@@ -821,7 +956,10 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
         if gaussian_volume is not None:
-            result_dict[a_computation_measure_name] = ((gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            if isinstance(gaussian_volume, SparseGaussianVolume):
+                result_dict[a_computation_measure_name] = gaussian_volume.multiply_mask_threshold_to_int(an_alpha_epoch_masks, min_val_epsilon)
+            else:
+                result_dict[a_computation_measure_name] = ((gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int)
             
 
 
@@ -905,8 +1043,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
         # ==================================================================================================================================================================================================================================================================================== #
 
-        # if self.gaussian_volume is None:
-        #     self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
+        if self.gaussian_volume is None:
+            self.gaussian_volume = self._build_sampled_pos_with_gaussian_spread()
             
         if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
             _out = self.build_normalized_outputs()
@@ -2152,7 +2290,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
         return self.locality_measures.epoch_names
 
     @property
-    def gaussian_volume(self) -> NDArray:
+    def gaussian_volume(self) -> Optional[Union[NDArray, 'SparseGaussianVolume']]:
         """Delegate to DecodingLocalityMeasures."""
         return self.locality_measures.gaussian_volume
 
