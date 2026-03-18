@@ -1,6 +1,6 @@
 [project]
 name = "pyphoplacecellanalysis"
-version = "0.3.7"
+version = "0.3.8"
 description = ""
 authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
 requires-python = ">=3.9,<3.12"
@@ -71,6 +71,7 @@ gui = [
     "mpl-multitab",
     "patchworklib>=0.5.2,<0.6",
     "pyqt-responsive-label>=0.0.3,<0.0.4",
+    "vedo",
 ]
 testing = [
     "bcubed>=1.5",
@@ -91,6 +92,7 @@ mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev =
 neuropy = { path = "../NeuroPy", editable = true }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
+vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
 
 [build-system]
 requires = ["hatchling"]

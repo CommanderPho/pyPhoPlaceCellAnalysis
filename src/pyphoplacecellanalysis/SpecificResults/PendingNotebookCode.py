@@ -348,12 +348,12 @@ class BinnedOccupancyComparisons:
     @function_attributes(short_name=None, tags=['GREAT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-03 16:32', related_items=[])
     def plot_decoded_and_measured_occupancies(self, curr_active_pipeline, 
                                               pf1D_Decoder_dict=None, epochs_decoded_result_cache_dict=None, masked_container=None,
-                                              extant_pbe_decoding_time_bin_size: float = 0.025): 
+                                              extant_pbe_decoding_time_bin_size: float = 0.025, decoder_names: List[str]=None): 
         """ plots a comparison between decoded occupancy during various periods and observed 
         
         pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict
         epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict
-        """
+        """            
         if masked_container is not None:
             assert pf1D_Decoder_dict is None
             assert epochs_decoded_result_cache_dict is None
@@ -361,7 +361,10 @@ class BinnedOccupancyComparisons:
             pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict
             epochs_decoded_result_cache_dict = masked_container.epochs_decoded_result_cache_dict
 
-
+        if decoder_names is None:
+            decoder_names = list(pf1D_Decoder_dict.keys()) # ['roam', 'sprinkle']
+            print(f'decoder_names: {decoder_names}')
+            
         decoder_cache = self.decoder_cache
         
         def _subfn_add_single_row(win, curr_row, cmap, column_data):
@@ -400,7 +403,7 @@ class BinnedOccupancyComparisons:
 
         # Plot decoded PBES __________________________________________________________________________________________________ #
         curr_row: int = 0
-        for a_decoder_name in ['roam', 'sprinkle']:
+        for a_decoder_name in decoder_names:
             pbes_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].pbe)
             a_decoder = pf1D_Decoder_dict[a_decoder_name]
             decoded_PBEs_result: DecodedFilterEpochsResult = epochs_decoded_result_cache_dict.get(extant_pbe_decoding_time_bin_size, {}).get(a_decoder_name, None)
@@ -424,16 +427,19 @@ class BinnedOccupancyComparisons:
             cumm_flattened_p_x_given_n = np.nansum(timebins_p_x_given_n, axis=-1)
             cumm_flattened_p_x_given_n = cumm_flattened_p_x_given_n / float(n_timebins)
             across_all_time_bin_p_x_given_n_dict[a_decoder_name] = cumm_flattened_p_x_given_n
-        column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded PBE occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded PBE occupancy sprinkle")]
+            
+        # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded PBE occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded PBE occupancy sprinkle")]
+        column_data = [(across_all_time_bin_p_x_given_n_dict[a_decoder_name], f"decoded PBE occupancy {a_decoder_name}") for a_decoder_name in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
         ## OUTPUTS: across_all_time_bin_p_x_given_n_dict
 
 
         # Plot measured occupancy as a separate row: _________________________________________________________________________ #
-        occupancy_roam = pf1D_Decoder_dict['roam'].pf.occupancy
-        occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.occupancy
-        column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
+        # occupancy_roam = pf1D_Decoder_dict['roam'].pf.occupancy
+        # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.occupancy
+        # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
+        column_data = [(pf1D_Decoder_dict[a_decoder_name].pf.occupancy, f"measured occupancy {a_decoder_name}") for a_decoder_name in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
 
@@ -444,7 +450,7 @@ class BinnedOccupancyComparisons:
         if decoding_time_bin_size not in decoder_cache['laps']:
             decoder_cache['laps'][decoding_time_bin_size] = {} ## INIT
 
-        for a_decoder_name in ['roam', 'sprinkle']:
+        for a_decoder_name in decoder_names:
             laps_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].laps.to_dataframe())
             a_decoder = pf1D_Decoder_dict[a_decoder_name]
 
@@ -460,14 +466,16 @@ class BinnedOccupancyComparisons:
             across_all_time_bin_p_x_given_n_dict[a_decoder_name] = cumm_flattened_p_x_given_n
 
 
-        column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded Runs occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded Runs occupancy sprinkle")]
+        # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded Runs occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded Runs occupancy sprinkle")]
+        column_data = [(across_all_time_bin_p_x_given_n_dict[a_decoder_name], f"decoded Runs occupancy {a_decoder_name}") for a_decoder_name in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
 
         # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
-        occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
-        occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
-        column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
+        # occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
+        # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
+        # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
+        column_data = [(pf1D_Decoder_dict[a_decoder_name].pf.probability_normalized_occupancy, f"measured P_occupancy {a_decoder_name}") for a_decoder_name in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data)
 
 
