@@ -464,6 +464,11 @@ class TrajectorySegmentsVisual(Node):
         return self._lines
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# VispySceneTreeWidget - A tree widget that allows interactive customization of the vispy view hiearchy                                                                                                                                                                                #
+# ==================================================================================================================================================================================================================================================================================== #
+
 def _format_transform_vector(values: Any, max_dims: int = 3, precision: int = 2) -> str:
     """Format transform vector values for compact tree display."""
     try:
@@ -566,7 +571,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._root_node = root_node
         self._canvas = canvas
         self._is_rebuilding = False
-        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'GL Blend', 'Transform']
+        self._column_headers = ['Name', 'Type', 'Visible', 'Order', 'Opacity', 'GL Blend', 'Transform']
         self._user_column_renderers = dict(column_renderers or {})
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
@@ -598,17 +603,16 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self.tree.setSortingEnabled(False)
         header = self.tree.header()
         if header is not None:
-            resize_to_contents = getattr(QtWidgets.QHeaderView, 'ResizeToContents', QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-            stretch_mode = getattr(QtWidgets.QHeaderView, 'Stretch', QtWidgets.QHeaderView.ResizeMode.Stretch)
+            interactive_mode = getattr(QtWidgets.QHeaderView, 'Interactive', QtWidgets.QHeaderView.ResizeMode.Interactive)
             header_any = cast(Any, header)
-            header_any.setStretchLastSection(True)
-            header_any.setSectionResizeMode(0, resize_to_contents)
-            header_any.setSectionResizeMode(1, stretch_mode)
-            header_any.setSectionResizeMode(2, resize_to_contents)
-            header_any.setSectionResizeMode(3, resize_to_contents)
-            header_any.setSectionResizeMode(4, resize_to_contents)
-            header_any.setSectionResizeMode(5, resize_to_contents)
-            header_any.setSectionResizeMode(6, resize_to_contents)
+            header_any.setStretchLastSection(False)
+            header_any.setSectionResizeMode(0, interactive_mode)
+            header_any.setSectionResizeMode(1, interactive_mode)
+            header_any.setSectionResizeMode(2, interactive_mode)
+            header_any.setSectionResizeMode(3, interactive_mode)
+            header_any.setSectionResizeMode(4, interactive_mode)
+            header_any.setSectionResizeMode(5, interactive_mode)
+            header_any.setSectionResizeMode(6, interactive_mode)
         self.tree.setItemDelegateForColumn(5, _BlendPresetDelegate(self.tree))
         layout.addWidget(cast(Any, self.tree), stretch=1)
 
@@ -669,6 +673,13 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self.tree.clear()
         self._populate(node=self._root_node, parent_item=None)
         self.tree.expandToDepth(3)
+        self.tree.resizeColumnToContents(0)
+        self.tree.resizeColumnToContents(1)
+        self.tree.resizeColumnToContents(2)
+        self.tree.resizeColumnToContents(3)
+        self.tree.resizeColumnToContents(4)
+        self.tree.resizeColumnToContents(5)
+        self.tree.resizeColumnToContents(6)
         self.tree.blockSignals(False)
         self._is_rebuilding = False
 
@@ -686,7 +697,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         node_opacity = self._get_cell_text(column_name='Opacity', node=node)
         gl_blend_text = self._get_cell_text(column_name='GL Blend', node=node)
         transform_text = self._get_cell_text(column_name='Transform', node=node)
-        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, gl_blend_text, transform_text])
+        item = QtWidgets.QTreeWidgetItem([node_name, node_type, '', node_order, node_opacity, gl_blend_text, transform_text])
         item.setData(0, self._user_role, node)
         base_flags = item.flags() | self._item_is_user_checkable | self._item_is_enabled
         if self._node_has_gl_blend(node):

@@ -2140,7 +2140,7 @@ class Volumentric2DTimeSeriesPlotter:
                         fill_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(fill_alpha))
                         mesh = vz.Mesh(vertices=verts_3d, faces=faces, color=fill_rgba, parent=self.view.scene, name=f'ContourFill[t={t_idx}]')
                         mesh.order = 21
-                        mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
+                        mesh.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
                         fill_visuals.append(mesh)
         return (line_visuals, fill_visuals, contour_geometries)
 
@@ -2175,7 +2175,7 @@ class Volumentric2DTimeSeriesPlotter:
     def _build_posterior_plane_from_img(self, img: NDArray, time_value: float, visual_name: str = "posterior", **vzImageKwargs) -> vz.Image:
         posterior_plane = vz.Image(data=img, parent=self.view.scene, name=visual_name, **vzImageKwargs)
         posterior_plane.order = 20
-        posterior_plane.set_gl_state('translucent', depth_test=True)
+        posterior_plane.set_gl_state('translucent', depth_test=True, depth_mask=False)
         n_y, n_x = img.shape[:2]
         x_scale = float((self.xbin[-1] - self.xbin[0]) / max(n_x, 1))
         y_scale = float((self.ybin[-1] - self.ybin[0]) / max(n_y, 1))
@@ -2706,12 +2706,13 @@ class Volumentric2DTimeSeriesPlotter:
 
         # 2. Create the filled Mesh plane visual
         plane_mesh = vz.Mesh(vertices=vertices, faces=faces, color=rgba, parent=self.view.scene, name=curr_epoch_identifier)
-        plane_mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
+        plane_mesh.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
         plane_mesh.order = 10
 
         # 3. Create an edge outline around the plane for visibility
         edge_positions = np.array([[x_min, y_min, z_val], [x_max, y_min, z_val], [x_max, y_max, z_val], [x_min, y_max, z_val], [x_min, y_min, z_val]], dtype=np.float32)
         edge_line = vz.Line(pos=edge_positions, color=edge_rgba, width=1.5, parent=self.view.scene, name=f'{curr_epoch_identifier}_edge')
+        edge_line.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
         edge_line.order = 11
 
         self.highlight_boxes.append(plane_mesh)
@@ -2779,10 +2780,10 @@ class Volumentric2DTimeSeriesPlotter:
         self.register_epoch_visual(epoch_idx=epoch_idx, visual_type='contour', unique_identifier=contour_id)
 
         if extrude:
-            _ext = dict(z_half_extent=None, tube_radius=1.5, tube_alpha=0.3, wall_alpha=0.15)
+            _ext = dict(z_half_extent=None, tube_radius=1.2, tube_alpha=0.3, wall_alpha=0.15)
             if extrusion_kwargs is not None:
                 _ext.update(extrusion_kwargs)
-            self.build_contour_extrusions(unique_identifier=contour_id, z_half_extent=_ext.get('z_half_extent', None), tube_radius=float(_ext.get('tube_radius', 1.5)), tube_alpha=float(_ext.get('tube_alpha', 0.3)), wall_alpha=float(_ext.get('wall_alpha', 0.15)))
+            self.build_contour_extrusions(unique_identifier=contour_id, z_half_extent=_ext.get('z_half_extent', None), tube_radius=float(_ext.get('tube_radius', 1.2)), tube_alpha=float(_ext.get('tube_alpha', 0.3)), wall_alpha=float(_ext.get('wall_alpha', 0.15)))
 
         plane_id = f'plane[{epoch_idx}]'
         self.add_emphasis_plane(time_value=float(t_bin_edges[0]), curr_label=plane_id, **plane_kw)
