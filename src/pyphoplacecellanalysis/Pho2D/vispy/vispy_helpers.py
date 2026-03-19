@@ -516,6 +516,31 @@ def render_transform_column(node: Node) -> str:
     return transform_obj.__class__.__name__
 
 
+class _BlendPresetDelegate(QtWidgets.QStyledItemDelegate):  # type: ignore[misc]
+    """Item delegate that shows a QComboBox for the GL Blend column."""
+
+    _BLEND_PRESETS = ('', 'opaque', 'translucent', 'additive')
+
+    def createEditor(self, parent: Any, option: Any, index: Any) -> Any:
+        combo = QtWidgets.QComboBox(parent)
+        for preset in self._BLEND_PRESETS:
+            combo.addItem(preset)
+        return combo
+
+
+    def setEditorData(self, editor: Any, index: Any) -> None:
+        current_text = str(index.data() or '')
+        idx = cast(Any, editor).findText(current_text)
+        if idx >= 0:
+            cast(Any, editor).setCurrentIndex(idx)
+        else:
+            cast(Any, editor).setCurrentIndex(0)
+
+
+    def setModelData(self, editor: Any, model: Any, index: Any) -> None:
+        model.setData(index, cast(Any, editor).currentText())
+
+
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     """Qt tree widget that displays a vispy scene graph hierarchy.
@@ -541,7 +566,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._root_node = root_node
         self._canvas = canvas
         self._is_rebuilding = False
-        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Mode', 'Transform']
+        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'GL Blend', 'Transform']
         self._user_column_renderers = dict(column_renderers or {})
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
@@ -582,6 +607,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             header_any.setSectionResizeMode(4, resize_to_contents)
             header_any.setSectionResizeMode(5, resize_to_contents)
             header_any.setSectionResizeMode(6, resize_to_contents)
+        self.tree.setItemDelegateForColumn(5, _BlendPresetDelegate(self.tree))
         layout.addWidget(cast(Any, self.tree), stretch=1)
 
         self.refresh_button.clicked.connect(self.rebuild)
@@ -605,14 +631,16 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
                 return f'{float(node_opacity_val):0.3f}'
             return ''
 
-        def _render_mode(node: Node) -> str:
-            if hasattr(node, 'mode'):
-                return str(getattr(node, 'mode', ''))
-            if hasattr(node, 'method') and hasattr(node, 'connect'):
-                return f"{getattr(node, 'method', '')} / {getattr(node, 'connect', '')}"
-            return ''
+        def _render_gl_blend(node: Node) -> str:
+            vshare = getattr(node, '_vshare', None)
+            if vshare is None:
+                return ''
+            gl_state = getattr(vshare, 'gl_state', None)
+            if not isinstance(gl_state, dict):
+                return ''
+            return str(gl_state.get('preset', '') or '')
 
-        return {'Type': _render_type, 'Name': _render_name, 'Order': _render_order, 'Opacity': _render_opacity, 'Mode': _render_mode, 'Transform': render_transform_column}
+        return {'Type': _render_type, 'Name': _render_name, 'Order': _render_order, 'Opacity': _render_opacity, 'GL Blend': _render_gl_blend, 'Transform': render_transform_column}
 
 
     def _get_cell_text(self, column_name: str, node: Node) -> str:
@@ -643,9 +671,9 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._is_rebuilding = False
 
 
-    def _node_has_editable_mode(self, node: Node) -> bool:
-        """True when the node exposes a settable GL draw mode (Mesh.mode or Line.method)."""
-        return hasattr(node, 'mode') or hasattr(node, 'method')
+    def _node_has_gl_blend(self, node: Node) -> bool:
+        """True when the node supports set_gl_state (Visual subclasses)."""
+        return hasattr(node, 'set_gl_state') and hasattr(node, '_vshare')
 
 
     def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
@@ -654,12 +682,12 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         node_name = self._get_cell_text(column_name='Name', node=node)
         node_order = self._get_cell_text(column_name='Order', node=node)
         node_opacity = self._get_cell_text(column_name='Opacity', node=node)
-        mode_text = self._get_cell_text(column_name='Mode', node=node)
+        gl_blend_text = self._get_cell_text(column_name='GL Blend', node=node)
         transform_text = self._get_cell_text(column_name='Transform', node=node)
-        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, mode_text, transform_text])
+        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, gl_blend_text, transform_text])
         item.setData(0, self._user_role, node)
         base_flags = item.flags() | self._item_is_user_checkable | self._item_is_enabled
-        if self._node_has_editable_mode(node):
+        if self._node_has_gl_blend(node):
             base_flags = base_flags | self._item_is_editable
         item.setFlags(base_flags)
         item.setCheckState(2, self._checked_state if node_visible else self._unchecked_state)
@@ -671,8 +699,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             self._populate(node=child, parent_item=item)
 
 
-    _VALID_MESH_MODES = ('triangles', 'triangle_strip', 'triangle_fan')
-    _VALID_LINE_METHODS = ('gl', 'agg')
+    _VALID_BLEND_PRESETS = ('opaque', 'translucent', 'additive')
 
     def _on_item_changed(self, item: Any, column: int) -> None:
         if self._is_rebuilding:
@@ -692,11 +719,11 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
                 pass
         elif column == 5:
             new_text = str(item.text(5)).strip()
+            if new_text not in self._VALID_BLEND_PRESETS or not self._node_has_gl_blend(node):
+                return
             try:
-                if hasattr(node, 'mode') and new_text in self._VALID_MESH_MODES:
-                    node.mode = new_text
-                elif hasattr(node, 'method') and new_text in self._VALID_LINE_METHODS:
-                    node.method = new_text
+                extra_kwargs = {k: v for k, v in node._vshare.gl_state.items() if k != 'preset'}
+                node.set_gl_state(new_text, **extra_kwargs)
                 if self._canvas is not None:
                     self._canvas.update()
             except Exception:
