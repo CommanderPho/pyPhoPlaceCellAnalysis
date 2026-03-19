@@ -580,6 +580,8 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
 
     def _init_ui(self) -> None:
+        expanding = getattr(QtWidgets.QSizePolicy, 'Expanding', QtWidgets.QSizePolicy.Policy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy(expanding, expanding))
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         controls_layout = QtWidgets.QHBoxLayout()
@@ -599,7 +601,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             resize_to_contents = getattr(QtWidgets.QHeaderView, 'ResizeToContents', QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
             stretch_mode = getattr(QtWidgets.QHeaderView, 'Stretch', QtWidgets.QHeaderView.ResizeMode.Stretch)
             header_any = cast(Any, header)
-            header_any.setStretchLastSection(False)
+            header_any.setStretchLastSection(True)
             header_any.setSectionResizeMode(0, resize_to_contents)
             header_any.setSectionResizeMode(1, stretch_mode)
             header_any.setSectionResizeMode(2, resize_to_contents)

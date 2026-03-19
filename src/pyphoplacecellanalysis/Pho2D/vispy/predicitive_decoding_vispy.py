@@ -1824,7 +1824,6 @@ class Volumentric2DTimeSeriesPlotter:
         self.view = canvas.central_widget.add_view()
         self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)        
         self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
-        self.scene_tree_widget.setMaximumWidth(320)
         self.scene_tree_widget.setMinimumWidth(200)
         root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
         self.main_window = root_dockAreaWindow
