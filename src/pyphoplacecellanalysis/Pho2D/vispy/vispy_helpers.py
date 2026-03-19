@@ -541,13 +541,14 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._root_node = root_node
         self._canvas = canvas
         self._is_rebuilding = False
-        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Transform']
+        self._column_headers = ['Type', 'Name', 'Visible', 'Order', 'Opacity', 'Mode', 'Transform']
         self._user_column_renderers = dict(column_renderers or {})
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
         self._unchecked_state = getattr(QtCore.Qt, 'Unchecked', QtCore.Qt.CheckState.Unchecked)
         self._item_is_user_checkable = getattr(QtCore.Qt, 'ItemIsUserCheckable', QtCore.Qt.ItemFlag.ItemIsUserCheckable)
         self._item_is_enabled = getattr(QtCore.Qt, 'ItemIsEnabled', QtCore.Qt.ItemFlag.ItemIsEnabled)
+        self._item_is_editable = getattr(QtCore.Qt, 'ItemIsEditable', QtCore.Qt.ItemFlag.ItemIsEditable)
         self._init_ui()
         self.setWindowTitle('VispySceneTreeWidget')
         self.rebuild()
@@ -563,7 +564,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         layout.addLayout(cast(Any, controls_layout))
 
         self.tree = QtWidgets.QTreeWidget()
-        self.tree.setColumnCount(6)
+        self.tree.setColumnCount(7)
         self.tree.setHeaderLabels(self._column_headers)
         self.tree.setAlternatingRowColors(True)
         self.tree.setUniformRowHeights(True)
@@ -580,6 +581,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             header_any.setSectionResizeMode(3, resize_to_contents)
             header_any.setSectionResizeMode(4, resize_to_contents)
             header_any.setSectionResizeMode(5, resize_to_contents)
+            header_any.setSectionResizeMode(6, resize_to_contents)
         layout.addWidget(cast(Any, self.tree), stretch=1)
 
         self.refresh_button.clicked.connect(self.rebuild)
@@ -603,7 +605,14 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
                 return f'{float(node_opacity_val):0.3f}'
             return ''
 
-        return {'Type': _render_type, 'Name': _render_name, 'Order': _render_order, 'Opacity': _render_opacity, 'Transform': render_transform_column}
+        def _render_mode(node: Node) -> str:
+            if hasattr(node, 'mode'):
+                return str(getattr(node, 'mode', ''))
+            if hasattr(node, 'method') and hasattr(node, 'connect'):
+                return f"{getattr(node, 'method', '')} / {getattr(node, 'connect', '')}"
+            return ''
+
+        return {'Type': _render_type, 'Name': _render_name, 'Order': _render_order, 'Opacity': _render_opacity, 'Mode': _render_mode, 'Transform': render_transform_column}
 
 
     def _get_cell_text(self, column_name: str, node: Node) -> str:
@@ -634,16 +643,25 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._is_rebuilding = False
 
 
+    def _node_has_editable_mode(self, node: Node) -> bool:
+        """True when the node exposes a settable GL draw mode (Mesh.mode or Line.method)."""
+        return hasattr(node, 'mode') or hasattr(node, 'method')
+
+
     def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
         node_visible = bool(getattr(node, 'visible', True))
         node_type = self._get_cell_text(column_name='Type', node=node)
         node_name = self._get_cell_text(column_name='Name', node=node)
         node_order = self._get_cell_text(column_name='Order', node=node)
         node_opacity = self._get_cell_text(column_name='Opacity', node=node)
+        mode_text = self._get_cell_text(column_name='Mode', node=node)
         transform_text = self._get_cell_text(column_name='Transform', node=node)
-        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, transform_text])
+        item = QtWidgets.QTreeWidgetItem([node_type, node_name, '', node_order, node_opacity, mode_text, transform_text])
         item.setData(0, self._user_role, node)
-        item.setFlags(item.flags() | self._item_is_user_checkable | self._item_is_enabled)
+        base_flags = item.flags() | self._item_is_user_checkable | self._item_is_enabled
+        if self._node_has_editable_mode(node):
+            base_flags = base_flags | self._item_is_editable
+        item.setFlags(base_flags)
         item.setCheckState(2, self._checked_state if node_visible else self._unchecked_state)
         if parent_item is None:
             self.tree.addTopLevelItem(item)
@@ -653,21 +671,36 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             self._populate(node=child, parent_item=item)
 
 
+    _VALID_MESH_MODES = ('triangles', 'triangle_strip', 'triangle_fan')
+    _VALID_LINE_METHODS = ('gl', 'agg')
+
     def _on_item_changed(self, item: Any, column: int) -> None:
         if self._is_rebuilding:
             return
-        if column != 2:
+        if column not in (2, 5):
             return
         node = item.data(0, self._user_role)
         if node is None:
             return
-        is_checked = (item.checkState(2) == self._checked_state)
-        try:
-            node.visible = bool(is_checked)
-            if self._canvas is not None:
-                self._canvas.update()
-        except Exception:
-            pass
+        if column == 2:
+            is_checked = (item.checkState(2) == self._checked_state)
+            try:
+                node.visible = bool(is_checked)
+                if self._canvas is not None:
+                    self._canvas.update()
+            except Exception:
+                pass
+        elif column == 5:
+            new_text = str(item.text(5)).strip()
+            try:
+                if hasattr(node, 'mode') and new_text in self._VALID_MESH_MODES:
+                    node.mode = new_text
+                elif hasattr(node, 'method') and new_text in self._VALID_LINE_METHODS:
+                    node.method = new_text
+                if self._canvas is not None:
+                    self._canvas.update()
+            except Exception:
+                pass
 
 
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
