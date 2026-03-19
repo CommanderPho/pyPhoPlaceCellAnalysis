@@ -1757,6 +1757,14 @@ class Volumentric2DTimeSeriesPlotter:
     posterior_contours_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
     posterior_contours_counter: int = field(default=0)
 
+    emphasis_planes_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
+    emphasis_planes_counter: int = field(default=0)
+
+    epoch_visual_groups: Dict[int, Dict[str, List[str]]] = field(default=Factory(dict))
+    active_epoch_idx: Optional[int] = field(default=None)
+    epoch_slider: Optional[Any] = field(default=None)
+    epoch_value_label: Optional[Any] = field(default=None)
+
     debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
 
@@ -1844,6 +1852,24 @@ class Volumentric2DTimeSeriesPlotter:
             self.t_bin_value_label = t_bin_value_label
             t_bin_slider.valueChanged.connect(self.on_slider_value_changed)
 
+        epoch_slider_widget = QtWidgets.QWidget()
+        epoch_slider_layout = QtWidgets.QHBoxLayout(epoch_slider_widget)
+        epoch_slider_layout.addWidget(QtWidgets.QLabel("epoch:"))
+        epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        epoch_slider.setMinimum(0)
+        epoch_slider.setMaximum(0)
+        epoch_slider.setValue(0)
+        epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        epoch_slider.setTickInterval(1)
+        epoch_slider.setEnabled(False)
+        epoch_value_label = QtWidgets.QLabel("0/0")
+        epoch_value_label.setMinimumWidth(90)
+        epoch_slider_layout.addWidget(epoch_slider, stretch=1)
+        epoch_slider_layout.addWidget(epoch_value_label)
+        viewer_layout.addWidget(epoch_slider_widget, stretch=0)
+        self.epoch_slider = epoch_slider
+        self.epoch_value_label = epoch_value_label
+        epoch_slider.valueChanged.connect(self.on_epoch_slider_value_changed)
 
         viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
         _, viewer_dock_item = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
@@ -2540,7 +2566,110 @@ class Volumentric2DTimeSeriesPlotter:
         self.highlight_boxes.append(plane_mesh)
         self.highlight_boxes.append(edge_line)
 
+        identifier = str(curr_label)
+        self.emphasis_planes_by_key[identifier] = {'unique_identifier': identifier, 'plane_mesh': plane_mesh, 'edge_line': edge_line, 'visible': True}
+
         return (plane_mesh, edge_line)
+
+
+    def get_emphasis_plane(self, unique_identifier: str) -> Optional[Dict[str, Any]]:
+        return self.emphasis_planes_by_key.get(str(unique_identifier), None)
+
+
+    def list_emphasis_plane_keys(self) -> List[str]:
+        return list(self.emphasis_planes_by_key.keys())
+
+
+    def set_emphasis_plane_visibility(self, unique_identifier: str, is_visible: bool) -> bool:
+        item = self.get_emphasis_plane(unique_identifier=unique_identifier)
+        if item is None:
+            return False
+        item['visible'] = bool(is_visible)
+        plane_mesh = item.get('plane_mesh', None)
+        if plane_mesh is not None:
+            plane_mesh.visible = bool(is_visible)
+        edge_line = item.get('edge_line', None)
+        if edge_line is not None:
+            edge_line.visible = bool(is_visible)
+        return True
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Epoch Group Management                                                                                                                                                                                                                                                               #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @property
+    def n_epoch_groups(self) -> int:
+        return len(self.epoch_visual_groups)
+
+
+    def register_epoch_visual(self, epoch_idx: int, visual_type: str, unique_identifier: str):
+        epoch_idx = int(epoch_idx)
+        group = self.epoch_visual_groups.get(epoch_idx, None)
+        if group is None:
+            group = {'contour_keys': [], 'plane_keys': []}
+            self.epoch_visual_groups[epoch_idx] = group
+        key_list_name = 'contour_keys' if visual_type == 'contour' else 'plane_keys'
+        if unique_identifier not in group[key_list_name]:
+            group[key_list_name].append(unique_identifier)
+        self._update_epoch_slider_range()
+
+
+    def add_epoch_visuals(self, epoch_idx: int, per_t_bin_mask, t_bin_edges, contour_kwargs: Optional[Dict] = None, plane_kwargs: Optional[Dict] = None) -> Dict[str, str]:
+        contour_kw = dict(line_width=2.0, contour_alpha=0.7, level=0.5, fill=True, fill_alpha=0.25)
+        if contour_kwargs is not None:
+            contour_kw.update(contour_kwargs)
+        plane_kw = dict(color='white', alpha=0.05, edge_alpha=0.5)
+        if plane_kwargs is not None:
+            plane_kw.update(plane_kwargs)
+
+        contour_id = f'contour[{epoch_idx}]'
+        self.add_posterior_contours(per_t_bin_mask=per_t_bin_mask, t_bin_edges=t_bin_edges, unique_identifier=contour_id, **contour_kw)
+        self.register_epoch_visual(epoch_idx=epoch_idx, visual_type='contour', unique_identifier=contour_id)
+
+        plane_id = f'plane[{epoch_idx}]'
+        self.add_emphasis_plane(time_value=float(t_bin_edges[0]), curr_label=plane_id, **plane_kw)
+        self.register_epoch_visual(epoch_idx=epoch_idx, visual_type='plane', unique_identifier=plane_id)
+
+        return {'contour': contour_id, 'plane': plane_id}
+
+
+    def set_active_epoch(self, epoch_idx: Optional[int]):
+        if epoch_idx is not None:
+            epoch_idx = int(epoch_idx)
+        self.active_epoch_idx = epoch_idx
+        sorted_indices = sorted(self.epoch_visual_groups.keys())
+        for eidx in sorted_indices:
+            group = self.epoch_visual_groups[eidx]
+            is_active = (epoch_idx is None) or (eidx == epoch_idx)
+            for key in group.get('contour_keys', []):
+                self.set_posterior_contours_visibility(unique_identifier=key, is_visible=is_active)
+            for key in group.get('plane_keys', []):
+                self.set_emphasis_plane_visibility(unique_identifier=key, is_visible=is_active)
+        if self.epoch_slider is not None and epoch_idx is not None:
+            if self.epoch_slider.value() != epoch_idx:
+                self.epoch_slider.blockSignals(True)
+                self.epoch_slider.setValue(epoch_idx)
+                self.epoch_slider.blockSignals(False)
+        if self.epoch_value_label is not None:
+            n = self.n_epoch_groups
+            lbl = f"{epoch_idx}/{max(0, n - 1)}" if epoch_idx is not None else f"all/{max(0, n - 1)}"
+            self.epoch_value_label.setText(lbl)
+        self._refresh_scene_tree()
+        if self.canvas is not None:
+            self.canvas.update()
+
+
+    def _update_epoch_slider_range(self):
+        if self.epoch_slider is None:
+            return
+        n = self.n_epoch_groups
+        self.epoch_slider.setMaximum(max(0, n - 1))
+        self.epoch_slider.setEnabled(n > 0)
+
+
+    def on_epoch_slider_value_changed(self, value: int):
+        self.set_active_epoch(int(value))
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2550,6 +2679,20 @@ class Volumentric2DTimeSeriesPlotter:
         key_name = str(event.key)
         if key_name == 'Shift':
             self.debug_is_shift_hover_enabled = True
+            return
+        if key_name in {'Up', 'Down'} and self.n_epoch_groups > 0:
+            sorted_indices = sorted(self.epoch_visual_groups.keys())
+            if self.active_epoch_idx is None:
+                next_epoch = sorted_indices[0] if key_name == 'Down' else sorted_indices[-1]
+            else:
+                try:
+                    cur_pos = sorted_indices.index(self.active_epoch_idx)
+                except ValueError:
+                    cur_pos = 0
+                step = 1 if key_name == 'Down' else -1
+                next_pos = max(0, min(len(sorted_indices) - 1, cur_pos + step))
+                next_epoch = sorted_indices[next_pos]
+            self.set_active_epoch(next_epoch)
             return
         if key_name not in {'Left', 'Right'}:
             return
