@@ -1760,6 +1760,8 @@ class Volumentric2DTimeSeriesPlotter:
     emphasis_planes_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
     emphasis_planes_counter: int = field(default=0)
 
+    contour_extrusion_visuals_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
+
     epoch_visual_groups: Dict[int, Dict[str, List[str]]] = field(default=Factory(dict))
     active_epoch_idx: Optional[int] = field(default=None)
     epoch_slider: Optional[Any] = field(default=None)
@@ -2093,20 +2095,22 @@ class Volumentric2DTimeSeriesPlotter:
                 return key
 
 
-    def _build_posterior_contours_3d(self, per_t_bin_mask: NDArray, t_bin_edges_for_contours: Optional[NDArray] = None, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5, fill: bool = True, fill_alpha: float = 0.25) -> Tuple[List[Any], List[Any]]:
+    def _build_posterior_contours_3d(self, per_t_bin_mask: NDArray, t_bin_edges_for_contours: Optional[NDArray] = None, line_width: float = 2.0, contour_alpha: float = 0.7, level: float = 0.5, fill: bool = True, fill_alpha: float = 0.25) -> Tuple[List[Any], List[Any], List[Dict]]:
         """Build 3D contour line visuals (and optional filled meshes) from a per-time-bin boolean mask array.
 
         per_t_bin_mask: (n_xbins, n_ybins, n_tbins) boolean/float mask array.
         Each time-bin slice is contoured in 2D then lifted to the corresponding z-height.
         When fill=True, each contour is also rendered as a translucent vz.Mesh using the
         same RGB as the line with alpha=fill_alpha (default 0.25).
-        Returns (line_visuals, fill_visuals) lists of vispy visuals parented to self.view.scene.
+        Returns (line_visuals, fill_visuals, contour_geometries) where contour_geometries is a
+        list of dicts with keys 'polygon_2d', 'z_val', 'rgba', 't_idx' for downstream use.
         """
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
         n_tbins = int(per_t_bin_mask.shape[2])
         line_visuals: List[Any] = []
         fill_visuals: List[Any] = []
+        contour_geometries: List[Dict] = []
         for t_idx in range(n_tbins):
             if t_bin_edges_for_contours is not None and len(t_bin_edges_for_contours) >= (t_idx + 2):
                 t_center = float((t_bin_edges_for_contours[t_idx] + t_bin_edges_for_contours[t_idx + 1]) * 0.5)
@@ -2123,6 +2127,7 @@ class Volumentric2DTimeSeriesPlotter:
             for pos_2d, rgba in contour_items:
                 if len(pos_2d) < 2:
                     continue
+                contour_geometries.append({'polygon_2d': np.array(pos_2d, dtype=np.float32), 'z_val': z_val, 'rgba': rgba, 't_idx': t_idx})
                 pos_3d = np.column_stack([pos_2d, np.full(len(pos_2d), z_val, dtype=np.float32)]).astype(np.float32)
                 line = vz.Line(pos=pos_3d, color=rgba, width=line_width, parent=self.view.scene, name=f'Contour[t={t_idx}]')
                 line.order = 22
@@ -2137,7 +2142,7 @@ class Volumentric2DTimeSeriesPlotter:
                         mesh.order = 21
                         mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
                         fill_visuals.append(mesh)
-        return (line_visuals, fill_visuals)
+        return (line_visuals, fill_visuals, contour_geometries)
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2296,12 +2301,12 @@ class Volumentric2DTimeSeriesPlotter:
             if not bool(replace_if_exists):
                 raise KeyError(f"posterior contour key already exists: '{identifier}'")
             self.remove_posterior_contours(unique_identifier=identifier)
-        line_visuals, fill_visuals = self._build_posterior_contours_3d(per_t_bin_mask=np.asarray(per_t_bin_mask), t_bin_edges_for_contours=t_bin_edges, line_width=line_width, contour_alpha=contour_alpha, level=level, fill=fill, fill_alpha=fill_alpha)
+        line_visuals, fill_visuals, contour_geometries = self._build_posterior_contours_3d(per_t_bin_mask=np.asarray(per_t_bin_mask), t_bin_edges_for_contours=t_bin_edges, line_width=line_width, contour_alpha=contour_alpha, level=level, fill=fill, fill_alpha=fill_alpha)
         for lv in line_visuals:
             lv.visible = bool(visible)
         for fv in fill_visuals:
             fv.visible = bool(visible)
-        self.posterior_contours_by_key[identifier] = {'unique_identifier': identifier, 'line_visuals': line_visuals, 'fill_visuals': fill_visuals, 'visible': bool(visible)}
+        self.posterior_contours_by_key[identifier] = {'unique_identifier': identifier, 'line_visuals': line_visuals, 'fill_visuals': fill_visuals, 'contour_geometries': contour_geometries, 't_bin_edges': (np.array(t_bin_edges, dtype=np.float32) if t_bin_edges is not None else None), 'visible': bool(visible)}
         self._refresh_scene_tree()
         return identifier
 
@@ -2325,10 +2330,12 @@ class Volumentric2DTimeSeriesPlotter:
         for fv in item.get('fill_visuals', []):
             if fv is not None:
                 fv.visible = bool(is_visible)
+        self.set_contour_extrusions_visibility(unique_identifier=unique_identifier, is_visible=is_visible)
         return True
 
 
     def remove_posterior_contours(self, unique_identifier: str) -> bool:
+        self.remove_contour_extrusions(unique_identifier=unique_identifier)
         item = self.posterior_contours_by_key.pop(str(unique_identifier), None)
         if item is None:
             return False
@@ -2343,6 +2350,7 @@ class Volumentric2DTimeSeriesPlotter:
 
 
     def clear_posterior_contours(self):
+        self.clear_contour_extrusions()
         if len(self.posterior_contours_by_key) == 0:
             return
         for item in self.posterior_contours_by_key.values():
@@ -2353,6 +2361,150 @@ class Volumentric2DTimeSeriesPlotter:
                 if fv is not None:
                     fv.parent = None
         self.posterior_contours_by_key = {}
+        self._refresh_scene_tree()
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Contour Extrusion + Position-Line Intersection Highlighting                                                                                                                                                                                                                          #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def _build_extrusion_wall_mesh(self, polygon_2d: NDArray, z_bottom: float, z_top: float, rgba: Tuple[float, float, float, float], wall_alpha: float = 0.1, name: str = 'ExtrusionWall') -> vz.Mesh:
+        """Create a translucent mesh representing the extruded walls of a 2D polygon between z_bottom and z_top."""
+        closed = _ensure_closed_pos(polygon_2d)
+        n = len(closed)
+        bottom_verts = np.column_stack([closed, np.full(n, z_bottom, dtype=np.float32)]).astype(np.float32)
+        top_verts = np.column_stack([closed, np.full(n, z_top, dtype=np.float32)]).astype(np.float32)
+        vertices = np.vstack([bottom_verts, top_verts]).astype(np.float32)  # shape (2*n, 3)
+        faces_list = []
+        for i in range(n - 1):
+            b0, b1 = i, i + 1
+            t0, t1 = i + n, i + 1 + n
+            faces_list.append([b0, b1, t1])
+            faces_list.append([b0, t1, t0])
+        faces = np.array(faces_list, dtype=np.uint32)
+        wall_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(wall_alpha))
+        mesh = vz.Mesh(vertices=vertices, faces=faces, color=wall_rgba, parent=self.view.scene, name=name)
+        mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
+        mesh.order = 19
+        return mesh
+
+
+    def _find_pos3d_segments_inside_contour(self, polygon_2d: NDArray, z_bottom: float, z_top: float) -> List[Tuple[int, int]]:
+        """Return list of (start_idx, end_idx) contiguous segments of self.pos3d inside the extruded contour volume."""
+        from matplotlib.path import Path as MplPath
+        if self.pos3d is None or len(self.pos3d) == 0:
+            return []
+        closed = _ensure_closed_pos(polygon_2d)
+        mpl_path = MplPath(closed[:, :2])
+        xy_inside = mpl_path.contains_points(self.pos3d[:, :2])
+        z_vals = self.pos3d[:, 2]
+        z_inside = (z_vals >= z_bottom) & (z_vals <= z_top)
+        inside = xy_inside & z_inside
+        segments: List[Tuple[int, int]] = []
+        i = 0
+        n = len(inside)
+        while i < n:
+            if inside[i]:
+                start = i
+                while i < n and inside[i]:
+                    i += 1
+                segments.append((start, i))
+            else:
+                i += 1
+        return segments
+
+
+    def _build_intersection_tube(self, segment_points: NDArray, rgba: Tuple[float, float, float, float], tube_radius: float = 1.5, tube_alpha: float = 0.3, name: str = 'IntersectionTube') -> Optional[Any]:
+        """Create a translucent vz.Tube highlighting a segment of the position line."""
+        if len(segment_points) < 2:
+            return None
+        tube_color = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(tube_alpha))
+        tube = vz.Tube(points=segment_points, radius=tube_radius, color=tube_color, tube_points=8, shading='smooth', parent=self.view.scene, name=name)
+        tube.set_gl_state('translucent', depth_test=True, cull_face=False)
+        tube.order = 18
+        return tube
+
+
+    def build_contour_extrusions(self, unique_identifier: str, z_half_extent: Optional[float] = None, tube_radius: float = 1.5, tube_alpha: float = 0.3, wall_alpha: float = 0.15) -> bool:
+        """Build volumetric extrusions for an existing set of contours and highlight intersecting position-line segments.
+
+        z_half_extent: distance in z-units to extrude in each direction from the contour's z_val.
+                       None = extend from z=0 to z=z_max (full z-axis range).
+        """
+        contour_entry = self.posterior_contours_by_key.get(str(unique_identifier), None)
+        if contour_entry is None:
+            return False
+        geometries = contour_entry.get('contour_geometries', [])
+        if len(geometries) == 0:
+            return False
+        self.remove_contour_extrusions(unique_identifier=unique_identifier)
+        wall_visuals: List[Any] = []
+        tube_visuals: List[Any] = []
+        for geom in geometries:
+            polygon_2d = geom['polygon_2d']
+            z_val = float(geom['z_val'])
+            rgba = geom['rgba']
+            t_idx = int(geom['t_idx'])
+            if z_half_extent is not None:
+                z_bot = z_val - float(z_half_extent)
+                z_top = z_val + float(z_half_extent)
+            else:
+                z_bot = 0.0
+                z_top = float(self.z_max)
+            wall_mesh = self._build_extrusion_wall_mesh(polygon_2d=polygon_2d, z_bottom=z_bot, z_top=z_top, rgba=rgba, wall_alpha=wall_alpha, name=f'ExtWall[{unique_identifier},t={t_idx}]')
+            wall_visuals.append(wall_mesh)
+            segments = self._find_pos3d_segments_inside_contour(polygon_2d=polygon_2d, z_bottom=z_bot, z_top=z_top)
+            for seg_i, (s_start, s_end) in enumerate(segments):
+                seg_pts = np.ascontiguousarray(self.pos3d[s_start:s_end], dtype=np.float32)
+                tube = self._build_intersection_tube(segment_points=seg_pts, rgba=rgba, tube_radius=tube_radius, tube_alpha=tube_alpha, name=f'IntTube[{unique_identifier},t={t_idx},s={seg_i}]')
+                if tube is not None:
+                    tube_visuals.append(tube)
+        self.contour_extrusion_visuals_by_key[str(unique_identifier)] = {'unique_identifier': str(unique_identifier), 'wall_visuals': wall_visuals, 'tube_visuals': tube_visuals, 'visible': True}
+        self._refresh_scene_tree()
+        return True
+
+
+    def remove_contour_extrusions(self, unique_identifier: str) -> bool:
+        """Remove extrusion wall meshes and intersection tubes for the given contour identifier."""
+        item = self.contour_extrusion_visuals_by_key.pop(str(unique_identifier), None)
+        if item is None:
+            return False
+        for v in item.get('wall_visuals', []):
+            if v is not None:
+                v.parent = None
+        for v in item.get('tube_visuals', []):
+            if v is not None:
+                v.parent = None
+        self._refresh_scene_tree()
+        return True
+
+
+    def set_contour_extrusions_visibility(self, unique_identifier: str, is_visible: bool) -> bool:
+        item = self.contour_extrusion_visuals_by_key.get(str(unique_identifier), None)
+        if item is None:
+            return False
+        item['visible'] = bool(is_visible)
+        for v in item.get('wall_visuals', []):
+            if v is not None:
+                v.visible = bool(is_visible)
+        for v in item.get('tube_visuals', []):
+            if v is not None:
+                v.visible = bool(is_visible)
+        return True
+
+
+    def clear_contour_extrusions(self):
+        """Remove all contour extrusion visuals."""
+        if len(self.contour_extrusion_visuals_by_key) == 0:
+            return
+        for item in self.contour_extrusion_visuals_by_key.values():
+            for v in item.get('wall_visuals', []):
+                if v is not None:
+                    v.parent = None
+            for v in item.get('tube_visuals', []):
+                if v is not None:
+                    v.parent = None
+        self.contour_extrusion_visuals_by_key = {}
         self._refresh_scene_tree()
 
 
@@ -2614,7 +2766,7 @@ class Volumentric2DTimeSeriesPlotter:
         self._update_epoch_slider_range()
 
 
-    def add_epoch_visuals(self, epoch_idx: int, per_t_bin_mask, t_bin_edges, contour_kwargs: Optional[Dict] = None, plane_kwargs: Optional[Dict] = None) -> Dict[str, str]:
+    def add_epoch_visuals(self, epoch_idx: int, per_t_bin_mask, t_bin_edges, contour_kwargs: Optional[Dict] = None, plane_kwargs: Optional[Dict] = None, extrude: bool = False, extrusion_kwargs: Optional[Dict] = None) -> Dict[str, str]:
         contour_kw = dict(line_width=2.0, contour_alpha=0.7, level=0.5, fill=True, fill_alpha=0.25)
         if contour_kwargs is not None:
             contour_kw.update(contour_kwargs)
@@ -2625,6 +2777,12 @@ class Volumentric2DTimeSeriesPlotter:
         contour_id = f'contour[{epoch_idx}]'
         self.add_posterior_contours(per_t_bin_mask=per_t_bin_mask, t_bin_edges=t_bin_edges, unique_identifier=contour_id, **contour_kw)
         self.register_epoch_visual(epoch_idx=epoch_idx, visual_type='contour', unique_identifier=contour_id)
+
+        if extrude:
+            _ext = dict(z_half_extent=None, tube_radius=1.5, tube_alpha=0.3, wall_alpha=0.15)
+            if extrusion_kwargs is not None:
+                _ext.update(extrusion_kwargs)
+            self.build_contour_extrusions(unique_identifier=contour_id, z_half_extent=_ext.get('z_half_extent', None), tube_radius=float(_ext.get('tube_radius', 1.5)), tube_alpha=float(_ext.get('tube_alpha', 0.3)), wall_alpha=float(_ext.get('wall_alpha', 0.15)))
 
         plane_id = f'plane[{epoch_idx}]'
         self.add_emphasis_plane(time_value=float(t_bin_edges[0]), curr_label=plane_id, **plane_kw)
