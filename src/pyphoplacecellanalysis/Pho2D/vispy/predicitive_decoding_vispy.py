@@ -2404,9 +2404,144 @@ class Volumentric2DTimeSeriesPlotter:
     # ==================================================================================================================================================================================================================================================================================== #
     # Fresh Emphasis/Rendering Helpers                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
-    def add_emphasis_volume(self):
+    def add_emphasis_volume(self, start_t: float, stop_t: Optional[float]=None, curr_label: Optional[str]=None):
+        """
+
+        Usage:
+            epoch_result_for_contours: MatchingPastFuturePositionsResult = epoch_flat_mask_future_past_result[an_epoch_idx] if (epoch_flat_mask_future_past_result and an_epoch_idx < len(epoch_flat_mask_future_past_result)) else None
+            per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask
+            # np.shape(per_t_bin_mask) # (45, 63, 5)
+            # epoch_result_for_contours.epoch_t_idx_col_name
+            time_bin_edges = epoch_result_for_contours.decoded_epoch_result.time_bin_edges
+
+            ## OUTPUTS: per_t_bin_mask, time_bin_edges
+
+            unique_identifier = f'contour[{an_epoch_idx}]'
+            _out_contour_img_objs[unique_identifier] = viewer_3d.add_posterior_contours(per_t_bin_mask=per_t_bin_mask, t_bin_edges=time_bin_edges, unique_identifier=unique_identifier)
+                
+            unique_identifier = f'vol[{an_epoch_idx}]'
+            _out_contour_img_objs[unique_identifier] = viewer_3d.add_emphasis_volume(start_t=time_bin_edges[0], stop_t=time_bin_edges[-1], curr_label=unique_identifier)
+
+            
+        """
         #TODO 2026-03-19 06:20: - [ ] do it
-        pass
+        from vispy.color import BaseColormap
+        class TransGray(BaseColormap):
+            glsl_map = """
+            vec4 translucent_gray(float t) {
+                return vec4(t, t, t, t * 0.06);
+            }
+            """
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+        x_width = float(max(x_max - x_min, 1e-6))
+        y_width = float(max(y_max - y_min, 1e-6))
+        x_center = 0.5 * (x_min + x_max)
+        y_center = 0.5 * (y_min + y_max)
+
+        if stop_t is None:
+            stop_t = start_t + 0.100 # 100ms default duration for an event
+            
+        curr_label: str = curr_label or 'UNTITLED'
+        curr_epoch_identifier: str = f'Vol[{curr_label}]'
+
+        z0 = float((start_t - self.t_min) * self.z_scale)
+        z1 = float((stop_t - self.t_min) * self.z_scale)
+        z_min, z_max = float(min(z0, z1)), float(max(z0, z1))
+        z_size = float(max(z_max - z_min, 1e-4))
+        z_center = float(0.5 * (z_min + z_max))
+
+        # box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene, name=curr_epoch_identifier)
+
+        # 2. Generate dummy volume data (Shape: Z, Y, X)
+        # Creating a 50x100x200 array
+        # nz, ny, nx = 50, 100, 200
+        nz, ny, nx = 3, 10, 10
+        vol_data: NDArray = np.random.normal(size=(nz, ny, nx), loc=0.5, scale=0.2).astype(np.float32) # shape is (z, y, x)
+
+        # 3. Define the target bounding box: [xmin, xmax, ymin, ymax, zmin, zmax]
+        # x_min, x_max = -100, 100
+        # y_min, y_max = 0, 50
+        # z_min, z_max = -25, 25
+
+        # 4. Calculate scale factors
+        scale_x = (x_max - x_min) / nx
+        scale_y = (y_max - y_min) / ny
+        scale_z = (z_max - z_min) / nz
+
+        # 5. Create the Volume visual
+        box_vol: scene.visuals.Volume = scene.visuals.Volume(
+            vol_data,
+            parent=self.view.scene,
+            method='translucent',
+            cmap=TransGray(), # cmap='grays'
+            interpolation='linear',
+            relative_step_size=0.8, name=curr_epoch_identifier,
+        )
+        box_vol.order = 10
+        
+        # transform = scene.transforms.MatrixTransform()
+        # transform.translate((x_center, y_center, z_center))
+        # # transform.translate((x_center, z_center, y_center))
+        # box_vol.transform = transform
+        
+        # 6. Apply the Scale and Translate (STTransform)
+        box_vol.transform = scene.transforms.STTransform(
+            scale=(scale_x, scale_y, scale_z),
+            # translate=(x_center, z_center, y_center), ## ceertainly wrong
+            translate=(x_min, y_min, z_min),
+        )
+        
+        self.highlight_boxes.append(box_vol)
+
+        return box_vol
+
+
+    def add_emphasis_plane(self, time_value: float, curr_label: Optional[str]=None, color: Any=None, alpha: float=0.25, edge_alpha: float=0.5):
+        """Adds a flat, translucent emphasis plane (quad) at a specific time value, spanning the full arena XY extent.
+            plane_mesh, edge_line
+            
+            unique_identifier = f'plane[{an_epoch_idx}]'
+            _out_contour_img_objs[unique_identifier] = viewer_3d.add_emphasis_plane(time_value=time_bin_edges[0], color='white', curr_label=unique_identifier, alpha=0.05, edge_alpha=0.5)
+
+        """
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
+        y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
+
+        curr_label: str = curr_label or 'UNTITLED'
+        curr_epoch_identifier: str = f'Plane[{curr_label}]'
+
+        z_val = float((float(time_value) - self.t_min) * self.z_scale)
+
+        rgba = self._to_rgba(color, alpha=alpha)
+        edge_rgba = (rgba[0], rgba[1], rgba[2], float(edge_alpha))
+
+        # 1. Build quad vertices (four corners of the arena at z_val)
+        vertices = np.array([[x_min, y_min, z_val], [x_max, y_min, z_val], [x_max, y_max, z_val], [x_min, y_max, z_val]], dtype=np.float32)
+        faces = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.uint32)
+
+        # 2. Create the filled Mesh plane visual
+        plane_mesh = vz.Mesh(vertices=vertices, faces=faces, color=rgba, parent=self.view.scene, name=curr_epoch_identifier)
+        plane_mesh.set_gl_state('translucent', depth_test=True, cull_face=False)
+        plane_mesh.order = 10
+
+        # 3. Create an edge outline around the plane for visibility
+        edge_positions = np.array([[x_min, y_min, z_val], [x_max, y_min, z_val], [x_max, y_max, z_val], [x_min, y_max, z_val], [x_min, y_min, z_val]], dtype=np.float32)
+        edge_line = vz.Line(pos=edge_positions, color=edge_rgba, width=1.5, parent=self.view.scene, name=f'{curr_epoch_identifier}_edge')
+        edge_line.order = 11
+
+        self.highlight_boxes.append(plane_mesh)
+        self.highlight_boxes.append(edge_line)
+
+        return (plane_mesh, edge_line)
+
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Interaction/UI Events                                                                                                                                                                                                                                                                #
