@@ -564,7 +564,15 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     # scene_tree_widget.register_column_renderer('Transform', render_transform_column)
     # scene_tree_widget.register_column_renderer('Name', lambda n: f"{n.__class__.__name__}:{getattr(n, 'name', '')}")
 
+    # Type and Transform columns are hidden by default; show with e.g.
+    # scene_tree_widget.tree.setColumnHidden(VispySceneTreeWidget._COL_TYPE, False)
+    # scene_tree_widget.tree.setColumnHidden(VispySceneTreeWidget._COL_TRANSFORM, False)
+
     """
+
+    _COL_TYPE = 1
+    _COL_TRANSFORM = 6
+
 
     def __init__(self, root_node: Node, canvas: Optional[scene.SceneCanvas] = None, parent: Optional[Any] = None, column_renderers: Optional[Dict[str, Callable[[Node], str]]] = None):
         super().__init__(parent=parent)
@@ -614,6 +622,8 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             header_any.setSectionResizeMode(5, interactive_mode)
             header_any.setSectionResizeMode(6, interactive_mode)
         self.tree.setItemDelegateForColumn(5, _BlendPresetDelegate(self.tree))
+        self.tree.setColumnHidden(self._COL_TYPE, True)
+        self.tree.setColumnHidden(self._COL_TRANSFORM, True)
         layout.addWidget(cast(Any, self.tree), stretch=1)
 
         self.refresh_button.clicked.connect(self.rebuild)
@@ -634,7 +644,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         def _render_opacity(node: Node) -> str:
             node_opacity_val = getattr(node, 'opacity', None)
             if isinstance(node_opacity_val, (float, int)):
-                return f'{float(node_opacity_val):0.3f}'
+                return f'{float(node_opacity_val):0.2f}'
             return ''
 
         def _render_gl_blend(node: Node) -> str:
