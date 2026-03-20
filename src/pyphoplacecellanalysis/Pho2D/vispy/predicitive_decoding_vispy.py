@@ -2882,6 +2882,27 @@ class Volumentric2DTimeSeriesPlotter:
 
         Replaces the pattern of looping `add_epoch_visuals` for every epoch and toggling visibility.
         CPU cost: meshes are rebuilt when switching epochs; memory: only one epoch's scene objects exist.
+
+        Usage:
+
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import MatchingPastFuturePositionsResult
+
+            ## INPUTS: _container_container
+            decoder_name = 'roam'
+            container = _container_container.masked_container
+
+            epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult] = (
+                container.debug_computed_dict
+                .get(decoder_name, {})
+                .get("prominence_future_past_analysis", {})
+                .get("_out_epoch_flat_mask_future_past_result")
+            )
+            assert epoch_flat_mask_future_past_result is not None
+
+            viewer_3d.set_epoch_visual_source(epoch_flat_mask_future_past_result, extrude=True, extrusion_kwargs={"tube_radius": 1.1, "tube_alpha": 0.6}, initial_epoch_idx=35)
+
+
+
         """
         self.epoch_flat_mask_future_past_result = epoch_flat_mask_future_past_result
         self.epoch_visual_extrude = bool(extrude)
