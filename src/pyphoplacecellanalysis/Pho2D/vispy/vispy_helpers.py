@@ -566,9 +566,11 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     # scene_tree_widget.register_column_renderer('Transform', render_transform_column)
     # scene_tree_widget.register_column_renderer('Name', lambda n: f"{n.__class__.__name__}:{getattr(n, 'name', '')}")
 
+    Leading single-child wrapper chains (e.g. canvas.scene down to the main SubScene) are collapsed so their descendants appear as top-level rows without extra horizontal indent.
     # Type and Transform columns are hidden by default; show with e.g.
     # scene_tree_widget.tree.setColumnHidden(VispySceneTreeWidget._COL_TYPE, False)
     # scene_tree_widget.tree.setColumnHidden(VispySceneTreeWidget._COL_TRANSFORM, False)
+
 
     """
 
