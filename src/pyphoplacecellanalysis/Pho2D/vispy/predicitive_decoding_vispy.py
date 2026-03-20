@@ -1718,15 +1718,15 @@ _SINGLE_SLOT_PLANE_ID: str = "plane[active]"
 @define(slots=False, repr=False, eq=False)
 class Volumentric2DTimeSeriesPlotter:
     """plots a 3D volume that represents a rat in a 2D open-field arena (x-, y- axis) over time (z-axis) 
-	It renders:
-	- The animal's 2D position over time as a curve
-	- plotting 2D decoded position posteriors at a certain time bin as a plane
-	
-	It features
-	- highlighting of certain time ranges - highlights the volume along the z-axis
+    It renders:
+    - The animal's 2D position over time as a curve
+    - plotting 2D decoded position posteriors at a certain time bin as a plane
+    
+    It features
+    - highlighting of certain time ranges - highlights the volume along the z-axis
         - can color the curve according to the range color
-		- can add labels along the x=0, y=0 planes visually indicate the region in question
-		
+        - can add labels along the x=0, y=0 planes visually indicate the region in question
+        
         
     Usage:
     
