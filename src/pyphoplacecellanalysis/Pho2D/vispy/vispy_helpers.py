@@ -1,4 +1,6 @@
 from __future__ import annotations
+from functools import partial
+import time
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence, cast
 import numpy as np
 import pandas as pd
@@ -580,6 +582,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._canvas = canvas
         self._is_rebuilding = False
         self._column_headers = ['Name', 'Type', 'Visible', 'Order', 'Opacity', 'GL Blend', 'Transform']
+        self._column_visibility = [True] * len(self._column_headers)
         self._user_column_renderers = dict(column_renderers or {})
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
@@ -628,6 +631,15 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
         self.refresh_button.clicked.connect(self.rebuild)
         self.tree.itemChanged.connect(self._on_item_changed)
+
+
+
+
+    def _set_column_visible(self, column: int, visible: bool) -> None:
+        if column < 0 or column >= len(self._column_headers):
+            return
+        self._column_visibility[column] = visible
+        self.tree.setColumnHidden(column, not visible)
 
 
     def _get_default_column_renderers(self) -> Dict[str, Callable[[Node], str]]:
@@ -681,15 +693,17 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._is_rebuilding = True
         self.tree.blockSignals(True)
         self.tree.clear()
-        self._populate(node=self._root_node, parent_item=None)
+        effective = self._effective_display_root(self._root_node)
+        effective_children = list(effective.children)
+        if len(effective_children) == 0:
+            self._populate(node=effective, parent_item=None)
+        else:
+            for child in effective_children:
+                self._populate(node=child, parent_item=None)
         self.tree.expandToDepth(3)
-        self.tree.resizeColumnToContents(0)
-        self.tree.resizeColumnToContents(1)
-        self.tree.resizeColumnToContents(2)
-        self.tree.resizeColumnToContents(3)
-        self.tree.resizeColumnToContents(4)
-        self.tree.resizeColumnToContents(5)
-        self.tree.resizeColumnToContents(6)
+        for col in range(len(self._column_headers)):
+            if self._column_visibility[col]:
+                self.tree.resizeColumnToContents(col)
         self.tree.blockSignals(False)
         self._is_rebuilding = False
 
@@ -697,6 +711,19 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     def _node_has_gl_blend(self, node: Node) -> bool:
         """True when the node supports set_gl_state (Visual subclasses)."""
         return hasattr(node, 'set_gl_state') and hasattr(node, '_vshare')
+
+
+    _MAX_SINGLE_CHILD_DESCENT = 256
+
+    def _effective_display_root(self, node: Node) -> Node:
+        """First node along `node` where `len(children) != 1`, or last node after max descent steps."""
+        current = node
+        for _ in range(self._MAX_SINGLE_CHILD_DESCENT):
+            kids = list(current.children)
+            if len(kids) != 1:
+                return current
+            current = kids[0]
+        return current
 
 
     def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
