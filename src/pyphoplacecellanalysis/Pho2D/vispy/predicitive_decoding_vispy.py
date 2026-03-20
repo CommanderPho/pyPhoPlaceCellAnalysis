@@ -1,5 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
+from warnings import warn
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from typing_extensions import TypeAlias
@@ -1790,6 +1791,13 @@ class Volumentric2DTimeSeriesPlotter:
     _single_slot_rendered_epoch_idx: Optional[int] = field(default=None)
     epoch_single_slot_parent_node: Any = field(default=None)
 
+    _epoch_mask_datasource: Optional[MaskDataSource] = field(default=None)
+    epoch_visual_filter_epochs: Optional[pd.DataFrame] = field(default=None)
+    minimum_included_matching_sequence_length: Optional[int] = field(default=None)
+    show_match_lines: bool = field(default=True)
+    match_line_visuals: List[Any] = field(default=Factory(list))
+    _match_lines_built_for_epoch_idx: Optional[int] = field(default=None)
+
     debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
 
@@ -2028,6 +2036,63 @@ class Volumentric2DTimeSeriesPlotter:
         z_vals = (t_vals - self.t_min) * self.z_scale
         self.pos3d = np.ascontiguousarray(np.column_stack((x_vals, y_vals, z_vals)), dtype=np.float32)
 
+
+    def _t_to_z(self, t: NDArray) -> NDArray:
+        """Map session time (seconds) to scene z using the same scale as `setup_position_trajectory_curves`."""
+        t_arr = np.asarray(t, dtype=np.float64)
+        return np.asarray((t_arr - float(self.t_min)) * float(self.z_scale), dtype=np.float32)
+
+
+    @staticmethod
+    def _make_dummy_filter_epochs(n: int) -> pd.DataFrame:
+        return pd.DataFrame({'original_epoch_idx': np.arange(int(n), dtype=np.int64), 'start': np.full(n, np.nan, dtype=np.float64), 'stop': np.full(n, np.nan, dtype=np.float64)})
+
+
+    def _clear_match_line_visuals(self) -> None:
+        for lv in self.match_line_visuals:
+            if lv is not None:
+                lv.parent = None
+        self.match_line_visuals.clear()
+
+
+    def _build_match_lines_for_epoch(self, epoch_idx: int, parent_node: Any) -> None:
+        """3D past/future match trajectories under `parent_node`, z = (t - t_min) * z_scale."""
+        if self._epoch_mask_datasource is None:
+            self._match_lines_built_for_epoch_idx = int(epoch_idx)
+            return
+        try:
+            epoch_data = self._epoch_mask_datasource._prepare_epoch_data(int(epoch_idx), minimum_included_matching_sequence_length=self.minimum_included_matching_sequence_length)
+        except Exception:
+            self._match_lines_built_for_epoch_idx = int(epoch_idx)
+            return
+        pos_dict = epoch_data.get('curr_matching_past_future_positions_df_dict', None)
+        if not pos_dict:
+            self._match_lines_built_for_epoch_idx = int(epoch_idx)
+            return
+        for category, default_hue in (('past', 0.0), ('future', 0.5)):
+            sub = pos_dict.get(category, None)
+            if not sub:
+                continue
+            rgb = colorsys.hsv_to_rgb(default_hue, 0.85, 0.95)
+            rgba = (float(rgb[0]), float(rgb[1]), float(rgb[2]), 0.92)
+            for _epoch_id, positions_df in sub.items():
+                if positions_df is None or len(positions_df) < 2:
+                    continue
+                if 't' not in positions_df.columns or 'x' not in positions_df.columns or 'y' not in positions_df.columns:
+                    continue
+                x_coords = np.asarray(positions_df['x'].to_numpy(), dtype=np.float64)
+                y_coords = np.asarray(positions_df['y'].to_numpy(), dtype=np.float64)
+                t_coords = np.asarray(positions_df['t'].to_numpy(), dtype=np.float64)
+                vm = np.isfinite(x_coords) & np.isfinite(y_coords) & np.isfinite(t_coords)
+                if np.count_nonzero(vm) < 2:
+                    continue
+                xv, yv, tv = x_coords[vm], y_coords[vm], t_coords[vm]
+                zv = self._t_to_z(tv)
+                pos3d = np.ascontiguousarray(np.column_stack([xv, yv, zv]), dtype=np.float32)
+                line = vz.Line(pos=pos3d, color=rgba, width=2.5, method='gl', parent=parent_node, name=f'Match3D[{category}]_{_epoch_id}')
+                line.order = 8
+                self.match_line_visuals.append(line)
+        self._match_lines_built_for_epoch_idx = int(epoch_idx)
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -2851,7 +2916,9 @@ class Volumentric2DTimeSeriesPlotter:
 
 
     def _clear_active_slot_visuals(self) -> None:
-        """Remove single-slot contour, extrusions, and emphasis plane from the scene."""
+        """Remove single-slot contour, extrusions, emphasis plane, and match lines from the scene."""
+        self._clear_match_line_visuals()
+        self._match_lines_built_for_epoch_idx = None
         if self.get_posterior_contours(_SINGLE_SLOT_CONTOUR_ID) is not None:
             self.remove_posterior_contours(_SINGLE_SLOT_CONTOUR_ID)
         if self.get_emphasis_plane(_SINGLE_SLOT_PLANE_ID) is not None:
@@ -2875,13 +2942,20 @@ class Volumentric2DTimeSeriesPlotter:
                 _ext.update(extrusion_kwargs)
             self.build_contour_extrusions(unique_identifier=_SINGLE_SLOT_CONTOUR_ID, z_half_extent=_ext.get('z_half_extent', None), tube_radius=float(_ext.get('tube_radius', 1.2)), tube_alpha=float(_ext.get('tube_alpha', 0.3)), wall_alpha=float(_ext.get('wall_alpha', 0.15)))
         self.add_emphasis_plane(time_value=float(t_bin_edges[0]), curr_label=_SINGLE_SLOT_PLANE_ID, scene_parent=epoch_node, **plane_kw)
+        if self.show_match_lines and self._epoch_mask_datasource is not None:
+            self._build_match_lines_for_epoch(epoch_idx, epoch_node)
 
 
-    def set_epoch_visual_source(self, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], *, extrude: bool = False, contour_kwargs: Optional[Dict[str, Any]] = None, plane_kwargs: Optional[Dict[str, Any]] = None, extrusion_kwargs: Optional[Dict[str, Any]] = None, initial_epoch_idx: int = 0) -> None:
+    def set_epoch_visual_source(self, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], *, extrude: bool = False, contour_kwargs: Optional[Dict[str, Any]] = None, plane_kwargs: Optional[Dict[str, Any]] = None, extrusion_kwargs: Optional[Dict[str, Any]] = None, initial_epoch_idx: int = 0, filter_epochs: Optional[pd.DataFrame] = None, minimum_included_matching_sequence_length: Optional[int] = None, show_match_lines: bool = True) -> None:
         """Store per-epoch `MatchingPastFuturePositionsResult` list and show one epoch at a time (rebuild on change).
 
         Replaces the pattern of looping `add_epoch_visuals` for every epoch and toggling visibility.
         CPU cost: meshes are rebuilt when switching epochs; memory: only one epoch's scene objects exist.
+
+        filter_epochs: optional decode filter epochs DataFrame aligned 1:1 with `epoch_flat_mask_future_past_result`.
+            If omitted, a dummy index-only frame is used (same masking as the 2D viewer still applies via `MaskDataSource`).
+        minimum_included_matching_sequence_length: passed to `MaskDataSource._prepare_epoch_data` when building match lines.
+        show_match_lines: if False, only contours/plane/extrusion are drawn for each epoch.
 
         Usage:
 
@@ -2899,8 +2973,8 @@ class Volumentric2DTimeSeriesPlotter:
             )
             assert epoch_flat_mask_future_past_result is not None
 
-            viewer_3d.set_epoch_visual_source(epoch_flat_mask_future_past_result, extrude=True, extrusion_kwargs={"tube_radius": 1.1, "tube_alpha": 0.6}, initial_epoch_idx=35)
-
+            viewer_3d.set_epoch_visual_source(epoch_flat_mask_future_past_result, extrude=True, extrusion_kwargs={"tube_radius": 1.1, "tube_alpha": 0.6}, initial_epoch_idx=35, filter_epochs=a_decoded_filter_epochs_df)
+            viewer_3d.set_epoch_visual_source(epoch_flat_mask_future_past_result, show_match_lines=False)
 
 
         """
@@ -2909,8 +2983,21 @@ class Volumentric2DTimeSeriesPlotter:
         self.epoch_visual_contour_kwargs = contour_kwargs
         self.epoch_visual_plane_kwargs = plane_kwargs
         self.epoch_visual_extrusion_kwargs = extrusion_kwargs
-        self._update_epoch_slider_range()
+        self.minimum_included_matching_sequence_length = minimum_included_matching_sequence_length
+        self.show_match_lines = bool(show_match_lines)
+        self._epoch_mask_datasource = None
+        self.epoch_visual_filter_epochs = None
         n = len(epoch_flat_mask_future_past_result)
+        if n > 0:
+            fe = filter_epochs
+            if fe is not None and len(fe) != n:
+                warn(f"filter_epochs length {len(fe)} != epoch list length {n}; using dummy filter_epochs", stacklevel=2)
+                fe = None
+            if fe is None:
+                fe = self._make_dummy_filter_epochs(n)
+            self.epoch_visual_filter_epochs = fe
+            self._epoch_mask_datasource = MaskDataSource.init_from_list_of_MatchingPastFuturePositionsResult(epoch_flat_mask_future_past_result, fe)
+        self._update_epoch_slider_range()
         if n == 0:
             self.set_active_epoch(None)
             return
@@ -2990,7 +3077,9 @@ class Volumentric2DTimeSeriesPlotter:
             return
         if epoch_idx < 0 or epoch_idx >= n:
             epoch_idx = max(0, min(n - 1, epoch_idx))
-        if self._single_slot_rendered_epoch_idx == epoch_idx and self.get_posterior_contours(_SINGLE_SLOT_CONTOUR_ID) is not None:
+        need_match_lines = self.show_match_lines and self._epoch_mask_datasource is not None
+        match_lines_ok = (not need_match_lines) or (self._match_lines_built_for_epoch_idx == epoch_idx)
+        if self._single_slot_rendered_epoch_idx == epoch_idx and self.get_posterior_contours(_SINGLE_SLOT_CONTOUR_ID) is not None and match_lines_ok:
             if self.epoch_slider is not None and self.epoch_slider.value() != epoch_idx:
                 self.epoch_slider.blockSignals(True)
                 self.epoch_slider.setValue(epoch_idx)
