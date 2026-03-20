@@ -1708,6 +1708,10 @@ _VOLUMETRIC_CAMERA_VIEW_PRESETS: Tuple[Tuple[str, float, float], ...] = (
     ("Perspective", _VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, _VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH),
 )
 
+# Single-slot epoch overlay: at most one epoch's meshes in the scene; swap on `set_active_epoch`.
+_SINGLE_SLOT_CONTOUR_ID: str = "contour[active]"
+_SINGLE_SLOT_PLANE_ID: str = "plane[active]"
+
 
 @metadata_attributes(short_name=None, tags=['vispy', 'qt', '3D', 'Bapun', 'ACTIVE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-18 05:41', related_items=[])
 @define(slots=False, repr=False, eq=False)
@@ -1777,6 +1781,14 @@ class Volumentric2DTimeSeriesPlotter:
     active_epoch_idx: Optional[int] = field(default=None)
     epoch_slider: Optional[Any] = field(default=None)
     epoch_value_label: Optional[Any] = field(default=None)
+
+    epoch_flat_mask_future_past_result: Optional[List[MatchingPastFuturePositionsResult]] = field(default=None)
+    epoch_visual_extrude: bool = field(default=False)
+    epoch_visual_contour_kwargs: Optional[Dict[str, Any]] = field(default=None)
+    epoch_visual_plane_kwargs: Optional[Dict[str, Any]] = field(default=None)
+    epoch_visual_extrusion_kwargs: Optional[Dict[str, Any]] = field(default=None)
+    _single_slot_rendered_epoch_idx: Optional[int] = field(default=None)
+    epoch_single_slot_parent_node: Any = field(default=None)
 
     debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
@@ -2785,13 +2797,37 @@ class Volumentric2DTimeSeriesPlotter:
         return True
 
 
+    def remove_emphasis_plane(self, unique_identifier: str) -> bool:
+        """Detach and remove a registered emphasis plane (mesh + edge) from the scene."""
+        item = self.emphasis_planes_by_key.pop(str(unique_identifier), None)
+        if item is None:
+            return False
+        plane_mesh = item.get('plane_mesh', None)
+        edge_line = item.get('edge_line', None)
+        if plane_mesh is not None:
+            plane_mesh.parent = None
+        if edge_line is not None:
+            edge_line.parent = None
+        self.highlight_boxes = [x for x in self.highlight_boxes if x is not plane_mesh and x is not edge_line]
+        self._refresh_scene_tree()
+        return True
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Epoch Group Management                                                                                                                                                                                                                                                               #
     # ==================================================================================================================================================================================================================================================================================== #
 
     @property
     def n_epoch_groups(self) -> int:
+        if self.epoch_flat_mask_future_past_result is not None:
+            return len(self.epoch_flat_mask_future_past_result)
         return len(self.epoch_visual_groups)
+
+
+    def _iter_epoch_nav_indices(self) -> List[int]:
+        if self.epoch_flat_mask_future_past_result is not None:
+            return list(range(len(self.epoch_flat_mask_future_past_result)))
+        return sorted(self.epoch_visual_groups.keys())
 
 
     def _get_or_create_epoch_group_node(self, epoch_idx: int) -> Any:
@@ -2802,6 +2838,63 @@ class Volumentric2DTimeSeriesPlotter:
         node = scene.Node(parent=self.view.scene, name=f'Epoch {epoch_idx}')
         self.epoch_group_nodes[epoch_idx] = node
         return node
+
+
+    def _get_or_create_single_slot_epoch_node(self, epoch_idx: int) -> Any:
+        """Parent node for single-slot epoch overlays; name tracks the logical epoch index."""
+        epoch_idx = int(epoch_idx)
+        if self.epoch_single_slot_parent_node is None:
+            self.epoch_single_slot_parent_node = scene.Node(parent=self.view.scene, name=f'Epoch {epoch_idx}')
+        else:
+            self.epoch_single_slot_parent_node.name = f'Epoch {epoch_idx}'
+        return self.epoch_single_slot_parent_node
+
+
+    def _clear_active_slot_visuals(self) -> None:
+        """Remove single-slot contour, extrusions, and emphasis plane from the scene."""
+        if self.get_posterior_contours(_SINGLE_SLOT_CONTOUR_ID) is not None:
+            self.remove_posterior_contours(_SINGLE_SLOT_CONTOUR_ID)
+        if self.get_emphasis_plane(_SINGLE_SLOT_PLANE_ID) is not None:
+            self.remove_emphasis_plane(_SINGLE_SLOT_PLANE_ID)
+        self._single_slot_rendered_epoch_idx = None
+
+
+    def _add_epoch_visuals_single_slot(self, epoch_idx: int, per_t_bin_mask, t_bin_edges, extrude: bool, contour_kwargs: Optional[Dict[str, Any]], plane_kwargs: Optional[Dict[str, Any]], extrusion_kwargs: Optional[Dict[str, Any]]) -> None:
+        """Build contours (+ optional extrusion) + emphasis plane under fixed keys; does not register legacy epoch_visual_groups."""
+        contour_kw = dict(line_width=2.0, contour_alpha=0.7, level=0.5, fill=True, fill_alpha=0.25)
+        if contour_kwargs is not None:
+            contour_kw.update(contour_kwargs)
+        plane_kw = dict(color='white', alpha=0.05, edge_alpha=0.5)
+        if plane_kwargs is not None:
+            plane_kw.update(plane_kwargs)
+        epoch_node = self._get_or_create_single_slot_epoch_node(epoch_idx)
+        self.add_posterior_contours(per_t_bin_mask=per_t_bin_mask, t_bin_edges=t_bin_edges, unique_identifier=_SINGLE_SLOT_CONTOUR_ID, scene_parent=epoch_node, **contour_kw)
+        if extrude:
+            _ext = dict(z_half_extent=None, tube_radius=1.2, tube_alpha=0.3, wall_alpha=0.15)
+            if extrusion_kwargs is not None:
+                _ext.update(extrusion_kwargs)
+            self.build_contour_extrusions(unique_identifier=_SINGLE_SLOT_CONTOUR_ID, z_half_extent=_ext.get('z_half_extent', None), tube_radius=float(_ext.get('tube_radius', 1.2)), tube_alpha=float(_ext.get('tube_alpha', 0.3)), wall_alpha=float(_ext.get('wall_alpha', 0.15)))
+        self.add_emphasis_plane(time_value=float(t_bin_edges[0]), curr_label=_SINGLE_SLOT_PLANE_ID, scene_parent=epoch_node, **plane_kw)
+
+
+    def set_epoch_visual_source(self, epoch_flat_mask_future_past_result: List[MatchingPastFuturePositionsResult], *, extrude: bool = False, contour_kwargs: Optional[Dict[str, Any]] = None, plane_kwargs: Optional[Dict[str, Any]] = None, extrusion_kwargs: Optional[Dict[str, Any]] = None, initial_epoch_idx: int = 0) -> None:
+        """Store per-epoch `MatchingPastFuturePositionsResult` list and show one epoch at a time (rebuild on change).
+
+        Replaces the pattern of looping `add_epoch_visuals` for every epoch and toggling visibility.
+        CPU cost: meshes are rebuilt when switching epochs; memory: only one epoch's scene objects exist.
+        """
+        self.epoch_flat_mask_future_past_result = epoch_flat_mask_future_past_result
+        self.epoch_visual_extrude = bool(extrude)
+        self.epoch_visual_contour_kwargs = contour_kwargs
+        self.epoch_visual_plane_kwargs = plane_kwargs
+        self.epoch_visual_extrusion_kwargs = extrusion_kwargs
+        self._update_epoch_slider_range()
+        n = len(epoch_flat_mask_future_past_result)
+        if n == 0:
+            self.set_active_epoch(None)
+            return
+        idx = max(0, min(n - 1, int(initial_epoch_idx)))
+        self.set_active_epoch(idx)
 
 
     def register_epoch_visual(self, epoch_idx: int, visual_type: str, unique_identifier: str):
@@ -2842,7 +2935,72 @@ class Volumentric2DTimeSeriesPlotter:
         return {'contour': contour_id, 'plane': plane_id}
 
 
+    def _set_active_epoch_single_source(self, epoch_idx: Optional[int]) -> None:
+        """Single-slot mode: remove previous overlay meshes and rebuild for `epoch_idx` (or clear if None / empty list)."""
+        src = self.epoch_flat_mask_future_past_result
+        assert src is not None
+        n = len(src)
+        if epoch_idx is not None:
+            epoch_idx = int(epoch_idx)
+        self.active_epoch_idx = epoch_idx
+        if n == 0:
+            self._clear_active_slot_visuals()
+            if self.epoch_slider is not None:
+                self.epoch_slider.blockSignals(True)
+                self.epoch_slider.setValue(0)
+                self.epoch_slider.blockSignals(False)
+            if self.epoch_value_label is not None:
+                self.epoch_value_label.setText("0/0")
+            self._refresh_scene_tree()
+            if self.canvas is not None:
+                self.canvas.update()
+            return
+        if epoch_idx is None:
+            self._clear_active_slot_visuals()
+            if self.epoch_slider is not None:
+                self.epoch_slider.blockSignals(True)
+                self.epoch_slider.setValue(0)
+                self.epoch_slider.blockSignals(False)
+            if self.epoch_value_label is not None:
+                self.epoch_value_label.setText(f"—/{max(0, n - 1)}")
+            self._refresh_scene_tree()
+            if self.canvas is not None:
+                self.canvas.update()
+            return
+        if epoch_idx < 0 or epoch_idx >= n:
+            epoch_idx = max(0, min(n - 1, epoch_idx))
+        if self._single_slot_rendered_epoch_idx == epoch_idx and self.get_posterior_contours(_SINGLE_SLOT_CONTOUR_ID) is not None:
+            if self.epoch_slider is not None and self.epoch_slider.value() != epoch_idx:
+                self.epoch_slider.blockSignals(True)
+                self.epoch_slider.setValue(epoch_idx)
+                self.epoch_slider.blockSignals(False)
+            if self.epoch_value_label is not None:
+                self.epoch_value_label.setText(f"{epoch_idx}/{max(0, n - 1)}")
+            self._refresh_scene_tree()
+            if self.canvas is not None:
+                self.canvas.update()
+            return
+        self._clear_active_slot_visuals()
+        er = src[epoch_idx]
+        per_t_bin_mask = er.epoch_t_bins_high_prob_pos_mask
+        t_bin_edges = er.decoded_epoch_result.time_bin_edges
+        self._add_epoch_visuals_single_slot(epoch_idx, per_t_bin_mask, t_bin_edges, self.epoch_visual_extrude, self.epoch_visual_contour_kwargs, self.epoch_visual_plane_kwargs, self.epoch_visual_extrusion_kwargs)
+        self._single_slot_rendered_epoch_idx = epoch_idx
+        if self.epoch_slider is not None and self.epoch_slider.value() != epoch_idx:
+            self.epoch_slider.blockSignals(True)
+            self.epoch_slider.setValue(epoch_idx)
+            self.epoch_slider.blockSignals(False)
+        if self.epoch_value_label is not None:
+            self.epoch_value_label.setText(f"{epoch_idx}/{max(0, n - 1)}")
+        self._refresh_scene_tree()
+        if self.canvas is not None:
+            self.canvas.update()
+
+
     def set_active_epoch(self, epoch_idx: Optional[int]):
+        if self.epoch_flat_mask_future_past_result is not None:
+            self._set_active_epoch_single_source(epoch_idx)
+            return
         if epoch_idx is not None:
             epoch_idx = int(epoch_idx)
         self.active_epoch_idx = epoch_idx
@@ -2889,7 +3047,7 @@ class Volumentric2DTimeSeriesPlotter:
             self.debug_is_shift_hover_enabled = True
             return
         if key_name in {'Up', 'Down'} and self.n_epoch_groups > 0:
-            sorted_indices = sorted(self.epoch_visual_groups.keys())
+            sorted_indices = self._iter_epoch_nav_indices()
             if self.active_epoch_idx is None:
                 next_epoch = sorted_indices[0] if key_name == 'Down' else sorted_indices[-1]
             else:
