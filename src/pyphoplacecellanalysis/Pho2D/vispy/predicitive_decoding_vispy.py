@@ -48,7 +48,6 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionL
 # ==================================================================================================================================================================================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
 import colorsys
-from skimage import measure
 ## vispy
 import vispy
 import vispy as vp
@@ -1699,6 +1698,17 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 # Volumetric 2D time-series plotter using vispy
+_VOLUMETRIC_TURNTABLE_FOV: float = 45.0
+_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION: float = 30.0
+_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH: float = 135.0
+_VOLUMETRIC_CAMERA_VIEW_PRESETS: Tuple[Tuple[str, float, float], ...] = (
+    ("Top", 90.0, 0.0),
+    ("Left", 0.0, -90.0),
+    ("Right", 0.0, 90.0),
+    ("Perspective", _VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, _VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH),
+)
+
+
 @metadata_attributes(short_name=None, tags=['vispy', 'qt', '3D', 'Bapun', 'ACTIVE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-18 05:41', related_items=[])
 @define(slots=False, repr=False, eq=False)
 class Volumentric2DTimeSeriesPlotter:
@@ -1738,7 +1748,7 @@ class Volumentric2DTimeSeriesPlotter:
     view: Any = field(default=None)
     scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
-    position_line: Any = field(default=None)
+    position_line: vz.Line = field(default=None)
     posterior_plane: Any = field(default=None)
     decoded_posteriors_by_key: Dict[str, Dict[str, Any]] = field(default=Factory(dict))
     decoded_posterior_counter: int = field(default=0)
@@ -1825,11 +1835,12 @@ class Volumentric2DTimeSeriesPlotter:
         canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
         self.canvas = canvas
         self.view = canvas.central_widget.add_view()
-        self.view.camera = scene.TurntableCamera(fov=45.0, elevation=30.0, azimuth=135.0)        
+        self.view.camera = scene.TurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
         self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
         self.scene_tree_widget.setMinimumWidth(200)
         root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
         self.main_window = root_dockAreaWindow
+        self._build_camera_view_menu(main_window=root_dockAreaWindow)
         viewer_central_widget = QtWidgets.QWidget()
         viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
         viewer_layout.setContentsMargins(0, 0, 0, 0)
@@ -1881,7 +1892,6 @@ class Volumentric2DTimeSeriesPlotter:
         _, _scene_tree_dock_item = root_dockAreaWindow.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
         root_dockAreaWindow.resize(1400, 950)
         
-
         # Something to give 3D context (axis from 0 to 1)
         self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
         self.gridlines = vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
@@ -1889,7 +1899,7 @@ class Volumentric2DTimeSeriesPlotter:
 
         self._build_arena_wireframe()
         ## Graphics
-        self.position_line = vz.Line(pos=self.pos3d, color=(1.0, 1.0, 1.0, 0.65), width=1.0, parent=self.view.scene, name='Pos<x,y,t>')        
+        self.position_line = vz.Line(pos=self.pos3d, color=(0.22, 0.22, 0.22, 0.6), width=1.0, parent=self.view.scene, name='Pos<x,y,t>')        
         self._build_debug_crosshairs()
 
         if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
@@ -1912,7 +1922,29 @@ class Volumentric2DTimeSeriesPlotter:
         self.view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max), z=(0.0, self.z_max))
         self.scene_tree_widget.rebuild()
         root_dockAreaWindow.show()
-        
+
+
+    def _apply_turntable_camera_preset(self, elevation: float, azimuth: float) -> None:
+        if self.view is None:
+            return
+        cam = self.view.camera
+        if not isinstance(cam, scene.TurntableCamera):
+            return
+        cam.elevation = float(elevation)
+        cam.azimuth = float(azimuth)
+        cam.roll = 0.0
+        if self.canvas is not None:
+            self.canvas.update()
+
+
+    def _build_camera_view_menu(self, main_window: Any) -> None:
+        mb = main_window.menuBar()
+        view_menu = mb.addMenu("View")
+        for label, elev, azim in _VOLUMETRIC_CAMERA_VIEW_PRESETS:
+            act = QtWidgets.QAction(label, main_window)
+            act.triggered.connect(lambda *_e, e=elev, a=azim: self._apply_turntable_camera_preset(e, a))
+            view_menu.addAction(act)
+
 
     def _build_arena_wireframe(self):
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
