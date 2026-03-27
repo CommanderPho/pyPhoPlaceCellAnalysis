@@ -204,6 +204,12 @@ class CustomTurntableCamera(Base3DRotationCamera):
         * SHIFT + LMB: translate the center point
         * SHIFT + RMB: change FOV
 
+    Replaces: scene.TurntableCamera
+    
+    Usage:
+    
+    	from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera
+    
     """
 
     _state_props = Base3DRotationCamera._state_props + ("elevation", "azimuth", "roll")
