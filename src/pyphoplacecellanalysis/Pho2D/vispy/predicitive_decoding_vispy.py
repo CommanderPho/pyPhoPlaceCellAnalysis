@@ -1749,9 +1749,9 @@ class Volumentric2DTimeSeriesPlotter:
     z_scale: float = field(default=1.0)
     pos3d: Optional[NDArray] = field(default=None)
 
-    canvas: Any = field(default=None)
-    main_window: Any = field(default=None)
-    view: Any = field(default=None)
+    canvas: scene.SceneCanvas = field(default=None)
+    main_window: PhoDockAreaContainingWindow = field(default=None)
+    view: ViewBox = field(default=None)
     scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
     position_line: vz.Line = field(default=None)
@@ -1781,8 +1781,8 @@ class Volumentric2DTimeSeriesPlotter:
     epoch_visual_groups: Dict[int, Dict[str, List[str]]] = field(default=Factory(dict))
     epoch_group_nodes: Dict[int, Any] = field(default=Factory(dict))
     active_epoch_idx: Optional[int] = field(default=None)
-    epoch_slider: Optional[Any] = field(default=None)
-    epoch_value_label: Optional[Any] = field(default=None)
+    epoch_slider: Optional[QtWidgets.QSlider] = field(default=None)
+    epoch_value_label: Optional[QtWidgets.QLabel] = field(default=None)
 
     epoch_flat_mask_future_past_result: Optional[List[MatchingPastFuturePositionsResult]] = field(default=None)
     epoch_visual_extrude: bool = field(default=False)
