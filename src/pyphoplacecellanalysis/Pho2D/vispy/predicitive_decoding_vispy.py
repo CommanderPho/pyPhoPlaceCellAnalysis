@@ -1700,14 +1700,6 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
-from PyQt5.QtCore import QTimer # Or PySide2/6 equivalent
-
-# # Inside your main QWidget or QMainWindow class:
-# def resizeEvent(self, event):
-#     super().resizeEvent(event)
-#     # Delay the Vispy redraw by 10ms so the layout can settle
-#     QTimer.singleShot(10, self.vispy_canvas.update)
-
 
 # Volumetric 2D time-series plotter using vispy
 _VOLUMETRIC_TURNTABLE_FOV: float = 45.0
@@ -1870,17 +1862,16 @@ class Volumentric2DTimeSeriesPlotter:
         self.view = canvas.central_widget.add_view()
         # self.view.camera = scene.TurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
         self.view.camera = CustomTurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
-        
-        
-        self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
-        self.scene_tree_widget.setMinimumWidth(200)
         root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
         self.main_window = root_dockAreaWindow
         self._build_camera_view_menu(main_window=root_dockAreaWindow)
         viewer_central_widget = QtWidgets.QWidget()
         viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
         viewer_layout.setContentsMargins(0, 0, 0, 0)
-        viewer_layout.addWidget(canvas.native, stretch=1)
+        scene_wrap = VispySceneWrappingWidget(canvas=canvas, parent=viewer_central_widget, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
+        assert scene_wrap.scene_tree_widget is not None
+        self.scene_tree_widget = scene_wrap.scene_tree_widget
+        viewer_layout.addWidget(scene_wrap, stretch=1)
 
         if self.n_t_bins > 0:
             slider_widget = QtWidgets.QWidget()
@@ -1921,11 +1912,7 @@ class Volumentric2DTimeSeriesPlotter:
         epoch_slider.valueChanged.connect(self.on_epoch_slider_value_changed)
 
         viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
-        _, viewer_dock_item = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
-        
-        _custom_dock_coloring_fn = CustomDockDisplayConfig.build_custom_get_colors_fn(fg_color='#ffffff', bg_color="#aaa344", border_color="#998A33")
-        scene_tree_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=_custom_dock_coloring_fn)
-        _, _scene_tree_dock_item = root_dockAreaWindow.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
+        _, _ = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
         root_dockAreaWindow.resize(1400, 950)
         
         # Something to give 3D context (axis from 0 to 1)
@@ -3382,23 +3369,6 @@ class Volumentric2DTimeSeriesPlotter:
         self._hide_debug_crosshairs()
         if self.canvas is not None:
             self.canvas.update()
-
-
-    def on_resize(self, event):
-        # Tell the OpenGL context the new physical dimensions
-        vp = (0, 0, event.physical_size[0], event.physical_size[1])
-        self.context.set_viewport(*vp)
-        
-        # If you have custom visuals, you may also need to update transforms:
-        # self.visual.transforms.configure(canvas=self, viewport=vp)
-
-
-    # Inside your main QWidget or QMainWindow class:
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        # Delay the Vispy redraw by 10ms so the layout can settle
-        QTimer.singleShot(10, self.vispy_canvas.update)
-
 
 
     def on_slider_value_changed(self, value: int):
