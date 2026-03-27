@@ -200,6 +200,7 @@ class CustomTurntableCamera(Base3DRotationCamera):
 
         * LMB: orbits the view around its center point.
         * RMB or scroll: change scale_factor (i.e. zoom level)
+        * MMB drag: translate the center point (same as SHIFT + LMB)
         * SHIFT + LMB: translate the center point
         * SHIFT + RMB: change FOV
 
@@ -216,6 +217,33 @@ class CustomTurntableCamera(Base3DRotationCamera):
         self.roll = roll
         self.distance = distance  # None means auto-distance
         self.translate_speed = translate_speed
+
+
+    def viewbox_mouse_event(self, event):
+        super(CustomTurntableCamera, self).viewbox_mouse_event(event)
+        if not self.interactive:
+            return
+        if event.type != 'mouse_move' or event.press_event is None:
+            return
+        if 1 in event.buttons and 2 in event.buttons:
+            return
+        if 3 not in event.buttons or event.mouse_event.modifiers:
+            return
+        norm = np.mean(self._viewbox.size)
+        if self._event_value is None or len(self._event_value) == 2:
+            self._event_value = self.center
+        p1 = event.mouse_event.press_event.pos
+        p2 = event.mouse_event.pos
+        dist = (p1 - p2) / norm * self._scale_factor
+        dist[1] *= -1
+        dx, dy, dz = self._dist_to_trans(dist)
+        ff = self._flip_factors
+        up, forward, right = self._get_dim_vectors()
+        dx, dy, dz = right * dx + forward * dy + up * dz
+        dx, dy, dz = ff[0] * dx, ff[1] * dy, dz * ff[2]
+        c = self._event_value
+        self.center = c[0] + dx, c[1] + dy, c[2] + dz
+
 
     @property
     def elevation(self):
