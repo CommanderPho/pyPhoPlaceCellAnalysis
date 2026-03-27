@@ -376,27 +376,18 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
 
 class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
-    """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
+    """Dock-area main window for composing vispy UIs alongside other docks.
+		a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
     
         Can be used to dynamically create windows composed of multiple separate widgets programmatically.
     
         pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper.PhoDockAreaContainingWindow
         
         Inherited Properties: .area
-
-    Usage:
-    from pyphoplacecellanalysis.Pho2D.stacked_epoch_slices import PhoPaginatedMultiDecoderDecodedEpochsWindow
-
-    ## Ripples:
-    pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, epochs_name='ripple', included_epoch_indicies=None, defer_render=False, save_figure=False)
-    app, root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(pagination_controller_dict) # Combine to a single figure
-    root_dockAreaWindow.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
-            
-    ## Laps:
-    laps_pagination_controller_dict =  PhoPaginatedMultiDecoderDecodedEpochsWindow._subfn_prepare_plot_multi_decoders_stacked_epoch_slices(curr_active_pipeline, track_templates, decoder_decoded_epochs_result_dict=decoder_laps_filter_epochs_decoder_result_dict, epochs_name='laps', included_epoch_indicies=None, defer_render=False, save_figure=False)
-    laps_app, laps_root_dockAreaWindow = PhoPaginatedMultiDecoderDecodedEpochsWindow.init_from_pagination_controller_dict(laps_pagination_controller_dict) # Combine to a single figure
-    laps_root_dockAreaWindow.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
-
+    Subclasses ``PhoDockAreaContainingWindow`` (central ``DockArea``, ``.area``). Embed a
+    ``SceneCanvas`` via ``canvas.native``, or a ``VispySceneWrappingWidget``, using
+    ``add_display_dock`` from ``DynamicDockDisplayAreaContentMixin``. For generic dock-only
+    patterns see ``DockAreaWrapper`` / ``PhoDockAreaContainingWindow``.
     """
 
     # ==================================================================================================================== #
@@ -404,22 +395,31 @@ class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
     # ==================================================================================================================== #
 
     def __init__(self, title='VispyCanvasContainingWindow', *args, **kwargs):
-        super(VispyCanvasContainingWindow, self).__init__(*args, **kwargs)
-        # self.setup()
-        # self.buildUI()
+        super(VispyCanvasContainingWindow, self).__init__(title, *args, **kwargs)
+        self.setWindowTitle(title)
 
 
-    # def draw(self):
-    #     """ Calls .draw() on all children MatplotlibTimeSynchronizedWidget items. 
-    #     Successfully redraws items.
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
+from PyQt5.QtCore import QTimer # Or PySide2/6 equivalent
 
-    #     """
-    #     #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
-    #     for a_name, a_child_paginated_widget in self.paginated_widgets.items():
-    #         # a_child_paginated_widget.ui.canvas.draw()
-    #         a_child_paginated_widget.draw()
+# # Inside your main QWidget or QMainWindow class:
+# def resizeEvent(self, event):
+#     super().resizeEvent(event)
+#     # Delay the Vispy redraw by 10ms so the layout can settle
+#     QTimer.singleShot(10, self.vispy_canvas.update)
 
-        
+
+# Volumetric 2D time-series plotter using vispy
+_VOLUMETRIC_TURNTABLE_FOV: float = 45.0
+_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION: float = 30.0
+_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH: float = 135.0
+_VOLUMETRIC_CAMERA_VIEW_PRESETS: Tuple[Tuple[str, float, float], ...] = (
+    ("Top", 90.0, 0.0),
+    ("Left", 0.0, -90.0),
+    ("Right", 0.0, 90.0),
+    ("Perspective", _VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, _VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH),
+)
 
 
 class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
@@ -471,18 +471,18 @@ class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
     def buildUI(self):
         title = 'Volumetric 2D Time-Series Viewer'
-        self.canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
-        self.canvas = self.canvas
-        self.view = self.canvas.central_widget.add_view()
-        # self.view.camera = scene.TurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
-        self.view.camera = CustomTurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
-        
-        
+        if self.canvas is None:
+            self.canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
+
+        if self.view is None:
+            self.view = self.canvas.central_widget.add_view()
+            # self.view.camera = scene.TurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
+            self.view.camera = CustomTurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
+
         self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
         self.scene_tree_widget.setMinimumWidth(200)
-        root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
-        self.main_window = root_dockAreaWindow
-        self._build_camera_view_menu(main_window=root_dockAreaWindow)
+        self.main_window = VispyCanvasContainingWindow(title=title, defer_show=True)
+        self._build_camera_view_menu(main_window=self.main_window)
         viewer_central_widget = QtWidgets.QWidget()
         viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
         viewer_layout.setContentsMargins(0, 0, 0, 0)
@@ -527,12 +527,12 @@ class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
         epoch_slider.valueChanged.connect(self.on_epoch_slider_value_changed)
 
         viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
-        _, viewer_dock_item = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
+        _, viewer_dock_item = self.main_window.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
         
         _custom_dock_coloring_fn = CustomDockDisplayConfig.build_custom_get_colors_fn(fg_color='#ffffff', bg_color="#aaa344", border_color="#998A33")
         scene_tree_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=_custom_dock_coloring_fn)
-        _, _scene_tree_dock_item = root_dockAreaWindow.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
-        root_dockAreaWindow.resize(1400, 950)
+        _, _scene_tree_dock_item = self.main_window.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
+        self.main_window.resize(1400, 950)
         
         # Something to give 3D context (axis from 0 to 1)
         self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
@@ -562,7 +562,7 @@ class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
             self.canvas.events.resize.connect(self.on_resize)
                         
         self.rebuild()
-        root_dockAreaWindow.show()
+        self.main_window.show()
         
 
     def rebuild(self) -> None:
