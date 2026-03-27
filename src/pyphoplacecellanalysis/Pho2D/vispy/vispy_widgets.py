@@ -399,190 +399,66 @@ class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
         self.setWindowTitle(title)
 
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
-from PyQt5.QtCore import QTimer # Or PySide2/6 equivalent
-
-# # Inside your main QWidget or QMainWindow class:
-# def resizeEvent(self, event):
-#     super().resizeEvent(event)
-#     # Delay the Vispy redraw by 10ms so the layout can settle
-#     QTimer.singleShot(10, self.vispy_canvas.update)
-
-
-# Volumetric 2D time-series plotter using vispy
-_VOLUMETRIC_TURNTABLE_FOV: float = 45.0
-_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION: float = 30.0
-_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH: float = 135.0
-_VOLUMETRIC_CAMERA_VIEW_PRESETS: Tuple[Tuple[str, float, float], ...] = (
-    ("Top", 90.0, 0.0),
-    ("Left", 0.0, -90.0),
-    ("Right", 0.0, 90.0),
-    ("Perspective", _VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, _VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH),
-)
-
-
 class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
     """Composite Qt widget: vispy ``SceneCanvas.native`` plus an optional ``VispySceneTreeWidget``.
 
-    Use for a single parent that shows the GL view and the scene graph inspector without a dock
-    layout. The tree is identical to ``VispySceneTreeWidget`` (visibility toggles, GL blend column,
-    refresh). ``column_renderers`` are forwarded when ``show_scene_tree`` is True.
-    
+    For embedding in a parent layout or dock (no main window or volumetric logic here). The tree
+    matches ``VispySceneTreeWidget`` (visibility toggles, GL blend column, refresh). When
+    ``show_scene_tree`` is True, ``column_renderers`` is forwarded to ``VispySceneTreeWidget``.
 
-    from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
-
-
+    If ``canvas`` is None, a minimal ``SceneCanvas`` with one default turntable view is created for
+    standalone use. If ``canvas`` is provided, the caller must configure views and cameras; this
+    widget only embeds ``canvas.native``.
     """
 
-    def __init__(self, canvas: Optional[scene.SceneCanvas], parent: Optional[Any] = None, *, show_scene_tree: bool = True, tree_on_right: bool = True, tree_minimum_width: int = 200, column_renderers: Optional[Dict[str, Callable[[Node], str]]] = None, splitter_sizes: Optional[Sequence[int]] = None) -> None:
+    def __init__(self, canvas: Optional[scene.SceneCanvas] = None, parent: Optional[Any] = None, *, show_scene_tree: bool = True, tree_on_right: bool = True, tree_minimum_width: int = 200, column_renderers: Optional[Dict[str, Callable[[Node], str]]] = None, splitter_sizes: Optional[Sequence[int]] = None) -> None:
         super().__init__(parent=parent)
-        self.canvas = canvas
-        self.view = None
         self.scene_tree_widget: Optional[VispySceneTreeWidget] = None
+        if canvas is None:
+            _canvas = scene.SceneCanvas(keys='interactive', show=False, size=(800, 600), autoswap=False, resizable=True, decorate=False)
+            _view = _canvas.central_widget.add_view()
+            _view.camera = 'turntable'
+            self.canvas = _canvas
+        else:
+            self.canvas = canvas
         expanding = getattr(QtWidgets.QSizePolicy, 'Expanding', QtWidgets.QSizePolicy.Policy.Expanding)
         self.setSizePolicy(QtWidgets.QSizePolicy(expanding, expanding))
         self.setWindowTitle('VispySceneWrappingWidget')
-        # outer = QtWidgets.QVBoxLayout(self)
-        # outer.setContentsMargins(0, 0, 0, 0)
-        # native = canvas.native
-        # if not show_scene_tree:
-        #     outer.addWidget(cast(Any, native), stretch=1)
-        #     return
-        # self.scene_tree_widget = VispySceneTreeWidget(root_node=canvas.scene, canvas=canvas, parent=self, column_renderers=column_renderers)
-        # self.scene_tree_widget.setMinimumWidth(tree_minimum_width)
-        # splitter = QtWidgets.QSplitter(self)
-        # _qt = QtCore.Qt
-        # _horiz = getattr(_qt, 'Horizontal', None)
-        # if _horiz is None:
-        #     _horiz = getattr(cast(Any, _qt).Orientation, 'Horizontal', 1)
-        # splitter.setOrientation(cast(Any, _horiz))
-        # first, second = (native, self.scene_tree_widget) if tree_on_right else (self.scene_tree_widget, native)
-        # splitter.addWidget(cast(Any, first))
-        # splitter.addWidget(cast(Any, second))
-        # splitter.setStretchFactor(0, 1)
-        # splitter.setStretchFactor(1, 0)
-        # sizes = list(splitter_sizes) if splitter_sizes is not None else [700, 300]
-        # if len(sizes) == 2:
-        #     splitter.setSizes(sizes)
-        # outer.addWidget(splitter, stretch=1)
-        self.buildUI()
-        
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        native = self.canvas.native
+        if not show_scene_tree:
+            outer.addWidget(cast(Any, native), stretch=1)
+        else:
+            self.scene_tree_widget = VispySceneTreeWidget(root_node=cast(Node, self.canvas.scene), canvas=self.canvas, parent=self, column_renderers=column_renderers)
+            self.scene_tree_widget.setMinimumWidth(tree_minimum_width)
+            splitter = QtWidgets.QSplitter(self)
+            _qt = QtCore.Qt
+            _horiz = getattr(_qt, 'Horizontal', None)
+            if _horiz is None:
+                _horiz = getattr(cast(Any, _qt).Orientation, 'Horizontal', 1)
+            splitter.setOrientation(cast(Any, _horiz))
+            first, second = (native, self.scene_tree_widget) if tree_on_right else (self.scene_tree_widget, native)
+            splitter.addWidget(cast(Any, first))
+            splitter.addWidget(cast(Any, second))
+            splitter.setStretchFactor(0, 1)
+            splitter.setStretchFactor(1, 0)
+            sizes = list(splitter_sizes) if splitter_sizes is not None else [700, 300]
+            if len(sizes) == 2:
+                splitter.setSizes(sizes)
+            outer.addWidget(cast(Any, splitter), stretch=1)
 
-    def buildUI(self):
-        title = 'Volumetric 2D Time-Series Viewer'
-        if self.canvas is None:
-            self.canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1400, 900), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
-
-        if self.view is None:
-            self.view = self.canvas.central_widget.add_view()
-            # self.view.camera = scene.TurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
-            self.view.camera = CustomTurntableCamera(fov=_VOLUMETRIC_TURNTABLE_FOV, elevation=_VOLUMETRIC_CAMERA_PERSPECTIVE_ELEVATION, azimuth=_VOLUMETRIC_CAMERA_PERSPECTIVE_AZIMUTH)
-
-        self.scene_tree_widget = VispySceneTreeWidget(root_node=self.canvas.scene, canvas=self.canvas)
-        self.scene_tree_widget.setMinimumWidth(200)
-        self.main_window = VispyCanvasContainingWindow(title=title, defer_show=True)
-        self._build_camera_view_menu(main_window=self.main_window)
-        viewer_central_widget = QtWidgets.QWidget()
-        viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
-        viewer_layout.setContentsMargins(0, 0, 0, 0)
-        viewer_layout.addWidget(self.canvas.native, stretch=1)
-
-        if self.n_t_bins > 0:
-            slider_widget = QtWidgets.QWidget()
-            slider_layout = QtWidgets.QHBoxLayout(slider_widget)
-            slider_layout.addWidget(QtWidgets.QLabel("t-bin:"))
-            t_bin_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-            t_bin_slider.setMinimum(0)
-            t_bin_slider.setMaximum(max(0, self.n_t_bins - 1))
-            t_bin_slider.setValue(self.active_t_bin_idx)
-            t_bin_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-            t_bin_slider.setTickInterval(1)
-            t_bin_value_label = QtWidgets.QLabel(f"{self.active_t_bin_idx}/{max(0, self.n_t_bins - 1)}")
-            t_bin_value_label.setMinimumWidth(90)
-            slider_layout.addWidget(t_bin_slider, stretch=1)
-            slider_layout.addWidget(t_bin_value_label)
-            viewer_layout.addWidget(slider_widget, stretch=0)
-            self.t_bin_slider = t_bin_slider
-            self.t_bin_value_label = t_bin_value_label
-            t_bin_slider.valueChanged.connect(self.on_slider_value_changed)
-
-        epoch_slider_widget = QtWidgets.QWidget()
-        epoch_slider_layout = QtWidgets.QHBoxLayout(epoch_slider_widget)
-        epoch_slider_layout.addWidget(QtWidgets.QLabel("epoch:"))
-        epoch_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        epoch_slider.setMinimum(0)
-        epoch_slider.setMaximum(0)
-        epoch_slider.setValue(0)
-        epoch_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        epoch_slider.setTickInterval(1)
-        epoch_slider.setEnabled(False)
-        epoch_value_label = QtWidgets.QLabel("0/0")
-        epoch_value_label.setMinimumWidth(90)
-        epoch_slider_layout.addWidget(epoch_slider, stretch=1)
-        epoch_slider_layout.addWidget(epoch_value_label)
-        viewer_layout.addWidget(epoch_slider_widget, stretch=0)
-        self.epoch_slider = epoch_slider
-        self.epoch_value_label = epoch_value_label
-        epoch_slider.valueChanged.connect(self.on_epoch_slider_value_changed)
-
-        viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
-        _, viewer_dock_item = self.main_window.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
-        
-        _custom_dock_coloring_fn = CustomDockDisplayConfig.build_custom_get_colors_fn(fg_color='#ffffff', bg_color="#aaa344", border_color="#998A33")
-        scene_tree_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=_custom_dock_coloring_fn)
-        _, _scene_tree_dock_item = self.main_window.add_display_dock("Scene Tree", dockSize=(300, 900), widget=self.scene_tree_widget, dockAddLocationOpts=['right', viewer_dock_item], display_config=scene_tree_display_config)
-        self.main_window.resize(1400, 950)
-        
-        # Something to give 3D context (axis from 0 to 1)
-        self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
-        self.gridlines = vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
-        self._build_coordinate_axes()
-
-        self._build_arena_wireframe()
-        ## Graphics
-        self.position_line = vz.Line(pos=self.pos3d, color=(0.22, 0.22, 0.22, 0.6), width=1.0, parent=self.view.scene, name='Pos<x,y,t>')        
-        self._build_debug_crosshairs()
-
-        if self.highlight_epochs is not None and len(self.highlight_epochs) > 0:
-            self._build_highlight_bands()
-
-        if self.n_t_bins > 0:
-            self.update_active_t_bin(self.active_t_bin_idx)
-
-        if hasattr(self.canvas.events, 'key_press'):
-            self.canvas.events.key_press.connect(self.on_key_press)
-        if hasattr(self.canvas.events, 'key_release'):
-            self.canvas.events.key_release.connect(self.on_key_release)
-        if hasattr(self.canvas.events, 'mouse_move'):
-            self.canvas.events.mouse_move.connect(self.on_mouse_move)
-        if hasattr(self.canvas.events, 'mouse_leave'):
-            self.canvas.events.mouse_leave.connect(self.on_mouse_leave)
-        if hasattr(self.canvas.events, 'resize'):
-            self.canvas.events.resize.connect(self.on_resize)
-                        
-        self.rebuild()
-        self.main_window.show()
-        
 
     def rebuild(self) -> None:
         if self.scene_tree_widget is not None:
             self.scene_tree_widget.rebuild()
 
-    def on_resize(self, event):
-        # Tell the OpenGL context the new physical dimensions
-        vp = (0, 0, event.physical_size[0], event.physical_size[1])
-        self.context.set_viewport(*vp)
-        
-        # If you have custom visuals, you may also need to update transforms:
-        # self.visual.transforms.configure(canvas=self, viewport=vp)
 
 
-    # Inside your main QWidget or QMainWindow class:
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
-        # Delay the Vispy redraw by 10ms so the layout can settle
-        QTimer.singleShot(10, self.vispy_canvas.update)
+        if self.canvas is not None:
+            QtCore.QTimer.singleShot(10, self.canvas.update)
 
 
 
