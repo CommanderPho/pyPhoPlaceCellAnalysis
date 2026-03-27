@@ -13,6 +13,7 @@ from attrs import asdict, define, field, Factory, astuple
 
 import numpy as np
 import pandas as pd
+from shapely.geometry import Polygon
 from datetime import datetime, timedelta
 
 from attrs import define, field, asdict, evolve
@@ -1799,6 +1800,8 @@ class Volumentric2DTimeSeriesPlotter:
     match_line_visuals: List[Any] = field(default=Factory(list))
     _match_lines_built_for_epoch_idx: Optional[int] = field(default=None)
 
+    reward_zone_extrusion_visuals: List[Any] = field(default=Factory(list))
+
     debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
 
@@ -2045,6 +2048,149 @@ class Volumentric2DTimeSeriesPlotter:
         """Map session time (seconds) to scene z using the same scale as `setup_position_trajectory_curves`."""
         t_arr = np.asarray(t, dtype=np.float64)
         return np.asarray((t_arr - float(self.t_min)) * float(self.z_scale), dtype=np.float32)
+
+
+    # Reward Zone Shape Extrusions
+    def clear_reward_zone_extrusions(self) -> None:
+        for vis in self.reward_zone_extrusion_visuals:
+            if vis is not None:
+                vis.parent = None
+        self.reward_zone_extrusion_visuals.clear()
+        if self.canvas is not None:
+            self.canvas.update()
+
+
+    @staticmethod
+    def _segment_to_dashed_line_pos(a: NDArray, b: NDArray, dash_len: float, gap_len: float) -> NDArray:
+        """Return (2*k, 3) float32 positions for vz.Line(..., connect='segments'): dash-gap pattern along [a,b]."""
+        aa = np.asarray(a, dtype=np.float64).reshape(3)
+        bb = np.asarray(b, dtype=np.float64).reshape(3)
+        d = bb - aa
+        L = float(np.linalg.norm(d))
+        if L < 1e-12:
+            return np.zeros((0, 3), dtype=np.float32)
+        u = d / L
+        pos_list: List[NDArray] = []
+        t = 0.0
+        drawing = True
+        while t < L - 1e-9:
+            if drawing:
+                t1 = min(t + float(dash_len), L)
+                if t1 - t > 1e-9:
+                    pos_list.append(aa + u * t)
+                    pos_list.append(aa + u * t1)
+                t = t1
+            else:
+                t = min(t + float(gap_len), L)
+            drawing = not drawing
+        if not pos_list:
+            return np.zeros((0, 3), dtype=np.float32)
+        return np.ascontiguousarray(np.vstack(pos_list), dtype=np.float32)
+
+
+    @staticmethod
+    def _prism_outline_dashed_pos(ring_xy: NDArray, z0: float, z1: float, dash_len: float, gap_len: float) -> NDArray:
+        """Closed XY ring (n,2), unique vertices; dashed bottom loop, top loop, and verticals at each vertex."""
+        ring = np.asarray(ring_xy, dtype=np.float32)
+        if ring.ndim != 2 or ring.shape[1] != 2 or ring.shape[0] < 3:
+            return np.zeros((0, 3), dtype=np.float32)
+        if np.allclose(ring[0], ring[-1], atol=1e-5):
+            ring = ring[:-1]
+        n = int(ring.shape[0])
+        if n < 3:
+            return np.zeros((0, 3), dtype=np.float32)
+        z0f, z1f = float(z0), float(z1)
+        chunks: List[NDArray] = []
+        for i in range(n):
+            j = (i + 1) % n
+            p0 = np.array([ring[i, 0], ring[i, 1], z0f], dtype=np.float64)
+            p1 = np.array([ring[j, 0], ring[j, 1], z0f], dtype=np.float64)
+            q0 = np.array([ring[i, 0], ring[i, 1], z1f], dtype=np.float64)
+            q1 = np.array([ring[j, 0], ring[j, 1], z1f], dtype=np.float64)
+            chunks.append(Volumentric2DTimeSeriesPlotter._segment_to_dashed_line_pos(p0, p1, dash_len, gap_len))
+            chunks.append(Volumentric2DTimeSeriesPlotter._segment_to_dashed_line_pos(q0, q1, dash_len, gap_len))
+            chunks.append(Volumentric2DTimeSeriesPlotter._segment_to_dashed_line_pos(p0, q0, dash_len, gap_len))
+        out = [c for c in chunks if c.size > 0]
+        if not out:
+            return np.zeros((0, 3), dtype=np.float32)
+        return np.ascontiguousarray(np.vstack(out), dtype=np.float32)
+
+
+    @staticmethod
+    def _extruded_prism_vertices_faces(ring_xy: NDArray, z0: float, z1: float) -> Tuple[NDArray, NDArray]:
+        """Extrude closed XY polygon along z from z0 to z1; returns (vertices (2n,3), faces (m,3))."""
+        pts = np.asarray(ring_xy, dtype=np.float32)
+        if pts.ndim != 2 or pts.shape[1] != 2 or pts.shape[0] < 3:
+            return (np.zeros((0, 3), dtype=np.float32), np.zeros((0, 3), dtype=np.int32))
+        if np.allclose(pts[0], pts[-1], atol=1e-5):
+            pts = pts[:-1]
+        n = int(pts.shape[0])
+        if n < 3:
+            return (np.zeros((0, 3), dtype=np.float32), np.zeros((0, 3), dtype=np.int32))
+        z0f, z1f = float(z0), float(z1)
+        bottom = np.column_stack([pts, np.full(n, z0f, dtype=np.float32)])
+        top = np.column_stack([pts, np.full(n, z1f, dtype=np.float32)])
+        verts = np.ascontiguousarray(np.vstack([bottom, top]), dtype=np.float32)
+        closed_2d = _ensure_closed_pos(pts)
+        tri = _triangulate_polygon_2d(closed_2d)
+        if tri is None or len(tri) < 1:
+            return (verts, np.zeros((0, 3), dtype=np.int32))
+        faces_bottom = np.asarray(tri, dtype=np.int32)
+        faces_top = faces_bottom.copy() + np.int32(n)
+        faces_top = faces_top[:, [0, 2, 1]]
+        side_faces: List[NDArray] = []
+        for i in range(n):
+            j = (i + 1) % n
+            bi, bj, ti, tj = i, j, i + n, j + n
+            side_faces.append(np.array([[bi, bj, tj], [bi, tj, ti]], dtype=np.int32))
+        faces = np.ascontiguousarray(np.vstack([faces_bottom, faces_top] + side_faces), dtype=np.int32)
+        return (verts, faces)
+
+
+    def plot_reward_zones_as_extruded_prisms(self, reward_zones: Dict[str, Polygon], *, clear_existing: bool = True, fill_rgba: Tuple[float, float, float, float] = (1.0, 0.55, 0.12, 0.28), outline_rgba: Tuple[float, float, float, float] = (0.95, 0.42, 0.05, 0.92), outline_width: float = 2.0, dash_length: Optional[float] = None, gap_length: Optional[float] = None) -> None:
+        """Draw each 2D shapely polygon as a prism along scene z from 0 to z_max (full time axis).
+
+        Fills use translucent orange by default; outlines are orange dashes (segment-based; VisPy has no 3D stipple).
+        Interior rings (holes) are ignored; only ``polygon.exterior`` is extruded.
+        """
+        if self.view is None:
+            return
+        if clear_existing:
+            self.clear_reward_zone_extrusions()
+        x_span = float(self.xbin[-1] - self.xbin[0]) if self.xbin is not None and len(self.xbin) > 1 else 1.0
+        y_span = float(self.ybin[-1] - self.ybin[0]) if self.ybin is not None and len(self.ybin) > 1 else 1.0
+        span = max(x_span, y_span, 1e-6)
+        dlen = float(dash_length) if dash_length is not None else max(span * 0.025, 1e-4)
+        glen = float(gap_length) if gap_length is not None else max(dlen * 0.45, 1e-4)
+        z0, z1 = 0.0, float(self.z_max)
+        parent = self.view.scene
+        for name, poly in reward_zones.items():
+            if poly is None or poly.is_empty:
+                continue
+            if not isinstance(poly, Polygon):
+                continue
+            try:
+                xy = np.asarray(poly.exterior.coords, dtype=np.float32)
+            except Exception:
+                continue
+            if xy.shape[0] < 4:
+                continue
+            verts, faces = self._extruded_prism_vertices_faces(xy, z0, z1)
+            if verts.shape[0] < 6 or faces.shape[0] < 1:
+                continue
+            mesh = vz.Mesh(vertices=verts, faces=faces, color=fill_rgba, parent=parent, name=f'RewardZoneFill[{name}]')
+            mesh.order = 19
+            mesh.set_gl_state('translucent', depth_test=True, depth_mask=False, cull_face=False)
+            self.reward_zone_extrusion_visuals.append(mesh)
+            dash_pos = self._prism_outline_dashed_pos(xy, z0, z1, dlen, glen)
+            if dash_pos.shape[0] >= 2:
+                ol = vz.Line(pos=dash_pos, color=outline_rgba, width=float(outline_width), connect='segments', method='gl', parent=parent, name=f'RewardZoneOutline[{name}]')
+                ol.order = 20
+                self.reward_zone_extrusion_visuals.append(ol)
+        if self.scene_tree_widget is not None:
+            self.scene_tree_widget.rebuild()
+        if self.canvas is not None:
+            self.canvas.update()
 
 
     @staticmethod
