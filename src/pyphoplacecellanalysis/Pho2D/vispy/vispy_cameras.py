@@ -40,10 +40,31 @@ class CustomArcballCamera(Base3DRotationCamera):
     
     Usage:
     
-    	from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomArcballCamera
-		
-        CustomArcballCamera(fov=45)
-        
+    	
+		import numpy as np
+		from vispy import app, scene
+		from vispy.color import BaseColormap
+		from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomArcballCamera
+
+		vol = np.random.rand(64, 64, 64).astype(np.float32)  # shape is (z, y, x)
+
+		canvas = scene.SceneCanvas(keys='interactive', show=True, bgcolor='black')
+		view = canvas.central_widget.add_view()
+		# view.camera = scene.cameras.TurntableCamera(fov=45)
+
+		view.camera = CustomArcballCamera(fov=45)
+
+		v = scene.visuals.Volume(
+			vol,
+			parent=view.scene,
+			method='translucent',
+			cmap='grey',
+			interpolation='linear',
+			relative_step_size=0.8,
+		)
+
+		app.run()
+
         
     """
 
