@@ -373,7 +373,8 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
             except Exception:
                 pass
 
-@metadata_attributes(short_name=None, tags=['paginated', 'multi-decoder', 'epochs', 'widget', 'window', 'ui'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-23 13:54', related_items=[])
+
+
 class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
     """ a custom PhoMainAppWindowBase (QMainWindow) subclass that contains a DockArea as its central view.
     
@@ -397,60 +398,6 @@ class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
     laps_root_dockAreaWindow.add_data_overlays(decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict)
 
     """
-    @property
-    def contents(self):
-        return self.ui._contents
-    
-    @property
-    def pagination_controllers(self) -> Dict[types.DecoderName, DecodedEpochSlicesPaginatedFigureController]:
-        return self.contents.pagination_controllers
-
-    @property
-    def paginator_controller_widget(self) -> PaginationControlWidget:
-        """ the widget that goes left and right by pages in the bottom of the left plot. """
-        assert self.isPaginatorControlWidgetBackedMode
-        a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
-        paginator_controller_widget = a_controlling_pagination_controller.ui.mw.ui.paginator_controller_widget
-        return paginator_controller_widget
-    
-    @property
-    def isPaginatorControlWidgetBackedMode(self) -> bool:
-        """ whether it's isPaginatorControlWidgetBackedMode """
-        a_controlling_pagination_controller = self.contents.pagination_controllers['long_LR'] # DecodedEpochSlicesPaginatedFigureController
-        return a_controlling_pagination_controller.params.isPaginatorControlWidgetBackedMode
-        
-
-    @property
-    def paginated_widgets(self) -> Dict[types.DecoderName, MatplotlibTimeSynchronizedWidget]:
-        """ the list of plotting child widgets. """
-        return {a_decoder_name:a_pagination_controller.ui.mw for a_decoder_name, a_pagination_controller in self.contents.pagination_controllers.items()}
-
-
-    @property
-    def debug_print(self):
-        """The debug_print property."""
-        return np.all([v.params.debug_print for a_name, v in self.pagination_controllers.items()])
-    @debug_print.setter
-    def debug_print(self, value):
-        for a_name, v in self.pagination_controllers.items():
-            v.params.debug_print = value
-
-    @property
-    def figure_ctx_dict(self) -> Dict[str, IdentifyingContext]:
-        """ the list of plotting child widgets. """
-        return {a_name:v.params.active_identifying_figure_ctx for a_name, v in self.pagination_controllers.items()} 
-
-        
-    @property
-    def global_thin_button_bar_widget(self) -> ThinButtonBarWidget:
-        """The global_thin_button_bar_widget property."""
-        return self.ui._contents.global_thin_button_bar_widget
-    
-    @property
-    def global_paginator_controller_widget(self) -> PaginationControlWidget:
-        """The global_thin_button_bar_widget property."""
-        return self.global_thin_button_bar_widget.ui.paginator_controller_widget
-    
 
     # ==================================================================================================================== #
     # Initializers                                                                                                         #
@@ -458,40 +405,20 @@ class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
 
     def __init__(self, title='VispyCanvasContainingWindow', *args, **kwargs):
         super(VispyCanvasContainingWindow, self).__init__(*args, **kwargs)
-        self.ui._contents = None
-        self.ui.attached_ripple_rasters_widget = None
-        self.ui.attached_yellow_blue_marginals_viewer_widget = None
-        # self.highlighted_epoch_time_bin_idx = None
-            
         # self.setup()
         # self.buildUI()
 
 
-    def draw(self):
-        """ Calls .draw() on all children MatplotlibTimeSynchronizedWidget items. 
-        Successfully redraws items.
+    # def draw(self):
+    #     """ Calls .draw() on all children MatplotlibTimeSynchronizedWidget items. 
+    #     Successfully redraws items.
 
-        """
-        #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
-        for a_name, a_child_paginated_widget in self.paginated_widgets.items():
-            # a_child_paginated_widget.ui.canvas.draw()
-            a_child_paginated_widget.draw()
+    #     """
+    #     #TODO 2023-07-06 15:05: - [ ] PERFORMANCE - REDRAW
+    #     for a_name, a_child_paginated_widget in self.paginated_widgets.items():
+    #         # a_child_paginated_widget.ui.canvas.draw()
+    #         a_child_paginated_widget.draw()
 
-
-    def update_params(self, **updated_values):
-        """ called to change the .params on all of the child controllers simultaneously.
-         
-          
-        
-            paginated_multi_decoder_decoded_epochs_window.update_params(posterior_heatmap_imshow_kwargs = dict(vmin=0.0))
-            paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
-
-
-        """
-        # if self.debug_print:
-        #     self.ui.print(f'PhoPaginatedMultiDecoderDecodedEpochsWindow.refresh_current_page():') # for page_idx == max_index this is called but doesn't continue
-        for a_name, a_pagination_controller in self.pagination_controllers.items():
-            a_pagination_controller.params.update(**updated_values)
         
 
 
