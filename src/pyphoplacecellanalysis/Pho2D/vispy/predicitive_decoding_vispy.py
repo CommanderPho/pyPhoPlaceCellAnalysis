@@ -1699,6 +1699,15 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
+from PyQt5.QtCore import QTimer # Or PySide2/6 equivalent
+
+# # Inside your main QWidget or QMainWindow class:
+# def resizeEvent(self, event):
+#     super().resizeEvent(event)
+#     # Delay the Vispy redraw by 10ms so the layout can settle
+#     QTimer.singleShot(10, self.vispy_canvas.update)
+
 
 # Volumetric 2D time-series plotter using vispy
 _VOLUMETRIC_TURNTABLE_FOV: float = 45.0
@@ -3373,6 +3382,23 @@ class Volumentric2DTimeSeriesPlotter:
         self._hide_debug_crosshairs()
         if self.canvas is not None:
             self.canvas.update()
+
+
+    def on_resize(self, event):
+        # Tell the OpenGL context the new physical dimensions
+        vp = (0, 0, event.physical_size[0], event.physical_size[1])
+        self.context.set_viewport(*vp)
+        
+        # If you have custom visuals, you may also need to update transforms:
+        # self.visual.transforms.configure(canvas=self, viewport=vp)
+
+
+    # Inside your main QWidget or QMainWindow class:
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Delay the Vispy redraw by 10ms so the layout can settle
+        QTimer.singleShot(10, self.vispy_canvas.update)
+
 
 
     def on_slider_value_changed(self, value: int):
