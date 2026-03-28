@@ -371,6 +371,16 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         num_epoch_time_bins_for_raster: Optional[int] = None
         if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
             num_epoch_time_bins_for_raster = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
+        raster_time_bin_edges: Optional[np.ndarray] = None
+        if time_bin_edges is not None:
+            te = np.asarray(time_bin_edges, dtype=np.float64).ravel()
+            if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
+                k_vis = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
+                if te.size >= k_vis + 1:
+                    raster_time_bin_edges = te[: k_vis + 1].astype(np.float32, copy=False)
+            elif te.size >= 2:
+                raster_time_bin_edges = te.astype(np.float32, copy=False)
+        num_bins_for_raster_lines: Optional[int] = None if raster_time_bin_edges is not None else num_epoch_time_bins_for_raster
         # new_all_aclus_sort_indicies = None
         # pen = {'color': 'white', 'width': 1}
         # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
@@ -383,7 +393,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                                             # unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, 
                                                             scatter_plot_kwargs=override_scatter_plot_kwargs,
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
-                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black', num_epoch_time_bins=num_epoch_time_bins_for_raster)
+                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black', time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines)
 
 
     return _update_dict

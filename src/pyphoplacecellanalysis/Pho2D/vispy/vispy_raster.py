@@ -125,11 +125,11 @@ def _unit_grid_line_visual(x0: float, x1: float, n_cells: int, parent: Node) -> 
     pos[1::2, 1] = ys
     connect = np.arange(nseg * 2, dtype=np.uint32).reshape(nseg, 2)
     line = vz.Line(pos=pos, connect=connect, color=(0.53, 0.53, 0.53, 0.55), width=1.0, method='gl', parent=parent)  # type: ignore[call-arg]
-    line.order = -50
+    line.order = -55
     return line
 
 
-def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, parent: Node, *, rgba: Tuple[float, float, float, float] = (0.82, 0.82, 0.88, 0.2), line_width: float = 1.0) -> Optional[vz.Line]:
+def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, parent: Node, *, rgba: Tuple[float, float, float, float] = (0.92, 0.92, 0.98, 0.6), line_width: float = 1.0) -> Optional[vz.Line]:
     """Low-alpha vertical lines at decoded time-bin edges (world time on x); behind unit grid (order -50) and spikes (order 5)."""
     t_arr = np.asarray(edge_times, dtype=np.float32).ravel()
     if t_arr.size < 2:
@@ -142,7 +142,7 @@ def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, 
     pos[1::2, 1] = float(y1)
     connect = np.arange(n * 2, dtype=np.uint32).reshape(n, 2)
     line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
-    line.order = -55
+    line.order = -50
     return line
 
 
@@ -157,14 +157,15 @@ def _marker_style_from_pg_kwargs(pg_kw: Dict[str, Any], *, fallback_size: float 
 
 
 @function_attributes(short_name=None, tags=['vispy', 'raster', '2D', 'gpu'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_build_scatter_plotting_managers', 'Render2DScrollWindowPlotMixin'], used_by=[], creation_date='2026-03-28', related_items=['plot_multiple_raster_plot'])
-def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', time_bin_raster_view: Any = None, clear_host_scene: bool = True, num_epoch_time_bins: Optional[int] = None, **kwargs) -> VispyMultiRasterPlotTuple:
+def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', time_bin_raster_view: Any = None, clear_host_scene: bool = True, time_bin_edges: Optional[np.ndarray] = None, num_epoch_time_bins: Optional[int] = None, **kwargs) -> VispyMultiRasterPlotTuple:
     """Multi-row spike rasters in one `SceneCanvas` (one view per epoch), or embedded into an existing `ViewBox` via `time_bin_raster_view`. Same data arguments as `plot_multiple_raster_plot`.
 
     Returns `VispyMultiRasterPlotTuple(canvas, plots, plots_data)`:
     - `plots.views` / `plots.raster_visuals` / `plots.grid_lines` / `plots.time_bin_edge_lines` are dicts keyed by epoch index (``an_epoch.Index``).
     - When `time_bin_raster_view` is set, `plots.grid` is ``None``, every `plots.views[k]` is that host view, and `canvas` is the host view's canvas.
     - `active_context` is accepted for API parity with the PyQtGraph helper (stored on `plots_data` when provided).
-    - Optional `num_epoch_time_bins` draws faint vertical lines at bin edges in each epoch's [start, stop] interval (aligned with the time-bin row when counts match).
+    - Optional `time_bin_edges` (absolute times, same axis as spikes) draws faint vertical guides at those edges; when set it overrides `num_epoch_time_bins` for line placement.
+    - Optional `num_epoch_time_bins` otherwise uses `linspace` across each epoch's [start, stop] (aligned with the time-bin row when counts match).
 
     Usage:
 
@@ -288,11 +289,17 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
             grid_lines[an_epoch.Index] = _unit_grid_line_visual(x0, x1, n_cells, scene_parent)
         else:
             grid_lines[an_epoch.Index] = None
-        if num_epoch_time_bins is not None and int(num_epoch_time_bins) > 0:
+        y_hi = max(float(n_cells - 1), 1.0)
+        edges_vis: Optional[np.ndarray] = None
+        if time_bin_edges is not None:
+            te = np.asarray(time_bin_edges, dtype=np.float32).ravel()
+            if te.size >= 2:
+                edges_vis = te
+        if edges_vis is None and num_epoch_time_bins is not None and int(num_epoch_time_bins) > 0:
             n_tb = int(num_epoch_time_bins)
-            edges = np.linspace(x0, x1, n_tb + 1, dtype=np.float32)
-            y_hi = max(float(n_cells - 1), 1.0)
-            time_bin_edge_lines[an_epoch.Index] = _time_bin_edge_vertical_lines(edges, 0.0, y_hi, scene_parent)
+            edges_vis = np.linspace(x0, x1, n_tb + 1, dtype=np.float32)
+        if edges_vis is not None:
+            time_bin_edge_lines[an_epoch.Index] = _time_bin_edge_vertical_lines(edges_vis, 0.0, y_hi, scene_parent)
         else:
             time_bin_edge_lines[an_epoch.Index] = None
     ## END for an_epoch in filter_epochs_df.itertuples()...

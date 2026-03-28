@@ -764,9 +764,9 @@ class PredictiveDecodingVispyWidget:
         if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
             curr_matching: MatchingPastFuturePositionsResult = self.epoch_flat_mask_future_past_result[new_epoch_idx]
             single_epoch_decoded = curr_matching.decoded_epoch_result
-            if single_epoch_decoded:
+            if single_epoch_decoded is not None:
                 time_bin_edges = single_epoch_decoded.time_bin_edges
-                if time_bin_edges:
+                if time_bin_edges is not None and np.size(time_bin_edges) >= 2:
                     _raster_kwargs['time_bin_edges'] = time_bin_edges
                 
             # epochs_t_centers: NDArray = np.hstack([t.centers for t in single_epoch_decoded.time_bin_containers]) # np.shape(epochs_t_centers) # (19018,)
