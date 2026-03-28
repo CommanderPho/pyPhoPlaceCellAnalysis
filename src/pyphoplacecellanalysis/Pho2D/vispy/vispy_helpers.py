@@ -625,6 +625,10 @@ class VispyHelpers:
 
         line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
         line.set_gl_state('translucent', depth_test=False)
+        arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=24)
+        if arr is not None:
+            arr.set_gl_state('translucent', depth_test=False)
+        
 
 
         """
@@ -645,6 +649,138 @@ class VispyHelpers:
         # line = AngleColoredLineVisual(pos=pos, color=vertex_colors, method='gl')
         line.order = order
         return line, data_dict
+
+
+    @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'arrows'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-28', related_items=[])
+    @classmethod
+    def create_heading_rainbow_arrows_along_line(cls, data_dict: Optional[Dict[str, Any]] = None, pos: Optional[NDArray] = None, vertex_colors: Optional[NDArray] = None, parent: Optional[Node] = None, spacing: Optional[float] = None, n_arrows: Optional[int] = None,
+             arrow_length: Optional[float] = None, arrow_size: Optional[float] = None, arrow_type: str = 'triangle_30', width: float = 2.0, method: str = 'gl', order: int = 11, alpha: Optional[float] = None, end_margin_frac: float = 0.02, name: str = 'heading_rainbow_arrows') -> Tuple[Optional[Any], Dict[str, Any]]:
+        """Overlay batched triangular arrows along the same polyline as :meth:`create_heading_rainbow_line`, with per-arrow RGBA interpolated from ``vertex_colors`` and tangents along the path.
+
+        line, dd = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
+        arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=dd, parent=scene_parent, n_arrows=24)
+        if arr is not None:
+            arr.set_gl_state('translucent', depth_test=False)
+
+        If both ``spacing`` and ``n_arrows`` are set, ``spacing`` is used. If both are omitted, ``n_arrows`` defaults to ``max(2, min(48, max(1, N - 1)))`` for ``N`` vertices. Returns ``(None, info)`` when the path is too short or no sample points fit inside the end margins.
+
+        """
+        if data_dict is not None:
+            pos_arr = np.asarray(data_dict['pos'], dtype=np.float32)
+            vcolors = np.asarray(data_dict['vertex_colors'], dtype=np.float32)
+        elif pos is not None:
+            pos_arr = np.asarray(pos, dtype=np.float32)
+            if pos_arr.ndim == 1:
+                pos_arr = pos_arr.reshape(-1, 2)
+            if vertex_colors is None:
+                vcolors = HeadingAngleHelpers._positions_to_vertex_colors(pos_arr)
+            else:
+                vcolors = np.asarray(vertex_colors, dtype=np.float32)
+        else:
+            return None, {'reason': 'missing_data', 'detail': 'Provide data_dict or pos'}
+
+        if pos_arr.ndim == 1:
+            pos_arr = pos_arr.reshape(-1, 2)
+        n_points = int(pos_arr.shape[0])
+        if n_points < 2:
+            return None, {'reason': 'insufficient_points', 'n_points': n_points}
+        if vcolors.shape[0] != n_points or vcolors.shape[1] != 4:
+            return None, {'reason': 'vertex_colors_shape_mismatch', 'expected': (n_points, 4), 'got': tuple(int(x) for x in vcolors.shape)}
+
+        if alpha is not None:
+            vcolors = np.array(vcolors, dtype=np.float32, copy=True)
+            vcolors[:, 3] = np.clip(vcolors[:, 3] * float(alpha), 0.0, 1.0)
+
+        seg = np.diff(pos_arr.astype(np.float64), axis=0)
+        seg_lens = np.linalg.norm(seg, axis=1)
+        total_len = float(np.sum(seg_lens))
+        if total_len <= 1e-12:
+            return None, {'reason': 'zero_length', 'total_len': total_len}
+
+        cum = np.concatenate([[0.0], np.cumsum(seg_lens)])
+        margin = float(end_margin_frac) * total_len
+        lo, hi = margin, total_len - margin
+        if hi <= lo + 1e-9:
+            return None, {'reason': 'path_too_short_for_margin', 'total_len': total_len, 'margin': margin}
+
+        if spacing is not None and float(spacing) > 0.0:
+            sp = float(spacing)
+            sample_distances = np.arange(lo + 0.5 * sp, hi, sp, dtype=np.float64)
+        elif n_arrows is not None and int(n_arrows) > 0:
+            na = int(n_arrows)
+            sample_distances = np.linspace(lo, hi, na + 2, dtype=np.float64)[1:-1]
+        else:
+            na_default = max(2, min(48, max(1, n_points - 1)))
+            sample_distances = np.linspace(lo, hi, na_default + 2, dtype=np.float64)[1:-1]
+
+        sample_distances = np.asarray(sample_distances, dtype=np.float64)
+        if sample_distances.size == 0:
+            return None, {'reason': 'no_samples', 'lo': lo, 'hi': hi}
+
+        xmin, xmax = float(np.nanmin(pos_arr[:, 0])), float(np.nanmax(pos_arr[:, 0]))
+        ymin, ymax = float(np.nanmin(pos_arr[:, 1])), float(np.nanmax(pos_arr[:, 1]))
+        data_scale = float(np.hypot(max(xmax - xmin, 1e-12), max(ymax - ymin, 1e-12)))
+        if arrow_length is None:
+            arrow_length_f = min(0.03 * data_scale, 0.15 * total_len)
+        else:
+            arrow_length_f = float(arrow_length)
+        if arrow_size is None:
+            arrow_size_f = 0.05 * data_scale
+        else:
+            arrow_size_f = float(arrow_size)
+
+        pos64 = pos_arr.astype(np.float64)
+        v64 = vcolors.astype(np.float64)
+        seg64 = seg
+        eps = 1e-12
+        n_seg = n_points - 1
+        centers: list[np.ndarray] = []
+        tangents: list[np.ndarray] = []
+        rgba_centers: list[np.ndarray] = []
+        for s in sample_distances:
+            if s <= cum[0] + eps:
+                i = 0
+                t = 0.0
+            elif s >= cum[-1] - eps:
+                i = n_seg - 1
+                t = 1.0
+            else:
+                i = int(np.searchsorted(cum, s, side='right') - 1)
+                i = max(0, min(i, n_seg - 1))
+                denom = max(float(seg_lens[i]), eps)
+                t = float(np.clip((s - cum[i]) / denom, 0.0, 1.0))
+            xy = (1.0 - t) * pos64[i] + t * pos64[i + 1]
+            c = (1.0 - t) * v64[i] + t * v64[i + 1]
+            seg_vec = seg64[i]
+            slen = float(np.linalg.norm(seg_vec))
+            if slen < eps:
+                tan = np.array([1.0, 0.0], dtype=np.float64)
+            else:
+                tan = seg_vec / slen
+            centers.append(xy)
+            tangents.append(tan)
+            rgba_centers.append(c)
+
+        centers_a = np.asarray(centers, dtype=np.float64)
+        tangents_a = np.asarray(tangents, dtype=np.float64)
+        rgba_c = np.asarray(rgba_centers, dtype=np.float32)
+        half = 0.5 * arrow_length_f
+        starts = centers_a - half * tangents_a
+        ends = centers_a + half * tangents_a
+        n_arr = int(centers_a.shape[0])
+        pos_batch = np.empty((2 * n_arr, 2), dtype=np.float32)
+        pos_batch[0::2] = starts.astype(np.float32)
+        pos_batch[1::2] = ends.astype(np.float32)
+        arrows_batch = np.hstack([starts, ends]).astype(np.float32)
+        vertex_point_color = np.empty((2 * n_arr, 4), dtype=np.float32)
+        vertex_point_color[0::2] = rgba_c
+        vertex_point_color[1::2] = rgba_c
+        arrow_color = rgba_c
+        arrow = vz.Arrow(pos=pos_batch, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=vertex_point_color, width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
+        arrow.order = order
+        eff_spacing = float(np.mean(np.diff(sample_distances))) if int(sample_distances.size) >= 2 else float(hi - lo)
+        info_dict: Dict[str, Any] = dict(n_arrows=n_arr, spacing_used=eff_spacing, sample_distances=sample_distances, sample_centers=centers_a.astype(np.float32), arrow_length=arrow_length_f, arrow_size=arrow_size_f, total_length=total_len, data_scale=data_scale)
+        return arrow, info_dict
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -905,8 +1041,15 @@ if __name__ == '__main__':
         view.camera = 'panzoom'
         scene_parent = view.scene
         if scene_parent is not None:
-            line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=3.0, order=10)
+            line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
             line.set_gl_state('translucent', depth_test=False)
+            arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+            # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=20.0, alpha=0.8, arrow_type='stealth', method='agg')
+
+
+            if arr is not None:
+                arr.set_gl_state('translucent', depth_test=False)
+
         app.run()
 
 
