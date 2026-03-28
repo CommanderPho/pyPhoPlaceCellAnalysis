@@ -613,8 +613,42 @@ class VispyHelpers:
         overlay_text._viewport_overlay_update_position = _update_overlay_text_position
         overlay_text._viewport_overlay_disconnect = _disconnect_overlay_resize_handler
         return overlay_text
-    
 
+
+    @classmethod
+    def create_viewport_heading_compass_legend(cls, canvas: scene.SceneCanvas, margin: Tuple[float, float] = (18.0, 18.0), size_frac: float = 0.11, line_width: float = 2.0, line_points: int = 20, order: int = 10_000, parent: Optional[Node] = None, **rose_kwargs: Any) -> Any:
+        """Place a :class:`~pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle.HeadingCompassRoseVisual` in the bottom-right of the canvas in pixel space (parent ``canvas.scene``), matching heading colors used by :meth:`create_heading_rainbow_line`; pan/zoom on subplot views does not move the legend."""
+        from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingCompassRoseVisual
+        overlay_parent = canvas.scene if parent is None else parent
+        rose = HeadingCompassRoseVisual(parent=overlay_parent, line_width=line_width, line_points=line_points, **rose_kwargs)
+        rose.order = order
+        rose.line.order = order
+        if getattr(rose, 'labels', None) is not None:
+            rose.labels.order = order
+        rose.line.set_gl_state('translucent', depth_test=False)
+        _local_extent = float(rose_kwargs.get('label_pad', 0.12)) + float(rose_kwargs.get('major_length', 1.0)) + 0.03
+
+        def _update_compass_position(event: Any = None) -> None:
+            width_f, height_f = float(canvas.size[0]), float(canvas.size[1])
+            margin_x, margin_y = float(margin[0]), float(margin[1])
+            scale = float(size_frac) * max(8.0, min(width_f, height_f))
+            half = _local_extent * scale
+            cx = width_f - margin_x - half
+            cy = margin_y + half
+            rose.transform = STTransform(scale=(scale, scale), translate=(cx, cy))
+
+        def _disconnect_viewport_compass_handler() -> None:
+            try:
+                canvas.events.resize.disconnect(_update_compass_position)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+        canvas.events.resize.connect(_update_compass_position)  # type: ignore[attr-defined]
+        _update_compass_position()
+        setattr(rose, '_viewport_compass_update_position', _update_compass_position)
+        setattr(rose, '_viewport_compass_disconnect', _disconnect_viewport_compass_handler)
+        return rose
+    
 
     @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
     @classmethod
@@ -655,14 +689,16 @@ class VispyHelpers:
     @classmethod
     def create_heading_rainbow_arrows_along_line(cls, data_dict: Optional[Dict[str, Any]] = None, pos: Optional[NDArray] = None, vertex_colors: Optional[NDArray] = None, parent: Optional[Node] = None, spacing: Optional[float] = None, n_arrows: Optional[int] = None,
              arrow_length: Optional[float] = None, arrow_size: Optional[float] = None, arrow_type: str = 'triangle_30', width: float = 2.0, method: str = 'gl', order: int = 11, alpha: Optional[float] = None, end_margin_frac: float = 0.02, name: str = 'heading_rainbow_arrows') -> Tuple[Optional[Any], Dict[str, Any]]:
-        """Overlay batched triangular arrows along the same polyline as :meth:`create_heading_rainbow_line`, with per-arrow RGBA interpolated from ``vertex_colors`` and tangents along the path.
+        """Overlay batched arrow heads (no line shafts) along the same polyline as :meth:`create_heading_rainbow_line`, with per-head RGBA interpolated from ``vertex_colors`` and tangents along the path.
+
+        VisPy's :class:`~vispy.scene.visuals.Arrow` draws the shaft from ``pos`` and heads from ``arrows``; this helper uses empty ``pos`` so only heads are visible.
 
         line, dd = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
         arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=dd, parent=scene_parent, n_arrows=24)
         if arr is not None:
             arr.set_gl_state('translucent', depth_test=False)
 
-        If both ``spacing`` and ``n_arrows`` are set, ``spacing`` is used. If both are omitted, ``n_arrows`` defaults to ``max(2, min(48, max(1, N - 1)))`` for ``N`` vertices. Returns ``(None, info)`` when the path is too short or no sample points fit inside the end margins.
+        If both ``spacing`` and ``n_arrows`` are set, ``spacing`` is used. If both are omitted, ``n_arrows`` defaults to ``max(2, min(48, max(1, N - 1)))`` for ``N`` vertices. Returns ``(None, info)`` when the path is too short or no sample points fit inside the end margins. ``arrow_length`` only affects ``info`` / scaling hints, not the visual (heads use ``arrow_size``).
 
         """
         if data_dict is not None:
@@ -764,19 +800,13 @@ class VispyHelpers:
         centers_a = np.asarray(centers, dtype=np.float64)
         tangents_a = np.asarray(tangents, dtype=np.float64)
         rgba_c = np.asarray(rgba_centers, dtype=np.float32)
-        half = 0.5 * arrow_length_f
-        starts = centers_a - half * tangents_a
-        ends = centers_a + half * tangents_a
         n_arr = int(centers_a.shape[0])
-        pos_batch = np.empty((2 * n_arr, 2), dtype=np.float32)
-        pos_batch[0::2] = starts.astype(np.float32)
-        pos_batch[1::2] = ends.astype(np.float32)
-        arrows_batch = np.hstack([starts, ends]).astype(np.float32)
-        vertex_point_color = np.empty((2 * n_arr, 4), dtype=np.float32)
-        vertex_point_color[0::2] = rgba_c
-        vertex_point_color[1::2] = rgba_c
+        orient_eps = max(1e-9, 1e-7 * data_scale)
+        v_tail = centers_a - orient_eps * tangents_a
+        arrows_batch = np.hstack([v_tail, centers_a]).astype(np.float32)
+        pos_empty = np.zeros((0, 2), dtype=np.float32)
         arrow_color = rgba_c
-        arrow = vz.Arrow(pos=pos_batch, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=vertex_point_color, width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
+        arrow = vz.Arrow(pos=pos_empty, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=(1.0, 1.0, 1.0, 0.0), width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
         arrow.order = order
         eff_spacing = float(np.mean(np.diff(sample_distances))) if int(sample_distances.size) >= 2 else float(hi - lo)
         info_dict: Dict[str, Any] = dict(n_arrows=n_arr, spacing_used=eff_spacing, sample_distances=sample_distances, sample_centers=centers_a.astype(np.float32), arrow_length=arrow_length_f, arrow_size=arrow_size_f, total_length=total_len, data_scale=data_scale)
@@ -1032,6 +1062,7 @@ if __name__ == '__main__':
     def example_heading_rainbow_line():
         """Example: draw a path colored by heading (0°=red, ROYGBIV, 359°=violet). Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_heading_rainbow_line; example_heading_rainbow_line()\"."""
         from vispy import app
+
         t = np.linspace(0, 4 * np.pi, 200)
         x = 0.3 * t * np.cos(t)
         y = 0.3 * t * np.sin(t)
@@ -1043,12 +1074,14 @@ if __name__ == '__main__':
         if scene_parent is not None:
             line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
             line.set_gl_state('translucent', depth_test=False)
-            arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+            # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+            arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=7, width=5.0, arrow_size=5.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+
             # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=20.0, alpha=0.8, arrow_type='stealth', method='agg')
-
-
             if arr is not None:
                 arr.set_gl_state('translucent', depth_test=False)
+
+        VispyHelpers.create_viewport_heading_compass_legend(canvas=canvas, margin=(18.0, 18.0), size_frac=0.11)
 
         app.run()
 

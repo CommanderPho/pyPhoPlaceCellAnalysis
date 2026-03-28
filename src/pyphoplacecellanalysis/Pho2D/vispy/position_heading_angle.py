@@ -18,7 +18,7 @@ from vispy.visuals.transforms import STTransform
 
 from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
 
-
+# Compass Legend Helpers
 class HeadingCompassRoseVisual(scene.Node):
     """Heading-colored compass rose as a scene Node; geometry is in local space — set ``transform`` (e.g. STTransform) to place and scale on any ViewBox scene.
 
@@ -92,6 +92,44 @@ class HeadingCompassRoseVisual(scene.Node):
         self._compass_deg = compass_deg
         self._colors = colors
 
+class CompassLegendItem:
+    """ from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import CompassLegendItem, HeadingCompassRoseVisual, CompassDemo
+    
+    """
+    def __init__(self, view: scene.ViewBox, center=np.array([0.0, 0.0]), length=0.6, line_points: int = 20, line_width=2.0, **kwargs):
+        self._rose = HeadingCompassRoseVisual(parent=view.scene, line_width=line_width, line_points=line_points)
+        st = STTransform(scale=(float(length), float(length)), translate=(float(center[0]), float(center[1])))
+        self._rose.transform = st
+        self.line = self._rose.line
+        world_pos = st.map(self._rose._local_positions)[:, :2].astype(np.float32)
+        self._data_dict = dict(pos=world_pos, tangents=self._rose._tangents, angle_deg=self._rose._angle_deg, compass_deg=self._rose._compass_deg, colors=self._rose._colors)
+
+
+
+class CompassDemo(scene.SceneCanvas):
+    """
+    Demonstrates the heading-to-color mapping with lines pointing in cardinal directions
+    """
+    def __init__(self, **kwargs):
+        scene.SceneCanvas.__init__(self, keys='interactive', size=(800, 800), **kwargs)
+        self.unfreeze()
+        self._view = self.central_widget.add_view(camera='panzoom')
+        self._view.camera.aspect = 1
+        self._rose = HeadingCompassRoseVisual(parent=self._view.scene, line_width=5.0)
+        self._rose.transform = STTransform(scale=(0.6, 0.6))
+        self._line = self._rose.line
+        self._view.camera.set_range(x=(-1, 1), y=(-1, 1))
+        self.show()
+        print("\nCompass Rose Color Mapping:")
+        print("North (↑, 0°): Red")
+        print("Northeast (↗, 45°): Orange/Yellow")
+        print("East (→, 90°): Cyan")
+        print("Southeast (↘, 135°): Blue")
+        print("South (↓, 180°): Green")
+        print("Southwest (↙, 225°): Yellow-Green")
+        print("West (←, 270°): Magenta")
+        print("Northwest (↖, 315°): Red-Magenta")
+
 
 # class AngularrColoredLine(scene.visuals.Line):
 #     def __init__(self, **kwargs):
@@ -155,45 +193,6 @@ class HeadingColoredLine(scene.SceneCanvas):
         self.show()
 
 
-
-class CompassLegendItem:
-    """ from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import CompassLegendItem
-    
-    """
-    def __init__(self, view: scene.ViewBox, center=np.array([0.0, 0.0]), length=0.6, line_points: int = 20, line_width=2.0, **kwargs):
-        self._rose = HeadingCompassRoseVisual(parent=view.scene, line_width=line_width, line_points=line_points)
-        st = STTransform(scale=(float(length), float(length)), translate=(float(center[0]), float(center[1])))
-        self._rose.transform = st
-        self.line = self._rose.line
-        world_pos = st.map(self._rose._local_positions)[:, :2].astype(np.float32)
-        self._data_dict = dict(pos=world_pos, tangents=self._rose._tangents, angle_deg=self._rose._angle_deg, compass_deg=self._rose._compass_deg, colors=self._rose._colors)
-
-
-        
-    
-class CompassDemo(scene.SceneCanvas):
-    """
-    Demonstrates the heading-to-color mapping with lines pointing in cardinal directions
-    """
-    def __init__(self, **kwargs):
-        scene.SceneCanvas.__init__(self, keys='interactive', size=(800, 800), **kwargs)
-        self.unfreeze()
-        self._view = self.central_widget.add_view(camera='panzoom')
-        self._view.camera.aspect = 1
-        self._rose = HeadingCompassRoseVisual(parent=self._view.scene, line_width=5.0)
-        self._rose.transform = STTransform(scale=(0.6, 0.6))
-        self._line = self._rose.line
-        self._view.camera.set_range(x=(-1, 1), y=(-1, 1))
-        self.show()
-        print("\nCompass Rose Color Mapping:")
-        print("North (↑, 0°): Red")
-        print("Northeast (↗, 45°): Orange/Yellow")
-        print("East (→, 90°): Cyan")
-        print("Southeast (↘, 135°): Blue")
-        print("South (↓, 180°): Green")
-        print("Southwest (↙, 225°): Yellow-Green")
-        print("West (←, 270°): Magenta")
-        print("Northwest (↖, 315°): Red-Magenta")
 
 
 class InteractiveHeadingLine(scene.SceneCanvas):
