@@ -19,7 +19,7 @@ import vispy.scene.visuals as vz
 
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import ContourItem, contours_from_masks, create_contour_line_visuals
-
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_raster import VispyRasterVisual, plot_multiple_raster_plot_vispy, VispyMultiRasterPlotTuple
 
 def _time_bin_colors(n_bins: int, alpha: float = 0.9) -> np.ndarray:
     """Return (n_bins, 4) float32 array of RGBA colors for time bins (hue cycled)."""
@@ -31,7 +31,11 @@ def _time_bin_colors(n_bins: int, alpha: float = 0.9) -> np.ndarray:
     return out
 
 
-def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int, epoch_start_t: Optional[float], epoch_end_t: Optional[float], *, epoch_flat_mask_future_past_result: Optional[List[Any]] = None, curr_position_df: Optional[pd.DataFrame] = None, current_traj_seconds_pre_post_extension: float = 0.75, num_epochs: int = 1, max_time_bins_to_show: int = 12, fallback_mask_2d_for_shape: Optional[np.ndarray] = None, use_new_centroid_arrows: bool = True, use_single_arrows_object: bool = False, _update_dict: Optional[Dict[str, Any]] = None, needs_clear_owned_views: bool = True) -> Dict[str, Any]:
+def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int, epoch_start_t: Optional[float], epoch_end_t: Optional[float], *, epoch_flat_mask_future_past_result: Optional[List[Any]] = None,
+                            curr_position_df: Optional[pd.DataFrame] = None, current_traj_seconds_pre_post_extension: float = 0.75, num_epochs: int = 1, max_time_bins_to_show: int = 12, fallback_mask_2d_for_shape: Optional[np.ndarray] = None,
+                            use_new_centroid_arrows: bool = True, use_single_arrows_object: bool = False, _update_dict: Optional[Dict[str, Any]] = None, needs_clear_owned_views: bool = True,
+                            actIve_filter_epochs_spikes_df: Optional[pd.DataFrame]=None, active_epochs_df: Optional[pd.DataFrame] = None, active_aclus: Optional[NDArray]=None,
+                        ) -> Dict[str, Any]:
     """Update the center view with posteriors, time bins, centroid dots/arrows, current position line, and contours.
 
     _update_dict must contain the vispy views and mutable lists (e.g. posterior_2d_view, time_bin_grid, past_view,
@@ -349,5 +353,28 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
             for (a_name, (a_view, a_cont_list)) in zip(list_names, active_posterior_contours_dict_list):
                 if (a_view is not None) and (a_cont_list is not None):
                     _update_dict[a_name] = a_cont_list
+
+
+    time_bin_raster = _update_dict.get('time_bin_raster', None)
+    can_plot_raster: bool = (active_epochs_df is not None) and (active_aclus is not None) and (actIve_filter_epochs_spikes_df is not None) and (time_bin_raster is not None)
+    if can_plot_raster:
+        new_all_aclus_sort_indicies = None
+        defer_show = False
+        save_figure = False
+
+        # pen = {'color': 'white', 'width': 1}
+        # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
+        override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=6, pen=None) ## mid
+        # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=10, pen=None) ## big
+        # override_scatter_plot_kwargs = dict(pxMode=True, symbol='vbar', size=0.001, pen=None)
+
+        # time_bin_raster
+        _out_vispy_raster: VispyMultiRasterPlotTuple = plot_multiple_raster_plot_vispy(filter_epochs_df=active_epochs_df, spikes_df=actIve_filter_epochs_spikes_df,
+                                                            included_neuron_ids=active_aclus,
+                                                            # unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, 
+                                                            scatter_plot_kwargs=override_scatter_plot_kwargs,
+                                            epoch_id_key_name='replay_epoch_id', scatter_app_name=f"{a_track_name} Decoded Example Replays", defer_show=defer_show,
+                                            active_context=curr_active_pipeline.build_display_context_for_session('plot_multiple_raster_plot', fig=1, track=a_track_name, epoch='example_replays'))
+
 
     return _update_dict

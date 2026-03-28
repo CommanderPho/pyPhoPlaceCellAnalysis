@@ -142,12 +142,14 @@ class PredictiveDecodingVispyWidget:
     # UI / vispy (created in buildUI)
     canvas: Any = field(default=None)
     main_window: Any = field(default=None)
-    grid: Any = field(default=None)
+    grid: vispy.scene.widgets.grid.Grid = field(default=None)
     past_view: Any = field(default=None)
     posterior_2d_view: Any = field(default=None)
     future_view: Any = field(default=None)
-    time_bin_grid: Any = field(default=None)
+    time_bin_grid: vispy.scene.widgets.grid.Grid = field(default=None)
     time_bin_views: List[Any] = field(default=Factory(list))
+    time_bin_raster: Any = field(default=None)
+
     combined_timeline_view: Any = field(default=None)
     colorbar_view: Any = field(default=None)
     epoch_slider: Any = field(default=None)
@@ -352,12 +354,21 @@ class PredictiveDecodingVispyWidget:
     
             self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
             
-            self.time_bin_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=1, col=1, col_span=1, border_color='gray')
+            curr_row: int = 1
+            self.time_bin_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=curr_row, col=1, col_span=1, border_color='gray')
             self.time_bin_grid.height_max = 120
-            
-            self.combined_timeline_view = grid.add_view(row=2, col=0, col_span=3, border_color='gray')
+            curr_row = curr_row + 1
+
+            ## add raster
+            self.time_bin_raster = grid.add_view(row=curr_row, col=1, col_span=1, border_color='gray')
+            self.time_bin_raster.height_max = 120
+            curr_row = curr_row + 1
+
+            self.combined_timeline_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray')
             self.combined_timeline_view.height_max = 40
-            self.colorbar_view = grid.add_view(row=3, col=0, col_span=3, border_color='gray')
+            curr_row = curr_row + 1
+
+            self.colorbar_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray') # curr_row: 3
             self.colorbar_view.height_max = 60
 
 
@@ -421,7 +432,7 @@ class PredictiveDecodingVispyWidget:
             # self.posterior_2d_container_view_grid = grid.add_view(row=0, col=0, col_span=1, border_color='gray')
             for idx, epoch_data in enumerate(epoch_data_list):
                 ## make a new local only temp container dict
-                a_multi_epoch_overview_container = {'a_posterior_2d_container_view_grid': None, 'a_posterior_2d_view': None, 'a_time_bin_grid': None, 'an_update_dict': {}} #[]
+                a_multi_epoch_overview_container = {'a_posterior_2d_container_view_grid': None, 'a_posterior_2d_view': None, 'a_time_bin_grid': None, 'a_time_bin_raster': None, 'an_update_dict': {}} #[]
                 
                 if idx >= self.MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER:
                     # print(f'MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER: {MAX_NUM_OVERVIEW_EPOCHS_TO_RENDER}')
@@ -456,12 +467,22 @@ class PredictiveDecodingVispyWidget:
                 a_posterior_2d_container_view_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=idx, col=0, col_span=(1+n_time_bins), border_color='white') ## holds the epoch's two views
                 a_posterior_2d_view = a_posterior_2d_container_view_grid.add_view(row=0, col=0, col_span=1, border_color='gray')
                 a_posterior_2d_view.height_max = row_max_height
-                a_time_bin_grid: vispy.scene.widgets.grid.Grid = a_posterior_2d_container_view_grid.add_grid(row=0, col=1, col_span=n_time_bins, border_color='gray')
+                curr_row: int = 0
+
+                a_time_bin_grid: vispy.scene.widgets.grid.Grid = a_posterior_2d_container_view_grid.add_grid(row=curr_row, col=1, col_span=n_time_bins, border_color='gray') # curr_row: 0
                 a_time_bin_grid.height_max = row_max_height
+                curr_row = curr_row + 1
+                a_time_bin_raster = a_posterior_2d_container_view_grid.add_view(row=curr_row, col=1, col_span=n_time_bins, border_color='gray')
+                a_time_bin_raster.height_max = 120
+                curr_row = curr_row + 1
+
+
+
                 a_posterior_2d_container_view_grid.height_max = row_max_height
-                a_multi_epoch_overview_container['a_posterior_2d_container_view_grid'] =a_posterior_2d_container_view_grid
+                a_multi_epoch_overview_container['a_posterior_2d_container_view_grid'] = a_posterior_2d_container_view_grid
                 a_multi_epoch_overview_container['a_posterior_2d_view'] = a_posterior_2d_view
                 a_multi_epoch_overview_container['a_time_bin_grid'] = a_time_bin_grid
+                a_multi_epoch_overview_container['a_time_bin_raster'] = a_time_bin_raster
 
                 _common_render_kwargs = dict(time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=idx)
                 
@@ -491,7 +512,7 @@ class PredictiveDecodingVispyWidget:
                     # time_bin_views=a_time_bin_grid, #self.multi_epoch_overview_container['a_time_bin_grid'],
                     # time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
                     # past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,  
-                    posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid,
+                    posterior_2d_view=a_posterior_2d_view, time_bin_grid=a_time_bin_grid, time_bin_raster=a_time_bin_raster,
                     # past_view=None, future_view=None,
                     # past_mask_contours=[], posterior_mask_contours=[], future_mask_contours=[],
                 )
@@ -721,8 +742,31 @@ class PredictiveDecodingVispyWidget:
             mask_2d = self.a_flat_matching_results_list_ds.epoch_high_prob_pos_masks[new_epoch_idx]
             if mask_2d is not None and getattr(mask_2d, 'size', 0) > 0:
                 fallback_mask_2d_for_shape = mask_2d
-        return render_predictive_decoding_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d, time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=new_epoch_idx, epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t, epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result, curr_position_df=self.curr_position_df, current_traj_seconds_pre_post_extension=self.current_traj_seconds_pre_post_extension, num_epochs=self.num_epochs, max_time_bins_to_show=self.max_time_bins_to_show, fallback_mask_2d_for_shape=fallback_mask_2d_for_shape, use_new_centroid_arrows=use_new_centroid_arrows, use_single_arrows_object=use_single_arrows_object, _update_dict=_update_dict, needs_clear_owned_views=needs_clear_owned_views)
 
+        ## Raster:
+        pf_decoder = kwargs.pop('pf_decoder', self.pf_decoder)
+        active_aclus = np.array(pf_decoder.ratemap.neuron_ids)
+        n_active_aclus: int = len(active_aclus)
+        print(f'n_active_aclus: {n_active_aclus}')
+
+        # unit_colors_list = None # default rainbow of colors for the raster plots
+        neuron_qcolors_list = [pg.mkColor('black') for aclu in active_aclus] # solid green for all
+        unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
+        if (active_epochs_df is None or getattr(active_epochs_df, 'size', 1) == 0) and hasattr(self.a_flat_matching_results_list_ds, 'filter_epochs') and self.a_flat_matching_results_list_ds is not None and self.a_flat_matching_results_list_ds.filter_epochs is not None and new_epoch_idx < len(self.a_flat_matching_results_list_ds.filter_epochs):
+            # active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs[a_flat_matching_results_list_ds.filter_epochs['original_epoch_idx'] < 3]
+            active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs.iloc[new_epoch_idx]
+        actIve_filter_epochs_spikes_df: pd.DataFrame = pf_decoder.spikes_df
+
+        _raster_kwargs = dict(active_epochs_df=active_epochs_df, active_aclus=active_aclus, actIve_filter_epochs_spikes_df=actIve_filter_epochs_spikes_df, )
+
+        _out = render_predictive_decoding_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d, time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=new_epoch_idx, epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t, epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result,
+            curr_position_df=self.curr_position_df, current_traj_seconds_pre_post_extension=self.current_traj_seconds_pre_post_extension, num_epochs=self.num_epochs, max_time_bins_to_show=self.max_time_bins_to_show, fallback_mask_2d_for_shape=fallback_mask_2d_for_shape,
+            use_new_centroid_arrows=use_new_centroid_arrows, use_single_arrows_object=use_single_arrows_object, _update_dict=_update_dict, needs_clear_owned_views=needs_clear_owned_views,
+            **_raster_kwargs, #active_epochs_df=active_epochs_df, actIve_filter_epochs_spikes_df=actIve_filter_epochs_spikes_df,
+        )
+
+
+        return _out
 
 
     def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int,
@@ -1284,7 +1328,7 @@ class PredictiveDecodingVispyWidget:
                                   _update_dict = dict(
                                         centroid_dots=self.centroid_dots, centroid_arrows=self.centroid_arrows,
                                         current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
-                                        time_bin_views=self.time_bin_views, time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images,
+                                        time_bin_views=self.time_bin_views, time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images, time_bin_raster=self.time_bin_raster,
                                         past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
                                     ),  
         )
@@ -3311,6 +3355,13 @@ class Volumentric2DTimeSeriesPlotter:
 
     def on_resize(self, event):
         print(f'Volumentric2DTimeSeriesPlotter.on_resize(event:(event.size: {event.size})')
+        print(f'\tevent.physical_size: {event.physical_size}')
+        # Tell the OpenGL context the new physical dimensions
+        vp = (0, 0, event.physical_size[0], event.physical_size[1])
+        self.context.set_viewport(*vp)
+        
+        # If you have custom visuals, you may also need to update transforms:
+        # self.visual.transforms.configure(canvas=self, viewport=vp)
         
 
     def on_key_press(self, event):
