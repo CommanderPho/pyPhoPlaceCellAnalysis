@@ -40,7 +40,7 @@ from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 ## NEW: filtering by whether decoded posterior in each t_bin is "position-like"
 from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
 
@@ -759,6 +759,19 @@ class PredictiveDecodingVispyWidget:
         actIve_filter_epochs_spikes_df: pd.DataFrame = pf_decoder.spikes_df
 
         _raster_kwargs = dict(active_epochs_df=active_epochs_df, active_aclus=active_aclus, actIve_filter_epochs_spikes_df=actIve_filter_epochs_spikes_df, )
+
+        single_epoch_decoded: Optional[SingleEpochDecodedResult] = None
+        if self.epoch_flat_mask_future_past_result is not None and new_epoch_idx < len(self.epoch_flat_mask_future_past_result):
+            curr_matching: MatchingPastFuturePositionsResult = self.epoch_flat_mask_future_past_result[new_epoch_idx]
+            single_epoch_decoded = curr_matching.decoded_epoch_result
+            if single_epoch_decoded:
+                time_bin_edges = single_epoch_decoded.time_bin_edges
+                if time_bin_edges:
+                    _raster_kwargs['time_bin_edges'] = time_bin_edges
+                
+            # epochs_t_centers: NDArray = np.hstack([t.centers for t in single_epoch_decoded.time_bin_containers]) # np.shape(epochs_t_centers) # (19018,)
+
+        
 
         _out = render_predictive_decoding_central_view(p_x_given_n=p_x_given_n, posterior_2d=posterior_2d, time_bin_colors=time_bin_colors, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, new_epoch_idx=new_epoch_idx, epoch_start_t=epoch_start_t, epoch_end_t=epoch_end_t, epoch_flat_mask_future_past_result=self.epoch_flat_mask_future_past_result,
             curr_position_df=self.curr_position_df, current_traj_seconds_pre_post_extension=self.current_traj_seconds_pre_post_extension, num_epochs=self.num_epochs, max_time_bins_to_show=self.max_time_bins_to_show, fallback_mask_2d_for_shape=fallback_mask_2d_for_shape,

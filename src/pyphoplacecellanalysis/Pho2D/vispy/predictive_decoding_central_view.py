@@ -34,7 +34,7 @@ def _time_bin_colors(n_bins: int, alpha: float = 0.9) -> np.ndarray:
 def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int, epoch_start_t: Optional[float], epoch_end_t: Optional[float], *, epoch_flat_mask_future_past_result: Optional[List[Any]] = None,
                             curr_position_df: Optional[pd.DataFrame] = None, current_traj_seconds_pre_post_extension: float = 0.75, num_epochs: int = 1, max_time_bins_to_show: int = 12, fallback_mask_2d_for_shape: Optional[np.ndarray] = None,
                             use_new_centroid_arrows: bool = True, use_single_arrows_object: bool = False, _update_dict: Optional[Dict[str, Any]] = None, needs_clear_owned_views: bool = True,
-                            actIve_filter_epochs_spikes_df: Optional[pd.DataFrame]=None, active_epochs_df: Optional[pd.DataFrame] = None, active_aclus: Optional[NDArray]=None,
+                            actIve_filter_epochs_spikes_df: Optional[pd.DataFrame]=None, active_epochs_df: Optional[pd.DataFrame] = None, active_aclus: Optional[NDArray]=None, time_bin_edges: Optional[NDArray]=None,
                         ) -> Dict[str, Any]:
     """Update the center view with posteriors, time bins, centroid dots/arrows, current position line, and contours.
 
