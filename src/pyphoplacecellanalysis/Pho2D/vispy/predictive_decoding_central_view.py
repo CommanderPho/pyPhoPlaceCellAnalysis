@@ -277,15 +277,25 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         view_time_bin_colors = _time_bin_colors(n_bins_to_show, alpha=1.0)[:, :3]
         vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
 
-        if len(time_bin_views) != n_bins_to_show:
+        _grid_widgets = getattr(time_bin_grid, '_grid_widgets', {})
+        needs_rebuild_time_bin_views = (len(time_bin_views) != n_bins_to_show) or (needs_clear_owned_views and len(_grid_widgets) != n_bins_to_show)
+        if needs_rebuild_time_bin_views:
             if needs_clear_owned_views:
+                ## time_bin_views first:
                 for view in time_bin_views:
                     if view is not None and hasattr(view, 'parent'):
                         view.parent = None
-                time_bin_views.clear()
                 for child in list(time_bin_grid.children):
                     time_bin_grid.remove_widget(child)
 
+
+                # remove_widget must run before parent=None; detached views are not in .children, so a loop over
+                # time_bin_grid.children never unregister them and leaves phantom columns in the layout solver.
+                for _slot in list(_grid_widgets.values()):
+                    _w = _slot[-1]
+                    time_bin_grid.remove_widget(_w)
+                    _w.parent = None
+                time_bin_views.clear()
             for t_idx in range(n_bins_to_show):
                 t_bin_border_color = view_time_bin_colors[t_idx] if t_idx < len(view_time_bin_colors) else (0.5, 0.5, 0.5)
                 view = time_bin_grid.add_view(row=0, col=t_idx, border_color=t_bin_border_color)
@@ -358,6 +368,9 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
     time_bin_raster = _update_dict.get('time_bin_raster', None)
     can_plot_raster: bool = (active_epochs_df is not None) and (active_aclus is not None) and (actIve_filter_epochs_spikes_df is not None) and (time_bin_raster is not None)
     if can_plot_raster:
+        num_epoch_time_bins_for_raster: Optional[int] = None
+        if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
+            num_epoch_time_bins_for_raster = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
         # new_all_aclus_sort_indicies = None
         # pen = {'color': 'white', 'width': 1}
         # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
@@ -370,7 +383,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                                             # unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, 
                                                             scatter_plot_kwargs=override_scatter_plot_kwargs,
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
-                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black')
+                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black', num_epoch_time_bins=num_epoch_time_bins_for_raster)
 
 
     return _update_dict
