@@ -692,7 +692,7 @@ class VispyHelpers:
              arrow_length: Optional[float] = None, arrow_size: Optional[float] = None, arrow_type: str = 'triangle_30', width: float = 2.0, method: str = 'gl', order: int = 11, alpha: Optional[float] = None, end_margin_frac: float = 0.02, name: str = 'heading_rainbow_arrows') -> Tuple[Optional[Any], Dict[str, Any]]:
         """Overlay batched arrow heads (no line shafts) along the same polyline as :meth:`create_heading_rainbow_line`, with per-head RGBA interpolated from ``vertex_colors`` and tangents along the path.
 
-        VisPy's :class:`~vispy.scene.visuals.Arrow` draws the shaft from ``pos`` and heads from ``arrows``; this helper uses empty ``pos`` so only heads are visible.
+        VisPy's :class:`~vispy.scene.visuals.Arrow` draws the shaft from ``pos`` and heads from ``arrows``. To keep heads-only appearance while satisfying :class:`~vispy.visuals.line.line.LineVisual` bounds (non-empty ``pos``), the shaft is encoded as one fully transparent segment per head—the same tail/center pairs as ``arrows``—not visible strokes.
 
         line, dd = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
         arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=dd, parent=scene_parent, n_arrows=24)
@@ -805,9 +805,11 @@ class VispyHelpers:
         orient_eps = max(1e-9, 1e-7 * data_scale)
         v_tail = centers_a - orient_eps * tangents_a
         arrows_batch = np.hstack([v_tail, centers_a]).astype(np.float32)
-        pos_empty = np.zeros((0, 2), dtype=np.float32)
+        pos_line = np.empty((2 * n_arr, 2), dtype=np.float32)
+        pos_line[0::2] = arrows_batch[:, :2]
+        pos_line[1::2] = arrows_batch[:, 2:]
         arrow_color = rgba_c
-        arrow = vz.Arrow(pos=pos_empty, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=(1.0, 1.0, 1.0, 0.0), width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
+        arrow = vz.Arrow(pos=pos_line, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=(1.0, 1.0, 1.0, 0.0), width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
         arrow.order = order
         eff_spacing = float(np.mean(np.diff(sample_distances))) if int(sample_distances.size) >= 2 else float(hi - lo)
         info_dict: Dict[str, Any] = dict(n_arrows=n_arr, spacing_used=eff_spacing, sample_distances=sample_distances, sample_centers=centers_a.astype(np.float32), arrow_length=arrow_length_f, arrow_size=arrow_size_f, total_length=total_len, data_scale=data_scale)
