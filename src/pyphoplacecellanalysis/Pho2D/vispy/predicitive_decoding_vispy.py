@@ -120,7 +120,7 @@ class PredictiveDecodingVispyWidget:
     
 
     enable_full_vispy_debug_mode: bool = field(default=False)
-    enable_line_render_debug_logging: bool = field(default=True)
+    enable_line_render_debug_logging: bool = field(default=False)
 
     max_time_bins_to_show: int = field(default=12)
     enable_table_widgets: bool = field(default=False)
