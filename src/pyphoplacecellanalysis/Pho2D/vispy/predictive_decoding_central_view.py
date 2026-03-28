@@ -393,7 +393,8 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                                             # unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, 
                                                             scatter_plot_kwargs=override_scatter_plot_kwargs,
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
-                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black', time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines)
+                                            active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black',
+                                            time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines)
 
 
     return _update_dict
