@@ -4680,7 +4680,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
     def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None,
-                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=5, mask_position_like_time_score_cutoff: Optional[float] = 0.42,  fine_time_bin_size: float=0.025, 
+                drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=None, mask_position_like_time_score_cutoff: Optional[float] = 0.42,  fine_time_bin_size: float=0.025, 
                 enable_masked_filtered_container_before_any_comps: bool = True, should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False,
                 max_workers: Optional[int]=1,
         ):
@@ -4780,11 +4780,11 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 if should_filter_by_active_spikes:
                     ## TODO: I think this works?
                     a_masked_result, mask_index_tuple = a_masked_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(
-                        spikes_df=deepcopy(spikes_df),
+                        spikes_df=spikes_df.copy(),
                         min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
                         min_num_unique_active_neurons_per_time_bin=1,
-                        masked_bin_fill_mode='dropped',
-                        # masked_bin_fill_mode='nan_filled'
+                        # masked_bin_fill_mode='dropped',
+                        masked_bin_fill_mode='nan_filled'
                     )
                 else:
                     # a_masked_result
