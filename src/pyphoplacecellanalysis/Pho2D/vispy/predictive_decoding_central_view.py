@@ -1,7 +1,8 @@
 """Standalone vispy rendering for the predictive decoding central view (posterior heatmap, time bins, centroids, contours).
 
 This module does not import from PredictiveDecodingComputations to avoid circular imports.
-Callers must pass all views and mutable lists via _update_dict.
+Callers must pass all views and mutable lists via _update_dict. After raster plotting, _update_dict may
+gain vispy_multi_raster_plot (VispyMultiRasterPlotTuple) alongside time_bin_raster (host view).
 """
 
 from __future__ import annotations
@@ -29,10 +30,11 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                         ) -> Dict[str, Any]:
     """Update the center view with posteriors, time bins, centroid dots/arrows, current position line, and contours.
 
-    _update_dict must contain the vispy views and mutable lists (e.g. posterior_2d_view, time_bin_grid, past_view,
-    future_view, centroid_dots, centroid_arrows, current_position_line, trajectory_arrows, epoch_info_text,
-    time_bin_views, time_bin_labels, time_bin_images, past_mask_contours, posterior_mask_contours, future_mask_contours).
-    It is updated in place and returned.
+    _update_dict must contain the vispy views and mutable lists (e.g. posterior_2d_view, time_bin_grid,
+    time_bin_raster for spike rasters, past_view, future_view, centroid_dots, centroid_arrows,
+    current_position_line, trajectory_arrows, epoch_info_text, time_bin_views, time_bin_labels, time_bin_images,
+    past_mask_contours, posterior_mask_contours, future_mask_contours). When a raster is drawn,
+    time_bin_raster and vispy_multi_raster_plot are written back. It is updated in place and returned.
 
     epoch_flat_mask_future_past_result: optional list of duck-typed epoch results. Each element must have
     centroids_df (DataFrame with x, y, segment_idx; optionally segment_Vp_deg, dt) and
@@ -374,9 +376,9 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         num_bins_for_raster_lines: Optional[int] = None if raster_time_bin_edges is not None else num_epoch_time_bins_for_raster
         raster_edge_vu: Optional[np.ndarray] = None
         if raster_time_bin_edges is not None:
-            m = int(np.asarray(raster_time_bin_edges, dtype=np.float64).size)
+            m = int(np.asarray(raster_time_bin_edges, dtype=np.float32).size)
             if m >= 2:
-                raster_edge_vu = np.linspace(0.0, 1.0, m, dtype=np.float64)
+                raster_edge_vu = np.linspace(0.0, 1.0, m, dtype=np.float32)
         # new_all_aclus_sort_indicies = None
         # pen = {'color': 'white', 'width': 1}
         # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
@@ -391,6 +393,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
                                             active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black',
                                             time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines, time_bin_edge_vu=raster_edge_vu, time_bin_edge_line_alpha=0.65)
+        _update_dict.update(time_bin_raster=time_bin_raster, vispy_multi_raster_plot=_out_vispy_raster)
 
 
     return _update_dict
