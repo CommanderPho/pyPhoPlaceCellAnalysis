@@ -1699,7 +1699,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget, VispyCanvasContainingWindow
 
 # Volumetric 2D time-series plotter using vispy
 _VOLUMETRIC_TURNTABLE_FOV: float = 45.0
@@ -1752,8 +1752,8 @@ class Volumentric2DTimeSeriesPlotter:
     pos3d: Optional[NDArray] = field(default=None)
 
     canvas: scene.SceneCanvas = field(default=None)
-    main_window: PhoDockAreaContainingWindow = field(default=None)
-    view: ViewBox = field(default=None)
+    main_window: VispyCanvasContainingWindow = field(default=None)
+    view: scene.widgets.ViewBox = field(default=None)
     scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
     position_line: vz.Line = field(default=None)
