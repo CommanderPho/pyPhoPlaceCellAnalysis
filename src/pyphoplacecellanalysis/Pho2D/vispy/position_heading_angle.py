@@ -14,9 +14,60 @@ Heading angle mapping:
 
 import numpy as np
 from vispy import app, scene
-from vispy.scene import visuals
+from vispy.visuals.transforms import STTransform
 
 from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
+
+
+class HeadingCompassRoseVisual(scene.Node):
+    """Heading-colored compass rose as a scene Node; geometry is in local space — set ``transform`` (e.g. STTransform) to place and scale on any ViewBox scene.
+
+    from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingCompassRoseVisual
+    from vispy.visuals.transforms import STTransform
+
+    rose = HeadingCompassRoseVisual(parent=view.scene, line_width=3.0)
+    rose.transform = STTransform(scale=(0.05, 0.05), translate=(2.0, 3.0))
+
+    """
+    @classmethod
+    def build_heading_compass_rose_line_data(cls, line_points: int = 20, major_length: float = 1.0, minor_length: float = 0.5):
+        """Build unit heading-color compass rose polyline at the origin (2D). Major spokes use major_length; alternating shorter spokes use minor_length."""
+        center = np.array([0.0, 0.0])
+        angles = np.linspace(0, 2 * np.pi, 9)[:-1]
+        all_positions = []
+        all_tangents = []
+        for i, angle in enumerate(angles):
+            line_length = major_length if i % 2 == 0 else minor_length
+            end = center + line_length * np.array([np.cos(angle), np.sin(angle)])
+            t_ = np.linspace(0, 1, line_points)
+            x = center[0] + t_ * (end[0] - center[0])
+            y = center[1] + t_ * (end[1] - center[1])
+            positions = np.c_[x, y]
+            tangent = (end - center) / np.linalg.norm(end - center)
+            tangents = np.tile(tangent, (line_points, 1))
+            all_positions.append(positions)
+            all_tangents.append(tangents)
+            all_positions.append(np.array([[np.nan, np.nan]]))
+            all_tangents.append(np.array([[0.0, 0.0]]))
+        positions = np.vstack(all_positions).astype(np.float32)
+        tangents = np.vstack(all_tangents)
+        angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
+        angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
+        compass_deg = HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)
+        colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
+        return positions, colors.astype(np.float32), tangents, angle_deg, compass_deg
+
+
+    def __init__(self, parent=None, line_width: float = 2.0, line_points: int = 20, major_length: float = 1.0, minor_length: float = 0.5, **kwargs):
+        scene.Node.__init__(self, parent=parent, **kwargs)
+        positions, colors, tangents, angle_deg, compass_deg = self.build_heading_compass_rose_line_data(line_points=line_points, major_length=major_length, minor_length=minor_length)
+        self.line = scene.visuals.Line(pos=positions, color=colors, width=line_width, parent=self)
+        self.line.set_gl_state('translucent', depth_test=False)
+        self._local_positions = positions
+        self._tangents = tangents
+        self._angle_deg = angle_deg
+        self._compass_deg = compass_deg
+        self._colors = colors
 
 # class AngularrColoredLine(scene.visuals.Line):
 #     def __init__(self, **kwargs):
@@ -85,56 +136,13 @@ class CompassLegendItem:
     """ from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import CompassLegendItem
     
     """
-    def __init__(self, view: scene.ViewBox, center = np.array([0.0, 0.0]), length = 0.6, 
-                 line_points: int = 20, line_width=2.0, **kwargs):
-
-        self._data_dict = dict()
-
-
-        angles = np.linspace(0, 2 * np.pi, 9)[:-1]
-
-        all_positions = []
-        all_tangents = []
-
-        for i, angle in enumerate(angles):
-            line_length = length if i % 2 == 0 else length * 0.5
-            end = center + line_length * np.array([np.cos(angle), np.sin(angle)])
-
-            
-            t_ = np.linspace(0, 1, line_points)
-            x = center[0] + t_ * (end[0] - center[0])
-            y = center[1] + t_ * (end[1] - center[1])
-
-            positions = np.c_[x, y]
-            tangent = (end - center) / np.linalg.norm(end - center)
-            tangents = np.tile(tangent, (line_points, 1))
-
-            all_positions.append(positions)
-            all_tangents.append(tangents)
-
-            # break line
-            all_positions.append(np.array([[np.nan, np.nan]]))
-            all_tangents.append(np.array([[0.0, 0.0]]))
-
-        positions = np.vstack(all_positions).astype(np.float32)
-        tangents = np.vstack(all_tangents)
-
-        angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
-        angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
-        compass_deg = HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)
-
-        colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
-
-        self.line = scene.visuals.Line(pos=positions, color=colors, width=line_width, parent=view.scene)
-        self.line.set_gl_state('translucent', depth_test=False)
-
-        # self.circle = scene.visuals.Ellipse(center=(float(center[0]), float(center[1])), radius=(circle_radius, circle_radius), color=None, border_width=int(circle_border_width), border_color=circle_color, parent=view.scene)
-        # self.circle.set_gl_state('translucent', depth_test=False)
-
-
-        self._data_dict = dict(pos=positions, tangents=tangents,
-                               angle_deg=angle_deg, compass_deg=compass_deg,
-                                colors=colors)
+    def __init__(self, view: scene.ViewBox, center=np.array([0.0, 0.0]), length=0.6, line_points: int = 20, line_width=2.0, **kwargs):
+        self._rose = HeadingCompassRoseVisual(parent=view.scene, line_width=line_width, line_points=line_points)
+        st = STTransform(scale=(float(length), float(length)), translate=(float(center[0]), float(center[1])))
+        self._rose.transform = st
+        self.line = self._rose.line
+        world_pos = st.map(self._rose._local_positions)[:, :2].astype(np.float32)
+        self._data_dict = dict(pos=world_pos, tangents=self._rose._tangents, angle_deg=self._rose._angle_deg, compass_deg=self._rose._compass_deg, colors=self._rose._colors)
 
 
         
@@ -146,35 +154,11 @@ class CompassDemo(scene.SceneCanvas):
     def __init__(self, **kwargs):
         scene.SceneCanvas.__init__(self, keys='interactive', size=(800, 800), **kwargs)
         self.unfreeze()
-        center = np.array([0.0, 0.0])
-        length = 0.6
-        angles = np.linspace(0, 2 * np.pi, 9)[:-1]
-        all_positions = []
-        all_tangents = []
-        for i, angle in enumerate(angles):
-            line_length = length if i % 2 == 0 else length * 0.5
-            end = center + line_length * np.array([np.cos(angle), np.sin(angle)])
-            line_points = 20
-            t_ = np.linspace(0, 1, line_points)
-            x = center[0] + t_ * (end[0] - center[0])
-            y = center[1] + t_ * (end[1] - center[1])
-            positions = np.c_[x, y]
-            tangent = (end - center) / np.linalg.norm(end - center)
-            tangents = np.tile(tangent, (line_points, 1))
-            all_positions.append(positions)
-            all_tangents.append(tangents)
-            all_positions.append(np.array([[np.nan, np.nan]]))
-            all_tangents.append(np.array([[0.0, 0.0]]))
-        positions = np.vstack(all_positions).astype(np.float32)
-        tangents = np.vstack(all_tangents)
-        angle_rad = np.arctan2(tangents[:, 1], tangents[:, 0])
-        angle_deg = (np.degrees(angle_rad) + 360.0) % 360.0
-        compass_deg = HeadingAngleHelpers._heading_deg_to_compass_deg(angle_deg)
-        colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(compass_deg, alpha=1.0)
         self._view = self.central_widget.add_view(camera='panzoom')
         self._view.camera.aspect = 1
-        self._line = scene.visuals.Line(pos=positions, color=colors, width=5.0, parent=self._view.scene)
-        self._line.set_gl_state('translucent', depth_test=False)
+        self._rose = HeadingCompassRoseVisual(parent=self._view.scene, line_width=5.0)
+        self._rose.transform = STTransform(scale=(0.6, 0.6))
+        self._line = self._rose.line
         self._view.camera.set_range(x=(-1, 1), y=(-1, 1))
         self.show()
         print("\nCompass Rose Color Mapping:")
