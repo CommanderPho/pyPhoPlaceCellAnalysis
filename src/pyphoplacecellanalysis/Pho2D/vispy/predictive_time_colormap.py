@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Literal, cast
 
 import numpy as np
@@ -17,7 +18,9 @@ _PREDICTIVE_TIME_MPL_NAME: dict[PredictiveTimeColormapName, str | None] = {
     "cool": "cool",
 }
 
-_active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
+# _active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
+# _active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
+_active_predictive_time_colormap: PredictiveTimeColormapName = "cool"
 
 
 def set_predictive_time_colormap(name: PredictiveTimeColormapName | str) -> None:
@@ -39,7 +42,7 @@ def _hex_to_rgb01(hex_str: str) -> tuple[float, float, float]:
 
 
 # Control stops u in [0,1]: start bright cyan, mid periwinkle, end magenta-purple (cyan_magenta only).
-_PREDICTIVE_TIME_STOPS_U = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float64)
+_PREDICTIVE_TIME_STOPS_U = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
 _PREDICTIVE_TIME_STOPS_RGB = np.array(
     [
         _hex_to_rgb01('#58D4E8'),
@@ -48,17 +51,20 @@ _PREDICTIVE_TIME_STOPS_RGB = np.array(
         _hex_to_rgb01('#986BB4'),
         _hex_to_rgb01('#B850A0'),
     ],
-    dtype=np.float64,
+    dtype=np.float32,
 )
 
 
 def _predictive_time_rgb_for_key(key: PredictiveTimeColormapName, u: float) -> tuple[float, float, float]:
-    uu = float(np.clip(u, 0.0, 1.0))
+    uu = float(u)
+    if not math.isfinite(uu):
+        uu = 0.0
+    uu = float(np.clip(uu, 0.0, 1.0))
     mpl = _PREDICTIVE_TIME_MPL_NAME[key]
     if mpl is None:
-        r_g_b = np.empty(3, dtype=np.float64)
+        r_g_b = np.empty(3, dtype=np.float32)
         for c in range(3):
-            r_g_b[c] = float(np.interp(uu, _PREDICTIVE_TIME_STOPS_U, _PREDICTIVE_TIME_STOPS_RGB[:, c]))
+            r_g_b[c] = np.float32(np.interp(uu, _PREDICTIVE_TIME_STOPS_U, _PREDICTIVE_TIME_STOPS_RGB[:, c]))
         return (float(r_g_b[0]), float(r_g_b[1]), float(r_g_b[2]))
     import matplotlib
 
@@ -83,7 +89,10 @@ def predictive_time_rgb(u: float, colormap: PredictiveTimeColormapName | str | N
 def predictive_time_rgba_u(u: float, alpha: float, colormap: PredictiveTimeColormapName | str | None = None) -> tuple[float, float, float, float]:
     """RGBA sample at u with given alpha."""
     r, g, b = predictive_time_rgb(u, colormap=colormap)
-    a = float(np.clip(alpha, 0.0, 1.0))
+    a = float(alpha)
+    if not math.isfinite(a):
+        a = 1.0
+    a = float(np.clip(a, 0.0, 1.0))
     return (r, g, b, a)
 
 
