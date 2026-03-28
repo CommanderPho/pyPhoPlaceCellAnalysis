@@ -840,21 +840,22 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
 
     @classmethod
-    def init_from_builder_classmethod(cls, win, pf1D_decoder_template_objects, plots_container, plot_data, name_suffix: str='test') -> "BinByBinDecodingDebugger":
+    def init_from_builder_classmethod(cls, win, pf1D_decoder_template_objects, plots_container, plots_data, name_suffix: str='test') -> "BinByBinDecodingDebugger":
         _obj_dict = dict()
         if plots_container is None:
             plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None) # Create a new one
             
         _obj_dict['plots'] = plots_container
 
-        if plot_data is None:
-            plot_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=pf1D_decoder_template_objects) # , spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data
-        if isinstance(plot_data, dict):
+        if plots_data is None:
+            plots_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=pf1D_decoder_template_objects) # , spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data
+        if isinstance(plots_data, dict):
             # looks like a separate entry for each time bin? Weird
-            plot_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=pf1D_decoder_template_objects)
+            plots_data = RenderPlotsData(name=f'epoch[{name_suffix}]', pf1D_decoder_template_objects=pf1D_decoder_template_objects)
             
 
-        _obj_dict['plot_data'] = plot_data
+        # _obj_dict['plot_data'] = plot_data
+        _obj_dict['plots_data'] = plots_data
         _obj = cls(**_obj_dict)
         _obj.plots_data.pf1D_decoder_template_objects = pf1D_decoder_template_objects
         _obj.ui.win = win
@@ -880,7 +881,7 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         
         """
         from pyphocorehelpers.DataStructure.RenderPlots.PyqtgraphRenderPlots import PyqtgraphRenderPlots
-        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
+        # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.BinByBinDecodingDebugger import BinByBinDebuggingData, BinByBinDecodingDebugger
 
 
         neuron_IDs = deepcopy(a_decoder.neuron_IDs)
@@ -926,10 +927,10 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         ## INPUTS: active_window_slice_idxs, active_window_time_bin_edges, active_p_x_given_n
         plots_container = PyqtgraphRenderPlots(name=f'PhoTest_{name_suffix}', root_plot=None) # Create a new one
         plots_data = RenderPlotsData(name=f'epoch[{name_suffix}]', spikes_df=active_global_spikes_df, a_decoder=a_decoder, active_aclus=neuron_IDs, bin_by_bin_data=bin_by_bin_data)
-        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = BinByBinDecodingDebugger._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
+        win, out_pf1D_decoder_template_objects, (plots_container, plots_data) = cls._perform_build_time_binned_decoder_debug_plots(a_decoder=a_decoder, time_bin_edges=active_window_time_bin_edges, p_x_given_n=active_p_x_given_n, active_epoch_active_aclu_spike_counts_list=active_epoch_active_aclu_spike_counts_list,
                                                                                                                                     plots_data=plots_data, plots_container=plots_container,
                                                                                                                                     debug_print=False, name_suffix=name_suffix)
-        bin_by_bin_debugger: BinByBinDecodingDebugger = BinByBinDecodingDebugger.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plot_data=plots_data)
+        bin_by_bin_debugger: BinByBinDecodingDebugger = cls.init_from_builder_classmethod(win=win, pf1D_decoder_template_objects=out_pf1D_decoder_template_objects, plots_container=plots_container, plots_data=plots_data)
         
 
         
