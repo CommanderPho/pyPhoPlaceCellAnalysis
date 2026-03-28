@@ -502,6 +502,7 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
                                         **_common_render_kwargs,
                                         allow_use_self_properties=False, needs_clear_owned_views=False, 
                                         _update_dict=_an_update_dict, #multi_epoch_overview_container_render_dict_list[idx],
+                                        dtype=np.float32,
                 )
                 # multi_epoch_overview_container_render_dict_list[idx] = _an_update_dict ## update the existing
                 a_multi_epoch_overview_container['an_update_dict'] = _an_update_dict
@@ -764,6 +765,8 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
             curr_position_df=self.curr_position_df, current_traj_seconds_pre_post_extension=self.current_traj_seconds_pre_post_extension, num_epochs=self.num_epochs, max_time_bins_to_show=self.max_time_bins_to_show, fallback_mask_2d_for_shape=fallback_mask_2d_for_shape,
             use_new_centroid_arrows=use_new_centroid_arrows, use_single_arrows_object=use_single_arrows_object, _update_dict=_update_dict, needs_clear_owned_views=needs_clear_owned_views,
             **_raster_kwargs, #active_epochs_df=active_epochs_df, actIve_filter_epochs_spikes_df=actIve_filter_epochs_spikes_df,
+            # dtype=np.float64,
+            dtype=np.float32,
         )
 
 
@@ -1338,7 +1341,8 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
                                         current_position_line=self.current_position_line, trajectory_arrows=self.trajectory_arrows, epoch_info_text=self.epoch_info_text,
                                         time_bin_views=self.time_bin_views, time_bin_labels=self.time_bin_labels, time_bin_images=self.time_bin_images, time_bin_raster=self.time_bin_raster,
                                         past_mask_contours=self.past_mask_contours, posterior_mask_contours=self.posterior_mask_contours, future_mask_contours=self.future_mask_contours,    
-                                    ),  
+                                    ),
+                                    dtype=np.float32,  
         )
         for _k, _v in _update_dict.items():
             setattr(self, _k, _v)
