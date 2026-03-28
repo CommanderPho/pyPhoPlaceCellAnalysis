@@ -85,6 +85,7 @@ from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, Conto
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_decoding_central_view import render_central_view as render_predictive_decoding_central_view
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget, VispyCanvasContainingWindow
 
 
 ## missing imports: MatchingPastFuturePositionsResult, BasePositionDecoder, MaskDataSource
@@ -141,17 +142,21 @@ class PredictiveDecodingVispyWidget:
 
     # UI / vispy (created in buildUI)
     canvas: Any = field(default=None)
-    main_window: Any = field(default=None)
-    grid: vispy.scene.widgets.grid.Grid = field(default=None)
-    past_view: Any = field(default=None)
-    posterior_2d_view: Any = field(default=None)
-    future_view: Any = field(default=None)
-    time_bin_grid: vispy.scene.widgets.grid.Grid = field(default=None)
-    time_bin_views: List[Any] = field(default=Factory(list))
-    time_bin_raster: Any = field(default=None)
+    main_window: VispyCanvasContainingWindow = field(default=None)
+    scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
-    combined_timeline_view: Any = field(default=None)
-    colorbar_view: Any = field(default=None)
+
+    grid: vispy.scene.widgets.grid.Grid = field(default=None)
+    past_view: scene.widgets.ViewBox = field(default=None)
+    posterior_2d_view: scene.widgets.ViewBox = field(default=None)
+    future_view: scene.widgets.ViewBox = field(default=None)
+    time_bin_grid: vispy.scene.widgets.grid.Grid = field(default=None)
+    time_bin_views: List[scene.widgets.ViewBox] = field(default=Factory(list))
+    time_bin_raster: scene.widgets.ViewBox = field(default=None)
+    vispy_multi_raster_plot: Any = field(default=None)
+
+    combined_timeline_view: scene.widgets.ViewBox = field(default=None)
+    colorbar_view: scene.widgets.ViewBox = field(default=None)
     epoch_slider: Any = field(default=None)
     epoch_value_label: Any = field(default=None)
     epoch_table_manager: Optional[TableManager] = field(default=None)
@@ -275,31 +280,23 @@ class PredictiveDecodingVispyWidget:
 
 
     def buildUI(self):
-        # from vispy import app, scene
-        # from qtpy import QtWidgets, QtCore
         self.current_epoch_idx = self.active_epoch_idx
 
-        # Main Canvas Init ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        # canvas = scene.SceneCanvas(keys='interactive', show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy')
-        canvas = scene.SceneCanvas(show=False, size=(1920, 1080), title='Predictive Decoding Display - Vispy',
-            # keys='interactive',
-            autoswap=False, resizable=True, decorate=True, fullscreen=False,
-            # parent=self,
-        )
+        title = 'Predictive Decoding Display - Vispy'
+        canvas = scene.SceneCanvas(show=False, size=(1920, 1080), title=title, autoswap=False, resizable=True, decorate=True, fullscreen=False)
         self.canvas = canvas
 
+        root_dockAreaWindow = VispyCanvasContainingWindow(title=title)
+        root_dockAreaWindow.setWindowTitle(f'{title}: dockAreaWindow')
+        self.main_window = root_dockAreaWindow
 
-        # Build UI ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        main_window = QtWidgets.QMainWindow()
-        main_window.setWindowTitle('Predictive Decoding Display - Vispy')
-        self.main_window = main_window
-        central_widget = QtWidgets.QWidget()
-        main_layout = QtWidgets.QVBoxLayout(central_widget)
+        viewer_central_widget = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Add Native Canvas Widget ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        main_layout.addWidget(canvas.native, stretch=1)
-        
+        scene_wrap = VispySceneWrappingWidget(canvas=canvas, parent=viewer_central_widget, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
+        assert scene_wrap.scene_tree_widget is not None
+        self.scene_tree_widget = scene_wrap.scene_tree_widget
+        main_layout.addWidget(scene_wrap, stretch=1)
 
         if not self.enable_multi_epoch_overview_display_mode:
             slider_widget = QtWidgets.QWidget()
@@ -320,7 +317,6 @@ class PredictiveDecodingVispyWidget:
             slider_layout.addWidget(epoch_value_label)
             main_layout.addWidget(slider_widget)
 
-
         if self.enable_table_widgets:
             from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
             table_container = QtWidgets.QWidget()
@@ -331,14 +327,12 @@ class PredictiveDecodingVispyWidget:
             }
             epoch_table_manager = TableManager(table_container, visible_columns_dict=visible_columns_dict)
             self.epoch_table_manager = epoch_table_manager
-            
             main_layout.addWidget(table_container)
-            
 
-        main_window.setCentralWidget(central_widget)
-        main_window.resize(1400, 950)
-        main_window.show()
-        
+        viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
+        _, _ = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
+        root_dockAreaWindow.resize(1400, 950)
+
         grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid() # vispy.scene.widgets.grid.Grid
         self.grid = grid
         
@@ -540,7 +534,10 @@ class PredictiveDecodingVispyWidget:
             print(f'\t finally updating self.multi_epoch_overview_container_render_dict_list... len(multi_epoch_overview_container_render_dict_list): {len(multi_epoch_overview_container_render_dict_list)}')
             self.multi_epoch_overview_container_render_dict_list = multi_epoch_overview_container_render_dict_list ## finally update self
             print(f'\tdone.')
-                
+
+
+        self._refresh_scene_tree()
+        self.main_window.show()
 
 
 
@@ -550,7 +547,15 @@ class PredictiveDecodingVispyWidget:
     # ==================================================================================================================================================================================================================================================================================== #
     # Helper/Rendering Functions                                                                                                                                                                                                                                                           #
     # ==================================================================================================================================================================================================================================================================================== #
+
+    def _refresh_scene_tree(self) -> None:
+        if self.scene_tree_widget is not None:
+            self.scene_tree_widget.rebuild()
+
+
+
     def _clear_epoch_visuals(self):
+        """Detach per-epoch visuals; also clears `time_bin_raster.scene` and drops `vispy_multi_raster_plot`."""
         # self._detach_and_clear_visual_lists(
         list_attr_names = [
             'past_lines', 'future_lines',
@@ -602,11 +607,16 @@ class PredictiveDecodingVispyWidget:
                 if ref is not None:
                     ref.parent = None
                 setattr(self, name, None)
-                
+
+        if self.time_bin_raster is not None and hasattr(self.time_bin_raster, 'scene'):
+            for _child in list(self.time_bin_raster.scene.children):
+                _child.parent = None
+        self.vispy_multi_raster_plot = None
+
 
     def _time_bin_colors(self, n_bins: int, alpha: float = 0.9) -> np.ndarray:
         """Return (n_bins, 4) float32 RGBA using the standardized predictive time colormap (cyan→magenta)."""
-        return predictive_time_bin_rgba(n_bins, alpha=alpha)
+        return predictive_time_bin_rgba(n_bins=n_bins, alpha=alpha)
 
     def _debug_log_line_visual(self, line: Any, context: str, pos: Optional[np.ndarray] = None, colors: Optional[np.ndarray] = None, extra: Optional[Dict[str, Any]] = None) -> None:
         """Logs line id and finite stats so crash addresses can be mapped to source visuals."""
@@ -730,6 +740,8 @@ class PredictiveDecodingVispyWidget:
                 _update_dict['future_view'] = self.future_view
             if _update_dict.get('time_bin_grid') is None:
                 _update_dict['time_bin_grid'] = self.time_bin_grid
+            if _update_dict.get('time_bin_raster') is None:
+                _update_dict['time_bin_raster'] = self.time_bin_raster
             if _update_dict.get('current_position_line') is None:
                 _update_dict['current_position_line'] = self.current_position_line
         fallback_mask_2d_for_shape = None
@@ -1182,10 +1194,11 @@ class PredictiveDecodingVispyWidget:
             return
 
         self.current_epoch_idx = new_epoch_idx
-        self.epoch_slider.blockSignals(True)
-        self.epoch_slider.setValue(new_epoch_idx)
-        # self.epoch_slider.blockSignals(False)
-        self.epoch_value_label.setText(f"{new_epoch_idx}/{self.num_epochs}")
+        if self.epoch_slider is not None:
+            self.epoch_slider.blockSignals(True)
+            self.epoch_slider.setValue(new_epoch_idx)
+        if self.epoch_value_label is not None:
+            self.epoch_value_label.setText(f"{new_epoch_idx}/{self.num_epochs}")
         self._clear_epoch_visuals() ## clear existing
         
         ## Get the epoch data (this performs the filtering by `minimum_included_matching_sequence_length` if set, etc
@@ -1278,10 +1291,16 @@ class PredictiveDecodingVispyWidget:
             for time_val, x_pos in zip(label_times, label_positions):
                 text = vz.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=self.colorbar_view.scene)
                 self.colorbar_texts.append(text)
-            title_start = vz.Text('start', pos=(10, -20), color='white', font_size=12, anchor_x='left', parent=self.colorbar_view.scene)
-            title_end = vz.Text('end', pos=(colorbar_width - 10, -20), color='white', font_size=12, anchor_x='right', parent=self.colorbar_view.scene)
+
+            title_past = vz.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_future = vz.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            # title_start = vz.Text('start', pos=(10, -20), color='white', font_size=12, anchor_x='left', parent=self.colorbar_view.scene)
+            # title_end = vz.Text('end', pos=(colorbar_width - 10, -20), color='white', font_size=12, anchor_x='right', parent=self.colorbar_view.scene)
             title_opacity = vz.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=self.colorbar_view.scene)
-            self.colorbar_texts.extend([title_start, title_end, title_opacity])
+            # self.colorbar_texts.extend([title_start, title_end, title_opacity])
+
+            self.colorbar_texts.extend([title_past, title_future, title_opacity])
+
             self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
             self.colorbar_view.camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
             
@@ -1354,7 +1373,7 @@ class PredictiveDecodingVispyWidget:
         if 'future' in curr_matching_past_future_positions_df_dict:
             curr_past_future_key_name: types.PastFutureCategory = 'future'
             self.render_data_dict_list_dict[curr_past_future_key_name] = [] ## clear manually
-            self.future_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_end_t, endpoint_time_u=1.0, view=self.future_view, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
+            self.future_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_end_t, endpoint_time_u=0.5, view=self.future_view, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
                                                                 lines_list=self.future_lines, trajectory_debug_arrows=self.trajectory_debug_arrows.get(curr_past_future_key_name, []), render_data_dict_list=self.render_data_dict_list_dict.get(curr_past_future_key_name, []),
                                                              )
             
@@ -1419,10 +1438,9 @@ class PredictiveDecodingVispyWidget:
 
         # self.canvas.title = f'Predictive Decoding Display - Vispy (Epoch {new_epoch_idx + 1}/{self.num_epochs})'
         self.canvas.update()
-        # QApplication.processEvents()
-
-        ## unblock the epoch_slider       
-        self.epoch_slider.blockSignals(False)
+        self._refresh_scene_tree()
+        if self.epoch_slider is not None:
+            self.epoch_slider.blockSignals(False)
 
 
     def perform_update_table_widgets(self, new_epoch_idx: Optional[int]=None, epoch_data: Optional[Dict]=None):
@@ -1751,8 +1769,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget, VispyCanvasContainingWindow
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera  # Used in `Volumentric2DTimeSeriesPlotter`
 
 # Volumetric 2D time-series plotter using vispy
 _VOLUMETRIC_TURNTABLE_FOV: float = 45.0
@@ -2438,7 +2455,8 @@ class Volumentric2DTimeSeriesPlotter:
             else:
                 t_center = float(self.t_min + (t_idx + 0.5) * ((self.t_max - self.t_min) / max(n_tbins, 1)))
             z_val = float((t_center - self.t_min) * self.z_scale)
-            rgb = predictive_time_rgb(t_idx / max(n_tbins, 1))
+            u = float((t_idx / max(n_tbins, 1)) % 1.0)
+            rgb = predictive_time_rgb(u)
             t_color = (rgb[0], rgb[1], rgb[2], contour_alpha)
             mask_2d = per_t_bin_mask[:, :, t_idx].T
             contour_items: List[ContourItem] = contours_from_masks([mask_2d], x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=[t_color], level=level, return_per_mask=False)
