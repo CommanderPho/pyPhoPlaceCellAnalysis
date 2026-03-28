@@ -415,6 +415,22 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
 
     @classmethod
+    def _bin_by_bin_true_2d_posterior_layout(cls, a_decoder: BasePositionDecoder, p_x_given_n: NDArray) -> bool:
+        """True when posteriors are (nx, ny, n_time) from a 2D placefield decoder — not pseudo-2D (n_x, n_models, T) on a 1D decoder."""
+        return int(a_decoder.ndim) >= 2 and np.ndim(p_x_given_n) == 3
+
+
+    @classmethod
+    def _get_decoder_from_plots_data(cls, plots_data: Optional[RenderPlotsData]) -> Optional[BasePositionDecoder]:
+        if plots_data is None:
+            return None
+        d = getattr(plots_data, 'a_decoder', None)
+        if d is None:
+            d = getattr(plots_data, 'decoder', None)
+        return d
+
+
+    @classmethod
     def _perform_build_time_binned_decoder_debug_plots(cls, a_decoder: BasePositionDecoder, time_bin_edges: NDArray, p_x_given_n: NDArray, active_epoch_active_aclu_spike_counts_list, plots_data: Optional[RenderPlotsData]=None, plots_container: Optional[RenderPlots]=None, debug_print=False, name_suffix: str = 'unknown', is_horizontal: bool=False, **kwargs):
         """ Builds the time-binned decoder debug plots for visualizing decoding results.
             
@@ -514,17 +530,26 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         
         win.nextRow()
 
-        # Decoded Epoch Posterior (bin-by-bin), takes up a row _______________________________________________________________ #
-        spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
-        spanning_posterior_plot.setTitle(f"P_x_given_n Plot - Decoded over epoch[{name_suffix}]")
-
-        flat_p_x_given_n = deepcopy(p_x_given_n)
-        if np.ndim(flat_p_x_given_n) > 2:
-            ## Pseudo2D decoder, have to concatenate the decoded posteriors vertically
-            n_pos_bins, n_decoders, n_t_bins = np.shape(flat_p_x_given_n)
-            flat_p_x_given_n = np.vstack([flat_p_x_given_n[:, i, :] for i in np.arange(n_decoders)]) # (n_stacked_pos_bins, n_epoch_time_bins
-        cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=spanning_posterior_plot, image=flat_p_x_given_n, xbin_edges=np.arange(n_epoch_time_bins+1), ybin_edges=deepcopy(a_decoder.xbin))
+        # Decoded Epoch Posterior (bin-by-bin) _______________________________________________________________ #
+        spanning_posterior_plot = None
+        posterior_row_plots: List[Any] = []
+        if cls._bin_by_bin_true_2d_posterior_layout(a_decoder, p_x_given_n):
+            for a_time_bin_idx in np.arange(n_epoch_time_bins):
+                post_plot = win.addPlot(title=f"P(x|n) t={a_time_bin_idx}", row=1, rowspan=1, col=int(a_time_bin_idx), colspan=1)
+                post_plot.setTitle(f"P(x|n) bin {a_time_bin_idx}")
+                cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=post_plot, image=np.asarray(p_x_given_n[:, :, int(a_time_bin_idx)]), xbin_edges=deepcopy(a_decoder.xbin), ybin_edges=deepcopy(a_decoder.ybin), debug_print=debug_print)
+                posterior_row_plots.append(post_plot)
+        else:
+            spanning_posterior_plot = win.addPlot(title="P_x_given_n Plot", row=1, rowspan=1, col=0, colspan=n_epoch_time_bins)
+            spanning_posterior_plot.setTitle(f"P_x_given_n Plot - Decoded over epoch[{name_suffix}]")
+            flat_p_x_given_n = deepcopy(p_x_given_n)
+            if np.ndim(flat_p_x_given_n) > 2 and int(a_decoder.ndim) < 2:
+                n_pos_bins, n_decoders, n_t_bins = np.shape(flat_p_x_given_n)
+                flat_p_x_given_n = np.vstack([flat_p_x_given_n[:, i, :] for i in np.arange(n_decoders)])
+            cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=spanning_posterior_plot, image=flat_p_x_given_n, xbin_edges=np.arange(n_epoch_time_bins+1), ybin_edges=deepcopy(a_decoder.xbin))
         win.nextRow()
+
+        posterior_reference_plot = posterior_row_plots[0] if posterior_row_plots else spanning_posterior_plot
 
         # Bin-by-bin active spike templates/pf1D fields ______________________________________________________________________ #
         for a_time_bin_idx in np.arange(n_epoch_time_bins):
@@ -541,11 +566,14 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
 
             plot = win.addPlot(title=f"Plot {a_time_bin_idx+1}", row=2, rowspan=1, col=a_time_bin_idx, colspan=1)
             plot.getViewBox().setBorder(color=(200, 200, 200), width=1)
-            spanning_posterior_plot.showGrid(x=True, y=True)
-            x_axis = spanning_posterior_plot.getAxis('bottom')
-            x_axis.setTickSpacing(major=5, minor=1)
-            # plot.setRange(xRange=(0.0, float(len(active_bin_aclus))), yRange=(a_decoder.xbin[0], a_decoder.xbin[-1]))
-            plot.setRange(xRange=(a_decoder.xbin[0], a_decoder.xbin[-1]), yRange=(0.0, float(len(active_bin_aclus))))
+            if posterior_reference_plot is not None:
+                posterior_reference_plot.showGrid(x=True, y=True)
+                x_axis = posterior_reference_plot.getAxis('bottom')
+                x_axis.setTickSpacing(major=5, minor=1)
+            if int(a_decoder.ndim) >= 2:
+                plot.setRange(xRange=(0.0, float(a_decoder.flat_position_size)), yRange=(0.0, float(len(active_bin_aclus))))
+            else:
+                plot.setRange(xRange=(a_decoder.xbin[0], a_decoder.xbin[-1]), yRange=(0.0, float(len(active_bin_aclus))))
             plots.append(plot)
             _obj: BaseTemplateDebuggingMixin = BaseTemplateDebuggingMixin.init_from_decoder(a_decoder=a_decoder, win=plot, title_str=f't={a_time_bin_idx}', is_horizontal=is_horizontal, **kwargs)
             _obj.update_base_decoder_debugger_data(
@@ -613,17 +641,24 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
             add_debug_header_label=False
         )
 
-        # 2. Update posterior plot (second row) 
-        spanning_posterior_plot = win.getItem(row=1, col=0)
-        spanning_posterior_plot.clear()
+        # 2. Update posterior plot (second row)
+        dec = cls._get_decoder_from_plots_data(plots_data)
         n_epoch_time_bins = len(new_time_bin_edges) - 1
-        flat_p_x_given_n = deepcopy(new_p_x_given_n)
-        cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(
-            curr_plot=spanning_posterior_plot,
-            image=flat_p_x_given_n,
-            xbin_edges=np.arange(n_epoch_time_bins+1),
-            ybin_edges=plots_data.a_decoder.xbin
-        )
+        if dec is not None and cls._bin_by_bin_true_2d_posterior_layout(dec, new_p_x_given_n):
+            for t in np.arange(n_epoch_time_bins):
+                post_plot = win.getItem(row=1, col=int(t))
+                post_plot.clear()
+                cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=post_plot, image=np.asarray(new_p_x_given_n[:, :, int(t)]), xbin_edges=deepcopy(dec.xbin), ybin_edges=deepcopy(dec.ybin))
+        else:
+            spanning_posterior_plot = win.getItem(row=1, col=0)
+            spanning_posterior_plot.clear()
+            flat_p_x_given_n = deepcopy(new_p_x_given_n)
+            if np.ndim(flat_p_x_given_n) > 2 and dec is not None and int(dec.ndim) < 2:
+                n_pos_bins, n_decoders, n_t_bins = np.shape(flat_p_x_given_n)
+                flat_p_x_given_n = np.vstack([flat_p_x_given_n[:, i, :] for i in np.arange(n_decoders)])
+            if dec is None:
+                raise ValueError("perform_update_time_binned_decoder_debug_plots requires plots_data.a_decoder or plots_data.decoder for 1D/pseudo-2D posterior row")
+            cls._helper_simply_plot_posterior_in_pyqtgraph_plotitem(curr_plot=spanning_posterior_plot, image=flat_p_x_given_n, xbin_edges=np.arange(n_epoch_time_bins + 1), ybin_edges=deepcopy(dec.xbin))
 
         # 3. Update individual time bin template plots (third row)
         for time_bin_idx, (template_obj, active_bin_spike_counts) in enumerate(zip(decoder_template_objects, new_active_aclu_spike_counts_list)):

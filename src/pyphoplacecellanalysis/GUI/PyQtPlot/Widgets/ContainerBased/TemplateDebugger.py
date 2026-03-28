@@ -237,8 +237,11 @@ class BaseTemplateDebuggingMixin:
         sorted_pf_peak_locations = deepcopy(sorted_pf_peak_location_list[0])
 
         img_extents = img_extents_dict[dummy_decoder_name_key]
-        
-        
+        if int(decoder.ndim) >= 2 and sorted_pf_tuning_curves.ndim == 3:
+            _n_cells, _nx, _ny = np.shape(sorted_pf_tuning_curves)
+            sorted_pf_tuning_curves = np.reshape(sorted_pf_tuning_curves, (_n_cells, _nx * _ny), order="C")
+            img_extents = [0.0, 0.0, float(_nx * _ny), float(len(sorted_neuron_IDs))]
+
         ## apply
         _out_data.sorted_neuron_IDs = sorted_neuron_IDs
         _out_data.sort_helper_neuron_id_to_neuron_colors = sort_helper_neuron_id_to_neuron_colors
@@ -850,6 +853,14 @@ class TemplateDebugger:
     # ==================================================================================================================== #
     # Extracted Functions:                                                                                                 #
     # ==================================================================================================================== #
+    @staticmethod
+    def _directional_template_peak_x_offset(a_decoder, curr_data_row, stored_peak_value):
+        if int(a_decoder.ndim) >= 2:
+            return float(np.argmax(curr_data_row))
+        return float(stored_peak_value)
+
+
+
     @function_attributes(short_name=None, tags=['rebuild'], input_requires=[], output_provides=[], uses=['paired_incremental_sort_neurons'], used_by=['_subfn_buildUI_directional_template_debugger_data', '_subfn_update_directional_template_debugger_data'], creation_date='2024-10-21 19:19', related_items=[])
     @classmethod
     def _subfn_rebuild_sort_idxs(cls, decoders_dict: Dict, _out_data: RenderPlotsData, use_incremental_sorting: bool, included_any_context_neuron_ids: NDArray) -> RenderPlotsData:
@@ -879,6 +890,11 @@ class TemplateDebugger:
         # sorted_pf_image_bounds_list = [pyqtplot_build_image_bounds_extent(a_decoder.pf.ratemap.xbins, a_decoder.pf.ratemap.ybins, margin=0.0, debug_print=False) for a_decoder in decoders_dict.values()]
         # pf_xbins_list = [a_decoder.pf.ratemap.xbin for a_decoder in decoders_dict.values()]
         img_extents_dict = {a_decoder_name:[a_decoder.pf.ratemap.xbin[0], 0, (a_decoder.pf.ratemap.xbin[-1]-a_decoder.pf.ratemap.xbin[0]), (float(len(sorted_neuron_IDs_lists[i]))-0.0)] for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()) } # these extents are  (x, y, w, h)
+        for i, ((a_decoder_name, a_decoder), cur) in enumerate(zip(decoders_dict.items(), sorted_pf_tuning_curves)):
+            if int(a_decoder.ndim) >= 2 and cur.ndim == 3:
+                _n, _nx, _ny = np.shape(cur)
+                sorted_pf_tuning_curves[i] = np.reshape(cur, (_n, _nx * _ny), order="C")
+                img_extents_dict[a_decoder_name] = [0.0, 0.0, float(_nx * _ny), float(len(sorted_neuron_IDs_lists[i]))]
         
         # ymin_ymax_tuple_dict = {a_decoder_name:[(float(cell_i), (float(cell_i) + line_height)) for a_decoder.] for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()) } # these extents are  (x, y, w, h)
         
@@ -982,7 +998,7 @@ class TemplateDebugger:
                 
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
-                    x_offset = curr_pf_peak_locations[cell_i]
+                    x_offset = cls._directional_template_peak_x_offset(a_decoder, curr_data[cell_i, :], curr_pf_peak_locations[cell_i])
                     y_offset = float(cell_i) 
                     
                     half_line_height = line_height / 2.0 # to compensate for middle
@@ -1150,7 +1166,7 @@ class TemplateDebugger:
 
                 # Add vertical lines
                 if _out_params.enable_pf_peak_indicator_lines:
-                    x_offset = curr_pf_peak_locations[cell_i]
+                    x_offset = cls._directional_template_peak_x_offset(a_decoder, curr_data[cell_i, :], curr_pf_peak_locations[cell_i])
                     # y_offset = float(cell_i)
                     y_offset = float(visible_cell_i) 
                     ## INPUTS: line_height
