@@ -754,7 +754,7 @@ class PredictiveDecodingVispyWidget:
         pf_decoder = kwargs.pop('pf_decoder', self.pf_decoder)
         active_aclus = np.array(pf_decoder.ratemap.neuron_ids)
         n_active_aclus: int = len(active_aclus)
-        print(f'n_active_aclus: {n_active_aclus}')
+        # print(f'n_active_aclus: {n_active_aclus}')
 
         active_epochs_df = kwargs.pop('active_epochs_df', None)
         # unit_colors_list = None # default rainbow of colors for the raster plots

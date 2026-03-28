@@ -907,7 +907,7 @@ def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0,
         # Merge the default kwargs with the user-provided kwargs
         merged_kwargs = {**default_scatter_plot_kwargs, **scatter_plot_kwargs}
 
-    print(f'merged_kwargs: {merged_kwargs}')
+    # print(f'merged_kwargs: {merged_kwargs}')
     return merged_kwargs
 
 def _build_units_y_grid(plot_item) -> pg.GridItem:
