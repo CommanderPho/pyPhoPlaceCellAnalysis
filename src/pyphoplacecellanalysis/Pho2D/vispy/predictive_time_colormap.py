@@ -1,4 +1,4 @@
-"""Sequential predictive-decoding time colors: bright cyan→neon magenta stops, full hue cycle (rainbow_hue), or matplotlib cmaps (e.g. plasma, cool)."""
+"""Sequential predictive-decoding time colors: high-luminance cyan→magenta stops (for outlines on viridis-like heatmaps), full hue cycle (rainbow_hue), or matplotlib cmaps (e.g. plasma, cool)."""
 
 from __future__ import annotations
 
@@ -48,15 +48,24 @@ def _hex_to_rgb01(hex_str: str) -> tuple[float, float, float]:
     return (int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0)
 
 
-# Control stops u in [0,1]: bright cyan → blue-violet → bright neon magenta (cyan_magenta only).
-_PREDICTIVE_TIME_STOPS_U = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
+# Control stops u in [0,1]: all high-luminance “neon” samples so outlines stay readable on viridis (dark purple–teal–yellow); cyan_magenta only.
+# _PREDICTIVE_TIME_STOPS_U = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
+# _PREDICTIVE_TIME_STOPS_RGB = np.array(
+#     [
+#         _hex_to_rgb01('#59FFFF'),
+#         _hex_to_rgb01('#70D8FF'),
+#         _hex_to_rgb01('#A29EFF'),
+#         _hex_to_rgb01('#D580FF'),
+#         _hex_to_rgb01('#FF7BFF'),
+#     ],
+#     dtype=np.float32,
+# )
+
+_PREDICTIVE_TIME_STOPS_U = np.array([0.0, 1.0], dtype=np.float32)
 _PREDICTIVE_TIME_STOPS_RGB = np.array(
     [
-        _hex_to_rgb01('#00F5FF'),
-        _hex_to_rgb01('#3399FF'),
-        _hex_to_rgb01('#8055FF'),
-        _hex_to_rgb01('#CC1FFF'),
-        _hex_to_rgb01('#FF00FF'),
+        _hex_to_rgb01('#59FFFF'),
+        _hex_to_rgb01('#FF7BFF'),
     ],
     dtype=np.float32,
 )
