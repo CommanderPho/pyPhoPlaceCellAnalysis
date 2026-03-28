@@ -1,6 +1,6 @@
 [project]
 name = "pyphoplacecellanalysis"
-version = "0.3.8"
+version = "0.4.0"
 description = ""
 authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
 requires-python = ">=3.9,<3.12"
@@ -8,7 +8,6 @@ readme = "README.md"
 dependencies = [
     "param>=1.12.3,<3",
     "qtmodern>=0.2.0,<0.3",
-    "elephant>=0.11.2,<0.12",
     "dill[graph]==0.3.5.1",
     "klepto==0.2.2",
     "findpeaks>=2.4.4,<3",
@@ -26,9 +25,9 @@ dependencies = [
     "attrs>=22.2.0,<23",
     "jinja2==3.0.3",
     "pandas==1.5.3",
-    "napari[pyqt5]>=0.4.18,<0.5",
-    "napari-animated-gif-io>=0.1.2,<0.2",
-    "napari-animation>=0.0.8,<0.0.9",
+    # "napari[pyqt5]>=0.4.18,<0.6", # "napari[pyqt5]>=0.4.18,<0.6",
+    # "napari-animated-gif-io>=0.1.2,<0.2",
+    # "napari-animation>=0.0.8,<0.0.9",
     "panel>=1.2.3,<2",
     "params>=0.9.0,<0.10",
     "jupyter-bokeh>=3.0.7,<4",
@@ -45,6 +44,7 @@ dependencies = [
     "numpy>=1.23.5",
     "pyclustering>=0.10.1.2",
     "silx>=2.2.0,<3",
+    "vispy",
 ]
 
 [dependency-groups]
@@ -93,6 +93,7 @@ neuropy = { path = "../NeuroPy", editable = true }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
 vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
+vispy = { path = "../vispy", editable = true }
 
 [build-system]
 requires = ["hatchling"]
