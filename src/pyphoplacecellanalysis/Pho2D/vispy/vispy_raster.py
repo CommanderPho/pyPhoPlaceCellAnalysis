@@ -140,11 +140,12 @@ def _marker_style_from_pg_kwargs(pg_kw: Dict[str, Any], *, fallback_size: float 
 
 
 @function_attributes(short_name=None, tags=['vispy', 'raster', '2D', 'gpu'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_build_scatter_plotting_managers', 'Render2DScrollWindowPlotMixin'], used_by=[], creation_date='2026-03-28', related_items=['plot_multiple_raster_plot'])
-def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', **kwargs) -> VispyMultiRasterPlotTuple:
-    """Multi-row spike rasters in one `SceneCanvas` (one view per epoch). Same data arguments as `plot_multiple_raster_plot`.
+def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', time_bin_raster_view: Any = None, clear_host_scene: bool = True, **kwargs) -> VispyMultiRasterPlotTuple:
+    """Multi-row spike rasters in one `SceneCanvas` (one view per epoch), or embedded into an existing `ViewBox` via `time_bin_raster_view`. Same data arguments as `plot_multiple_raster_plot`.
 
     Returns `VispyMultiRasterPlotTuple(canvas, plots, plots_data)`:
     - `plots.views` / `plots.raster_visuals` / `plots.grid_lines` are dicts keyed by epoch index (``an_epoch.Index``).
+    - When `time_bin_raster_view` is set, `plots.grid` is ``None``, every `plots.views[k]` is that host view, and `canvas` is the host view's canvas.
     - `active_context` is accepted for API parity with the PyQtGraph helper (stored on `plots_data` when provided).
 
     Usage:
@@ -201,28 +202,55 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
     spikes_df = _ensure_spikes_df_canonical_time_t(spikes_df)
 
     merged_pg_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs)
-    print(f'scatter_plot_kwargs: {scatter_plot_kwargs}\nmerged_pg_kwargs: {merged_pg_kwargs}')
+    if time_bin_raster_view is None:
+        print(f'scatter_plot_kwargs: {scatter_plot_kwargs}\nmerged_pg_kwargs: {merged_pg_kwargs}')
     sym, msize, scaling = _marker_style_from_pg_kwargs(merged_pg_kwargs)
-    print(f'sym: {sym}, msize: {msize}, scaling: {scaling}')
+    if time_bin_raster_view is None:
+        print(f'sym: {sym}, msize: {msize}, scaling: {scaling}')
 
-    canvas = scene.SceneCanvas(keys='interactive', show=(not defer_show), title=scatter_app_name, size=(1000, max(400, 80 * len(filter_epochs_df))), bgcolor=bgcolor, resizable=True)
-    grid = canvas.central_widget.add_grid()
-    grid.spacing = 0
-
-    views: Dict[Any, scene.ViewBox] = {}
+    views: Dict[Any, Any] = {}
     raster_visuals: Dict[Any, VispyRasterVisual] = {}
     grid_lines: Dict[Any, Optional[vz.Line]] = {}
 
     n_cells = int(plots_data.n_cells)
 
+    host: Any = time_bin_raster_view
+    grid: Any = None
+    canvas: Any = None
+
+    if host is not None:
+        if clear_host_scene:
+            for _child in list(host.scene.children):
+                _child.parent = None
+        canvas = cast(Any, host).canvas
+        host_pz = scene.PanZoomCamera(aspect=None)
+        host.camera = host_pz
+        host_pz.interactive = False
+        if hasattr(host, 'bgcolor'):
+            host.bgcolor = bgcolor
+        gx0 = float(filter_epochs_df['start'].min())
+        gx1 = float(filter_epochs_df['stop'].max())
+        host_pz.rect = Rect((gx0, 0.0), ((gx1 - gx0), max(float(n_cells - 1), 1.0)))
+    else:
+        canvas = scene.SceneCanvas(keys='interactive', show=(not defer_show), title=scatter_app_name, size=(1000, max(400, 80 * len(filter_epochs_df))), bgcolor=bgcolor, resizable=True)
+        grid = canvas.central_widget.add_grid()
+        grid.spacing = 0
+
     for an_epoch in filter_epochs_df.itertuples():
         row = int(an_epoch.Index)
-        view = grid.add_view(row=row, col=0, camera='panzoom', bgcolor=bgcolor)
-        view.camera = scene.PanZoomCamera(aspect=None)
-        view.camera.interactive = False
-        views[an_epoch.Index] = view
+        if host is not None:
+            view = host
+            views[an_epoch.Index] = host
+        else:
+            assert grid is not None
+            view = grid.add_view(row=row, col=0, camera='panzoom', bgcolor=bgcolor)
+            row_pz = scene.PanZoomCamera(aspect=None)
+            view.camera = row_pz
+            row_pz.interactive = False
+            views[an_epoch.Index] = view
 
-        a_vispy_raster_visual: VispyRasterVisual = VispyRasterVisual(parent=view.scene, symbol=sym, marker_size=msize, scaling=scaling, edge_width=0.0, order=5)
+        scene_parent = cast(Node, view.scene)
+        a_vispy_raster_visual: VispyRasterVisual = VispyRasterVisual(parent=scene_parent, symbol=sym, marker_size=msize, scaling=scaling, edge_width=0.0, order=5)
         raster_visuals[an_epoch.Index] = a_vispy_raster_visual
 
         _active_epoch_spikes_df = spikes_df[spikes_df[epoch_id_key_name] == an_epoch.Index]
@@ -233,10 +261,12 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
             a_vispy_raster_visual.set_spike_arrays(np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.zeros((0, 4), dtype=np.float32))
 
         x0, x1 = float(an_epoch.start), float(an_epoch.stop)
-        view.camera.rect = Rect((x0, 0.0), ((x1 - x0), max(float(n_cells - 1), 1.0)))
+        if host is None:
+            assert isinstance(view.camera, scene.PanZoomCamera)
+            view.camera.rect = Rect((x0, 0.0), ((x1 - x0), max(float(n_cells - 1), 1.0)))
 
         if draw_unit_grid:
-            grid_lines[an_epoch.Index] = _unit_grid_line_visual(x0, x1, n_cells, view.scene)
+            grid_lines[an_epoch.Index] = _unit_grid_line_visual(x0, x1, n_cells, scene_parent)
         else:
             grid_lines[an_epoch.Index] = None
     ## END for an_epoch in filter_epochs_df.itertuples()...

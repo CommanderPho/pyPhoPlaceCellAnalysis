@@ -360,7 +360,7 @@ class PredictiveDecodingVispyWidget:
             curr_row = curr_row + 1
 
             ## add raster
-            self.time_bin_raster = grid.add_view(row=curr_row, col=1, col_span=1, border_color='gray')
+            self.time_bin_raster = grid.add_view(row=curr_row, col=1, col_span=1, border_color='gray', bgcolor='black')
             self.time_bin_raster.height_max = 120
             curr_row = curr_row + 1
 
@@ -749,12 +749,13 @@ class PredictiveDecodingVispyWidget:
         n_active_aclus: int = len(active_aclus)
         print(f'n_active_aclus: {n_active_aclus}')
 
+        active_epochs_df = kwargs.pop('active_epochs_df', None)
         # unit_colors_list = None # default rainbow of colors for the raster plots
-        neuron_qcolors_list = [pg.mkColor('black') for aclu in active_aclus] # solid green for all
-        unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
+        # neuron_qcolors_list = [pg.mkColor('black') for aclu in active_aclus] # solid green for all
+        # unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
         if (active_epochs_df is None or getattr(active_epochs_df, 'size', 1) == 0) and hasattr(self.a_flat_matching_results_list_ds, 'filter_epochs') and self.a_flat_matching_results_list_ds is not None and self.a_flat_matching_results_list_ds.filter_epochs is not None and new_epoch_idx < len(self.a_flat_matching_results_list_ds.filter_epochs):
             # active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs[a_flat_matching_results_list_ds.filter_epochs['original_epoch_idx'] < 3]
-            active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs.iloc[new_epoch_idx]
+            active_epochs_df: pd.DataFrame = self.a_flat_matching_results_list_ds.filter_epochs.iloc[[new_epoch_idx]]
         actIve_filter_epochs_spikes_df: pd.DataFrame = pf_decoder.spikes_df
 
         _raster_kwargs = dict(active_epochs_df=active_epochs_df, active_aclus=active_aclus, actIve_filter_epochs_spikes_df=actIve_filter_epochs_spikes_df, )
