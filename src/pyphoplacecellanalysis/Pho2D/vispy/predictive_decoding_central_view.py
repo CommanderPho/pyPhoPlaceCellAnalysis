@@ -6,7 +6,6 @@ Callers must pass all views and mutable lists via _update_dict.
 
 from __future__ import annotations
 
-import colorsys
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
@@ -18,17 +17,9 @@ from vispy import scene
 import vispy.scene.visuals as vz
 
 from pyphocorehelpers.assertion_helpers import Assert
+from pyphoplacecellanalysis.Pho2D.vispy.predictive_time_colormap import predictive_time_bin_rgba
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import ContourItem, contours_from_masks, create_contour_line_visuals
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_raster import VispyRasterVisual, plot_multiple_raster_plot_vispy, VispyMultiRasterPlotTuple
-
-def _time_bin_colors(n_bins: int, alpha: float = 0.9) -> np.ndarray:
-    """Return (n_bins, 4) float32 array of RGBA colors for time bins (hue cycled)."""
-    out = np.zeros((n_bins, 4), dtype=np.float32)
-    for t_idx in range(n_bins):
-        hue = (t_idx / max(n_bins, 1)) % 1.0
-        rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-        out[t_idx] = (rgb[0], rgb[1], rgb[2], alpha)
-    return out
 
 
 def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int, epoch_start_t: Optional[float], epoch_end_t: Optional[float], *, epoch_flat_mask_future_past_result: Optional[List[Any]] = None,
@@ -274,7 +265,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
     if p_x_given_n is not None and p_x_given_n.size > 0 and time_bin_grid is not None:
         n_time_bins = p_x_given_n.shape[2]
         n_bins_to_show = min(n_time_bins, max_time_bins_to_show)
-        view_time_bin_colors = _time_bin_colors(n_bins_to_show, alpha=1.0)[:, :3]
+        view_time_bin_colors = predictive_time_bin_rgba(n_bins_to_show, alpha=1.0)[:, :3]
         vol_min, vol_max = p_x_given_n.min(), p_x_given_n.max()
 
         _grid_widgets = getattr(time_bin_grid, '_grid_widgets', {})
@@ -338,7 +329,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
             per_t_bin_mask = epoch_result_for_contours.epoch_t_bins_high_prob_pos_mask
             n_mask_t_bins = per_t_bin_mask.shape[2]
             masks = [per_t_bin_mask[:, :, t_idx].T for t_idx in range(n_mask_t_bins)]
-            contour_time_bin_colors = _time_bin_colors(n_mask_t_bins, alpha=0.7)
+            contour_time_bin_colors = predictive_time_bin_rgba(n_mask_t_bins, alpha=0.7)
             colors = [tuple(contour_time_bin_colors[i]) for i in range(n_mask_t_bins)]
             contour_data_per_mask = contours_from_masks(masks, x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=colors, level=0.5, return_per_mask=True)
             contour_data_flat: List[ContourItem] = [item for sublist in contour_data_per_mask for item in sublist]
@@ -381,6 +372,11 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
             elif te.size >= 2:
                 raster_time_bin_edges = te.astype(np.float32, copy=False)
         num_bins_for_raster_lines: Optional[int] = None if raster_time_bin_edges is not None else num_epoch_time_bins_for_raster
+        raster_edge_vu: Optional[np.ndarray] = None
+        if raster_time_bin_edges is not None:
+            m = int(np.asarray(raster_time_bin_edges, dtype=np.float64).size)
+            if m >= 2:
+                raster_edge_vu = np.linspace(0.0, 1.0, m, dtype=np.float64)
         # new_all_aclus_sort_indicies = None
         # pen = {'color': 'white', 'width': 1}
         # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
@@ -394,7 +390,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                                             scatter_plot_kwargs=override_scatter_plot_kwargs,
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
                                             active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black',
-                                            time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines)
+                                            time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines, time_bin_edge_vu=raster_edge_vu, time_bin_edge_line_alpha=0.65)
 
 
     return _update_dict

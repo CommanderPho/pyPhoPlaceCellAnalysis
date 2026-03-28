@@ -49,7 +49,7 @@ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionL
 # 2026-01-21 - Vispy                                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
 from pyphoplacecellanalysis.GUI.Qt.Widgets.Testing.StackedDynamicTablesWidget import TableManager
-import colorsys
+from pyphoplacecellanalysis.Pho2D.vispy.predictive_time_colormap import predictive_time_bin_rgba, predictive_time_rgb
 ## vispy
 import vispy
 import vispy as vp
@@ -605,13 +605,8 @@ class PredictiveDecodingVispyWidget:
                 
 
     def _time_bin_colors(self, n_bins: int, alpha: float = 0.9) -> np.ndarray:
-        """Return (n_bins, 4) float32 array of RGBA colors for time bins (hue cycled)."""
-        out = np.zeros((n_bins, 4), dtype=np.float32)
-        for t_idx in range(n_bins):
-            hue = (t_idx / max(n_bins, 1)) % 1.0
-            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
-            out[t_idx] = (rgb[0], rgb[1], rgb[2], alpha)
-        return out
+        """Return (n_bins, 4) float32 RGBA using the standardized predictive time colormap (cyan→magenta)."""
+        return predictive_time_bin_rgba(n_bins, alpha=alpha)
 
     def _debug_log_line_visual(self, line: Any, context: str, pos: Optional[np.ndarray] = None, colors: Optional[np.ndarray] = None, extra: Optional[Dict[str, Any]] = None) -> None:
         """Logs line id and finite stats so crash addresses can be mapped to source visuals."""
@@ -783,7 +778,7 @@ class PredictiveDecodingVispyWidget:
         return _out
 
 
-    def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], default_hue: float, view: Any, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int,
+    def _render_trajectory_side(self, positions_dict: dict, epoch_anchor_t: Optional[float], endpoint_time_u: float, view: Any, trajectory_colors_and_times_out: list, max_time_distance: float, time_bin_colors: np.ndarray, x_min: float, x_max: float, y_min: float, y_max: float, new_epoch_idx: int,
                                  lines_list: Optional[List]=None, 
                                  trajectory_debug_arrows: Optional[List]=None,
                                  render_data_dict_list: Optional[List]=None,
@@ -824,9 +819,9 @@ class PredictiveDecodingVispyWidget:
                         if len(valid_match_indices) > 0:
                             segment_row_idx = int(valid_match_indices[0])
                             matched_t_idx = self._segment_row_to_time_bin_idx(segment_row_idx, new_epoch_idx, mode='centroids')
-                            base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if (matched_t_idx is not None and matched_t_idx < len(time_bin_colors)) else colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                            base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if (matched_t_idx is not None and matched_t_idx < len(time_bin_colors)) else predictive_time_rgb(endpoint_time_u)
                         else:
-                            base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                            base_rgb = predictive_time_rgb(endpoint_time_u)
                             
                     elif self.color_matches_by_merged_epoch_t_bin_idx and 'matching_found_relevant_pos_epoch' in positions_df.columns:
                         matching_idx_values = positions_df['matching_found_relevant_pos_epoch'].values
@@ -885,12 +880,12 @@ class PredictiveDecodingVispyWidget:
                         #     segment_row_idx = int(valid_match_indices[0])
                         #     matched_t_idx = self._segment_row_to_time_bin_idx(segment_row_idx, new_epoch_idx, mode='merged_segments')
                         #     matched_t_idx = valid_match_indices
-                        #     # base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if ((matched_t_idx is not None) and (matched_t_idx < len(time_bin_colors))) else colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                        #     # base_rgb = tuple(time_bin_colors[matched_t_idx][:3]) if ((matched_t_idx is not None) and (matched_t_idx < len(time_bin_colors))) else predictive_time_rgb(endpoint_time_u)
                         # else:
-                        #     base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9)
+                        #     base_rgb = predictive_time_rgb(endpoint_time_u)
 
                     else:
-                        base_rgb = colorsys.hsv_to_rgb(default_hue, 0.8, 0.9) ## all the same (default) hue
+                        base_rgb = predictive_time_rgb(endpoint_time_u)
                         custom_cmap = None
 
 
@@ -907,7 +902,7 @@ class PredictiveDecodingVispyWidget:
                             y_valid = y_valid[valid_time_mask]
                             mean_time = float(np.mean(t_coords))
                             if np.isfinite(mean_time):
-                                trajectory_colors_and_times_out.append((colorsys.hsv_to_rgb(default_hue, 0.8, 0.9), mean_time))
+                                trajectory_colors_and_times_out.append((predictive_time_rgb(endpoint_time_u), mean_time))
                             time_rel = t_coords - epoch_anchor_t
                             time_distance = np.abs(time_rel)
                             opacity = (1.0 - (time_distance / max_time_distance) * 0.8) if max_time_distance > 0 else np.ones(len(x_valid)) * 0.8
@@ -1272,8 +1267,8 @@ class PredictiveDecodingVispyWidget:
                 time_distance = np.abs(time_val)
                 distance_normalized = time_distance / max_time_distance
                 opacity = np.clip(1.0 - distance_normalized * 0.8, 0.2, 1.0)
-                hue = 0.0 if time_val < 0 else 0.5
-                rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+                u_grad = float(i) / float(max(num_segments - 1, 1))
+                rgb = predictive_time_rgb(u_grad)
                 color = (rgb[0], rgb[1], rgb[2], opacity)
                 x_pos = i * segment_width
                 rect = vz.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene)
@@ -1283,10 +1278,10 @@ class PredictiveDecodingVispyWidget:
             for time_val, x_pos in zip(label_times, label_positions):
                 text = vz.Text(f'{time_val:.2f}s', pos=(x_pos, colorbar_height + 10), color='white', font_size=10, parent=self.colorbar_view.scene)
                 self.colorbar_texts.append(text)
-            title_past = vz.Text('Past (time from start)', pos=(colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
-            title_future = vz.Text('Future (time from end)', pos=(3*colorbar_width/4, -20), color='white', font_size=12, parent=self.colorbar_view.scene)
+            title_start = vz.Text('start', pos=(10, -20), color='white', font_size=12, anchor_x='left', parent=self.colorbar_view.scene)
+            title_end = vz.Text('end', pos=(colorbar_width - 10, -20), color='white', font_size=12, anchor_x='right', parent=self.colorbar_view.scene)
             title_opacity = vz.Text('Opacity: 1.0 (close) → 0.2 (distant)', pos=(colorbar_width/2, colorbar_height + 25), color='white', font_size=11, parent=self.colorbar_view.scene)
-            self.colorbar_texts.extend([title_past, title_future, title_opacity])
+            self.colorbar_texts.extend([title_start, title_end, title_opacity])
             self.colorbar_view.camera = scene.PanZoomCamera(aspect=1)
             self.colorbar_view.camera.set_range(x=(-50, colorbar_width + 50), y=(-50, colorbar_height + 50))
             
@@ -1328,7 +1323,7 @@ class PredictiveDecodingVispyWidget:
         if 'past' in curr_matching_past_future_positions_df_dict:
             curr_past_future_key_name: types.PastFutureCategory = 'past'
             self.render_data_dict_list_dict[curr_past_future_key_name] = [] ## clear manually
-            self.past_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_start_t, default_hue=0.0, view=self.past_view, trajectory_colors_and_times_out=past_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
+            self.past_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_start_t, endpoint_time_u=0.0, view=self.past_view, trajectory_colors_and_times_out=past_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
                                                                lines_list=self.past_lines, trajectory_debug_arrows=self.trajectory_debug_arrows.get(curr_past_future_key_name, []), render_data_dict_list=self.render_data_dict_list_dict.get(curr_past_future_key_name, []),
                                                            )
 
@@ -1359,7 +1354,7 @@ class PredictiveDecodingVispyWidget:
         if 'future' in curr_matching_past_future_positions_df_dict:
             curr_past_future_key_name: types.PastFutureCategory = 'future'
             self.render_data_dict_list_dict[curr_past_future_key_name] = [] ## clear manually
-            self.future_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_end_t, default_hue=0.5, view=self.future_view, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
+            self.future_lines, self.trajectory_debug_arrows[curr_past_future_key_name], self.render_data_dict_list_dict[curr_past_future_key_name] = self._render_trajectory_side(positions_dict=curr_matching_past_future_positions_df_dict[curr_past_future_key_name], epoch_anchor_t=epoch_end_t, endpoint_time_u=1.0, view=self.future_view, trajectory_colors_and_times_out=future_trajectory_colors_and_times, **_common_past_future_render_trajectory_side_kwargs,
                                                                 lines_list=self.future_lines, trajectory_debug_arrows=self.trajectory_debug_arrows.get(curr_past_future_key_name, []), render_data_dict_list=self.render_data_dict_list_dict.get(curr_past_future_key_name, []),
                                                              )
             
@@ -2282,11 +2277,11 @@ class Volumentric2DTimeSeriesPlotter:
         if not pos_dict:
             self._match_lines_built_for_epoch_idx = int(epoch_idx)
             return
-        for category, default_hue in (('past', 0.0), ('future', 0.5)):
+        for category, endpoint_u in (('past', 0.0), ('future', 1.0)):
             sub = pos_dict.get(category, None)
             if not sub:
                 continue
-            rgb = colorsys.hsv_to_rgb(default_hue, 0.85, 0.95)
+            rgb = predictive_time_rgb(endpoint_u)
             rgba = (float(rgb[0]), float(rgb[1]), float(rgb[2]), 0.92)
             for _epoch_id, positions_df in sub.items():
                 if positions_df is None or len(positions_df) < 2:
@@ -2443,8 +2438,7 @@ class Volumentric2DTimeSeriesPlotter:
             else:
                 t_center = float(self.t_min + (t_idx + 0.5) * ((self.t_max - self.t_min) / max(n_tbins, 1)))
             z_val = float((t_center - self.t_min) * self.z_scale)
-            hue = (t_idx / max(n_tbins, 1)) % 1.0
-            rgb = colorsys.hsv_to_rgb(hue, 0.8, 0.9)
+            rgb = predictive_time_rgb(t_idx / max(n_tbins, 1))
             t_color = (rgb[0], rgb[1], rgb[2], contour_alpha)
             mask_2d = per_t_bin_mask[:, :, t_idx].T
             contour_items: List[ContourItem] = contours_from_masks([mask_2d], x_bounds=(x_min, x_max), y_bounds=(y_min, y_max), colors=[t_color], level=level, return_per_mask=False)

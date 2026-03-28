@@ -30,6 +30,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import (
     Render2DScrollWindowPlotMixin,
 )
+from pyphoplacecellanalysis.Pho2D.vispy.predictive_time_colormap import predictive_time_rgba_u
 
 
 def _ensure_spikes_df_canonical_time_t(spikes_df: pd.DataFrame) -> pd.DataFrame:
@@ -129,8 +130,11 @@ def _unit_grid_line_visual(x0: float, x1: float, n_cells: int, parent: Node) -> 
     return line
 
 
-def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, parent: Node, *, rgba: Tuple[float, float, float, float] = (0.92, 0.92, 0.98, 0.6), line_width: float = 1.0) -> Optional[vz.Line]:
-    """Low-alpha vertical lines at decoded time-bin edges (world time on x); behind unit grid (order -50) and spikes (order 5)."""
+def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, parent: Node, *, rgba: Tuple[float, float, float, float] = (0.92, 0.92, 0.98, 0.6), line_width: float = 1.0, edge_vu: Optional[np.ndarray] = None, edge_line_alpha: Optional[float] = None) -> Optional[vz.Line]:
+    """Low-alpha vertical lines at decoded time-bin edges (world time on x); behind unit grid (order -50) and spikes (order 5).
+
+    If ``edge_vu`` is length n matching ``edge_times``, each segment is colored via ``predictive_time_rgba_u``; ``edge_line_alpha`` overrides alpha for those samples (defaults to ``rgba[3]``).
+    """
     t_arr = np.asarray(edge_times, dtype=np.float32).ravel()
     if t_arr.size < 2:
         return None
@@ -141,7 +145,19 @@ def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, 
     pos[1::2, 0] = t_arr
     pos[1::2, 1] = float(y1)
     connect = np.arange(n * 2, dtype=np.uint32).reshape(n, 2)
-    line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
+    if edge_vu is not None:
+        vu = np.asarray(edge_vu, dtype=np.float64).ravel()
+        if vu.size != n:
+            raise ValueError(f'edge_vu length {vu.size} != n_edges {n}')
+        al = float(rgba[3]) if edge_line_alpha is None else float(edge_line_alpha)
+        col = np.empty((n * 2, 4), dtype=np.float32)
+        for i in range(n):
+            r0, g0, b0, a0 = predictive_time_rgba_u(float(vu[i]), al)
+            col[2 * i] = (r0, g0, b0, a0)
+            col[2 * i + 1] = (r0, g0, b0, a0)
+        line = vz.Line(pos=pos, connect=connect, color=col, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
+    else:
+        line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
     line.order = -50
     return line
 
@@ -157,7 +173,7 @@ def _marker_style_from_pg_kwargs(pg_kw: Dict[str, Any], *, fallback_size: float 
 
 
 @function_attributes(short_name=None, tags=['vispy', 'raster', '2D', 'gpu'], input_requires=[], output_provides=[], uses=['_prepare_spikes_df_from_filter_epochs', '_build_scatter_plotting_managers', 'Render2DScrollWindowPlotMixin'], used_by=[], creation_date='2026-03-28', related_items=['plot_multiple_raster_plot'])
-def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', time_bin_raster_view: Any = None, clear_host_scene: bool = True, time_bin_edges: Optional[np.ndarray] = None, num_epoch_time_bins: Optional[int] = None, **kwargs) -> VispyMultiRasterPlotTuple:
+def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: pd.DataFrame, included_neuron_ids=None, unit_sort_order=None, unit_colors_list=None, scatter_plot_kwargs=None, epoch_id_key_name='temp_epoch_id', scatter_app_name: str = 'Pho Stacked Replays', defer_show: bool = False, active_context=None, *, draw_unit_grid: bool = True, bgcolor: str = 'white', time_bin_raster_view: Any = None, clear_host_scene: bool = True, time_bin_edges: Optional[np.ndarray] = None, num_epoch_time_bins: Optional[int] = None, time_bin_edge_vu: Optional[np.ndarray] = None, time_bin_edge_line_alpha: float = 0.6, **kwargs) -> VispyMultiRasterPlotTuple:
     """Multi-row spike rasters in one `SceneCanvas` (one view per epoch), or embedded into an existing `ViewBox` via `time_bin_raster_view`. Same data arguments as `plot_multiple_raster_plot`.
 
     Returns `VispyMultiRasterPlotTuple(canvas, plots, plots_data)`:
@@ -166,6 +182,7 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
     - `active_context` is accepted for API parity with the PyQtGraph helper (stored on `plots_data` when provided).
     - Optional `time_bin_edges` (absolute times, same axis as spikes) draws faint vertical guides at those edges; when set it overrides `num_epoch_time_bins` for line placement.
     - Optional `num_epoch_time_bins` otherwise uses `linspace` across each epoch's [start, stop] (aligned with the time-bin row when counts match).
+    - Optional `time_bin_edge_vu`: length m colormap coordinates in [0,1] for each edge time (predictive time colormap); omit for neutral gray-blue guides.
 
     Usage:
 
@@ -299,7 +316,12 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
             n_tb = int(num_epoch_time_bins)
             edges_vis = np.linspace(x0, x1, n_tb + 1, dtype=np.float32)
         if edges_vis is not None:
-            time_bin_edge_lines[an_epoch.Index] = _time_bin_edge_vertical_lines(edges_vis, 0.0, y_hi, scene_parent)
+            vu_arg = None
+            if time_bin_edge_vu is not None:
+                vu_arg = np.asarray(time_bin_edge_vu, dtype=np.float64).ravel()
+                if vu_arg.size != int(edges_vis.size):
+                    raise ValueError(f'time_bin_edge_vu length {vu_arg.size} != time_bin_edges length {int(edges_vis.size)}')
+            time_bin_edge_lines[an_epoch.Index] = _time_bin_edge_vertical_lines(edges_vis, 0.0, y_hi, scene_parent, edge_vu=vu_arg, edge_line_alpha=time_bin_edge_line_alpha)
         else:
             time_bin_edge_lines[an_epoch.Index] = None
     ## END for an_epoch in filter_epochs_df.itertuples()...
