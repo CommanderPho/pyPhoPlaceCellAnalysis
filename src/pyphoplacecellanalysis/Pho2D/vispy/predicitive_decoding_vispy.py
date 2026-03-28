@@ -333,7 +333,7 @@ class PredictiveDecodingVispyWidget:
         _, _ = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
         root_dockAreaWindow.resize(1400, 950)
 
-        grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid() # vispy.scene.widgets.grid.Grid
+        grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid(name='grid') # vispy.scene.widgets.grid.Grid
         self.grid = grid
         
 
@@ -343,26 +343,26 @@ class PredictiveDecodingVispyWidget:
             # SINGLE EPOCH VIEW WITH SLIDER                                                                                                                                                                                                                                                        #
             # ==================================================================================================================================================================================================================================================================================== #
             # Default single epoch plotting mode with slider to control active epoch _____________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red')
-            self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue')
+            self.past_view = grid.add_view(row=0, col=0, col_span=1, row_span=2, border_color='red', name='past_view')
+            self.future_view = grid.add_view(row=0, col=2, col_span=1, row_span=2, border_color='blue', name='future_view')
     
-            self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray')
+            self.posterior_2d_view = grid.add_view(row=0, col=1, col_span=1, border_color='gray', name='posterior_2d_view')
             
             curr_row: int = 1
-            self.time_bin_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=curr_row, col=1, col_span=1, border_color='gray')
+            self.time_bin_grid: vispy.scene.widgets.grid.Grid = grid.add_grid(row=curr_row, col=1, col_span=1, border_color='gray', name='time_bin_grid')
             self.time_bin_grid.height_max = 120
             curr_row = curr_row + 1
 
             ## add raster
-            self.time_bin_raster = grid.add_view(row=curr_row, col=1, col_span=1, border_color='gray', bgcolor='black')
+            self.time_bin_raster = grid.add_view(row=curr_row, col=1, col_span=1, border_color='gray', bgcolor='black', name='time_bin_raster')
             self.time_bin_raster.height_max = 120
             curr_row = curr_row + 1
 
-            self.combined_timeline_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray')
+            self.combined_timeline_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray', name='combined_timeline_view')
             self.combined_timeline_view.height_max = 40
             curr_row = curr_row + 1
 
-            self.colorbar_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray') # curr_row: 3
+            self.colorbar_view = grid.add_view(row=curr_row, col=0, col_span=3, border_color='gray', name='colorbar_view') # curr_row: 3
             self.colorbar_view.height_max = 60
 
 
