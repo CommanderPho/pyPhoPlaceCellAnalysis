@@ -70,13 +70,13 @@ class VispyRasterVisual(Node):
     
     """
 
-    def __init__(self, parent: Optional[Node] = None, *, symbol: str = 'vbar', marker_size: float = 6.0, scaling: bool = True, edge_width: float = 0.0, order: int = 5) -> None:
-        super().__init__(parent=parent)
+    def __init__(self, parent: Optional[Node] = None, *, symbol: str = 'vbar', marker_size: float = 6.0, scaling: bool = True, edge_width: float = 0.0, order: int = 5, name='VispyRaster', **kwargs) -> None:
+        super().__init__(parent=parent, name=name, **kwargs)
         self._symbol = symbol
         self._marker_size = marker_size
         self._scaling = scaling
         self._edge_width = edge_width
-        self._markers = vz.Markers(parent=self, symbol=symbol, size=marker_size, scaling=scaling, edge_width=edge_width)  # type: ignore[call-arg]
+        self._markers = vz.Markers(parent=self, symbol=symbol, size=marker_size, scaling=scaling, edge_width=edge_width, name=f'{name}.Markers')  # type: ignore[call-arg]
         self._markers.order = order
         self._markers.set_gl_state(depth_test=False, blend=True, blend_func=('src_alpha', 'one_minus_src_alpha'))
 
@@ -125,7 +125,7 @@ def _unit_grid_line_visual(x0: float, x1: float, n_cells: int, parent: Node) -> 
     pos[0::2, 1] = ys
     pos[1::2, 1] = ys
     connect = np.arange(nseg * 2, dtype=np.uint32).reshape(nseg, 2)
-    line = vz.Line(pos=pos, connect=connect, color=(0.53, 0.53, 0.53, 0.55), width=1.0, method='gl', parent=parent)  # type: ignore[call-arg]
+    line = vz.Line(pos=pos, connect=connect, color=(0.53, 0.53, 0.53, 0.55), width=1.0, method='gl', parent=parent, name=f'neuron_grid_hlines')  # type: ignore[call-arg]
     line.order = -55
     return line
 
@@ -149,7 +149,7 @@ def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, 
     connect = np.arange(n * 2, dtype=np.uint32).reshape(n, 2)
     # line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
     print(f'\trgba: {rgba}')
-    line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='agg', parent=parent)  # type: ignore[call-arg]
+    line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='agg', parent=parent, name=f'time_bin_edge_vlines')  # type: ignore[call-arg]
 
     # if edge_vu is not None:
     #     vu = np.asarray(edge_vu, dtype=np.float64).ravel()

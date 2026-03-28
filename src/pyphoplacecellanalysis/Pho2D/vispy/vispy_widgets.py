@@ -53,10 +53,13 @@ except Exception:
     _HAS_MPL = False
 
 
+from attrs import define, field
+
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -143,9 +146,17 @@ class _BlendPresetDelegate(QtWidgets.QStyledItemDelegate):  # type: ignore[misc]
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
     """Qt tree widget that displays a vispy scene graph hierarchy.
-    
+
+    Name column: if a vispy ``Node`` has a non-empty ``name`` (e.g. ``name=`` in the
+    constructor), that string is shown. Otherwise the default label is the node's class
+    name (e.g. ``Line``). If several siblings share the same concrete class, indices
+    are appended (``Line [0]``, ``Line [1]``, ...) in child order. Python attribute or
+    variable names used in assignment (e.g. ``self.my_line = Line(...)``) are not
+    available on the object at runtime, so custom labels require an explicit ``name=``
+    (or a custom ``Name`` column renderer via ``register_column_renderer``).
+
     from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneTreeWidget
-    
+
     from pyphoplacecellanalysis.Pho2D.vispy.predicitive_decoding_vispy import Volumentric2DTimeSeriesPlotter
     viewer_3d = Volumentric2DTimeSeriesPlotter.init_from_position_and_decoder(curr_position_df=curr_position_df, xbin=xbin, ybin=ybin, p_x_given_n=p_x_given_n, t_bin_edges=t_bin_edges, highlight_epochs=highlight_epochs)
     scene_tree_widget = VispySceneTreeWidget(root_node=viewer_3d.canvas.scene, canvas=viewer_3d.canvas)
@@ -178,6 +189,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         self._column_headers = ['Name', 'Type', 'Visible', 'Order', 'Opacity', 'GL Blend', 'Transform']
         self._column_visibility = [True] * len(self._column_headers)
         self._user_column_renderers = dict(column_renderers or {})
+        self._name_parent_ctx: Optional[Node] = None
         self._user_role = getattr(QtCore.Qt, 'UserRole', QtCore.Qt.ItemDataRole.UserRole)
         self._checked_state = getattr(QtCore.Qt, 'Checked', QtCore.Qt.CheckState.Checked)
         self._unchecked_state = getattr(QtCore.Qt, 'Unchecked', QtCore.Qt.CheckState.Unchecked)
@@ -242,7 +254,17 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
 
         def _render_name(node: Node) -> str:
             node_name = getattr(node, 'name', None)
-            return '' if node_name is None else str(node_name)
+            if node_name is not None and str(node_name).strip():
+                return str(node_name)
+            cls_name = node.__class__.__name__
+            parent = self._name_parent_ctx
+            if parent is not None:
+                kids = list(getattr(parent, 'children', []) or [])
+                same_class = [c for c in kids if c.__class__ is node.__class__]
+                if len(same_class) > 1:
+                    idx = same_class.index(node)
+                    return f'{cls_name} [{idx}]'
+            return cls_name
 
         def _render_order(node: Node) -> str:
             return str(getattr(node, 'order', ''))
@@ -290,16 +312,17 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         effective = self._effective_display_root(self._root_node)
         effective_children = list(effective.children)
         if len(effective_children) == 0:
-            self._populate(node=effective, parent_item=None)
+            self._populate(node=effective, parent_item=None, parent_vispy_node=None)
         else:
             for child in effective_children:
-                self._populate(node=child, parent_item=None)
+                self._populate(node=child, parent_item=None, parent_vispy_node=effective)
         self.tree.expandToDepth(3)
         for col in range(len(self._column_headers)):
             if self._column_visibility[col]:
                 self.tree.resizeColumnToContents(col)
         self.tree.blockSignals(False)
         self._is_rebuilding = False
+        self._name_parent_ctx = None
 
 
     def _node_has_gl_blend(self, node: Node) -> bool:
@@ -320,7 +343,8 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         return current
 
 
-    def _populate(self, node: Node, parent_item: Optional[Any]) -> None:
+    def _populate(self, node: Node, parent_item: Optional[Any], parent_vispy_node: Optional[Node] = None) -> None:
+        self._name_parent_ctx = parent_vispy_node
         node_visible = bool(getattr(node, 'visible', True))
         node_type = self._get_cell_text(column_name='Type', node=node)
         node_name = self._get_cell_text(column_name='Name', node=node)
@@ -340,7 +364,7 @@ class VispySceneTreeWidget(QtWidgets.QWidget):  # type: ignore[misc]
         else:
             cast(Any, parent_item).addChild(item)
         for child in list(node.children):
-            self._populate(node=child, parent_item=item)
+            self._populate(node=child, parent_item=item, parent_vispy_node=node)
 
 
     _VALID_BLEND_PRESETS = ('opaque', 'translucent', 'additive')
@@ -398,6 +422,57 @@ class VispyCanvasContainingWindow(PhoDockAreaContainingWindow):
         super(VispyCanvasContainingWindow, self).__init__(title, *args, **kwargs)
         self.setWindowTitle(title)
 
+
+
+@define(slots=False, repr=False, eq=False)
+class VispySceneWindowState:
+    """Attrs field bundle for dock-hosted vispy viewers with an optional scene tree."""
+    canvas: Any = field(default=None)
+    main_window: Optional[PhoDockAreaContainingWindow] = field(default=None)
+    scene_tree_widget: Optional[VispySceneTreeWidget] = field(default=None)
+
+
+
+
+class VispySceneWindowMixin:
+    """Method mixin for types that use ``VispySceneWindowState`` (or matching attributes)."""
+
+
+    def _refresh_scene_tree(self) -> None:
+        if self.scene_tree_widget is not None:
+            self.scene_tree_widget.rebuild()
+
+
+
+    def _bind_scene_tree_from_wrap(self, scene_wrap: VispySceneWrappingWidget) -> None:
+        assert scene_wrap.scene_tree_widget is not None
+        self.scene_tree_widget = scene_wrap.scene_tree_widget
+
+
+
+    @classmethod
+    def default_vispy_viewer_dock_display_config(cls) -> CustomDockDisplayConfig:
+        return CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
+
+
+
+    @classmethod
+    def make_viewer_central_widget_with_scene_wrap(cls, canvas: scene.SceneCanvas, *, parent: Optional[Any] = None, stretch_for_wrap: int = 1, show_scene_tree: bool = True, tree_on_right: bool = True, tree_minimum_width: int = 200, column_renderers: Optional[Dict[str, Callable[[Node], str]]] = None, splitter_sizes: Optional[Sequence[int]] = None) -> Tuple[QtWidgets.QWidget, QtWidgets.QVBoxLayout, VispySceneWrappingWidget]:
+        viewer_central_widget = QtWidgets.QWidget(parent)
+        main_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        scene_wrap = VispySceneWrappingWidget(canvas=canvas, parent=viewer_central_widget, show_scene_tree=show_scene_tree, tree_on_right=tree_on_right, tree_minimum_width=tree_minimum_width, column_renderers=column_renderers, splitter_sizes=splitter_sizes)
+        main_layout.addWidget(scene_wrap, stretch=stretch_for_wrap)
+        return viewer_central_widget, main_layout, scene_wrap
+
+
+
+    @classmethod
+    def add_standard_vispy_viewer_dock(cls, main_window: PhoDockAreaContainingWindow, viewer_central_widget: QtWidgets.QWidget, *, dock_title: str = "Viewer", dock_size: Tuple[int, int] = (1100, 900), window_size: Tuple[int, int] = (1400, 950), display_config: Optional[CustomDockDisplayConfig] = None, dock_add_location_opts: Optional[List[str]] = None) -> None:
+        cfg = display_config if display_config is not None else cls.default_vispy_viewer_dock_display_config()
+        opts = dock_add_location_opts if dock_add_location_opts is not None else ['left']
+        _, _ = main_window.add_display_dock(dock_title, dockSize=dock_size, widget=viewer_central_widget, dockAddLocationOpts=opts, display_config=cfg)
+        main_window.resize(window_size[0], window_size[1])
 
 
 class CanvasEventHandlerMixin: # Canvas(app.Canvas):
@@ -546,13 +621,10 @@ class VispySceneWrappingWidget(QtWidgets.QWidget):  # type: ignore[misc]
             self.scene_tree_widget.rebuild()
 
 
-
     def resizeEvent(self, event: Any) -> None:
         super().resizeEvent(event)
         if self.canvas is not None:
             QtCore.QTimer.singleShot(10, self.canvas.update)
-
-
 
 
 def example_trajectory_segments_visual():

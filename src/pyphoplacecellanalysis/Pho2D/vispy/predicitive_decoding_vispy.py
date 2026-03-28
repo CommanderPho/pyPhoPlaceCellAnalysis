@@ -84,15 +84,14 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers, ContourItem, contours_from_masks, create_contour_line_visuals, VispySceneTreeWidget, _ensure_closed_pos, _triangulate_polygon_2d
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_decoding_central_view import render_central_view as render_predictive_decoding_central_view
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
-from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget, VispyCanvasContainingWindow
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispyCanvasContainingWindow, VispySceneWindowState, VispySceneWindowMixin
 
 
 ## missing imports: MatchingPastFuturePositionsResult, BasePositionDecoder, MaskDataSource
 
 @metadata_attributes(short_name=None, tags=['vispy', 'rendering', 'standalone'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-21', related_items=[])
 @define(slots=False, repr=False, eq=False)
-class PredictiveDecodingVispyWidget:
+class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin):
     """Vispy-based widget that renders predictive decoding data (same data as PredictiveDecodingDisplayWidget).
 
     Keyboard: Left/Right arrow to change epoch. Use init_from_list or init_from_datasource to create;
@@ -139,13 +138,7 @@ class PredictiveDecodingVispyWidget:
     past_future_trajectory_start_extension_seconds: float = field(default=0.0)
     past_future_trajectory_end_extension_seconds: float = field(default=0.0)
     
-
     # UI / vispy (created in buildUI)
-    canvas: Any = field(default=None)
-    main_window: VispyCanvasContainingWindow = field(default=None)
-    scene_tree_widget: VispySceneTreeWidget = field(default=None)
-
-
     grid: vispy.scene.widgets.grid.Grid = field(default=None)
     past_view: scene.widgets.ViewBox = field(default=None)
     posterior_2d_view: scene.widgets.ViewBox = field(default=None)
@@ -290,13 +283,8 @@ class PredictiveDecodingVispyWidget:
         root_dockAreaWindow.setWindowTitle(f'{title}: dockAreaWindow')
         self.main_window = root_dockAreaWindow
 
-        viewer_central_widget = QtWidgets.QWidget()
-        main_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        scene_wrap = VispySceneWrappingWidget(canvas=canvas, parent=viewer_central_widget, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
-        assert scene_wrap.scene_tree_widget is not None
-        self.scene_tree_widget = scene_wrap.scene_tree_widget
-        main_layout.addWidget(scene_wrap, stretch=1)
+        viewer_central_widget, main_layout, scene_wrap = self.make_viewer_central_widget_with_scene_wrap(canvas, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
+        self._bind_scene_tree_from_wrap(scene_wrap)
 
         if not self.enable_multi_epoch_overview_display_mode:
             slider_widget = QtWidgets.QWidget()
@@ -329,9 +317,7 @@ class PredictiveDecodingVispyWidget:
             self.epoch_table_manager = epoch_table_manager
             main_layout.addWidget(table_container)
 
-        viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
-        _, _ = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
-        root_dockAreaWindow.resize(1400, 950)
+        self.add_standard_vispy_viewer_dock(root_dockAreaWindow, viewer_central_widget)
 
         grid: vispy.scene.widgets.grid.Grid = canvas.central_widget.add_grid(name='grid') # vispy.scene.widgets.grid.Grid
         self.grid = grid
@@ -547,12 +533,6 @@ class PredictiveDecodingVispyWidget:
     # ==================================================================================================================================================================================================================================================================================== #
     # Helper/Rendering Functions                                                                                                                                                                                                                                                           #
     # ==================================================================================================================================================================================================================================================================================== #
-
-    def _refresh_scene_tree(self) -> None:
-        if self.scene_tree_widget is not None:
-            self.scene_tree_widget.rebuild()
-
-
 
     def _clear_epoch_visuals(self):
         """Detach per-epoch visuals; also clears `time_bin_raster.scene` and drops `vispy_multi_raster_plot`."""
@@ -1789,7 +1769,7 @@ _SINGLE_SLOT_PLANE_ID: str = "plane[active]"
 
 @metadata_attributes(short_name=None, tags=['vispy', 'qt', '3D', 'Bapun', 'ACTIVE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-18 05:41', related_items=[])
 @define(slots=False, repr=False, eq=False)
-class Volumentric2DTimeSeriesPlotter:
+class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixin):
     """plots a 3D volume that represents a rat in a 2D open-field arena (x-, y- axis) over time (z-axis) 
     It renders:
     - The animal's 2D position over time as a curve
@@ -1821,10 +1801,7 @@ class Volumentric2DTimeSeriesPlotter:
     z_scale: float = field(default=1.0)
     pos3d: Optional[NDArray] = field(default=None)
 
-    canvas: scene.SceneCanvas = field(default=None)
-    main_window: VispyCanvasContainingWindow = field(default=None)
     view: scene.widgets.ViewBox = field(default=None)
-    scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
     position_line: vz.Line = field(default=None)
     posterior_plane: Any = field(default=None)
@@ -1935,13 +1912,8 @@ class Volumentric2DTimeSeriesPlotter:
         root_dockAreaWindow, _app = DockAreaWrapper.build_default_dockAreaWindow(title=title, defer_show=True)
         self.main_window = root_dockAreaWindow
         self._build_camera_view_menu(main_window=root_dockAreaWindow)
-        viewer_central_widget = QtWidgets.QWidget()
-        viewer_layout = QtWidgets.QVBoxLayout(viewer_central_widget)
-        viewer_layout.setContentsMargins(0, 0, 0, 0)
-        scene_wrap = VispySceneWrappingWidget(canvas=canvas, parent=viewer_central_widget, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
-        assert scene_wrap.scene_tree_widget is not None
-        self.scene_tree_widget = scene_wrap.scene_tree_widget
-        viewer_layout.addWidget(scene_wrap, stretch=1)
+        viewer_central_widget, viewer_layout, scene_wrap = self.make_viewer_central_widget_with_scene_wrap(canvas, show_scene_tree=True, tree_on_right=True, tree_minimum_width=200, column_renderers=None, splitter_sizes=(700, 300))
+        self._bind_scene_tree_from_wrap(scene_wrap)
 
         if self.n_t_bins > 0:
             slider_widget = QtWidgets.QWidget()
@@ -1981,9 +1953,7 @@ class Volumentric2DTimeSeriesPlotter:
         self.epoch_value_label = epoch_value_label
         epoch_slider.valueChanged.connect(self.on_epoch_slider_value_changed)
 
-        viewer_display_config = CustomDockDisplayConfig(showCloseButton=False, showTimelineSyncModeButton=False, showCollapseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color="#448aaa", border_color="#338199"))
-        _, _ = root_dockAreaWindow.add_display_dock("Viewer", dockSize=(1100, 900), widget=viewer_central_widget, dockAddLocationOpts=['left'], display_config=viewer_display_config)
-        root_dockAreaWindow.resize(1400, 950)
+        self.add_standard_vispy_viewer_dock(root_dockAreaWindow, viewer_central_widget)
         
         # Something to give 3D context (axis from 0 to 1)
         self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
@@ -2016,13 +1986,10 @@ class Volumentric2DTimeSeriesPlotter:
         if hasattr(canvas.events, 'mouse_leave'):
             canvas.events.mouse_leave.connect(self.on_mouse_leave)
             
-
-        
-
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
         self.view.camera.set_range(x=(x_min, x_max), y=(y_min, y_max), z=(0.0, self.z_max))
-        self.scene_tree_widget.rebuild()
+        self._refresh_scene_tree()
         root_dockAreaWindow.show()
 
 
@@ -2262,8 +2229,7 @@ class Volumentric2DTimeSeriesPlotter:
                 ol = vz.Line(pos=dash_pos, color=outline_rgba, width=float(outline_width), connect='segments', method='gl', parent=parent, name=f'RewardZoneOutline[{name}]')
                 ol.order = 20
                 self.reward_zone_extrusion_visuals.append(ol)
-        if self.scene_tree_widget is not None:
-            self.scene_tree_widget.rebuild()
+        self._refresh_scene_tree()
         if self.canvas is not None:
             self.canvas.update()
 
@@ -2533,11 +2499,6 @@ class Volumentric2DTimeSeriesPlotter:
     
         
 
-
-
-    def _refresh_scene_tree(self):
-        if self.scene_tree_widget is not None:
-            self.scene_tree_widget.rebuild()
 
 
     def _build_posterior_plane(self, t_bin_idx: int):
