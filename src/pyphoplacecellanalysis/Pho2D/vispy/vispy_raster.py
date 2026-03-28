@@ -151,6 +151,29 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
 
         from pyphoplacecellanalysis.Pho2D.vispy.vispy_raster import VispyRasterVisual, plot_multiple_raster_plot_vispy, VispyMultiRasterPlotTuple
 
+        a_track_name: str = 'roam'
+        a_decoder = masked_container.pf1D_Decoder_dict[a_track_name]
+        active_aclus = np.array(a_decoder.ratemap.neuron_ids)
+        n_active_aclus: int = len(active_aclus)
+        print(f'n_active_aclus: {n_active_aclus}')
+
+        # unit_colors_list = None # default rainbow of colors for the raster plots
+        neuron_qcolors_list = [pg.mkColor('black') for aclu in active_aclus] # solid green for all
+        unit_colors_list = DataSeriesColorHelpers.qColorsList_to_NDarray(neuron_qcolors_list, is_255_array=True)
+
+        # active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs[a_flat_matching_results_list_ds.filter_epochs['original_epoch_idx'] < 3]
+        active_epochs_df: pd.DataFrame = a_flat_matching_results_list_ds.filter_epochs[a_flat_matching_results_list_ds.filter_epochs['original_epoch_idx'] < 10]
+        actIve_filter_epochs_spikes_df: pd.DataFrame = a_decoder.spikes_df
+        new_all_aclus_sort_indicies = None
+        defer_show = False
+        save_figure = False
+
+        # pen = {'color': 'white', 'width': 1}
+        # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
+        override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=6, pen=None) ## mid
+        # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=10, pen=None) ## big
+        # override_scatter_plot_kwargs = dict(pxMode=True, symbol='vbar', size=0.001, pen=None)
+
         _out_vispy_raster: VispyMultiRasterPlotTuple = plot_multiple_raster_plot_vispy(filter_epochs_df=active_epochs_df, spikes_df=actIve_filter_epochs_spikes_df,
                                                             included_neuron_ids=active_aclus,
                                                             # unit_sort_order=new_all_aclus_sort_indicies, unit_colors_list=unit_colors_list_L, 
@@ -199,24 +222,25 @@ def plot_multiple_raster_plot_vispy(filter_epochs_df: pd.DataFrame, spikes_df: p
         view.camera.interactive = False
         views[an_epoch.Index] = view
 
-        v: VispyRasterVisual = VispyRasterVisual(parent=view.scene, symbol=sym, marker_size=msize, scaling=scaling, edge_width=0.0, order=5)
-        raster_visuals[an_epoch.Index] = v
+        a_vispy_raster_visual: VispyRasterVisual = VispyRasterVisual(parent=view.scene, symbol=sym, marker_size=msize, scaling=scaling, edge_width=0.0, order=5)
+        raster_visuals[an_epoch.Index] = a_vispy_raster_visual
 
         _active_epoch_spikes_df = spikes_df[spikes_df[epoch_id_key_name] == an_epoch.Index]
         curr_spike_t, curr_spike_y, curr_spike_pens, _, _, curr_n = Render2DScrollWindowPlotMixin.build_spikes_data_values_from_df(_active_epoch_spikes_df, plots_data.raster_plot_manager.config_fragile_linear_neuron_IDX_map, should_return_data_tooltips_kwargs=False)
         if curr_n > 0:
-            v.set_from_build_result(curr_spike_t, curr_spike_y, curr_spike_pens)
+            a_vispy_raster_visual.set_from_build_result(curr_spike_t, curr_spike_y, curr_spike_pens)
         else:
-            v.set_spike_arrays(np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.zeros((0, 4), dtype=np.float32))
+            a_vispy_raster_visual.set_spike_arrays(np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.zeros((0, 4), dtype=np.float32))
 
         x0, x1 = float(an_epoch.start), float(an_epoch.stop)
-        view.camera.rect = Rect((x0, 0.0), (x1 - x0, max(float(n_cells - 1), 1.0)))
+        view.camera.rect = Rect((x0, 0.0), ((x1 - x0), max(float(n_cells - 1), 1.0)))
 
         if draw_unit_grid:
             grid_lines[an_epoch.Index] = _unit_grid_line_visual(x0, x1, n_cells, view.scene)
         else:
             grid_lines[an_epoch.Index] = None
-
+    ## END for an_epoch in filter_epochs_df.itertuples()...
+    
     plots = SimpleNamespace(canvas=canvas, grid=grid, views=views, raster_visuals=raster_visuals, grid_lines=grid_lines, scatter_plot_kwargs_merged=merged_pg_kwargs, filter_epochs_df=filter_epochs_df)
 
     return VispyMultiRasterPlotTuple(canvas, plots, plots_data)
