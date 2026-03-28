@@ -616,8 +616,8 @@ class VispyHelpers:
 
 
     @classmethod
-    def create_viewport_heading_compass_legend(cls, canvas: scene.SceneCanvas, margin: Tuple[float, float] = (18.0, 18.0), size_frac: float = 0.11, line_width: float = 2.0, line_points: int = 20, order: int = 10_000, parent: Optional[Node] = None, **rose_kwargs: Any) -> Any:
-        """Place a :class:`~pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle.HeadingCompassRoseVisual` in the bottom-right of the canvas in pixel space (parent ``canvas.scene``), matching heading colors used by :meth:`create_heading_rainbow_line`; pan/zoom on subplot views does not move the legend."""
+    def create_viewport_heading_compass_legend(cls, canvas: scene.SceneCanvas, margin: Tuple[float, float] = (18.0, 18.0), size_frac: float = 0.066, line_width: float = 2.0, line_points: int = 20, order: int = 10_000, parent: Optional[Node] = None, **rose_kwargs: Any) -> Any:
+        """Place a :class:`~pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle.HeadingCompassRoseVisual` in the bottom-right of the canvas in pixel space (parent ``canvas.scene``), matching heading colors used by :meth:`create_heading_rainbow_line`; pan/zoom on subplot views does not move the legend. ``STTransform`` translate uses y increasing downward so ``cy`` is measured from the top edge (unlike :meth:`create_viewport_overlay_text` text positions)."""
         from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingCompassRoseVisual
         overlay_parent = canvas.scene if parent is None else parent
         rose = HeadingCompassRoseVisual(parent=overlay_parent, line_width=line_width, line_points=line_points, **rose_kwargs)
@@ -634,7 +634,7 @@ class VispyHelpers:
             scale = float(size_frac) * max(8.0, min(width_f, height_f))
             half = _local_extent * scale
             cx = width_f - margin_x - half
-            cy = margin_y + half
+            cy = height_f - margin_y - half
             rose.transform = STTransform(scale=(scale, scale), translate=(cx, cy))
 
         def _disconnect_viewport_compass_handler() -> None:
@@ -1081,7 +1081,7 @@ if __name__ == '__main__':
             if arr is not None:
                 arr.set_gl_state('translucent', depth_test=False)
 
-        VispyHelpers.create_viewport_heading_compass_legend(canvas=canvas, margin=(18.0, 18.0), size_frac=0.11)
+        VispyHelpers.create_viewport_heading_compass_legend(canvas=canvas, margin=(18.0, 18.0), size_frac=0.066)
 
         app.run()
 
