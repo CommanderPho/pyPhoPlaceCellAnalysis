@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pyphoplacecellanalysis.External import pyqtgraph as pg
 from copy import deepcopy
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -98,7 +98,75 @@ class BinByBinDebuggingData:
         decoding_bins_epochs_df
         _obj = cls(decoding_time_bin_size=decoding_time_bin_size, a_decoder=a_decoder, global_spikes_df=global_spikes_df, decoding_bins_epochs_df=decoding_bins_epochs_df, time_bin_edges=time_bin_edges, p_x_given_n=p_x_given_n, n_max_debugged_time_bins=n_max_debugged_time_bins)
         return _obj
-    
+
+
+    @classmethod
+    def init_from_decoded_filter_epochs_result(cls, a_decoder, global_spikes_df: pd.DataFrame, a_decoded_result: DecodedFilterEpochsResult, decoding_time_bin_size: Optional[float] = None, epoch_indices: Optional[Sequence[int]] = None, n_max_debugged_time_bins: Optional[int] = 20):
+        if decoding_time_bin_size is None:
+            decoding_time_bin_size = float(a_decoded_result.decoding_time_bin_size)
+        elif not np.isclose(float(decoding_time_bin_size), float(a_decoded_result.decoding_time_bin_size), rtol=0.0, atol=1e-9):
+            raise ValueError(f"decoding_time_bin_size {decoding_time_bin_size} != a_decoded_result.decoding_time_bin_size {a_decoded_result.decoding_time_bin_size}")
+        if epoch_indices is None:
+            epoch_indices = list(range(a_decoded_result.n_epochs))
+        else:
+            epoch_indices = list(epoch_indices)
+        if len(epoch_indices) == 0:
+            raise ValueError("epoch_indices is empty")
+        for ei in epoch_indices:
+            if ei < 0 or ei >= a_decoded_result.n_epochs:
+                raise ValueError(f"epoch_indices contains {ei} out of range [0, {a_decoded_result.n_epochs})")
+        if len(epoch_indices) == 1:
+            return cls.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=a_decoded_result.get_result_for_epoch(epoch_indices[0]), decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
+        spike_parts: List[pd.DataFrame] = []
+        pseudo_parts: List[pd.DataFrame] = []
+        px_parts: List[NDArray] = []
+        merged_edges: Optional[NDArray] = None
+        global_label_cursor = 0
+        cumulative_bin_offset = 0
+        ref_leading_shape: Optional[Tuple[int, ...]] = None
+        for epoch_idx in epoch_indices:
+            single = a_decoded_result.get_result_for_epoch(epoch_idx)
+            time_bin_edges = deepcopy(single.time_bin_edges)
+            if merged_edges is None:
+                merged_edges = np.asarray(time_bin_edges)
+            else:
+                merged_edges = np.concatenate([merged_edges, np.asarray(time_bin_edges)[1:]])
+            ndim_px = int(np.ndim(single.p_x_given_n))
+            leading_shape = tuple(np.shape(single.p_x_given_n)[:-1]) if ndim_px >= 1 else ()
+            if ref_leading_shape is None:
+                ref_leading_shape = leading_shape
+            elif leading_shape != ref_leading_shape:
+                raise ValueError(f"p_x_given_n leading shape mismatch across epochs: {ref_leading_shape} vs {leading_shape}")
+            px_parts.append(deepcopy(single.p_x_given_n))
+            pseudo_df = single.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df().copy()
+            if len(pseudo_df) != int(single.nbins):
+                raise ValueError(f"epoch {epoch_idx}: len(pseudo_df) {len(pseudo_df)} != single.nbins {single.nbins}")
+            pseudo_df["label"] = np.arange(global_label_cursor, global_label_cursor + len(pseudo_df), dtype=int)
+            global_label_cursor += len(pseudo_df)
+            pseudo_parts.append(pseudo_df)
+            gdf = deepcopy(global_spikes_df)
+            gdf = gdf.spikes.add_binned_time_column(time_window_edges=time_bin_edges, time_window_edges_binning_info=single.time_bin_container.edge_info)
+            gdf = gdf.dropna(axis="index", how="any", subset=["binned_time"], inplace=False)
+            if len(gdf) > 0:
+                gdf = gdf.copy()
+                gdf["binned_time"] = gdf["binned_time"].astype(int) - 1 + cumulative_bin_offset
+            spike_parts.append(gdf)
+            cumulative_bin_offset += int(single.nbins)
+        assert merged_edges is not None
+        p_x_given_n: NDArray = np.concatenate(px_parts, axis=-1)
+        decoding_bins_epochs_df: pd.DataFrame = pd.concat(pseudo_parts, ignore_index=True)
+        if len(decoding_bins_epochs_df) != cumulative_bin_offset:
+            raise ValueError(f"len(decoding_bins_epochs_df) {len(decoding_bins_epochs_df)} != total bins {cumulative_bin_offset}")
+        n_time_posterior = int(np.shape(p_x_given_n)[-1])
+        if n_time_posterior != cumulative_bin_offset:
+            raise ValueError(f"p_x_given_n time dim {n_time_posterior} != total bins {cumulative_bin_offset}")
+        global_spikes_out = pd.concat(spike_parts, ignore_index=True)
+        unique_aclus_per_bin = global_spikes_out.groupby("binned_time")["aclu"].unique() if len(global_spikes_out) > 0 else pd.Series(dtype=object)
+        decoding_bins_epochs_df["active_aclus"] = unique_aclus_per_bin
+        decoding_bins_epochs_df["active_aclus"] = decoding_bins_epochs_df["active_aclus"].apply(lambda x: [] if np.any(pd.isna(x)) else x)
+        _obj = cls(decoding_time_bin_size=decoding_time_bin_size, a_decoder=a_decoder, global_spikes_df=global_spikes_out, decoding_bins_epochs_df=decoding_bins_epochs_df, time_bin_edges=merged_edges, p_x_given_n=p_x_given_n, n_max_debugged_time_bins=n_max_debugged_time_bins)
+        return _obj
+
 
     def sliced_to_current_window(self, active_window_t_start, active_window_t_end, debug_print:bool=True):
         """ captures: global_spikes_df, decoding_bins_epochs_df, time_bin_edges, p_x_given_n
@@ -821,17 +889,27 @@ class BinByBinDecodingDebugger(GenericPyQtGraphContainer):
         active_2d_plot = spike_raster_window.spike_raster_plt_2d
         active_spikes_window = active_2d_plot.spikes_window
 
+        bin_by_bin_data: BinByBinDebuggingData = None
         if isinstance(a_decoded_result, SingleEpochDecodedResult):
             single_continuous_result = a_decoded_result ## already have this
             decoding_time_bin_size: float = single_continuous_result.time_bin_container.edge_info.step
+            bin_by_bin_data = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=_single, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
         else:
-            ## extract it
-            single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult            
             decoding_time_bin_size: float = a_decoded_result.decoding_time_bin_size
+
+            if a_decoded_result.n_epochs == 1:
+                ## extract it
+                single_continuous_result: SingleEpochDecodedResult = a_decoded_result.get_result_for_epoch(0) # SingleEpochDecodedResult                            
+                bin_by_bin_data = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=_single, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
+
+            else:
+                _dts = float(a_decoded_result.decoding_time_bin_size)
+                bin_by_bin_data = BinByBinDebuggingData.init_from_decoded_filter_epochs_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, a_decoded_result=a_decoded_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
 
 
         # decoding_bins_epochs_df: pd.DataFrame = single_continuous_result.build_pseudo_epochs_df_from_decoding_bins().epochs.get_valid_df()
-        bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
+        # bin_by_bin_data: BinByBinDebuggingData = BinByBinDebuggingData.init_from_single_continuous_result(a_decoder=a_decoder, global_spikes_df=global_spikes_df, single_continuous_result=single_continuous_result, decoding_time_bin_size=decoding_time_bin_size, n_max_debugged_time_bins=n_max_debugged_time_bins)
+
         ## OUTPUTS: bin_by_bin_data
 
         ## INPUTS: active_spikes_window, global_spikes_df, decoding_bins_epochs_df
