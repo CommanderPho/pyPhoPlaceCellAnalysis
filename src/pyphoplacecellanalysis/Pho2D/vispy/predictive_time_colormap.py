@@ -25,8 +25,8 @@ _RAINBOW_HUE_S = 0.8
 _RAINBOW_HUE_V = 0.9
 
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
-# _active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
-_active_predictive_time_colormap: PredictiveTimeColormapName = "cool"
+_active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
+# _active_predictive_time_colormap: PredictiveTimeColormapName = "cool"
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "rainbow_hue"
 
 

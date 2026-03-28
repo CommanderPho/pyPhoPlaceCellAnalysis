@@ -110,7 +110,8 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
     past_future_trajectory_extension_seconds: Union[float, Tuple[float, float]] = field(default=(0.4, 1.0))
     start_end_extension_max_opacity: float = field(default=0.4)
     show_full_position_background: bool = field(default=False)
-    
+    enable_cmap_time_distance_taper: bool = field(default=True)
+
     require_angle_match: bool = field(default=False)
     color_matches_by_matching_angle: bool = field(default=False)
     color_matches_by_merged_epoch_t_bin_idx: bool = field(default=False)
@@ -243,7 +244,8 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
             curr_position_df=curr_position_df,
             pf_decoder=pf_decoder,
             decoded_result=decoded_result,
-            active_epoch_idx=active_epoch_idx)
+            active_epoch_idx=active_epoch_idx,
+            **kwargs)
 
 
     def setup(self):
@@ -1263,12 +1265,15 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
             for i, time_val in enumerate(time_range):
                 time_distance = np.abs(time_val)
                 distance_normalized = time_distance / max_time_distance
-                opacity = np.clip(1.0 - distance_normalized * 0.8, 0.2, 1.0)
+                if self.enable_cmap_time_distance_taper:
+                    opacity = np.clip(1.0 - distance_normalized * 0.8, 0.2, 1.0)  ## taper opacity at each end with distance
+                else:
+                    opacity = 1.0
                 u_grad = float(i) / float(max(num_segments - 1, 1))
                 rgb = predictive_time_rgb(u_grad)
                 color = (rgb[0], rgb[1], rgb[2], opacity)
                 x_pos = i * segment_width
-                rect = vz.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene)
+                rect = vz.Rectangle(center=(x_pos + segment_width/2, colorbar_height/2), width=segment_width, height=colorbar_height, color=color, parent=self.colorbar_view.scene, name=f'colorbar_rect[{i}]')
                 self.colorbar_rects.append(rect)
             label_times = [-max_time_distance, -max_time_distance/2, 0, max_time_distance/2, max_time_distance]
             label_positions = np.linspace(0, colorbar_width, len(label_times))
