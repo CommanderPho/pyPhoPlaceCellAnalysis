@@ -2213,8 +2213,8 @@ from pyphocorehelpers.plotting.hairy_lines_plot import _perform_plot_hairy_overl
 # ==================================================================================================================== #
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-import pyqtgraph as pg
-import pyqtgraph.exporters
+from pyphoplacecellanalysis.External import pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.exporters
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, export_pyqtgraph_plot
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks

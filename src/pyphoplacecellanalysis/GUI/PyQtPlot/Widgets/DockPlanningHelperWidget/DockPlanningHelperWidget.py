@@ -9,7 +9,7 @@ from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui, QtWidget
 # from ...pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget import DockPlanningHelperWidget
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_DockPlanningHelperWidget import Ui_Form
 # from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockPlanningHelperWidget.Uic_AUTOGEN_TinyDockPlanningHelperWidget import Ui_Form
-from pyqtgraph.widgets.ColorButton import ColorButton
+# from pyqtgraph.widgets.ColorButton import ColorButton
 from pyphoplacecellanalysis.Resources import ActionIcons
 
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock

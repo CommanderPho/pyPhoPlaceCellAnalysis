@@ -3,7 +3,7 @@
 # ==================================================================================================================== #
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External import pyqtgraph as pg
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias

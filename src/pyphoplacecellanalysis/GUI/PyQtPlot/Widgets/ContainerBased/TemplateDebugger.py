@@ -34,8 +34,8 @@ from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_
 
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-import pyqtgraph as pg
-import pyqtgraph.exporters
+from pyphoplacecellanalysis.External import pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.exporters
 from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
@@ -68,7 +68,7 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
     Builds a standalone pf1D heatmap with text labels + vertical peak lines for each ACLU.
     """
     import numpy as np
-    import pyqtgraph as pg
+    from pyphoplacecellanalysis.External import pyqtgraph as pg
     from copy import deepcopy
     from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import UnitColoringMode, DataSeriesColorHelpers
     # Requires pf1D_decoder.pf.ratemap.pdf_normalized_tuning_curves, pf1D_decoder.pf.ratemap.xbin,

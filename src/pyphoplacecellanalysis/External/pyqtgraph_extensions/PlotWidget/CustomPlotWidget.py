@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External import pyqtgraph as pg
 import sys
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any

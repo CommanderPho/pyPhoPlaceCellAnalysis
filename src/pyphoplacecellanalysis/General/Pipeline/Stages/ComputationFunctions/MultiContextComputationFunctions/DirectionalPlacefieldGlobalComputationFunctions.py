@@ -8769,8 +8769,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 # ==================================================================================================================== #
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-import pyqtgraph as pg
-import pyqtgraph.exporters
+from pyphoplacecellanalysis.External import pyqtgraph as pg
+import pyphoplacecellanalysis.External.pyqtgraph.exporters
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
@@ -9156,8 +9156,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 """ captures: epochs_editor, _out_pf1D_heatmaps
 
                 TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
-                import pyqtgraph as pg
-                import pyqtgraph.exporters
+                from pyphoplacecellanalysis.External import pyqtgraph as pg
+                import pyphoplacecellanalysis.External.pyqtgraph.exporters
                 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
                 """
                 ## Get main laps plotter:

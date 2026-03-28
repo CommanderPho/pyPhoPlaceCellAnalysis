@@ -24,8 +24,8 @@ epoch_split_key: TypeAlias = str # a string that describes a split epoch, such a
 DecoderName = NewType('DecoderName', str)
 
 import numpy as np
-import pyqtgraph
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External import pyqtgraph
+from pyphoplacecellanalysis.External import pyqtgraph as pg
 from PyQt5 import QtGui
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData, VisualizationParameters
 from pyphoplacecellanalysis.PhoPositionalData.plotting.mixins.decoder_plotting_mixins import DecodedTrajectoryMatplotlibPlotter
