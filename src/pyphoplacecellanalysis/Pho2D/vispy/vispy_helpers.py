@@ -308,7 +308,7 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
 # ==================================================================================================================================================================================================================================================================================== #
 
 
-def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
+def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3, name: str='Contour') -> Tuple[List, List]:
     """Create vispy Line visuals from contour data and attach to parent. When fill=True, adds translucent Polygon fill (same RGB as line) behind each contour. Returns (lines, polygons) so callers can clear both on epoch change; polygons is empty when fill=False."""
     lines: List = []
     polygons: List = []
@@ -317,10 +317,10 @@ def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], paren
         if fill and len(pos) >= 3:
             pos_closed = _ensure_closed_pos(pos)
             fill_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(alpha))
-            polygon = vz.Polygon(pos=pos_closed, color=fill_rgba, border_width=0, parent=parent)  # type: ignore[call-arg]
+            polygon = vz.Polygon(pos=pos_closed, color=fill_rgba, border_width=0, parent=parent, name=f'{name}.Poly')  # type: ignore[call-arg]
             polygon.order = order - 1
             polygons.append(polygon)
-        line = vz.Line(pos=pos, color=rgba, width=line_width, parent=parent)  # type: ignore[call-arg]
+        line = vz.Line(pos=pos, color=rgba, width=line_width, parent=parent, name=f'{name}.Border')  # type: ignore[call-arg]
         line.order = order
         lines.append(line)
     return (lines, polygons)

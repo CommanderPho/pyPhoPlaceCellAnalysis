@@ -340,7 +340,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
             for view, cont_list in views_and_lists_to_draw:
                 scene_parent = view.scene if view is not None else None
                 if scene_parent is not None:
-                    lines, polygon_fills = create_contour_line_visuals(contour_data_flat, parent=scene_parent, line_width=2.0, order=contour_order_main, **contour_render_kwargs)
+                    lines, polygon_fills = create_contour_line_visuals(contour_data_flat, parent=scene_parent, line_width=2.0, order=contour_order_main, **contour_render_kwargs, name=f'ContourMain')
                     cont_list.extend(polygon_fills)
                     cont_list.extend(lines)
 
@@ -349,7 +349,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                 scene_parent = time_bin_views[t_idx].scene if time_bin_views[t_idx] is not None else None
                 if scene_parent is not None:
                     per_mask_contours: List[ContourItem] = contour_data_per_mask[t_idx]
-                    lines, polygon_fills = create_contour_line_visuals(per_mask_contours, parent=scene_parent, line_width=2.0, order=contour_order_t_bins, **contour_render_kwargs)
+                    lines, polygon_fills = create_contour_line_visuals(per_mask_contours, parent=scene_parent, line_width=2.0, order=contour_order_t_bins, **contour_render_kwargs, name=f'Contours[{t_idx}]')
                     posterior_mask_contours.extend(polygon_fills)
                     posterior_mask_contours.extend(lines)
 
