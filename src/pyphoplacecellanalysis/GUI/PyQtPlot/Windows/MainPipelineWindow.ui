@@ -59,7 +59,7 @@
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="ConsoleWidget" name="console" native="true"/>
+         <widget class="PhoCodeConsoleWidget" name="console" native="true"/>
         </item>
        </layout>
       </widget>
@@ -164,9 +164,9 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>ConsoleWidget</class>
+   <class>PhoCodeConsoleWidget</class>
    <extends>QWidget</extends>
-   <header location="global">pyphoplacecellanalysis.External.pyqtgraph.console</header>
+   <header location="global">pyphoplacecellanalysis.GUI.Qt.Widgets.PhoCodeConsoleWidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
