@@ -364,7 +364,13 @@ def safeSaveSplitData(pkl_path: Union[str, Path], computed_data: Union[Dict[str,
     
     if include_includelist is None:
         ## include all keys if none are specified
-        include_includelist = list(computed_data.keys())
+        try:
+            include_includelist = list(computed_data.keys()) 
+        except AttributeError as err:
+            # AttributeError: 'PredictiveDecodingComputationsContainer' object has no attribute 'keys' -- for some reason it's still an object
+            computed_data = computed_data.__getstate__()
+            include_includelist = list(computed_data.keys())
+
     
     ## Save each item in the computed_data dictionary:
     split_save_paths = {}

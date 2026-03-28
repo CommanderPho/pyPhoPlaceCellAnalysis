@@ -1022,6 +1022,10 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 spkcount=spike_counts
             )
         """
+        if isinstance(single_epoch_result, cls) or hasattr(single_epoch_result, 'filter_epochs'):
+            ## already a `DecodedFilterEpochsResult`, not a `SingleEpochDecodedResult`
+            return single_epoch_result
+            
         # Convert epoch_info_tuple to DataFrame
         epoch_info_dict = single_epoch_result.epoch_info_tuple._asdict()
         filter_epochs_df = pd.DataFrame([epoch_info_dict])

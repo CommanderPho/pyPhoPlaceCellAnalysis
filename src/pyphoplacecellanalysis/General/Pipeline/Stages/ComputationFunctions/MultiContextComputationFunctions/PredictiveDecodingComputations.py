@@ -652,9 +652,16 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """
         a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
         # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
+        try:
+            n_epochs: int = a_result_decoded.n_epochs
+            assert n_epochs == 1, f"n_epochs: {n_epochs} is more than 1, so cannot treat as continuous "
+            a_result_decoded = a_result_decoded.get_result_for_epoch(0)
+        except AttributeError as err:
+            # if already `SingleEpochDecodedResult` AttributeError: 'SingleEpochDecodedResult' object has no attribute 'get_result_for_epoch'
+            pass
         
-        time_window_centers = deepcopy(a_result_decoded.time_bin_container.centers)
-        pos_df = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+        time_window_centers = a_result_decoded.time_bin_container.centers.copy()
+        pos_df = curr_active_pipeline.sess.position.to_dataframe().copy()
         # pos_df
 
         # axis=0 interpolates along rows (time) for all columns ('x' and 'y')
@@ -664,15 +671,15 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         # Returns shape new_positions .shape: (n_target_times, 2)
         new_positions = interpolator(time_window_centers)
         # new_positions
-        p_x_given_n = deepcopy(a_result_decoded.p_x_given_n)
+        p_x_given_n = a_result_decoded.p_x_given_n.copy()
         epoch_names: List[str] = list(directional_decoders_decode_result.pf1D_Decoder_dict.keys())
         # decoding_locality_measures.epoch_names
-        paradigm_epochs_df = deepcopy(curr_active_pipeline.sess.epochs.to_dataframe())
+        paradigm_epochs_df = curr_active_pipeline.sess.epochs.to_dataframe().copy()
         paradigm_epochs_df = paradigm_epochs_df.epochs.label_slice(epoch_names)
 
         _obj = cls(time_window_centers=time_window_centers, pos_df=pos_df,
-                   xbin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin), ybin=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin),
-                   xbin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.xbin_centers), ybin_centers=deepcopy(directional_decoders_decode_result.pseudo2D_decoder.ybin_centers),
+                   xbin=directional_decoders_decode_result.pseudo2D_decoder.xbin.copy(), ybin=directional_decoders_decode_result.pseudo2D_decoder.ybin.copy(),
+                   xbin_centers=directional_decoders_decode_result.pseudo2D_decoder.xbin_centers.copy(), ybin_centers=directional_decoders_decode_result.pseudo2D_decoder.ybin_centers.copy(),
                    new_positions=new_positions, interpolator=interpolator, p_x_given_n=p_x_given_n,
                    paradigm_epochs_df=paradigm_epochs_df, epoch_names=epoch_names,
                    sigma=sigma)
@@ -4765,8 +4772,9 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             for i_tbin, (extant_decoded_time_bin_size, a_result_decoded) in enumerate(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items()):
                 print(f'[{_fn_name}]   Processing time_bin_size {i_tbin+1}/{n_time_bin_sizes}: {extant_decoded_time_bin_size}s')
                 a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
-                a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
-                
+                if isinstance(a_result_decoded, SingleEpochDecodedResult) or (not hasattr(a_result_decoded, 'filter_epochs')):
+                    a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
+
                 # FILTER TO JUST POSITION-LIKE POSTERIORS ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 if mask_position_like_time_score_cutoff:
                     a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, position_like_score_cutoff=mask_position_like_time_score_cutoff, num_min_position_like_t_bins=None,
