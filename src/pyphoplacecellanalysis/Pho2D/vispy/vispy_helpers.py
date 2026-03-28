@@ -905,7 +905,7 @@ if __name__ == '__main__':
         view.camera = 'panzoom'
         scene_parent = view.scene
         if scene_parent is not None:
-            line = create_heading_rainbow_line(pos, parent=scene_parent, line_width=3.0, order=10)
+            line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=3.0, order=10)
             line.set_gl_state('translucent', depth_test=False)
         app.run()
 
@@ -927,4 +927,5 @@ if __name__ == '__main__':
 
     # app.run()
 
-    example_trajectory_segments_visual()
+    # example_trajectory_segments_visual()
+    example_heading_rainbow_line()
