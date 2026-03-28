@@ -139,8 +139,13 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
 
 
                             use_new_heading_line_with_arrow_overlay_mode: bool = True
+                            # use_new_heading_line_with_arrow_overlay_mode: bool = False
+                            
                             if use_new_heading_line_with_arrow_overlay_mode:
-                                line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=posterior_2d_view.scene, line_width=1.0, order=7, name=f'centroids_sequence_line')
+                                from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
+                                
+                                line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, vertex_colors=vertex_point_color,
+                                                                                            parent=posterior_2d_view.scene, line_width=1.0, order=7, name=f'centroids_sequence_line')
                                 line.set_gl_state('translucent', depth_test=False)
                                 # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=posterior_2d_view.scene, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
                                 arrow, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=posterior_2d_view.scene, n_arrows=(n_centroids-1), width=5.0, arrow_size=5.0, alpha=0.8, arrow_type='triangle_30', method='gl', name=f'centroids_sequence_line_arrows')
@@ -273,7 +278,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
         epoch_info_str = f'Epoch {new_epoch_idx + 1}/{num_epochs} | start_t: {epoch_start_t:.2f}s | end_t: {epoch_end_t:.2f}s | duration: {epoch_end_t - epoch_start_t:.2f}s'
         text_y_pos = y_max + (y_max - y_min) * 0.15
         text_x_pos = (x_min + x_max) / 2
-        epoch_info_text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=10, bold=False, anchor_x='center', anchor_y='bottom', parent=posterior_2d_view.scene)
+        epoch_info_text = vz.Text(epoch_info_str, pos=(text_x_pos, text_y_pos), color='white', font_size=10, bold=False, anchor_x='center', anchor_y='bottom', parent=posterior_2d_view.scene, name=f'title_label')
         y_range = y_max - y_min
         posterior_2d_view.camera.set_range(x=(x_min, x_max), y=(y_min - y_range * 0.05, y_max + y_range * 0.2))
 

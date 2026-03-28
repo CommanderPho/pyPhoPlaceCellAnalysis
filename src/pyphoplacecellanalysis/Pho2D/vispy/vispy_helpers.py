@@ -652,7 +652,7 @@ class VispyHelpers:
 
     @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
     @classmethod
-    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl', name: str = 'heading_rainbow_line') -> Any:
+    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, vertex_colors: Optional[NDArray]=None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl', name: str = 'heading_rainbow_line') -> Any:
         """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
 
         from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
@@ -662,8 +662,6 @@ class VispyHelpers:
         arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=24)
         if arr is not None:
             arr.set_gl_state('translucent', depth_test=False)
-        
-
 
         """
         pos = np.asarray(pos, dtype=np.float32)
@@ -674,8 +672,11 @@ class VispyHelpers:
         else:
             headings_deg = np.asarray(headings_deg, dtype=np.float64)
             
-        # colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
-        colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
+        if (vertex_colors is None):
+            # colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+            colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
+        else:
+            colors = vertex_colors
 
         data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
 
