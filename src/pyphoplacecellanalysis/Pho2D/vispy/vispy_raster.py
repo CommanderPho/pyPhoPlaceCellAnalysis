@@ -149,10 +149,10 @@ def _time_bin_edge_vertical_lines(edge_times: np.ndarray, y0: float, y1: float, 
     pos[1::2, 1] = float(y1)
     connect = np.arange(n * 2, dtype=np.uint32).reshape(n, 2)
     # line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent)  # type: ignore[call-arg]
-    # print(f'\trgba: {rgba}')
-    line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent, name=f'time_bin_edge_vlines') # method='gl' works, but method='agg' raises crazy error when connect: NDArray
+    print(f'\trgba: {rgba}')
+    # line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='agg', parent=parent, name=f'time_bin_edge_vlines')  # type: ignore[call-arg]
+    line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='agg', parent=parent, name=f'time_bin_edge_vlines')  # type: ignore[call-arg]
 
-    # line = vz.Line(pos=pos, connect=connect, color=rgba, width=line_width, method='gl', parent=parent, name=f'time_bin_edge_vlines') 
     # if edge_vu is not None:
     #     vu = np.asarray(edge_vu, dtype=np.float64).ravel()
     #     if vu.size != n:

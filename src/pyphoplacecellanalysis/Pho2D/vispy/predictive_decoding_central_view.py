@@ -157,7 +157,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                     an_arrows = np.array([[x_start, y_start, x_end, y_end]])
                                     a_pos = np.asarray(a_pos, dtype=np.float32)
                                     an_arrows = np.asarray(an_arrows, dtype=np.float32)
-                                    arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='gl', parent=posterior_2d_view.scene, name=f'centroids_arrow[{t_idx}]')
+                                    arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene, name=f'centroids_arrow[{t_idx}]')
                                     arrow.order = 7
                                     centroid_arrows.append(arrow)
 
@@ -184,7 +184,7 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                 pos = np.asarray(pos, dtype=np.float32)
                                 arrows = np.array([[x_start, y_start, x_end, y_end]])
                                 arrows = np.asarray(arrows, dtype=np.float32)
-                                arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='gl', parent=posterior_2d_view.scene, name=f'centroids_arrow[{i}]')
+                                arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=arrow_color, arrow_color=arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene, name=f'centroids_arrow[{i}]')
                                 arrow.order = 7
                                 centroid_arrows.append(arrow)
 

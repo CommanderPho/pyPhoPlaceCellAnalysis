@@ -980,8 +980,7 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
                             arrow_length = arrow_head_size * 0.5
                             x_end = x_center + arrow_length * np.cos(mean_angle_rad)
                             y_end = y_center + arrow_length * np.sin(mean_angle_rad)
-                            debug_arrow = vz.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9),
-                                                    width=2.0, method='agg', parent=view.scene, name=f'debug_arrow')
+                            debug_arrow = vz.Arrow(pos=np.array([[x_center, y_center], [x_end, y_end]]), arrows=np.array([[x_center, y_center, x_end, y_end]]), arrow_type='triangle_30', arrow_size=arrow_head_size, color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), arrow_color=(base_rgb[0], base_rgb[1], base_rgb[2], 0.9), width=2.0, method='agg', parent=view.scene)
                             debug_arrow.order = 5
                             trajectory_debug_arrows.append(debug_arrow)
         ## END for epoch_id, positions_df in list(positions_dict....
@@ -1371,26 +1370,25 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
         timeline_bar_height = 1.0
         recording_duration = self.recording_t_max - self.recording_t_min
         if recording_duration > 0:
-            bar_fill: vz.Rectangle = vz.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene, name=f'bar_fill')
+            bar_fill: vz.Rectangle = vz.Rectangle(center=((self.recording_t_min + self.recording_t_max) / 2, timeline_bar_height / 2), width=recording_duration, height=timeline_bar_height, color=(0.15, 0.15, 0.15, 1.0), border_color=(0.4, 0.4, 0.4, 1.0), parent=self.combined_timeline_view.scene)
             self.timeline_bar = bar_fill
             if epoch_start_t is not None and epoch_end_t is not None:
                 epoch_duration = epoch_end_t - epoch_start_t
                 epoch_center_t = (epoch_start_t + epoch_end_t) / 2
-                epoch_rect: vz.Rectangle = vz.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene, name=f'epoch_rect[{epoch_start_t:.4f}]')
+                epoch_rect: vz.Rectangle = vz.Rectangle(center=(epoch_center_t, timeline_bar_height / 2), width=epoch_duration, height=timeline_bar_height, color=(1.0, 1.0, 1.0, 0.3), border_color=(1.0, 1.0, 1.0, 1.0), border_width=2, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_rect = epoch_rect
                 triangle_height = timeline_bar_height * 0.35
                 triangle_half_width = recording_duration * 0.008
                 triangle_top_y = timeline_bar_height + triangle_height * 0.3
                 triangle_bottom_y = timeline_bar_height - triangle_height * 0.3
                 triangle_vertices = np.array([[epoch_center_t - triangle_half_width, triangle_top_y], [epoch_center_t + triangle_half_width, triangle_top_y], [epoch_center_t, triangle_bottom_y]], dtype=np.float32)
-                epoch_triangle: vz.Polygon = vz.Polygon(pos=np.asarray(triangle_vertices, dtype=np.float32), color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene, name=f'epoch_triangle[{epoch_start_t:.4f}]')
+                epoch_triangle: vz.Polygon = vz.Polygon(pos=np.asarray(triangle_vertices, dtype=np.float32), color=(1.0, 1.0, 1.0, 0.5), border_color=(1.0, 1.0, 1.0, 1.0), border_width=1, parent=self.combined_timeline_view.scene)
                 self.timeline_epoch_triangle = epoch_triangle
             for base_rgb, mean_time in (past_trajectory_colors_and_times + future_trajectory_colors_and_times):
                 if not np.isfinite(mean_time):
                     continue
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                # tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='agg', parent=self.combined_timeline_view.scene, name=f'tick[{mean_time:.4f}]')
-                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='gl', parent=self.combined_timeline_view.scene, name=f'tick[{mean_time:.4f}]')
+                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='agg', parent=self.combined_timeline_view.scene)
                 self._debug_log_line_visual(tick, context='timeline_tick', pos=tick_pos, extra={'new_epoch_idx': new_epoch_idx, 'mean_time': float(mean_time)})
                 self.timeline_ticks.append(tick)
             self.combined_timeline_view.camera = scene.PanZoomCamera()
