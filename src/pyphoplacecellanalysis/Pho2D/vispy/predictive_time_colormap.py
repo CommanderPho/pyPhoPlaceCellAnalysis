@@ -1,4 +1,4 @@
-"""Sequential predictive-decoding time colors: cyan→magenta stops, full hue cycle (rainbow_hue), or matplotlib cmaps (e.g. plasma, cool)."""
+"""Sequential predictive-decoding time colors: bright cyan→neon magenta stops, full hue cycle (rainbow_hue), or matplotlib cmaps (e.g. plasma, cool)."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ _PREDICTIVE_TIME_MPL_NAME: dict[PredictiveTimeColormapName, str | None] = {
 _RAINBOW_HUE_S = 0.8
 _RAINBOW_HUE_V = 0.9
 
-# _active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
-_active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
+_active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
+# _active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "cool"
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "rainbow_hue"
 
@@ -48,15 +48,15 @@ def _hex_to_rgb01(hex_str: str) -> tuple[float, float, float]:
     return (int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0)
 
 
-# Control stops u in [0,1]: start bright cyan, mid periwinkle, end magenta-purple (cyan_magenta only).
+# Control stops u in [0,1]: bright cyan → blue-violet → bright neon magenta (cyan_magenta only).
 _PREDICTIVE_TIME_STOPS_U = np.array([0.0, 0.25, 0.5, 0.75, 1.0], dtype=np.float32)
 _PREDICTIVE_TIME_STOPS_RGB = np.array(
     [
-        _hex_to_rgb01('#58D4E8'),
-        _hex_to_rgb01('#6BC0E8'),
-        _hex_to_rgb01('#7886C8'),
-        _hex_to_rgb01('#986BB4'),
-        _hex_to_rgb01('#B850A0'),
+        _hex_to_rgb01('#00F5FF'),
+        _hex_to_rgb01('#3399FF'),
+        _hex_to_rgb01('#8055FF'),
+        _hex_to_rgb01('#CC1FFF'),
+        _hex_to_rgb01('#FF00FF'),
     ],
     dtype=np.float32,
 )
