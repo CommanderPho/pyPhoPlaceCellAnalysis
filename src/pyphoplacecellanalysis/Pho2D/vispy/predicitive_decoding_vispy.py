@@ -1389,7 +1389,8 @@ class PredictiveDecodingVispyWidget(VispySceneWindowState, VispySceneWindowMixin
                 if not np.isfinite(mean_time):
                     continue
                 tick_pos = np.array([[mean_time, 0], [mean_time, timeline_bar_height]], dtype=np.float32)
-                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='agg', parent=self.combined_timeline_view.scene)
+                # tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='agg', parent=self.combined_timeline_view.scene, name=f'tick[{mean_time:.4f}]')
+                tick: vz.Line = vz.Line(pos=tick_pos, color=(base_rgb[0], base_rgb[1], base_rgb[2], 1.0), width=1.0, method='gl', parent=self.combined_timeline_view.scene, name=f'tick[{mean_time:.4f}]')
                 self._debug_log_line_visual(tick, context='timeline_tick', pos=tick_pos, extra={'new_epoch_idx': new_epoch_idx, 'mean_time': float(mean_time)})
                 self.timeline_ticks.append(tick)
             self.combined_timeline_view.camera = scene.PanZoomCamera()
