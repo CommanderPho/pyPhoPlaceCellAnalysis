@@ -1699,7 +1699,7 @@ def render_predictive_decoding_with_vispy(epoch_flat_mask_future_past_result: Li
 
 
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_cameras import CustomTurntableCamera # Used in `Volumentric2DTimeSeriesPlotter`
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneWrappingWidget, VispyCanvasContainingWindow
 
 # Volumetric 2D time-series plotter using vispy
 _VOLUMETRIC_TURNTABLE_FOV: float = 45.0
@@ -1752,8 +1752,8 @@ class Volumentric2DTimeSeriesPlotter:
     pos3d: Optional[NDArray] = field(default=None)
 
     canvas: scene.SceneCanvas = field(default=None)
-    main_window: PhoDockAreaContainingWindow = field(default=None)
-    view: ViewBox = field(default=None)
+    main_window: VispyCanvasContainingWindow = field(default=None)
+    view: scene.widgets.ViewBox = field(default=None)
     scene_tree_widget: VispySceneTreeWidget = field(default=None)
 
     position_line: vz.Line = field(default=None)
@@ -1931,6 +1931,12 @@ class Volumentric2DTimeSeriesPlotter:
         if self.n_t_bins > 0:
             self.update_active_t_bin(self.active_t_bin_idx)
 
+        if hasattr(canvas.events, 'on_resize'):
+            canvas.events.on_resize.connect(self.on_resize)
+        if hasattr(canvas.events, 'on_close'):
+            canvas.events.on_close.connect(self.on_close)
+                        
+
         if hasattr(canvas.events, 'key_press'):
             canvas.events.key_press.connect(self.on_key_press)
         if hasattr(canvas.events, 'key_release'):
@@ -1939,6 +1945,9 @@ class Volumentric2DTimeSeriesPlotter:
             canvas.events.mouse_move.connect(self.on_mouse_move)
         if hasattr(canvas.events, 'mouse_leave'):
             canvas.events.mouse_leave.connect(self.on_mouse_leave)
+            
+
+        
 
         x_min, x_max = float(self.xbin[0]), float(self.xbin[-1])
         y_min, y_max = float(self.ybin[0]), float(self.ybin[-1])
@@ -3297,6 +3306,13 @@ class Volumentric2DTimeSeriesPlotter:
     # ==================================================================================================================================================================================================================================================================================== #
     # Interaction/UI Events                                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
+    def on_close(self, event):
+        print(f'Volumentric2DTimeSeriesPlotter.on_close(event: {event}): closing!')
+
+    def on_resize(self, event):
+        print(f'Volumentric2DTimeSeriesPlotter.on_resize(event:(event.size: {event.size})')
+        
+
     def on_key_press(self, event):
         key_name = str(event.key)
         if key_name == 'Shift':
