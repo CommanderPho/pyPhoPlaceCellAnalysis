@@ -652,7 +652,7 @@ class VispyHelpers:
 
     @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
     @classmethod
-    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
+    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl', name: str = 'heading_rainbow_line') -> Any:
         """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
 
         from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
@@ -679,7 +679,7 @@ class VispyHelpers:
 
         data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
 
-        line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
+        line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent, name=name)  # type: ignore[call-arg]
         # line = AngleColoredLineVisual(pos=pos, color=vertex_colors, method='gl')
         line.order = order
         return line, data_dict
@@ -1076,7 +1076,6 @@ if __name__ == '__main__':
             line.set_gl_state('translucent', depth_test=False)
             # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
             arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=7, width=5.0, arrow_size=5.0, alpha=0.8, arrow_type='triangle_30', method='gl')
-
             # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=20.0, alpha=0.8, arrow_type='stealth', method='agg')
             if arr is not None:
                 arr.set_gl_state('translucent', depth_test=False)

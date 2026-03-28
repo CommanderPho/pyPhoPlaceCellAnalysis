@@ -19,7 +19,7 @@ import vispy.scene.visuals as vz
 
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphoplacecellanalysis.Pho2D.vispy.predictive_time_colormap import predictive_time_bin_rgba
-from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import ContourItem, contours_from_masks, create_contour_line_visuals
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import ContourItem, contours_from_masks, create_contour_line_visuals, VispyHelpers
 from pyphoplacecellanalysis.Pho2D.vispy.vispy_raster import VispyRasterVisual, plot_multiple_raster_plot_vispy, VispyMultiRasterPlotTuple
 
 
@@ -127,7 +127,8 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
 
                             pos: NDArray = np.vstack([arrow_centroids_df[['x_start', 'y_start']].to_numpy(), arrow_centroids_df[['x_end', 'y_end']].to_numpy()])
                             arrows: NDArray = arrow_centroids_df[['x_start', 'y_start', 'x_mid', 'y_mid']].to_numpy()
-
+                            n_centroids: int = len(arrow_centroids_df)
+                            
                             _safe_color_map_fn = lambda t_idx: tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
                             _original_index_start_colors_list = arrow_centroids_df['original_index_start'].map(_safe_color_map_fn).to_list()
                             _original_index_end_colors_list = arrow_centroids_df['original_index_end'].map(_safe_color_map_fn).to_list()
@@ -136,30 +137,49 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                             arrow_color: NDArray = np.vstack(_original_index_start_colors_list)
                             Assert.same_length(arrow_color, arrows)
 
-                            if use_single_arrows_object:
-                                arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_color=arrow_color, arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color, width=3.0,
-                                                            method='gl', connect='segments', parent=posterior_2d_view.scene, name=f'arrow')
-                                arrow.order = 7
+
+                            use_new_heading_line_with_arrow_overlay_mode: bool = True
+                            if use_new_heading_line_with_arrow_overlay_mode:
+                                line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=posterior_2d_view.scene, line_width=1.0, order=7, name=f'centroids_sequence_line')
+                                line.set_gl_state('translucent', depth_test=False)
+                                # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=posterior_2d_view.scene, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+                                arrow, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=posterior_2d_view.scene, n_arrows=(n_centroids-1), width=5.0, arrow_size=5.0, alpha=0.8, arrow_type='triangle_30', method='gl', name=f'centroids_sequence_line_arrows')
+                                # arrow, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=posterior_2d_view.scene, n_arrows=5, width=20.0, alpha=0.8, arrow_type='stealth', method='agg')
+                                if arrow is not None:
+                                    arrow.set_gl_state('translucent', depth_test=False)
+                                    arrow.order = 8
+
+                                centroid_arrows.append(line)
                                 centroid_arrows.append(arrow)
+
+                                # VispyHelpers.create_viewport_heading_compass_legend(canvas=canvas, margin=(18.0, 18.0), size_frac=0.066)
+
                             else:
-                                for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
-                                    t_idx = original_indices[i]
-                                    a_row_dict = a_row._asdict()
-                                    x_center = a_row_dict['x_start']
-                                    y_center = a_row_dict['y_start']
-                                    unit_dx = a_row_dict['unit_dx']
-                                    unit_dy = a_row_dict['unit_dy']
-                                    x_start, y_start = x_center, y_center
-                                    x_end = x_center + (unit_dx * arrow_length)
-                                    y_end = y_center + (unit_dy * arrow_length)
-                                    an_arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
-                                    a_pos = np.array([[x_start, y_start], [x_end, y_end]])
-                                    an_arrows = np.array([[x_start, y_start, x_end, y_end]])
-                                    a_pos = np.asarray(a_pos, dtype=np.float32)
-                                    an_arrows = np.asarray(an_arrows, dtype=np.float32)
-                                    arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene, name=f'centroids_arrow[{t_idx}]')
+                                ## pre 2026-03-28 arrow-based mode
+                                if use_single_arrows_object:
+                                    arrow: vz.Arrow = vz.Arrow(pos=pos, arrows=arrows, arrow_color=arrow_color, arrow_type='triangle_30', arrow_size=arrow_head_size, color=vertex_point_color, width=3.0,
+                                                                method='gl', connect='segments', parent=posterior_2d_view.scene, name=f'arrow')
                                     arrow.order = 7
                                     centroid_arrows.append(arrow)
+                                else:
+                                    for i, a_row in enumerate(arrow_centroids_df.itertuples(index=True)):
+                                        t_idx = original_indices[i]
+                                        a_row_dict = a_row._asdict()
+                                        x_center = a_row_dict['x_start']
+                                        y_center = a_row_dict['y_start']
+                                        unit_dx = a_row_dict['unit_dx']
+                                        unit_dy = a_row_dict['unit_dy']
+                                        x_start, y_start = x_center, y_center
+                                        x_end = x_center + (unit_dx * arrow_length)
+                                        y_end = y_center + (unit_dy * arrow_length)
+                                        an_arrow_color = tuple(color_by_time_bin[t_idx]) if (0 <= t_idx < n_time_bin_slots) else (1.0, 1.0, 1.0, 0.8)
+                                        a_pos = np.array([[x_start, y_start], [x_end, y_end]])
+                                        an_arrows = np.array([[x_start, y_start, x_end, y_end]])
+                                        a_pos = np.asarray(a_pos, dtype=np.float32)
+                                        an_arrows = np.asarray(an_arrows, dtype=np.float32)
+                                        arrow = vz.Arrow(pos=a_pos, arrows=an_arrows, arrow_type='triangle_30', arrow_size=arrow_head_size, color=an_arrow_color, arrow_color=an_arrow_color, width=3.0, method='agg', parent=posterior_2d_view.scene, name=f'centroids_arrow[{t_idx}]')
+                                        arrow.order = 7
+                                        centroid_arrows.append(arrow)
 
                 else:
                     if 'segment_Vp_deg' in centroids_df.columns:
