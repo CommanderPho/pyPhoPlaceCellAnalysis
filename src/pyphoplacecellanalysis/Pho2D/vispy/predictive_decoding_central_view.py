@@ -362,24 +362,43 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
     time_bin_raster = _update_dict.get('time_bin_raster', None)
     can_plot_raster: bool = (active_epochs_df is not None) and (active_aclus is not None) and (actIve_filter_epochs_spikes_df is not None) and (time_bin_raster is not None)
     if can_plot_raster:
+        num_total_epoch_t_windows: int = None
         num_epoch_time_bins_for_raster: Optional[int] = None
         if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
-            num_epoch_time_bins_for_raster = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
+            num_total_epoch_t_windows: int = int(p_x_given_n.shape[-1])
+            num_epoch_time_bins_for_raster = int(min(num_total_epoch_t_windows, int(max_time_bins_to_show)))
+            
         raster_time_bin_edges: Optional[np.ndarray] = None
         if time_bin_edges is not None:
-            te = np.asarray(time_bin_edges, dtype=np.float64).ravel()
-            if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
-                k_vis = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
-                if te.size >= k_vis + 1:
-                    raster_time_bin_edges = te[: k_vis + 1].astype(np.float32, copy=False)
-            elif te.size >= 2:
-                raster_time_bin_edges = te.astype(np.float32, copy=False)
+            if num_total_epoch_t_windows is not None:
+                assert num_total_epoch_t_windows == (len(time_bin_edges)-1), f"num_total_epoch_t_windows: {num_total_epoch_t_windows} != (len(time_bin_edges)-1): {(len(time_bin_edges)-1)}"
+            else:
+                num_total_epoch_t_windows = len(time_bin_edges)-1 ## set it
+                
+            active_time_bin_edges = np.asarray(time_bin_edges, dtype=dtype).ravel()
+            
+            if len(active_time_bin_edges) < 3:
+                active_time_bin_edges = None ## don't plot any
+            else:
+                active_time_bin_edges = active_time_bin_edges[1:-1] ## exclude the first and last edges (which form the edges of the window). Only want the middle ones
+
+            raster_time_bin_edges = active_time_bin_edges.astype(dtype, copy=False)
+            # te = np.asarray(time_bin_edges, dtype=np.float64).ravel()
+            # if p_x_given_n is not None and getattr(p_x_given_n, 'size', 0) > 0 and p_x_given_n.ndim >= 3:
+            #     k_vis = int(min(int(p_x_given_n.shape[2]), int(max_time_bins_to_show)))
+            #     if te.size >= k_vis + 1:
+            #         raster_time_bin_edges = te[: k_vis + 1].astype(np.float32, copy=False)
+            # elif te.size >= 2:
+            #     raster_time_bin_edges = te.astype(np.float32, copy=False)
+                
+
+
         num_bins_for_raster_lines: Optional[int] = None if raster_time_bin_edges is not None else num_epoch_time_bins_for_raster
         raster_edge_vu: Optional[np.ndarray] = None
-        if raster_time_bin_edges is not None:
-            m = int(np.asarray(raster_time_bin_edges, dtype=np.float32).size)
-            if m >= 2:
-                raster_edge_vu = np.linspace(0.0, 1.0, m, dtype=np.float32)
+        # if raster_time_bin_edges is not None:
+        #     m = int(np.asarray(raster_time_bin_edges, dtype=dtype).size)
+        #     if m >= 2:
+        #         raster_edge_vu = np.linspace(0.0, 1.0, m, dtype=dtype)
         # new_all_aclus_sort_indicies = None
         # pen = {'color': 'white', 'width': 1}
         # override_scatter_plot_kwargs = dict(pxMode=False, symbol='vbar', size=5, pen=None) ## small
@@ -393,7 +412,9 @@ def render_central_view(p_x_given_n: np.ndarray, posterior_2d: np.ndarray, time_
                                                             scatter_plot_kwargs=override_scatter_plot_kwargs,
                                             epoch_id_key_name='replay_epoch_id', scatter_app_name=f'Decoded example replays (epoch {new_epoch_idx + 1}/{num_epochs})', defer_show=True,
                                             active_context=None, time_bin_raster_view=time_bin_raster, clear_host_scene=needs_clear_owned_views, bgcolor='black',
-                                            time_bin_edges=raster_time_bin_edges, num_epoch_time_bins=num_bins_for_raster_lines, time_bin_edge_vu=raster_edge_vu, time_bin_edge_line_alpha=0.65)
+                                            time_bin_edges=raster_time_bin_edges, 
+                                            #num_epoch_time_bins=num_bins_for_raster_lines, time_bin_edge_vu=raster_edge_vu,
+                                            time_bin_edge_line_alpha=0.65, dtype=dtype)
         _update_dict.update(time_bin_raster=time_bin_raster, vispy_multi_raster_plot=_out_vispy_raster)
 
 
