@@ -24,10 +24,10 @@ _PREDICTIVE_TIME_MPL_NAME: dict[PredictiveTimeColormapName, str | None] = {
 _RAINBOW_HUE_S = 0.8
 _RAINBOW_HUE_V = 0.9
 
-_active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
+# _active_predictive_time_colormap: PredictiveTimeColormapName = "cyan_magenta"
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "plasma"
 # _active_predictive_time_colormap: PredictiveTimeColormapName = "cool"
-# _active_predictive_time_colormap: PredictiveTimeColormapName = "rainbow_hue"
+_active_predictive_time_colormap: PredictiveTimeColormapName = "rainbow_hue"
 
 
 def set_predictive_time_colormap(name: PredictiveTimeColormapName | str) -> None:
@@ -116,13 +116,13 @@ def predictive_time_rgba_u(u: float, alpha: float, colormap: PredictiveTimeColor
 
 
 def predictive_time_bin_rgba(n_bins: int, alpha: float = 0.9, colormap: PredictiveTimeColormapName | str | None = None) -> np.ndarray:
-    """Return (n_bins, 4) float32 RGBA; ``u = t_idx / max(n_bins, 1)`` for each bin index, sampled from ``colormap`` or the module default."""
+    """Return (n_bins, 4) float32 RGBA; ``u = t_idx / max(n_bins - 1, 1)`` so the first/last bin hit colormap endpoints (``n_bins==1`` → ``u=0``)."""
     key = _resolve_colormap_key(colormap)
     n = int(n_bins)
     out = np.zeros((max(n, 0), 4), dtype=np.float32)
     if n <= 0:
         return out
-    denom = float(max(n, 1))
+    denom = float(max(n - 1, 1))
     for t_idx in range(n):
         u = t_idx / denom
         r, g, b = _predictive_time_rgb_for_key(key, u)

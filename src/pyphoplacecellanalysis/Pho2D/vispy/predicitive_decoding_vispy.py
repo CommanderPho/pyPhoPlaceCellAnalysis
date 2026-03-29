@@ -1861,7 +1861,7 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
 
     reward_zone_extrusion_visuals: List[Any] = field(default=Factory(list))
 
-    debug_xyz_axes: vz.XYZAxis = field(default=None)
+    # debug_xyz_axes: vz.XYZAxis = field(default=None)
     gridlines: vz.GridLines = field(default=None)
 
     def __attrs_post_init__(self):
@@ -1967,7 +1967,7 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
         self.add_standard_vispy_viewer_dock(root_dockAreaWindow, viewer_central_widget)
         
         # Something to give 3D context (axis from 0 to 1)
-        self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
+        
         self.gridlines = vz.GridLines(parent=self.view.scene, color=(0.4, 0.4, 0.4, 0.4))
         self._build_coordinate_axes()
 
@@ -2064,6 +2064,8 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
         self.coordinate_axes_labels.append(vz.Text(text='X', color=(1.0, 0.25, 0.25, 1.0), pos=x_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<X>_lbl'))
         self.coordinate_axes_labels.append(vz.Text(text='Y', color=(0.25, 1.0, 0.25, 1.0), pos=y_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<Y>_lbl'))
         self.coordinate_axes_labels.append(vz.Text(text='Z', color=(0.25, 0.5, 1.0, 1.0), pos=z_label_pos, font_size=12, anchor_x='left', anchor_y='center', parent=self.view.scene, name='Axes<Z>_lbl'))
+
+        # self.debug_xyz_axes = vz.XYZAxis(parent=self.view.scene)
 
 
     def setup_position_trajectory_curves(self):
@@ -2432,7 +2434,7 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
             else:
                 t_center = float(self.t_min + (t_idx + 0.5) * ((self.t_max - self.t_min) / max(n_tbins, 1)))
             z_val = float((t_center - self.t_min) * self.z_scale)
-            u = float((t_idx / max(n_tbins, 1)) % 1.0)
+            u = float(t_idx) / float(max(n_tbins - 1, 1))
             rgb = predictive_time_rgb(u)
             t_color = (rgb[0], rgb[1], rgb[2], contour_alpha)
             mask_2d = per_t_bin_mask[:, :, t_idx].T
