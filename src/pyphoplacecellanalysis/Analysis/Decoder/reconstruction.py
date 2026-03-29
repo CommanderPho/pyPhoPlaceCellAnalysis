@@ -916,7 +916,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
     time_bin_containers: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
-    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
+    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',), 'desc': 'Per epoch: (n_bins+1,) contiguous histogram edges, or (n_bins, 2) [start, stop] rows for overlapping sliding windows. Prefer time_bin_containers for full binning state.'}) # depends on the number of epochs, one per epoch
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
     ## Optional Helpers
@@ -1817,16 +1817,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             else:
                 raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 1, 2, or 3')
 
-            a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
-            if (len(a_time_bin_edges) != (num_time_bins+1)):
-                #@IgnoreException
-                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
-                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                continue
-            else:
-                assert len(a_time_bin_edges) == (num_time_bins+1)
-        
-            is_time_bin_active = is_time_bin_active_list[i]
+            is_time_bin_active = np.asarray(is_time_bin_active_list[i])
+            if is_time_bin_active.size != num_time_bins:
+                print(f'WARN: Epoch[{i}]: len(is_time_bin_active): {is_time_bin_active.size} != num_time_bins: {num_time_bins}. Using all-active mask for this epoch.')
+                is_time_bin_active = np.ones((num_time_bins,), dtype=bool)
+
             inactive_mask: NDArray[ND.Shape["N_TIME_BINS"], Any]  = ~is_time_bin_active
             
             # Make a copy of the original data before masking
@@ -1875,32 +1870,36 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, ...]
 
                 a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
-                # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
                 a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
                 center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
-                #TODO 2026-01-16 17:07: - [ ] I see some weirdnesses now, as the bins aren't evenly spaced anymore...
-                try:
-                    a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) #
-                    ## make whole new container
-                    a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                
-                except IndexError as e:
-                    if len(a_sliced_centers) == 0:
-                        ## no center => no edges
+                if a_binning_container.window_start_edges is not None:
+                    w0 = np.asarray(a_binning_container.window_start_edges[is_time_bin_active])
+                    w1 = np.asarray(a_binning_container.window_stop_edges[is_time_bin_active])
+                    if len(w0) == 0:
                         a_decoded_result.time_bin_edges[i] = np.array([])
-                        ## make whole new container
                         edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
-                
                     else:
-                        assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
-                        assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
-                        a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents) ## use the extents directly
-                        ## make whole new container
+                        ww = float(w1[0] - w0[0])
+                        hop = float(a_binning_container.slideby) if a_binning_container.slideby is not None else ww
+                        a_decoded_result.time_bin_containers[i] = BinningContainer.from_sliding_windows(window_start_edges=w0, window_stop_edges=w1, epoch_variable_extents=(float(w0[0]), float(w1[-1])), window_width=ww, hop=hop)
+                        a_decoded_result.time_bin_edges[i] = np.column_stack((w0, w1))
+                else:
+                    try:
+                        a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers)
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                    
-                except Exception as e:
-                    raise
+                    except IndexError as e:
+                        if len(a_sliced_centers) == 0:
+                            a_decoded_result.time_bin_edges[i] = np.array([])
+                            edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
+                            a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
+                        else:
+                            assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
+                            assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
+                            a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents)
+                            a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
+                    except Exception as e:
+                        raise
                 
 
                 # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
@@ -1955,9 +1954,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             ## Update start/stop/duration columns based on remaining time_bin_containers
             for i in np.arange(num_filter_epochs):
                 if a_decoded_result.nbins[i] > 0:
-                    remaining_centers = a_decoded_result.time_bin_containers[i].centers
-                    remaining_edges = a_decoded_result.time_bin_edges[i]
-                    if len(remaining_edges) > 0:
+                    remaining_edges = np.asarray(a_decoded_result.time_bin_edges[i])
+                    if remaining_edges.size == 0:
+                        continue
+                    if remaining_edges.ndim == 2 and remaining_edges.shape[1] == 2:
+                        a_decoded_result.filter_epochs.loc[i, 'start'] = float(remaining_edges[0, 0])
+                        a_decoded_result.filter_epochs.loc[i, 'stop'] = float(remaining_edges[-1, 1])
+                        a_decoded_result.filter_epochs.loc[i, 'duration'] = float(remaining_edges[-1, 1] - remaining_edges[0, 0])
+                    else:
                         a_decoded_result.filter_epochs.loc[i, 'start'] = remaining_edges[0]
                         a_decoded_result.filter_epochs.loc[i, 'stop'] = remaining_edges[-1]
                         a_decoded_result.filter_epochs.loc[i, 'duration'] = remaining_edges[-1] - remaining_edges[0]
@@ -2046,20 +2050,21 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         for i in np.arange(num_filter_epochs):
             *num_spatial_dims_list, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
-            a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
-            if (len(a_time_bin_edges) != (num_time_bins+1)):
-                #@IgnoreException
-                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
-                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                # continue
-                break
+            tc: BinningContainer = a_decoded_result.time_bin_containers[i]
+            sliding_iv = tc.get_sliding_window_intervals()
+            if sliding_iv is not None:
+                w_st, w_en = sliding_iv
+                _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
             else:
-                assert len(a_time_bin_edges) == (num_time_bins+1)
-        
-            unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges,
-                                                                                                                                                                                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                                                                                                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
-            
+                a_time_bin_edges: NDArray = np.asarray(a_decoded_result.time_bin_edges[i])
+                if a_time_bin_edges.ndim == 2 and a_time_bin_edges.shape[0] == num_time_bins and a_time_bin_edges.shape[1] == 2:
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=a_time_bin_edges[:, 0], window_stop_edges=a_time_bin_edges[:, 1], included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                elif a_time_bin_edges.ndim == 1 and len(a_time_bin_edges) == (num_time_bins + 1):
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                else:
+                    print(f'WARN: Epoch[{i}]: cannot derive spike mask from time_bin_edges with shape {getattr(a_time_bin_edges, "shape", None)}; treating all time bins as active.')
+                    is_time_bin_active = np.ones((num_time_bins,), dtype=bool)
+            assert len(is_time_bin_active) == num_time_bins, f"Epoch[{i}]: spike mask length {len(is_time_bin_active)} != num_time_bins {num_time_bins}"
             is_time_bin_active_list.append(is_time_bin_active)
             
         #END for i in np.arange(num_filter_epochs)    
@@ -2793,7 +2798,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
+            _tc = curr_filter_epoch_time_bin_container
+            if _tc.window_start_edges is not None:
+                a_time_bin_edges = np.column_stack((np.asarray(_tc.window_start_edges), np.asarray(_tc.window_stop_edges)))
+            else:
+                a_time_bin_edges = np.atleast_1d(_tc.edges)
             filter_epochs_decoder_result.time_bin_edges.append(a_time_bin_edges)
             if use_single_time_bin_per_epoch:
                 assert curr_filter_epoch_time_bin_container.num_bins == 1
@@ -2852,7 +2861,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 
                 # time_bin_edges, epoch_description_list
                 if filter_epochs_decoder_result.time_bin_edges[invalid_idx] is not None:
-                    filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges) # filter_epochs_decoder_result.time_bin_edges[invalid_idx][good_indicies]
+                    _fix_tc = filter_epochs_decoder_result.time_bin_containers[invalid_idx]
+                    if _fix_tc.window_start_edges is not None:
+                        filter_epochs_decoder_result.time_bin_edges[invalid_idx] = np.column_stack((np.asarray(_fix_tc.window_start_edges), np.asarray(_fix_tc.window_stop_edges)))
+                    else:
+                        filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(_fix_tc.edges)
                     
                 # if filter_epochs_decoder_result.epoch_description_list[invalid_idx] is not None:
                 #     filter_epochs_decoder_result.epoch_description_list[invalid_idx] = filter_epochs_decoder_result.epoch_description_list[invalid_idx][good_indicies]

@@ -9,7 +9,7 @@ from collections import namedtuple
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable, Set
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -10454,8 +10454,21 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
             # time_bin_size_list = [str(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
-            time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
-
+            # time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()] ## doesn't work for sliding window
+            # time_bin_size_list = [np.asarray(a_time_bin_size, dtype=np.float64) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
+            
+            ## had to generalize for sliding windows
+            time_bin_size_list = []
+            for a_time_bin_size in continuously_decoded_result_cache_dict.keys():
+                if isinstance(a_time_bin_size, (Tuple, List, np.array, Set)):
+                    a_time_bin_size = [float(v) for v in a_time_bin_size] ## turn the members into floats
+                else:
+                    ## single item
+                    a_time_bin_size = float(a_time_bin_size)
+                    
+                time_bin_size_list.append(a_time_bin_size)
+            ## END for a_time_bin_size in continuously_decoded_result_cache_dict.keys()....
+            
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
             print(f'get_all_computed_time_bin_sizes(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
