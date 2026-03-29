@@ -377,8 +377,22 @@ class BinnedOccupancyComparisons:
                 vmax = vmin + np.finfo(float).eps
             return vmin, vmax
 
+        def _row_shared_limits_percentile_cap(*arrays, p_high: float = 99.0):
+            """Like _row_shared_limits but vmax = p_high percentile so rare hot bins do not crush mid-range contrast (values above cap saturate on the colorbar)."""
+            stacked = np.concatenate([np.asarray(a, dtype=float).ravel() for a in arrays], axis=0)
+            stacked = stacked[np.isfinite(stacked)]
+            if stacked.size == 0:
+                return 0.0, 1.0
+            vmin, vmax = float(np.min(stacked)), float(np.percentile(stacked, p_high))
+            if vmax <= vmin:
+                vmax = vmin + np.finfo(float).eps
+            return vmin, vmax
+
+        def _column_banner_name(dk: str) -> str:
+            return 'Directed' if dk == 'roam' else 'Sprinkle' if dk == 'sprinkle' else str(dk)
+
         def _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, colorbar_label):
-            """Add one row of images + colorbars + labels. column_data is list of (image_array, title) per column; one shared (vmin, vmax) and colorbar_label for the row (roam vs other contexts). Returns next row index (curr_row + 2)."""
+            """Add one row of images + colorbars + labels. column_data is list of (image_array, title) per column; one shared (vmin, vmax) and colorbar_label for the row. Returns next row index (curr_row + 2)."""
             for col_idx, (image_data, title) in enumerate(column_data):
                 win.addLabel(text=title, row=curr_row, col=col_idx * 2, colspan=2)
                 vb = win.addViewBox(row=(curr_row + 1), col=col_idx * 2)
@@ -399,7 +413,7 @@ class BinnedOccupancyComparisons:
         
         # extant_pbe_decoding_time_bin_size: float = 0.025
 
-        win = pg.GraphicsLayoutWidget(title="BinnedOccupancyComparisons — occupancy maps (per row: shared color scale across contexts; titles state quantity)")
+        win = pg.GraphicsLayoutWidget(title="BinnedOccupancyComparisons — columns: Directed (roam) vs Sprinkle; shared color scale per row")
         
 
         across_all_time_bin_p_x_given_n_dict = {}
@@ -409,9 +423,11 @@ class BinnedOccupancyComparisons:
         if extant_pbe_decoding_time_bin_size not in decoder_cache['pbe']:
             decoder_cache['pbe'][extant_pbe_decoding_time_bin_size] = {} ## INIT
 
+        for col_idx, nm in enumerate(decoder_names):
+            win.addLabel(text=_column_banner_name(nm), row=0, col=col_idx * 2, colspan=2, size='24pt', bold=True)
+        curr_row: int = 1
 
         # Plot decoded PBES __________________________________________________________________________________________________ #
-        curr_row: int = 0
         for a_decoder_name in decoder_names:
             pbes_df: pd.DataFrame = ensure_dataframe(curr_active_pipeline.filtered_sessions[a_decoder_name].pbe)
             a_decoder = pf1D_Decoder_dict[a_decoder_name]
@@ -440,7 +456,7 @@ class BinnedOccupancyComparisons:
         # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded PBE occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded PBE occupancy sprinkle")]
         _pbe_row_arrays = [across_all_time_bin_p_x_given_n_dict[nm] for nm in decoder_names]
         vmin, vmax = _row_shared_limits(*_pbe_row_arrays)
-        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], f"Decoded PBE · {nm}\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
+        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], "Decoded PBE\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density (row scale shared)")
 
         ## OUTPUTS: across_all_time_bin_p_x_given_n_dict
@@ -451,9 +467,9 @@ class BinnedOccupancyComparisons:
         # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.occupancy
         # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         _raw_occ_arrays = [pf1D_Decoder_dict[nm].pf.occupancy for nm in decoder_names]
-        vmin, vmax = _row_shared_limits(*_raw_occ_arrays)
-        column_data = [(pf1D_Decoder_dict[nm].pf.occupancy, f"Measured PF occupancy · {nm}\nraw (time in bin or samples; not normalized like decoder)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "PF occupancy (raw; row scale shared)")
+        vmin, vmax = _row_shared_limits_percentile_cap(*_raw_occ_arrays, p_high=99.0)
+        column_data = [(pf1D_Decoder_dict[nm].pf.occupancy, "Measured PF occupancy\nraw (time in bin or samples; not normalized like decoder)") for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "PF occupancy raw — row scale; vmax = 99th %ile (hot bins saturate)")
 
 
         # Plot decoded LAPs __________________________________________________________________________________________________ #
@@ -482,7 +498,7 @@ class BinnedOccupancyComparisons:
         # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded Runs occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded Runs occupancy sprinkle")]
         _laps_row_arrays = [across_all_time_bin_p_x_given_n_dict[nm] for nm in decoder_names]
         vmin, vmax = _row_shared_limits(*_laps_row_arrays)
-        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], f"Decoded laps · {nm}\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
+        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], "Decoded laps\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density (row scale shared)")
 
 
@@ -491,9 +507,9 @@ class BinnedOccupancyComparisons:
         # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
         # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         _pnorm_arrays = [pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy for nm in decoder_names]
-        vmin, vmax = _row_shared_limits(*_pnorm_arrays)
-        column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, f"Measured PF · {nm}\nprobability-normalized occupancy (comparable to a distribution)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm occupancy (row scale shared)")
+        vmin, vmax = _row_shared_limits_percentile_cap(*_pnorm_arrays, p_high=99.0)
+        column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, "Measured PF\nprobability-normalized occupancy (comparable to a distribution)") for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm — row scale; vmax = 99th %ile (hot bins saturate)")
 
 
         # a_decoder.pf.occupancy
@@ -4241,7 +4257,7 @@ def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
 
 
 @function_attributes(short_name=None, tags=['GUI', 'dual-conteext', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-01 08:00', related_items=[])
-def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None) -> GenericPyQtGraphContainer:
+def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None, show_decoding_window_raster: bool=True) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -4279,7 +4295,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         included_filter_names = ['sprinkle', 'roam']
         
     
-    def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
+    def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, window_sync_raster_widget=None, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
         """ Merges the provided list of `_out_sync_plotters` into a single horizontally stacked widget, all controlled by `a_controlling_widget`
         
             implicitly captures title from the outer function
@@ -4306,6 +4322,12 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
             _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
         # END for a_name, a_sync_plotter in _out_sync_plotter...
+
+        if window_sync_raster_widget is not None:
+            decoding_window_raster_id: str = 'decoding_window_spikes'
+            _raster_strip_width = int(final_desired_width * max(1, len(_out_sync_plotters)))
+            _display_configs[decoding_window_raster_id] = CustomDockDisplayConfig(showCloseButton=False)
+            _, _display_dock_items[decoding_window_raster_id] = root_dockAreaWindow.add_display_dock(identifier=decoding_window_raster_id, dockSize=(_raster_strip_width, 140), widget=window_sync_raster_widget, dockAddLocationOpts=['bottom'], display_config=_display_configs[decoding_window_raster_id])
         
         if a_controlling_widget is not None:
             if not is_controlling_widget_external:
@@ -4327,6 +4349,11 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
                 _display_sync_connections[a_name] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=a_sync_plotter, driver=a_controlling_widget,
                                                                 custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
             # END for a_name, a_sync_plotter in _out_sync_plotter...
+            if window_sync_raster_widget is not None:
+                _display_sync_connections['decoding_window_spikes'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=window_sync_raster_widget, driver=a_controlling_widget,
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.update_zoomed_plot_rate_limited)))
+                _wt0, _wt1 = a_controlling_widget.spikes_window.active_time_window
+                window_sync_raster_widget.update_zoomed_plot(_wt0, _wt1)
 
         _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_combined_time_synchronized_plotters_window')       
         _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
@@ -4334,9 +4361,11 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_container.ui.display_sync_connections = _display_sync_connections
         _out_container.ui.display_dock_items = _display_dock_items
         _out_container.ui.sync_plotters = _out_sync_plotters
-        _out_container.ui.controlling_widget = controlling_widget
+        _out_container.ui.controlling_widget = a_controlling_widget
+        _out_container.ui.window_sync_raster = window_sync_raster_widget
 
         _out_container.plots_data.display_configs = _display_configs
+        _out_container.plots_data.window_sync_raster = window_sync_raster_widget
         if context is not None:
             _out_container.plots_data.display_context = context
         if included_filter_names is not None:
@@ -4639,8 +4668,20 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_sync_plotters[a_filter_name] = curr_position_decoder_plotter
     # END for a_filter_name in included_filter_names...
 
+    window_sync_raster = None
+    if show_decoding_window_raster and controlling_widget is not None:
+        from pyphoplacecellanalysis.General.Model.SpikesDataframeWindow import SpikesDataframeWindow
+        _wt0, _ = controlling_widget.spikes_window.active_time_window
+        _slave_params = VisualizationParameters('BapunDecodingWindowRaster')
+        _slave_params['use_docked_pyqtgraph_plots'] = False
+        _slave_sw = SpikesDataframeWindow(all_epochs_spikes_df, window_duration=fixed_window_duration, window_start_time=float(_wt0))
+        window_sync_raster = Spike2DRaster(params=_slave_params, spikes_window=_slave_sw, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name='BapunDecodingWindowRaster', should_show=False, parent=None)
+        window_sync_raster.plots.background_static_scroll_window_plot.hide()
+        if getattr(window_sync_raster.ui, 'scroll_window_region', None) is not None:
+            window_sync_raster.ui.scroll_window_region.hide()
+
     # Merge the plotters here: ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, **_out_sync_plotters)
+    _out_container = _subfn_merge_plotters(controlling_widget, is_controlling_widget_external=is_controlling_widget_external, window_sync_raster_widget=window_sync_raster, **_out_sync_plotters)
     if directional_decoders_decode_result is not None:
         _out_container.plots_data.directional_decoders_decode_result = directional_decoders_decode_result
     
