@@ -49,6 +49,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "lxml-html-clean>=0.4.0,<1",
     "pytest>=7.2.1,<8",
     "ipython>=8.9.0,<9",
     "viztracer>=0.15.6,<0.16",

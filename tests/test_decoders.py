@@ -2,6 +2,7 @@ import unittest
 import sys, os
 from pathlib import Path
 from copy import deepcopy
+from typing import Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
@@ -23,6 +24,28 @@ finally:
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
+DecodingContinuousCacheKey = Tuple[float, float]
+
+
+def decoding_continuous_cache_key(decoding_time_bin_size: float, slideby: Optional[float]) -> DecodingContinuousCacheKey:
+    """Mirror of DirectionalPlacefieldGlobalComputationFunctions.decoding_continuous_cache_key (keep in sync)."""
+    w = float(decoding_time_bin_size)
+    h = float(slideby) if slideby is not None else w
+    return (w, h)
+
+
+def normalize_continuous_decoding_cache_lookup_key(extant: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> DecodingContinuousCacheKey:
+    """Mirror of DirectionalPlacefieldGlobalComputationFunctions.normalize_continuous_decoding_cache_lookup_key (keep in sync)."""
+    if isinstance(extant, tuple) and len(extant) == 2:
+        return (float(extant[0]), float(extant[1]))
+    return decoding_continuous_cache_key(float(extant), slideby)
+
+
+H5_FIXTURE_PATH = root_project_folder.parent.joinpath('NeuroPy').joinpath('tests').joinpath('neuropy_pf_testing.h5')
+requires_neuropy_h5 = unittest.skipUnless(H5_FIXTURE_PATH.is_file(), f'missing {H5_FIXTURE_PATH.name}')
+
+
+@requires_neuropy_h5
 class TestDecodersMethods(unittest.TestCase):
 
     def setUp(self):
@@ -111,13 +134,28 @@ class TestDecodersMethods(unittest.TestCase):
         # self.assertTrue(np.all(np.isclose(neuron_sliced_pf.ratemap.tuning_curves, [original_pf.ratemap.tuning_curves[idx] for idx in subset_included_neuron_IDXs]))) # ensure that the tuning curves built for the neuron_slided_pf are the same as those subset as retrieved from the  original_pf
 
 
+class TestDecodingContinuousCacheKey(unittest.TestCase):
+
+
+    def test_decoding_continuous_cache_key_none_slideby_is_width(self):
+        self.assertEqual(decoding_continuous_cache_key(0.25, None), (0.25, 0.25))
+        self.assertEqual(decoding_continuous_cache_key(0.25, 0.05), (0.25, 0.05))
+
+
+    def test_normalize_lookup_accepts_float_or_tuple(self):
+        self.assertEqual(normalize_continuous_decoding_cache_lookup_key(0.1, None), (0.1, 0.1))
+        self.assertEqual(normalize_continuous_decoding_cache_lookup_key(0.1, 0.02), (0.1, 0.02))
+        self.assertEqual(normalize_continuous_decoding_cache_lookup_key((0.1, 0.02)), (0.1, 0.02))
+
+
 class TestEpochsSpkcountMethods(unittest.TestCase):
 
     def setUp(self):
         self.enable_debug_printing = False
         self.test_spikes_df = pd.DataFrame({
-            'neuron_id': [1, 1, 2, 2, 3],
-            'time': [0.1, 0.2, 0.15, 0.25, 0.3]
+            'aclu': [1, 1, 2, 2, 3],
+            't_rel_seconds': [0.1, 0.2, 0.15, 0.25, 0.3],
+            'neuron_type': ['pyramidal'] * 5,
         })
         self.test_epochs_df = pd.DataFrame({
             'start': [0.0, 0.5],
@@ -125,10 +163,10 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
         })
 
     def test_single_time_bin_per_epoch(self):
-        spkcount, nbins, time_bins = epochs_spkcount(
+        spkcount, _, nbins, time_bins = epochs_spkcount(
             self.test_spikes_df, 
             self.test_epochs_df,
-            bin_size=0.1,
+            bin_size=None,
             export_time_bins=True,
             use_single_time_bin_per_epoch=True
         )
@@ -139,9 +177,9 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
     def test_short_epoch_handling(self):
         short_epochs_df = pd.DataFrame({
             'start': [0.0, 0.5],
-            'stop': [0.005, 0.51]
+            'stop': [0.005, 0.505]
         })
-        spkcount, nbins, time_bins = epochs_spkcount(
+        spkcount, _, nbins, time_bins = epochs_spkcount(
             self.test_spikes_df,
             short_epochs_df,
             bin_size=0.01,
@@ -152,7 +190,7 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
 
     def test_included_neuron_ids(self):
         specific_neuron_ids = [1, 2, 3, 4]
-        spkcount, nbins, _ = epochs_spkcount(
+        spkcount, _, nbins, _ = epochs_spkcount(
             self.test_spikes_df,
             self.test_epochs_df,
             included_neuron_ids=specific_neuron_ids,
@@ -161,7 +199,7 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
         self.assertEqual(len(spkcount[0]), len(specific_neuron_ids))
 
     def test_variable_slideby(self):
-        spkcount, nbins, _ = epochs_spkcount(
+        spkcount, _, nbins, _ = epochs_spkcount(
             self.test_spikes_df,
             self.test_epochs_df,
             bin_size=0.1,
@@ -174,7 +212,7 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
             'start': [],
             'stop': []
         })
-        spkcount, nbins, time_bins = epochs_spkcount(
+        spkcount, _, nbins, time_bins = epochs_spkcount(
             self.test_spikes_df,
             empty_epochs_df,
             bin_size=0.1,
