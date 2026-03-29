@@ -23,7 +23,6 @@ from pyphoplacecellanalysis.External.pyqtgraph import QtCore
 
 from neuropy.core.epoch import Epoch, TimeColumnAliasesProtocol
 from neuropy.utils.dynamic_container import DynamicContainer
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset, override_dict, overriding_dict_with, overriding_dict_with, get_dict_subset
 from neuropy.utils.matplotlib_helpers import set_ax_emphasis_color
 
 

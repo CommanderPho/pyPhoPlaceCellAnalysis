@@ -7,7 +7,6 @@ from functools import total_ordering # used for `SplitPartitionMembership`
 from attrs import define, field, Factory
 
 from neuropy.utils.dynamic_container import DynamicContainer
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset, override_dict, overriding_dict_with, overriding_dict_with, get_dict_subset
 from neuropy.utils.misc import safe_item
 import pandas as pd
 from pandas import CategoricalDtype

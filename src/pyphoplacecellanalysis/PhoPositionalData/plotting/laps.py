@@ -11,7 +11,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import pyvista as pv
 import pyvistaqt as pvqt
 
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset, override_dict, overriding_dict_with
+from neuropy.utils.mixins.dict_representable import override_dict
 from neuropy.utils.matplotlib_helpers import plot_position_curves_figure # for plot_laps_2d
 
 from pyphocorehelpers.function_helpers import function_attributes

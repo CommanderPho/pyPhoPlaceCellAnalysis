@@ -32,7 +32,7 @@ from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 from neuropy.core.laps import Laps, LapsAccessor # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset, override_dict, overriding_dict_with # used to build config
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset # used to build config
 from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times

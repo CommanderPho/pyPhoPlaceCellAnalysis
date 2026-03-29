@@ -54,7 +54,7 @@ from neuropy.core.neuron_identities import  neuronTypesEnum, NeuronIdentityTable
 from neuropy.utils.mixins.HDF5_representable import HDF_Converter
 from neuropy.utils.indexing_helpers import PandasHelpers
 from neuropy.utils.debug_helpers import parameter_sweeps 
-from neuropy.utils.mixins.indexing_helpers import get_dict_subset, override_dict, overriding_dict_with, overriding_dict_with
+from neuropy.utils.mixins.dict_representable import override_dict
 
 from pyphocorehelpers.Filesystem.metadata_helpers import  get_file_metadata
 from pyphocorehelpers.assertion_helpers import Assert
