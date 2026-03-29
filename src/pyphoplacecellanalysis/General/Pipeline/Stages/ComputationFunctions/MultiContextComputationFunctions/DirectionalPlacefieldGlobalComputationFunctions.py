@@ -76,6 +76,39 @@ DecodedMarginalResultTuple: TypeAlias = Tuple[
     NDArray[ND.Shape["*"], ND.Bool]
 ] 
 
+DecodingContinuousCacheKey: TypeAlias = Tuple[float, float]
+
+
+def decoding_continuous_cache_key(decoding_time_bin_size: float, slideby: Optional[float]) -> DecodingContinuousCacheKey:
+    """Stable cache key (window_width_sec, slideby_sec). None slideby means non-overlapping bins (slideby == window width)."""
+    w = float(decoding_time_bin_size)
+    h = float(slideby) if slideby is not None else w
+    return (w, h)
+
+
+def coerce_continuously_decoded_cache_dict_keys(cache_dict: Optional[Dict[Any, Any]]) -> Optional[Dict[DecodingContinuousCacheKey, Any]]:
+    """Normalize legacy float keys to (w, w) tuples."""
+    if cache_dict is None:
+        return None
+    out: Dict[DecodingContinuousCacheKey, Any] = {}
+    for k, v in cache_dict.items():
+        if isinstance(k, tuple) and len(k) == 2:
+            nk: DecodingContinuousCacheKey = (float(k[0]), float(k[1]))
+        else:
+            w = float(k)
+            nk = (w, w)
+        if nk in out:
+            raise ValueError(f"Duplicate decoding cache key after normalization: {nk}")
+        out[nk] = v
+    return out
+
+
+def normalize_continuous_decoding_cache_lookup_key(extant: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> DecodingContinuousCacheKey:
+    """Resolve user lookup (float W or (W,H) tuple) to a cache key."""
+    if isinstance(extant, tuple) and len(extant) == 2:
+        return (float(extant[0]), float(extant[1]))
+    return decoding_continuous_cache_key(float(extant), slideby)
+
 # DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
 # Assume a1 and a2 are your numpy arrays
@@ -3939,28 +3972,43 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
     spikes_df: pd.DataFrame = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"}) # global
     
     # Posteriors computed via the all_directional decoder:
-    continuously_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"}) # key is the t_bin_size in seconds
+    continuously_decoded_result_cache_dict: Optional[Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, DecodedFilterEpochsResult]]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"})  # key is (window_sec, hop_sec); legacy pickles used float W -> coerced to (W,W) in __attrs_post_init__
+
+
+    def __attrs_post_init__(self):
+        coerced = coerce_continuously_decoded_cache_dict_keys(self.continuously_decoded_result_cache_dict)
+        if coerced is not self.continuously_decoded_result_cache_dict:
+            self.continuously_decoded_result_cache_dict = coerced
+
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        coerced = coerce_continuously_decoded_cache_dict_keys(self.continuously_decoded_result_cache_dict)
+        if coerced is not None:
+            self.continuously_decoded_result_cache_dict = coerced
     
 
     @property
-    def most_recent_decoding_time_bin_size(self) -> Optional[float]:
-        """Gets the last cached continuously_decoded_dict property."""
-        if ((self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict or {}) < 1)):
+    def most_recent_continuous_decoding_cache_key(self) -> Optional[DecodingContinuousCacheKey]:
+        if (self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict) < 1):
             return None
-        else:
-            last_time_bin_size: float = list(self.continuously_decoded_result_cache_dict.keys())[-1]
-            return last_time_bin_size   
-        
+        return list(self.continuously_decoded_result_cache_dict.keys())[-1]
+
+
+    @property
+    def most_recent_decoding_time_bin_size(self) -> Optional[float]:
+        """Most recent cached entry: decoding window width W (seconds), first component of the cache key."""
+        k = self.most_recent_continuous_decoding_cache_key
+        return None if k is None else k[0]
+
 
     @property
     def most_recent_continuously_decoded_dict(self) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
         """Gets the last cached continuously_decoded_dict property."""
-        last_time_bin_size = self.most_recent_decoding_time_bin_size
-        if (last_time_bin_size is None):
+        k = self.most_recent_continuous_decoding_cache_key
+        if k is None:
             return None
-        else:
-            # otherwise return the result            
-            return self.continuously_decoded_result_cache_dict[last_time_bin_size]         
+        return self.continuously_decoded_result_cache_dict[k]
 
 
     @property
@@ -3970,17 +4018,15 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('pseudo2D', None)
         
         """
-        last_time_bin_size = self.most_recent_decoding_time_bin_size
-        if (last_time_bin_size is None):
+        k = self.most_recent_continuous_decoding_cache_key
+        if k is None:
             return None
-        else:
-            # otherwise return the result            
-            return self.continuously_decoded_result_cache_dict[last_time_bin_size].get('pseudo2D', None)    
+        return self.continuously_decoded_result_cache_dict[k].get('pseudo2D', None)
 
 
     @property
-    def continuously_decoded_pseudo2D_decoder_dict(self) -> Optional[Dict[float, DecodedFilterEpochsResult]]:
-        """Gets 'pseudo2D' result only for each time_bin_size
+    def continuously_decoded_pseudo2D_decoder_dict(self) -> Optional[Dict[DecodingContinuousCacheKey, DecodedFilterEpochsResult]]:
+        """Gets 'pseudo2D' result only for each (W, H) cache key
         
         ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
         assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
@@ -4027,14 +4073,14 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         # all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
         # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
 
-        all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = {} ## time_bin_size: 1D_tracks
-        
-        for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+        all_time_bin_sizes_output_dict: Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, SingleEpochDecodedResult]] = {}
+
+        for cache_key, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
             ## Each iteration here adds 4 more tracks -- one for each decoding context
             
             # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
             if debug_print:
-                print(f'time_bin_size: {time_bin_size}')
+                print(f'continuous_decoding_cache_key (W, H): {cache_key}')
 
             # info_string: str = f" - t_bin_size: {time_bin_size}"
             
@@ -4115,9 +4161,9 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
                 # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
                 # output_dict[a_decoder_name] = _out_tuple
             ## END for i, a_de...
-            all_time_bin_sizes_output_dict[time_bin_size] = output_pseudo2D_split_to_1D_continuous_results_dict
-            
-        ## END for time_bin_size, a_continuously_decoded_dict in cont
+            all_time_bin_sizes_output_dict[cache_key] = output_pseudo2D_split_to_1D_continuous_results_dict
+
+        ## END for cache_key, a_continuously_decoded_dict in continuously_decoded_result_cache_dict
         
         return all_time_bin_sizes_output_dict
 
@@ -8095,7 +8141,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # validate_computation_test=DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs,
         validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
         is_global=True, computation_precidence=(1002.0))
-    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None, should_disable_cache: bool = False):
+    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None, slideby: Optional[float]=None, should_disable_cache: bool = False):
         """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
         
         should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
@@ -8230,10 +8276,10 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
             # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
             # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False)
+            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False)
             all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
-            continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
+            continuously_decoded_result_cache_dict = {decoding_continuous_cache_key(time_bin_size, slideby): all_directional_continuously_decoded_dict}
             print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
             directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
             did_update_computations = True
@@ -8246,7 +8292,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder # pseudo2D_decoder: missing .spikes_df (is None)
             spikes_df = directional_decoders_decode_result.spikes_df
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-            previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
+            previously_decoded_keys: List[DecodingContinuousCacheKey] = list(continuously_decoded_result_cache_dict.keys())
             # In future could extract `single_global_epoch` from the previously decoded result:
             # first_decoded_result = continuously_decoded_result_cache_dict[previously_decoded_keys[0]]
 
@@ -8257,20 +8303,19 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 time_bin_size = first_decoder.time_bin_size
                 
             print(f'\ttime_bin_size: {time_bin_size}')
-            
-            needs_recompute: bool = (time_bin_size not in previously_decoded_keys)
+            _cache_key = decoding_continuous_cache_key(time_bin_size, slideby)
+            needs_recompute: bool = (_cache_key not in previously_decoded_keys)
             if needs_recompute:
-                print(f'\t\trecomputing for time_bin_size: {time_bin_size}...')
+                print(f'\t\trecomputing for cache_key (W,H)={_cache_key}...')
                 ## Recompute here only:
-                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-                pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False)
+                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+                pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False)
                 all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
-                # directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
-                directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
+                directional_decoders_decode_result.continuously_decoded_result_cache_dict[_cache_key] = all_directional_continuously_decoded_dict
                 did_update_computations = True
-                
+
             else:
-                print(f'(time_bin_size == {time_bin_size}) already found in cache. Not recomputing.')
+                print(f'(cache_key == {_cache_key}) already found in cache. Not recomputing.')
 
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result

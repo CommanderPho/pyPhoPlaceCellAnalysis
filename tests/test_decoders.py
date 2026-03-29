@@ -19,6 +19,7 @@ except ModuleNotFoundError as e:
     sys.path.insert(0, str(src_folder))
 finally:
     from neuropy.analyses.placefields import PfND
+    from neuropy.analyses.decoders import epochs_spkcount
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 

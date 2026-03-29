@@ -2952,8 +2952,8 @@ def build_paired_time_synchronized_Bapun_decoder_with_lead_lag_window(curr_activ
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         continuously_decoded_pseudo2D_decoder_dict = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict
         ## Unpacking a result:
-        a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
-        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
+        a_continuous_cache_key = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1]
+        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_continuous_cache_key]
 
         ## HACK post-hoc: build correct 2D results from 3D only:
         one_step_decoder_dummy_dict = {}
@@ -4059,7 +4059,7 @@ def build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_
 
 
 @function_attributes(short_name=None, tags=['IMPORTANT', 'pseduo3D', 'pseudoND', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-09 10:50', related_items=[])
-def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, desired_global_created_epoch_name: str = 'maze_GLOBAL', active_laps_decoding_time_bin_size: float = 0.75, epochs_to_merge_as_global_epoch_names=None):
+def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder: BasePositionDecoder, desired_global_created_epoch_name: str = 'maze_GLOBAL', active_laps_decoding_time_bin_size: float = 0.75, slideby: Optional[float] = None, epochs_to_merge_as_global_epoch_names=None):
     """ The generalized context decoder for Bapun session, which is created out of the specified `epochs_to_create_global_from_names` and then used to decode the 'maze_any' epoch at the specified time bin size.
     
     Usage:
@@ -4073,7 +4073,8 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
 
         ## Build global result object
         global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
-        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={active_laps_decoding_time_bin_size:{'pseudo2D': all_context_filter_epochs_decoder_result}})
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import decoding_continuous_cache_key
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={decoding_continuous_cache_key(active_laps_decoding_time_bin_size, slideby): {'pseudo2D': all_context_filter_epochs_decoder_result}})
         curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
 
     """
@@ -4097,7 +4098,7 @@ def decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_D
     global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
     # get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
     # global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['x', 'y']) # computation_result.sess.position.to_dataframe()
-    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=global_spikes_df.copy(), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, debug_print=False)
+    all_context_filter_epochs_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=global_spikes_df.copy(), filter_epochs=ensure_dataframe(epochs_to_decode_dict[desired_global_created_epoch_name]), decoding_time_bin_size=active_laps_decoding_time_bin_size, slideby=slideby, debug_print=False)
 
     all_context_filter_epochs_decoder_result.marginal_z_list = [DynamicContainer(p_x_given_n=None, most_likely_positions_2D=None) for i in np.arange(all_context_filter_epochs_decoder_result.num_filter_epochs)]
     # for a_p_x_given_n in all_context_filter_epochs_decoder_result.p_x_given_n_list:
@@ -4523,8 +4524,8 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
         continuously_decoded_pseudo2D_decoder_dict = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict
         ## Unpacking a result:
-        a_time_bin_size: float = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1] ## ALWAYS GET THE MOST RECENT
-        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_time_bin_size] ## ALWAYS GET THE MOST RECENT
+        a_continuous_cache_key = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1]
+        all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_continuous_cache_key]
         # if not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
         if hasattr(all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
             all_context_filter_epochs_decoder_result = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
@@ -11573,7 +11574,7 @@ def perform_split_save_dictlike_result(split_save_folder: Path, active_computed_
 from neuropy.utils.mixins.time_slicing import TimePointEventAccessor
 from neuropy.core.position import PositionAccessor
 from neuropy.core.flattened_spiketrains import SpikesAccessor
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodingContinuousCacheKey, normalize_continuous_decoding_cache_lookup_key
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_1D_most_likely_position_comparsions
@@ -11638,22 +11639,23 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
 
     directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
     # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-    previously_decoded_keys: List[float] = list(directional_decoders_decode_result.continuously_decoded_result_cache_dict.keys()) # [0.03333]
+    previously_decoded_keys: List[DecodingContinuousCacheKey] = list(directional_decoders_decode_result.continuously_decoded_result_cache_dict.keys())
     if debug_print:
-        print(F'previously_decoded time_bin_sizes: {previously_decoded_keys}')
+        print(F'previously_decoded (W,H) keys: {previously_decoded_keys}')
 
     if desired_time_bin_size is None:
         time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
         continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
     else:
-        if desired_time_bin_size not in previously_decoded_keys:
+        desired_ck: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(desired_time_bin_size, None)
+        if desired_ck not in previously_decoded_keys:
             print(f'desired_time_bin_size: {desired_time_bin_size} is missing from previously decoded continuous cache. Must recompute.')
             curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
             directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] ## update the result
             print(f'\tcalculation complete.')
 
-        time_bin_size: float =  desired_time_bin_size
-        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size]
+        time_bin_size: float = float(desired_ck[0])
+        continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict[desired_ck]
 
 
     print(f'time_bin_size: {time_bin_size}')
