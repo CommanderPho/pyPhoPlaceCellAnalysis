@@ -42,6 +42,7 @@ from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color # require
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import _decoder_bin_left_right_edges
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
@@ -814,6 +815,65 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         self.update_zoomed_plot(min_t, max_t)
 
 
+
+    def _hide_decoded_posterior_active_bin_highlight(self) -> None:
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is not None:
+            reg.hide()
+
+
+
+    def _apply_decoded_posterior_x_grid(self, min_t: float, max_t: float) -> None:
+        """Decoded time-bin vertical grid for BapunDecodingWindowRaster only (see PendingNotebookCode). When decoded_posterior_x_grid_highlight_decoder_plotter is set and use_all_active_viewport_timebins is False, shades the decoded bin whose posterior is shown (left-edge index, same as viewport start_t)."""
+        if self.applicationName != 'BapunDecodingWindowRaster':
+            return
+        dec = self.params.get('decoded_posterior_x_grid_one_step_decoder', None)
+        plot_w = self.plots.main_plot_widget
+        hl_plotter = self.params.get('decoded_posterior_x_grid_highlight_decoder_plotter', None)
+        if dec is None or plot_w is None:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        centers = np.asarray(dec.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        left, right = _decoder_bin_left_right_edges(dec, centers)
+        edge_list: List[float] = []
+        for i in range(n):
+            if right[i] < min_t or left[i] > max_t:
+                continue
+            edge_list.append(float(left[i]))
+            edge_list.append(float(right[i]))
+        if len(edge_list) == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        edges = np.unique(np.asarray(edge_list, dtype=float))
+        show_labels = self.params.get('decoded_posterior_x_grid_show_labels', None)
+        if show_labels is None:
+            show_labels = len(edges) <= 25
+        alpha = float(self.params.get('decoded_posterior_x_grid_alpha', 0.35))
+        bottom = plot_w.getAxis('bottom')
+        ticks = [(float(e), f'{e:g}') for e in edges] if show_labels else [(float(e), '') for e in edges]
+        bottom.setTicks([ticks])
+        plot_w.showGrid(x=True, y=False, alpha=alpha)
+        if hl_plotter is None or getattr(hl_plotter, 'use_all_active_viewport_timebins', False):
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        idx = int(np.searchsorted(centers, float(min_t), side='left'))
+        idx = max(0, min(idx, n - 1))
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is None:
+            reg = pg.LinearRegionItem(values=[float(left[idx]), float(right[idx])], orientation='vertical', movable=False, brush=(255, 200, 60, 85))
+            reg.setZValue(-20)
+            plot_w.addItem(reg)
+            self._decoded_posterior_active_bin_region = reg
+        else:
+            reg.setRegion([float(left[idx]), float(right[idx])])
+        reg.show()
+
+
+
     @pyqtExceptionPrintingSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         """ update the zoomed plot, the spikes_window, and update the dependent curves
@@ -841,9 +901,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         
         # Update 3D Curves if we have them: TODO: figure out where this goes!
         self.TimeCurvesViewMixin_on_window_update()
-        
-        
-        
+        self._apply_decoded_posterior_x_grid(min_t, max_t)
+
+
     @pyqtExceptionPrintingSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control

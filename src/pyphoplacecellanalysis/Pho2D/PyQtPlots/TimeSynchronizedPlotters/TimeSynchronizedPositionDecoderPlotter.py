@@ -28,6 +28,47 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.User
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
 
 
+def _decoder_bin_left_right_edges(active_one_step_decoder, centers: NDArray) -> Tuple[NDArray, NDArray]:
+    """Per-bin (left, right) edges aligned with decoded frames. Uses time_bin_container when present, else midpoint inference from centers."""
+    centers = np.asarray(centers, dtype=float)
+    n: int = len(centers)
+    if n == 0:
+        return np.array([]), np.array([])
+    if hasattr(active_one_step_decoder, 'time_bin_container') and active_one_step_decoder.time_bin_container is not None:
+        tbc = active_one_step_decoder.time_bin_container
+        left = np.asarray(tbc.left_edges, dtype=float)
+        right = np.asarray(tbc.right_edges, dtype=float)
+        if len(left) >= n and len(right) >= n:
+            return left[:n], right[:n]
+    if n == 1:
+        d = 1.0
+    else:
+        d = float(np.median(np.diff(centers)))
+    mid = (centers[:-1] + centers[1:]) / 2.0
+    left = np.empty(n, dtype=float)
+    left[0] = centers[0] - (mid[0] - centers[0]) if n > 1 else centers[0] - d / 2.0
+    left[1:] = mid
+    right = np.empty(n, dtype=float)
+    right[-1] = centers[-1] + (centers[-1] - mid[-1]) if n > 1 else centers[-1] + d / 2.0
+    right[:-1] = mid
+    return left, right
+
+
+def _included_posterior_bin_indices_for_viewport(active_one_step_decoder, centers: NDArray, viewport_start: float, viewport_end: float) -> NDArray:
+    """Decoded bin indices with [left,right] strictly inside [viewport_start, viewport_end]; if none, single bin from clamped searchsorted(viewport_start). Used for viewport aggregation when TimeSynchronizedPositionDecoderPlotter.use_all_active_viewport_timebins is True."""
+    centers = np.asarray(centers, dtype=float)
+    n = len(centers)
+    if n == 0:
+        return np.array([], dtype=np.intp)
+    left, right = _decoder_bin_left_right_edges(active_one_step_decoder, centers)
+    strict = [i for i in range(n) if left[i] >= viewport_start and right[i] <= viewport_end]
+    if strict:
+        return np.asarray(strict, dtype=np.intp)
+    i0 = int(np.searchsorted(centers, viewport_start, side='left'))
+    i0 = max(0, min(i0, n - 1))
+    return np.array([i0], dtype=np.intp)
+
+
 class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Plots the decoded position posteriors at a given moment in time. 
     Uses pyqtgraph to render the decoded posteriors
@@ -94,6 +135,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
     
         self.last_window_index = None
         self.last_window_time = None
+        self.last_included_posterior_bin_indices: Optional[NDArray] = None
         self.active_one_step_decoder = active_one_step_decoder
         self.active_two_step_decoder = active_two_step_decoder
         
@@ -102,6 +144,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
         self.params.show_posteriors = param_kwargs.pop('show_posteriors', True)
         self.params.decoded_time_bins_info_df = param_kwargs.pop('decoded_time_bins_info_df', None) ## 
+        self.use_all_active_viewport_timebins = param_kwargs.pop('use_all_active_viewport_timebins', False)
 
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
@@ -372,11 +415,27 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # called when the window is updated
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        # if self.enable_debug_print:
-        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
-
-        # self.update(end_t, defer_render=False)
-        self.update(start_t, defer_render=False)
+        centers = np.asarray(self.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self.last_included_posterior_bin_indices = np.array([], dtype=np.intp)
+            self.last_window_index = None
+            self.last_window_time = None
+        elif self.use_all_active_viewport_timebins:
+            self.last_included_posterior_bin_indices = _included_posterior_bin_indices_for_viewport(self.active_one_step_decoder, centers, float(start_t), float(end_t))
+            if len(self.last_included_posterior_bin_indices) == 0:
+                self.last_window_index = None
+                self.last_window_time = None
+            else:
+                fi = int(self.last_included_posterior_bin_indices[0])
+                self.last_window_index = fi
+                self.last_window_time = centers[fi]
+        else:
+            idx = int(np.searchsorted(centers, float(start_t), side='left'))
+            idx = max(0, min(idx, n - 1))
+            self.last_included_posterior_bin_indices = np.array([idx], dtype=np.intp)
+            self.last_window_index = idx
+            self.last_window_time = centers[idx]
 
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
@@ -395,15 +454,26 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except Exception as e:
                 ## Unexpected exception!
                 raise e
-            
+
+        self._update_plots()
         if self.params.debug_print:
             print('\tFinished calling _update_plots()')
 
 
     def update(self, t, defer_render=False):
         # Finds the nearest previous decoded position for the time t:
-        self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        centers = np.asarray(self.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self.last_window_index = None
+            self.last_window_time = None
+            self.last_included_posterior_bin_indices = np.array([], dtype=np.intp)
+        else:
+            idx = int(np.searchsorted(centers, t, side='left')) # side='left' ensures that no future values (later than 't') are ever returned
+            idx = max(0, min(idx, n - 1))
+            self.last_window_index = idx
+            self.last_window_time = centers[idx]
+            self.last_included_posterior_bin_indices = np.array([idx], dtype=np.intp)
         
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
@@ -525,6 +595,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             
         if (self.last_window_time is not None):
             curr_window_title_str = f"{curr_window_title_str} | t: {self.last_window_time}"
+        if self.use_all_active_viewport_timebins and (self.last_included_posterior_bin_indices is not None):
+            curr_window_title_str = f"{curr_window_title_str} | n_bins: {len(self.last_included_posterior_bin_indices)}"
 
         # self.ui.root_plot.setTitle(f'PositionDecoder -  t = {self.last_window_time}')
         self.ui.root_plot.setTitle(curr_window_title_str)

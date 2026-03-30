@@ -4674,6 +4674,8 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _wt0, _ = controlling_widget.spikes_window.active_time_window
         _slave_params = VisualizationParameters('BapunDecodingWindowRaster')
         _slave_params['use_docked_pyqtgraph_plots'] = False
+        _slave_params['decoded_posterior_x_grid_one_step_decoder'] = _out_sync_plotters[included_filter_names[0]].active_one_step_decoder
+        _slave_params['decoded_posterior_x_grid_highlight_decoder_plotter'] = _out_sync_plotters[included_filter_names[0]]
         _slave_sw = SpikesDataframeWindow(all_epochs_spikes_df, window_duration=fixed_window_duration, window_start_time=float(_wt0))
         window_sync_raster = Spike2DRaster(params=_slave_params, spikes_window=_slave_sw, playback_controller=None, neuron_colors=None, neuron_sort_order=None, application_name='BapunDecodingWindowRaster', should_show=False, parent=None)
         window_sync_raster.plots.background_static_scroll_window_plot.hide()
