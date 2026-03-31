@@ -1,5 +1,7 @@
 from neuropy.core.user_annotations import function_attributes
 import numpy as np
+import signal
+import threading
 import pandas as pd
 from qtpy import QtCore, QtWidgets
 from copy import deepcopy
@@ -603,6 +605,41 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
 
 
+    def _export_video_spike_raster_duration_seconds(self, spike_raster_plt_2d: Any) -> float:
+        """Visible window duration for sliding the spike raster during export (seconds)."""
+        rd = getattr(spike_raster_plt_2d, 'render_window_duration', None)
+        if rd is not None:
+            d = float(rd)
+            if d > 0:
+                return d
+        pd = getattr(spike_raster_plt_2d, 'plot_data', None)
+        if pd is not None:
+            try:
+                te = float(pd.time_window_end)
+                ts = float(pd.time_window_start)
+                if te > ts:
+                    return te - ts
+            except (TypeError, ValueError, AttributeError):
+                pass
+        return 15.0
+
+
+
+    def _export_video_apply_frame_time(self, t: float, spike_raster_plt_2d: Any, additional_decoder_plotters: Optional[List[Any]]) -> None:
+        """Advance time for export one frame: either scroll+emit the driver raster (updates connected decoders) or update() on each plotter."""
+        if spike_raster_plt_2d is not None:
+            duration = self._export_video_spike_raster_duration_seconds(spike_raster_plt_2d)
+            win_start = float(t)
+            win_end = win_start + duration
+            spike_raster_plt_2d.update_scroll_window_region(win_start, win_end, block_signals=True)
+            spike_raster_plt_2d.window_scrolled.emit(win_start, win_end)
+        else:
+            self.update(t, defer_render=False)
+            if additional_decoder_plotters:
+                for p in additional_decoder_plotters:
+                    p.update(t, defer_render=False)
+
+
     @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
         """Efficiently export a video or animated GIF from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
@@ -655,10 +692,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except (KeyError, AttributeError) as e:
                 print(f'\t encountered error "{e}" while trying to update item. Skipping.')
             except Exception as e:
-                ## Unexpected exception!
                 raise
+        ## END for (a_stack_item_key, a_stack_item) in self.ui.plot_stack.items()...
 
-        
         video_filepath = Path(output_path).resolve()
         suffix = video_filepath.suffix.lower()
         VIDEO_EXTENSIONS = {'.avi', '.mp4', '.mov'}
