@@ -628,7 +628,11 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
 
 
     def _export_video_apply_frame_time(self, t: float, spike_raster_plt_2d: Any, additional_decoder_plotters: Optional[List[Any]]) -> None:
-        """Advance time for export one frame: either scroll+emit the driver raster (updates connected decoders) or update() on each plotter."""
+        """Advance time for export one frame: either scroll+emit the driver raster (updates connected decoders) or update() on each plotter.
+        
+        Never called?!?
+        
+        """
         if spike_raster_plt_2d is not None:
             duration = self._export_video_spike_raster_duration_seconds(spike_raster_plt_2d)
             win_start = float(t)
@@ -697,7 +701,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 raise
         ## END for (a_stack_item_key, a_stack_item) in self.ui.plot_stack.items()...
 
-        video_filepath = Path(output_path).resolve()
+        video_filepath: Path = Path(output_path).resolve()
         suffix = video_filepath.suffix.lower()
         VIDEO_EXTENSIONS = {'.avi', '.mp4', '.mov'}
         GIF_EXTENSIONS = {'.gif'}
@@ -731,14 +735,14 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
         # Subsample frame indices based on fps to reduce processing
         # Calculate desired time step between frames (in seconds)
-        desired_time_step = 1.0 / fps if fps > 0 else float('inf')
+        desired_time_step: float = 1.0 / fps if fps > 0 else float('inf')
         
         # Get all candidate frame indices
         all_frame_indices = np.arange(start_idx, end_idx)
         all_frame_times = time_window_centers[all_frame_indices]
         
         # Subsample frames based on desired time step
-        if desired_time_step < float('inf') and len(all_frame_indices) > 1:
+        if (desired_time_step < float('inf')) and (len(all_frame_indices) > 1):
             # Start with the first frame
             subsampled_indices = [all_frame_indices[0]]
             last_selected_time = all_frame_times[0]
@@ -762,7 +766,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             raise ValueError(f"No frames to export after subsampling at {fps} fps")
         
         if progress_print:
-            total_available_frames = len(all_frame_indices)
+            total_available_frames: int = len(all_frame_indices)
             kind = 'animated GIF' if export_format == 'gif' else 'video'
             print(f'Exporting {kind}: {n_frames} frames (from {total_available_frames} available) from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f} at {fps} fps')
         
@@ -801,7 +805,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         out = None  # Initialize to None for proper cleanup
         try:
             # Create ImageExporter for the root plot
-            exporter = ImageExporter(self.ui.root_plot)
+            exporter: ImageExporter = ImageExporter(self.ui.root_plot)
             exporter.parameters()['width'] = width
             exporter.parameters()['height'] = height
             exporter.parameters()['antialias'] = True
@@ -810,7 +814,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             QtWidgets.QApplication.processEvents()
             
             # Capture first frame to get actual output dimensions (may differ from requested)
-            first_frame_idx = frame_indices[0]
+            first_frame_idx: int = frame_indices[0]
             self.update(time_window_centers[first_frame_idx], defer_render=False)
             QtWidgets.QApplication.processEvents()
             first_qimage = exporter.export(toBytes=True)
@@ -823,7 +827,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             del first_qimage  # Free memory
             
             # Set up output path and directory
-            video_parent_path = video_filepath.parent
+            video_parent_path: Path = video_filepath.parent
             if not video_parent_path.exists():
                 if progress_print:
                     print(f'Creating output directory: {video_parent_path}')
@@ -833,6 +837,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 
                 frames_list = [first_frame]
                 progress_print_every_n_frames = max(1, n_frames // 20)
+                
+                # Main export loop ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 for i, frame_idx in enumerate(frame_indices):
                     if i == 0:
                         if progress_print:
@@ -841,10 +847,13 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                         print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
                     t = time_window_centers[frame_idx]
-                    self.update(t, defer_render=False)
+                    self.update(t, defer_render=False) ## Update call
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
                     frames_list.append(qimage_to_rgb(qimage))
+                ## END: for i, frame_idx in enumerate(frame_indices)
+
+
                 duration_sec = 1.0 / fps if fps > 0 else 0.1
                 imageio.mimsave(str(video_filepath), frames_list, format='GIF', duration=duration_sec, loop=0)
             else:
@@ -856,6 +865,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 out.write(first_bgr)
                 del first_bgr  # Free memory
                 progress_print_every_n_frames = max(1, n_frames // 20)
+                
+                # Main export loop ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 for i, frame_idx in enumerate(frame_indices):
                     if i == 0:
                         if progress_print:
@@ -864,11 +875,15 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                         print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
                     t = time_window_centers[frame_idx]
-                    self.update(t, defer_render=False)
+                    self.update(t, defer_render=False) ## Update call
+                    
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
                     bgr_array = qimage_to_bgr(qimage)
                     out.write(bgr_array)
+                ## END: for i, frame_idx in enumerate(frame_indices)
+
+
         finally:
             # Always close video writer (if opened) and restore debug print setting
             if out is not None:

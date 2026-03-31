@@ -4423,8 +4423,6 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             # win.repaint()
             
 
-
-
     def _subfn_add_session_epoch_intervals(active_2d_plot, curr_active_pipeline, **kwargs):
         """ 
         captures: active_2d_plot
@@ -4517,10 +4515,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
                 if 'windowed' not in a_dock.config.dock_group_names:
                     a_dock.config.dock_group_names.append('windowed') 
 
-
         return active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
-
-
 
 
     # ==================================================================================================================================================================================================================================================================================== #
