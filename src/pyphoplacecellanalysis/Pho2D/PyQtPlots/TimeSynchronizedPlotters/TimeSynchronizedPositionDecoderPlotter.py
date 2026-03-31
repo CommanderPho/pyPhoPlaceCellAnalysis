@@ -9,6 +9,8 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
+import imageio
+
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.assertion_helpers import Assert
 from neuropy.utils.mixins.dict_representable import overriding_dict_with
@@ -828,7 +830,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 video_parent_path.mkdir(parents=True, exist_ok=True)
             
             if export_format == 'gif':
-                import imageio
+                
                 frames_list = [first_frame]
                 progress_print_every_n_frames = max(1, n_frames // 20)
                 for i, frame_idx in enumerate(frame_indices):
