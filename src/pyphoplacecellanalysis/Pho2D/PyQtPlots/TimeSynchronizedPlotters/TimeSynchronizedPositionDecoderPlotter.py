@@ -675,7 +675,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             plotter.export_video('output/videos/decoder.gif', start_t=100.0, end_t=200.0, fps=10.0)
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
-        from pyphoplacecellanalysis.External.pyqtgraph import functions as fn
+        from pyphoplacecellanalysis.External.pyqtgraph_extensions.export_helpers import ExportHelpers
         from pathlib import Path
         import sys
         
@@ -779,29 +779,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 height = widget_size.height()
         
 
-        # Helper to convert QImage to BGR array for OpenCV (contiguous uint8 for compatibility)
-        def qimage_to_bgr(qimage):
-            img_array = fn.ndarray_from_qimage(qimage)
-            # Handle ARGB32 format conversion based on byte order
-            if img_array.shape[2] == 4:
-                # ARGB32 format - extract RGB channels based on byte order
-                if sys.byteorder == 'little':
-                    # Little-endian: channels are [B, G, R, A] in memory
-                    bgr = img_array[:, :, :3]  # B, G, R (first 3 channels)
-                else:
-                    # Big-endian: channels are [A, R, G, B] in memory
-                    bgr = img_array[:, :, [3, 2, 1]]  # B, G, R from indices 3,2,1
-            elif img_array.shape[2] == 3:
-                # Already RGB format, convert to BGR for OpenCV
-                bgr = img_array[:, :, ::-1]
-            else:
-                raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
-            # Ensure contiguous uint8 array for OpenCV compatibility
-            return np.ascontiguousarray(bgr, dtype=np.uint8)
-        
-        def qimage_to_rgb(qimage):
-            return np.ascontiguousarray(qimage_to_bgr(qimage)[:, :, ::-1], dtype=np.uint8)
-        
+
         out = None  # Initialize to None for proper cleanup
         try:
             # Create ImageExporter for the root plot
@@ -819,9 +797,9 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             QtWidgets.QApplication.processEvents()
             first_qimage = exporter.export(toBytes=True)
             if export_format == 'gif':
-                first_frame = qimage_to_rgb(first_qimage)
+                first_frame = ExportHelpers.qimage_to_rgb(first_qimage)
             else:
-                first_bgr = qimage_to_bgr(first_qimage)
+                first_bgr = ExportHelpers.qimage_to_bgr(first_qimage)
                 first_frame = first_bgr
             actual_height, actual_width = first_frame.shape[:2]
             del first_qimage  # Free memory
@@ -850,7 +828,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     self.update(t, defer_render=False) ## Update call
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
-                    frames_list.append(qimage_to_rgb(qimage))
+                    frames_list.append(ExportHelpers.qimage_to_rgb(qimage))
                 ## END: for i, frame_idx in enumerate(frame_indices)
 
 
@@ -879,7 +857,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
-                    bgr_array = qimage_to_bgr(qimage)
+                    bgr_array = ExportHelpers.qimage_to_bgr(qimage)
                     out.write(bgr_array)
                 ## END: for i, frame_idx in enumerate(frame_indices)
 
