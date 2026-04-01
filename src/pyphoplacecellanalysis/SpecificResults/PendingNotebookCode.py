@@ -4258,7 +4258,7 @@ def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
 
 @function_attributes(short_name=None, tags=['GUI', 'dual-conteext', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-01 08:00', related_items=[])
 def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None,
-                                                            show_decoding_window_raster: bool=True, decoding_window_raster_fixed_duration: bool=True) -> GenericPyQtGraphContainer:
+                                                            show_decoding_window_raster: bool=True, decoding_window_raster_fixed_duration: bool=True, enable_masked_bin_fill_mode: Optional[str]=None) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -4613,8 +4613,22 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         a_continuous_cache_key = list(continuously_decoded_pseudo2D_decoder_dict.keys())[-1]
         all_context_filter_epochs_decoder_result: SingleEpochDecodedResult = continuously_decoded_pseudo2D_decoder_dict[a_continuous_cache_key]
         # if not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
-        if hasattr(all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):
+        if hasattr(all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):                
             all_context_filter_epochs_decoder_result = all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
+            
+
+        if enable_masked_bin_fill_mode is not None:
+            ## masking:
+            print(f'enabling masking mode: {enable_masked_bin_fill_mode}')
+            global_spikes_df: pd.DataFrame = curr_active_pipeline.sess.spikes_df.copy()
+            a_masked_all_context_filter_epochs_decoder_result, mask_index_tuple = DecodedFilterEpochsResult.init_from_single_epoch_result(all_context_filter_epochs_decoder_result, 
+                                                                                                                                          decoding_time_bin_size=fixed_window_duration,
+                                                                                                                                        ).mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=global_spikes_df, #a_decoder.spikes_df,
+																																										 masked_bin_fill_mode=enable_masked_bin_fill_mode)
+            if hasattr(a_masked_all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):                
+                a_masked_all_context_filter_epochs_decoder_result = a_masked_all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
+            all_context_filter_epochs_decoder_result = a_masked_all_context_filter_epochs_decoder_result ## replace witht he masked version
+            
         try:
             marginal_z: NDArray = all_context_filter_epochs_decoder_result.marginal_z.p_x_given_n
 
@@ -4767,7 +4781,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         
         active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
         sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
-        window_sync_raster_widget: Optional[Spike2DRaster] = out_container.ui.window_sync_raster
+        window_sync_raster_widget: Optional[Spike2DRaster] = _out_container_new.ui.window_sync_raster
         win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
         
         _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline)
