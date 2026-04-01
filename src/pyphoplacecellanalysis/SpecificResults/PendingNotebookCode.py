@@ -4365,7 +4365,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _out_container.ui.window_sync_raster = window_sync_raster_widget
 
         _out_container.plots_data.display_configs = _display_configs
-        _out_container.plots_data.window_sync_raster = window_sync_raster_widget
+        # _out_container.plots_data.window_sync_raster = window_sync_raster_widget
         if context is not None:
             _out_container.plots_data.display_context = context
         if included_filter_names is not None:
@@ -4516,6 +4516,29 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
                     a_dock.config.dock_group_names.append('windowed') 
 
         return active_2d_plot.ui.dynamic_docked_widget_container.get_dockGroup_dock_dict()
+
+
+    def _subfn_bapun_combined_update_window_t_fn(out_container: GenericPyQtGraphContainer, start_t: float, end_t: Optional[float]=None):
+        """ programmatically updates all 3 widgets (the 2 upper 2D decoders and the bottom scrolling raster) accordingly in a single function 
+        
+        Usage:
+        
+            bapun_combined_update_window_t_fn(out_container=_out_container_new, start_t=7465.5)
+        """
+        # active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
+        sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = out_container.ui.sync_plotters
+        window_sync_raster_widget: Optional[Spike2DRaster] = out_container.ui.window_sync_raster
+        # win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
+
+        ## update 2D plotters
+        for an_epoch_name, a_plotter in sync_plotters.items():
+            a_plotter.update(start_t, defer_render=False)
+
+        ## update raster
+        if window_sync_raster_widget is not None:
+            window_sync_raster_widget.perform_update_zoomed_plot(min_t=start_t, max_t=end_t)
+            
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -4710,6 +4733,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     _out_container.add_session_epoch_intervals = lambda curr_active_pipeline, **kwargs: _subfn_add_session_epoch_intervals(active_2d_plot=_out_container.ui.controlling_widget, curr_active_pipeline=curr_active_pipeline, **kwargs)
     _out_container.add_pbes_full_result_marginals = lambda pbes_full_result, **kwargs: _subfn_add_pbes_full_result_marginals(active_2d_plot=_out_container.ui.controlling_widget, pbes_full_result=pbes_full_result, **kwargs)
     _out_container.build_overview_and_windowed_dockgroups = lambda debug_print=False, **kwargs: _subfn_build_overview_and_windowed_dockgroups(active_2d_plot=_out_container.ui.controlling_widget, debug_print=debug_print, **kwargs)
+    _out_container.combined_update_window_t = lambda start_t, end_t=None, **kwargs: _subfn_bapun_combined_update_window_t_fn(out_container=_out_container, start_t=start_t, end_t=end_t, **kwargs) ## can be called to update all programmatically
 
     ## Execute those of the marginals that we can do already:
     if (not is_controlling_widget_external):
@@ -4720,6 +4744,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         
         active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
         sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
+        window_sync_raster_widget: Optional[Spike2DRaster] = out_container.ui.window_sync_raster
         win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
         
         _out_container.add_session_epoch_intervals(curr_active_pipeline=curr_active_pipeline)
