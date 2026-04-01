@@ -4257,7 +4257,8 @@ def add_static_occupancy_maze_backgrounds(curr_active_pipeline, sync_plotters):
 
 
 @function_attributes(short_name=None, tags=['GUI', 'dual-conteext', 'context-decoding', 'bapun', 'WORKING'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-09-01 08:00', related_items=[])
-def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None, show_decoding_window_raster: bool=True) -> GenericPyQtGraphContainer:
+def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names: List[str]=None, fixed_window_duration = 15.0, controlling_widget=None, context=None, create_new_controlling_widget=True, show_posteriors: bool=True, directional_decoders_decode_result: Optional[DirectionalDecodersContinuouslyDecodedResult]=None,
+                                                            show_decoding_window_raster: bool=True, decoding_window_raster_fixed_duration: bool=True) -> GenericPyQtGraphContainer:
     """ Builds a single window with time_synchronized (time-dependent placefield) plotters controlled by an internal 2DRasterPlot widget.
     
     Usage:
@@ -4347,13 +4348,35 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             # Wire up signals such that time-synchronized plotters are controlled by the RasterPlot2D:
             for a_name, a_sync_plotter in _out_sync_plotters.items():
                 _display_sync_connections[a_name] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=a_sync_plotter, driver=a_controlling_widget,
-                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited)))
+                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.on_window_changed_rate_limited))) 
             # END for a_name, a_sync_plotter in _out_sync_plotter...
+            
             if window_sync_raster_widget is not None:
-                _display_sync_connections['decoding_window_spikes'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=window_sync_raster_widget, driver=a_controlling_widget,
-                                                                custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.update_zoomed_plot_rate_limited)))
                 _wt0, _wt1 = a_controlling_widget.spikes_window.active_time_window
-                window_sync_raster_widget.update_zoomed_plot(_wt0, _wt1)
+                if decoding_window_raster_fixed_duration:
+                    ## update only the window start:
+                    # update_window_start_rate_limited
+                    desired_window_duration: float = (1.2 * fixed_window_duration)
+                    _wt1 = _wt0 + desired_window_duration ## override _wt1 with the fixed duration
+                    #TODO 2026-04-01 05:24: - [ ] should we set `d.spikes_window.window_duration = desired_window_duration`?
+                    # _display_sync_connections['decoding_window_spikes'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=window_sync_raster_widget, driver=a_controlling_widget,
+                    #                                                 custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60,
+                    #                                                                                                                 slot=(lambda evt, d=drivable: d.update_zoomed_plot(evt[0], evt[0] + desired_window_duration)), 
+                    #                                                                                                                 # slot=(lambda evt, d=drivable: d.update_zoomed_plot(evt[0], evt[0] + d.spikes_window.window_duration)), 
+                    #                                                                                                                 )))
+
+                    _display_sync_connections['decoding_window_spikes'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=window_sync_raster_widget, driver=a_controlling_widget,
+                                                                    custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.update_window_start_rate_limited)))
+
+                    window_sync_raster_widget.update_zoomed_plot(_wt0, _wt1)
+                    
+                else:
+                    ## Update both window start_t and duration:
+                    _display_sync_connections['decoding_window_spikes'] = root_dockAreaWindow.connection_man.connect_drivable_to_driver(drivable=window_sync_raster_widget, driver=a_controlling_widget,
+                                                                    custom_connect_function=(lambda driver, drivable: pg.SignalProxy(driver.window_scrolled, delay=0.2, rateLimit=60, slot=drivable.update_zoomed_plot_rate_limited)))
+
+                    window_sync_raster_widget.update_zoomed_plot(_wt0, _wt1)
+
 
         _out_container: GenericPyQtGraphContainer = GenericPyQtGraphContainer(name='build_combined_time_synchronized_plotters_window')       
         _out_container.ui.root_dockAreaWindow = root_dockAreaWindow
