@@ -791,8 +791,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     def _update_plots(self):
         """
         Seems to be called every time the timeline is scrolled at least.
-
-        
         """
         self.logger.debug(f'Spike2DRaster._update_plots()')
         if self.enable_debug_print:
@@ -813,6 +811,33 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     def update_zoomed_plot_rate_limited(self, evt):
         min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
         self.update_zoomed_plot(min_t, max_t)
+
+    @pyqtExceptionPrintingSlot(float)
+    def update_window_start(self, new_value):
+        # self.timeWindow.update_window_start(new_value)
+        self.perform_update_zoomed_plot(min_t=new_value, max_t=None)
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        # self.timeWindow.update_window_start_end(new_start, new_end)
+        self.perform_update_zoomed_plot(min_t=new_start, max_t=new_end)
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @pyqtExceptionPrintingSlot(object)
+    def update_window_start_rate_limited(self, evt):
+        if len(evt) == 1:
+            self.update_window_start(*evt)
+        elif len(evt) == 2:
+            ## truncate to just the first, as expected output is start_t, end_t = evt
+            start_t = evt[0]
+            self.update_window_start(start_t)
+        else:
+            raise NotImlementedError(f'update_window_start_rate_limited(evt): len(evt): {len(evt)}, evt: {evt}')
+
 
 
 
@@ -873,35 +898,54 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         reg.show()
 
 
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=[], used_by=['update_zoomed_plot', 'update_window_start', 'update_window_start_end'], creation_date='2026-04-01 06:03', related_items=[])
+    def perform_update_zoomed_plot(self, min_t: float, max_t: Optional[float]=None):
+        """ common internal function to perform the update of the window, with an optional max_t
+        """
+        needs_update_duration: bool = (max_t is not None)
+        
+        if max_t is None:
+            ## update window start only:
+            max_t = min_t + self.spikes_window.window_duration
+        
+
+        # Update the main_plot_widget:
+        if self.Includes2DActiveWindowScatter:
+            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+
+
+        if needs_update_duration:
+            # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
+            scroll_window_width = max_t - min_t
+            # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
+
+            # Update GUI if we have one:
+            if self.WantsRenderWindowControls:
+                self.ui.spinTemporalZoomFactor.setValue(1.0)
+                self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+                            
+            # Here is the main problem: The duration and window end-time aren't being updated
+            self.spikes_window.update_window_start_end(min_t, max_t)
+                        
+        else:
+            ## update window start only:            
+            self.spikes_window.update_window_start(min_t)
+
+
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update()
+        self._apply_decoded_posterior_x_grid(min_t, max_t)
+
+
+
 
     @pyqtExceptionPrintingSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         """ update the zoomed plot, the spikes_window, and update the dependent curves
         
         """
-        # Update the main_plot_widget:
-        if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+        self.perform_update_zoomed_plot(min_t=min_t, max_t=max_t)
 
-        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
-        scroll_window_width = max_t - min_t
-        # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
-
-        # Update GUI if we have one:
-        if self.WantsRenderWindowControls:
-            self.ui.spinTemporalZoomFactor.setValue(1.0)
-            self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
-            
-        # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
-        # self.spikes_window.update_window_start(min_t)
-        
-        # Here is the main problem: The duration and window end-time aren't being updated
-        self.spikes_window.update_window_start_end(min_t, max_t)
-        
-        
-        # Update 3D Curves if we have them: TODO: figure out where this goes!
-        self.TimeCurvesViewMixin_on_window_update()
-        self._apply_decoded_posterior_x_grid(min_t, max_t)
 
 
     @pyqtExceptionPrintingSlot(float, float)
