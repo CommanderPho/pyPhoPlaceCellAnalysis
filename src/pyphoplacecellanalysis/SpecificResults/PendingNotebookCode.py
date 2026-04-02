@@ -312,6 +312,9 @@ def compute_lap_binned_occupancies(a_sess, a_decoder):
     return occupancy_counts_df_dict, lap_occupancy_n_samples_dict, lap_occupancy_seconds_dict, a_lap_occupancy_matricies_dict
 
 
+from neuropy.utils.mixins.metadata_helpers import DataframeMetadataProtocol, MetadataAccessor
+from neuropy.core.position import PositionAccessor, Position
+
 @define(slots=False, eq=False)
 class BinnedOccupancyComparisons:
     """ Compares decoded/measured occupancies between PBEs/Laps/etc on the Bapun 2D maze
@@ -391,19 +394,22 @@ class BinnedOccupancyComparisons:
         def _column_banner_name(dk: str) -> str:
             return 'Directed' if dk == 'roam' else 'Sprinkle' if dk == 'sprinkle' else str(dk)
 
-        def _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, colorbar_label):
-            """Add one row of images + colorbars + labels. column_data is list of (image_array, title) per column; one shared (vmin, vmax) and colorbar_label for the row. Returns next row index (curr_row + 2)."""
+        def _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, colorbar_label, row_side_label):
+            """Add one row of images + labels; one ColorBarItem on the rightmost column only (shared vmin/vmax for the row). column_data is list of (image_array, title) per column. row_side_label is drawn vertically in column 0. Returns next row index (curr_row + 2)."""
+            win.addLabel(text=row_side_label, row=curr_row, col=0, rowspan=2, angle=-90, size='12pt', bold=True)
             for col_idx, (image_data, title) in enumerate(column_data):
-                win.addLabel(text=title, row=curr_row, col=col_idx * 2, colspan=2)
-                vb = win.addViewBox(row=(curr_row + 1), col=col_idx * 2)
+                col0 = 1 + col_idx * 2
+                win.addLabel(text=title, row=curr_row, col=col0, colspan=2)
+                vb = win.addViewBox(row=(curr_row + 1), col=col0)
                 img_item = pg.ImageItem(image_data, title=title)
                 img_item.setLookupTable(cmap.getLookupTable())
                 img_item.setLevels((vmin, vmax))
                 vb.addItem(img_item)
                 vb.setAspectLocked(True)
-                cbar = pg.ColorBarItem(colorMap=cmap, label=colorbar_label, values=(vmin, vmax), rounding=None)
-                cbar.setImageItem(img_item)
-                win.addItem(cbar, row=(curr_row + 1), col=col_idx * 2 + 1)
+                if col_idx == len(column_data) - 1:
+                    cbar = pg.ColorBarItem(colorMap=cmap, label=colorbar_label, values=(vmin, vmax), rounding=None)
+                    cbar.setImageItem(img_item)
+                    win.addItem(cbar, row=(curr_row + 1), col=col0 + 1)
             return curr_row + 2
 
 
@@ -415,7 +421,6 @@ class BinnedOccupancyComparisons:
 
         win = pg.GraphicsLayoutWidget(title="BinnedOccupancyComparisons — columns: Directed (roam) vs Sprinkle; shared color scale per row")
         
-
         across_all_time_bin_p_x_given_n_dict = {}
 
         cmap = pg.colormap.get('viridis')  # added
@@ -423,9 +428,11 @@ class BinnedOccupancyComparisons:
         if extant_pbe_decoding_time_bin_size not in decoder_cache['pbe']:
             decoder_cache['pbe'][extant_pbe_decoding_time_bin_size] = {} ## INIT
 
+        win.addLabel(text='', row=0, col=0)
         for col_idx, nm in enumerate(decoder_names):
-            win.addLabel(text=_column_banner_name(nm), row=0, col=col_idx * 2, colspan=2, size='24pt', bold=True)
+            win.addLabel(text=_column_banner_name(nm), row=0, col=1 + col_idx * 2, colspan=2, size='24pt', bold=True)
         curr_row: int = 1
+        _subtitle_mean_posterior = 'mean posterior mass per spatial bin (÷ n_timebins)'
 
         # Plot decoded PBES __________________________________________________________________________________________________ #
         for a_decoder_name in decoder_names:
@@ -456,8 +463,8 @@ class BinnedOccupancyComparisons:
         # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded PBE occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded PBE occupancy sprinkle")]
         _pbe_row_arrays = [across_all_time_bin_p_x_given_n_dict[nm] for nm in decoder_names]
         vmin, vmax = _row_shared_limits(*_pbe_row_arrays)
-        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], "Decoded PBE\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density (row scale shared)")
+        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], _subtitle_mean_posterior) for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density", "Decoded PBE") # posterior density (row scale shared)
 
         ## OUTPUTS: across_all_time_bin_p_x_given_n_dict
 
@@ -468,8 +475,8 @@ class BinnedOccupancyComparisons:
         # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         _raw_occ_arrays = [pf1D_Decoder_dict[nm].pf.occupancy for nm in decoder_names]
         vmin, vmax = _row_shared_limits_percentile_cap(*_raw_occ_arrays, p_high=99.0)
-        column_data = [(pf1D_Decoder_dict[nm].pf.occupancy, "Measured PF occupancy\nraw (time in bin or samples; not normalized like decoder)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "PF occupancy raw — row scale; vmax = 99th %ile (hot bins saturate)")
+        column_data = [(pf1D_Decoder_dict[nm].pf.occupancy, 'raw (time in bin or samples; not normalized like decoder)') for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "Occupancy (sec)", "Measured Decoder occupancy") # raw — row scale; vmax = 99th %ile (hot bins saturate)
 
 
         # Plot decoded LAPs __________________________________________________________________________________________________ #
@@ -498,8 +505,8 @@ class BinnedOccupancyComparisons:
         # column_data = [(across_all_time_bin_p_x_given_n_dict['roam'], "decoded Runs occupancy roam"), (across_all_time_bin_p_x_given_n_dict['sprinkle'], "decoded Runs occupancy sprinkle")]
         _laps_row_arrays = [across_all_time_bin_p_x_given_n_dict[nm] for nm in decoder_names]
         vmin, vmax = _row_shared_limits(*_laps_row_arrays)
-        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], "Decoded laps\nmean posterior mass per spatial bin (÷ n_timebins)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density (row scale shared)")
+        column_data = [(across_all_time_bin_p_x_given_n_dict[nm], _subtitle_mean_posterior) for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Decoded laps")
 
 
         # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
@@ -508,13 +515,35 @@ class BinnedOccupancyComparisons:
         # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
         _pnorm_arrays = [pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy for nm in decoder_names]
         vmin, vmax = _row_shared_limits_percentile_cap(*_pnorm_arrays, p_high=99.0)
-        column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, "Measured PF\nprobability-normalized occupancy (comparable to a distribution)") for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm — row scale; vmax = 99th %ile (hot bins saturate)")
+        column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, 'probability-normalized occupancy (comparable to a distribution)') for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Measured Decoder") #  row scale; vmax = 99th %ile (hot bins saturate)
 
 
-        # a_decoder.pf.occupancy
-        # column_data = [...]; vmin, vmax = _row_shared_limits(...); _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "cbar units")
-        
+        # Plot measured all-positions occupancy (full session position on each decoder's bin grid) _________________________________________________________________________________________________________________________________________________________________________________________________ #
+        all_pos_occ_n_samples_dict: Dict[str, Any] = {}
+        all_pos_occ_sec_dict: Dict[str, Any] = {}
+        for nm in decoder_names:
+            curr_sess = curr_active_pipeline.filtered_sessions[nm]
+            a_decoder = pf1D_Decoder_dict[nm]
+            position_sampling_rate_Hz: float = curr_sess.position_sampling_rate
+            mean_sampling_rate_sec: float = 1.0 / position_sampling_rate_Hz
+            pos_obj: Position = curr_sess.position
+            updated_metadata = {'sampling_rate': position_sampling_rate_Hz, 'mean_sampling_rate_sec': mean_sampling_rate_sec}
+            pos_obj.metadata.update(**updated_metadata)
+            pos_obj.update_df_metadata(**updated_metadata)
+            pos_df: pd.DataFrame = pos_obj.to_dataframe()
+            occ_samples, occ_sec = pos_df.position.compute_binned_position_occupancy(xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin, position_sampling_rate_Hz=position_sampling_rate_Hz)
+            all_pos_occ_n_samples_dict[nm] = occ_samples
+            all_pos_occ_sec_dict[nm] = occ_sec
+        _all_pos_n_samples_arrays = [all_pos_occ_n_samples_dict[nm] for nm in decoder_names]
+        vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_n_samples_arrays, p_high=99.0)
+        column_data = [(all_pos_occ_n_samples_dict[nm], 'all recorded positions (sample counts per bin)') for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Samples', 'All-pos occupancy (n)')
+        _all_pos_sec_arrays = [all_pos_occ_sec_dict[nm] for nm in decoder_names]
+        vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_sec_arrays, p_high=99.0)
+        column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
+
         win.show()
         return across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row)
 
