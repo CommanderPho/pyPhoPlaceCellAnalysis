@@ -3180,7 +3180,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingComputationsContainer(ComputedResult):
-    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    """ 
 
 
     Usage:
