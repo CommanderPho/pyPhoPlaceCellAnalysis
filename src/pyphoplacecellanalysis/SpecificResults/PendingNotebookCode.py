@@ -476,7 +476,7 @@ class BinnedOccupancyComparisons:
         _raw_occ_arrays = [pf1D_Decoder_dict[nm].pf.occupancy for nm in decoder_names]
         vmin, vmax = _row_shared_limits_percentile_cap(*_raw_occ_arrays, p_high=99.0)
         column_data = [(pf1D_Decoder_dict[nm].pf.occupancy, 'raw (time in bin or samples; not normalized like decoder)') for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "Occupancy (sec)", "Measured Decoder occupancy") # raw — row scale; vmax = 99th %ile (hot bins saturate)
+        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "Occupancy (sec)", "Measured Decoder") # raw — row scale; vmax = 99th %ile (hot bins saturate)
 
 
         # Plot decoded LAPs __________________________________________________________________________________________________ #
@@ -508,41 +508,42 @@ class BinnedOccupancyComparisons:
         column_data = [(across_all_time_bin_p_x_given_n_dict[nm], _subtitle_mean_posterior) for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Decoded laps")
 
+        # Bottom three rows: measured P_norm + full-session all-pos occupancy (n and s). Hidden by default; set True to append to layout.
+        _show_optional_bottom_occupancy_rows: bool = False
+        if _show_optional_bottom_occupancy_rows:
+            # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
+            # occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
+            # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
+            # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
+            _pnorm_arrays = [pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy for nm in decoder_names]
+            vmin, vmax = _row_shared_limits_percentile_cap(*_pnorm_arrays, p_high=99.0)
+            column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, 'probability-normalized occupancy (comparable to a distribution)') for nm in decoder_names]
+            curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Measured Decoder") #  row scale; vmax = 99th %ile (hot bins saturate)
 
-        # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
-        # occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
-        # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
-        # column_data = [(occupancy_roam, "measured occupancy roam"), (occupancy_sprinkle, "measured occupancy sprinkle")]
-        _pnorm_arrays = [pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy for nm in decoder_names]
-        vmin, vmax = _row_shared_limits_percentile_cap(*_pnorm_arrays, p_high=99.0)
-        column_data = [(pf1D_Decoder_dict[nm].pf.probability_normalized_occupancy, 'probability-normalized occupancy (comparable to a distribution)') for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Measured Decoder") #  row scale; vmax = 99th %ile (hot bins saturate)
-
-
-        # Plot measured all-positions occupancy (full session position on each decoder's bin grid) _________________________________________________________________________________________________________________________________________________________________________________________________ #
-        all_pos_occ_n_samples_dict: Dict[str, Any] = {}
-        all_pos_occ_sec_dict: Dict[str, Any] = {}
-        for nm in decoder_names:
-            curr_sess = curr_active_pipeline.filtered_sessions[nm]
-            a_decoder = pf1D_Decoder_dict[nm]
-            position_sampling_rate_Hz: float = curr_sess.position_sampling_rate
-            mean_sampling_rate_sec: float = 1.0 / position_sampling_rate_Hz
-            pos_obj: Position = curr_sess.position
-            updated_metadata = {'sampling_rate': position_sampling_rate_Hz, 'mean_sampling_rate_sec': mean_sampling_rate_sec}
-            pos_obj.metadata.update(**updated_metadata)
-            pos_obj.update_df_metadata(**updated_metadata)
-            pos_df: pd.DataFrame = pos_obj.to_dataframe()
-            occ_samples, occ_sec = pos_df.position.compute_binned_position_occupancy(xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin, position_sampling_rate_Hz=position_sampling_rate_Hz)
-            all_pos_occ_n_samples_dict[nm] = occ_samples
-            all_pos_occ_sec_dict[nm] = occ_sec
-        _all_pos_n_samples_arrays = [all_pos_occ_n_samples_dict[nm] for nm in decoder_names]
-        vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_n_samples_arrays, p_high=99.0)
-        column_data = [(all_pos_occ_n_samples_dict[nm], 'all recorded positions (sample counts per bin)') for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Samples', 'All-pos occupancy (n)')
-        _all_pos_sec_arrays = [all_pos_occ_sec_dict[nm] for nm in decoder_names]
-        vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_sec_arrays, p_high=99.0)
-        column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
-        curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
+            # Plot measured all-positions occupancy (full session position on each decoder's bin grid) _________________________________________________________________________________________________________________________________________________________________________________________________ #
+            all_pos_occ_n_samples_dict: Dict[str, Any] = {}
+            all_pos_occ_sec_dict: Dict[str, Any] = {}
+            for nm in decoder_names:
+                curr_sess = curr_active_pipeline.filtered_sessions[nm]
+                a_decoder = pf1D_Decoder_dict[nm]
+                position_sampling_rate_Hz: float = curr_sess.position_sampling_rate
+                mean_sampling_rate_sec: float = 1.0 / position_sampling_rate_Hz
+                pos_obj: Position = curr_sess.position
+                updated_metadata = {'sampling_rate': position_sampling_rate_Hz, 'mean_sampling_rate_sec': mean_sampling_rate_sec}
+                pos_obj.metadata.update(**updated_metadata)
+                pos_obj.update_df_metadata(**updated_metadata)
+                pos_df: pd.DataFrame = pos_obj.to_dataframe()
+                occ_samples, occ_sec = pos_df.position.compute_binned_position_occupancy(xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin, position_sampling_rate_Hz=position_sampling_rate_Hz)
+                all_pos_occ_n_samples_dict[nm] = occ_samples
+                all_pos_occ_sec_dict[nm] = occ_sec
+            _all_pos_n_samples_arrays = [all_pos_occ_n_samples_dict[nm] for nm in decoder_names]
+            vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_n_samples_arrays, p_high=99.0)
+            column_data = [(all_pos_occ_n_samples_dict[nm], 'all recorded positions (sample counts per bin)') for nm in decoder_names]
+            curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Samples', 'All-pos occupancy (n)')
+            _all_pos_sec_arrays = [all_pos_occ_sec_dict[nm] for nm in decoder_names]
+            vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_sec_arrays, p_high=99.0)
+            column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
+            curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
 
         win.show()
         return across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row)
