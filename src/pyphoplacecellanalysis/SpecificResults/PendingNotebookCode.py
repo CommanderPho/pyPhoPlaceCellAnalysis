@@ -545,6 +545,15 @@ class BinnedOccupancyComparisons:
             column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
             curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
 
+        # Equal height for each heatmap row: row 0 = column banners (fixed), odd rows = subtitles (fixed), even rows >= 2 = ViewBoxes (share space evenly).
+        _grid_layout = win.ci.layout
+        for _r in range(_grid_layout.rowCount()):
+            if _r == 0 or (_r % 2 == 1):
+                _grid_layout.setRowStretchFactor(_r, 0)
+            else:
+                _grid_layout.setRowStretchFactor(_r, 1)
+        _grid_layout.activate()
+
         win.show()
         return across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row)
 
