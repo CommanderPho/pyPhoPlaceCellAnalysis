@@ -4065,7 +4065,7 @@ class MeasuredVsDecodedOccupancy:
 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
-def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=False) -> Dict[str, pd.DataFrame]:
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True) -> Dict[str, pd.DataFrame]:
     """ sees if some positions consistently decode to ambiguous context/etc
 
     If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
