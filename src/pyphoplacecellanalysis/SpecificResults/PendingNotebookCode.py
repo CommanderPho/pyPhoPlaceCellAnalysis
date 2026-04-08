@@ -4064,6 +4064,150 @@ class MeasuredVsDecodedOccupancy:
         return fig, ax_dict
 
 
+@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None) -> pd.DataFrame:
+    """ sees if some positions consistently decode to ambiguous context/etc
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+    ## find the number of correctly decoded components:
+    
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+    records_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=time_bin_size)
+    records_df
+    
+    """
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+    from neuropy.utils.result_context import IdentifyingContext
+    from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
+    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    ## INPUTS: a_new_fully_generic_result
+    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
+    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+    best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+    ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+    ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+    a_decoded_marginal_posterior_df, a_custom_decode_analysis = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df,
+                                                                                                                global_measured_position_df=global_measured_position_df)
+
+    is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
+    a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
+    a_decoded_marginal_posterior_df.loc[is_post_delta, 'pre_post_delta_id'] = 'post-delta'
+
+    # a_decoded_marginal_posterior_df['pre_post_delta_id'].nunique()
+    # a_decoded_marginal_posterior_df['pre_post_delta_id'].value_counts()
+    # a_decoded_marginal_posterior_df
+
+    ## INPUTS: a_decoder, a_decoded_marginal_posterior_df
+
+    a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.drop(columns=[k for k in ['binned_x_meas', 'binned_y_meas'] if k in a_decoded_marginal_posterior_df], inplace=False)
+
+    a_decoded_marginal_posterior_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, bin_values=(a_decoder.xbin, a_decoder.ybin),
+                                                                                                            #   active_computation_config=active_computation_config,
+                                                                                                            position_column_names = ('x_meas','y_meas'),  binned_column_names = ('binned_x_meas','binned_y_meas'),
+                                                                                                            force_recompute=True, debug_print=True)
+    # a_decoded_marginal_posterior_df
+
+    # # Usage 1D (x-only):
+    # a_decoded_marginal_posterior_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, bin_values=(deepcopy(a_decoder.xbin),),
+    # 																									position_column_names = ('x_meas',),  binned_column_names = ('binned_x_meas', ),
+    # 																									force_recompute=True, debug_print=True)
+    # a_decoded_marginal_posterior_df
+    # a_decoded_marginal_posterior_df
+
+    #INPUTS: a_decoded_marginal_posterior_df
+
+
+
+    # ['binned_x_meas', 'binned_y_meas']
+    # print(f'{list(a_decoded_marginal_posterior_df.columns)}')
+    # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'long_LR', 'long_RL', 'short_LR', 'short_RL',
+    #  'parent_epoch_df_idx', 'result_t_bin_idx', 'epoch_id', 'sub_epoch_time_bin_index', 'parent_epoch_id', 'parent_epoch_label', 'parent_epoch_start_t', 'parent_epoch_end_t', 'parent_epoch_duration',
+    #  'most_likely_positions_1D', 'label', 'start', 't_bin_center', 'stop', 'delta_aligned_start_t',
+    #  'session_name', 'time_bin_size', 'pre_post_delta_category', 'trained_compute_epochs', 'pfND_ndim', 'decoder_identifier', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'format_name', 'animal', 'exper_name', 'epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz', ## Context/Compute Params
+
+    #  'is_t_bin_center_fake', 'x_meas', 'y_meas', 'binned_x_meas', 'binned_y_meas', 'x_decoded_most_likely', 'sq_err', 'err_cm', 'binned_x_decoded_most_likely', ## Position matching
+    #  'is_decoded_pos_long_track_body', 'is_decoded_pos_short_track_body', 'is_most_likely_decoder_Long', 'is_track_body']
+
+    def _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df, debug_print: bool=False):
+        """ captures: a_decoder, a_decoder 
+        """
+        binned_pos_columns = ['binned_x_meas'] # 'sq_err', 'err_cm', 'binned_y_meas'
+        # binned_pos_columns = ['binned_y_meas'] #, 'binned_x_decoded_most_likely'] # 'sq_err', 'err_cm', 'binned_y_meas', 
+        context_decoding_columns = ['P_Long', 'P_Short'] ## 2-context
+        # context_decoding_columns = ['long_LR', 'long_RL', 'short_LR', 'short_RL'] ## 4-context
+
+        n_contexts: int = len(context_decoding_columns)
+        n_pos_bins: int = len(a_decoder.xbin_centers) # xbin (len(xbin): 60) is correct here, len(a_decoder.ybin) # 5
+        ## INPUTS: a_decoded_marginal_posterior_df
+        n_original_t_bins: int = len(active_decoded_marginal_posterior_df)
+        if debug_print:
+            print(f'n_contexts: {n_contexts}')
+            print(f'n_pos_bins: {n_pos_bins}')
+            print(f'n_original_t_bins: {n_original_t_bins}')
+
+
+        result_pos_by_ctxt_joint = np.zeros(shape=[n_contexts, n_pos_bins])
+        # epoch_partitioned_dfs_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict(partitionColumn='parent_epoch_label')
+        pos_binned_x_partitioned_dfs_dict = active_decoded_marginal_posterior_df.pho.partition_df_dict(partitionColumn=binned_pos_columns[0])
+
+        for a_pos_bin_idx, a_df in pos_binned_x_partitioned_dfs_dict.items():
+            a_ctxt_posterior_list = a_df[context_decoding_columns].to_numpy()
+            # np.shape(a_ctxt_posterior_list)
+            result_pos_by_ctxt_joint[:, (a_pos_bin_idx-1)] += np.nansum(a_ctxt_posterior_list, axis=0)
+
+        # result_pos_by_ctxt_joint ## re-normalize
+        result_pos_by_ctxt_joint = result_pos_by_ctxt_joint / np.nansum(result_pos_by_ctxt_joint, axis=0, keepdims=True)
+        ## OUTPUTS: result_pos_by_ctxt_joint
+        return result_pos_by_ctxt_joint
+    ## END def _subfn_compute_pre_post_delta_pos_by_ctxt_j....
+
+
+    pre_post_delta_a_decoded_marginal_posterior_df_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category') # pre_post_delta_category
+    # pre_post_delta_a_decoded_marginal_posterior_df_dict['pre-delta']
+    # pre_post_delta_a_decoded_marginal_posterior_df_dict['post-delta']
+
+    ## OUTPUTS: pre_post_delta_a_decoded_marginal_posterior_df_dict
+    pre_post_delta_result_pos_by_ctxt_joint_dict: Dict[str, NDArray] = {}
+    for a_pre_post_delta, a_decoded_marginal_posterior_df in pre_post_delta_a_decoded_marginal_posterior_df_dict.items():
+        result_pos_by_ctxt_joint = _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+        pre_post_delta_result_pos_by_ctxt_joint_dict[a_pre_post_delta] = result_pos_by_ctxt_joint
+
+        if (enable_export_path is not None):
+            export_csv_path = enable_export_path.joinpath(f'output/2026-04-09_decoded_marginal_posterior_df_with_meas_pos_{a_pre_post_delta}.csv')
+            print(f'exporting to export_csv_path: {export_csv_path}...')
+            a_decoded_marginal_posterior_df.to_csv(export_csv_path)
+
+    ## OUTPUTS: pre_post_delta_result_pos_by_ctxt_joint_dict
+    # pre_post_delta_result_pos_by_ctxt_joint_dict
+    # list(pre_post_delta_a_decoded_marginal_posterior_df_dict.keys()) # ['post-delta', 'pre-delta']
+
+    ## OUTPUTS: a_decoded_marginal_posterior_df
+
+    #TODO 2026-04-08 13:58: - [ ] render out to an image
+
+    from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
+
+    # _out_viewer = BasicBinnedImageRenderingWindow(a_p_x_by_ctxt_marginal, name='p_x_by_ctxt_marginal', title="p_x_by_ctxt_marginal per Pos X", variable_label='Ctxt')
+    _out_viewer_dict = {}
+    for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
+        _out_viewer_dict[a_pre_post_delta] = BasicBinnedImageRenderingWindow(a_result_pos_by_ctxt_joint.T, name=f'result_pos_by_ctxt_joint[{a_pre_post_delta}]', title=f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X", variable_label=f'Ctxt[{a_pre_post_delta}]')
+        _out_viewer_dict[a_pre_post_delta].show()
+    # _out_viewer_dict
+    a_laps_decoded_marginal_posterior_df
+    ## now check the histogram for `a_decoded_marginal_posterior_df`
+
+
 
 
 # ==================================================================================================================================================================================================================================================================================== #
