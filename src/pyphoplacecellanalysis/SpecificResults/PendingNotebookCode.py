@@ -4064,44 +4064,17 @@ class MeasuredVsDecodedOccupancy:
         return fig, ax_dict
 
 
-@function_attributes(short_name=None, tags=['plotting', 'heatmap', 'context', 'position', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['determine_decoded_context_uncertainty_as_fn_of_position'], creation_date='2026-04-08 00:00', related_items=[])
-def plot_pos_by_ctxt_joint_heatmap(result_pos_by_ctxt_joint: NDArray, context_labels: List[str], xbin_centers: NDArray, title: str, num: Optional[str]=None, save_path: Optional[Path]=None, show_figure: bool=False, figsize: Tuple[float, float]=(10.0, 4.0), dpi: int=220, cmap: str='viridis'):
-    """Batch-friendly heatmap for ``result_pos_by_ctxt_joint`` (shape ``(n_contexts, n_pos_bins)``), matching the former PyQt ``BasicBinnedImageRenderingWindow(matrix.T, ...)`` orientation."""
-    import matplotlib.pyplot as plt
-    img = np.asarray(result_pos_by_ctxt_joint).T
-    n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
-    if num is None:
-        num = title
-    fig, ax = plt.subplots(num=num, figsize=figsize, dpi=dpi, clear=True)
-    xc = np.asarray(xbin_centers, dtype=float)
-    if xc.size != n_pos:
-        xc = np.arange(n_pos, dtype=float)
-    half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
-    y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
-    extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
-    im = ax.imshow(img, aspect='auto', origin='lower', interpolation='nearest', cmap=cmap, extent=extent)
-    ax.set_xticks(np.arange(n_ctx))
-    ax.set_xticklabels(list(context_labels))
-    ax.set_xlabel('Context')
-    ax.set_ylabel('Linearized position')
-    ax.set_title(title)
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    if save_path is not None:
-        fig.savefig(save_path, dpi=300, bbox_inches='tight')
-    if not show_figure:
-        plt.close(fig)
-    return fig, ax, img
-
-
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
-def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=False) -> pd.DataFrame:
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=False) -> Dict[str, pd.DataFrame]:
     """ sees if some positions consistently decode to ambiguous context/etc
 
     If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
     ``<enable_export_path>/output/`` (directory created if needed), ``curr_active_pipeline.register_output_file`` is
     called for each successful write, and export failures are logged without aborting the rest of the function.
-    The same folder receives optional PNG heatmaps of ``result_pos_by_ctxt_joint`` per pre/post-delta partition
-    (``plot_pos_by_ctxt_joint_heatmap``), also registered on success.
+    The same folder receives optional matplotlib PNG heatmaps of ``result_pos_by_ctxt_joint`` per pre/post-delta
+    partition, also registered on success.
+
+    Returns ``pre_post_delta_a_decoded_marginal_posterior_df_dict`` (partition key to DataFrame).
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
     ## find the number of correctly decoded components:
@@ -4120,7 +4093,7 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
-    # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import _perform_plot_hairy_overlayed_position
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 
     valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
@@ -4139,10 +4112,6 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
     a_decoded_marginal_posterior_df.loc[is_post_delta, 'pre_post_delta_id'] = 'post-delta'
 
-    # a_decoded_marginal_posterior_df['pre_post_delta_id'].nunique()
-    # a_decoded_marginal_posterior_df['pre_post_delta_id'].value_counts()
-    # a_decoded_marginal_posterior_df
-
     ## INPUTS: a_decoder, a_decoded_marginal_posterior_df
 
     a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.drop(columns=[k for k in ['binned_x_meas', 'binned_y_meas'] if k in a_decoded_marginal_posterior_df], inplace=False)
@@ -4151,18 +4120,6 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
                                                                                                             #   active_computation_config=active_computation_config,
                                                                                                             position_column_names = ('x_meas','y_meas'),  binned_column_names = ('binned_x_meas','binned_y_meas'),
                                                                                                             force_recompute=True, debug_print=True)
-    # a_decoded_marginal_posterior_df
-
-    # # Usage 1D (x-only):
-    # a_decoded_marginal_posterior_df, (xbin, ), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, bin_values=(deepcopy(a_decoder.xbin),),
-    # 																									position_column_names = ('x_meas',),  binned_column_names = ('binned_x_meas', ),
-    # 																									force_recompute=True, debug_print=True)
-    # a_decoded_marginal_posterior_df
-    # a_decoded_marginal_posterior_df
-
-    #INPUTS: a_decoded_marginal_posterior_df
-
-
 
     # ['binned_x_meas', 'binned_y_meas']
     # print(f'{list(a_decoded_marginal_posterior_df.columns)}')
@@ -4243,6 +4200,8 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     ## OUTPUTS: a_decoded_marginal_posterior_df
 
     if (csv_export_out_dir is not None) or show_pos_by_ctxt_joint_figure:
+        import matplotlib.pyplot as plt
+        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
         _pos_by_ctxt_context_labels = ['P_Long', 'P_Short']
         for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
             _plot_title = f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X"
@@ -4255,7 +4214,27 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
                 _tbin = str(time_bin_size).replace('.', 'p')
                 _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_part}_tbin{_tbin}.png')
             try:
-                plot_pos_by_ctxt_joint_heatmap(a_result_pos_by_ctxt_joint, context_labels=_pos_by_ctxt_context_labels, xbin_centers=a_decoder.xbin_centers, title=_plot_title, num=_plot_num, save_path=_png_save_path, show_figure=show_pos_by_ctxt_joint_figure)
+                img = np.asarray(a_result_pos_by_ctxt_joint).T
+                n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
+                xc = np.asarray(a_decoder.xbin_centers, dtype=float)
+                if xc.size != n_pos:
+                    xc = np.arange(n_pos, dtype=float)
+                half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
+                y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
+                extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
+                _cmap = mpl.colormaps.get_cmap('viridis')
+                _cmap.set_bad(color='black')
+                imshow_kwargs = dict(origin='lower', interpolation='nearest', aspect='auto', extent=extent, cmap=_cmap, animated=False)
+                fig, ax = plt.subplots(num=_plot_num, figsize=(10.0, 4.0), dpi=220, clear=True)
+                fig, ax, _im = visualize_heatmap(img, ax=ax, title=_plot_title, layout='none', defer_show=True, show_colorbar=True, show_xticks=False, show_yticks=False, **imshow_kwargs)
+                ax.set_xticks(np.arange(n_ctx))
+                ax.set_xticklabels(_pos_by_ctxt_context_labels)
+                ax.set_xlabel('Context')
+                ax.set_ylabel('Linearized position')
+                if _png_save_path is not None:
+                    fig.savefig(_png_save_path, dpi=300, bbox_inches='tight')
+                if not show_pos_by_ctxt_joint_figure:
+                    plt.close(fig)
                 if _png_save_path is not None:
                     export_png_resolved = _png_save_path.resolve()
                     curr_active_pipeline.register_output_file(output_path=export_png_resolved, output_metadata=dict(kind='pos_by_ctxt_joint_png', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
