@@ -4210,7 +4210,7 @@ wheels = [
 
 [[package]]
 name = "neuropy"
-version = "0.2.7"
+version = "0.2.5"
 source = { editable = "../NeuroPy" }
 dependencies = [
     { name = "cupy-cuda12x" },
@@ -4236,7 +4236,6 @@ dependencies = [
     { name = "pingouin" },
     { name = "portion" },
     { name = "python-benedict" },
-    { name = "rdp" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "scikit-posthocs" },
@@ -4274,7 +4273,6 @@ requires-dist = [
     { name = "pingouin", specifier = ">=0.5.3,<0.6" },
     { name = "portion", git = "https://github.com/CommanderPho/portion.git" },
     { name = "python-benedict", specifier = ">=0.28.3,<0.29" },
-    { name = "rdp", specifier = ">=0.8" },
     { name = "scikit-learn", specifier = ">=1.2.1,<2" },
     { name = "scikit-posthocs", specifier = ">=0.7.0,<0.8" },
     { name = "scipy", specifier = "~=1.6" },
@@ -4293,7 +4291,6 @@ dev = [
     { name = "dvc", extras = ["gdrive"], specifier = ">=3.59.0,<4" },
     { name = "ipdb", specifier = ">=0.13.11,<0.14" },
     { name = "pip", specifier = "~=24.0" },
-    { name = "pyrefly", specifier = ">=0.54.0" },
 ]
 
 [[package]]
@@ -6436,15 +6433,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/40/b4/a14dbeebf8ab08600
 wheels = [
     { url = "https://files.pythonhosted.org/packages/17/0c/b4ee3f929bbe564101f110080dcdd33d1181a6f8a041cc9e21d992509b52/quantities-0.16.2-py3-none-any.whl", hash = "sha256:bd5b1ed422770b7cd8952ccfccaf67a89024ae0ecb31b1eacbc7ff966899ab34", size = 103021, upload-time = "2025-04-11T14:16:10.524Z" },
 ]
-
-[[package]]
-name = "rdp"
-version = "0.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/67/42/80a54cc4387256335c32b48bd42db80967ab5f40d6ffcd8167b3dd988c11/rdp-0.8.tar.gz", hash = "sha256:19ec92f0803587891a00b439441e5e23fc9410500983f02941e4cf9ac3113e4b", size = 4382, upload-time = "2016-12-19T01:34:07.454Z" }
 
 [[package]]
 name = "referencing"

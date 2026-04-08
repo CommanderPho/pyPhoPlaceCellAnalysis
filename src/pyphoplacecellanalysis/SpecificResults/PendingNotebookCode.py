@@ -4064,9 +4064,44 @@ class MeasuredVsDecodedOccupancy:
         return fig, ax_dict
 
 
-@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
-def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None) -> pd.DataFrame:
+@function_attributes(short_name=None, tags=['plotting', 'heatmap', 'context', 'position', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['determine_decoded_context_uncertainty_as_fn_of_position'], creation_date='2026-04-08 00:00', related_items=[])
+def plot_pos_by_ctxt_joint_heatmap(result_pos_by_ctxt_joint: NDArray, context_labels: List[str], xbin_centers: NDArray, title: str, num: Optional[str]=None, save_path: Optional[Path]=None, show_figure: bool=False, figsize: Tuple[float, float]=(10.0, 4.0), dpi: int=220, cmap: str='viridis'):
+    """Batch-friendly heatmap for ``result_pos_by_ctxt_joint`` (shape ``(n_contexts, n_pos_bins)``), matching the former PyQt ``BasicBinnedImageRenderingWindow(matrix.T, ...)`` orientation."""
+    import matplotlib.pyplot as plt
+    img = np.asarray(result_pos_by_ctxt_joint).T
+    n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
+    if num is None:
+        num = title
+    fig, ax = plt.subplots(num=num, figsize=figsize, dpi=dpi, clear=True)
+    xc = np.asarray(xbin_centers, dtype=float)
+    if xc.size != n_pos:
+        xc = np.arange(n_pos, dtype=float)
+    half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
+    y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
+    extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
+    im = ax.imshow(img, aspect='auto', origin='lower', interpolation='nearest', cmap=cmap, extent=extent)
+    ax.set_xticks(np.arange(n_ctx))
+    ax.set_xticklabels(list(context_labels))
+    ax.set_xlabel('Context')
+    ax.set_ylabel('Linearized position')
+    ax.set_title(title)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    if save_path is not None:
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+    if not show_figure:
+        plt.close(fig)
+    return fig, ax, img
+
+
+@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=False) -> pd.DataFrame:
     """ sees if some positions consistently decode to ambiguous context/etc
+
+    If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
+    ``<enable_export_path>/output/`` (directory created if needed), ``curr_active_pipeline.register_output_file`` is
+    called for each successful write, and export failures are logged without aborting the rest of the function.
+    The same folder receives optional PNG heatmaps of ``result_pos_by_ctxt_joint`` per pre/post-delta partition
+    (``plot_pos_by_ctxt_joint_heatmap``), also registered on success.
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
     ## find the number of correctly decoded components:
@@ -4179,14 +4214,27 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     ## OUTPUTS: pre_post_delta_a_decoded_marginal_posterior_df_dict
     pre_post_delta_result_pos_by_ctxt_joint_dict: Dict[str, NDArray] = {}
+    csv_export_out_dir: Optional[Path] = None
+    if enable_export_path is not None:
+        csv_export_out_dir = Path(enable_export_path).joinpath('output')
+        csv_export_out_dir.mkdir(parents=True, exist_ok=True)
     for a_pre_post_delta, a_decoded_marginal_posterior_df in pre_post_delta_a_decoded_marginal_posterior_df_dict.items():
         result_pos_by_ctxt_joint = _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
         pre_post_delta_result_pos_by_ctxt_joint_dict[a_pre_post_delta] = result_pos_by_ctxt_joint
 
-        if (enable_export_path is not None):
-            export_csv_path = enable_export_path.joinpath(f'output/2026-04-09_decoded_marginal_posterior_df_with_meas_pos_{a_pre_post_delta}.csv')
-            print(f'exporting to export_csv_path: {export_csv_path}...')
-            a_decoded_marginal_posterior_df.to_csv(export_csv_path)
+        if csv_export_out_dir is not None:
+            _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
+            _delta_part = sanitize_filename_for_Windows(str(a_pre_post_delta))
+            _date = datetime.now().strftime('%Y-%m-%d')
+            _tbin = str(time_bin_size).replace('.', 'p')
+            export_csv_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_decoded_marginal_posterior_with_meas_pos_{_delta_part}_tbin{_tbin}.csv')
+            try:
+                export_resolved = export_csv_path.resolve()
+                a_decoded_marginal_posterior_df.to_csv(export_resolved, index=False)
+                print(f'exported decoded marginal posterior CSV: {export_resolved}')
+                curr_active_pipeline.register_output_file(output_path=export_resolved, output_metadata=dict(kind='decoded_marginal_posterior_df_csv', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
+            except Exception as e:
+                print(f'WARN: failed to export CSV to {export_csv_path}: {e}')
 
     ## OUTPUTS: pre_post_delta_result_pos_by_ctxt_joint_dict
     # pre_post_delta_result_pos_by_ctxt_joint_dict
@@ -4194,20 +4242,27 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     ## OUTPUTS: a_decoded_marginal_posterior_df
 
-    #TODO 2026-04-08 13:58: - [ ] render out to an image
+    if (csv_export_out_dir is not None) or show_pos_by_ctxt_joint_figure:
+        _pos_by_ctxt_context_labels = ['P_Long', 'P_Short']
+        for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
+            _plot_title = f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X"
+            _plot_num = f"pos_by_ctxt_joint[{a_pre_post_delta}]"
+            _png_save_path: Optional[Path] = None
+            if csv_export_out_dir is not None:
+                _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
+                _delta_part = sanitize_filename_for_Windows(str(a_pre_post_delta))
+                _date = datetime.now().strftime('%Y-%m-%d')
+                _tbin = str(time_bin_size).replace('.', 'p')
+                _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_part}_tbin{_tbin}.png')
+            try:
+                plot_pos_by_ctxt_joint_heatmap(a_result_pos_by_ctxt_joint, context_labels=_pos_by_ctxt_context_labels, xbin_centers=a_decoder.xbin_centers, title=_plot_title, num=_plot_num, save_path=_png_save_path, show_figure=show_pos_by_ctxt_joint_figure)
+                if _png_save_path is not None:
+                    export_png_resolved = _png_save_path.resolve()
+                    curr_active_pipeline.register_output_file(output_path=export_png_resolved, output_metadata=dict(kind='pos_by_ctxt_joint_png', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
+            except Exception as e:
+                print(f'WARN: failed to plot/save pos_by_ctxt_joint PNG to {_png_save_path}: {e}')
 
-    from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
-
-    # _out_viewer = BasicBinnedImageRenderingWindow(a_p_x_by_ctxt_marginal, name='p_x_by_ctxt_marginal', title="p_x_by_ctxt_marginal per Pos X", variable_label='Ctxt')
-    _out_viewer_dict = {}
-    for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
-        _out_viewer_dict[a_pre_post_delta] = BasicBinnedImageRenderingWindow(a_result_pos_by_ctxt_joint.T, name=f'result_pos_by_ctxt_joint[{a_pre_post_delta}]', title=f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X", variable_label=f'Ctxt[{a_pre_post_delta}]')
-        _out_viewer_dict[a_pre_post_delta].show()
-    # _out_viewer_dict
-    a_laps_decoded_marginal_posterior_df
-    ## now check the histogram for `a_decoded_marginal_posterior_df`
-
-
+    return pre_post_delta_a_decoded_marginal_posterior_df_dict
 
 
 # ==================================================================================================================================================================================================================================================================================== #
