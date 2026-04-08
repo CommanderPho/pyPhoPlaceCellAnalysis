@@ -6995,8 +6995,6 @@ class MeasuredVsDecodedOccupancy:
         return fig, ax_dict
 
 
-
-
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-05-06 - Hairy Marginal on timeline                                                                                                                                                                                                                                              #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -11929,6 +11927,9 @@ class EstimationCorrectnessPlots:
 
         Usage:
             # Example usage
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import EstimationCorrectnessPlots
+
             EstimationCorrectnessPlots.plot_estimation_correctness_with_raw_data(epochs_track_identity_marginal_df, 'binned_x_meas', 'estimation_correctness_track_ID')
 
 
