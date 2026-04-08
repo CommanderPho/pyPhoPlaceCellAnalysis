@@ -18,9 +18,7 @@ import pandas as pd
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 
-
 from attrs import make_class
-from neuropy.utils.mixins.instance_class_reloadable import InstanceClassReloadableMixin
 
 
 SimpleBatchComputationDummy = make_class('SimpleBatchComputationDummy', attrs=['BATCH_DATE_TO_USE', 'collected_outputs_path', 'fail_on_exception'])
