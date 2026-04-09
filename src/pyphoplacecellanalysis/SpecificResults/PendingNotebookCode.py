@@ -568,8 +568,9 @@ import numpy as np
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
+@metadata_attributes(short_name=None, tags=['novelty', '2D', 'bapun', 'self-avoidance'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-03 10:09', related_items=[])
 class PositionNovelty:
-    """
+    """ Occupancy and Position Novelty 
 
     Prompt: "scientific literature scores for indicating the novelty of a given 2D path through an environment"
     
