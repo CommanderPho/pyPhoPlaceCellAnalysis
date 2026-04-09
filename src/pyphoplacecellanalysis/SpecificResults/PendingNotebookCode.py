@@ -4065,7 +4065,7 @@ class MeasuredVsDecodedOccupancy:
 
 
 @function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
-def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True) -> Dict[str, pd.DataFrame]:
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True, a_target_context: Optional[IdentifyingContext]=None) -> Dict[str, pd.DataFrame]:
     """ sees if some positions consistently decode to ambiguous context/etc
 
     If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
@@ -4099,17 +4099,17 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
 
     ## INPUTS: a_new_fully_generic_result
-    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
-    
-    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') ## global
-    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+    if a_target_context is None:
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')        
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') ## global
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
 
     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
     ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
     ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
     global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
     a_decoded_marginal_posterior_df, a_custom_decode_analysis = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df,
-                                                                                                                global_measured_position_df=global_measured_position_df)
+                                                                                                                global_measured_position_df=global_measured_position_df).copy()
 
     is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
     a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
@@ -4119,9 +4119,17 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.drop(columns=[k for k in ['binned_x_meas', 'binned_y_meas'] if k in a_decoded_marginal_posterior_df], inplace=False)
 
-    a_decoded_marginal_posterior_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, bin_values=(a_decoder.xbin, a_decoder.ybin),
-                                                                                                            #   active_computation_config=active_computation_config,
-                                                                                                            position_column_names = ('x_meas','y_meas'),  binned_column_names = ('binned_x_meas','binned_y_meas'),
+
+    position_column_names = [k for k in ('x_meas','y_meas') if k in a_decoded_marginal_posterior_df.columns]
+    binned_column_names = [f'binned_{k}' for k in position_column_names]
+    ndim: int = len(position_column_names)
+    if ndim == 2:
+        bin_values=(a_decoder.xbin, a_decoder.ybin)
+    else:
+        bin_values=(a_decoder.xbin, )
+
+    a_decoded_marginal_posterior_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, 
+                                                                                                            bin_values=bin_values, position_column_names = position_column_names,  binned_column_names = binned_column_names,
                                                                                                             force_recompute=True, debug_print=True)
 
     # ['binned_x_meas', 'binned_y_meas']
