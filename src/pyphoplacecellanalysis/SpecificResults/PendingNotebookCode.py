@@ -4100,7 +4100,10 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
 
     ## INPUTS: a_new_fully_generic_result
     # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
-    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+    
+    # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') ## global
+    a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+
     best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
     ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
     ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
@@ -4202,6 +4205,7 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     if (csv_export_out_dir is not None) or show_pos_by_ctxt_joint_figure:
         import matplotlib.pyplot as plt
         from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
+        
         _pos_by_ctxt_context_labels = ['P_Long', 'P_Short']
         for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
             _plot_title = f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X"
