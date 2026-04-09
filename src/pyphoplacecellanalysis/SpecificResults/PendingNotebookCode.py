@@ -4071,8 +4071,8 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
     ``<enable_export_path>/output/`` (directory created if needed), ``curr_active_pipeline.register_output_file`` is
     called for each successful write, and export failures are logged without aborting the rest of the function.
-    The same folder receives optional matplotlib PNG heatmaps of ``result_pos_by_ctxt_joint`` per pre/post-delta
-    partition, also registered on success.
+    The same folder receives an optional matplotlib PNG: a single figure with ``result_pos_by_ctxt_joint`` heatmaps
+    side-by-side for all pre/post-delta partitions (shared colormap, one colorbar), registered on success.
 
     Returns ``pre_post_delta_a_decoded_marginal_posterior_df_dict`` (partition key to DataFrame).
 
@@ -4203,41 +4203,57 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
         import matplotlib.pyplot as plt
         from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
         _pos_by_ctxt_context_labels = ['P_Long', 'P_Short']
-        for a_pre_post_delta, a_result_pos_by_ctxt_joint in pre_post_delta_result_pos_by_ctxt_joint_dict.items():
-            _plot_title = f"{a_pre_post_delta}: result_pos_by_ctxt_joint per Pos X"
-            _plot_num = f"pos_by_ctxt_joint[{a_pre_post_delta}]"
+        _preferred_pre_post_order = ('pre-delta', 'post-delta')
+        _ordered_pre_post_deltas = [k for k in _preferred_pre_post_order if k in pre_post_delta_result_pos_by_ctxt_joint_dict]
+        _ordered_pre_post_deltas.extend(sorted(k for k in pre_post_delta_result_pos_by_ctxt_joint_dict.keys() if k not in _preferred_pre_post_order))
+        if _ordered_pre_post_deltas:
             _png_save_path: Optional[Path] = None
             if csv_export_out_dir is not None:
                 _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
-                _delta_part = sanitize_filename_for_Windows(str(a_pre_post_delta))
                 _date = datetime.now().strftime('%Y-%m-%d')
                 _tbin = str(time_bin_size).replace('.', 'p')
-                _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_part}_tbin{_tbin}.png')
+                _delta_slug = '_'.join(sanitize_filename_for_Windows(str(k)) for k in _ordered_pre_post_deltas)
+                _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_slug}_tbin{_tbin}.png')
             try:
-                img = np.asarray(a_result_pos_by_ctxt_joint).T
-                n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
-                xc = np.asarray(a_decoder.xbin_centers, dtype=float)
-                if xc.size != n_pos:
-                    xc = np.arange(n_pos, dtype=float)
-                half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
-                y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
-                extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
+                _imgs = [np.asarray(pre_post_delta_result_pos_by_ctxt_joint_dict[k], dtype=float).T for k in _ordered_pre_post_deltas]
+                _stack = np.concatenate([im.ravel() for im in _imgs])
+                if not np.any(np.isfinite(_stack)):
+                    _vmin, _vmax = 0.0, 1.0
+                else:
+                    _vmin, _vmax = float(np.nanmin(_stack)), float(np.nanmax(_stack))
+                    if _vmin == _vmax:
+                        _vmax = _vmin + 1e-12
+                n_panels = len(_ordered_pre_post_deltas)
+                fig, axes = plt.subplots(1, n_panels, num='pos_by_ctxt_joint_combined', figsize=(10.0 * float(n_panels), 4.0), dpi=220, sharey=True, clear=True)
+                if n_panels == 1:
+                    axes = np.array([axes])
                 _cmap = mpl.colormaps.get_cmap('viridis')
                 _cmap.set_bad(color='black')
-                imshow_kwargs = dict(origin='lower', interpolation='nearest', aspect='auto', extent=extent, cmap=_cmap, animated=False)
-                fig, ax = plt.subplots(num=_plot_num, figsize=(10.0, 4.0), dpi=220, clear=True)
-                fig, ax, _im = visualize_heatmap(img, ax=ax, title=_plot_title, layout='none', defer_show=True, show_colorbar=True, show_xticks=False, show_yticks=False, **imshow_kwargs)
-                ax.set_xticks(np.arange(n_ctx))
-                ax.set_xticklabels(_pos_by_ctxt_context_labels)
-                ax.set_xlabel('Context')
-                ax.set_ylabel('Linearized position')
+                for i, a_pre_post_delta in enumerate(_ordered_pre_post_deltas):
+                    img = _imgs[i]
+                    n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
+                    xc = np.asarray(a_decoder.xbin_centers, dtype=float)
+                    if xc.size != n_pos:
+                        xc = np.arange(n_pos, dtype=float)
+                    half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
+                    y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
+                    extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
+                    imshow_kwargs = dict(origin='lower', interpolation='nearest', aspect='auto', extent=extent, cmap=_cmap, animated=False, vmin=_vmin, vmax=_vmax)
+                    ax = axes[i]
+                    fig, ax, _ = visualize_heatmap(img, ax=ax, title=a_pre_post_delta, layout='none', defer_show=True, show_colorbar=False, show_xticks=False, show_yticks=False, **imshow_kwargs)
+                    ax.set_xticks(np.arange(n_ctx))
+                    ax.set_xticklabels(_pos_by_ctxt_context_labels)
+                    ax.set_xlabel('Context')
+                    if i == 0:
+                        ax.set_ylabel('Linearized position')
+                fig.colorbar(axes[0].get_images()[0], ax=np.ravel(axes).tolist(), shrink=0.82)
                 if _png_save_path is not None:
                     fig.savefig(_png_save_path, dpi=300, bbox_inches='tight')
                 if not show_pos_by_ctxt_joint_figure:
                     plt.close(fig)
                 if _png_save_path is not None:
                     export_png_resolved = _png_save_path.resolve()
-                    curr_active_pipeline.register_output_file(output_path=export_png_resolved, output_metadata=dict(kind='pos_by_ctxt_joint_png', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
+                    curr_active_pipeline.register_output_file(output_path=export_png_resolved, output_metadata=dict(kind='pos_by_ctxt_joint_png', pre_post_deltas=tuple(_ordered_pre_post_deltas), time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
             except Exception as e:
                 print(f'WARN: failed to plot/save pos_by_ctxt_joint PNG to {_png_save_path}: {e}')
 
