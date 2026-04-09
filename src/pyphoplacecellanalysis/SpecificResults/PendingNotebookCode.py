@@ -4128,9 +4128,15 @@ def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline
     else:
         bin_values=(a_decoder.xbin, )
 
-    a_decoded_marginal_posterior_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, 
+    a_decoded_marginal_posterior_df, updated_bin_values, bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, 
                                                                                                             bin_values=bin_values, position_column_names = position_column_names,  binned_column_names = binned_column_names,
                                                                                                             force_recompute=True, debug_print=True)
+
+    # unpack updated_bin_values:
+    # if ndim == 2:
+    #     (xbin, ybin) = updated_bin_values
+    # else:
+    #     xbin = updated_bin_values        
 
     # ['binned_x_meas', 'binned_y_meas']
     # print(f'{list(a_decoded_marginal_posterior_df.columns)}')
