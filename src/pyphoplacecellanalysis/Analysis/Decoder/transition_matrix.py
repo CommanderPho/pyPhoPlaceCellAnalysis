@@ -85,10 +85,8 @@ def vertical_gaussian_blur(arr, sigma:float=1, **kwargs):
 def horizontal_gaussian_blur(arr, sigma:float=1, **kwargs):
     """ blurs each row over the columns """
     return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
-    
 
 
-    
 
 @define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
@@ -101,6 +99,8 @@ class TransitionMatrixComputations:
     
     out = TransitionMatrixComputations.plot_transition_matricies(decoders_dict=decoders_dict, binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict)
     out
+
+    # 2D (x, y) grid: use ``_compute_position_transition_matrix_2d`` and ``position_flat_index_from_xy`` / ``reshape_square_tm_to_grid``.
 
     """
     binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = field(factory=dict)
@@ -155,6 +155,88 @@ class TransitionMatrixComputations:
 
         # binned_x_transition_matrix.shape # (64, 64)
         return binned_x_transition_matrix_higher_order_list
+
+
+    @function_attributes(short_name=None, tags=['UNTESTED', 'AI', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-09 18:08', related_items=[])
+    @classmethod
+    def _compute_position_transition_matrix_2d(cls, xbin_labels, ybin_labels, binned_x_index_sequence: np.ndarray, binned_y_index_sequence: np.ndarray, n_powers: int = 3, use_direct_observations_for_order: bool = True, should_validate_normalization: bool = True) -> List[NDArray]:
+        """2D transition matrix on the *(x, y)* grid: states are linearized with
+        ``flat = ix * n_y + iy`` (see :func:`position_flat_index_from_xy`), matching ``pf2D.occupancy`` layout.
+
+        Each returned matrix has shape ``(n_x * n_y, n_x * n_y)``. Use :func:`reshape_square_tm_to_grid` for a
+        *(ix, iy, ix', iy')* view.
+
+        Usage:
+
+            # pf2D = deepcopy(curr_active_pipeline.computation_results['maze1'].computed_data['pf2D'])
+            pos_df = pf2D.filtered_pos_df.dropna(axis='index', how='any', subset=['binned_x', 'binned_y'])
+            binned_x_transition_matrix_higher_order_list = TransitionMatrixComputations._compute_position_transition_matrix_2d(
+                pf2D.xbin_labels, pf2D.ybin_labels,
+                pos_df['binned_x'].to_numpy() - 1, pos_df['binned_y'].to_numpy() - 1)
+
+        """
+        def _subfn_position_flat_index_from_xy(ix: Union[int, np.ndarray], iy: Union[int, np.ndarray], n_y_bins: int) -> NDArray:
+            """Map 0-based bin indices *(ix, iy)* to a single linear state id.
+
+            Convention matches ``neuropy.utils.mixins.binning_helpers.build_spanning_grid_matrix`` (and
+            ``pf2D.occupancy.shape == (len(xbin_centers), len(ybin_centers))``): first axis is *x*,
+            second is *y*, C-order flatten so ``flat = ix * n_y_bins + iy``.
+            """
+            ix_arr = np.asarray(ix, dtype=np.int64)
+            iy_arr = np.asarray(iy, dtype=np.int64)
+            return ix_arr * int(n_y_bins) + iy_arr
+
+
+        def _subfn_reshape_square_tm_to_grid(T: NDArray, n_x_bins: int, n_y_bins: int) -> NDArray:
+            """Reshape a flat-state transition matrix *T* of shape ``(n_x*n_y, n_x*n_y)`` to
+            ``(n_x_bins, n_y_bins, n_x_bins, n_y_bins)`` so
+            ``out[ix_from, iy_from, ix_to, iy_to] == T[flat_from, flat_to]`` with the same flattening as
+            :func:`position_flat_index_from_xy`.
+            """
+            n = int(n_x_bins) * int(n_y_bins)
+            t = np.asarray(T)
+            assert t.shape == (n, n), f"T.shape {t.shape} != ({n}, {n})"
+            return t.reshape(n_x_bins, n_y_bins, n_x_bins, n_y_bins)
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        binned_x_index_sequence = np.asarray(binned_x_index_sequence)
+        binned_y_index_sequence = np.asarray(binned_y_index_sequence)
+        assert len(binned_x_index_sequence) == len(binned_y_index_sequence), "binned_x and binned_y sequences must have the same length"
+        n_x: int = len(xbin_labels)
+        n_y: int = len(ybin_labels)
+        num_position_states: int = n_x * n_y
+        max_state_index: int = num_position_states - 1
+
+        max_ix = int(np.max(binned_x_index_sequence)) if binned_x_index_sequence.size else -1
+        max_iy = int(np.max(binned_y_index_sequence)) if binned_y_index_sequence.size else -1
+        assert max_ix <= n_x - 1, f"max(binned_x_index_sequence): {max_ix} > n_x-1: {n_x - 1}"
+        assert max_iy <= n_y - 1, f"max(binned_y_index_sequence): {max_iy} > n_y-1: {n_y - 1}"
+        assert max_ix < n_x and max_iy < n_y
+
+        flat_sequence: NDArray = _subfn_position_flat_index_from_xy(binned_x_index_sequence, binned_y_index_sequence, n_y)
+        assert int(np.max(flat_sequence)) <= max_state_index, f"max(flat_sequence): {int(np.max(flat_sequence))} <= max_state_index: {max_state_index}"
+        assert int(np.max(flat_sequence)) < num_position_states
+
+        binned_xy_transition_matrix = transition_matrix(deepcopy(flat_sequence), markov_order=1, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization)
+        if should_validate_normalization:
+            _row_normalization_sum = np.sum(binned_xy_transition_matrix, axis=1)
+            assert np.allclose(_row_normalization_sum[np.nonzero(_row_normalization_sum)], 1), f"0th order not row normalized!\n\t_row_normalization_sum: {_row_normalization_sum}"
+
+        if not use_direct_observations_for_order:
+            binned_xy_transition_matrix_higher_order_list = [binned_xy_transition_matrix] + [np.linalg.matrix_power(binned_xy_transition_matrix, n) for n in np.arange(2, n_powers + 1)]
+        else:
+            binned_xy_transition_matrix_higher_order_list = [binned_xy_transition_matrix] + [transition_matrix(deepcopy(flat_sequence), markov_order=n, max_state_index=max_state_index, nan_entries_replace_value=0.0, should_validate_normalization=should_validate_normalization) for n in np.arange(2, n_powers + 1)]
+
+        if should_validate_normalization:
+            _row_normalization_sums = [np.sum(a_mat, axis=1) for a_mat in binned_xy_transition_matrix_higher_order_list]
+            _is_row_normalization_all_valid = [np.allclose(v[np.nonzero(v)], 1.0) for v in _row_normalization_sums]
+            assert np.alltrue(_is_row_normalization_all_valid), f"not row normalized!\n\t_is_row_normalization_all_valid: {_is_row_normalization_all_valid}\n\t_row_normalization_sums: {_row_normalization_sums}"
+
+        return binned_xy_transition_matrix_higher_order_list
 
 
     @classmethod

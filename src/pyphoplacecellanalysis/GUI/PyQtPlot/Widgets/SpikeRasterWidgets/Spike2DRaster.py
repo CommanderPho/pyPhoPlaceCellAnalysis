@@ -42,6 +42,7 @@ from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color # require
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import _decoder_bin_left_right_edges
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
@@ -790,8 +791,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     def _update_plots(self):
         """
         Seems to be called every time the timeline is scrolled at least.
-
-        
         """
         self.logger.debug(f'Spike2DRaster._update_plots()')
         if self.enable_debug_print:
@@ -813,37 +812,142 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
         self.update_zoomed_plot(min_t, max_t)
 
+    @pyqtExceptionPrintingSlot(float)
+    def update_window_start(self, new_value):
+        # self.timeWindow.update_window_start(new_value)
+        self.perform_update_zoomed_plot(min_t=new_value, max_t=None)
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        # self.timeWindow.update_window_start_end(new_start, new_end)
+        self.perform_update_zoomed_plot(min_t=new_start, max_t=new_end)
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @pyqtExceptionPrintingSlot(object)
+    def update_window_start_rate_limited(self, evt):
+        if len(evt) == 1:
+            self.update_window_start(*evt)
+        elif len(evt) == 2:
+            ## truncate to just the first, as expected output is start_t, end_t = evt
+            start_t = evt[0]
+            self.update_window_start(start_t)
+        else:
+            raise NotImlementedError(f'update_window_start_rate_limited(evt): len(evt): {len(evt)}, evt: {evt}')
+
+
+
+
+    def _hide_decoded_posterior_active_bin_highlight(self) -> None:
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is not None:
+            reg.hide()
+
+
+
+    def _apply_decoded_posterior_x_grid(self, min_t: float, max_t: float) -> None:
+        """Decoded time-bin vertical grid for BapunDecodingWindowRaster only (see PendingNotebookCode). When decoded_posterior_x_grid_highlight_decoder_plotter is set and use_all_active_viewport_timebins is False, shades the decoded bin whose posterior is shown (left-edge index, same as viewport start_t)."""
+        if self.applicationName != 'BapunDecodingWindowRaster':
+            return
+        dec = self.params.get('decoded_posterior_x_grid_one_step_decoder', None)
+        plot_w = self.plots.main_plot_widget
+        hl_plotter = self.params.get('decoded_posterior_x_grid_highlight_decoder_plotter', None)
+        if dec is None or plot_w is None:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        centers = np.asarray(dec.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        left, right = _decoder_bin_left_right_edges(dec, centers)
+        edge_list: List[float] = []
+        for i in range(n):
+            if right[i] < min_t or left[i] > max_t:
+                continue
+            edge_list.append(float(left[i]))
+            edge_list.append(float(right[i]))
+        if len(edge_list) == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        edges = np.unique(np.asarray(edge_list, dtype=float))
+        show_labels = self.params.get('decoded_posterior_x_grid_show_labels', None)
+        if show_labels is None:
+            show_labels = len(edges) <= 25
+        alpha = float(self.params.get('decoded_posterior_x_grid_alpha', 0.35))
+        bottom = plot_w.getAxis('bottom')
+        ticks = [(float(e), f'{e:g}') for e in edges] if show_labels else [(float(e), '') for e in edges]
+        bottom.setTicks([ticks])
+        plot_w.showGrid(x=True, y=False, alpha=alpha)
+        if hl_plotter is None or getattr(hl_plotter, 'use_all_active_viewport_timebins', False):
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        idx = int(np.searchsorted(centers, float(min_t), side='left'))
+        idx = max(0, min(idx, n - 1))
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is None:
+            reg = pg.LinearRegionItem(values=[float(left[idx]), float(right[idx])], orientation='vertical', movable=False, brush=(255, 200, 60, 85))
+            reg.setZValue(-20)
+            plot_w.addItem(reg)
+            self._decoded_posterior_active_bin_region = reg
+        else:
+            reg.setRegion([float(left[idx]), float(right[idx])])
+        reg.show()
+
+
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=[], used_by=['update_zoomed_plot', 'update_window_start', 'update_window_start_end'], creation_date='2026-04-01 06:03', related_items=[])
+    def perform_update_zoomed_plot(self, min_t: float, max_t: Optional[float]=None):
+        """ common internal function to perform the update of the window, with an optional max_t
+        """
+        needs_update_duration: bool = (max_t is not None)
+        
+        if max_t is None:
+            ## update window start only:
+            max_t = min_t + self.spikes_window.window_duration
+        
+
+        # Update the main_plot_widget:
+        if self.Includes2DActiveWindowScatter:
+            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+
+
+        if needs_update_duration:
+            # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
+            scroll_window_width = max_t - min_t
+            # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
+
+            # Update GUI if we have one:
+            if self.WantsRenderWindowControls:
+                self.ui.spinTemporalZoomFactor.setValue(1.0)
+                self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+                            
+            # Here is the main problem: The duration and window end-time aren't being updated
+            self.spikes_window.update_window_start_end(min_t, max_t)
+                        
+        else:
+            ## update window start only:            
+            self.spikes_window.update_window_start(min_t)
+
+
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update()
+        self._apply_decoded_posterior_x_grid(min_t, max_t)
+
+
+
 
     @pyqtExceptionPrintingSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         """ update the zoomed plot, the spikes_window, and update the dependent curves
         
         """
-        # Update the main_plot_widget:
-        if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+        self.perform_update_zoomed_plot(min_t=min_t, max_t=max_t)
 
-        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
-        scroll_window_width = max_t - min_t
-        # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
 
-        # Update GUI if we have one:
-        if self.WantsRenderWindowControls:
-            self.ui.spinTemporalZoomFactor.setValue(1.0)
-            self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
-            
-        # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
-        # self.spikes_window.update_window_start(min_t)
-        
-        # Here is the main problem: The duration and window end-time aren't being updated
-        self.spikes_window.update_window_start_end(min_t, max_t)
-        
-        
-        # Update 3D Curves if we have them: TODO: figure out where this goes!
-        self.TimeCurvesViewMixin_on_window_update()
-        
-        
-        
+
     @pyqtExceptionPrintingSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control

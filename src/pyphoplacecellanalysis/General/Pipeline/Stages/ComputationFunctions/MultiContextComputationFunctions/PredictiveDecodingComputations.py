@@ -40,7 +40,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, DirectionalPseudo2DDecodersResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, DirectionalPseudo2DDecodersResult, DecodingContinuousCacheKey, decoding_continuous_cache_key, normalize_continuous_decoding_cache_lookup_key
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import compute_weighted_correlations
@@ -646,11 +646,12 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
     @classmethod
-    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, extant_decoded_time_bin_size: float = 0.25, sigma: Optional[float] = None) -> "DecodingLocalityMeasures":
+    def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, extant_decoded_time_bin_size: Union[float, DecodingContinuousCacheKey] = 0.25, extant_decoded_slideby: Optional[float] = None, sigma: Optional[float] = None) -> "DecodingLocalityMeasures":
         """ 
         _obj: PredictiveDecoding = DecodingLocalityMeasures.init_from_decode_result(
         """
-        a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+        _lookup_key = normalize_continuous_decoding_cache_lookup_key(extant_decoded_time_bin_size, extant_decoded_slideby)
+        a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[_lookup_key]
         # a_result_decoded.p_x_given_n # .shape (41, 63, 2, 103948) - (n_x_bins, n_y_bins, n_tasks, n_time_bins) 
         try:
             n_epochs: int = a_result_decoded.n_epochs
@@ -3179,7 +3180,7 @@ class PredictiveDecoding(ComputedResult): #PickleSerializableMixin, AttrsBasedCl
 
 @define(slots=False, repr=False, eq=False)
 class PredictiveDecodingComputationsContainer(ComputedResult):
-    """ Holds the result from a single rank-ordering (odd/even) comparison between odd/even
+    """ 
 
 
     Usage:
@@ -3340,7 +3341,9 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
                 for an_decoder_name, a_decoded_local_epochs_result in (a_decoded_results_dict or {}).items():
                     filter_epochs = a_decoded_local_epochs_result.filter_epochs
                     for epoch_idx, time_bin_container in enumerate(a_decoded_local_epochs_result.time_bin_containers):
-                        epoch_idx_to_actual_times[epoch_idx] = (time_bin_container.edges[0], time_bin_container.edges[-1])
+                        le = time_bin_container.left_edges
+                        re = time_bin_container.right_edges
+                        epoch_idx_to_actual_times[epoch_idx] = (float(np.min(le)), float(np.max(re)))
                     break  # Only need one decoder/time_bin_size
                     
             ## assign the dang epoch:
@@ -3521,28 +3524,30 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         # Modifies `directional_decoders_decode_result` from the pipeline itself?                                                                                                                                                                                                              #
         # ==================================================================================================================================================================================================================================================================================== #
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'])
-        available_tbins: List[float] = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
-        assert len(available_tbins) > 0
-        most_recent_tbin: float = available_tbins[-1]
-        selected_tbin: float = a_t_bin_size if (a_t_bin_size in available_tbins) else most_recent_tbin
+        available_continuous_keys: List[DecodingContinuousCacheKey] = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
+        assert len(available_continuous_keys) > 0
+        most_recent_cache_key: DecodingContinuousCacheKey = available_continuous_keys[-1]
+        selected_continuous_key: DecodingContinuousCacheKey = next((k for k in available_continuous_keys if np.isclose(k[0], float(a_t_bin_size))), most_recent_cache_key)
 
         if should_filter_directional_decoders_decode_result:
             print(f'directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict')
             a_decoder = list(directional_decoders_decode_result.pf1D_Decoder_dict.values())[0]
-            for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
-                a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
-                a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
+            for cache_key, a_result_decoded in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items():
+                a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[cache_key]
+                w_win, h_hop = cache_key
+                hop_arg = None if np.isclose(w_win, h_hop) else float(h_hop)
+                a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=float(w_win), slideby=hop_arg)
                 filtered_decoded_local_epochs_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=a_result_decoded, xbin=a_decoder.xbin, ybin=a_decoder.ybin,
                                                                                                                                             **position_like_kwargs, normalization_across_epochs_epoch_names=epoch_names)
-                directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = filtered_decoded_local_epochs_result.get_result_for_epoch(0) ## get the single epoch, re-assign
-            ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoder...
+                directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[cache_key] = filtered_decoded_local_epochs_result.get_result_for_epoch(0)
+            ## END for cache_key, a_result_decoded in directional_decoder...
 
         masked_directional_decoders_decode_result = directional_decoders_decode_result
         ## OUTPUTS: masked_directional_decoders_decode_result
         
         pos_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
-        masked_locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=masked_directional_decoders_decode_result, extant_decoded_time_bin_size=most_recent_tbin, sigma=None)
-        masked_predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(pos_df=pos_df, locality_measures=masked_locality_measures, a_result_decoded=masked_directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[most_recent_tbin], window_size=window_size)
+        masked_locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=curr_active_pipeline, directional_decoders_decode_result=masked_directional_decoders_decode_result, extant_decoded_time_bin_size=selected_continuous_key, sigma=None)
+        masked_predictive_decoding: PredictiveDecoding = PredictiveDecoding.init_from_decode_result(pos_df=pos_df, locality_measures=masked_locality_measures, a_result_decoded=masked_directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[selected_continuous_key], window_size=window_size)
 
         if masked_locality_measures.sigma is None:
             x_step: float = np.nanmean(np.diff(masked_predictive_decoding.xbin))
@@ -3624,7 +3629,7 @@ class PredictiveDecodingComputationsContainer(ComputedResult):
         print(f'done with all decoding.')
         
         ## where the main results are filtered
-        masked_container = _subfn_update_internal_results(masked_container=masked_container, selected_tbin_size=selected_tbin)
+        masked_container = _subfn_update_internal_results(masked_container=masked_container, selected_tbin_size=a_t_bin_size)
         
         ## Filter active_epochs_df and matching_pos_epochs_dfs_list to match the filtered decoded results ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         # NOTE: We use actual time span from time_bin_containers (edges) rather than filter_epochs start/stop because when time bins are dropped during masking, the effective start/stop times change
@@ -4686,7 +4691,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                         input_requires=['DirectionalDecodersDecoded', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['PredictiveDecoding'], uses=['PredictiveDecodingComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalDecodersDecoded', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['PredictiveDecoding'],
         validate_computation_test=validate_has_predictive_decoding_results, is_global=True)
-    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None,
+    def perform_predictive_decoding_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, window_size:int=8, extant_decoded_time_bin_size: Optional[float]=None, extant_decoded_slideby: Optional[float]=None,
                 drop_previous_result_and_compute_fresh:bool=False, min_num_spikes_per_bin_to_be_considered_active: Optional[int]=None, mask_position_like_time_score_cutoff: Optional[float] = 0.42,  fine_time_bin_size: float=0.025, 
                 enable_masked_filtered_container_before_any_comps: bool = True, should_perform_first_pass_compute_future_and_past_analysis: bool=False, enable_filter_and_final_result_processing: bool = False,
                 max_workers: Optional[int]=1,
@@ -4732,7 +4737,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         _total_start_time = _time.perf_counter()
         
         print(f'[{_fn_name}] ========== STARTING ==========')
-        print(f'[{_fn_name}] Parameters: window_size={window_size}, fine_time_bin_size={fine_time_bin_size}, extant_decoded_time_bin_size={extant_decoded_time_bin_size}')
+        print(f'[{_fn_name}] Parameters: window_size={window_size}, fine_time_bin_size={fine_time_bin_size}, extant_decoded_time_bin_size={extant_decoded_time_bin_size}, extant_decoded_slideby={extant_decoded_slideby}')
         print(f'[{_fn_name}] Flags: drop_previous_result_and_compute_fresh={drop_previous_result_and_compute_fresh}, enable_masked_filtered_container_before_any_comps={enable_masked_filtered_container_before_any_comps}')
         print(f'[{_fn_name}] Flags: should_perform_first_pass_compute_future_and_past_analysis={should_perform_first_pass_compute_future_and_past_analysis}, enable_filter_and_final_result_processing={enable_filter_and_final_result_processing}')
 
@@ -4769,11 +4774,13 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
             n_time_bin_sizes = len(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict)
             print(f'[{_fn_name}] Applying masks to {n_time_bin_sizes} time bin size(s)...')
             
-            for i_tbin, (extant_decoded_time_bin_size, a_result_decoded) in enumerate(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items()):
-                print(f'[{_fn_name}]   Processing time_bin_size {i_tbin+1}/{n_time_bin_sizes}: {extant_decoded_time_bin_size}s')
-                a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]
+            for i_tbin, (extant_cache_key, a_result_decoded) in enumerate(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.items()):
+                print(f'[{_fn_name}]   Processing cache_key (W,H) {i_tbin+1}/{n_time_bin_sizes}: {extant_cache_key}')
+                a_result_decoded: SingleEpochDecodedResult = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_cache_key]
                 if isinstance(a_result_decoded, SingleEpochDecodedResult) or (not hasattr(a_result_decoded, 'filter_epochs')):
-                    a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=extant_decoded_time_bin_size) ## convert to a `DecodedFilterEpochsResult` for masking
+                    w_w, h_h = extant_cache_key
+                    hop_kw = None if np.isclose(w_w, h_h) else float(h_h)
+                    a_result_decoded: DecodedFilterEpochsResult = DecodedFilterEpochsResult.init_from_single_epoch_result(single_epoch_result=a_result_decoded, decoding_time_bin_size=float(w_w), slideby=hop_kw)
 
                 # FILTER TO JUST POSITION-LIKE POSTERIORS ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 if mask_position_like_time_score_cutoff:
@@ -4801,8 +4808,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
 
                 # a_masked_result: DecodedFilterEpochsResult
                 # is_time_bin_active_list, inactive_mask_list, all_time_bin_indicies_list, last_valid_indices_list = mask_index_tuple
-                ## re-assign to `directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size]`
-                directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_decoded_time_bin_size] = a_masked_result.get_result_for_epoch(0) ## get the single epoch, re-assign
+                directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[extant_cache_key] = a_masked_result.get_result_for_epoch(0)
 
             ## END for extant_decoded_time_bin_size, a_result_decoded in directional_decoders_decode_result.continuousl...
             print(f'[{_fn_name}] Masking complete for all time bin sizes.')
@@ -4822,18 +4828,22 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         pos_df: pd.DataFrame = deepcopy(owning_pipeline_reference.sess.position.to_dataframe())
         print(f'[{_fn_name}] Loaded position dataframe. Shape: {pos_df.shape}')
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
-        print(f'[{_fn_name}] Previously decoded time_bin_sizes: {previously_decoded_keys}')
+        previously_decoded_keys: List[DecodingContinuousCacheKey] = list(continuously_decoded_result_cache_dict.keys())
+        print(f'[{_fn_name}] Previously decoded (W,H) cache keys: {previously_decoded_keys}')
 
         if extant_decoded_time_bin_size is None:
-            time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
-            print(f'[{_fn_name}] Using most_recent_decoding_time_bin_size: {time_bin_size}')
+            selected_decoding_cache_key: DecodingContinuousCacheKey = directional_decoders_decode_result.most_recent_continuous_decoding_cache_key
+            if selected_decoding_cache_key is None:
+                raise ValueError(f'[{_fn_name}] directional decode cache is empty')
+            time_bin_size: float = selected_decoding_cache_key[0]
+            print(f'[{_fn_name}] Using most_recent cache key {selected_decoding_cache_key} (window W={time_bin_size})')
         else:
+            selected_decoding_cache_key = normalize_continuous_decoding_cache_lookup_key(extant_decoded_time_bin_size, extant_decoded_slideby)
             available_sizes = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
-            if extant_decoded_time_bin_size not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
-                raise KeyError(f"[{_fn_name}] extant_decoded_time_bin_size={extant_decoded_time_bin_size} not in available sizes: {available_sizes}")
-            time_bin_size: float = extant_decoded_time_bin_size
-            print(f'[{_fn_name}] Using specified extant_decoded_time_bin_size: {time_bin_size}')
+            if selected_decoding_cache_key not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
+                raise KeyError(f"[{_fn_name}] cache key {selected_decoding_cache_key} not in available sizes: {available_sizes}")
+            time_bin_size = float(selected_decoding_cache_key[0])
+            print(f'[{_fn_name}] Using specified decode cache key {selected_decoding_cache_key}')
 
         if drop_previous_result_and_compute_fresh:
             removed_predictive_decoding_result = global_computation_results.computed_data.pop('PredictiveDecoding', None)
@@ -4877,17 +4887,17 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         
         locality_measures = None
         try:
-            print(f'[{_fn_name}] [DecodingLocalityMeasures] Initializing with time_bin_size={time_bin_size}...')
+            print(f'[{_fn_name}] [DecodingLocalityMeasures] Initializing with cache_key={selected_decoding_cache_key}...')
             
             if not hasattr(directional_decoders_decode_result, 'continuously_decoded_pseudo2D_decoder_dict'):
                 available_attrs = list(directional_decoders_decode_result.__dict__.keys())[:10]
                 raise AttributeError(f"[{_fn_name}] directional_decoders_decode_result missing 'continuously_decoded_pseudo2D_decoder_dict'. Available: {available_attrs}")
             
-            if time_bin_size not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
+            if selected_decoding_cache_key not in directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict:
                 available_sizes = list(directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict.keys())
-                raise KeyError(f"[{_fn_name}] time_bin_size={time_bin_size} not in continuously_decoded_pseudo2D_decoder_dict. Available: {available_sizes}")
+                raise KeyError(f"[{_fn_name}] cache_key={selected_decoding_cache_key} not in continuously_decoded_pseudo2D_decoder_dict. Available: {available_sizes}")
             
-            locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=owning_pipeline_reference, directional_decoders_decode_result=directional_decoders_decode_result, extant_decoded_time_bin_size=time_bin_size, sigma=None)
+            locality_measures = DecodingLocalityMeasures.init_from_decode_result(curr_active_pipeline=owning_pipeline_reference, directional_decoders_decode_result=directional_decoders_decode_result, extant_decoded_time_bin_size=selected_decoding_cache_key, sigma=None)
             
             print(f'[{_fn_name}] [DecodingLocalityMeasures] Successfully initialized.')
             if locality_measures is not None:
@@ -4908,7 +4918,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
         print(f'[{_fn_name}] --- PHASE 4: Initialize and compute PredictiveDecoding ---')
         
         try:
-            print(f'[{_fn_name}] [PredictiveDecoding] Initializing with time_bin_size={time_bin_size}, window_size={window_size}...')
+            print(f'[{_fn_name}] [PredictiveDecoding] Initializing with cache_key={selected_decoding_cache_key}, window_size={window_size}...')
             
             if locality_measures is None:
                 locality_measures = a_container.locality_measures
@@ -4918,7 +4928,7 @@ class PredictiveDecodingComputationsGlobalComputationFunctions(AllFunctionEnumer
                 raise ValueError(f"[{_fn_name}] locality_measures is None - cannot proceed with PredictiveDecoding initialization.")
 
             # Get a_result_decoded from directional_decoders_decode_result
-            a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[time_bin_size]
+            a_result_decoded = directional_decoders_decode_result.continuously_decoded_pseudo2D_decoder_dict[selected_decoding_cache_key]
             
             #TODO 2025-12-23 20:55: - [ ] Found that everything seems to be working well except that there are sometimes a few time bins out of an epoch that have poorly localized posteriors in general (they look very diffuse and like an error, maybe low firing bins)
             ### These need to be filtered out (either by diffusivity of low-firing criteria) so that when we collapse over all the time bins within each epoch we don't pick up a bunch of garbage (the diffuse bins are too liberal).

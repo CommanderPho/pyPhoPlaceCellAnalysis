@@ -2895,7 +2895,7 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
     # ==================================================================================================================================================================================================================================================================================== #
     # Fresh Emphasis/Rendering Helpers                                                                                                                                                                                                                                                     #
     # ==================================================================================================================================================================================================================================================================================== #
-    def add_emphasis_volume(self, start_t: float, stop_t: Optional[float]=None, curr_label: Optional[str]=None):
+    def add_emphasis_volume(self, start_t: float, stop_t: Optional[float]=None, curr_label: Optional[str]=None, vol_data: Optional[NDArray]=None, **vol_kwargs):
         """
 
         Usage:
@@ -2912,6 +2912,11 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
                 
             unique_identifier = f'vol[{an_epoch_idx}]'
             _out_contour_img_objs[unique_identifier] = viewer_3d.add_emphasis_volume(start_t=time_bin_edges[0], stop_t=time_bin_edges[-1], curr_label=unique_identifier)
+            
+            unique_identifier = f'vol[{an_epoch_idx}]'
+            _out_contour_img_objs[unique_identifier] = viewer_3d.add_emphasis_volume(start_t=time_bin_edges[0], stop_t=time_bin_edges[-1], curr_label=unique_identifier, vol_data=vol_data,
+                cmap='viridis', relative_step_size=0.1,
+            )
 
             
         """
@@ -2949,10 +2954,16 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
         # box = vz.Box(width=x_width, height=z_size, depth=y_width, color=rgba, edge_color=edge_rgba, parent=self.view.scene, name=curr_epoch_identifier)
 
         # 2. Generate dummy volume data (Shape: Z, Y, X)
-        # Creating a 50x100x200 array
-        # nz, ny, nx = 50, 100, 200
-        nz, ny, nx = 3, 10, 10
-        vol_data: NDArray = np.random.normal(size=(nz, ny, nx), loc=0.5, scale=0.2).astype(np.float32) # shape is (z, y, x)
+        if vol_data is None:
+            # Creating a 50x100x200 array
+            # nz, ny, nx = 50, 100, 200
+            nz, ny, nx = 3, 10, 10
+            vol_data: NDArray = np.random.normal(size=(nz, ny, nx), loc=0.5, scale=0.2).astype(np.float32) # shape is (z, y, x)
+        else:
+            assert np.ndim(vol_data) == 3, f"np.ndim(vol_data): should be 3 (x, y, z) but is {np.ndim(vol_data)}!\n\tnp.shape(vol_data): {np.shape(vol_data)}"
+            nz, ny, nx = np.shape(vol_data)
+            vol_data: NDArray = vol_data.astype(np.float32) # shape is (z, y, x)
+            
 
         # 3. Define the target bounding box: [xmin, xmax, ymin, ymax, zmin, zmax]
         # x_min, x_max = -100, 100
@@ -2968,10 +2979,12 @@ class Volumentric2DTimeSeriesPlotter(VispySceneWindowState, VispySceneWindowMixi
         box_vol: scene.visuals.Volume = scene.visuals.Volume(
             vol_data,
             parent=self.view.scene,
-            method='translucent',
-            cmap=TransGray(), # cmap='grays'
-            interpolation='linear',
-            relative_step_size=0.8, name=curr_epoch_identifier,
+            method=vol_kwargs.pop('method', 'translucent'),
+            cmap=vol_kwargs.pop('cmap', TransGray()), # cmap='grays'
+            interpolation=vol_kwargs.pop('interpolation', 'linear'),
+            relative_step_size=vol_kwargs.pop('relative_step_size', 0.8),
+            name=curr_epoch_identifier,
+            **vol_kwargs,
         )
         box_vol.order = 10
         

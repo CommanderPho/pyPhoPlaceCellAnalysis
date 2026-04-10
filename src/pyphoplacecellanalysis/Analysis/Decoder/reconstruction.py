@@ -709,15 +709,15 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
             decoding_bins_epochs_df
 
         """
-        # single_continuous_result.nbins
-        # single_continuous_result.time_bin_container.edges
-        left_edges = self.time_bin_container.edges[:-1]
-        right_edges = self.time_bin_container.edges[1:]
+        left_edges = np.asarray(self.time_bin_container.left_edges)
+        right_edges = np.asarray(self.time_bin_container.right_edges)
         assert len(left_edges) == len(right_edges), f"len(right_edges): {len(right_edges)}, len(left_edges): {len(left_edges)}"
         assert len(left_edges) == self.time_bin_container.num_bins, f"self.time_bin_container.num_bins: {self.time_bin_container.num_bins}, len(left_edges): {len(left_edges)}"
-        # decoding_bins_epochs_df: pd.DataFrame = pd.DataFrame({'start': self.time_bin_container.left_edges, 'stop': self.time_bin_container.right_edges})
         decoding_bins_epochs_df: pd.DataFrame = pd.DataFrame({'start': left_edges, 'stop': right_edges})
-        decoding_bins_epochs_df['stop'] = decoding_bins_epochs_df['stop'] - epoch_end_non_overlapping_difference # make non-overlapping by subtracting off 1-nano-second from the end of each
+        w = np.asarray(right_edges, dtype=np.float64) - np.asarray(left_edges, dtype=np.float64)
+        apply_shrink = bool(np.max(w) <= np.min(w) + 1e-12)
+        if apply_shrink:
+            decoding_bins_epochs_df['stop'] = decoding_bins_epochs_df['stop'] - epoch_end_non_overlapping_difference # make non-overlapping by subtracting off 1-nano-second from the end of each (contiguous bins only)
         decoding_bins_epochs_df['duration'] = decoding_bins_epochs_df['stop'] - decoding_bins_epochs_df['start']
         decoding_bins_epochs_df['label'] = decoding_bins_epochs_df.index.to_numpy().astype(int)
         assert len(decoding_bins_epochs_df) == self.nbins, f"len(decoding_bins_epochs_df): {len(decoding_bins_epochs_df)}, self.nbins: {self.nbins}"
@@ -904,6 +904,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
        
     """
     decoding_time_bin_size: float = serialized_attribute_field() # the time bin_size in seconds
+    decoding_slideby: Optional[float] = serialized_field(default=None, metadata={'desc': 'slideby (sliding-window step) in seconds; None means hop equals decoding_time_bin_size (non-overlapping)'})
     filter_epochs: pd.DataFrame = serialized_field() # the filter epochs themselves
     num_filter_epochs: int = serialized_attribute_field() # depends on the number of epochs (`n_epochs`)
     most_likely_positions_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
@@ -915,7 +916,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
     time_bin_containers: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
-    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one per epoch
+    time_bin_edges: list = non_serialized_field(metadata={'shape': ('n_epochs',), 'desc': 'Per epoch: (n_bins+1,) contiguous histogram edges, or (n_bins, 2) [start, stop] rows for overlapping sliding windows. Prefer time_bin_containers for full binning state.'}) # depends on the number of epochs, one per epoch
     epoch_description_list: list[str] = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)}) # depends on the number of epochs, one for each
     
     ## Optional Helpers
@@ -999,7 +1000,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
     @function_attributes(short_name=None, tags=['single-epoch', 'conversion', 'compatibility'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-23 00:00', related_items=['self.get_result_for_epoch'])
     @classmethod
-    def init_from_single_epoch_result(cls, single_epoch_result: SingleEpochDecodedResult, decoding_time_bin_size: float, spkcount: Optional[NDArray] = None, pos_bin_edges: Optional[NDArray] = None) -> "DecodedFilterEpochsResult":
+    def init_from_single_epoch_result(cls, single_epoch_result: SingleEpochDecodedResult, decoding_time_bin_size: float, spkcount: Optional[NDArray] = None, pos_bin_edges: Optional[NDArray] = None, slideby: Optional[float] = None) -> "DecodedFilterEpochsResult":
         """Converts a SingleEpochDecodedResult back into a DecodedFilterEpochsResult with a single epoch.
         
         This is the inverse operation of get_result_for_epoch(), enabling compatibility with functions
@@ -1053,6 +1054,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         # Construct and return DecodedFilterEpochsResult
         result = cls(
             decoding_time_bin_size=decoding_time_bin_size,
+            decoding_slideby=slideby,
             filter_epochs=filter_epochs_df,
             num_filter_epochs=1,
             most_likely_positions_list=most_likely_positions_list,
@@ -1116,7 +1118,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         decoding_time_bin_sizes: List[float] = [a_results_to_merge_obj.decoding_time_bin_size for a_results_to_merge_obj in results_to_merge_list]
         Assert.all_equal(*decoding_time_bin_sizes) ## require all have the same decoding time bin size so the time bin variables are meaningful when merged...
         decoding_time_bin_size: float = decoding_time_bin_sizes[0]
-        out_result: "DecodedFilterEpochsResult" = cls(decoding_time_bin_size=decoding_time_bin_size, filter_epochs=merged_epochs, 
+        decoding_slidebys_raw: List[Optional[float]] = []
+        for a_results_to_merge_obj in results_to_merge_list:
+            h = getattr(a_results_to_merge_obj, 'decoding_slideby', None)
+            if h is None:
+                h = getattr(a_results_to_merge_obj, 'decoding_time_bin_hop', None)
+            decoding_slidebys_raw.append(h)
+        effective_hops: List[float] = [(h if h is not None else decoding_time_bin_size) for h in decoding_slidebys_raw]
+        Assert.all_equal(*effective_hops)
+        out_result: "DecodedFilterEpochsResult" = cls(decoding_time_bin_size=decoding_time_bin_size, decoding_slideby=decoding_slidebys_raw[0], filter_epochs=merged_epochs, 
             num_filter_epochs=len(merged_epochs),
         )
 
@@ -1267,6 +1277,9 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         self.__dict__.update(state)
         if 'pos_bin_edges' not in state:
             self.__dict__.update(pos_bin_edges=None) ## default to None (for same unpickling)
+        if 'decoding_slideby' not in self.__dict__:
+            self.decoding_slideby = self.__dict__.get('decoding_time_bin_hop', None)
+        self.__dict__.pop('decoding_time_bin_hop', None)
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin 
@@ -1804,16 +1817,11 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             else:
                 raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 1, 2, or 3')
 
-            a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
-            if (len(a_time_bin_edges) != (num_time_bins+1)):
-                #@IgnoreException
-                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
-                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                continue
-            else:
-                assert len(a_time_bin_edges) == (num_time_bins+1)
-        
-            is_time_bin_active = is_time_bin_active_list[i]
+            is_time_bin_active = np.asarray(is_time_bin_active_list[i])
+            if is_time_bin_active.size != num_time_bins:
+                print(f'WARN: Epoch[{i}]: len(is_time_bin_active): {is_time_bin_active.size} != num_time_bins: {num_time_bins}. Using all-active mask for this epoch.')
+                is_time_bin_active = np.ones((num_time_bins,), dtype=bool)
+
             inactive_mask: NDArray[ND.Shape["N_TIME_BINS"], Any]  = ~is_time_bin_active
             
             # Make a copy of the original data before masking
@@ -1862,32 +1870,36 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 a_decoded_result.most_likely_positions_list[i] = a_decoded_result.most_likely_positions_list[i][is_time_bin_active, ...]
 
                 a_binning_container: BinningContainer = deepcopy(a_decoded_result.time_bin_containers[i])
-                # a_binning_container.centers = a_binning_container.centers[is_time_bin_active]
                 a_sliced_centers = deepcopy(a_decoded_result.time_bin_containers[i].centers[is_time_bin_active])
                 center_info = BinningContainer.build_center_binning_info(centers=a_sliced_centers, variable_extents=a_binning_container.center_info.variable_extents)
-                #TODO 2026-01-16 17:07: - [ ] I see some weirdnesses now, as the bins aren't evenly spaced anymore...
-                try:
-                    a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers) #
-                    ## make whole new container
-                    a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                
-                except IndexError as e:
-                    if len(a_sliced_centers) == 0:
-                        ## no center => no edges
+                if a_binning_container.window_start_edges is not None:
+                    w0 = np.asarray(a_binning_container.window_start_edges[is_time_bin_active])
+                    w1 = np.asarray(a_binning_container.window_stop_edges[is_time_bin_active])
+                    if len(w0) == 0:
                         a_decoded_result.time_bin_edges[i] = np.array([])
-                        ## make whole new container
                         edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
-                
                     else:
-                        assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
-                        assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
-                        a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents) ## use the extents directly
-                        ## make whole new container
+                        ww = float(w1[0] - w0[0])
+                        hop = float(a_binning_container.slideby) if a_binning_container.slideby is not None else ww
+                        a_decoded_result.time_bin_containers[i] = BinningContainer.from_sliding_windows(window_start_edges=w0, window_stop_edges=w1, epoch_variable_extents=(float(w0[0]), float(w1[-1])), window_width=ww, hop=hop)
+                        a_decoded_result.time_bin_edges[i] = np.column_stack((w0, w1))
+                else:
+                    try:
+                        a_decoded_result.time_bin_edges[i] = get_bin_edges(a_sliced_centers)
                         a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
-                    
-                except Exception as e:
-                    raise
+                    except IndexError as e:
+                        if len(a_sliced_centers) == 0:
+                            a_decoded_result.time_bin_edges[i] = np.array([])
+                            edge_info = BinningInfo(variable_extents=a_binning_container.edge_info.variable_extents, step=a_binning_container.edge_info.step, num_bins=0)
+                            a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i], edge_info=edge_info, center_info=center_info)
+                        else:
+                            assert len(a_sliced_centers) == 1, f"a_sliced_centers: {a_sliced_centers} -- len(a_sliced_centers): {len(a_sliced_centers)}"
+                            assert len(a_binning_container.center_info.variable_extents) == 2, f"a_binning_container.center_info.variable_extents: {a_binning_container.center_info.variable_extents}"
+                            a_decoded_result.time_bin_edges[i] = np.array(a_binning_container.center_info.variable_extents)
+                            a_decoded_result.time_bin_containers[i] = BinningContainer(centers=a_sliced_centers, edges=a_decoded_result.time_bin_edges[i])
+                    except Exception as e:
+                        raise
                 
 
                 # a_decoded_result.time_bin_containers[i] = a_decoded_result.time_bin_containers[i][is_time_bin_active]
@@ -1942,9 +1954,14 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             ## Update start/stop/duration columns based on remaining time_bin_containers
             for i in np.arange(num_filter_epochs):
                 if a_decoded_result.nbins[i] > 0:
-                    remaining_centers = a_decoded_result.time_bin_containers[i].centers
-                    remaining_edges = a_decoded_result.time_bin_edges[i]
-                    if len(remaining_edges) > 0:
+                    remaining_edges = np.asarray(a_decoded_result.time_bin_edges[i])
+                    if remaining_edges.size == 0:
+                        continue
+                    if remaining_edges.ndim == 2 and remaining_edges.shape[1] == 2:
+                        a_decoded_result.filter_epochs.loc[i, 'start'] = float(remaining_edges[0, 0])
+                        a_decoded_result.filter_epochs.loc[i, 'stop'] = float(remaining_edges[-1, 1])
+                        a_decoded_result.filter_epochs.loc[i, 'duration'] = float(remaining_edges[-1, 1] - remaining_edges[0, 0])
+                    else:
                         a_decoded_result.filter_epochs.loc[i, 'start'] = remaining_edges[0]
                         a_decoded_result.filter_epochs.loc[i, 'stop'] = remaining_edges[-1]
                         a_decoded_result.filter_epochs.loc[i, 'duration'] = remaining_edges[-1] - remaining_edges[0]
@@ -2033,20 +2050,21 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         for i in np.arange(num_filter_epochs):
             *num_spatial_dims_list, num_time_bins = np.shape(a_decoded_result.p_x_given_n_list[i])
-            a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
-            if (len(a_time_bin_edges) != (num_time_bins+1)):
-                #@IgnoreException
-                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
-                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                # continue
-                break
+            tc: BinningContainer = a_decoded_result.time_bin_containers[i]
+            sliding_iv = tc.get_sliding_window_intervals()
+            if sliding_iv is not None:
+                w_st, w_en = sliding_iv
+                _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=w_st, window_stop_edges=w_en, included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
             else:
-                assert len(a_time_bin_edges) == (num_time_bins+1)
-        
-            unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges,
-                                                                                                                                                                                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                                                                                                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
-            
+                a_time_bin_edges: NDArray = np.asarray(a_decoded_result.time_bin_edges[i])
+                if a_time_bin_edges.ndim == 2 and a_time_bin_edges.shape[0] == num_time_bins and a_time_bin_edges.shape[1] == 2:
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask_from_window_intervals(window_start_edges=a_time_bin_edges[:, 0], window_stop_edges=a_time_bin_edges[:, 1], included_neuron_ids=None, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                elif a_time_bin_edges.ndim == 1 and len(a_time_bin_edges) == (num_time_bins + 1):
+                    _unused_counts, _unused_units, (is_time_bin_active, _inactive_mask, _mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges, min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active, min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                else:
+                    print(f'WARN: Epoch[{i}]: cannot derive spike mask from time_bin_edges with shape {getattr(a_time_bin_edges, "shape", None)}; treating all time bins as active.')
+                    is_time_bin_active = np.ones((num_time_bins,), dtype=bool)
+            assert len(is_time_bin_active) == num_time_bins, f"Epoch[{i}]: spike mask length {len(is_time_bin_active)} != num_time_bins {num_time_bins}"
             is_time_bin_active_list.append(is_time_bin_active)
             
         #END for i in np.arange(num_filter_epochs)    
@@ -2445,7 +2463,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================== #
     @function_attributes(short_name='decode_specific_epochs', tags=['decode', 'epochs', 'specific'], input_requires=[], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['BayesianPlacemapPositionDecoder.perform_decode_specific_epochs', 'pre_build_epochs_decoding_result', 'perform_pre_built_specific_epochs_decoding'], used_by=['decode_using_new_decoders'], related_items=['get_proper_global_spikes_df'])
-    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, slideby: Optional[float]=None, debug_print=False) -> DecodedFilterEpochsResult:
         """
         History:
             Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
@@ -2455,16 +2473,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         """
         ## Equivalent:
         # return self.perform_decode_specific_epochs(self, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
-        pre_built_epochs_decoding_result = self.pre_build_epochs_decoding_result(spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        pre_built_epochs_decoding_result = self.pre_build_epochs_decoding_result(spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, slideby=slideby, debug_print=debug_print)
         return self.perform_pre_built_specific_epochs_decoding(filter_epochs_decoder_result=pre_built_epochs_decoding_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
     @function_attributes(short_name=None, tags=['pre-build', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'perform_pre_built_specific_epochs_decoding'])
-    def pre_build_epochs_decoding_result(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+    def pre_build_epochs_decoding_result(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, slideby: Optional[float]=None, debug_print=False) -> DynamicContainer:
         """ Builds the results used to call `.perform_pre_built_specific_epochs_decoding(...)`
         History:
             Split from `self.decode_specific_epochs` to allow reuse of the epochs for efficiency
         """
-        return self._build_decode_specific_epochs_result_shell(neuron_IDs=self.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        return self._build_decode_specific_epochs_result_shell(neuron_IDs=self.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, slideby=slideby, debug_print=debug_print)
     
     @function_attributes(short_name=None, tags=['decode', 'efficiency'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-29 00:00', related_items=['decode_specific_epochs', 'pre_build_epochs_decoding_result'])
     def perform_pre_built_specific_epochs_decoding(self, filter_epochs_decoder_result: DynamicContainer, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
@@ -2551,7 +2569,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     @function_attributes(short_name='hyper_perform_decode', tags=['decode', 'pure'], input_requires=['self.neuron_IDs'], output_provides=[], creation_date='2023-03-23 19:10',
         uses=['self.decode', 'BayesianPlacemapPositionDecoder.perform_build_marginals', 'epochs_spkcount'],
         used_by=[])
-    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
+    def hyper_perform_decode(self, spikes_df, decoding_time_bin_size=0.1, slideby: Optional[float]=None, t_start=None, t_end=None, output_flat_versions=False, debug_print=False):
         """ Fully decodes the neural activity from its internal placefields, internally calling `self.decode(...)` and then in addition building the marginals and additional outputs.
 
         Does not alter the internal state of the decoder (doesn't change internal most_likely_positions or posterior, etc)
@@ -2576,7 +2594,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         epochs_df = pd.DataFrame({'start':[t_start],'stop':[t_end],'label':['epoch']})
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(spikes_df, epochs=epochs_df, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print)
+        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(spikes_df, epochs=epochs_df, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=self.neuron_IDs, debug_print=debug_print, slideby=slideby)
         spkcount = spkcount[0]
         n_tbin_centers = n_tbin_centers[0]
         time_bin_container = time_bin_containers_list[0] # neuropy.utils.mixins.binning_helpers.BinningContainer
@@ -2651,7 +2669,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     @classmethod
-    def _build_decode_specific_epochs_result_shell(cls, neuron_IDs: NDArray, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DynamicContainer:
+    def _build_decode_specific_epochs_result_shell(cls, neuron_IDs: NDArray, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, slideby: Optional[float]=None, debug_print=False) -> DynamicContainer:
         """Precomputes the time_binned spikes for the filter epochs since this is the slowest part of `perform_decode_specific_epochs`
 
         NOTE: Uses active_decoder.decode(...) to actually do the decoding
@@ -2696,14 +2714,18 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             print(f'np.shape(filter_epoch_spikes_df): {np.shape(filter_epoch_spikes_df)}')
 
         ## final step is to time_bin (relative to the start of each epoch) the time values of remaining spikes
-        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, epochs=filter_epochs, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=neuron_IDs, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        spkcount, included_neuron_ids, n_tbin_centers, time_bin_containers_list = epochs_spkcount(filter_epoch_spikes_df, epochs=filter_epochs, bin_size=decoding_time_bin_size, export_time_bins=True, included_neuron_ids=neuron_IDs, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print, slideby=slideby)
         num_filter_epochs = len(n_tbin_centers) # one for each epoch in filter_epochs
 
         # apply np.atleast_1d to all
         for i, a_n_bins in enumerate(n_tbin_centers):
-            time_bin_containers_list[i].centers = np.atleast_1d(time_bin_containers_list[i].centers)
-            time_bin_containers_list[i].edges = np.atleast_1d(time_bin_containers_list[i].edges)
-            # time_bin_containers_list[i].nbins = np.atleast_1d(time_bin_containers_list[i].edges)
+            _tc = time_bin_containers_list[i]
+            _tc.centers = np.atleast_1d(_tc.centers)
+            _tc.edges = np.atleast_1d(_tc.edges)
+            if _tc.window_start_edges is not None:
+                _tc.window_start_edges = np.atleast_1d(_tc.window_start_edges)
+            if _tc.window_stop_edges is not None:
+                _tc.window_stop_edges = np.atleast_1d(_tc.window_stop_edges)
 
             # [(a_n_bins == len(time_bin_containers_list[i].centers)) ]
         assert np.all([(a_n_bins == len(time_bin_containers_list[i].centers)) for i, a_n_bins in enumerate(n_tbin_centers)])
@@ -2716,6 +2738,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         filter_epochs_decoder_result.nbins = n_tbin_centers
         filter_epochs_decoder_result.time_bin_containers = time_bin_containers_list
         filter_epochs_decoder_result.decoding_time_bin_size = decoding_time_bin_size
+        filter_epochs_decoder_result.decoding_slideby = slideby
         filter_epochs_decoder_result.filter_epochs = filter_epochs
         filter_epochs_decoder_result.num_filter_epochs = num_filter_epochs
 
@@ -2775,7 +2798,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         for i, curr_filter_epoch_spkcount, curr_epoch_num_time_bins, curr_filter_epoch_time_bin_container in zip(np.arange(filter_epochs_decoder_result.num_filter_epochs), filter_epochs_decoder_result.spkcount, filter_epochs_decoder_result.nbins, filter_epochs_decoder_result.time_bin_containers):
             ## New 2022-09-26 method with working time_bin_centers_list returned from epochs_spkcount
-            a_time_bin_edges = np.atleast_1d(curr_filter_epoch_time_bin_container.edges)
+            _tc = curr_filter_epoch_time_bin_container
+            if _tc.window_start_edges is not None:
+                a_time_bin_edges = np.column_stack((np.asarray(_tc.window_start_edges), np.asarray(_tc.window_stop_edges)))
+            else:
+                a_time_bin_edges = np.atleast_1d(_tc.edges)
             filter_epochs_decoder_result.time_bin_edges.append(a_time_bin_edges)
             if use_single_time_bin_per_epoch:
                 assert curr_filter_epoch_time_bin_container.num_bins == 1
@@ -2834,7 +2861,11 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 
                 # time_bin_edges, epoch_description_list
                 if filter_epochs_decoder_result.time_bin_edges[invalid_idx] is not None:
-                    filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(filter_epochs_decoder_result.time_bin_containers[invalid_idx].edges) # filter_epochs_decoder_result.time_bin_edges[invalid_idx][good_indicies]
+                    _fix_tc = filter_epochs_decoder_result.time_bin_containers[invalid_idx]
+                    if _fix_tc.window_start_edges is not None:
+                        filter_epochs_decoder_result.time_bin_edges[invalid_idx] = np.column_stack((np.asarray(_fix_tc.window_start_edges), np.asarray(_fix_tc.window_stop_edges)))
+                    else:
+                        filter_epochs_decoder_result.time_bin_edges[invalid_idx] = deepcopy(_fix_tc.edges)
                     
                 # if filter_epochs_decoder_result.epoch_description_list[invalid_idx] is not None:
                 #     filter_epochs_decoder_result.epoch_description_list[invalid_idx] = filter_epochs_decoder_result.epoch_description_list[invalid_idx][good_indicies]
@@ -2892,14 +2923,14 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     @function_attributes(short_name='perform_decode_specific_epochs', tags=['decode','specific_epochs','epoch', 'classmethod'], input_requires=[], output_provides=[], uses=['active_decoder.decode', 'add_epochs_id_identity', 'epochs_spkcount', 'cls.perform_build_marginals'], used_by=[''], creation_date='2022-12-04 00:00')
     @classmethod
-    def perform_decode_specific_epochs(cls, active_decoder, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, debug_print=False) -> DecodedFilterEpochsResult:
+    def perform_decode_specific_epochs(cls, active_decoder, spikes_df: pd.DataFrame, filter_epochs: Union[Epoch, pd.DataFrame], decoding_time_bin_size:float=0.05, use_single_time_bin_per_epoch: bool=False, slideby: Optional[float]=None, debug_print=False) -> DecodedFilterEpochsResult:
         """Uses the decoder to decode the nerual activity (provided in spikes_df) for each epoch in filter_epochs
 
         History:
             Split `perform_decode_specific_epochs` into two subfunctions: `_build_decode_specific_epochs_result_shell` and `_perform_decoding_specific_epochs`
         """
         # build output result object:
-        filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
+        filter_epochs_decoder_result = cls._build_decode_specific_epochs_result_shell(neuron_IDs=active_decoder.neuron_IDs, spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, slideby=slideby, debug_print=debug_print)
         return cls._perform_decoding_specific_epochs(active_decoder=active_decoder, filter_epochs_decoder_result=filter_epochs_decoder_result, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
     
     

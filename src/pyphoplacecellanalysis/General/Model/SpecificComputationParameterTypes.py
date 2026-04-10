@@ -661,6 +661,8 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
         # params_class_type_dict
         
         params_class_type_dict = deepcopy(cls.__annotations__)
+        # Merged-fn `short_name` (fn_best_name) can differ from attrs field name; map to ComputationKWargParameters keys.
+        MERGED_FN_SHORT_NAME_TO_PARAM_FIELD = {'non_PBE_epochs_results': 'non_pbe_epochs_results'}
         
         ## Convert to the new native types
         ## INPUTS: registered_merged_computation_function_default_kwargs_dict, params_class_type_dict
@@ -668,12 +670,13 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
         for k, v_dict in registered_merged_computation_function_default_kwargs_dict.items():
             a_type = None
             final_key: str = k.removeprefix('_')
+            canonical_key: str = MERGED_FN_SHORT_NAME_TO_PARAM_FIELD.get(final_key, final_key)
             try:
-                a_type = params_class_type_dict[final_key] # KeyError: 'directional_decoders_epoch_heuristic_scoring'
-                _out_param_typed_parameters_dict[final_key] = a_type(**v_dict)
+                a_type = params_class_type_dict[canonical_key]
+                _out_param_typed_parameters_dict[canonical_key] = a_type(**v_dict)
             
             except Exception as e:
-                print(f'k: {k}, final_key: {final_key}, v_dict: {v_dict}')
+                print(f'k: {k}, final_key: {final_key}, canonical_key: {canonical_key}, v_dict: {v_dict}')
                 print(f'\ta_type: {a_type}')
                 raise
 
@@ -730,6 +733,7 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
         self.long_short_rate_remapping.to_hdf(file_path, key=f"{key}/long_short_rate_remapping")
         self.long_short_inst_spike_rate_groups.to_hdf(file_path, key=f"{key}/long_short_inst_spike_rate_groups")
         self.wcorr_shuffle_analysis.to_hdf(file_path, key=f"{key}/wcorr_shuffle_analysis")
+        self.non_pbe_epochs_results.to_hdf(file_path, key=f"{key}/non_pbe_epochs_results")
         self.position_decoding.to_hdf(file_path, key=f"{key}/position_decoding")
         self.perform_specific_epochs_decoding.to_hdf(file_path, key=f"{key}/perform_specific_epochs_decoding")
         self.DEP_ratemap_peaks.to_hdf(file_path, key=f"{key}/DEP_ratemap_peaks")
