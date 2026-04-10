@@ -379,7 +379,7 @@ class ComputerVisionComputations:
     def imshow(cls, img: NDArray, xbin_edges=None, ybin_edges=None):
         """ visualizes the image using matplotlib's imshow 
         Usage:
-            fig, imv = 
+            fig, imv = ComputerVisionComputations.imshow(img, xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin)
         """
         
         img_shape = np.shape(img)
