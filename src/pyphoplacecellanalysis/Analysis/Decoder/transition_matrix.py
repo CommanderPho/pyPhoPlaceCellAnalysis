@@ -782,11 +782,37 @@ class TransitionMatrixComputations:
         from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
         
         out = None
-        all_decoders_label_kwargs = dict(name=f'binned_x_transition_matrix for all decoders', title=f"Transition Matrix for binned x (from, to) for all decoders", variable_label='Transition Matrix')
+        all_decoders_label_kwargs = dict(name='transition_matrix for all decoders', title='Transition Matrix for all decoders', variable_label='Transition Matrix')
         for a_decoder_idx, (a_decoder_name, a_binned_x_transition_matrix_higher_order_list) in enumerate(binned_x_transition_matrix_higher_order_list_dict.items()):
-            a_decoder_label_kwargs = dict(name=f'binned_x_transition_matrix["{a_decoder_name}"]', title=f"Transition Matrix for binned x (from, to) for '{a_decoder_name}'", variable_label='Transition Matrix')
+            a_decoder = decoders_dict[a_decoder_name]
+            xbins = getattr(a_decoder, 'xbin_centers', None)
+            if xbins is None:
+                xbins = getattr(a_decoder, 'xbin_labels', None)
+            ybins = getattr(a_decoder, 'ybin_centers', None)
+            if ybins is None:
+                ybins = getattr(a_decoder, 'ybin_labels', None)
+
+            first_transition_matrix = np.asarray(a_binned_x_transition_matrix_higher_order_list[0])
+            n_x_bins = len(xbins) if xbins is not None else None
+            n_y_bins = len(ybins) if ybins is not None else None
+            is_2d_transition_matrix = ((n_x_bins is not None) and (n_y_bins is not None) and (np.shape(first_transition_matrix) == (n_x_bins * n_y_bins, n_x_bins * n_y_bins)))
+
+            if is_2d_transition_matrix:
+                a_decoder_label_kwargs = dict(name=f'binned_xy_transition_matrix["{a_decoder_name}"]', title=f"Transition Matrix destination map for binned (x, y) for '{a_decoder_name}'", variable_label='Transition Probability')
+                plot_xbins, plot_ybins = xbins, ybins
+            else:
+                a_decoder_label_kwargs = dict(name=f'binned_x_transition_matrix["{a_decoder_name}"]', title=f"Transition Matrix for binned x (from, to) for '{a_decoder_name}'", variable_label='Transition Matrix')
+                plot_xbins, plot_ybins = xbins, xbins
+
+            def _subfn_prepare_display_matrix(transition_matrix: NDArray) -> NDArray:
+                transition_matrix = np.asarray(transition_matrix)
+                if not is_2d_transition_matrix:
+                    return transition_matrix
+                dest_flat = np.nansum(transition_matrix, axis=0)
+                return dest_flat.reshape(n_x_bins, n_y_bins)
 
             def _subfn_plot_all_rows(start_idx:int=0):
+                assert out is not None
                 for row_idx, transition_power_idx in enumerate(np.arange(start=start_idx, stop=len(a_binned_x_transition_matrix_higher_order_list), step=power_step)):
                     row_idx = row_idx + start_idx
                     a_title = ''
@@ -796,13 +822,13 @@ class TransitionMatrixComputations:
                         if row_idx == 0:
                             a_title = f'decoder: "{a_decoder_name}"'
                     
-                    out.add_data(row=row_idx, col=a_decoder_idx, matrix=a_binned_x_transition_matrix_higher_order_list[transition_power_idx], xbins=decoders_dict[a_decoder_name].xbin_centers, ybins= decoders_dict[a_decoder_name].xbin_centers,
+                    out.add_data(row=row_idx, col=a_decoder_idx, matrix=_subfn_prepare_display_matrix(a_binned_x_transition_matrix_higher_order_list[transition_power_idx]), xbins=plot_xbins, ybins=plot_ybins,
                                 name=f'{a_decoder_label_kwargs["name"]}[{transition_power_idx}]', title=a_title, variable_label=f'{a_decoder_label_kwargs["name"]}[{transition_power_idx}]')  
 
             if out is None:
                 ## only VERy first (0, 0) item
-                out = BasicBinnedImageRenderingWindow(a_binned_x_transition_matrix_higher_order_list[0], decoders_dict[a_decoder_name].xbin_centers, decoders_dict[a_decoder_name].xbin_centers,
-                                                    **all_decoders_label_kwargs, scrollability_mode=LayoutScrollability.NON_SCROLLABLE,
+                out = BasicBinnedImageRenderingWindow(_subfn_prepare_display_matrix(a_binned_x_transition_matrix_higher_order_list[0]), plot_xbins, plot_ybins,
+                                                    name=all_decoders_label_kwargs['name'], title=all_decoders_label_kwargs['title'], variable_label=all_decoders_label_kwargs['variable_label'], scrollability_mode=LayoutScrollability.NON_SCROLLABLE,
                                                     grid_opacity=grid_opacity)
                 # add remaining rows for this decoder:
                 _subfn_plot_all_rows(start_idx=1)
@@ -811,7 +837,7 @@ class TransitionMatrixComputations:
                 # add to existing plotter:
                 _subfn_plot_all_rows()
                 
-
+        assert out is not None
         return out
     
 
