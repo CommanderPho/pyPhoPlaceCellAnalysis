@@ -131,6 +131,98 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
 
+
+from types import SimpleNamespace
+import numpy as np
+from neuropy.core.epoch import ensure_dataframe
+from replay_structure.config import RatDay_Preprocessing_Parameters
+from replay_structure.ratday_preprocessing import RatDay_Preprocessing
+# from scripts.local.preprocess_spikemat_data import run_spikemat_preprocessing
+from replay_structure.read_write import save_ratday_data
+from replay_structure.metadata import (
+    DATA_PATH,
+    string_to_session_indicator,
+    Session_List,
+    Session_Name,
+)
+
+class RepoConvert_HippocampalSWRDynamics:
+    """ converts Neuropy piepline data into compatible sessions 
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import RepoConvert_HippocampalSWRDynamics
+
+    """
+
+    @classmethod
+    def _first_present_column(cls, df, candidate_names, label: str) -> str:
+        valid_candidate_names = [name for name in candidate_names if name is not None]
+        for name in valid_candidate_names:
+            if name in df.columns:
+                return name
+        raise KeyError(f"Could not find a {label} column. Tried: {valid_candidate_names}. Available columns: {list(df.columns)}")
+
+    @classmethod
+    def build_matlab_like_from_neuropy_pipeline(cls, kdiba_pipeline: NeuropyPipeline):
+        sess = kdiba_pipeline.sess
+        if (sess.pbe is None) or (len(sess.pbe) == 0):
+            raise ValueError("`kdiba_pipeline.sess.pbe` is missing or empty. Load or compute PBEs before building RatDay_Preprocessing.")
+
+        spikes_df = sess.spikes_df.copy()
+        pos_df = sess.position.to_dataframe().copy()
+        pbe_df = ensure_dataframe(sess.pbe).copy()
+
+        pos_time_col = cls._first_present_column(pos_df, [getattr(pos_df.position, 'time_variable_name', None), 't', 'time', 't_rel_seconds'], 'position time')
+        pos_x_col = cls._first_present_column(pos_df, ['x'], 'position x')
+        pos_y_col = cls._first_present_column(pos_df, ['y'], 'position y')
+        spike_time_col = cls._first_present_column(spikes_df, ['t_rel_seconds', 't', 'time'], 'spike time')
+        spike_id_col = cls._first_present_column(spikes_df, ['aclu', 'neuron_id'], 'spike unit id')
+        pbe_start_col = cls._first_present_column(pbe_df, ['start', 't_start'], 'PBE start')
+        pbe_stop_col = cls._first_present_column(pbe_df, ['stop', 't_stop', 'end'], 'PBE stop')
+
+        spike_times_s = spikes_df[spike_time_col].to_numpy(dtype=float)
+        spike_aclus = spikes_df[spike_id_col].to_numpy()
+        unique_aclus = np.unique(spike_aclus)
+        dense_zero_based_ids = np.searchsorted(unique_aclus, spike_aclus)
+        spike_data = np.column_stack([spike_times_s, dense_zero_based_ids + 1])
+
+        pos_times_s = pos_df[pos_time_col].to_numpy(dtype=float)
+        pos_x = pos_df[pos_x_col].to_numpy(dtype=float)
+        pos_y = pos_df[pos_y_col].to_numpy(dtype=float)
+        position_data = np.column_stack([pos_times_s, pos_x, pos_y, np.zeros(len(pos_df), dtype=float)])
+
+        ripple_times = np.column_stack([
+            pbe_df[pbe_start_col].to_numpy(dtype=float),
+            pbe_df[pbe_stop_col].to_numpy(dtype=float),
+        ])
+        significant_ripples = np.arange(1, len(ripple_times) + 1, dtype=int)
+
+        matlab_like_data = SimpleNamespace(
+            SignificantRipples=significant_ripples,
+            RippleTimes=ripple_times,
+            InhibitoryNeurons=np.array([], dtype=int),
+            ExcitatoryNeurons=np.arange(1, len(unique_aclus) + 1, dtype=int),
+            WellLocations=np.empty((0, 2), dtype=float),
+            WellSequence=np.array([], dtype=int),
+            SpikeData=spike_data,
+            PositionData=position_data,
+        )
+        adapter_metadata = {
+            'n_pbes': len(ripple_times),
+            'n_position_samples': len(pos_df),
+            'n_spikes': len(spikes_df),
+            'n_dense_cells': len(unique_aclus),
+            'aclu_to_dense_zero_based_id': {int(aclu): int(i) for i, aclu in enumerate(unique_aclus)},
+            'position_time_col': pos_time_col,
+            'spike_time_col': spike_time_col,
+            'spike_id_col': spike_id_col,
+        }
+        return matlab_like_data, adapter_metadata
+
+
+
+
+
 @function_attributes(short_name=None, tags=['lap', 'binned_pos', '2026-03-13_lap_up_down_deflection_score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-05 02:09', related_items=[])
 def compute_lap_binned_occupancies(a_sess, a_decoder):
     """ Returns the occupancies during each lap
