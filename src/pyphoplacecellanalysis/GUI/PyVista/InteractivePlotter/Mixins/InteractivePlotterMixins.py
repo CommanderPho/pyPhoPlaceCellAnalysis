@@ -148,6 +148,10 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
 
         """
         cx, cy, cz = curr_animal_point
+        override_z = kwargs.pop('override_z', None)
+        if override_z is not None:
+            cz = override_z
+            
         hx, hy = heading_unit_xy
         # perpendicular (normal) in xy-plane, rotated +90deg from heading:
         nx, ny = -hy, hx
