@@ -45,6 +45,7 @@ dependencies = [
     "numpy>=1.23.5",
     "pyclustering>=0.10.1.2",
     "silx>=2.2.0,<3",
+    "numba>=0.57,<0.62",
 ]
 
 [dependency-groups]
