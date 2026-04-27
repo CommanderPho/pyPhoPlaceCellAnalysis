@@ -5,7 +5,7 @@
 
 
 """
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pyvista as pv
 
@@ -47,6 +47,7 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     """
     
     sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
+    animal_heading_triangle_quat_kwargs: Dict[str, Any] = dict(color='orange', edge_color='orange', length=15.0, base_width=1.8)
     
     
     def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
@@ -254,7 +255,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
 
                 ## quternion-derived heading direction as an orange arrow:
                 heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
-                self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, color='orange', edge_color='orange', length = 7.0, base_width = 1.8)
+                print('rx,ry,rz,rw[idx] =', self.pos_df[['rx','ry','rz','rw']].iloc[idx].to_dict())
+                print('quat_head_dir_degrees[idx] =', self.pos_df['quat_head_dir_degrees'].iat[idx])
+                print('heading_unit_xy_quat[idx] =', self.pos_df['heading_unit_xy_quat'].iat[idx])
+                self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, **self.animal_heading_triangle_quat_kwargs)
 
 
             needs_render = True
@@ -393,8 +397,11 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
 
             ## quternion-derived heading direction as an orange arrow:
+            print('rx,ry,rz,rw[idx] =', self.pos_df[['rx','ry','rz','rw']].iloc[idx].to_dict())
+            print('quat_head_dir_degrees[idx] =', self.pos_df['quat_head_dir_degrees'].iat[idx])
+            print('heading_unit_xy_quat[idx] =', self.pos_df['heading_unit_xy_quat'].iat[idx])
             heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
-            self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, color='orange', edge_color='orange', length = 7.0, base_width = 1.8)
+            self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, **self.animal_heading_triangle_quat_kwargs)
 
 
         ## Maze Plotting Updates:
@@ -505,6 +512,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # self.p._before_close_callback = 
         
         # self.p._BasePlotter__before_close_callback.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+
+        ## add quaternion-derived heading direction
+        # if 'quat_head_dir_degrees' not in self.pos_df.columns:
+        quat_col_names = ('rx', 'ry', 'rz', 'rw')
+        assert all((a_col in self.pos_df.columns) for a_col in quat_col_names)
+        self.pos_df = self.pos_df.position.adding_quat_head_dir_degrees_columns()
+        assert 'quat_head_dir_degrees' in self.pos_df.columns
+        h: float = 1.0
+        self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
         # p.background_color = 'black'
 
