@@ -3,6 +3,7 @@
 # from neuropy
 from copy import deepcopy
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 import pyvista as pv
 from qtpy import QtCore, QtGui, QtWidgets
@@ -122,7 +123,9 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         # if 'heading_unit_xy' not in self.pos_df.columns:
         self.pos_df = _subfn_add_heading_unit_xy(self.pos_df) # modifies in‑place
 
-
+        ## add quaternion-derived heading direction
+        h = 1.0
+        self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
 
         # Helper variables
