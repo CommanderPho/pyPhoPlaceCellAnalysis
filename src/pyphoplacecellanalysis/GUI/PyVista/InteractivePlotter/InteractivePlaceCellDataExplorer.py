@@ -305,17 +305,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         curr_text_rendering_string = '(t_start: {:.2f}, t_stop: {:.2f})'.format(t_start, t_stop) # :.3f
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
         
+        ## Shared spike data needed by both the historical and recent blocks:
+        flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
+        flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
+        flattened_spike_positions_list = self.params.flattened_spike_positions_list
+
         ## Historical Spikes:
         if enable_historical_spikes:
             # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
             historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
-
-            # TODO: replace with properties that I implemented
-            flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
-            # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
-            flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
-            # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
-            flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
             # evaluated as column names
             active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode

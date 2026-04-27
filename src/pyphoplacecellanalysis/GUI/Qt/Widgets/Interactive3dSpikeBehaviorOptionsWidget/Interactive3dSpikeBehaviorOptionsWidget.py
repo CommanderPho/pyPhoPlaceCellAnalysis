@@ -249,12 +249,7 @@ class Interactive3dSpikeBehaviorOptionsWidget(QtWidgets.QWidget):
     def _on_historical_spikes_toggled(self, checked: bool):
         if self._suspend_signals:
             return
-        # Only flip params.enable_historical_spikes on CHECK (so a previously-disabled rebuild path turns back on).
-        # On UNCHECK, leave params.enable_historical_spikes alone and rely on actor SetVisibility(0). This avoids a
-        # NameError in InteractivePlaceCellDataExplorer.on_active_window_update_mesh, where `flattened_spike_times`
-        # is only defined inside the historical block but referenced from the recent-spikes block.
-        if checked:
-            self.explorer.params.enable_historical_spikes = True
+        self.explorer.params.enable_historical_spikes = checked
         self._set_actor_visibility(self.explorer.spikes_main_historical, checked)
         self._render_now()
         self._emit_changed(enable_historical_spikes=bool(checked))
@@ -264,8 +259,7 @@ class Interactive3dSpikeBehaviorOptionsWidget(QtWidgets.QWidget):
     def _on_recent_spikes_toggled(self, checked: bool):
         if self._suspend_signals:
             return
-        if checked:
-            self.explorer.params.enable_recent_spikes = True
+        self.explorer.params.enable_recent_spikes = checked
         self._set_actor_visibility(self.explorer.spikes_main_recent_only, checked)
         self._render_now()
         self._emit_changed(enable_recent_spikes=bool(checked))
