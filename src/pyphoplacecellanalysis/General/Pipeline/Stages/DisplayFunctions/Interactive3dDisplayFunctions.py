@@ -155,7 +155,21 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
                 optionsWidget.show()
                 ipspikesDataExplorer.ui['optionsWidget'] = optionsWidget
                 active_root_main_widget = ipspikesDataExplorer.p.window()
-                root_dockAreaWindow, _options_dock_app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, optionsWidget, title=ipspikesDataExplorer.data_explorer_name)
+                root_dockAreaWindow, _options_dock_app = DockAreaWrapper.build_default_dockAreaWindow(title=ipspikesDataExplorer.data_explorer_name, defer_show=True)
+                from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+                main_geom = active_root_main_widget.window().geometry()
+                main_x, main_y, main_w, main_h = main_geom.getRect()
+                opts_geom = optionsWidget.sizeHint()
+                opts_w = min(opts_geom.width(), 260)
+                new_main_w = main_w - opts_w
+                print(f'opts_w: {opts_w}, main_w: {main_w}, new_main_w: {new_main_w}')
+                # optionsWidget.setMaximumWidth(opts_w)
+
+                _, _dMain = root_dockAreaWindow.add_display_dock("3D View", dockSize=(new_main_w, main_h), widget=active_root_main_widget, dockAddLocationOpts=['left'], display_config=CustomDockDisplayConfig(showCloseButton=False))
+                _, _dOpts = root_dockAreaWindow.add_display_dock("Options", dockSize=(opts_w, main_h), widget=optionsWidget, dockAddLocationOpts=['right', _dMain], display_config=CustomCyclicColorsDockDisplayConfig(showCloseButton=False, named_color_scheme=NamedColorScheme.red))
+                root_dockAreaWindow.resize(main_w, main_h) ## should be unchanged
+                _dOpts.setMaximumWidth(opts_w)
+                root_dockAreaWindow.show()
                 ipspikesDataExplorer.ui['root_dockAreaWindow'] = root_dockAreaWindow
             except Exception as e:
                 print(f'WARN: could not build/dock Interactive3dSpikeBehaviorOptionsWidget. Error {e}. Continuing.')
