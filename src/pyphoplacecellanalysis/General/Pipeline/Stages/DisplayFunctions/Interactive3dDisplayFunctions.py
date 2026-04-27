@@ -144,10 +144,26 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             pass
         except Exception as e:
             raise e
-        
-        
-        
-        return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter}
+
+        # Build options widget and dock it next to the plotter (interactive mode only):
+        optionsWidget = None
+        root_dockAreaWindow = None
+        if (not active_config.video_output_config.active_is_video_output_mode) and kwargs.get('show_options_widget', True):
+            try:
+                from pyphoplacecellanalysis.GUI.Qt.Widgets.Interactive3dSpikeBehaviorOptionsWidget.Interactive3dSpikeBehaviorOptionsWidget import Interactive3dSpikeBehaviorOptionsWidget
+                optionsWidget = Interactive3dSpikeBehaviorOptionsWidget.build_for_explorer(ipspikesDataExplorer)
+                optionsWidget.show()
+                ipspikesDataExplorer.ui['optionsWidget'] = optionsWidget
+                active_root_main_widget = ipspikesDataExplorer.p.window()
+                root_dockAreaWindow, _options_dock_app = DockAreaWrapper.wrap_with_dockAreaWindow(active_root_main_widget, optionsWidget, title=ipspikesDataExplorer.data_explorer_name)
+                ipspikesDataExplorer.ui['root_dockAreaWindow'] = root_dockAreaWindow
+            except Exception as e:
+                print(f'WARN: could not build/dock Interactive3dSpikeBehaviorOptionsWidget. Error {e}. Continuing.')
+                optionsWidget = None
+                root_dockAreaWindow = None
+
+        return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter, 'optionsWidget': optionsWidget, 'root_dockAreaWindow': root_dockAreaWindow}
+
 
     ## CustomDataExplorer 3D Plotter:
     @function_attributes(short_name='3d_interactive_custom_data_explorer', tags=['display', 'custom', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')
