@@ -486,6 +486,15 @@ class BinnedOccupancyComparisons:
         def _column_banner_name(dk: str) -> str:
             return 'Directed' if dk == 'roam' else 'Sprinkle' if dk == 'sprinkle' else str(dk)
 
+        def _safe_epoch_ids_from_label_or_order(filter_epochs_df: pd.DataFrame, label_column_name: str = 'label') -> pd.Series:
+            """Build int epoch IDs from numeric labels, falling back to row order for blank/non-numeric labels."""
+            if label_column_name in filter_epochs_df.columns:
+                label_ids = pd.to_numeric(filter_epochs_df[label_column_name], errors='coerce')
+            else:
+                label_ids = pd.Series(np.nan, index=filter_epochs_df.index)
+            fallback_ids = pd.Series(np.arange(len(filter_epochs_df), dtype=int), index=filter_epochs_df.index)
+            return label_ids.fillna(fallback_ids).astype(int)
+
         def _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, colorbar_label, row_side_label):
             """Add one row of images + labels; one ColorBarItem on the rightmost column only (shared vmin/vmax for the row). column_data is list of (image_array, title) per column. row_side_label is drawn vertically in column 0. Returns next row index (curr_row + 2)."""
             win.addLabel(text=row_side_label, row=curr_row, col=0, rowspan=2, angle=-90, size='12pt', bold=True)
@@ -511,7 +520,9 @@ class BinnedOccupancyComparisons:
         
         # extant_pbe_decoding_time_bin_size: float = 0.025
 
-        win = pg.GraphicsLayoutWidget(title="BinnedOccupancyComparisons — columns: Directed (roam) vs Sprinkle; shared color scale per row")
+        _session_uid: str = curr_active_pipeline.get_session_context().get_description_as_session_global_uid()
+
+        win = pg.GraphicsLayoutWidget(title=f"{_session_uid} — BinnedOccupancyComparisons — columns: Directed (roam) vs Sprinkle; shared color scale per row")
         
         across_all_time_bin_p_x_given_n_dict = {}
 
@@ -520,10 +531,11 @@ class BinnedOccupancyComparisons:
         if extant_pbe_decoding_time_bin_size not in decoder_cache['pbe']:
             decoder_cache['pbe'][extant_pbe_decoding_time_bin_size] = {} ## INIT
 
-        win.addLabel(text='', row=0, col=0)
+        win.addLabel(text=_session_uid, row=0, col=0, colspan=1 + 2 * len(decoder_names), size='12pt', bold=True)
+        win.addLabel(text='', row=1, col=0)
         for col_idx, nm in enumerate(decoder_names):
-            win.addLabel(text=_column_banner_name(nm), row=0, col=1 + col_idx * 2, colspan=2, size='24pt', bold=True)
-        curr_row: int = 1
+            win.addLabel(text=_column_banner_name(nm), row=1, col=1 + col_idx * 2, colspan=2, size='24pt', bold=True)
+        curr_row: int = 2
         _subtitle_mean_posterior = 'mean posterior mass per spatial bin (÷ n_timebins)'
 
         # Plot decoded PBES __________________________________________________________________________________________________ #
@@ -539,7 +551,7 @@ class BinnedOccupancyComparisons:
                     decoder_cache['pbe'][extant_pbe_decoding_time_bin_size][a_decoder_name] = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=pbes_df, decoding_time_bin_size=extant_pbe_decoding_time_bin_size)
                     
                 decoded_PBEs_result: DecodedFilterEpochsResult = decoder_cache['pbe'][extant_pbe_decoding_time_bin_size][a_decoder_name]
-                decoded_PBEs_result.filter_epochs._df['pbe_id'] = decoded_PBEs_result.filter_epochs._df['label'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+                decoded_PBEs_result.filter_epochs._df['pbe_id'] = _safe_epoch_ids_from_label_or_order(decoded_PBEs_result.filter_epochs._df) ## Prefer labels when numeric; directional-decoder PBEs can have blank labels.
                 # decoded_PBEs_result.filter_epochs._df['original_epoch_idx'] = decoded_PBEs_result.filter_epochs._df['pbe_id'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
                 
             # END ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -586,7 +598,7 @@ class BinnedOccupancyComparisons:
                 decoder_cache['laps'][decoding_time_bin_size][a_decoder_name] = a_decoder.decode_specific_epochs(spikes_df=a_decoder.spikes_df, filter_epochs=laps_df, decoding_time_bin_size=decoding_time_bin_size)
                 
             a_decoded_laps_epochs_result: DecodedFilterEpochsResult = decoder_cache['laps'][decoding_time_bin_size][a_decoder_name]
-            a_decoded_laps_epochs_result.filter_epochs._df['lap_id'] = a_decoded_laps_epochs_result.filter_epochs._df['label'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
+            a_decoded_laps_epochs_result.filter_epochs._df['lap_id'] = _safe_epoch_ids_from_label_or_order(a_decoded_laps_epochs_result.filter_epochs._df) ## Prefer labels when numeric; fall back to row order for blank/non-numeric labels.
             a_decoded_laps_epochs_result.filter_epochs._df['original_epoch_idx'] = a_decoded_laps_epochs_result.filter_epochs._df['lap_id'].astype(int) ## it already is an inbetween_lap_id because it's built from the laps
             n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_decoded_laps_epochs_result.flatten()
             cumm_flattened_p_x_given_n = np.nansum(timebins_p_x_given_n, axis=-1)
@@ -637,19 +649,40 @@ class BinnedOccupancyComparisons:
             column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
             curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
 
-        # Equal height for each heatmap row: row 0 = column banners (fixed), odd rows = subtitles (fixed), even rows >= 2 = ViewBoxes (share space evenly).
+        # Equal height for each heatmap row: rows 0–1 = suptitle + column banners (fixed); from row 2: even rows = subtitle labels (fixed), odd rows = ViewBoxes (share space evenly).
         _grid_layout = win.ci.layout
         for _r in range(_grid_layout.rowCount()):
-            if _r == 0 or (_r % 2 == 1):
+            if _r <= 1 or (_r % 2 == 0):
                 _grid_layout.setRowStretchFactor(_r, 0)
             else:
                 _grid_layout.setRowStretchFactor(_r, 1)
         _grid_layout.activate()
 
         win.show()
-        return across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row)
+        return across_all_time_bin_p_x_given_n_dict, (_subfn_add_single_row, win, cmap, curr_row, _session_uid)
 
 
+    
+    def export_figure(self, win, out_path: Path):
+        """ 
+
+        out_path = curr_active_pipeline.get_output_path().joinpath(f"binned_occupancy_comparisons.svg")
+        out_path = occ_comp.export_figure(win=win, out_path=out_path)
+
+        """
+        # from pyqtgraph.exporters import SVGExporter
+
+        # # Ensure layout is updated after show()
+        # win.scene().update()
+        # SVGExporter(win.scene()).export("binned_occupancy_comparisons.svg")
+
+        from pyqtgraph.exporters import SVGExporter
+
+        # out_path = curr_active_pipeline.get_output_path().joinpath(f"binned_occupancy_comparisons.svg") # (final_context=IdentifyingContext(f'binned_occupancy_comparisons'), make_foolder_if_needed=True)
+        # After plot_decoded_and_measured_occupancies(...)
+        SVGExporter(win.ci).export(out_path)
+        print(f'exported to out_path: {out_path}')
+        return out_path
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -3633,7 +3666,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         print(f'computing linearized position for session using method="{linearization_method}"...')
         sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
         print(f'estimating the laps from the linear position...')
-        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn'])) ## unfiltered session 
+        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
     else:
         print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
         sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
