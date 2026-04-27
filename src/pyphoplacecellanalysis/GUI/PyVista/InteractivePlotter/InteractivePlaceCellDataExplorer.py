@@ -180,6 +180,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     def animal_heading_triangle(self):
         return self.plots.get('animal_heading_triangle', None)
 
+    @property
+    def animal_heading_triangle_quot(self):
+        return self.plots.get('animal_heading_triangle_quot', None)
+
 
     def _get_heading_unit_xy_at(self, idx) -> Tuple[float, float]:
         """ Returns a unit (hx, hy) heading vector at position-sample index `idx`, derived from smoothed velocity.
@@ -269,8 +273,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             self.plots['animal_current_location_point'] = self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
             ## Animal Heading Triangle (red, points along inferred heading):
             if active_window_sample_indicies is not None:
-                heading_unit_xy = self._get_heading_unit_xy_at(np.atleast_1d(active_window_sample_indicies)[-1])
+                idx = int(np.atleast_1d(active_window_sample_indicies)[-1])
+                heading_unit_xy = self._get_heading_unit_xy_at(idx)
                 self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
+
+                ## quternion-derived heading direction as an orange arrow:
+                heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
+                self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, color='orange', edge_color='orange', length = 7.0, base_width = 1.8)
+
+
             needs_render = True
 
         if needs_render:
@@ -404,8 +415,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
             ## Animal Heading Triangle (red, points along inferred heading):
-            heading_unit_xy = self._get_heading_unit_xy_at(active_included_all_window_position_indicies[-1])
+            idx = int(np.atleast_1d(active_included_all_window_position_indicies)[-1])
+            heading_unit_xy = self._get_heading_unit_xy_at(idx)
             self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
+
+            ## quternion-derived heading direction as an orange arrow:
+            heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
+            self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, color='orange', edge_color='orange', length = 7.0, base_width = 1.8)
 
 
         ## Maze Plotting Updates:
@@ -451,8 +467,14 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
             ## Animal Heading Triangle (red, points along inferred heading):
-            heading_unit_xy = self._get_heading_unit_xy_at(active_window_sample_indicies[-1])
+            idx = int(np.atleast_1d(active_window_sample_indicies)[-1])
+            heading_unit_xy = self._get_heading_unit_xy_at(idx)
             self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
+
+            ## quternion-derived heading direction as an orange arrow:
+            heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
+            self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, color='orange', edge_color='orange', length = 7.0, base_width = 1.8)
+
         
         self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
         # self.p.update()
