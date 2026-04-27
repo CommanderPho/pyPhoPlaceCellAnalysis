@@ -70,6 +70,18 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         ## old-style:
         self.debug.spike_positions_list_old = self.params.flattened_spike_positions_list
 
+        ## Smoothed velocity for inferred animal heading direction (used by `animal_heading_triangle`):
+        try:
+            _ = self.active_session.position.compute_higher_order_derivatives()
+            pos_df = self.active_session.position.compute_smoothed_position_info(N=15)
+            self.vx_smooth = pos_df['velocity_x_smooth'].to_numpy()
+            self.vy_smooth = pos_df['velocity_y_smooth'].to_numpy()
+        except Exception as e:
+            print(f'WARN: could not compute smoothed velocity for animal heading. Error {e}. Falling back to raw velocity.')
+            self.vx_smooth = np.asarray(self.active_session.position.velocity_x)
+            self.vy_smooth = np.asarray(self.active_session.position.velocity_y)
+        self._last_heading_unit_xy = (1.0, 0.0)
+
 
     def _setup_visualization(self):
         # Split the position data into equal sized chunks to be displayed at a single time. These will look like portions of the trajectory and be used to animate. # Chunk the data to create the animation.
@@ -163,6 +175,31 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     def animal_current_location_point(self):
         return self.plots.get('animal_current_location_point', None)
 
+
+    @property
+    def animal_heading_triangle(self):
+        return self.plots.get('animal_heading_triangle', None)
+
+
+    def _get_heading_unit_xy_at(self, idx) -> Tuple[float, float]:
+        """ Returns a unit (hx, hy) heading vector at position-sample index `idx`, derived from smoothed velocity.
+        Falls back to the last-known heading when the value is undefined (NaN) or speed is below a tiny threshold (animal stationary, or start of recording before rolling-mean is valid).
+        """
+        idx = int(idx)
+        if (self.vx_smooth is None) or (self.vy_smooth is None) or (idx < 0) or (idx >= len(self.vx_smooth)):
+            return self._last_heading_unit_xy
+        vx = float(self.vx_smooth[idx])
+        vy = float(self.vy_smooth[idx])
+        if (not np.isfinite(vx)) or (not np.isfinite(vy)):
+            return self._last_heading_unit_xy
+        speed = float(np.hypot(vx, vy))
+        if speed < 1e-6:
+            return self._last_heading_unit_xy
+        heading_unit_xy = (vx / speed, vy / speed)
+        self._last_heading_unit_xy = heading_unit_xy
+        return heading_unit_xy
+
+
     def on_programmatic_data_update(self, active_included_all_historical_indicies=None, active_included_recent_only_indicies=None, active_window_sample_indicies=None, curr_animal_point=None):
         """ Called to programmatically update the interactive plot. """
 
@@ -208,6 +245,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         if curr_animal_point is not None:
             ## Animal Current Position:
             self.plots['animal_current_location_point'] = self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+            ## Animal Heading Triangle (red, points along inferred heading):
+            if active_window_sample_indicies is not None:
+                heading_unit_xy = self._get_heading_unit_xy_at(np.atleast_1d(active_window_sample_indicies)[-1])
+                self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
             needs_render = True
 
         if needs_render:
@@ -340,6 +381,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
 
+            ## Animal Heading Triangle (red, points along inferred heading):
+            heading_unit_xy = self._get_heading_unit_xy_at(active_included_all_window_position_indicies[-1])
+            self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
+
 
         ## Maze Plotting Updates:
         self.on_update_current_window_MazeRenderingMixin(new_window_t_start=t_start, new_window_t_stop=t_stop)
@@ -382,6 +427,10 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
             ## Animal Current Position:
             curr_animal_point = [self.x[active_window_sample_indicies[-1]], self.y[active_window_sample_indicies[-1]], self.z_fixed[-1]]
             self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+
+            ## Animal Heading Triangle (red, points along inferred heading):
+            heading_unit_xy = self._get_heading_unit_xy_at(active_window_sample_indicies[-1])
+            self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, render=False)
         
         self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
         # self.p.update()
