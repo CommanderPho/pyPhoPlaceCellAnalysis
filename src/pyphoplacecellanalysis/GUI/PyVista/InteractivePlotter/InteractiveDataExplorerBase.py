@@ -3,6 +3,7 @@
 # from neuropy
 from copy import deepcopy
 import numpy as np
+from numpy.typing import NDArray
 import pyvista as pv
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -66,11 +67,64 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         self.data_explorer_name = data_explorer_name
         
         self.z_fixed = None
+
         # Position variables: t, x, y
-        self.t = self.active_session.position.time
-        self.x = self.active_session.position.x
-        self.y = self.active_session.position.y
-        
+        self.pos_df = self.active_session.position.to_dataframe() ## full dataframe storage; t, x, y are computed properties
+
+
+
+        # ## OPTION 1: Compute from 'approx_head_dir_degrees':
+        # if 'heading_unit_xy' not in self.pos_df.columns:
+        #     ## compute it
+        #     h: float = 1.0
+        #     self.pos_df['heading_unit_xy'] = self.pos_df['approx_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+
+
+        ## OPTION 2: Compute it from smoothed velocities like original AI implemementation -- handles low speeds that would otherwise cause jitter:
+        def _subfn_add_heading_unit_xy(df: pd.DataFrame, vx_col: str = 'velocity_x_smooth', vy_col: str = 'velocity_y_smooth', speed_threshold: float = 0.01, fill_method: str = 'ffill') -> pd.DataFrame:
+            """
+            Compute heading unit vectors (ux, uy) from smoothed velocities.
+            Rows with speed <= threshold or non‑finite velocities are marked invalid.
+            Invalid headings can be filled forward ('ffill'), backward ('bfill'),
+            or left as NaN (fill_method=None).
+
+            Returns df with new column 'heading_unit_xy' containing tuples (ux, uy).
+
+            fill_method # 'ffill', 'bfill', or None (no fill) 
+
+            """
+            vx = df[vx_col].to_numpy()
+            vy = df[vy_col].to_numpy()
+            speed = np.hypot(vx, vy)
+
+            valid = (speed > speed_threshold) & np.isfinite(vx) & np.isfinite(vy)
+
+            ux = np.full(len(df), np.nan, dtype=float)
+            uy = np.full(len(df), np.nan, dtype=float)
+
+            # Compute heading only where valid
+            ux[valid] = vx[valid] / speed[valid]
+            uy[valid] = vy[valid] / speed[valid]
+
+            # Apply requested fill method
+            if fill_method == 'ffill':
+                ux = pd.Series(ux).ffill().to_numpy()
+                uy = pd.Series(uy).ffill().to_numpy()
+            elif fill_method == 'bfill':
+                ux = pd.Series(ux).bfill().to_numpy()
+                uy = pd.Series(uy).bfill().to_numpy()
+            # else: leave NaN as is
+
+            # Create tuple column
+            df['heading_unit_xy'] = [ (ux[i], uy[i]) for i in range(len(df)) ]
+            return df
+
+        # if 'heading_unit_xy' not in self.pos_df.columns:
+        self.pos_df = _subfn_add_heading_unit_xy(self.pos_df) # modifies in‑place
+
+
+
+
         # Helper variables
         display_class_name = f'{str(type(self))}{data_explorer_name}'
         self.params = VisualizationParameters(name=display_class_name, **params_kwargs)
@@ -80,7 +134,24 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         self.ui = PhoUIContainer(name=display_class_name, **ui_kwargs)
         
         self.params.plotter_backgrounds = get_gradients()
-        
+
+
+    @property
+    def t(self) -> NDArray:
+        """The t property."""
+        return self.pos_df['t'].to_numpy()
+
+    @property
+    def x(self) -> NDArray:
+        """The x property."""
+        return self.pos_df['x'].to_numpy()
+
+    @property
+    def y(self) -> NDArray:
+        """The y property."""
+        return self.pos_df['y'].to_numpy()
+
+
     @staticmethod
     def _unpack_variables(active_session):
         """ Unpacks the required variables from the active_session and returns them. Bascally a flexible mapping between active_session's properties and the required variables for the plotter. """
@@ -99,6 +170,8 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         reverse_cellID_idx_lookup_map = active_session.neurons.reverse_cellID_index_map
 
         # Position variables: t, x, y
+        pos_df = active_session.position.to_dataframe() ## full dataframe storage
+
         t = active_session.position.time
         x = active_session.position.x
         y = active_session.position.y

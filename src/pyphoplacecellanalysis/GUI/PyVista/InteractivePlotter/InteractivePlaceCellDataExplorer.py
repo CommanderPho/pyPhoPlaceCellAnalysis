@@ -184,18 +184,40 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     def _get_heading_unit_xy_at(self, idx) -> Tuple[float, float]:
         """ Returns a unit (hx, hy) heading vector at position-sample index `idx`, derived from smoothed velocity.
         Falls back to the last-known heading when the value is undefined (NaN) or speed is below a tiny threshold (animal stationary, or start of recording before rolling-mean is valid).
+
+        # ['approx_head_dir_degrees', 'head_dir_angle_binned']
+        # ['t', 'x', 'y', 'z', 'lin_pos', 'dt', 'velocity_x', 'acceleration_x', 'velocity_y', 'acceleration_y', 'velocity_z', 'acceleration_z', 'x_smooth', 'y_smooth', 'z_smooth', 'velocity_x_smooth', 'acceleration_x_smooth', 'velocity_y_smooth', 'acceleration_y_smooth', 'velocity_z_smooth', 'acceleration_z_smooth', 'speed', 'speed_xy', 'lap', 'lap_dir', 'approx_head_dir_degrees', 'head_dir_angle_binned', 'lap_dir_2D', 'lap_dir_1D', 'zone_id', 'novelty_lehman', 'novelty_knn_visited']
+        
         """
         idx = int(idx)
-        if (self.vx_smooth is None) or (self.vy_smooth is None) or (idx < 0) or (idx >= len(self.vx_smooth)):
-            return self._last_heading_unit_xy
-        vx = float(self.vx_smooth[idx])
-        vy = float(self.vy_smooth[idx])
-        if (not np.isfinite(vx)) or (not np.isfinite(vy)):
-            return self._last_heading_unit_xy
-        speed = float(np.hypot(vx, vy))
-        if speed < 1e-6:
-            return self._last_heading_unit_xy
-        heading_unit_xy = (vx / speed, vy / speed)
+
+        assert 'heading_unit_xy' in self.pos_df, f"'heading_unit_xy' not in self.pos_df.columns: {list(self.pos_df.columns)}" # ['approx_head_dir_degrees', 'head_dir_angle_binned']
+        # approx_head_dir_degrees = self.pos_df['approx_head_dir_degrees'].to_numpy()[idx]
+        # angle_rad = np.radians(approx_head_dir_degrees)
+        # h = 1.0 ## general scale factor
+        # x = np.cos(angle_rad) * h
+        # y = np.sin(angle_rad) * h
+        # h = np.sqrt(np.pow(x, 2) + np.pow(y, 2)) 
+
+        # self.pos_df['heading_unit_xy'] = self.pos_df['approx_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))        
+
+        # heading_unit_xy = self.pos_df['heading_angle'].to_numpy()[idx]
+        # heading_unit_xy = self.pos_df['heading_unit_xy'].to_list()[idx]
+        heading_unit_xy = self.pos_df['heading_unit_xy'].iat[idx]
+
+        # ## OLD:
+        # if (self.vx_smooth is None) or (self.vy_smooth is None) or (idx < 0) or (idx >= len(self.vx_smooth)):
+        #     return self._last_heading_unit_xy
+        # vx = float(self.vx_smooth[idx])
+        # vy = float(self.vy_smooth[idx])
+        # if (not np.isfinite(vx)) or (not np.isfinite(vy)):
+        #     return self._last_heading_unit_xy
+        # speed = float(np.hypot(vx, vy))
+        # if speed < 1e-6:
+        #     return self._last_heading_unit_xy
+        # heading_unit_xy = (vx / speed, vy / speed)
+
+
         self._last_heading_unit_xy = heading_unit_xy
         return heading_unit_xy
 
