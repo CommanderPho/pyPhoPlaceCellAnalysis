@@ -87,6 +87,13 @@ def horizontal_gaussian_blur(arr, sigma:float=1, **kwargs):
     return np.apply_along_axis(gaussian_filter1d, axis=1, arr=arr, sigma=sigma, **kwargs)
 
 
+# Direction table: 8 king-neighbor offsets in compass order starting at North.
+# Convention: +ix is East (+x), +iy is North (+y) — matches pf2D.occupancy axes.
+# Index  0  1   2  3    4    5   6    7
+# Label  N  NE  E  SE   S    SW  W    NW
+DIRECTION_OFFSETS_8WAY: List[Tuple[int, int]] = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
+DIRECTION_NAMES_8WAY: List[str] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+
 
 @define(slots=False, eq=False)
 @metadata_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-11-14 00:00', related_items=[])
@@ -101,6 +108,7 @@ class TransitionMatrixComputations:
     out
 
     # 2D (x, y) grid: use ``_compute_position_transition_matrix_2d`` and ``position_flat_index_from_xy`` / ``reshape_square_tm_to_grid``.
+    # 8-direction exit likelihoods (n_x, n_y, 8): use ``_compute_position_direction_exit_likelihood_8way``.
 
     """
     binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = field(factory=dict)
@@ -237,6 +245,110 @@ class TransitionMatrixComputations:
             assert np.alltrue(_is_row_normalization_all_valid), f"not row normalized!\n\t_is_row_normalization_all_valid: {_is_row_normalization_all_valid}\n\t_row_normalization_sums: {_row_normalization_sums}"
 
         return binned_xy_transition_matrix_higher_order_list
+
+
+    @function_attributes(short_name=None, tags=['UNTESTED', 'AI', '2D', 'direction'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-26 14:21', related_items=['_compute_position_transition_matrix_2d'])
+    @classmethod
+    def _compute_position_direction_exit_likelihood_8way(cls, xbin_labels, ybin_labels, binned_x_index_sequence: np.ndarray, binned_y_index_sequence: np.ndarray, nan_entries_replace_value: Optional[float] = 0.0, should_validate_normalization: bool = True) -> NDArray:
+        """Per-bin probability of exiting toward each of the 8 king-neighbor directions.
+
+        For every consecutive pair of samples ``(ix0, iy0) -> (ix1, iy1)`` the displacement
+        ``(dx, dy) = (ix1-ix0, iy1-iy0)`` is classified into one of the 8 compass directions when
+        ``max(|dx|, |dy|) == 1`` (a true single-step neighbor move).  Pairs where the animal stays
+        (``dx==dy==0``) or jumps more than one bin (Chebyshev distance > 1) are **excluded** and
+        contribute to neither the numerator nor the denominator.
+
+        Returns an array of shape ``(n_x, n_y, 8)`` where ``out[ix, iy, d]`` is the fraction of
+        qualifying exits from bin ``(ix, iy)`` that went in direction ``d``.  For any bin with at
+        least one qualifying exit the 8 direction probabilities sum to 1.  Bins with no qualifying
+        exits are filled with ``nan_entries_replace_value`` (default 0.0).
+
+        Direction-index mapping (axis convention: +ix = East, +iy = North, matching pf2D axes):
+
+            d=0  N  (dx= 0, dy=+1)    d=1  NE (dx=+1, dy=+1)
+            d=2  E  (dx=+1, dy= 0)    d=3  SE (dx=+1, dy=-1)
+            d=4  S  (dx= 0, dy=-1)    d=5  SW (dx=-1, dy=-1)
+            d=6  W  (dx=-1, dy= 0)    d=7  NW (dx=-1, dy=+1)
+
+        This can also be accessed via ``DIRECTION_OFFSETS_8WAY`` and ``DIRECTION_NAMES_8WAY`` at module level.
+
+        Parameters
+        ----------
+        xbin_labels, ybin_labels : array-like
+            Bin label arrays whose **lengths** define ``n_x`` and ``n_y``.
+        binned_x_index_sequence, binned_y_index_sequence : np.ndarray
+            0-based bin-index sequences of equal length (same contract as
+            ``_compute_position_transition_matrix_2d``).
+        nan_entries_replace_value : float or None
+            Value substituted for NaN in output (bins with no qualifying exits).  ``None`` leaves NaNs.
+        should_validate_normalization : bool
+            If True, assert that every bin row that has at least one qualifying exit sums to 1.
+
+        Returns
+        -------
+        NDArray, shape (n_x, n_y, 8)
+
+        Usage::
+
+            # pos_df already has 0-based binned_x / binned_y columns
+            pos_df = pf2D.filtered_pos_df.dropna(axis='index', how='any', subset=['binned_x', 'binned_y'])
+            exit_likelihood = TransitionMatrixComputations._compute_position_direction_exit_likelihood_8way(
+                pf2D.xbin_labels, pf2D.ybin_labels,
+                pos_df['binned_x'].to_numpy() - 1, pos_df['binned_y'].to_numpy() - 1)
+            # exit_likelihood.shape == (n_x, n_y, 8)
+        """
+        binned_x_index_sequence = np.asarray(binned_x_index_sequence, dtype=np.int64)
+        binned_y_index_sequence = np.asarray(binned_y_index_sequence, dtype=np.int64)
+        assert len(binned_x_index_sequence) == len(binned_y_index_sequence), "binned_x and binned_y sequences must have the same length"
+
+        n_x: int = len(xbin_labels)
+        n_y: int = len(ybin_labels)
+        n_dirs: int = 8
+
+        if binned_x_index_sequence.size > 0:
+            assert int(np.max(binned_x_index_sequence)) <= n_x - 1, f"max(binned_x_index_sequence): {int(np.max(binned_x_index_sequence))} > n_x-1: {n_x - 1}"
+            assert int(np.max(binned_y_index_sequence)) <= n_y - 1, f"max(binned_y_index_sequence): {int(np.max(binned_y_index_sequence))} > n_y-1: {n_y - 1}"
+
+        # Build lookup table: (dx+1, dy+1) -> direction index for valid king moves.
+        # Offsets range from -1..+1, so we shift by 1 to index a 3x3 table.
+        _dir_lookup = np.full((3, 3), -1, dtype=np.int8)  # -1 means "not a valid king-neighbor move"
+        for d, (dx, dy) in enumerate(DIRECTION_OFFSETS_8WAY):
+            _dir_lookup[dx + 1, dy + 1] = d
+
+        # Vectorized: compute displacements for all consecutive pairs
+        ix0, iy0 = binned_x_index_sequence[:-1], binned_y_index_sequence[:-1]
+        ix1, iy1 = binned_x_index_sequence[1:], binned_y_index_sequence[1:]
+        dx = ix1 - ix0
+        dy = iy1 - iy0
+
+        # Keep only true single-step king moves (Chebyshev distance == 1)
+        is_valid_move = (np.maximum(np.abs(dx), np.abs(dy)) == 1)
+        ix0_v = ix0[is_valid_move]
+        iy0_v = iy0[is_valid_move]
+        dx_v = dx[is_valid_move]
+        dy_v = dy[is_valid_move]
+
+        # Map each valid displacement to direction index via lookup table
+        dir_idx = _dir_lookup[dx_v + 1, dy_v + 1].astype(np.int64)
+
+        # Accumulate counts into (n_x, n_y, 8) array
+        counts = np.zeros((n_x, n_y, n_dirs), dtype=np.float64)
+        np.add.at(counts, (ix0_v, iy0_v, dir_idx), 1.0)
+
+        # Row-normalize each (ix, iy) slice over the 8 directions
+        row_sums = counts.sum(axis=2, keepdims=True)  # (n_x, n_y, 1)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            out = np.where(row_sums > 0, counts / row_sums, np.nan)
+
+        if nan_entries_replace_value is not None:
+            out = np.where(np.isnan(out), float(nan_entries_replace_value), out)
+
+        if should_validate_normalization:
+            active_sums = out.sum(axis=2)  # (n_x, n_y)
+            active_mask = row_sums[..., 0] > 0
+            assert np.allclose(active_sums[active_mask], 1.0), f"Direction exit likelihoods not row-normalized for all active bins!"
+
+        return out
 
 
     @classmethod
@@ -766,7 +878,7 @@ class TransitionMatrixComputations:
     # ==================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['transition_matrix', 'plot'], input_requires=[], output_provides=[], uses=['BasicBinnedImageRenderingWindow'], used_by=[], creation_date='2024-08-02 09:55', related_items=[])
-    def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray],
+    def plot_transition_matricies(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], binned_x_transition_matrix_higher_order_list_dict: Union[DecoderListDict[NDArray], List[NDArray], Tuple[NDArray, ...]],
                                    power_step:int=7, grid_opacity=0.4, enable_all_titles=True) -> BasicBinnedImageRenderingWindow:
         """ plots each decoder as a separate column
         each order of matrix as a separate row
@@ -778,12 +890,42 @@ class TransitionMatrixComputations:
             out = TransitionMatrixComputations.plot_transition_matricies(decoders_dict=decoders_dict, binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict)
             out
 
+            # Single-decoder list output from `_compute_position_transition_matrix_2d(...)` is also accepted:
+            binned_x_transition_matrix_higher_order_list = TransitionMatrixComputations._compute_position_transition_matrix_2d(a_decoder.xbin_labels, a_decoder.ybin_labels, *[(pos_df[k].to_numpy() - 1) for k in binned_pos_column_labels])
+            out = TransitionMatrixComputations.plot_transition_matricies(decoders_dict=directional_decoders_decode_result.pf1D_Decoder_dict, binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list, power_step=3)
+
         """
         from pyphoplacecellanalysis.GUI.PyQtPlot.BinnedImageRenderingWindow import BasicBinnedImageRenderingWindow, LayoutScrollability
         
         out = None
         all_decoders_label_kwargs = dict(name='transition_matrix for all decoders', title='Transition Matrix for all decoders', variable_label='Transition Matrix')
-        for a_decoder_idx, (a_decoder_name, a_binned_x_transition_matrix_higher_order_list) in enumerate(binned_x_transition_matrix_higher_order_list_dict.items()):
+        if isinstance(binned_x_transition_matrix_higher_order_list_dict, dict):
+            normalized_binned_x_transition_matrix_higher_order_list_dict: DecoderListDict[NDArray] = binned_x_transition_matrix_higher_order_list_dict
+        else:
+            assert isinstance(binned_x_transition_matrix_higher_order_list_dict, (list, tuple)), f"Expected dict or list/tuple, got type(binned_x_transition_matrix_higher_order_list_dict): {type(binned_x_transition_matrix_higher_order_list_dict)}"
+            assert len(binned_x_transition_matrix_higher_order_list_dict) > 0, "binned_x_transition_matrix_higher_order_list_dict cannot be empty"
+            first_transition_matrix = np.asarray(binned_x_transition_matrix_higher_order_list_dict[0])
+            matching_decoder_names = []
+            for a_decoder_name, a_decoder in decoders_dict.items():
+                xbins = getattr(a_decoder, 'xbin_centers', None)
+                if xbins is None:
+                    xbins = getattr(a_decoder, 'xbin_labels', None)
+                ybins = getattr(a_decoder, 'ybin_centers', None)
+                if ybins is None:
+                    ybins = getattr(a_decoder, 'ybin_labels', None)
+                n_x_bins = len(xbins) if xbins is not None else None
+                n_y_bins = len(ybins) if ybins is not None else None
+                if (n_x_bins is not None) and (n_y_bins is not None) and (np.shape(first_transition_matrix) == (n_x_bins * n_y_bins, n_x_bins * n_y_bins)):
+                    matching_decoder_names.append(a_decoder_name)
+
+            if len(matching_decoder_names) > 0:
+                a_decoder_name = matching_decoder_names[0]
+            else:
+                assert len(decoders_dict) == 1, f"Could not infer decoder for single transition-matrix list with first matrix shape {np.shape(first_transition_matrix)} from decoders_dict keys: {list(decoders_dict.keys())}"
+                a_decoder_name = list(decoders_dict.keys())[0]
+            normalized_binned_x_transition_matrix_higher_order_list_dict = {a_decoder_name: list(binned_x_transition_matrix_higher_order_list_dict)}
+
+        for a_decoder_idx, (a_decoder_name, a_binned_x_transition_matrix_higher_order_list) in enumerate(normalized_binned_x_transition_matrix_higher_order_list_dict.items()):
             a_decoder = decoders_dict[a_decoder_name]
             xbins = getattr(a_decoder, 'xbin_centers', None)
             if xbins is None:
