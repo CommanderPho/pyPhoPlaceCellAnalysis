@@ -274,12 +274,21 @@ class MomentumHelpers:
 
         pos_df, extra_dict = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
                                                             head_dir_angle_col_name='approx_head_dir_degrees') ## continuous in space version
-        
+
+
+        # pos_df, extra_dict = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
+        #                                                     head_dir_angle_col_name='head_dir_angle_binned') ## continuous in space version but not angle version (just to see what happens)
+
 
 
         ## binned-position verion
         pos_df, extra_dict_binned = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
-                                                                    head_dir_angle_col_name='head_dir_angle_binned')
+                                                                    head_dir_angle_col_name='approx_head_dir_degrees', ## this non-discrete angle version works
+                                                                    # head_dir_angle_col_name='head_dir_angle_binned',
+                                                                    )
+
+
+
         
         extra_dict.update({f"{k}_binned":v for k, v in extra_dict_binned.items()}) # adds ['momentum_mag_binned', 'dTheta_dt_binned']
         
@@ -293,7 +302,7 @@ class MomentumHelpers:
         return pos_df, extra_dict
 
     @classmethod
-    def plot_momentum_turning_radius_comparison_figures(cls, extra_dict):
+    def plot_momentum_turning_radius_comparison_figures(cls, extra_dict, n_1d_hist_bins: int = 25):
         """
         Usage:
             _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict)
@@ -305,12 +314,33 @@ class MomentumHelpers:
 
 
         for a_plot_name, a_plot_variables in momentum_mag_v_turning_radius_comparison_dict.items():
-            fig = plt.figure(a_plot_name)
-            plt.scatter(*[extra_dict[k] for k in a_plot_variables])
-            plt.xlim(0, 1.4)
-            plt.xlabel('momentum_mag')
-            plt.ylabel('dHeadingAngle/dt')
-            plt.title(f'effect of high momentum on maximum turn radius: {a_plot_name}')
+            x_values, y_values = [np.asarray(extra_dict[k]) for k in a_plot_variables]
+            valid_mask = np.isfinite(x_values) & np.isfinite(y_values)
+            x_values = x_values[valid_mask]
+            y_values = y_values[valid_mask]
+            x_min, x_max = 0.0, 1.4
+
+            fig = plt.figure(a_plot_name, clear=True)
+            grid_spec = fig.add_gridspec(2, 2, width_ratios=(4.0, 1.2), height_ratios=(1.2, 4.0), wspace=0.05, hspace=0.05)
+            ax_hist_x = fig.add_subplot(grid_spec[0, 0])
+            ax_scatter = fig.add_subplot(grid_spec[1, 0], sharex=ax_hist_x)
+            ax_hist_y = fig.add_subplot(grid_spec[1, 1], sharey=ax_scatter)
+
+            ax_scatter.scatter(x_values, y_values, alpha=0.5, s=8)
+            ax_scatter.set_xlim(x_min, x_max)
+            ax_scatter.set_xlabel('momentum_mag')
+            ax_scatter.set_ylabel('dHeadingAngle/dt')
+            ax_scatter.set_title(f'effect of high momentum on maximum turn radius: {a_plot_name}')
+
+            x_in = x_values[(x_values >= x_min) & (x_values <= x_max)]
+            ax_hist_x.hist(x_in, bins=np.linspace(x_min, x_max, (n_1d_hist_bins+1)), color='tab:blue', alpha=0.7)
+            # ax_hist_x.hist(x_values, bins=25, color='tab:blue', alpha=0.7)
+            ax_hist_x.tick_params(axis='x', labelbottom=False)
+            ax_hist_x.set_ylabel('count')
+
+            ax_hist_y.hist(y_values, bins=n_1d_hist_bins, orientation='horizontal', color='tab:orange', alpha=0.7)
+            ax_hist_y.tick_params(axis='y', labelleft=False)
+            ax_hist_y.set_xlabel('count')
 
 
 
