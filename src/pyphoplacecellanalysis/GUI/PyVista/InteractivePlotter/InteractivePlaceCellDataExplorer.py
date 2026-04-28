@@ -123,8 +123,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # print('pre_computed_window_sample_indicies: {}\n shape: {}'.format(pre_computed_window_sample_indicies, np.shape(pre_computed_window_sample_indicies)))
 
         ## New Pre Computed Indicies Way:
-        self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.1) # this seems to be about position, not spikes
-
+        # self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.1) # this seems to be about position, not spikes
+        self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.01) # this seems to be about position, not spikes
 
         ## Opacity Helpers:
         last_only_opacity_values = np.zeros([self.params.curr_view_window_length_samples,])
