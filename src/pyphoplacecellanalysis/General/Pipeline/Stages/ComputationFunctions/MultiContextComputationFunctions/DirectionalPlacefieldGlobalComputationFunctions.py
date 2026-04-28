@@ -8200,6 +8200,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             single_global_epoch: Epoch = ensure_Epoch(single_global_epoch_df)
 
         else:
+            
+            from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+
             active_data_mode_registered_class, active_data_mode_type_properties = owning_pipeline_reference.sess.config.get_format_data_session_type_class_info()
 
             if (active_data_mode_name == 'bapun'):
