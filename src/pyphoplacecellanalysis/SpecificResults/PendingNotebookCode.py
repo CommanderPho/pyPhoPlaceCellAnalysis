@@ -154,6 +154,61 @@ class MomentumHelpers:
 
     """
     @classmethod
+    def perform_compute_momentum_vectors(cls, pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy', 
+                                        head_dir_angle_col_name: str = 'approx_head_dir_degrees', momentum_filter_window_length: int = 5, should_plot: bool = False):
+        """ adds 'momentum_xy' columns
+        """
+        from scipy.signal import savgol_filter
+
+        # velocity_col_names = ['velocity_x', 'velocity_y']
+        # velocity_smooth_col_names = ['velocity_x_smooth', 'velocity_y_smooth']
+        active_col_names = pos_col_names
+        # active_col_names = velocity_col_names
+
+        
+        for a_col, a_momentum_col in zip(active_col_names, momentum_vector_col_names):
+            pos_df[a_momentum_col] = savgol_filter(pos_df[a_col], window_length=momentum_filter_window_length, polyorder=2, deriv=1) # deriv=1 means this returns velocity/momentum
+            if should_plot:
+                pos_df.plot(x='t', y=a_momentum_col) ## miraculously already normalized between [-1, +1] for both axes!!
+
+        pos_df[momentum_xy_col_name] = list(zip(pos_df[momentum_vector_col_names[0]].to_numpy(), pos_df[momentum_vector_col_names[1]].to_numpy()))
+
+
+        # Compute momentum v. maximum turn radius effect variables: __________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        momentum_mag = np.sqrt(np.power(pos_df[momentum_vector_col_names[0]].to_numpy(), 2) + np.power(pos_df[momentum_vector_col_names[1]].to_numpy(), 2))
+
+        if (head_dir_angle_col_name not in pos_df.columns):
+            ## compute it!
+            assert (head_dir_angle_col_name == 'approx_head_dir_degrees'), f"(head_dir_angle_col_name must be 'approx_head_dir_degrees' but was actually head_dir_angle_col_name: '{head_dir_angle_col_name}')"
+            print(f'WARNING: head_dir_angle_col_name: {head_dir_angle_col_name} is not in pos_df.columns: {list(pos_df.columns)}.\n\tcomputing it!')
+            # pos_df['approx_head_dir_degrees'] = ((np.rad2deg(np.arctan2(pos_df['velocity_y_smooth'], pos_df['velocity_x_smooth'])) + 360) % 360) # arctan2 is required to get the angle right
+            pos_df[head_dir_angle_col_name] = ((np.rad2deg(np.arctan2(pos_df[momentum_vector_col_names[1]], pos_df[momentum_vector_col_names[0]])) + 360) % 360) # arctan2 is required to get the angle right -- note it is supposed to by y-first
+            # pos_df = pos_df.dropna(axis='index', subset=[head_dir_angle_col_name]) ## TODO: probably don't want to drop the NaNs
+
+
+        # dTheta_dt: change in head direction
+        is_discrete_angle: bool = (head_dir_angle_col_name == 'head_dir_angle_binned') 
+        if is_discrete_angle:
+            ## handle the discrete binned version first (so it finds the minimal difference and not the maximal one) by converting to degrees first
+            theta = (pos_df[head_dir_angle_col_name].to_numpy().astype(float) * 360.0) ## convert to degrees instead of discrete angle bin idx (0-7)
+            theta = np.deg2rad(theta)
+            
+        else:
+            theta = np.deg2rad(pos_df[head_dir_angle_col_name].to_numpy())
+
+        dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
+        dTheta_dt = np.abs(np.rad2deg(dtheta))
+
+        # if is_discrete_angle:
+        #     ## convert back to discrete angle idx post-hoc
+        #     dTheta_dt = np.round(dTheta_dt / 360.0).astype(int) ## convert to degrees instead of discrete angle bin idx (0-7)
+
+        extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
+
+        return pos_df, extra_dict
+
+
+    @classmethod
     def add_momentum_related_computed_columns(cls, pos_df):
         """ 
 
@@ -214,48 +269,7 @@ class MomentumHelpers:
 
 
         # 2D Momentum Arrow __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        def _subfn_compute_momentum_vectors(pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy', 
-                                            head_dir_angle_col_name: str = 'approx_head_dir_degrees', should_plot: bool = False):
-            """ adds 'momentum_xy' columns
-            """
-            from scipy.signal import savgol_filter
 
-            
-            # velocity_col_names = ['velocity_x', 'velocity_y']
-            # velocity_smooth_col_names = ['velocity_x_smooth', 'velocity_y_smooth']
-            active_col_names = pos_col_names
-            # active_col_names = velocity_col_names
-            
-            for a_col, a_momentum_col in zip(active_col_names, momentum_vector_col_names):
-                pos_df[a_momentum_col] = savgol_filter(pos_df[a_col], window_length=5, polyorder=2, deriv=1)
-                if should_plot:
-                    pos_df.plot(x='t', y=a_momentum_col) ## miraculously already normalized between [-1, +1] for both axes!!
-
-            pos_df[momentum_xy_col_name] = list(zip(pos_df[momentum_vector_col_names[0]].to_numpy(), pos_df[momentum_vector_col_names[1]].to_numpy()))
-
-
-            # Compute momentum v. maximum turn radius effect variables: __________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-            momentum_mag = np.sqrt(np.power(pos_df[momentum_vector_col_names[0]].to_numpy(), 2) + np.power(pos_df[momentum_vector_col_names[1]].to_numpy(), 2))
-            # dTheta_dt: change in head direction
-            is_discrete_angle: bool = (head_dir_angle_col_name == 'head_dir_angle_binned') 
-            if is_discrete_angle:
-                ## handle the discrete binned version first (so it finds the minimal difference and not the maximal one) by converting to degrees first
-                theta = (pos_df[head_dir_angle_col_name].to_numpy().astype(float) * 360.0) ## convert to degrees instead of discrete angle bin idx (0-7)
-                theta = np.deg2rad(theta)
-                
-            else:
-                theta = np.deg2rad(pos_df[head_dir_angle_col_name].to_numpy())
-
-            dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
-            dTheta_dt = np.abs(np.rad2deg(dtheta))
-
-            # if is_discrete_angle:
-            #     ## convert back to discrete angle idx post-hoc
-            #     dTheta_dt = np.round(dTheta_dt / 360.0).astype(int) ## convert to degrees instead of discrete angle bin idx (0-7)
-
-            extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
-
-            return pos_df, extra_dict
 
 
         # if 'heading_unit_xy' not in pos_df.columns:
@@ -272,17 +286,17 @@ class MomentumHelpers:
         pos_df['heading_unit_xy_quat'] = pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
 
-        pos_df, extra_dict = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
+        pos_df, extra_dict = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
                                                             head_dir_angle_col_name='approx_head_dir_degrees') ## continuous in space version
 
 
-        # pos_df, extra_dict = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
+        # pos_df, extra_dict = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
         #                                                     head_dir_angle_col_name='head_dir_angle_binned') ## continuous in space version but not angle version (just to see what happens)
 
 
 
         ## binned-position verion
-        pos_df, extra_dict_binned = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
+        pos_df, extra_dict_binned = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
                                                                     head_dir_angle_col_name='approx_head_dir_degrees', ## this non-discrete angle version works
                                                                     # head_dir_angle_col_name='head_dir_angle_binned',
                                                                     )
@@ -302,25 +316,27 @@ class MomentumHelpers:
         return pos_df, extra_dict
 
     @classmethod
-    def plot_momentum_turning_radius_comparison_figures(cls, extra_dict, n_1d_hist_bins: int = 25):
+    def plot_momentum_turning_radius_comparison_figures(cls, extra_dict, momentum_mag_v_turning_radius_comparison_dict = None, n_1d_hist_bins: int = 25, figure_name: str ='GENERIC'):
         """
         Usage:
             _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict)
         """
         ## INPUTS: extra_dict
-        momentum_mag_v_turning_radius_comparison_dict = dict(continuous=['momentum_mag', 'dTheta_dt'],
-            binned=['momentum_mag_binned', 'dTheta_dt_binned'],
-        )
+        if momentum_mag_v_turning_radius_comparison_dict is None:
+            momentum_mag_v_turning_radius_comparison_dict = dict(continuous=['momentum_mag', 'dTheta_dt'],
+                binned=['momentum_mag_binned', 'dTheta_dt_binned'],
+            )
 
 
         for a_plot_name, a_plot_variables in momentum_mag_v_turning_radius_comparison_dict.items():
+            
             x_values, y_values = [np.asarray(extra_dict[k]) for k in a_plot_variables]
             valid_mask = np.isfinite(x_values) & np.isfinite(y_values)
             x_values = x_values[valid_mask]
             y_values = y_values[valid_mask]
             x_min, x_max = 0.0, 1.4
 
-            fig = plt.figure(a_plot_name, clear=True)
+            fig = plt.figure(f"{figure_name}: {a_plot_name}", clear=True)
             grid_spec = fig.add_gridspec(2, 2, width_ratios=(4.0, 1.2), height_ratios=(1.2, 4.0), wspace=0.05, hspace=0.05)
             ax_hist_x = fig.add_subplot(grid_spec[0, 0])
             ax_scatter = fig.add_subplot(grid_spec[1, 0], sharex=ax_hist_x)
@@ -330,7 +346,7 @@ class MomentumHelpers:
             ax_scatter.set_xlim(x_min, x_max)
             ax_scatter.set_xlabel('momentum_mag')
             ax_scatter.set_ylabel('dHeadingAngle/dt')
-            ax_scatter.set_title(f'effect of high momentum on maximum turn radius: {a_plot_name}')
+            ax_scatter.set_title(f'{figure_name}: effect of high momentum on maximum turn radius: {a_plot_name}')
 
             x_in = x_values[(x_values >= x_min) & (x_values <= x_max)]
             ax_hist_x.hist(x_in, bins=np.linspace(x_min, x_max, (n_1d_hist_bins+1)), color='tab:blue', alpha=0.7)
@@ -341,6 +357,130 @@ class MomentumHelpers:
             ax_hist_y.hist(y_values, bins=n_1d_hist_bins, orientation='horizontal', color='tab:orange', alpha=0.7)
             ax_hist_y.tick_params(axis='y', labelleft=False)
             ax_hist_y.set_xlabel('count')
+
+
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-28 04:55', related_items=[])
+    @classmethod
+    def main_behavior_momentum_analysis(cls, curr_active_pipeline, maze_names = ['roam', 'sprinkle']):
+        """
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MomentumHelpers
+
+                decoder_pos_dfs, decoder_extra_dicts, _out = MomentumHelpers.main_behavior_momentum_analysis(curr_active_pipeline=curr_active_pipeline)
+
+        """
+        pos_df = curr_active_pipeline.sess.position.to_dataframe()
+
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+
+        # a_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_dict[a_decoder_name]
+        # pos_df = pos_df.position.adding_binned_position_columns(a_decoder.xbin, a_decoder.ybin) # active_computation_config=curr_active_pipeline.active_configs['roam'].computation_config)  # 
+        # pos_df, extra_dict = MomentumHelpers.add_momentum_related_computed_columns(pos_df)
+        # pos_df
+
+        decoder_pos_dfs = {}
+        decoder_extra_dicts = {}
+        decoder_graphics_out_dict = {}
+
+        for a_decoder_name in maze_names:
+            pos_df = curr_active_pipeline.filtered_sessions[a_decoder_name].position.to_dataframe()
+            a_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_dict[a_decoder_name]
+            pos_df = pos_df.position.adding_binned_position_columns(a_decoder.xbin, a_decoder.ybin) # active_computation_config=curr_active_pipeline.active_configs['roam'].computation_config)  # 
+            pos_df, decoder_extra_dicts[a_decoder_name] = MomentumHelpers.add_momentum_related_computed_columns(pos_df)
+            decoder_pos_dfs[a_decoder_name] = pos_df
+            decoder_graphics_out_dict[a_decoder_name] = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=decoder_extra_dicts[a_decoder_name], figure_name=a_decoder_name)
+            
+        return decoder_pos_dfs, decoder_extra_dicts, decoder_graphics_out_dict
+
+
+
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-28 04:55', related_items=[])
+    @classmethod
+    def main_PBEs_decoding_momentum_analysis(cls, a_decoded_PBEs_result):        
+        """
+        NOTE: Almost was able to use
+            a_pos_df, extra_dict_binned = MomentumHelpers.perform_compute_momentum_vectors(pos_df=a_pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
+                                                                        head_dir_angle_col_name='approx_head_dir_degrees', ## this non-discrete angle version works
+                                                                        # head_dir_angle_col_name='head_dir_angle_binned',
+                                                                        momentum_filter_window_length = 3,
+                                                                        )
+            a_pos_df
+
+        for all these computations, but couldn't quite due to issue with decoded PBEs having too few of time points so had to reimplement here.
+                
+
+        
+        Usage:
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MomentumHelpers
+                from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import PredictiveDecoding, DecodingLocalityMeasures, PredictiveDecodingComputationsContainer, PredictiveDecodingComputationsContainerContainer
+                from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+
+                _container_container: PredictiveDecodingComputationsContainerContainer = curr_active_pipeline.global_computation_results.computed_data['PredictiveDecoding']
+                assert _container_container is not None
+                container: PredictiveDecodingComputationsContainer = _container_container.container
+                masked_container: PredictiveDecodingComputationsContainer = _container_container.masked_container
+
+                a_decoded_PBEs_result = masked_container.epochs_decoded_result_cache_dict[0.025]['roam']
+                
+        """
+
+        # a_decoded_PBEs_result.filter_epochs ## 74 epochs
+        # a_decoded_PBEs_result.most_likely_positions_list
+
+        pos_col_names = ['binned_x', 'binned_y']
+        momentum_vector_col_names = ['momentum_binned_x', 'momentum_binned_y']
+        momentum_xy_col_name = 'momentum_binned_xy'
+        head_dir_angle_col_name='approx_head_dir_degrees'
+
+        epoch_pos_dfs = []
+        epoch_extra_dicts = []
+
+        for epoch_idx, a_pos_list in enumerate(a_decoded_PBEs_result.most_likely_position_indicies_list):
+            a_pos_df = pd.DataFrame((a_pos_list.T + 1), columns=pos_col_names)
+            a_pos_df['epoch_idx'] = epoch_idx
+            a_pos_df['t_bin_idx'] = a_pos_df.index.astype(int)
+            
+            # a_pos_df
+            ## Mostly extracted from `MomentumHelpers.perform_compute_momentum_vectors(...)`
+            a_pos_df[momentum_vector_col_names] = a_pos_df[pos_col_names].diff(axis=0)
+            a_pos_df[momentum_xy_col_name] = list(zip(a_pos_df[momentum_vector_col_names[0]].to_numpy(), a_pos_df[momentum_vector_col_names[1]].to_numpy()))
+
+            # Compute momentum v. maximum turn radius effect variables: __________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            momentum_mag = np.sqrt(np.power(a_pos_df[momentum_vector_col_names[0]].to_numpy(), 2) + np.power(a_pos_df[momentum_vector_col_names[1]].to_numpy(), 2))
+            # a_pos_df
+
+            a_pos_df[head_dir_angle_col_name] = ((np.rad2deg(np.arctan2(a_pos_df[momentum_vector_col_names[1]], a_pos_df[momentum_vector_col_names[0]])) + 360) % 360) # arctan2 is required to get the angle right -- note it is supposed to by y-first
+
+            theta = np.deg2rad(a_pos_df[head_dir_angle_col_name].to_numpy())
+            dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
+            dTheta_dt = np.abs(np.rad2deg(dtheta))
+            an_extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
+            ## OUTPUTS: a_pos_df, extra_dict
+            epoch_pos_dfs.append(a_pos_df)
+            epoch_extra_dicts.append(an_extra_dict)
+
+        epoch_pos_result_df: pd.DataFrame = pd.concat(epoch_pos_dfs, ignore_index=True)
+
+        ## flatten out extra_dict
+        extra_dict = {}
+        for an_epoch_extra_dict in epoch_extra_dicts:
+            for k, v in an_epoch_extra_dict.items():
+                if k not in extra_dict:
+                    extra_dict[k] = []
+                extra_dict[k].append(v)
+                
+
+        extra_dict = {k:np.concatenate(v) for k, v in extra_dict.items()}
+        ## OUTPUTS: epoch_pos_result_df, extra_dict
+
+        epoch_pos_result_df
+
+        ## PLOT:
+        momentum_mag_v_turning_radius_comparison_dict = dict(binned=['momentum_mag', 'dTheta_dt'],
+            # binned=['momentum_mag_binned', 'dTheta_dt_binned'],
+        )
+
+        _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict, momentum_mag_v_turning_radius_comparison_dict=momentum_mag_v_turning_radius_comparison_dict)
 
 
 
