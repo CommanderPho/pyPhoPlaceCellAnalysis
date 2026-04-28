@@ -69,103 +69,117 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         
         self.z_fixed = None
 
-        # Position variables: t, x, y
-        self.pos_df = self.active_session.position.to_dataframe() ## full dataframe storage; t, x, y are computed properties
+
+        def _subfn_compute_momentum_vars(pos_df):
+            """ computes some stuff """            
+
+            # ## OPTION 1: Compute from 'approx_head_dir_degrees':
+            # if 'heading_unit_xy' not in pos_df.columns:
+            #     ## compute it
+            #     h: float = 1.0
+            #     pos_df['heading_unit_xy'] = pos_df['approx_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
 
 
-        # ## OPTION 1: Compute from 'approx_head_dir_degrees':
-        # if 'heading_unit_xy' not in self.pos_df.columns:
-        #     ## compute it
-        #     h: float = 1.0
-        #     self.pos_df['heading_unit_xy'] = self.pos_df['approx_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+            ## OPTION 2: Compute it from smoothed velocities like original AI implemementation -- handles low speeds that would otherwise cause jitter:
+            def _subfn_add_heading_unit_xy(df: pd.DataFrame, vx_col: str = 'velocity_x_smooth', vy_col: str = 'velocity_y_smooth', speed_threshold: float = 0.01, fill_method: str = 'ffill') -> pd.DataFrame:
+                """
+                Compute heading unit vectors (ux, uy) from smoothed velocities.
+                Rows with speed <= threshold or non‑finite velocities are marked invalid.
+                Invalid headings can be filled forward ('ffill'), backward ('bfill'),
+                or left as NaN (fill_method=None).
+
+                Returns df with new column 'heading_unit_xy' containing tuples (ux, uy).
+
+                fill_method # 'ffill', 'bfill', or None (no fill) 
+
+                """
+                vx = df[vx_col].to_numpy()
+                vy = df[vy_col].to_numpy()
+                speed = np.hypot(vx, vy)
+
+                valid = (speed > speed_threshold) & np.isfinite(vx) & np.isfinite(vy)
+
+                ux = np.full(len(df), np.nan, dtype=float)
+                uy = np.full(len(df), np.nan, dtype=float)
+
+                # Compute heading only where valid
+                ux[valid] = vx[valid] / speed[valid]
+                uy[valid] = vy[valid] / speed[valid]
+
+                # Apply requested fill method
+                if fill_method == 'ffill':
+                    ux = pd.Series(ux).ffill().to_numpy()
+                    uy = pd.Series(uy).ffill().to_numpy()
+                elif fill_method == 'bfill':
+                    ux = pd.Series(ux).bfill().to_numpy()
+                    uy = pd.Series(uy).bfill().to_numpy()
+                # else: leave NaN as is
+
+                # Create tuple column
+                df['heading_unit_xy'] = [ (ux[i], uy[i]) for i in range(len(df))]
+                return df
 
 
-        ## OPTION 2: Compute it from smoothed velocities like original AI implemementation -- handles low speeds that would otherwise cause jitter:
-        def _subfn_add_heading_unit_xy(df: pd.DataFrame, vx_col: str = 'velocity_x_smooth', vy_col: str = 'velocity_y_smooth', speed_threshold: float = 0.01, fill_method: str = 'ffill') -> pd.DataFrame:
-            """
-            Compute heading unit vectors (ux, uy) from smoothed velocities.
-            Rows with speed <= threshold or non‑finite velocities are marked invalid.
-            Invalid headings can be filled forward ('ffill'), backward ('bfill'),
-            or left as NaN (fill_method=None).
+            # if 'heading_unit_xy' not in pos_df.columns:
+            pos_df = _subfn_add_heading_unit_xy(pos_df) # modifies in‑place
 
-            Returns df with new column 'heading_unit_xy' containing tuples (ux, uy).
-
-            fill_method # 'ffill', 'bfill', or None (no fill) 
-
-            """
-            vx = df[vx_col].to_numpy()
-            vy = df[vy_col].to_numpy()
-            speed = np.hypot(vx, vy)
-
-            valid = (speed > speed_threshold) & np.isfinite(vx) & np.isfinite(vy)
-
-            ux = np.full(len(df), np.nan, dtype=float)
-            uy = np.full(len(df), np.nan, dtype=float)
-
-            # Compute heading only where valid
-            ux[valid] = vx[valid] / speed[valid]
-            uy[valid] = vy[valid] / speed[valid]
-
-            # Apply requested fill method
-            if fill_method == 'ffill':
-                ux = pd.Series(ux).ffill().to_numpy()
-                uy = pd.Series(uy).ffill().to_numpy()
-            elif fill_method == 'bfill':
-                ux = pd.Series(ux).bfill().to_numpy()
-                uy = pd.Series(uy).bfill().to_numpy()
-            # else: leave NaN as is
-
-            # Create tuple column
-            df['heading_unit_xy'] = [ (ux[i], uy[i]) for i in range(len(df))]
-            return df
+            ## add quaternion-derived heading direction
+            if 'quat_head_dir_degrees' not in pos_df.columns:
+                quat_col_names = ('rx', 'ry', 'rz', 'rw')
+                if all((a_col in pos_df.columns) for a_col in quat_col_names):
+                    pos_df = pos_df.position.adding_quat_head_dir_degrees_columns()
+            
+            assert 'quat_head_dir_degrees' in pos_df.columns
+            h: float = 1.0
+            pos_df['heading_unit_xy_quat'] = pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
 
-        # if 'heading_unit_xy' not in self.pos_df.columns:
-        self.pos_df = _subfn_add_heading_unit_xy(self.pos_df) # modifies in‑place
+            # 2D Momentum Arrow __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            def _subfn_compute_momentum_vectors(pos_df, should_plot: bool = False):
+                """ adds 'momentum_xy' columns
+                """
+                from scipy.signal import savgol_filter
 
-        ## add quaternion-derived heading direction
-        if 'quat_head_dir_degrees' not in self.pos_df.columns:
-            quat_col_names = ('rx', 'ry', 'rz', 'rw')
-            if all((a_col in self.pos_df.columns) for a_col in quat_col_names):
-                self.pos_df = self.pos_df.position.adding_quat_head_dir_degrees_columns()
-        
-        assert 'quat_head_dir_degrees' in self.pos_df.columns
-        h: float = 1.0
-        self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+                pos_col_names = ['x', 'y']
+                # velocity_col_names = ['velocity_x', 'velocity_y']
+                # velocity_smooth_col_names = ['velocity_x_smooth', 'velocity_y_smooth']
+                active_col_names = pos_col_names
+                # active_col_names = velocity_col_names
+                momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth']
+                momentum_xy_col_name = 'momentum_xy'
+
+                for a_col, a_momentum_col in zip(active_col_names, momentum_vector_col_names):
+                    pos_df[a_momentum_col] = savgol_filter(pos_df[a_col], window_length=5, polyorder=2, deriv=1)
+                    if should_plot:
+                        pos_df.plot(x='t', y=a_momentum_col) ## miraculously already normalized between [-1, +1] for both axes!!
+
+                pos_df[momentum_xy_col_name] = list(zip(pos_df['momentum_x_smooth'].to_numpy(), pos_df['momentum_y_smooth'].to_numpy()))
+                return pos_df
+
+            pos_df = _subfn_compute_momentum_vectors(pos_df=pos_df)
 
 
-        # 2D Momentum Arrow __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        def _subfn_compute_momentum_vectors(pos_df, should_plot: bool = False):
-            """ adds 'momentum_xy' columns
-            """
-            from scipy.signal import savgol_filter
+            # Define the bounds for the 90% range (5th to 95th percentile)
+            lower_bound = pos_df['speed_xy'].quantile(0.05)
+            upper_bound = pos_df['speed_xy'].quantile(0.95)
 
-            pos_col_names = ['x', 'y']
-            # velocity_col_names = ['velocity_x', 'velocity_y']
-            # velocity_smooth_col_names = ['velocity_x_smooth', 'velocity_y_smooth']
-            active_col_names = pos_col_names
-            # active_col_names = velocity_col_names
-            momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth']
-            momentum_xy_col_name = 'momentum_xy'
-
-            for a_col, a_momentum_col in zip(active_col_names, momentum_vector_col_names):
-                pos_df[a_momentum_col] = savgol_filter(pos_df[a_col], window_length=5, polyorder=2, deriv=1)
-                if should_plot:
-                    pos_df.plot(x='t', y=a_momentum_col) ## miraculously already normalized between [-1, +1] for both axes!!
-
-            pos_df[momentum_xy_col_name] = list(zip(pos_df['momentum_x_smooth'].to_numpy(), pos_df['momentum_y_smooth'].to_numpy()))
+            # Apply normalization and clip values outside the [0, 1] range
+            pos_df['speed_xy_normalized'] = (pos_df['speed_xy'] - lower_bound) / (upper_bound - lower_bound).clip(0, 1)
+            
             return pos_df
 
-        self.pos_df = _subfn_compute_momentum_vectors(pos_df=self.pos_df)
 
 
-        # Define the bounds for the 90% range (5th to 95th percentile)
-        lower_bound = self.pos_df['speed_xy'].quantile(0.05)
-        upper_bound = self.pos_df['speed_xy'].quantile(0.95)
+        # Position variables: t, x, y
+        self.pos_df = self.active_session.position.to_dataframe() ## full dataframe storage; t, x, y are computed properties
+        self.pos_df = _subfn_compute_momentum_vars(pos_df=self.pos_df)
 
-        # Apply normalization and clip values outside the [0, 1] range
-        self.pos_df['speed_xy_normalized'] = (self.pos_df['speed_xy'] - lower_bound) / (upper_bound - lower_bound).clip(0, 1)
+
+        ## Compute downsampled versions for position:
+        self.pos_df_downsampled = self.pos_df[::20].reset_index(drop=True) ## is a full duplicate
+        self.pos_df_downsampled = self.pos_df_downsampled.position.compute_higher_order_derivatives() ## recompute the derivatives
+        self.pos_df_downsampled = _subfn_compute_momentum_vars(pos_df=self.pos_df_downsampled)
 
 
 

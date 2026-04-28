@@ -49,6 +49,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
     animal_triangle_kwargs: Dict[str, Dict[str, Any]] = {'animal_heading_triangle_quat': dict(color='orange', edge_color='orange', length=15.0, base_width=1.8),
         'animal_momentum_triangle': dict(color='purple', edge_color='purple', length=16.0, base_width=2.0),
+        'animal_momentum_triangle_downsampled': dict(color='grey', edge_color='grey', length=18.0, base_width=1.9),
+        
+
     }
 
     
@@ -421,6 +424,16 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
         ## TODO: scale to reasonable range
         self.perform_plot_animal_heading_triangle('animal_momentum_triangle', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.2), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle'])
+        
+
+
+        ## DOWNSAMPLED VERSIONS:
+        downsampled_idx = min((idx // 20), (len(self.pos_df_downsampled) - 1))
+        momentum_vector_xy = np.array(self.pos_df_downsampled['heading_unit_xy'].iat[downsampled_idx]) * self.pos_df_downsampled['speed_xy_normalized'].iat[downsampled_idx] / 20.0
+        # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
+        ## TODO: scale to reasonable range
+        self.perform_plot_animal_heading_triangle('animal_momentum_triangle_downsampled', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.25), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle_downsampled'])
+        
 
 
 
