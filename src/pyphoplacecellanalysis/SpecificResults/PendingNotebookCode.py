@@ -132,6 +132,191 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-04-27 - Momentum-angle change prosessing                                                                                                                                                                                                                                        #
+# ==================================================================================================================================================================================================================================================================================== #
+
+class MomentumHelpers:
+    """
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MomentumHelpers
+
+        pos_df = curr_active_pipeline.sess.position.to_dataframe()
+
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+        all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+        a_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_dict[a_decoder_name]
+        pos_df = pos_df.position.adding_binned_position_columns(a_decoder.xbin, a_decoder.ybin) # active_computation_config=curr_active_pipeline.active_configs['roam'].computation_config)  # 
+        pos_df, extra_dict = MomentumHelpers.add_momentum_related_computed_columns(pos_df)
+        pos_df
+
+        _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict)
+
+    """
+    @classmethod
+    def add_momentum_related_computed_columns(cls, pos_df):
+        """ 
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import add_momentum_related_computed_columns
+
+            pos_df = curr_active_pipeline.sess.position.to_dataframe()
+            pos_df = add_momentum_related_computed_columns(pos_df)
+            pos_df
+
+
+        """
+        # ## OPTION 1: Compute from 'approx_head_dir_degrees':
+        # if 'heading_unit_xy' not in pos_df.columns:
+        #     ## compute it
+        #     h: float = 1.0
+        #     pos_df['heading_unit_xy'] = pos_df['approx_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+
+
+        ## OPTION 2: Compute it from smoothed velocities like original AI implemementation -- handles low speeds that would otherwise cause jitter:
+        def _subfn_add_heading_unit_xy(df: pd.DataFrame, vx_col: str = 'velocity_x_smooth', vy_col: str = 'velocity_y_smooth', speed_threshold: float = 0.01, fill_method: str = 'ffill') -> pd.DataFrame:
+            """
+            Compute heading unit vectors (ux, uy) from smoothed velocities.
+            Rows with speed <= threshold or non‑finite velocities are marked invalid.
+            Invalid headings can be filled forward ('ffill'), backward ('bfill'),
+            or left as NaN (fill_method=None).
+
+            Returns df with new column 'heading_unit_xy' containing tuples (ux, uy).
+
+            fill_method # 'ffill', 'bfill', or None (no fill) 
+
+            """
+            vx = df[vx_col].to_numpy()
+            vy = df[vy_col].to_numpy()
+            speed = np.hypot(vx, vy)
+
+            valid = (speed > speed_threshold) & np.isfinite(vx) & np.isfinite(vy)
+
+            ux = np.full(len(df), np.nan, dtype=float)
+            uy = np.full(len(df), np.nan, dtype=float)
+
+            # Compute heading only where valid
+            ux[valid] = vx[valid] / speed[valid]
+            uy[valid] = vy[valid] / speed[valid]
+
+            # Apply requested fill method
+            if fill_method == 'ffill':
+                ux = pd.Series(ux).ffill().to_numpy()
+                uy = pd.Series(uy).ffill().to_numpy()
+            elif fill_method == 'bfill':
+                ux = pd.Series(ux).bfill().to_numpy()
+                uy = pd.Series(uy).bfill().to_numpy()
+            # else: leave NaN as is
+
+            # Create tuple column
+            df['heading_unit_xy'] = [ (ux[i], uy[i]) for i in range(len(df))]
+            return df
+
+
+        # 2D Momentum Arrow __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        def _subfn_compute_momentum_vectors(pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy', 
+                                            head_dir_angle_col_name: str = 'approx_head_dir_degrees', should_plot: bool = False):
+            """ adds 'momentum_xy' columns
+            """
+            from scipy.signal import savgol_filter
+
+            
+            # velocity_col_names = ['velocity_x', 'velocity_y']
+            # velocity_smooth_col_names = ['velocity_x_smooth', 'velocity_y_smooth']
+            active_col_names = pos_col_names
+            # active_col_names = velocity_col_names
+            
+            for a_col, a_momentum_col in zip(active_col_names, momentum_vector_col_names):
+                pos_df[a_momentum_col] = savgol_filter(pos_df[a_col], window_length=5, polyorder=2, deriv=1)
+                if should_plot:
+                    pos_df.plot(x='t', y=a_momentum_col) ## miraculously already normalized between [-1, +1] for both axes!!
+
+            pos_df[momentum_xy_col_name] = list(zip(pos_df[momentum_vector_col_names[0]].to_numpy(), pos_df[momentum_vector_col_names[1]].to_numpy()))
+
+
+            # Compute momentum v. maximum turn radius effect variables: __________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            momentum_mag = np.sqrt(np.power(pos_df[momentum_vector_col_names[0]].to_numpy(), 2) + np.power(pos_df[momentum_vector_col_names[1]].to_numpy(), 2))
+            # dTheta_dt: change in head direction
+            is_discrete_angle: bool = (head_dir_angle_col_name == 'head_dir_angle_binned') 
+            if is_discrete_angle:
+                ## handle the discrete binned version first (so it finds the minimal difference and not the maximal one) by converting to degrees first
+                theta = (pos_df[head_dir_angle_col_name].to_numpy().astype(float) * 360.0) ## convert to degrees instead of discrete angle bin idx (0-7)
+                theta = np.deg2rad(theta)
+                
+            else:
+                theta = np.deg2rad(pos_df[head_dir_angle_col_name].to_numpy())
+
+            dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
+            dTheta_dt = np.abs(np.rad2deg(dtheta))
+
+            # if is_discrete_angle:
+            #     ## convert back to discrete angle idx post-hoc
+            #     dTheta_dt = np.round(dTheta_dt / 360.0).astype(int) ## convert to degrees instead of discrete angle bin idx (0-7)
+
+            extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
+
+            return pos_df, extra_dict
+
+
+        # if 'heading_unit_xy' not in pos_df.columns:
+        pos_df = _subfn_add_heading_unit_xy(pos_df) # modifies in‑place
+
+        ## add quaternion-derived heading direction
+        if 'quat_head_dir_degrees' not in pos_df.columns:
+            quat_col_names = ('rx', 'ry', 'rz', 'rw')
+            if all((a_col in pos_df.columns) for a_col in quat_col_names):
+                pos_df = pos_df.position.adding_quat_head_dir_degrees_columns()
+        
+        assert 'quat_head_dir_degrees' in pos_df.columns
+        h: float = 1.0
+        pos_df['heading_unit_xy_quat'] = pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+
+
+        pos_df, extra_dict = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
+                                                            head_dir_angle_col_name='approx_head_dir_degrees') ## continuous in space version
+        
+
+
+        ## binned-position verion
+        pos_df, extra_dict_binned = _subfn_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
+                                                                    head_dir_angle_col_name='head_dir_angle_binned')
+        
+        extra_dict.update({f"{k}_binned":v for k, v in extra_dict_binned.items()}) # adds ['momentum_mag_binned', 'dTheta_dt_binned']
+        
+        # Define the bounds for the 90% range (5th to 95th percentile)
+        lower_bound = pos_df['speed_xy'].quantile(0.05)
+        upper_bound = pos_df['speed_xy'].quantile(0.95)
+
+        # Apply normalization and clip values outside the [0, 1] range
+        pos_df['speed_xy_normalized'] = (pos_df['speed_xy'] - lower_bound) / (upper_bound - lower_bound).clip(0, 1)
+
+        return pos_df, extra_dict
+
+    @classmethod
+    def plot_momentum_turning_radius_comparison_figures(cls, extra_dict):
+        """
+        Usage:
+            _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict)
+        """
+        ## INPUTS: extra_dict
+        momentum_mag_v_turning_radius_comparison_dict = dict(continuous=['momentum_mag', 'dTheta_dt'],
+            binned=['momentum_mag_binned', 'dTheta_dt_binned'],
+        )
+
+
+        for a_plot_name, a_plot_variables in momentum_mag_v_turning_radius_comparison_dict.items():
+            fig = plt.figure(a_plot_name)
+            plt.scatter(*[extra_dict[k] for k in a_plot_variables])
+            plt.xlim(0, 1.4)
+            plt.xlabel('momentum_mag')
+            plt.ylabel('dHeadingAngle/dt')
+            plt.title(f'effect of high momentum on maximum turn radius: {a_plot_name}')
+
+
+
+
+# Pre 2026-04-27 HippocampalSWRDynamics Repo Conversions _____________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
 from types import SimpleNamespace
 import numpy as np
 from neuropy.core.epoch import ensure_dataframe
@@ -4789,7 +4974,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             a_masked_all_context_filter_epochs_decoder_result, mask_index_tuple = DecodedFilterEpochsResult.init_from_single_epoch_result(all_context_filter_epochs_decoder_result, 
                                                                                                                                           decoding_time_bin_size=fixed_window_duration,
                                                                                                                                         ).mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=global_spikes_df, #a_decoder.spikes_df,
-																																										 masked_bin_fill_mode=enable_masked_bin_fill_mode)
+                                                                                                                                                                         masked_bin_fill_mode=enable_masked_bin_fill_mode)
             if hasattr(a_masked_all_context_filter_epochs_decoder_result, 'get_result_for_epoch'): # not isinstance(all_context_filter_epochs_decoder_result, SingleEpochDecodedResult):                
                 a_masked_all_context_filter_epochs_decoder_result = a_masked_all_context_filter_epochs_decoder_result.get_result_for_epoch(0)
             all_context_filter_epochs_decoder_result = a_masked_all_context_filter_epochs_decoder_result ## replace witht he masked version
