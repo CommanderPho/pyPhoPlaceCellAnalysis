@@ -175,9 +175,12 @@ class InteractiveDataExplorerBase(DecoderRenderingPyVistaMixin, InteractivePyvis
         self.pos_df = self.active_session.position.to_dataframe() ## full dataframe storage; t, x, y are computed properties
         self.pos_df = _subfn_compute_momentum_vars(pos_df=self.pos_df)
 
-
+        self.downsampled_pos_rate = 20
+        # self.downsampled_pos_rate = 60
+        # self.downsampled_pos_rate = 30
+        
         ## Compute downsampled versions for position:
-        self.pos_df_downsampled = self.pos_df[::20].reset_index(drop=True) ## is a full duplicate
+        self.pos_df_downsampled = self.pos_df[::self.downsampled_pos_rate].reset_index(drop=True) ## is a full duplicate
         self.pos_df_downsampled = self.pos_df_downsampled.position.compute_higher_order_derivatives() ## recompute the derivatives
         self.pos_df_downsampled = _subfn_compute_momentum_vars(pos_df=self.pos_df_downsampled)
 

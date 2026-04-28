@@ -420,16 +420,17 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
 
         ## quternion-derived heading direction as an orange arrow:
         # momentum_vector_xy = np.array(heading_unit_xy) * self.pos_df['speed_xy'].iat[idx]
-        momentum_vector_xy = np.array(heading_unit_xy) * self.pos_df['speed_xy_normalized'].iat[idx] / 20.0
+        momentum_vector_xy = np.array(heading_unit_xy) * self.pos_df['speed_xy_normalized'].iat[idx] / 20.0 
         # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
         ## TODO: scale to reasonable range
         self.perform_plot_animal_heading_triangle('animal_momentum_triangle', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.2), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle'])
         
 
-
         ## DOWNSAMPLED VERSIONS:
-        downsampled_idx = min((idx // 20), (len(self.pos_df_downsampled) - 1))
-        momentum_vector_xy = np.array(self.pos_df_downsampled['heading_unit_xy'].iat[downsampled_idx]) * self.pos_df_downsampled['speed_xy_normalized'].iat[downsampled_idx] / 20.0
+        # downsampled_idx = min((idx // 20), (len(self.pos_df_downsampled) - 1))
+        downsampled_idx = min((idx // int(round(self.downsampled_pos_rate))), (len(self.pos_df_downsampled) - 1))
+        
+        momentum_vector_xy = np.array(self.pos_df_downsampled['heading_unit_xy'].iat[downsampled_idx]) * self.pos_df_downsampled['speed_xy_normalized'].iat[downsampled_idx] / 20.0 # float(self.downsampled_pos_rate) #20.0
         # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
         ## TODO: scale to reasonable range
         self.perform_plot_animal_heading_triangle('animal_momentum_triangle_downsampled', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.25), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle_downsampled'])
