@@ -396,7 +396,7 @@ class MomentumHelpers:
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-28 04:55', related_items=[])
     @classmethod
-    def main_PBEs_decoding_momentum_analysis(cls, a_decoded_PBEs_result):        
+    def perform_decoded_epochs_momentum_analysis(cls, a_decoded_PBEs_result, figure_name: str = 'GENERIC', **kwargs):        
         """
         NOTE: Almost was able to use
             a_pos_df, extra_dict_binned = MomentumHelpers.perform_compute_momentum_vectors(pos_df=a_pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
@@ -480,7 +480,7 @@ class MomentumHelpers:
             # binned=['momentum_mag_binned', 'dTheta_dt_binned'],
         )
 
-        _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict, momentum_mag_v_turning_radius_comparison_dict=momentum_mag_v_turning_radius_comparison_dict)
+        _out = MomentumHelpers.plot_momentum_turning_radius_comparison_figures(extra_dict=extra_dict, momentum_mag_v_turning_radius_comparison_dict=momentum_mag_v_turning_radius_comparison_dict, figure_name=figure_name, **kwargs)
 
 
 
