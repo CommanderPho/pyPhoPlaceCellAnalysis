@@ -177,6 +177,10 @@ class MomentumHelpers:
         # Compute momentum v. maximum turn radius effect variables: __________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         momentum_mag = np.sqrt(np.power(pos_df[momentum_vector_col_names[0]].to_numpy(), 2) + np.power(pos_df[momentum_vector_col_names[1]].to_numpy(), 2))
 
+        if ('speed_xy' not in pos_df.columns):
+            pos_df['speed_xy'] = np.sqrt(np.power(pos_df['velocity_x_smooth'], 2) +  np.power(pos_df['velocity_y_smooth'], 2)) ## TODO: maybe use the smoothed/filtered instead?
+            
+
         if (head_dir_angle_col_name not in pos_df.columns):
             ## compute it!
             assert (head_dir_angle_col_name == 'approx_head_dir_degrees'), f"(head_dir_angle_col_name must be 'approx_head_dir_degrees' but was actually head_dir_angle_col_name: '{head_dir_angle_col_name}')"
@@ -276,23 +280,28 @@ class MomentumHelpers:
         pos_df = _subfn_add_heading_unit_xy(pos_df) # modifies in‑place
 
         ## add quaternion-derived heading direction
+        has_optitrack_recorded_head_dir_columns: bool = False
         if 'quat_head_dir_degrees' not in pos_df.columns:
             quat_col_names = ('rx', 'ry', 'rz', 'rw')
             if all((a_col in pos_df.columns) for a_col in quat_col_names):
                 pos_df = pos_df.position.adding_quat_head_dir_degrees_columns()
+                assert 'quat_head_dir_degrees' in pos_df.columns
+                has_optitrack_recorded_head_dir_columns = True
+            else:
+                has_optitrack_recorded_head_dir_columns = False
         
-        assert 'quat_head_dir_degrees' in pos_df.columns
-        h: float = 1.0
-        pos_df['heading_unit_xy_quat'] = pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+        has_optitrack_recorded_head_dir_columns = ('quat_head_dir_degrees' in pos_df.columns)
+
+        if has_optitrack_recorded_head_dir_columns:
+            h: float = 1.0
+            pos_df['heading_unit_xy_quat'] = pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
 
         pos_df, extra_dict = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
                                                             head_dir_angle_col_name='approx_head_dir_degrees') ## continuous in space version
 
-
         # pos_df, extra_dict = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['x', 'y'], momentum_vector_col_names = ['momentum_x_smooth', 'momentum_y_smooth'], momentum_xy_col_name = 'momentum_xy',
         #                                                     head_dir_angle_col_name='head_dir_angle_binned') ## continuous in space version but not angle version (just to see what happens)
-
 
 
         ## binned-position verion
@@ -306,6 +315,7 @@ class MomentumHelpers:
         
         extra_dict.update({f"{k}_binned":v for k, v in extra_dict_binned.items()}) # adds ['momentum_mag_binned', 'dTheta_dt_binned']
         
+        
         # Define the bounds for the 90% range (5th to 95th percentile)
         lower_bound = pos_df['speed_xy'].quantile(0.05)
         upper_bound = pos_df['speed_xy'].quantile(0.95)
@@ -314,6 +324,7 @@ class MomentumHelpers:
         pos_df['speed_xy_normalized'] = (pos_df['speed_xy'] - lower_bound) / (upper_bound - lower_bound).clip(0, 1)
 
         return pos_df, extra_dict
+
 
     @classmethod
     def fit_analytical_function(cls, momentum, omega, p0=[10.0]):
