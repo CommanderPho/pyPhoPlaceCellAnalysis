@@ -305,17 +305,19 @@ class MomentumHelpers:
 
 
         ## binned-position verion
-        pos_df, extra_dict_binned = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = ['binned_x', 'binned_y'], momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
-                                                                    head_dir_angle_col_name='approx_head_dir_degrees', ## this non-discrete angle version works
-                                                                    # head_dir_angle_col_name='head_dir_angle_binned',
-                                                                    )
-
-
-
+        binned_pos_col_names = ('binned_x', 'binned_y')
+        if all((a_col in pos_df.columns) for a_col in binned_pos_col_names):
+            pos_df, extra_dict_binned = cls.perform_compute_momentum_vectors(pos_df=pos_df, pos_col_names = binned_pos_col_names, momentum_vector_col_names = ['momentum_binned_x_smooth', 'momentum_binned_y_smooth'], momentum_xy_col_name = 'momentum_binned_xy',
+                                                                        head_dir_angle_col_name='approx_head_dir_degrees', ## this non-discrete angle version works
+                                                                        # head_dir_angle_col_name='head_dir_angle_binned',
+                                                                        )
+            extra_dict.update({f"{k}_binned":v for k, v in extra_dict_binned.items()}) # adds ['momentum_mag_binned', 'dTheta_dt_binned']
         
-        extra_dict.update({f"{k}_binned":v for k, v in extra_dict_binned.items()}) # adds ['momentum_mag_binned', 'dTheta_dt_binned']
-        
-        
+
+        if ('speed_xy' not in pos_df.columns):
+            pos_df['speed_xy'] = np.sqrt(np.power(pos_df['velocity_x_smooth'], 2) +  np.power(pos_df['velocity_y_smooth'], 2)) ## TODO: maybe use the smoothed/filtered instead?
+            
+
         # Define the bounds for the 90% range (5th to 95th percentile)
         lower_bound = pos_df['speed_xy'].quantile(0.05)
         upper_bound = pos_df['speed_xy'].quantile(0.95)

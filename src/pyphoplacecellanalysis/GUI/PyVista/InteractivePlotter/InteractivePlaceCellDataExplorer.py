@@ -531,13 +531,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # self.p._BasePlotter__before_close_callback.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
 
         ## add quaternion-derived heading direction
-        # if 'quat_head_dir_degrees' not in self.pos_df.columns:
-        quat_col_names = ('rx', 'ry', 'rz', 'rw')
-        assert all((a_col in self.pos_df.columns) for a_col in quat_col_names)
-        self.pos_df = self.pos_df.position.adding_quat_head_dir_degrees_columns()
-        assert 'quat_head_dir_degrees' in self.pos_df.columns
-        h: float = 1.0
-        self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
+        # # if 'quat_head_dir_degrees' not in self.pos_df.columns:
+        # quat_col_names = ('rx', 'ry', 'rz', 'rw')
+        # assert all((a_col in self.pos_df.columns) for a_col in quat_col_names)
+        # self.pos_df = self.pos_df.position.adding_quat_head_dir_degrees_columns()
+        # assert 'quat_head_dir_degrees' in self.pos_df.columns
+        # h: float = 1.0
+        # self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
         # p.background_color = 'black'
 
