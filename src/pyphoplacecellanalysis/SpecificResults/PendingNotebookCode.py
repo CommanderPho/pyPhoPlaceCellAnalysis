@@ -409,7 +409,9 @@ class MomentumHelpers:
             if ax is None:
                 fig, ax = plt.subplots()
                 
-            ax.plot(x_plot, y_plot, color='red', linewidth=2, **kwargs)
+            ax.plot(x_plot, y_plot, color='red', linewidth=1, **kwargs)
+            eqn_text = rf"$\omega = \frac{{c}}{{p}},\; c={c_optimal:.2f}$"
+            ax.text(0.98, 0.95, eqn_text, transform=ax.transAxes, ha='right', va='top', color='red')
             # plt.plot(x_plot, y_plot, color='red', linewidth=2, ax=ax, **kwargs)
             
 
@@ -468,7 +470,8 @@ class MomentumHelpers:
                 plot_analytical_fit_curve_fn(ax=ax_scatter)
             ax_scatter.set_xlim(x_min, x_max)
             ax_scatter.set_xlabel('momentum_mag')
-            ax_scatter.set_ylabel('dHeadingAngle/dt')
+            ax_scatter.set_ylabel('dHeadingAngle/dt [deg]')
+       
             ax_scatter.set_title(f'{figure_name}: effect of high momentum on maximum turn radius: {a_plot_name}')
 
             x_in = x_values[(x_values >= x_min) & (x_values <= x_max)]
