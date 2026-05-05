@@ -146,6 +146,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # active_trail_size_values[-1] = 6.0 # except for the end (current) point, which has a scale of 1.0
         # active_trail_size_values = sharply_fading_opacity_values.copy()
 
+        self.params.setdefault('enable_animal_local_coordinate_axes', True)
+        self.params.setdefault('animal_local_coordinate_axes_length', 15.0)
+        self.params.setdefault('animal_local_coordinate_axes_shaft_radius', 0.025)
+        self.params.setdefault('animal_local_coordinate_axes_tip_length', 0.4)
+        self.params.setdefault('animal_local_coordinate_axes_tip_radius', 0.09)
+        self.params.setdefault('animal_local_coordinate_axes_z_offset', 0.02)
+
         # Background Track/Maze rendering options:
         self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
         if hasattr(self.active_config.plotting_config, 'should_use_linear_track_geometry') and (self.active_config.plotting_config.should_use_linear_track_geometry is not None):
@@ -408,6 +415,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         ## Animal Current Position:
         curr_animal_point = [self.x[idx], self.y[idx], self.z_fixed[-1]]
         self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+        if self.params.get('enable_animal_local_coordinate_axes', True):
+            self.perform_plot_local_coordinate_axes('animal_current_local_coordinate_axes', curr_animal_point, axis_length=float(self.params.get('animal_local_coordinate_axes_length', 2.0)), shaft_radius=float(self.params.get('animal_local_coordinate_axes_shaft_radius', 0.05)), tip_length=float(self.params.get('animal_local_coordinate_axes_tip_length', 0.30)), tip_radius=float(self.params.get('animal_local_coordinate_axes_tip_radius', 0.12)), z_offset=float(self.params.get('animal_local_coordinate_axes_z_offset', 0.02)), render=False)
 
         ## Animal Heading Triangle (red, points along inferred heading):
         

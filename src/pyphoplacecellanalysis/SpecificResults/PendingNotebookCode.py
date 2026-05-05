@@ -201,7 +201,11 @@ class MomentumHelpers:
             theta = np.deg2rad(pos_df[head_dir_angle_col_name].to_numpy())
 
         dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
-        dTheta_dt = np.abs(np.rad2deg(dtheta))
+        dt_steps = np.ones_like(dtheta, dtype=float)
+        if ('t' in pos_df.columns):
+            t_values = pos_df['t'].to_numpy().astype(float)
+            dt_steps = np.diff(t_values)
+        dTheta_dt = np.divide(np.abs(np.rad2deg(dtheta)), dt_steps, out=np.zeros_like(dtheta, dtype=float), where=np.abs(dt_steps) > 1e-12)
 
         # if is_discrete_angle:
         #     ## convert back to discrete angle idx post-hoc
@@ -582,7 +586,10 @@ class MomentumHelpers:
 
             theta = np.deg2rad(a_pos_df[head_dir_angle_col_name].to_numpy())
             dtheta = np.angle(np.exp(1j * np.diff(theta)))  # wrapped difference in radians
-            dTheta_dt = np.abs(np.rad2deg(dtheta))
+            dt_steps = np.ones_like(dtheta, dtype=float)
+            if ('t' in a_pos_df.columns):
+                dt_steps = np.diff(a_pos_df['t'].to_numpy().astype(float))
+            dTheta_dt = np.divide(np.abs(np.rad2deg(dtheta)), dt_steps, out=np.zeros_like(dtheta, dtype=float), where=np.abs(dt_steps) > 1e-12)
             an_extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
             ## OUTPUTS: a_pos_df, extra_dict
             epoch_pos_dfs.append(a_pos_df)
@@ -653,6 +660,7 @@ class MomentumHelpers:
         raw_deg = np.rad2deg(raw_rad)
         max_rate_deg_per_s = df[dtheta_dt_max_col].astype(float).abs().to_numpy()
         dt_arr = df[dt_col].astype(float).to_numpy() if (dt_col is not None and dt_col in df.columns) else np.full(n_rows, float(dt), dtype=float)
+        dt_safe = np.where(np.abs(dt_arr) > eps, dt_arr, np.nan)
         max_step_deg = max_rate_deg_per_s * dt_arr
 
         requested_with_queue_deg = np.zeros(n_rows, dtype=float)
@@ -691,7 +699,7 @@ class MomentumHelpers:
             theta_limited = np.zeros(n_rows, dtype=float)
             theta_limited[0] = theta_orig[0]
             for i in range(1, n_rows):
-                theta_limited[i] = theta_limited[i - 1] + applied_dtheta[i]
+                theta_limited[i] = theta_limited[i - 1] + applied_dtheta[i - 1]
 
             dx_limited = step_mag_orig * np.cos(theta_limited)
             dy_limited = step_mag_orig * np.sin(theta_limited)
@@ -701,9 +709,8 @@ class MomentumHelpers:
             x_limited = np.cumsum(dx_limited) + x_orig[0]
             y_limited = np.cumsum(dy_limited) + y_orig[0]
 
-            step_dt = np.where(np.abs(dt_arr) > eps, dt_arr, np.nan)
-            vel_x_limited = np.divide(np.diff(x_limited, prepend=x_limited[0]), step_dt, out=np.zeros(n_rows, dtype=float), where=np.isfinite(step_dt))
-            vel_y_limited = np.divide(np.diff(y_limited, prepend=y_limited[0]), step_dt, out=np.zeros(n_rows, dtype=float), where=np.isfinite(step_dt))
+            vel_x_limited = np.divide(np.diff(x_limited, prepend=x_limited[0]), dt_safe, out=np.zeros(n_rows, dtype=float), where=np.isfinite(dt_safe))
+            vel_y_limited = np.divide(np.diff(y_limited, prepend=y_limited[0]), dt_safe, out=np.zeros(n_rows, dtype=float), where=np.isfinite(dt_safe))
             speed_xy_limited = np.hypot(vel_x_limited, vel_y_limited)
             approx_head_dir_degrees_limited = (np.rad2deg(np.arctan2(vel_y_limited, vel_x_limited)) + 360.0) % 360.0
 
@@ -718,11 +725,15 @@ class MomentumHelpers:
             df['step_mag_preserved'] = np.abs(df['step_mag_limited'] - df['step_mag_original']) <= eps
 
         dTheta_dt_applied = np.divide(applied_dtheta_deg, dt_arr, out=np.zeros(n_rows, dtype=float), where=np.abs(dt_arr) > eps)
+        turn_balance_residual_deg = requested_with_queue_deg - applied_dtheta_deg - queued_after_deg
         df['requested_dtheta_with_queue'] = requested_with_queue
         df['dtheta_applied'] = applied_dtheta
         df['dTheta_dt_applied'] = dTheta_dt_applied
         df['turn_queue'] = queued_after
         df['respects_turn_limit'] = np.abs(df['dTheta_dt_applied']) <= np.abs(df[dtheta_dt_max_col]) + eps
+        df['turn_balance_residual_deg'] = turn_balance_residual_deg
+        df['queue_conservation_ok'] = np.abs(turn_balance_residual_deg) <= eps
+        df['turn_rate_margin_deg_per_s'] = np.abs(df[dtheta_dt_max_col]) - np.abs(df['dTheta_dt_applied'])
 
         return df
 
@@ -824,7 +835,7 @@ class MomentumHelpers:
             # momentum_plot_item = track_root_graphics_layout_widget.addPlot(row=1, col=0)
             momentum_plot_item = xy_plot_item ## plot on same plot
             curve_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(88, 10, 10, 100), width=0.5)), 'y': dict(pen=pg.mkPen(pg.mkColor(10, 88, 10, 100), width=0.5))} ## slightly darker
-            curves_dict.update(**_subfn_perform_plot(df=momentum_respecting_df, active_plot_item=momentum_plot_item, legend_suffix='constrain'), curve_kwargs=curve_kwargs) # subplot_axes['momentum_plot_item']
+            curves_dict.update(**_subfn_perform_plot(df=momentum_respecting_df, active_plot_item=momentum_plot_item, curve_kwargs=curve_kwargs, legend_suffix='constrain')) # subplot_axes['momentum_plot_item']
 
         return curves_dict
 

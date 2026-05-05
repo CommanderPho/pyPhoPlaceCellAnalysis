@@ -139,6 +139,27 @@ class InteractivePyvistaPlotter_PointAndPathPlottingMixin:
         return self.plots[plot_name], self.plots_data[plot_name]
 
 
+    def perform_plot_local_coordinate_axes(self, plot_name, curr_animal_point, axis_length: float = 2.0, shaft_radius: float = 0.05, tip_length: float = 0.30, tip_radius: float = 0.12, render: bool = True, **kwargs):
+        """Render a compact local XYZ triad anchored at `curr_animal_point`."""
+        z_offset = float(kwargs.pop('z_offset', 0.02))
+        x_color = kwargs.pop('x_color', 'red')
+        y_color = kwargs.pop('y_color', 'green')
+        z_color = kwargs.pop('z_color', 'dodgerblue')
+        base_mesh_kwargs = {'ambient': 0.6, 'opacity': 0.9, 'show_edges': False, 'show_scalar_bar': False, 'reset_camera': False, 'lighting': False} | kwargs
+        origin = np.asarray(curr_animal_point, dtype=float).copy()
+        origin[2] = origin[2] + z_offset
+        x_arrow = pv.Arrow(start=origin, direction=(1.0, 0.0, 0.0), scale=axis_length, shaft_radius=shaft_radius, tip_length=tip_length, tip_radius=tip_radius)
+        y_arrow = pv.Arrow(start=origin, direction=(0.0, 1.0, 0.0), scale=axis_length, shaft_radius=shaft_radius, tip_length=tip_length, tip_radius=tip_radius)
+        z_arrow = pv.Arrow(start=origin, direction=(0.0, 0.0, 1.0), scale=axis_length, shaft_radius=shaft_radius, tip_length=tip_length, tip_radius=tip_radius)
+        x_plot_name, y_plot_name, z_plot_name = f'{plot_name}_x', f'{plot_name}_y', f'{plot_name}_z'
+        self.plots_data[plot_name] = {'origin': origin, 'axis_length': axis_length, 'shaft_radius': shaft_radius, 'tip_length': tip_length, 'tip_radius': tip_radius, 'z_offset': z_offset, 'x_plot_name': x_plot_name, 'y_plot_name': y_plot_name, 'z_plot_name': z_plot_name}
+        self.plots[x_plot_name] = self.p.add_mesh(x_arrow, name=x_plot_name, color=x_color, render=False, **base_mesh_kwargs)
+        self.plots[y_plot_name] = self.p.add_mesh(y_arrow, name=y_plot_name, color=y_color, render=False, **base_mesh_kwargs)
+        self.plots[z_plot_name] = self.p.add_mesh(z_arrow, name=z_plot_name, color=z_color, render=render, **base_mesh_kwargs)
+        self.plots[plot_name] = (self.plots[x_plot_name], self.plots[y_plot_name], self.plots[z_plot_name])
+        return self.plots[plot_name], self.plots_data[plot_name]
+
+
     def perform_plot_animal_heading_triangle(self, plot_name, curr_animal_point, heading_unit_xy, length: float = 9.0, base_width: float = (2*1.8), render: bool = True, **kwargs):
         """ will render a small acute triangle centered at curr_animal_point with its tip pointing along heading_unit_xy=(hx, hy).
         Updates the existing plot if the same plot_name is reused.
