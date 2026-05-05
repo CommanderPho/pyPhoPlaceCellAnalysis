@@ -613,8 +613,12 @@ class MomentumHelpers:
 
 
     @classmethod
-    def compute_momentum_limited_change_df(cls, df, F_max: float, a_max: float = 303.0, mass_m: float = 1.0):
+    def compute_momentum_limited_change_df(cls, df: pd.DataFrame, dtheta_col: str = 'dtheta', dtheta_dt_max_col: str = 'dTheta_dt_max', dt: float = 1.0, dt_col: Optional[str] = 'dt', eps: float = 1e-12) -> pd.DataFrame:  # df, F_max: float, a_max: float = 303.0, mass_m: float = 1.0):
         """
+                import numpy as np
+                import pandas as pd
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MomentumHelpers
+        
                 a_decoder_name = 'roam'
                 ## INPUTS: decoder_pos_dfs, decoder_extra_dicts
                 # df: pd.DataFrame = deepcopy(pos_df)
@@ -634,138 +638,47 @@ class MomentumHelpers:
                 df['dtheta'] = extra_dict['dtheta'] ## drop the first entry
                 df['dTheta_dt'] = extra_dict['dTheta_dt'] ## drop the first entry
 
-                df = MomentumHelpers.compute_momentum_limited_change_df(df=df)
+
+
+                momentum_respecting_df: pd.DataFrame = MomentumHelpers.compute_momentum_limited_change_df(df=df)
+                momentum_respecting_df
 
         """
         ## ['momentum_mag', 'dTheta_dt', 'dtheta']
 
-        # extra_dict = dict(momentum_mag=momentum_mag[1:], dTheta_dt=dTheta_dt, dtheta=dtheta)
+        df = df.copy()
 
-        # Assuming your dataframe is named 'df'
-        t = df['t'].values
-        x = df['x_smooth'].values
-        y = df['y_smooth'].values
+        raw = df[dtheta_col].astype(float).to_numpy()
+        max_rate = df[dtheta_dt_max_col].astype(float).abs().to_numpy()
+        dt_arr = df[dt_col].astype(float).to_numpy() if dt_col is not None else np.full(len(df), float(dt), dtype=float)
+        max_step = max_rate * dt_arr
 
-        # 1. Compute Velocity Components (First Derivative)
-        # np.gradient(array, time_steps) computes dx/dt
-        vx = np.gradient(x, t)
-        vy = np.gradient(y, t)
+        requested_with_queue = np.zeros(len(df), dtype=float)
+        applied_dtheta = np.zeros(len(df), dtype=float)
+        queued_after = np.zeros(len(df), dtype=float)
 
-        # Compute Scalar Speed
-        v = np.sqrt(vx**2 + vy**2)
+        queue = 0.0
+        for i in range(len(df)):
+            request = raw[i] + queue
+            applied = np.clip(request, -max_step[i], max_step[i])
+            queue = request - applied
 
-        # 2. Compute Acceleration Components (Second Derivative)
-        ax = np.gradient(vx, t)
-        ay = np.gradient(vy, t)
+            requested_with_queue[i] = request
+            applied_dtheta[i] = applied
+            queued_after[i] = queue
 
-        # Compute Scalar Acceleration
-        a = np.sqrt(ax**2 + ay**2)
-
-        # 3. Compute Curvature (Kappa)
-        # We add a tiny epsilon to the denominator to prevent division by zero 
-        # when the animal is perfectly stationary (speed = 0).
-        epsilon = 1e-8 
-        kappa_numerator = np.abs(vx * ay - vy * ax)
-        kappa_denominator = (v**3) + epsilon
-        kappa = kappa_numerator / kappa_denominator
-
-        # 4. Assign the computations back to the DataFrame
-        df['v_x'] = vx
-        df['v_y'] = vy
-        df['speed'] = v
-        df['a_x'] = ax
-        df['a_y'] = ay
-        df['acceleration'] = a
-        df['curvature'] = kappa
-
-
-        # derive curvature_max _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        df['curvature_max'] = F_max / (mass_m * (df['speed']**2))
-        df['omega_max'] = F_max / (mass_m * df['speed'])
-
-        ## OUTPUTS: F_max, ['curvature_max', 'omega_max']
-
-        df = df.dropna(subset=['curvature', 'momentum_mag'], how='any', inplace=False)
-
-
-        ## determine a_max emperically
-        # df['acceleration'] ## 360 seems like  a good cutoff
-
-        # np.nanmax(np.abs(df['acceleration'].to_numpy())) ## 360 seems like  a good cutoff
-
-        # 95 * np.nanmax(np.abs(df['acceleration'].to_numpy())) ## 360 seems like  a good cutoff
-
-        # Define the biological limit (example: 15.0 m/s^2)
-         ## 95% value inclusion emperically
-        print(f'a_max: {a_max}')
-        n_total: int = len(df['acceleration'].to_numpy())
-        n_exceeding_max: int = np.sum(df['acceleration'] <= a_max)
-        percent_emperical_values_included_with_cutoff: float = float(n_exceeding_max)/float(n_total)
-        print(f'percent_emperical_values_included_with_cutoff: {percent_emperical_values_included_with_cutoff}')
-
-        # ['approx_head_dir_degrees', 'dTheta_dt']
-
-        # Define the biological limit (example: 15.0 m/s^2)
-        # a_max = 15.0 
-        print(f'a_max: {a_max}')
-
-        # 1. Flag where the total force required exceeds the limit
-        df['exceeds_force_limit'] = df['acceleration'] > a_max
-
-        # 2. Calculate the theoretical MAXIMUM allowed curvature at each point in time
-        # based on the animal's instantaneous speed: kappa_max = a_max / v^2
-        df['max_allowed_curvature'] = a_max / (df['speed']**2 + epsilon)
-
-        # 3. Flag where the animal's actual turn was "too sharp" for its current speed
-        df['exceeds_turn_limit'] = df['curvature'] > df['max_allowed_curvature']
-
-        df
-
-        # ['momentum_x_smooth', 'momentum_y_smooth']
-
-        # ['t', 'dt']
-        # ['speed_xy']
-        # ['x_smooth', 'y_smooth']
-        # ['velocity_x_smooth', 'velocity_y_smooth']
-        # ['acceleration_x_smooth', 'acceleration_y_smooth']
-
-        # 1. Calculate dynamic time steps (Delta t)
-        # This handles uneven frame rates gracefully
-        dt = np.gradient(df['t'].values)
-
-        ## INPUTS: a_max
-
-        # --- CONCEPT 1: COUPLED ACCELERATION BOUNDS ---
-        # We use np.maximum(0, ...) to prevent taking the square root of a negative 
-        # number in case noisy data pushed the animal slightly over a_max.
-        df['ax_upper_bound'] = np.sqrt(np.maximum(0, a_max**2 - df['a_y']**2))
-        df['ax_lower_bound'] = -df['ax_upper_bound']
-
-        df['ay_upper_bound'] = np.sqrt(np.maximum(0, a_max**2 - df['a_x']**2))
-        df['ay_lower_bound'] = -df['ay_upper_bound']
-
-
-        # --- CONCEPT 2: PREDICTIVE POSITION BOUNDS ---
-        # These columns calculate the maximum physical bounds for where the animal 
-        # could possibly be on the NEXT row (t + dt).
-        df['x_next_upper'] = df['x_smooth'] + (df['v_x'] * dt) + (0.5 * a_max * dt**2)
-        df['x_next_lower'] = df['x_smooth'] + (df['v_x'] * dt) - (0.5 * a_max * dt**2)
-
-        df['y_next_upper'] = df['y_smooth'] + (df['v_y'] * dt) + (0.5 * a_max * dt**2)
-        df['y_next_lower'] = df['y_smooth'] + (df['v_y'] * dt) - (0.5 * a_max * dt**2)
-
-        # To compare these bounds against reality, you can shift the next actual position backwards
-        df['actual_x_next'] = df['x_smooth'].shift(-1)
-        df['actual_y_next'] = df['y_smooth'].shift(-1)
-
-        # Check if the next point violated the physics envelope
-        df['x_envelope_violation'] = (df['actual_x_next'] > df['x_next_upper']) | (df['actual_x_next'] < df['x_next_lower'])
+        df['requested_dtheta_with_queue'] = requested_with_queue
+        df['dtheta_applied'] = applied_dtheta
+        df['dTheta_dt_applied'] = applied_dtheta / dt_arr
+        df['turn_queue'] = queued_after
+        df['respects_turn_limit'] = np.abs(df['dTheta_dt_applied']) <= np.abs(df[dtheta_dt_max_col]) + eps
 
         return df
 
 
+
     @classmethod
-    def plot_momentum_pyqtgraph_line_plot(cls, df: pd.DataFrame, track_root_graphics_layout_widget):
+    def plot_momentum_pyqtgraph_line_plot(cls, df: pd.DataFrame, track_root_graphics_layout_widget, active_subplot_name: str = 'xy_plot_item', skip_bounds_plot: bool = False):
         """
         from qtpy import QtCore
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import SynchronizedPlotMode
@@ -792,49 +705,54 @@ class MomentumHelpers:
         momentum_plot_item = track_root_graphics_layout_widget.addPlot(row=1, col=0)
         momentum_plot_item
 
+        subplot_axes = {'xy_plot_item': xy_plot_item, 'momentum_plot_item': momentum_plot_item}
+        active_plot_item = subplot_axes[active_subplot_name]
+        
 
         ## BEGIN MAIN PLOTTING
         curves_dict = {}
         curve_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(255, 0, 0, 200), width=0.5)), 'y': dict(pen=pg.mkPen(pg.mkColor(0, 255, 0, 200), width=0.5))}
         # curve_kwargs = dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
-        curves_dict['x_smooth'] = xy_plot_item.plot(x=df['t'].to_numpy(), y=df['x_smooth'].to_numpy(), name='x_smooth', **curve_kwargs['x'])
-        curves_dict['y_smooth'] = xy_plot_item.plot(x=df['t'].to_numpy(), y=df['y_smooth'].to_numpy(), name='y_smooth', **curve_kwargs['y'])
+        curves_dict['x_smooth'] = active_plot_item.plot(x=df['t'].to_numpy(), y=df['x_smooth'].to_numpy(), name='x_smooth', **curve_kwargs['x'])
+        curves_dict['y_smooth'] = active_plot_item.plot(x=df['t'].to_numpy(), y=df['y_smooth'].to_numpy(), name='y_smooth', **curve_kwargs['y'])
         legend.addItem(curves_dict['x_smooth'], 'x_smooth')
         legend.addItem(curves_dict['y_smooth'], 'y_smooth')
 
 
         # Add lower/upper bounds curves ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
+        if not skip_bounds_plot:
+            # bounds_curve_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(255, 0, 0, 100), width=0.5)), 'y': dict(pen=pg.mkPen(pg.mkColor(0, 255, 0, 100), width=0.5))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
+            # bounds_curve_kwargs = {'x': dict(pen=pg.mkPen(None)), 'y': dict(pen=pg.mkPen(None))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
+            bounds_curve_kwargs = {'x': dict(pen=pg.mkPen((144, 0, 0, 100), width=1, style=QtCore.Qt.DashLine)), 'y': dict(pen=pg.mkPen((0, 144, 0, 100), width=1, style=QtCore.Qt.DashLine))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
+            # bounds_curve_brush_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(255, 0, 0, 100), width=1), brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=pg.mkPen(pg.mkColor(0, 255, 0, 100), width=1), brush=pg.mkBrush(0, 255, 0, 200))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
+            # bounds_curve_brush_kwargs = {'x': dict(pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=pg.mkPen(None), brush=pg.mkBrush(0, 255, 0, 200))}
+            bounds_curve_brush_kwargs = {'x': dict(pen=None, brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=None, brush=pg.mkBrush(0, 255, 0, 200))}
+            ## Make a dashed yellow line 2px wide
 
-        # bounds_curve_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(255, 0, 0, 100), width=0.5)), 'y': dict(pen=pg.mkPen(pg.mkColor(0, 255, 0, 100), width=0.5))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
-        # bounds_curve_kwargs = {'x': dict(pen=pg.mkPen(None)), 'y': dict(pen=pg.mkPen(None))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
-        bounds_curve_kwargs = {'x': dict(pen=pg.mkPen((144, 0, 0, 100), width=1, style=QtCore.Qt.DashLine)), 'y': dict(pen=pg.mkPen((0, 144, 0, 100), width=1, style=QtCore.Qt.DashLine))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
-        # bounds_curve_brush_kwargs = {'x': dict(pen=pg.mkPen(pg.mkColor(255, 0, 0, 100), width=1), brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=pg.mkPen(pg.mkColor(0, 255, 0, 100), width=1), brush=pg.mkBrush(0, 255, 0, 200))} # dict(pen='r', symbol='t', symbolPen='r', symbolBrush='g')
-        # bounds_curve_brush_kwargs = {'x': dict(pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=pg.mkPen(None), brush=pg.mkBrush(0, 255, 0, 200))}
-        bounds_curve_brush_kwargs = {'x': dict(pen=None, brush=pg.mkBrush(255, 0, 0, 200)), 'y': dict(pen=None, brush=pg.mkBrush(0, 255, 0, 200))}
-        ## Make a dashed yellow line 2px wide
+            bounds_curve_names = [('x_next_upper', 'x_next_lower'), ('y_next_upper', 'y_next_lower')]
+            for (upper_bound_name, lower_bound_name) in bounds_curve_names:
+                fill_between_item_name: str = lower_bound_name.removesuffix('_lower') ## "x_next", "y_next"
+                x_or_y_name: str = fill_between_item_name.removesuffix('_next') ## "x_next", "y_next"
+                curves_dict[lower_bound_name] = active_plot_item.plot(x=df['t'].to_numpy(), y=df[lower_bound_name].to_numpy(), name=lower_bound_name, **bounds_curve_kwargs[x_or_y_name])
+                curves_dict[upper_bound_name] = active_plot_item.plot(x=df['t'].to_numpy(), y=df[upper_bound_name].to_numpy(), name=upper_bound_name, **bounds_curve_kwargs[x_or_y_name])
+                legend.addItem(curves_dict[lower_bound_name], lower_bound_name)
+                legend.addItem(curves_dict[upper_bound_name], upper_bound_name)
+                
+                # fill_between_item_name: str = lower_bound_name.removesuffix('_lower') ## "x_next", "y_next"
+                fill_between_item_name = f"{fill_between_item_name}_bounds"
+                curves_dict[fill_between_item_name] = pg.FillBetweenItem(curves_dict[lower_bound_name], curves_dict[upper_bound_name], **bounds_curve_brush_kwargs[x_or_y_name]) # , name=fill_between_item_name
+                # legend.addItem(curves_dict[fill_between_item_name], fill_between_item_name)
 
-        bounds_curve_names = [('x_next_upper', 'x_next_lower'), ('y_next_upper', 'y_next_lower')]
-        for (upper_bound_name, lower_bound_name) in bounds_curve_names:
-            fill_between_item_name: str = lower_bound_name.removesuffix('_lower') ## "x_next", "y_next"
-            x_or_y_name: str = fill_between_item_name.removesuffix('_next') ## "x_next", "y_next"
-            curves_dict[lower_bound_name] = xy_plot_item.plot(x=df['t'].to_numpy(), y=df[lower_bound_name].to_numpy(), name=lower_bound_name, **bounds_curve_kwargs[x_or_y_name])
-            curves_dict[upper_bound_name] = xy_plot_item.plot(x=df['t'].to_numpy(), y=df[upper_bound_name].to_numpy(), name=upper_bound_name, **bounds_curve_kwargs[x_or_y_name])
-            legend.addItem(curves_dict[lower_bound_name], lower_bound_name)
-            legend.addItem(curves_dict[upper_bound_name], upper_bound_name)
+            ## END for (upper_bound_name, lower_bound_name) in bound...
             
-            # fill_between_item_name: str = lower_bound_name.removesuffix('_lower') ## "x_next", "y_next"
-            fill_between_item_name = f"{fill_between_item_name}_bounds"
-            curves_dict[fill_between_item_name] = pg.FillBetweenItem(curves_dict[lower_bound_name], curves_dict[upper_bound_name], **bounds_curve_brush_kwargs[x_or_y_name]) # , name=fill_between_item_name
-            # legend.addItem(curves_dict[fill_between_item_name], fill_between_item_name)
+            # df['x_next_upper']
+            # df['x_next_lower']
 
-        ## END for (upper_bound_name, lower_bound_name) in bound...
+            # df['y_next_upper']
+            # df['y_next_lower']
+        ## END if not skip_bounds_plot
         
-        # df['x_next_upper']
-        # df['x_next_lower']
-
-        # df['y_next_upper']
-        # df['y_next_lower']
         return curves_dict
 
 
