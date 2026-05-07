@@ -4418,8 +4418,12 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         grid_bin_bounds = hardcoded_params.grid_bin_bounds
         x_min, x_max = grid_bin_bounds[0][0], grid_bin_bounds[0][1]
         y_min, y_max = grid_bin_bounds[1][0], grid_bin_bounds[1][1]
-        float_x_cm = (x_max - x_min) / 2.0
-        float_y_cm = (y_max - y_min) / 2.0
+        # float_x_cm = (x_max - x_min) / 2.0
+        # float_y_cm = (y_max - y_min) / 2.0
+
+        ##TODO 2026-05-07 01:31: - [ ] Fixed 4cm x 4cm bins:
+        float_x_cm = 4.0
+        float_y_cm = 4.0
 
         # Common grid for all epochs so decoders share xbin/ybin
         common_grid_bin_bounds = (((x_min, x_max), (y_min, y_max)))  # e.g. from hardcoded_params or global position
