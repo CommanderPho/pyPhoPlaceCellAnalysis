@@ -3870,7 +3870,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             if self.marginal.y is not None:
                 # self.marginal.y.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.y.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
                 self.marginal.y.revised_most_likely_positions_1D =  _revised_marginals[1].most_likely_positions_1D.copy()
-            if self.marginal.z is not None:
+            if getattr(self.marginal, 'z', None) is not None:
                 # self.marginal.z.revised_most_likely_positions_1D = self.perform_compute_forward_filled_positions(self.marginal.z.most_likely_positions_1D, is_non_firing_bin=is_non_firing_bin)
                 self.marginal.z.revised_most_likely_positions_1D =  _revised_marginals[2].most_likely_positions_1D.copy()
 
