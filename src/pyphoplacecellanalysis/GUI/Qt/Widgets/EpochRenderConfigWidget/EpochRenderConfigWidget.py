@@ -538,28 +538,6 @@ QToolButton:!checked {
 
                     print(f'a_config_name: "{a_config_name}" with {len(a_config)} sub-items:')
                     for i, a_sub_config in enumerate(a_config):
-                        a_sub_config_name: str = deepcopy(a_sub_config.name)
-                        # Strip a_config_name (ignoring case, allowing '_' to replace ' ')
-                        def normalize_key(s):
-                            return s.lower().replace(' ', '_')
-                        norm_sub = normalize_key(a_sub_config_name)
-                        norm_config = normalize_key(a_config_name)
-                        # Remove norm_config from the start or end if present
-                        if norm_sub.startswith(norm_config):
-                            a_proper_sub_config_name = a_sub_config_name[len(a_config_name):].lstrip(" _-")
-                        elif norm_sub.endswith(norm_config):
-                            a_proper_sub_config_name = a_sub_config_name[:-len(a_config_name)].rstrip(" _-")
-                        else:
-                            a_proper_sub_config_name = a_sub_config_name
-
-                        a_proper_sub_config_name = a_proper_sub_config_name.strip('[]{}()') ## strip bracket characters
-                        print(f'\ti: {i}, a_sub_config_name: {a_sub_config_name}, a_proper_sub_config_name: {a_proper_sub_config_name}')
-                        if not hasattr(a_sub_config, '_original_name'):
-                            a_sub_config._original_name = deepcopy(a_sub_config.name) ## only back up once
-                            ## only override once:
-                            a_sub_config.name = a_proper_sub_config_name ## override the name
-                            print(f'\toverrode name!')
-
                         a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config, is_config_list=True)
                         a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
                         a_sub_config_widget_layout.addWidget(a_sub_curr_widget)

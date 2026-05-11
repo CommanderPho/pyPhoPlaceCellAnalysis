@@ -1210,13 +1210,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         """
         epoch_display_configs = self.extract_interval_display_config_lists()
         out_configs_df = []
-        for a_name, a_config_list in epoch_display_configs.items():
-            num_configs: int = len(a_config_list)
-            for (i, a_config) in enumerate(a_config_list):
-                if num_configs > 1:
-                    config_name: str = f'{a_name}[{i}]'
-                else:
-                    config_name: str = a_name
+        for a_config_list in epoch_display_configs.values():
+            for a_config in a_config_list:
+                config_name: str = a_config.name
                 # a_config
                 out_config_dict = {'name': config_name} | deepcopy(a_config.to_dict())
                 out_configs_df.append(out_config_dict) # [a_name] = result
@@ -1258,9 +1254,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         epoch_display_configs = self.extract_interval_display_config_lists()
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
         if an_epochs_display_list_widget is None:
-            # create a new one:    
+            # create a new one:
             print(f'no epochs_render_configs_widget exists, creating a new one...')
-            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            an_epochs_display_list_widget: EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
             self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
             # Check if connection already exists before creating new one
             if 'epochs_render_configs_widget_updated' in self.ui.connections:
@@ -1285,6 +1281,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     pass
             self.ui.connections['epochs_render_configs_widget_remove'] = an_epochs_display_list_widget.sigRemoveRequested.connect(self.on_remove_epoch_series_from_widget)
         else:
+            print(f'an_epochs_display_list_widget already exists, updating existing one with new configs: {epoch_display_configs}...')
+            
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
             # Ensure connection exists even when updating existing widget
             if 'epochs_render_configs_widget_updated' not in self.ui.connections:

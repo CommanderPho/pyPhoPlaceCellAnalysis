@@ -73,7 +73,14 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
             else:
                 # Scalar value assignment:
                 active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
-        
+
+        text_label = kwargs.get('label', kwargs.get('name', None))
+        if text_label is not None and 'label' in active_df.columns:
+            if isinstance(text_label, (list, tuple)):
+                active_df['label'] = list(text_label)
+            else:
+                active_df['label'] = text_label
+
         return active_df #, kwargs
     
     @classmethod

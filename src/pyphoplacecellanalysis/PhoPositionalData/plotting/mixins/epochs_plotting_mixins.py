@@ -184,10 +184,27 @@ class EpochDisplayConfig(BasePlotDataParams):
 
 
         """
-        a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
-        assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
-        # return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
-        return [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+        included_columns = ['series_vertical_offset','series_height','pen','brush']
+        
+        try:
+            a_serializable_df = a_ds.df.copy() ## try this first
+            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns)) ## require only unique labels
+            label_names: List[str] = a_serializable_df['label'].to_list()
+            unique_label_names: List[str] = np.unique(label_names)
+            assert len(unique_label_names) == len(a_serializable_df), f"len(unique_label_names): {len(unique_label_names)}, unique_label_names: {unique_label_names} != len(a_serializable_df): {len(a_serializable_df)}\n\ta_serializable_df: {a_serializable_df}"
+            # out_list = [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            return out_list
+
+        except Exception as e:
+            print(f'WARNING: FALLBACK to old method that does not work for multi-interval items (due to error: {e}).')
+            ## old fallback way that drops datasource names
+            a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
+            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
+            # return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            return [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+        
+
 
 
 
@@ -211,7 +228,7 @@ class EpochDisplayConfig(BasePlotDataParams):
 
     def to_dict(self) -> dict:
         """ returns as a dictionary representation """
-        return dict(y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor, isVisible=self.isVisible)
+        return dict(name=self.name, y_location=self.y_location, height=self.height, pen_color=self.pen_QColor, brush_color=self.brush_QColor, isVisible=self.isVisible)
 
 
     def to_clipboard_epochs_update_dict_code(self) -> Tuple[str, bool]:
