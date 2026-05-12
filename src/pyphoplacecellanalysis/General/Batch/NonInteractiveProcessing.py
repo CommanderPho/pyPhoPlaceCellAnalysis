@@ -85,7 +85,8 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     update_global_variable_fn = kwargs.pop('update_global_variable_fn', None)    
 
     saving_mode = PipelineSavingScheme.init(saving_mode)
-    epoch_name_includelist = kwargs.get('epoch_name_includelist', ['maze1','maze2','maze'])
+    # None => let the active format's build_default_filter_functions decide (Bapun: maze*/roam+sprinkle; KDIBA callers may pass explicit ['maze1','maze2','maze']).
+    epoch_name_includelist = kwargs.get('epoch_name_includelist', None)
     debug_print = kwargs.get('debug_print', False)
     assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
     # skip_save = kwargs.get('skip_save', False)

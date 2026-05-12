@@ -134,7 +134,7 @@ class ProcessingScriptPhases(Enum):
         
         """
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import  kdiba_session_post_fixup_completion_function, generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
         
         if self.value == ProcessingScriptPhases.figure_run.value:
             # figure stage:
@@ -159,7 +159,7 @@ class ProcessingScriptPhases(Enum):
             phase0_any_run_custom_user_completion_functions_dict = {
                 # 'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function, # disabled 2024-10-29
                 # "determine_session_t_delta_completion_function": determine_session_t_delta_completion_function,  # ran 2024-05-28 6am
-                'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function, # 2025-01-15 10:16 REMOVED
+                # KDIBA-only — add `'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function` via extra_run_functions for kdiba batches
             }
 
             # Unused:
@@ -436,6 +436,10 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         else:
             curr_batch_script_rundir = output_directory
 
+        rs_kwargs_base = dict(renderer_script_generation_kwargs.get('run_specific_batch_kwargs') or {})
+        run_specific_batch_kwargs_for_run_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': (getattr(curr_session_context, 'format_name', None) == 'bapun')}
+        run_specific_batch_kwargs_for_figures_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': False}
+
         # Create two separate scripts:
         # Run Script _________________________________________________________________________________________________________ #
         python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
@@ -449,7 +453,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                     custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                     should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                     fail_on_exception=fail_on_exception,
-                                                    **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
+                                                    **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
+                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
             # script_file.write(script_content)
             script_file.write(script_content.encode())
         # output_python_scripts.append(python_script_path)
@@ -465,7 +470,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                     batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                     custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                     should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                    **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)))
+                                                    **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
+                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
 
 
             # script_file.write(script_content)
@@ -507,7 +513,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
                                                         # should_use_neptune_logging=should_use_neptune_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                         should_use_neptune_logging=False, should_use_file_redirected_output_logging=False,
-                                                        **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)))
+                                                        fail_on_exception=fail_on_exception,
+                                                        **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
+                                                        run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
                 # script_file.write(script_content)
                 script_file.write(script_content.encode())
 

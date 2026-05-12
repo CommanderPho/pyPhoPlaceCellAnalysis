@@ -1164,6 +1164,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
+    preflight_bapun_batch_helpers_run_all = bool(kwargs.pop('preflight_bapun_batch_helpers_run_all', False))
     _out_error = None
 
     try:
@@ -1185,6 +1186,12 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         return (SessionBatchProgress.FAILED, _out_error, None) # return the Failed status and the exception that occured.
     # finally:
     #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
+
+    if preflight_bapun_batch_helpers_run_all:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
+        new_print(f'{_line_sweep} runBatch Bapun preflight: BapunBatchHelpers.run_all {_line_sweep}')
+        _preflight_out_dict = BapunBatchHelpers.run_all(curr_active_pipeline=curr_active_pipeline)
+        new_print(f'Bapun preflight complete; _preflight_out_dict keys: {list(_preflight_out_dict.keys()) if isinstance(_preflight_out_dict, dict) else type(_preflight_out_dict)!r}')
 
     if post_run_callback_fn is not None:
         if fail_on_exception:

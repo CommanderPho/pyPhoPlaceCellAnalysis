@@ -3907,7 +3907,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
     """
     if override_custom_user_completion_functions_dict is None:
-        # If a literall None is provided, provide ALL
+        # If None is provided, use batch-default completion set (not KDIBA-specific). For KDIBA `_session_post_fixup`, pass explicit `override_custom_user_completion_functions_dict` that includes kdiba_session_post_fixup_completion_function.
         custom_user_completion_functions_dict = {
                                     "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
                                     "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
@@ -3915,8 +3915,6 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-                                    # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
-                                    'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,

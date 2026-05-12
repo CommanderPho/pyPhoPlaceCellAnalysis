@@ -140,7 +140,87 @@ class BapunBatchHelpers:
     """
     @classmethod
     def run_all(cls, curr_active_pipeline):
+        """ runs all post-computation (plotting, rendering, etc) batch operations for the Bapun OpenFiled-type sessions 
+        """
+        from neuropy.utils.matplotlib_helpers import matplotlib_file_only, matplotlib_configuration, matplotlib_configuration_update
+        from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+        from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+        from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPlacefieldsPlotter import TimeSynchronizedPlacefieldsPlotter
+        from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D, capture_new_figures_decorator
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import programmatic_render_to_file, programmatic_display_to_PDF, extract_figures_from_display_function_output
 
+
+        hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+
+
+        _restore_previous_matplotlib_settings_callback = matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
+
+        #  Create a new `SpikeRaster2D` instance using `_display_spike_raster_pyqtplot_2D` and capture its outputs:
+        curr_active_pipeline.reload_default_display_functions()
+        curr_active_pipeline.prepare_for_display()
+
+        ## ✅ 2025-09-19 - Clean programmmatic figure outputs 
+        fig_man = PhoActiveFigureManager2D(name=f'fig_man') # Initialize a new figure manager
+        fig_man.close_all()
+
+        # subset_includelist = ['maze1', 'maze2', 'maze_GLOBAL'] # Day5TwoNovel
+        # subset_includelist = ['roam', 'sprinkle'] # Day4
+
+        subset_includelist = hardcoded_params.decoder_building_session_names
+        print(f'subset_includelist: {subset_includelist}')
+        # display_fn_kwargs = dict(subplots=(None, 9))
+        display_fn_kwargs = dict(subplots=(None, 5))
+
+        # _out = dict()
+        # _out['_display_2d_placefield_result_plot_ratemaps_2D'] = curr_active_pipeline.display(display_function='_display_2d_placefield_result_plot_ratemaps_2D', active_session_configuration_context=IdentifyingContext(format_name='bapun',animal='RatS',session_name='Day5TwoNovel',filter_name='maze1'), **display_fn_kwargs) # _display_2d_placefield_result_plot_ratemaps_2D
+        # _out['_display_2d_placefield_result_plot_ratemaps_2D'] = curr_active_pipeline.display(display_function='_display_2d_placefield_result_plot_ratemaps_2D', active_session_configuration_context=IdentifyingContext(format_name='bapun',animal='RatS',session_name='Day5TwoNovel',filter_name='maze2'), **display_fn_kwargs) # _display_2d_placefield_result_plot_ratemaps_2D
+        _out_list = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name='_display_2d_placefield_result_plot_ratemaps_2D', subset_includelist=subset_includelist, 
+                                                write_vector_format=True, write_png=True, debug_print=True, **display_fn_kwargs)
+        _out_list = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name='_display_2d_placefield_occupancy', subset_includelist=subset_includelist, 
+                                                write_vector_format=True, write_png=True, debug_print=True)
+
+
+
+        ## `Spike3DRasterWindowWidget` Cell
+        from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+        from neuropy.core.flattened_spiketrains import SpikesAccessor
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.helpers import ScrollableRasterViewOwnerMixin
+        from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _setup_spike_raster_window_for_debugging
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import ScatterItemData # used in `NewSimpleRaster`
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals, build_bapun_all_epochs_df
+
+
+        active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+
+        # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
+        # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
+        # All units at once approach:
+        active_time_variable_name = active_spikes_df.spikes.time_variable_name
+        print(f'active_time_variable_name: {active_time_variable_name}')
+        if active_time_variable_name != 't': 
+            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
+            active_time_variable_name = 't' ## get the new one
+            active_spikes_df.spikes.set_time_variable_name('t')
+            # default_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
+            # active_datapoint_column_names = default_datapoint_column_names
+            active_spikes_df
+            
+        # active_spikes_df.spikes.time_variable_name
+        # active_spikes_df
+
+        # Gets the existing SpikeRasterWindow or creates a new one if one doesn't already exist:
+        # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True)
+        # spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=False, allow_replace_hardcoded_main_plots_with_tracks=True)
+        # spike_raster_window, (active_2d_plot, active_3d_plot, *_all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=False, allow_replace_hardcoded_main_plots_with_tracks=True)
+        # spike_raster_window, (active_2d_plot, active_3d_plot, *_all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context='maze_GLOBAL')
+        spike_raster_window, (active_2d_plot, active_3d_plot, *_all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=False, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context='maze_GLOBAL')
+
+        a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
 
 
 
@@ -157,7 +237,8 @@ class BapunBatchHelpers:
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, decoding_continuous_cache_key
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
 
-
+        _out_dict = {}
+        
         hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
         # hardcoded_params.decoder_building_session_names
         # hardcoded_params.non_global_activity_session_names
@@ -181,7 +262,8 @@ class BapunBatchHelpers:
             active_laps_decoding_time_bin_size = 0.250 # 250ms
             # active_laps_decoding_time_bin_size = 0.250 # 250ms
             active_laps_decoding_slideby = None  # None => non-overlapping; e.g. 0.05 with W=0.25 for sliding
-            epochs_to_create_global_from_names = ['maze']
+            # epochs_to_create_global_from_names = ['maze'] ## should be session specific
+            epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names
             
             ## Build the merged decoder `contextual_pf2D`
             contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = epochs_to_create_global_from_names)
@@ -236,10 +318,11 @@ class BapunBatchHelpers:
         export_video_parent_folder = curr_active_pipeline.get_output_path().joinpath('videos').resolve()
         export_video_parent_folder.mkdir(exist_ok=True)
 
-        an_epoch_name: str = 'maze'
+        # an_epoch_name: str = 'maze' ## MPTE" without the loop, only the last will be used
+        an_epoch_name: str = list(sync_plotters.keys())[0] ## get the FIRST item
         an_export_video_path = export_video_parent_folder.joinpath(f'2026-05-12_decoder_{an_epoch_name}.avi')
         epochs_df: pd.DataFrame = curr_active_pipeline.sess.epochs.to_dataframe()
-        curr_epoch_info = epochs_df[epochs_df['label'] == 'maze'].iloc[0]
+        curr_epoch_info = epochs_df[epochs_df['label'] == an_epoch_name].iloc[0]
         start_t: float = curr_epoch_info['start']
         end_t: float = curr_epoch_info['stop']
 
@@ -250,7 +333,45 @@ class BapunBatchHelpers:
         print(f'\texport to video_path: "{video_path.resolve().as_posix()}" complete.')
         export_video_paths[an_epoch_name] = video_path
 
+        _out_dict['export_video_paths'] = export_video_paths
+        return _out_dict
 
+    @classmethod
+    def build_agg_df_to_matr(cls, agg_pos_df: pd.DataFrame, bin_info, col_name: str='t_count') -> NDArray:
+        """ builds an explicit matrix from the aggregation dataframe
+
+        ## Usage:
+            pos_df = curr_active_pipeline.sess.position.to_dataframe()
+
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
+
+            for a_decoder_name in decoder_names:
+                pos_df = curr_active_pipeline.filtered_sessions[a_decoder_name].position.to_dataframe()
+                a_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_dict[a_decoder_name]
+                pos_df = pos_df.position.adding_binned_position_columns(a_decoder.xbin, a_decoder.ybin) # active_computation_config=curr_active_pipeline.active_configs['roam'].computation_config)  # 
+                ## INPUTS: pos_df
+                bin_info = pos_df.metadata.metadata.get('bin_info', None)
+                assert bin_info is not None
+
+            # Performed 5 aggregations grouped on columns: 'binned_x', 'binned_y'
+            agg_pos_df: pd.DataFrame = pos_df.groupby(['binned_x', 'binned_y']).agg(speed_xy_mean=('speed_xy', 'mean'), speed_xy_mode=('speed_xy', lambda s: s.value_counts().index[0]), speed_xy_min=('speed_xy', 'min'), speed_xy_max=('speed_xy', 'max'), dt_sum=('dt', 'sum'), t_count=('t', 'count')).reset_index()
+            # (decoder_output_dict_dicts[a_decoder_name]['continuous']['x_values'], decoder_output_dict_dicts[a_decoder_name]['continuous']['y_values'])
+            agg_pos_df
+
+            occupancy_n_samples = BapunBatchHelpers.build_agg_df_to_matr(agg_pos_df=agg_pos_df, bin_info=bin_info, col_name='t_count')
+            occupancy_n_samples
+            
+            speed_xy_mean_matr = BapunBatchHelpers.build_agg_df_to_matr(agg_pos_df=agg_pos_df, bin_info=bin_info, col_name='speed_xy_mean')
+            speed_xy_mean_matr
+
+        """
+        a_position_binned_activity_matr = np.zeros(shape=((bin_info['xnum_bins']-1), (bin_info['ynum_bins']-1))) # , dtype='uint64'
+        agg_pos_df = agg_pos_df[agg_pos_df[col_name] > 0] ## pre filter so there's less iteration needed
+        for a_row in agg_pos_df.itertuples():
+            a_position_binned_activity_matr[(a_row.binned_x-1), (a_row.binned_y-1)] += getattr(a_row, col_name)
+
+        return a_position_binned_activity_matr
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-04-27 - Momentum-angle change prosessing                                                                                                                                                                                                                                        #
