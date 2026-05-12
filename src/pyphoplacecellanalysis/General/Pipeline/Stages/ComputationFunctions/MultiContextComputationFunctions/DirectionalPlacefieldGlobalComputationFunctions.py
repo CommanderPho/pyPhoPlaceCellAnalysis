@@ -4196,7 +4196,9 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         if continuously_decoded_dict is None:
             return False
         pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
-        if pseudo2D_decoder_continuously_decoded_result is None:
+        pseudo3D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo3D', None)
+
+        if (pseudo2D_decoder_continuously_decoded_result is None) and (pseudo3D_decoder_continuously_decoded_result is None):
             return False
 
         return True
@@ -4224,7 +4226,9 @@ def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_p
     if continuously_decoded_dict is None:
         return False
     pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
-    if pseudo2D_decoder_continuously_decoded_result is None:
+    pseudo3D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo3D', None)
+
+    if (pseudo2D_decoder_continuously_decoded_result is None) and (pseudo3D_decoder_continuously_decoded_result is None):
         return False
 
     return True
