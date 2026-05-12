@@ -1559,11 +1559,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
             assert active_raster_plot is not None
 
-
-        ## Backup Existing Colors:
-        # _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
-        # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
-
+        ## get the widgets:
         rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
         right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
 
@@ -1642,6 +1638,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             ## Build Connections to signals:
             _connections_list = []
             def _on_update_rendered_intervals(active_2d_plot):
+                """ I believe used to update the epoch items after updating them in UI
+                """
                 print(f'_on_update_rendered_intervals(...)')
                 _legends_dict = active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
                 epoch_display_configs = active_2d_plot.extract_interval_display_config_lists()
@@ -1672,21 +1670,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(True)
-
-
-    # @property
-    # def dock_tree_sidebar_widget(self) -> Optional[DockAreaDocksTree]:
-    #     """The dock_tree_sidebar_widget property."""
-    #     ## Get 2D or 3D Raster from spike_raster_window
-    #     active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-    #     if active_raster_plot is None:
-    #         active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-    #         if active_raster_plot is None:
-    #             ## no available raster plots
-    #             return None
-
-    #     return active_raster_plot.ui.dockarea_dock_managing_tree_widget
-    
 
 
     @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])

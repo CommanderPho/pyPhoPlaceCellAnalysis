@@ -4391,6 +4391,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
 
 
+    print(f'filtering sessions via `curr_active_pipeline.filter_sessions(...)`...')
     # epoch_name_includelist = ['pre', 'maze1', 'post1', 'maze2', 'post2']
     # epoch_name_includelist = ['pre', 'roam', 'sprinkle', 'post']
     # epoch_name_includelist = ['roam', 'sprinkle']
@@ -4456,7 +4457,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
     if len(activity_only_epochs_df) < len(hardcoded_params.non_global_activity_session_names):
-        print(f'issue with hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
+        print(f'WARNING: issue with hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
         activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)]
         activity_only_epochs_df.loc[1, 'stop'] = activity_only_epochs_df.loc[2, 'start'] - 0.001
         activity_only_epochs_df.loc[1, 'label'] = 'roam' 
@@ -4466,7 +4467,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"post-activity_only_epochs_df.epochs.get_non_overlapping_df(): len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
         ## override the bad sessions:
         new_non_global_activity_session_names = ['roam', 'sprinkle']
-        print(f'overriding hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names} -> new_non_global_activity_session_names: {new_non_global_activity_session_names}')
+        print(f'\toverriding hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names} -> new_non_global_activity_session_names: {new_non_global_activity_session_names}')
         hardcoded_params.non_global_activity_session_names = new_non_global_activity_session_names
         print('\tdone.')
 
@@ -4529,7 +4530,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
                                                     ] # 'ratemap_peaks_prominence2d'
 
 
-
+    print(f'beginning compute...')
     for i, a_config in enumerate(active_session_computation_configs):
         active_epoch_names: List[str] = a_config.pf_params.computation_epochs.labels.tolist() ## should be same as config
         print(f'i: {i}, active_epoch_names: {active_epoch_names}') # (activity_only_epoch_names)
@@ -12587,9 +12588,6 @@ def _perform_plot_multi_decoder_meas_pred_position_track(curr_active_pipeline, f
 
         ## Compute continuous first
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.025}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.050}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.075}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.100}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': 0.250}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
         ## Build the new dock track:
