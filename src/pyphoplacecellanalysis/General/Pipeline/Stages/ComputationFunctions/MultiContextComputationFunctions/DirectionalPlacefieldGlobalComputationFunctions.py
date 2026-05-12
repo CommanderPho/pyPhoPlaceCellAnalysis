@@ -8301,7 +8301,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 if time_bin_size is None:
                     # active_laps_decoding_time_bin_size = 0.75
                     # active_laps_decoding_time_bin_size = 0.025 # 25ms
-                    active_laps_decoding_time_bin_size = 0.250 # 250ms
+                    time_bin_size = 0.250 # 250ms
                     # active_laps_decoding_time_bin_size = 0.250 # 250ms
                     # slideby = slideby  # None => non-overlapping; e.g. 0.05 with W=0.25 for sliding
                     
@@ -8312,11 +8312,11 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(owning_pipeline_reference, epochs_to_create_global_from_names = epochs_to_create_global_from_names)
                 ## Use `contextual_pf2D` to decode specific epochs:
                 all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(owning_pipeline_reference, contextual_pf2D_Decoder=contextual_pf2D_Decoder,
-                                                                                                                    active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size, slideby=slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
+                                                                                                                    active_laps_decoding_time_bin_size=time_bin_size, slideby=slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
                 print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
                 ## Build global result object
                 directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=deepcopy(spikes_df),
-                                                                                                                                                continuously_decoded_result_cache_dict={decoding_continuous_cache_key(active_laps_decoding_time_bin_size, slideby):{'pseudo2D': all_context_filter_epochs_decoder_result}})
+                                                                                                                                                continuously_decoded_result_cache_dict={decoding_continuous_cache_key(time_bin_size, slideby):{'pseudo2D': all_context_filter_epochs_decoder_result}})
                 did_update_computations = True
 
 
