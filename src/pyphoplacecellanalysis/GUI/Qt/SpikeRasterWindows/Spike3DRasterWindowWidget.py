@@ -383,8 +383,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.perform_jump_specific_timestamp_only))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time_window.connect(lambda start_t, end_t: self.perform_jump_specific_timestamp(start_t, (end_t - start_t))))
-            
-
+            self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.spikes_window.timeWindow.window_changed_signal.connect(self._on_drive_spikes_window_time_changed))
 
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.update_animation)
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
@@ -574,6 +573,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ##################################
     
 
+    @pyqtExceptionPrintingSlot(float, float)
+    def _on_drive_spikes_window_time_changed(self, start_t: float, end_t: float):
+        """Refresh bottom and left playback controls when the 2D driver spikes_window TimeWindow changes (region drag, wheel via window_scrolled, jumps, duration edits)."""
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, end_t)
+
+
     @pyqtExceptionPrintingSlot(float)
     def update_animation(self, next_start_timestamp: float):
         """ Actually updates the animation given the next_start_timestep
@@ -588,12 +594,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_end_timestamp, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
         # signal emit:
         self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_end_timestamp)
-        # update_scroll_window_region
-        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
-        # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
-        self.SpikeRasterBottomFrameControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp) ## indirect 
-        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp)
-        
+        # Bottom/left bars: refreshed via spikes_window.timeWindow.window_changed_signal -> _on_drive_spikes_window_time_changed
+
 
     @pyqtExceptionPrintingSlot(int)
     def shift_animation_frame_val(self, shift_frames: int):

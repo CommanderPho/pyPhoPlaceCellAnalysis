@@ -1,6 +1,10 @@
+# activate_path should be Scripts\activate.ps1 (not activate.bat) for PowerShell callers.
+# When $true (default), Python stdout is discarded (quieter when max_concurrent_jobs > 1). Set to $false to stream Python print output into the job transcript.
+$BatchSuppressPythonStdout = $true
+
 # Define a ScriptBlock to activate the virtual environment, change directory, and execute the Python script
 $scriptBlock = {
-    param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir)
+    param([string]$activatePath, [string]$pythonExec, [string]$scriptPath, [string]$parentDir, [bool]$suppressPythonStdout = $true)
     try {
         & $activatePath | Out-Null
         Set-Location -Path $parentDir
@@ -13,7 +17,11 @@ $scriptBlock = {
             Remove-Item $statusFile -Force
         }
         
-        & $pythonExec $scriptPath | Out-Null
+        if ($suppressPythonStdout) {
+            & $pythonExec $scriptPath | Out-Null
+        } else {
+            & $pythonExec $scriptPath
+        }
         
         $endTime = Get-Date
         $duration = $endTime - $startTime
@@ -73,9 +81,6 @@ function Manage-JobQueue {
                         $statusInfo = ""
                         if ($hashtable.PythonStatus) {
                             $statusInfo = " - Python Status: $($hashtable.PythonStatus.status)"
-                            if ($hashtable.PythonStatus.errors) {
-                                $statusInfo += " (Errors: $($hashtable.PythonStatus.errors))"
-                            }
                             if ($hashtable.PythonStatus.session_complete_identifier) {
                                 $statusInfo += " (session_complete_identifier: $($hashtable.PythonStatus.session_complete_identifier))"
                             }
@@ -83,6 +88,11 @@ function Manage-JobQueue {
                         }
                         
                         Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' has completed.$statusInfo"
+                        if ($hashtable.PythonStatus -and $hashtable.PythonStatus.errors) {
+                            Write-Host "Job $($job.Id) --- Python errors (full) ---"
+                            Write-Host $hashtable.PythonStatus.errors
+                            Write-Host "Job $($job.Id) --- end Python errors ---"
+                        }
                     } else {
                         Write-Error "Completed Job $($job.Id) did not return a hashtable."
                     }
@@ -108,7 +118,7 @@ function Start-NewJob {
     param (
         [ref]$jobQueue,
         [scriptblock]$scriptBlock,
-        [string[]]$arguments
+        [object[]]$arguments
     )
 
     $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $arguments
@@ -149,12 +159,14 @@ function WaitForAllJobs {
                         if ($hashtable.PythonStatus.session_complete_identifier) {
                             $statusInfo += " (session_complete_identifier: $($hashtable.PythonStatus.session_complete_identifier))"
                         }
-                        if ($hashtable.PythonStatus.errors) {
-                            $statusInfo += " (Errors: $($hashtable.PythonStatus.errors))"
-                        }
                     }
                     
                     Write-Host "Job $($job.Id) with script '$($hashtable.ScriptPath)' started at $($hashtable.StartTime) and took $($hashtable.Duration) has completed.$statusInfo"
+                    if ($hashtable.PythonStatus -and $hashtable.PythonStatus.errors) {
+                        Write-Host "Job $($job.Id) --- Python errors (full) ---"
+                        Write-Host $hashtable.PythonStatus.errors
+                        Write-Host "Job $($job.Id) --- end Python errors ---"
+                    }
                 } else {
                     Write-Error "Job $($job.Id) did not return a hashtable."
                     # Debug - Write all outputs to see what was received
@@ -207,7 +219,7 @@ $runHistory = @()
 
 {% for script in script_paths %}
 Manage-JobQueue -jobLimit $jobLimit -jobQueue ([ref]$jobQueue) -runHistory ([ref]$runHistory) # Wait until there is a free slot to run a new job
-Start-NewJob -jobQueue ([ref]$jobQueue) -scriptBlock $scriptBlock -arguments @('{{activate_path}}', '{{python_executable}}', '{{script}}', (Get-Item "{{script}}").DirectoryName)
+Start-NewJob -jobQueue ([ref]$jobQueue) -scriptBlock $scriptBlock -arguments @('{{activate_path}}', '{{python_executable}}', '{{script}}', (Get-Item "{{script}}").DirectoryName, $BatchSuppressPythonStdout)
 {% endfor %}
 
 # Wait for all queued jobs to complete, logging after each completes
@@ -235,7 +247,8 @@ foreach ($job in $runHistory) {
     $scriptName = [System.IO.Path]::GetFileNameWithoutExtension($job.ScriptPath)
     $status = if ($job.PythonStatus -and $job.PythonStatus.status) { $job.PythonStatus.status } else { "Unknown" }
     $duration = $job.Duration
-    $errors = if ($job.PythonStatus -and $job.PythonStatus.errors) { $job.PythonStatus.errors } else { "<No Errors>" }
+    $errRaw = if ($job.PythonStatus -and $job.PythonStatus.errors) { $job.PythonStatus.errors } else { "<No Errors>" }
+    $errors = if ($errRaw -is [string] -and $errRaw.Length -gt 200 -and $errRaw -ne "<No Errors>") { $errRaw.Substring(0, 200) + "... (truncated in summary; see per-job Python errors block above or status.json)" } else { $errRaw }
     $session_complete_identifier = if ($job.PythonStatus -and $job.PythonStatus.session_complete_identifier) { $job.PythonStatus.session_complete_identifier } else { "<No Complete Session Identifier>" }
 
     Write-Host "  $scriptName - Status: $status - Errors: $errors - Duration: $duration - CompleteSessionID: $session_complete_identifier"

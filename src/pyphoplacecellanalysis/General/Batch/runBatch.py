@@ -1176,11 +1176,11 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         ## can fail here before callback function is even called.
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, None)
-        new_print(f'exception occured: {an_error}')
+        new_print(f'exception occured: {an_error!r}\n{an_error.get_full_traceback()}')
         if fail_on_exception:
             raise # Re-raises the original exception with its traceback
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
-        _out_error = f"{an_error}"
+        _out_error = f"{an_error!r}\n{an_error.get_full_traceback()}"
         
         return (SessionBatchProgress.FAILED, _out_error, None) # return the Failed status and the exception that occured.
     # finally:
@@ -1197,12 +1197,12 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
             except Exception as e:
                 exception_info = sys.exc_info()
                 an_error = CapturedException(e, exception_info, curr_active_pipeline)
-                new_print(f'error occured in post_run_callback_fn: {an_error}. Suppressing.')
+                new_print(f'error occured in post_run_callback_fn: {an_error!r}\n{an_error.get_full_traceback()}. Suppressing.')
                 # if fail_on_exception:
                     # raise e.exc
                 post_run_callback_fn_output = None
                 if return_post_run_callback_fn_errors:
-                    _out_error = f"{an_error}"
+                    _out_error = f"{an_error!r}\n{an_error.get_full_traceback()}"
 
     #         finally:
     #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.

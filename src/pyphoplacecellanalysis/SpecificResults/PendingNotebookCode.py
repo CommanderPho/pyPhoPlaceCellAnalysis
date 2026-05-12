@@ -129,6 +129,126 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+@metadata_attributes(short_name=None, tags=['batch', 'bapun', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-05-12 11:12', related_items=[])
+class BapunBatchHelpers:
+    """ tools for helping with batch computation of Bapun sessions
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
+
+    _out = BapunBatchHelpers.run_all(curr_active_pipeline=curr_active_pipeline)
+    
+    """
+    @classmethod
+    def run_all(cls, curr_active_pipeline):
+
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Sync Plotters for Decoding Quality Analysis                                                                                                                                                                                                                                          #
+        # ==================================================================================================================================================================================================================================================================================== #
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.AnimalTrajectoryPlottingMixin import AnimalTrajectoryPlottingMixin
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_Bapun_decoders_window
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster, SynchronizedPlotMode
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import PhoDockAreaContainingWindow
+        from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.SpecificDockWidgetManipulatingMixin import SpecificDockWidgetManipulatingMixin
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, decoding_continuous_cache_key
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+
+
+        hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+        # hardcoded_params.decoder_building_session_names
+        # hardcoded_params.non_global_activity_session_names
+
+
+        # pg.setConfigOptions(useOpenGL=True)  # do this BEFORE creating plots/widgets
+        # force_recompute: bool = False
+        force_recompute: bool = True
+
+        ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+        directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
+
+        if (directional_decoders_decode_result is None) or force_recompute:
+            if force_recompute:
+                print(f'force_recompute is True, so `directional_decoders_decode_result` will be recomputed...')
+            else:
+                print(f'directional_decoders_decode_result is missing, recomputing....')
+
+            # active_laps_decoding_time_bin_size = 0.75
+            # active_laps_decoding_time_bin_size = 0.025 # 25ms
+            active_laps_decoding_time_bin_size = 0.250 # 250ms
+            # active_laps_decoding_time_bin_size = 0.250 # 250ms
+            active_laps_decoding_slideby = None  # None => non-overlapping; e.g. 0.05 with W=0.25 for sliding
+            epochs_to_create_global_from_names = ['maze']
+            
+            ## Build the merged decoder `contextual_pf2D`
+            contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names = epochs_to_create_global_from_names)
+            ## Use `contextual_pf2D` to decode specific epochs:
+            all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder,
+                                                                                                                active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size, slideby=active_laps_decoding_slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
+
+            ## Build global result object
+
+            global_spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df)
+            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df,
+                                                                                                                                            continuously_decoded_result_cache_dict={decoding_continuous_cache_key(active_laps_decoding_time_bin_size, active_laps_decoding_slideby):{'pseudo2D': all_context_filter_epochs_decoder_result}})
+            curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
+            print(f'\tdone recomputing.')
+
+
+        # _out_container: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=hardcoded_params.non_global_activity_session_names, fixed_window_duration = 3.0)
+        _out_container_new: GenericPyQtGraphContainer = build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline, included_filter_names=hardcoded_params.non_global_activity_session_names, fixed_window_duration = 1.0,
+            directional_decoders_decode_result=directional_decoders_decode_result,
+            controlling_widget=active_2d_plot, create_new_controlling_widget=False,
+        )
+
+        active_2d_plot: Spike2DRaster = _out_container_new.ui.controlling_widget
+        sync_plotters: Dict[str, TimeSynchronizedPositionDecoderPlotter] = _out_container_new.ui.sync_plotters
+        win: PhoDockAreaContainingWindow = _out_container_new.ui.root_dockAreaWindow
+        # a_sync_plotter: TimeSynchronizedPositionDecoderPlotter = sync_plotters['roam']
+        # a_sync_plotter.curr_position
+
+        # ## Disable debug print to speed up animation
+        # for a_plotter_name, a_plotter in sync_plotters.items():
+        #     a_plotter.params.debug_print = False
+
+
+        ## INPUTS: _out_container, active_2d_plot, _out_container, sync_plotters, 
+
+        for an_epoch_name, a_plotter in sync_plotters.items():
+            # display(a_plotter.params.debug_print)
+            # a_plotter.params.debug_print = True
+            # display(a_plotter.params.debug_print)
+            # a_plotter
+            a_plotter.ui.root_plot.setTitle(f'PositionDecoder -  t = {a_plotter.last_window_time}')    
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # OUTPUT Decoding Quality Video                                                                                                                                                                                                                                                        #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        ## Output videos:
+        ## INPUTS: sync_plotters
+        export_video_paths = {}
+
+        export_video_parent_folder = curr_active_pipeline.get_output_path().joinpath('videos').resolve()
+        export_video_parent_folder.mkdir(exist_ok=True)
+
+        an_epoch_name: str = 'maze'
+        an_export_video_path = export_video_parent_folder.joinpath(f'2026-05-12_decoder_{an_epoch_name}.avi')
+        epochs_df: pd.DataFrame = curr_active_pipeline.sess.epochs.to_dataframe()
+        curr_epoch_info = epochs_df[epochs_df['label'] == 'maze'].iloc[0]
+        start_t: float = curr_epoch_info['start']
+        end_t: float = curr_epoch_info['stop']
+
+        print(f'exporting to "{an_export_video_path}" for start_t: {start_t}, end_t: {end_t}...')
+        a_plotter = sync_plotters[an_epoch_name]
+        video_path = a_plotter.export_video(an_export_video_path, start_t=start_t, end_t=end_t, fps=30.0, debug_print=False)
+
+        print(f'\texport to video_path: "{video_path.resolve().as_posix()}" complete.')
+        export_video_paths[an_epoch_name] = video_path
 
 
 
