@@ -5,7 +5,6 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 import copy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from attr import has
-from neuropy.core.user_annotations import function_attributes, metadata_attributes
 import numpy as np
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin

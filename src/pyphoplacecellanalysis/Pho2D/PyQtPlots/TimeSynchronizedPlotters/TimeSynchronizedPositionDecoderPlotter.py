@@ -1,4 +1,4 @@
-from neuropy.core.user_annotations import function_attributes
+# from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import signal
 import threading
@@ -298,7 +298,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.enable_user_editable_rois(parent_plot_item=self.ui.root_plot)
 
     
-    @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
+    # @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
     def add_track_shapes(self, loaded_track_limits=None, override_ax=None, debug_print:bool=True, defer_draw:bool=False):
         """ Adds the Long and Short track shapes to the plotter:
     
@@ -646,7 +646,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     p.update(t, defer_render=False)
 
 
-    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
+    # @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
         """Efficiently export a video or animated GIF from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
         

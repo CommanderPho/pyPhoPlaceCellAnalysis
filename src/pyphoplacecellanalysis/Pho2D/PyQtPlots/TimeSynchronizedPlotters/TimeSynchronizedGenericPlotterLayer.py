@@ -1,4 +1,4 @@
-from neuropy.core.user_annotations import function_attributes
+# from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets, QtGui

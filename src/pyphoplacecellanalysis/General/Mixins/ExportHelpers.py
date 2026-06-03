@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple, Union, Dict
-from neuropy.core.user_annotations import metadata_attributes
+# from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
 import numpy as np
 from attrs import define, field, Factory, fields
@@ -546,7 +546,7 @@ def programmatic_display_to_PDF(curr_active_pipeline, curr_display_function_name
                 curr_active_pipeline.register_output_file(output_path=active_pdf_save_path, output_metadata={'filtered_context': a_filtered_context, 'context': active_identifying_ctx, 'fig': out_fig_list})
 
 
-@metadata_attributes(short_name=None, tags=['pdf', 'export', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
+# @metadata_attributes(short_name=None, tags=['pdf', 'export', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-01 01:13', related_items=[])
 class FigureToImageHelpers:
     """ Exports the entire active_2d_plot timeline (all tracks) to a multi-page PDF file 
     """
@@ -1706,7 +1706,7 @@ def _test_save_pipeline_data_to_h5(curr_active_pipeline, finalized_output_cache_
 
 
 
-@metadata_attributes(short_name=None, tags=['video', 'timeline', 'tracks', 'export', 'mp4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 17:40', related_items=[])
+# @metadata_attributes(short_name=None, tags=['video', 'timeline', 'tracks', 'export', 'mp4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 17:40', related_items=[])
 class TimelineVideoExporter:
     """ export the timeline out to a video file. Actually just programmatically advances the timeline as if a video were being output, but you have to use an external screen recorder to write the frames to video.
     
