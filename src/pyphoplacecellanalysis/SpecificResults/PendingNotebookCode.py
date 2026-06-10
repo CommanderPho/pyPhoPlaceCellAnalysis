@@ -1395,7 +1395,8 @@ class BinnedOccupancyComparisons:
     @function_attributes(short_name=None, tags=['GREAT'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-03 16:32', related_items=[])
     def plot_decoded_and_measured_occupancies(self, curr_active_pipeline, 
                                               pf1D_Decoder_dict=None, epochs_decoded_result_cache_dict=None, masked_container=None,
-                                              extant_pbe_decoding_time_bin_size: float = 0.025, decoder_names: List[str]=None): 
+                                              extant_pbe_decoding_time_bin_size: float = 0.025, decoder_names: List[str]=None,
+                                              show_optional_bottom_occupancy_rows: bool = False): 
         """ plots a comparison between decoded occupancy during various periods and observed 
         
         pf1D_Decoder_dict = masked_container.pf1D_Decoder_dict
@@ -1584,8 +1585,7 @@ class BinnedOccupancyComparisons:
         curr_row = _subfn_add_single_row(win, curr_row, pg.colormap.get('bwr', 'matplotlib'), column_data, vmin, vmax, "Δ posterior", "PBE − laps")
 
         # Bottom three rows: measured P_norm + full-session all-pos occupancy (n and s). Hidden by default; set True to append to layout.
-        _show_optional_bottom_occupancy_rows: bool = False
-        if _show_optional_bottom_occupancy_rows:
+        if show_optional_bottom_occupancy_rows:
             # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
             # occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
             # occupancy_sprinkle = pf1D_Decoder_dict['sprinkle'].pf.probability_normalized_occupancy
