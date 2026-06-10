@@ -5416,7 +5416,7 @@ def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_t
     # contextual_pf1D_Decoder, contextual_pf1D_dict = build_merged(pfND_Decoder_dict=pf1D_Decoder_dict)
     ## Use `contextual_pf2D` to decode specific epochs:
     all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=epochs_decoding_time_bin_size)
-    continuous_specific_decoded_results_dict[IdentifyingContext(decoder_name='pseudo3D', epoch_name=global_epoch_name, ndim=3)] = all_context_filter_epochs_decoder_result
+    continuous_specific_decoded_results_dict[IdentifyingContext(decoder_name='pseudo3D', epoch_name=global_epoch_name, ndim=3)] = all_context_filter_epochs_decoder_result ## this line might be extremely slow?
 
     # curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs = deepcopy(curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs.time_slice(long_epoch_obj.t_start, long_epoch_obj.t_stop)) ## #TODO 2025-07-15 13:07: - [ ] Why not laps for the pf_params?
     return new_decoder_dict, continuous_specific_decoded_results_dict, (contextual_pf2D_Decoder, contextual_pf2D_dict)
