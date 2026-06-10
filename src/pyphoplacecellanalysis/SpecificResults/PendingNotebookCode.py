@@ -1435,6 +1435,17 @@ class BinnedOccupancyComparisons:
                 vmax = vmin + np.finfo(float).eps
             return vmin, vmax
 
+        def _row_symmetric_limits(*arrays):
+            """Shared vmin/vmax symmetric about zero (for difference maps)."""
+            stacked = np.concatenate([np.asarray(a, dtype=float).ravel() for a in arrays], axis=0)
+            stacked = stacked[np.isfinite(stacked)]
+            if stacked.size == 0:
+                return -1.0, 1.0
+            lim = float(np.max(np.abs(stacked)))
+            if lim == 0.0:
+                lim = np.finfo(float).eps
+            return -lim, lim
+
         def _column_banner_name(dk: str) -> str:
             return 'Directed' if dk == 'roam' else 'Sprinkle' if dk == 'sprinkle' else str(dk)
 
@@ -1521,6 +1532,7 @@ class BinnedOccupancyComparisons:
         vmin, vmax = _row_shared_limits(*_pbe_row_arrays)
         column_data = [(across_all_time_bin_p_x_given_n_dict[nm], _subtitle_mean_posterior) for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "posterior density", "Decoded PBE") # posterior density (row scale shared)
+        decoded_pbe_p_x_given_n_dict = dict(across_all_time_bin_p_x_given_n_dict)
 
         ## OUTPUTS: across_all_time_bin_p_x_given_n_dict
 
@@ -1563,6 +1575,13 @@ class BinnedOccupancyComparisons:
         vmin, vmax = _row_shared_limits(*_laps_row_arrays)
         column_data = [(across_all_time_bin_p_x_given_n_dict[nm], _subtitle_mean_posterior) for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, "P_norm", "Decoded laps")
+
+        # Plot decoded PBE − decoded laps difference _________________________________________________________________________ #
+        decoded_pbe_minus_laps_dict = {nm: decoded_pbe_p_x_given_n_dict[nm] - across_all_time_bin_p_x_given_n_dict[nm] for nm in decoder_names}
+        _pbe_minus_laps_row_arrays = [decoded_pbe_minus_laps_dict[nm] for nm in decoder_names]
+        vmin, vmax = _row_symmetric_limits(*_pbe_minus_laps_row_arrays)
+        column_data = [(decoded_pbe_minus_laps_dict[nm], 'decoded PBE − decoded laps') for nm in decoder_names]
+        curr_row = _subfn_add_single_row(win, curr_row, pg.colormap.get('bwr', 'matplotlib'), column_data, vmin, vmax, "Δ posterior", "PBE − laps")
 
         # Bottom three rows: measured P_norm + full-session all-pos occupancy (n and s). Hidden by default; set True to append to layout.
         _show_optional_bottom_occupancy_rows: bool = False
