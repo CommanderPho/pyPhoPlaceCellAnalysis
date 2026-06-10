@@ -1584,7 +1584,7 @@ class BinnedOccupancyComparisons:
         column_data = [(decoded_pbe_minus_laps_dict[nm], 'decoded PBE − decoded laps') for nm in decoder_names]
         curr_row = _subfn_add_single_row(win, curr_row, pg.colormap.get('bwr', 'matplotlib'), column_data, vmin, vmax, "Δ posterior", "PBE − laps")
 
-        # Bottom three rows: measured P_norm + full-session all-pos occupancy (n and s). Hidden by default; set True to append to layout.
+        # Bottom optional rows: measured P_norm + full-session all-pos occupancy (n and s) + PBE−session P_norm diff. Hidden by default; set show_optional_bottom_occupancy_rows=True to append.
         if show_optional_bottom_occupancy_rows:
             # Plot measured lap-only occupancy as a separate row: _________________________________________________________________________ #
             # occupancy_roam = pf1D_Decoder_dict['roam'].pf.probability_normalized_occupancy
@@ -1619,6 +1619,14 @@ class BinnedOccupancyComparisons:
             vmin, vmax = _row_shared_limits_percentile_cap(*_all_pos_sec_arrays, p_high=99.0)
             column_data = [(all_pos_occ_sec_dict[nm], 'all recorded positions (seconds per bin)') for nm in decoder_names]
             curr_row = _subfn_add_single_row(win, curr_row, cmap, column_data, vmin, vmax, 'Occupancy (sec)', 'All-pos occupancy (s)')
+
+            # Plot decoded PBE − across-session probability-normalized occupancy _____________________________________________ #
+            all_pos_pnorm_dict = {nm: all_pos_occ_sec_dict[nm] / np.nansum(all_pos_occ_sec_dict[nm]) for nm in decoder_names}
+            decoded_pbe_minus_session_pnorm_dict = {nm: decoded_pbe_p_x_given_n_dict[nm] - all_pos_pnorm_dict[nm] for nm in decoder_names}
+            _pbe_minus_session_pnorm_row_arrays = [decoded_pbe_minus_session_pnorm_dict[nm] for nm in decoder_names]
+            vmin, vmax = _row_symmetric_limits(*_pbe_minus_session_pnorm_row_arrays)
+            column_data = [(decoded_pbe_minus_session_pnorm_dict[nm], 'decoded PBE − across-session P_norm') for nm in decoder_names]
+            curr_row = _subfn_add_single_row(win, curr_row, pg.colormap.get('bwr', 'matplotlib'), column_data, vmin, vmax, "Δ posterior", "PBE − session P_norm")
 
         # Equal height for each heatmap row: rows 0–1 = suptitle + column banners (fixed); from row 2: even rows = subtitle labels (fixed), odd rows = ViewBoxes (share space evenly).
         _grid_layout = win.ci.layout
