@@ -5225,6 +5225,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
         return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
 
+
     @classmethod
     def build_measured_decoded_position_comparison(cls, test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult], global_measured_position_df: pd.DataFrame):
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
@@ -5251,6 +5252,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             test_decoded_measured_diff_df_dict[k] = decoded_measured_diff_df
 
         return test_measured_positions_dfs_dict, test_decoded_positions_df_dict, test_decoded_measured_diff_df_dict
+
 
     @function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-12-31 11:55', related_items=['plot_estimation_correctness_with_raw_data'])
     @classmethod
@@ -5445,6 +5447,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         
         return epochs_track_identity_marginal_df
         
+
     @function_attributes(short_name=None, tags=['laps', 'performance', 'position'], input_requires=[], output_provides=[], uses=['cls.build_lap_bin_by_bin_performance_analysis_df'], used_by=[], creation_date='2024-12-31 11:55', related_items=['plot_estimation_correctness_with_raw_data'])
     def get_lap_bin_by_bin_performance_analysis_df(self, active_pf_2D, should_include_decoded_pos_columns: bool=False, debug_print:bool=False) -> pd.DataFrame:
         """ 
@@ -5491,7 +5494,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
-                                                                                                                                                          pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
+                                                                                                                                                            pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
                                                                                                                                                           )
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
