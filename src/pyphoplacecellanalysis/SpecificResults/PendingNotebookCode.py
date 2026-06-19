@@ -12965,16 +12965,48 @@ def _single_compute_train_test_split_epochs_decoders(a_decoder: BasePositionDeco
 
 
 def _resolve_bapun_train_test_split_laps_df(curr_active_pipeline, maze_name: str, a_decoder: BasePositionDecoder) -> pd.DataFrame:
-    """Resolve lap epochs for Bapun train/test splitting (pf epochs, then config, then filtered laps)."""
+    """Resolve per-lap epochs for Bapun train/test splitting.
+
+    Prefers time-sliced session laps for the filtered maze window (not session-level pf.epochs,
+    which is typically a single context epoch without lap_id).
+    """
     from neuropy.core.epoch import ensure_dataframe
-    a_prev_computation_epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(a_decoder.pf.epochs))
+    a_prev_computation_epochs_df: pd.DataFrame = pd.DataFrame()
+    a_sess = curr_active_pipeline.filtered_sessions[maze_name]
+    try:
+        laps_df: pd.DataFrame = ensure_dataframe(deepcopy(curr_active_pipeline.sess.laps))
+        a_prev_computation_epochs_df = laps_df.epochs.time_slice(a_sess.t_start, a_sess.t_stop)
+    except (AttributeError, KeyError, TypeError):
+        pass
+    if len(a_prev_computation_epochs_df) == 0:
+        a_prev_computation_epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[maze_name].laps))
     if len(a_prev_computation_epochs_df) == 0:
         comp_result = curr_active_pipeline.computation_results[maze_name]
         if hasattr(comp_result, 'computation_config') and hasattr(comp_result.computation_config, 'pf_params'):
-            a_prev_computation_epochs_df = ensure_dataframe(deepcopy(comp_result.computation_config.pf_params.computation_epochs))
+            a_candidate_df: pd.DataFrame = ensure_dataframe(deepcopy(comp_result.computation_config.pf_params.computation_epochs))
+            if ('lap_id' in a_candidate_df.columns) or ('lap' in a_candidate_df.columns):
+                a_prev_computation_epochs_df = a_candidate_df
     if len(a_prev_computation_epochs_df) == 0:
-        a_prev_computation_epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.filtered_sessions[maze_name].laps))
-    return a_prev_computation_epochs_df
+        a_candidate_df = ensure_dataframe(deepcopy(a_decoder.pf.epochs))
+        if ('lap_id' in a_candidate_df.columns) or ('lap' in a_candidate_df.columns):
+            a_prev_computation_epochs_df = a_candidate_df
+    if len(a_prev_computation_epochs_df) == 0:
+        raise ValueError(f"Could not resolve per-lap epochs for maze '{maze_name}'; check sess.laps and filtered_sessions['{maze_name}'].laps.")
+    return a_prev_computation_epochs_df.laps_accessor.get_valid_laps_epochs_df(rebuild_lap_id_columns=True)
+
+
+def _bapun_train_test_split_group_params(laps_df: pd.DataFrame) -> Tuple[str, List[str]]:
+    """Return (group_column_name, identity_cols) for Bapun split_into_training_and_test."""
+    if 'lap_id' in laps_df.columns:
+        group_column_name: str = 'lap_id'
+    elif 'lap' in laps_df.columns:
+        group_column_name = 'lap'
+    else:
+        raise ValueError(f"Bapun laps DataFrame must contain 'lap_id' or 'lap'; got columns: {list(laps_df.columns)}")
+    identity_cols: List[str] = ['label', group_column_name] if 'label' in laps_df.columns else [group_column_name]
+    if 'lap_dir' in laps_df.columns:
+        identity_cols.append('lap_dir')
+    return group_column_name, identity_cols
 
 
 def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str, pd.DataFrame], split_train_test_epoch_specific_pfND_Decoder_dict: Dict[str, BasePositionDecoder], training_data_portion: float, test_data_portion: float) -> TrainTestSplitResult:
@@ -12998,6 +13030,8 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
     **Bapun (OpenField / TwoMaze):** pass ``curr_active_pipeline`` (and optionally ``maze_epoch_names``).
     Builds one train-only ``pf2D_Decoder`` per context maze, keyed by context name
     (e.g. ``roam``/``sprinkle`` for OpenField, ``maze1``/``maze2`` for TwoMaze).
+    Laps are resolved from time-sliced ``sess.laps`` / ``filtered_sessions`` laps,
+    not session-level ``pf.epochs``.
 
     Parameters
     ----------
@@ -13096,12 +13130,10 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
             assert hasattr(computed_data, 'pf2D_Decoder') and (computed_data.pf2D_Decoder is not None), f"computation_results['{a_maze_name}'] is missing pf2D_Decoder; run placefield computation first."
             a_decoder: BasePositionDecoder = deepcopy(computed_data.pf2D_Decoder)
             a_prev_computation_epochs_df: pd.DataFrame = _resolve_bapun_train_test_split_laps_df(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=a_decoder)
-            identity_cols: List[str] = ['label', 'lap_id']
-            if 'lap_dir' in a_prev_computation_epochs_df.columns:
-                identity_cols.append('lap_dir')
+            group_column_name, identity_cols = _bapun_train_test_split_group_params(a_prev_computation_epochs_df)
             if debug_print:
-                print(f'a_maze_name: {a_maze_name}, n_laps: {len(a_prev_computation_epochs_df)}, identity_cols: {identity_cols}')
-            an_epoch_training_df, an_epoch_test_df = a_prev_computation_epochs_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name='lap_id', additional_epoch_identity_column_names=identity_cols, skip_get_non_overlapping=False, debug_print=False)
+                print(f'a_maze_name: {a_maze_name}, n_laps: {len(a_prev_computation_epochs_df)}, group_column_name: {group_column_name}, identity_cols: {identity_cols}')
+            an_epoch_training_df, an_epoch_test_df = a_prev_computation_epochs_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name=group_column_name, additional_epoch_identity_column_names=identity_cols, skip_get_non_overlapping=False, debug_print=False)
             (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), _, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder) = _single_compute_train_test_split_epochs_decoders(a_decoder=a_decoder, a_config=None, an_epoch_training_df=an_epoch_training_df, an_epoch_test_df=an_epoch_test_df, a_modern_name=a_maze_name, debug_print=debug_print)
             train_test_split_epochs_df_dict.update(a_training_test_split_epochs_df_dict)
             train_test_split_epoch_obj_dict.update(a_training_test_split_epochs_epoch_obj_dict)
