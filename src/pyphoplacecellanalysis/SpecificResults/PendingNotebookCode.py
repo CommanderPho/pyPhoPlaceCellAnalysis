@@ -12415,7 +12415,13 @@ def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
     # Calculate angles for radar plot (in radians)
     # theta = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
     # Calculate bin edges for rose plot
-    bins = np.linspace(0, 2*np.pi, n_angles+1)    
+    bins = np.linspace(0, 2*np.pi, n_angles+1)
+    widths = np.diff(bins)
+    angle_deg_centers = np.degrees(bins[:-1] + widths / 2)
+    segment_colors = mpl.colormaps['turbo'](angle_deg_centers / 360.0)
+
+    _right_cbar_margin = 0.04
+    _plot_w = 1.0 - _right_cbar_margin
 
     
     # Plot radar at each subsampled position
@@ -12430,17 +12436,20 @@ def plot_spatial_angular_distributions(occupancy_map, subsample_factor=5):
             # radar_ax.fill(theta, values, alpha=0.25)
             
             # Create small axes for this position
-            _new_radial_ax = fig.add_axes([i/n_x, j/n_y, 1/n_x, 1/n_y], projection='polar')
+            _new_radial_ax = fig.add_axes([i/n_x * _plot_w, j/n_y, 1/n_x * _plot_w, 1/n_y], projection='polar')
             
-            # Create rose plot using hist
-            _new_radial_ax.hist(bins[:-1], bins=bins, weights=values, density=False, histtype='stepfilled')
-
-            # pc = _new_radial_ax.pcolormesh(A, R, hist.T, cmap="magma_r")
-            # fig.colorbar(pc)
-            # _new_radial_ax.grid(True)
+            # Create rose plot with turbo-colored segments by heading angle
+            _new_radial_ax.bar(bins[:-1], values, width=widths, bottom=0, align='edge', color=segment_colors, edgecolor='none')
 
             _new_radial_ax.set_xticks([])
             _new_radial_ax.set_yticks([])
+    
+    _heading_norm = mpl.colors.Normalize(vmin=0, vmax=360)
+    _heading_sm = mpl.cm.ScalarMappable(cmap='turbo', norm=_heading_norm)
+    _heading_sm.set_array([])
+    _cbar_ax = fig.add_axes([1.0 - _right_cbar_margin + 0.008, 0.15, 0.012, 0.7])
+    fig.colorbar(_heading_sm, cax=_cbar_ax, label='Heading (degrees)')
+    ax.set_visible(False)
     
     return fig, ax
 
@@ -12591,7 +12600,7 @@ def draw_radial_lines(rect_width, rect_height, n_bins):
 
 
 
-@function_attributes(short_name=None, tags=['working', 'angular', 'head_dir_angle_binned'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
+@function_attributes(short_name=None, tags=['can-remove', 'working', 'angular', 'head_dir_angle_binned'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-21 00:48', related_items=[])
 def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
     """Creates a 3D occupancy map with fixed dimensions regardless of observed data
     
@@ -12636,23 +12645,9 @@ def compute_3d_occupancy_map(df, n_x_bins=50, n_y_bins=50, n_dir_bins=8):
         print(f"Unique bins per dimension: {bin_counts}")
 
     """
-    # Create all possible combinations
-    x_bins = range(n_x_bins)
-    y_bins = range(n_y_bins)
-    dir_bins = range(n_dir_bins)
-    
-    # Use crosstab with specific bins to force output size
-    occupancy_map = pd.crosstab(
-        index=[df['binned_x'], df['binned_y']], 
-        columns=df['head_dir_angle_binned'],
-        dropna=False  # Keep all combinations
-    ).reindex(
-        index=pd.MultiIndex.from_product([x_bins, y_bins]),
-        columns=dir_bins,
-        fill_value=0  # Fill missing combinations with 0
-    ).values.reshape(n_x_bins, n_y_bins, n_dir_bins)
-    
-    return occupancy_map, {'x': n_x_bins, 'y': n_y_bins, 'dir': n_dir_bins}
+    from neuropy.analyses.placefields import compute_3d_angular_occupancy_map
+
+    return compute_3d_angular_occupancy_map(n_x_bins=n_x_bins, n_y_bins=n_y_bins, n_dir_bins=n_dir_bins)
 
 
 
