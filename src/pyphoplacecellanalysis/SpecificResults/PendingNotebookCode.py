@@ -713,8 +713,8 @@ class BapunBatchHelpers:
     def run_all(cls, curr_active_pipeline, time_bin_size: float = 0.020, epochs_decoding_time_bin_size = 0.200, **kwargs):
         """ runs all post-computation (plotting, rendering, etc) batch operations for the Bapun OpenFiled-type sessions 
         """
-        ## TODO: currently forces recompute no matter what:
-        curr_active_pipeline = cls.run_all_computations(curr_active_pipeline, time_bin_size=time_bin_size, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+        ## Resume by default: skip clobbering extant preprocessing when rerunning batch computations.
+        curr_active_pipeline = cls.run_all_computations(curr_active_pipeline, time_bin_size=time_bin_size, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size, overwrite_extant=kwargs.pop('overwrite_extant', False))
 
         _out_dict = None
         try:
@@ -727,7 +727,7 @@ class BapunBatchHelpers:
         return curr_active_pipeline, _out_dict
 
     @classmethod
-    def run_all_computations(cls, curr_active_pipeline, time_bin_size: float = 0.020, epochs_decoding_time_bin_size = 0.200):
+    def run_all_computations(cls, curr_active_pipeline, time_bin_size: float = 0.020, epochs_decoding_time_bin_size = 0.200, overwrite_extant: bool=False):
         """ runs all computation batch operations for the Bapun OpenFiled-type sessions 
         """
         from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
@@ -738,7 +738,7 @@ class BapunBatchHelpers:
         try:
         # time_bin_size: float = 0.010 # 10ms bins
          # 20ms bins
-            curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=False, time_bin_size=time_bin_size)
+            curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=False, time_bin_size=time_bin_size, overwrite_extant=overwrite_extant)
             # curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
         except Exception as e:
             print(f'exception: {e}')
@@ -5118,7 +5118,21 @@ class GridBinBoundsHelpers:
 
 
 
-def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5):
+def _non_kdiba_session_preprocessing_is_complete(sess, active_maze_epoch_names) -> bool:
+    if not sess.position.has_linear_pos:
+        return False
+    if sess.laps is None or len(sess.laps) == 0:
+        return False
+    laps_df = sess.laps.to_dataframe()
+    if not all(c in laps_df.columns for c in ['maze_id', 'lap_dir']):
+        return False
+    pos_df = sess.position.to_dataframe()
+    if 'approx_head_dir_degrees' not in pos_df.columns:
+        return False
+    return True
+
+
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5, overwrite_extant: bool=False):
     """ Main non-kdiba processing/computation function (for Bapun/Rachel/etc sessions)
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
@@ -5139,15 +5153,26 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     # linearization_method: str = hardcoded_params.lap_estimation_parameters.pop('linearization_method', 'umap') # 'shapely'
     # print(f'linearization_method: {linearization_method}')
     # active_data_mode_name = 'rachel'
-    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size)
+    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size, overwrite_extant=overwrite_extant)
 
     
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba', 'LapsAccessor.non_kdiba_laps_determine_directions'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5):
-    """ 
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
-    curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
-    
+def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5, overwrite_extant: bool=False):
+    """ Recompute or resume Bapun/Rachel (non-KDiba) session processing and placefield computations.
+
+    When ``overwrite_extant=False`` (default), skips session preprocessing steps whose outputs already exist
+    (epoch fixup, linearization, laps, lap directions, head-dir columns) and relies on pipeline validators
+    to skip already-valid PF/decoding results. When ``overwrite_extant=True``, always reruns preprocessing
+    as on a fresh session; ``perform_computations`` still uses ``overwrite_extant_results=False``.
+
+    Resume a loaded pickle (skip clobbering extant work):
+
+        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline, posthoc_save=True, overwrite_extant=False)
+
+    Force preprocessing refresh:
+
+        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline, posthoc_save=True, overwrite_extant=True)
+
     """
     from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
     from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
@@ -5194,7 +5219,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     linearization_method: str = linearization_kwargs.get('method', 'umap')
 
     # session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
-    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=True)
+    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=overwrite_extant)
     session_epochs
 
     curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
@@ -5205,28 +5230,31 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     active_maze_epoch_names = deepcopy(hardcoded_params.non_global_activity_session_names) # ['maze1', 'maze2'] or ['roam', 'sprinkle']
     active_maze_epochs_df: pd.DataFrame = curr_active_pipeline.sess.paradigm.to_dataframe() # ['label']
     active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
-    curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
+    if overwrite_extant or not hasattr(curr_active_pipeline.sess, 'active_maze_epochs_df'):
+        curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
 
 
     lap_estimation_parameters = (hardcoded_params.lap_estimation_parameters or {})
     custom_lap_estimation_fn = lap_estimation_parameters.get('custom_lap_estimation_fn', None) ## defines a custom function to estimate the laps
 
-    if custom_lap_estimation_fn is None:
-        print(f'computing linearized position for session using method="{linearization_method}"...')
-        sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
-        print(f'estimating the laps from the linear position...')
-        sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
+    if overwrite_extant or not _non_kdiba_session_preprocessing_is_complete(curr_active_pipeline.sess, active_maze_epoch_names):
+        if custom_lap_estimation_fn is None:
+            print(f'computing linearized position for session using method="{linearization_method}"...')
+            sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
+            print(f'estimating the laps from the linear position...')
+            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
+        else:
+            print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
+            sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
+
+        laps_obj = curr_active_pipeline.sess.laps # Laps
+        laps_df: pd.DataFrame = laps_obj.to_dataframe()
+        print(f'estimating the maze_id to laps...')
+        laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df, replace_existing=overwrite_extant)
+        curr_active_pipeline.sess.laps._df = laps_df
+        lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
     else:
-        print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
-        sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
-
-
-    laps_obj = curr_active_pipeline.sess.laps # Laps
-    laps_df: pd.DataFrame = laps_obj.to_dataframe()
-    print(f'estimating the maze_id to laps...')
-    laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df)
-    curr_active_pipeline.sess.laps._df = laps_df
-    lap_only_linear_pos_df, lap_only_pos_df, (lap_dir_2D_dict, lap_dir_1D_dict) = LapsAccessor.non_kdiba_laps_determine_directions(sess=curr_active_pipeline.sess)
+        print('INFO: skipping session preprocessing — existing linearization/laps/lap-dir data look complete.')
 
 
     print(f'filtering sessions via `curr_active_pipeline.filter_sessions(...)`...')
@@ -5312,14 +5340,16 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
 
     activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
-    curr_active_pipeline.sess.activity_only_epochs = deepcopy(activity_only_epochs)
+    if overwrite_extant or not hasattr(curr_active_pipeline.sess, 'activity_only_epochs'):
+        curr_active_pipeline.sess.activity_only_epochs = deepcopy(activity_only_epochs)
 
 
     ## GLobal only ('maze_GLOBAL')
     epochs_df = ensure_dataframe(deepcopy(curr_active_pipeline.sess.epochs))
     global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([hardcoded_params.global_session_name])].epochs.get_non_overlapping_df()
     global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
-    curr_active_pipeline.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
+    if overwrite_extant or not hasattr(curr_active_pipeline.sess, 'global_activity_only_epoch'):
+        curr_active_pipeline.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
     
     ## OUTPUTS: activity_only_epochs, global_activity_only_epoch
 
@@ -5343,7 +5373,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
         ## forcibly compute the linearized position so it doesn't fallback to "isomap" method which eats all the memory
-        a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(**linearization_kwargs)
+        if overwrite_extant or not a_sess.position.has_linear_pos:
+            a_pos_df: pd.DataFrame = a_sess.position.compute_linearized_position(**linearization_kwargs)
         
 
 
@@ -5396,7 +5427,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     # ==================================================================================================================================================================================================================================================================================== #
 
 
-    post_process_non_kdiba(curr_active_pipeline)
+    post_process_non_kdiba(curr_active_pipeline, overwrite_extant=overwrite_extant)
         
     ## Add global epoch
     maze_epochs_obj = ensure_Epoch(deepcopy(curr_active_pipeline.sess.epochs).to_dataframe())
@@ -5601,7 +5632,7 @@ def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_t
 
 
 @function_attributes(short_name=None, tags=['rachel', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=['final_process_non_kdiba_all_comps'], creation_date='2025-09-10 07:01', related_items=[])
-def post_process_non_kdiba(curr_active_pipeline):
+def post_process_non_kdiba(curr_active_pipeline, overwrite_extant: bool=False):
     """ processes either Bapun or Rachel sessions
 
     Usage:
@@ -5619,6 +5650,8 @@ def post_process_non_kdiba(curr_active_pipeline):
         # INPUTS: a_session 
         # global_pos_obj: Position = deepcopy(a_session.position)
         global_pos_obj: Position = a_session.position # do NOT do a deepcopy, edit in place
+        if (not overwrite_extant) and ('approx_head_dir_degrees' in global_pos_obj.to_dataframe().columns):
+            return global_pos_obj.to_dataframe()
         # global_pos_df: pd.DataFrame = global_pos_obj.compute_higher_order_derivatives().position.compute_smoothed_position_info(N=15)
         global_pos_df: pd.DataFrame = global_pos_obj.adding_approx_head_dir_columns(N=15, n_dir_angular_bins=8) # ().position.compute_smoothed_position_info(N=15)
         return global_pos_df
