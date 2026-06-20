@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.User
 # @metadata_attributes(short_name=None, tags=['debug', 'window', 'visualization', 'activity', 'spikes', 'syncrhonized'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-03 15:41', related_items=[])
 class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Renders a `6 x n_cols` grid of subplots, each showing a heatmap of 2D place cells colored according to that' cells identity color, sorted according to their peak linearized 1D position (`lin_pos`) along the track.
-    All cell heatmaps start black, but **light up when the cell fires**, fading out back to black gradually over the following 3 seconds. 
+    All cell heatmaps start black, but **light up when the cell fires**, fading out back to black gradually over `fade_duration_seconds` (default 2.0 s). 
 
     """
     # Application/Window Configuration Options:
@@ -62,13 +62,14 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         return self.AnimalTrajectoryPlottingMixin_filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
 
     
-    def __init__(self, active_one_step_decoder, active_two_step_decoder=None, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None, **param_kwargs):
+    def __init__(self, active_one_step_decoder, active_two_step_decoder=None, drop_below_threshold: float=0.0000001, fade_duration_seconds: float=2.0, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None, **param_kwargs):
         """Initialize the Placefield Activity Debug Plotter.
         
         Args:
             active_one_step_decoder: Decoder object containing ratemap and placefield data
             active_two_step_decoder: Two-step decoder (optional, kept for compatibility, not used in new implementation)
             drop_below_threshold: Threshold below which placefield values are set to NaN
+            fade_duration_seconds: Seconds over which placefield brightness fades from 1.0 to 0.0 after a spike
             posterior_variable_to_render: Kept for compatibility, not used in new implementation
             application_name: Optional application name
             window_name: Optional window name
@@ -89,10 +90,12 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         if self.params.debug_print:
             print(f'TimeSynchronizedPlacefieldActivityDebugPlotter: params.debug_print is True, so debugging info will be printed!')
         self.params.drop_below_threshold = drop_below_threshold
+        self.params.fade_duration_seconds = fade_duration_seconds
         
         self.buildUI()
         self._update_plots()
         
+
     def setup(self):
         """Initialize parameters for grid layout, fading duration, and cell colors."""
         from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
@@ -106,9 +109,6 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         ratemap = self.active_one_step_decoder.ratemap
         n_neurons = ratemap.n_neurons
         self.params.grid_cols = int(np.ceil(n_neurons / self.params.grid_rows))
-        
-        # Fading duration: 3 seconds
-        self.params.fade_duration_seconds = 3.0
         
         # Build cell colors using existing color mapping utilities
         # colormap_source=None uses pyqtgraph's built-in colormaps (PAL-relaxed_bright)
@@ -138,6 +138,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         self.params.current_position_marker_brush = pg.mkBrush(255, 255, 255, 120)
         self.params.current_position_marker_pen = pg.mkPen(None)
     
+
     def _compute_peak_linearized_positions(self):
         """Compute peak linearized position for each cell and return sorted cell indices.
         
@@ -195,6 +196,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         return sorted_indices, peak_lin_positions
     
+
     def _get_cell_activity_levels(self, current_time: float):
         """Compute fading activity levels for all cells based on spike times.
         
@@ -251,6 +253,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         row = pos_up_to_t.iloc[-1]
         return float(row['x']), float(row['y'])
     
+
     def _apply_cell_colors(self, placefield_image: np.ndarray, neuron_idx: int, activity_level: float):
         """Apply cell identity color to a placefield image with activity level.
         
@@ -275,6 +278,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             rgb_image[:, :, c] = placefield_image * cell_color[c] * activity_level
         
         return rgb_image
+
 
     def _buildGraphics(self):
         """Create 6×N grid layout with ImageItems for each cell placefield."""
