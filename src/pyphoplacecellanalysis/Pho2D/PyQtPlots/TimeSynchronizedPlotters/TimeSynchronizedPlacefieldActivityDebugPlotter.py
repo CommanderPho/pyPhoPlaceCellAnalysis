@@ -278,8 +278,6 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
 
     def _buildGraphics(self):
         """Create 6×N grid layout with ImageItems for each cell placefield."""
-        from pyphocorehelpers.print_helpers import generate_html_string
-        
         # Initialize arrays to store plot components
         self.ui.img_item_array = []
         self.ui.plot_array = []
@@ -295,6 +293,9 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         # Compute sorted cell indices by peak linearized position
         sorted_cell_indices, _ = self._compute_peak_linearized_positions()
+        image_extent = self.params.image_bounds_extent
+        aclu_label_x = image_extent[0] + (image_extent[2] * 0.02)
+        aclu_label_y = image_extent[1] + image_extent[3] - (image_extent[3] * 0.02)
         
         # Create grid of subplots
         for grid_idx, neuron_idx in enumerate(sorted_cell_indices):
@@ -322,10 +323,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan
             
             # Create plot for this cell
-            curr_plot = self.ui.root_graphics_layout_widget.addPlot(
-                row=row, col=col, 
-                title=generate_html_string(input_str=curr_cell_identifier_string, font_size=2, color='grey')
-            )
+            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=row, col=col)
             curr_plot.setObjectName(curr_plot_identifier_string)
             
             # Create image item (will be updated with RGB data in _update_plots)
@@ -333,6 +331,10 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             curr_plot.addItem(img_item, defaultPadding=0.0)
             curr_position_marker = pg.PlotDataItem(pen=None, shadowPen=None, symbol='o', pxMode=False, symbolSize=self.params.current_position_marker_size, symbolPen=self.params.current_position_marker_pen, symbolBrush=self.params.current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}')
             curr_plot.addItem(curr_position_marker)
+            aclu_label = pg.TextItem(html=f'<span style="color:rgba(255, 255, 255, 0.2); font-size:9pt;">{int(cell_ID)}</span>', anchor=(0, 0))
+            aclu_label.setPos(aclu_label_x, aclu_label_y)
+            aclu_label.setZValue(10)
+            curr_plot.addItem(aclu_label)
             
             # Configure axes visibility
             is_first_column = (col == 0)
@@ -342,9 +344,15 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             if is_last_row:
                 curr_plot.showAxes('x', True)
                 curr_plot.showAxis('bottom', show=True)
+            else:
+                curr_plot.showAxes('x', False)
+                curr_plot.showAxis('bottom', show=False)
             if is_first_column:
                 curr_plot.showAxes('y', True)
                 curr_plot.showAxis('left', show=True)
+            else:
+                curr_plot.showAxes('y', False)
+                curr_plot.showAxis('left', show=False)
             
             curr_plot.hideButtons()
             curr_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0, update=False, disableAutoRange=True)
