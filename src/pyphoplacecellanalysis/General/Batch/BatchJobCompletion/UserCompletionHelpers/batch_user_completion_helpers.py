@@ -3511,6 +3511,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     """
     import sys
     from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
         print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
@@ -3559,6 +3560,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False) -> dict:
     """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance, perform_plot_bapun_test_decoder_performance_error_distance
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
         print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
