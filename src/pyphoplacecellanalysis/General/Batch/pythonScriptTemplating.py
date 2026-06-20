@@ -333,7 +333,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
-        batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+         batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -344,6 +344,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
     batch_session_completion_handler_kwargs: Optional[Dict] - the values to be passed to batch_session_completion_handler
     custom_user_completion_function_override_kwargs_dict - the kwarg overrides for the user_computation_functions
+    vscode_default_interpreter_path: Optional[Union[str, Path]] - Python executable written to generated VSCode workspace `python.defaultInterpreterPath`. When None, uses platform defaults.
     
     
     Usage:
@@ -440,6 +441,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     os.makedirs(output_directory, exist_ok=True)
     
     for curr_session_context in included_session_contexts:
+        if curr_session_context not in session_batch_basedirs:
+            print(f'WARN: skipping script generation for {curr_session_context}: no session basedir in session_batch_basedirs')
+            continue
         curr_session_basedir = session_batch_basedirs[curr_session_context]        
         if (job_suffix is not None) and (len(job_suffix) > 0):
             curr_session_complete_identifier: str = f"{curr_session_context}_{job_suffix}"
@@ -544,14 +548,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
 
             # script_dir = script_path.parent.resolve()
-            print(F'job_suffix: "{job_suffix}"')
-            
-            if (job_suffix is not None) and (len(job_suffix) > 0):
-                # notebook_path = script_path.with_name(f'{script_path.name}_{job_suffix}').with_suffix(f'.ipynb')
-                notebook_path = script_path.with_stem(f'{script_path.stem}_{job_suffix}').with_suffix(f'.ipynb')
-            else:
-                notebook_path = script_path.with_suffix('.ipynb')
-                
+            notebook_path = script_path.with_suffix('.ipynb')
             convert_script_to_notebook(_temp_notebook_python_script_path, notebook_path, enable_auto_reload=False)
             ## remove temporary script when done
             try:
@@ -573,14 +570,12 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     ## Generate VSCode Workspace for it
     if should_create_vscode_workspace:
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        # Check if the current operating system is Windows
-        if os.name == 'nt':
-            # Put your Windows-specific code here
+        if vscode_default_interpreter_path is not None:
+            python_executable = Path(vscode_default_interpreter_path).expanduser()
+        elif os.name == 'nt':
             python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
         else:
-            # Put your non-Windows-specific code here
-            python_executable = Path('~/repos/Spike3D/.venv/bin/python') # .resolve()
-
+            python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
 
         vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
@@ -724,12 +719,12 @@ def get_python_environment(active_venv_path: Path, debug_print:bool=True):
 
 
 @function_attributes(short_name=None, tags=['vscode_workspace', 'vscode'], input_requires=[], output_provides=[], uses=['get_running_python'], used_by=[], creation_date='2024-04-15 10:35', related_items=[])
-def build_vscode_workspace(script_paths, python_executable=None):
+def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, Path]]=None):
     """ builds a VSCode workspace for the batch python scripts
     
         from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import build_vscode_workspace
 
-        vscode_workspace_path = build_vscode_workspace(script_paths)
+        vscode_workspace_path = build_vscode_workspace(script_paths, python_executable='/scratch/kdiba_root/kdiba99/halechr/repos/Spike3D_ExploreEnv/Spike3D/.venv/bin/python')
         vscode_workspace_path
 
     """
@@ -737,6 +732,8 @@ def build_vscode_workspace(script_paths, python_executable=None):
 
     if python_executable is None:
         active_venv_path, python_executable, activate_script_path = get_running_python()
+    else:
+        python_executable = Path(python_executable).expanduser()
 
     is_platform_windows: bool = False
     if (platform.system() == 'Windows'):
