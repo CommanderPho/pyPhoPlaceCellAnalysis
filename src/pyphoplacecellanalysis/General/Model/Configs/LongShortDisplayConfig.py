@@ -671,6 +671,7 @@ class PlottingHelpers:
             y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
             y_bin_labels = ['long', 'short']
             y_bin_labels = ['LR', 'RL']
+            y_bin_labels = ['roam', 'sprinkle']  # Bapun contextual pf2D (arbitrary 2-context names)
 
         Usage:
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
@@ -688,13 +689,19 @@ class PlottingHelpers:
         
 
         ## INPUTS: ax
-        assert set(y_bin_labels) in [set(['long_LR', 'long_RL', 'short_LR', 'short_RL']), set(['long', 'short']), set(['LR', 'RL'])], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
+        _known_y_bin_label_sets = [set(['long_LR', 'long_RL', 'short_LR', 'short_RL']), set(['long', 'short']), set(['LR', 'RL'])]
         
         n_ybins: int = len(y_bin_labels)
         
         all_colors_dict: Dict[types.DecoderName, Tuple[str, str]] = DecoderIdentityColors.build_decoder_color_track_dir_tuple_dict()
     
-        active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
+        if set(y_bin_labels) in _known_y_bin_label_sets:
+            active_color_dict = {k: all_colors_dict[k] for k in y_bin_labels}
+        elif n_ybins == 2:
+            # Bapun / contextual pf2D: arbitrary 2-context names; reuse long/short track-ID colors
+            active_color_dict = {y_bin_labels[0]: all_colors_dict['long'], y_bin_labels[1]: all_colors_dict['short']}
+        else:
+            active_color_dict = {k: (None, None) for k in y_bin_labels}
 
 
         # BEGIN PLOTTING: ____________________________________________________________________________________________________ #

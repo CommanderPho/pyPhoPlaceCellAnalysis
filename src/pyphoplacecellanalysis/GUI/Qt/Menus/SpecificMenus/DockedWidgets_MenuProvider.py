@@ -11,6 +11,11 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphoplacecellanalysis.GUI.Qt.Menus.LocalMenus_AddRenderable.LocalMenus_AddRenderable import LocalMenus_AddRenderable
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.helpers import build_combined_time_synchronized_plotters_window, build_connected_time_synchronized_occupancy_plotter, build_connected_time_synchronized_placefields_plotter, build_connected_time_synchronized_decoder_plotter
+
+
+@pyqtExceptionPrintingSlot()
+def _run_docked_widget_menu_command(cmd):
+    return cmd()
     
 from pyphoplacecellanalysis.GUI.Qt.Menus.BaseMenuProviderMixin import BaseMenuCommand # for commands
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import AddNewDecodedPosition_MatplotlibPlotCommand, AddNewLongShortDecodedEpochSlices_MatplotlibPlotCommand, AddNewTrackTemplatesDecodedEpochSlicesRows_MatplotlibPlotCommand # for add matplotlib plot action
@@ -187,7 +192,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         # ==================================================================================================================== #
         # Connect the relevent actions to each action:
         for a_name, a_build_command in action_command_map.items():
-            curr_actions_dict[a_name].triggered.connect(a_build_command)
+            curr_actions_dict[a_name].triggered.connect(lambda checked=False, cmd=a_build_command: _run_docked_widget_menu_command(cmd))
             
         # curr_actions_dict['actionNewDockedCustom'].triggered.connect(CreateNewTimeSynchronizedPlotterCommand(spike_raster_window, active_pf_2D_dt, plotter_type='decoder', active_context=active_context, display_output=display_output))
                 
