@@ -5189,6 +5189,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
     from neuropy.analyses.laps import estimate_session_laps
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+    from neuropy.utils.position_util import build_shapely_maze_collection_for_session
  
 
     ## define lienarization kwargs:
@@ -5215,12 +5216,15 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     # basedir = Path('/media/halechr/MAX/Data/Rachel/Cho_241117_Session2').resolve()
     ## INPUTS: basedir 
-    linearization_kwargs = hardcoded_params.linearization_parameters
+    linearization_kwargs = dict(hardcoded_params.linearization_parameters or {})
     linearization_method: str = linearization_kwargs.get('method', 'umap')
 
     # session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
     session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=overwrite_extant)
     session_epochs
+
+    if linearization_kwargs.get('method') == 'shapely' and linearization_kwargs.get('all_session_mazes') is not None:
+        linearization_kwargs['all_session_mazes'] = build_shapely_maze_collection_for_session(pos_df=curr_active_pipeline.sess.position.to_dataframe(), geometry_template=linearization_kwargs['all_session_mazes'], maze_epoch_keys=hardcoded_params.non_global_activity_session_names, epochs_df=curr_active_pipeline.sess.epochs.to_dataframe(), valid_epochs_override=linearization_kwargs.pop('valid_epochs_override', None))
 
     curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
     print(f'curr_epoch_names: {curr_epoch_names}')
@@ -5228,7 +5232,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     ## Build umap position so it will go to filtered
 
     active_maze_epoch_names = deepcopy(hardcoded_params.non_global_activity_session_names) # ['maze1', 'maze2'] or ['roam', 'sprinkle']
-    active_maze_epochs_df: pd.DataFrame = curr_active_pipeline.sess.paradigm.to_dataframe() # ['label']
+    active_maze_epochs_df: pd.DataFrame = curr_active_pipeline.sess.epochs.to_dataframe() # post-fixup epochs (not raw paradigm)
     active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
     if overwrite_extant or not hasattr(curr_active_pipeline.sess, 'active_maze_epochs_df'):
         curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
