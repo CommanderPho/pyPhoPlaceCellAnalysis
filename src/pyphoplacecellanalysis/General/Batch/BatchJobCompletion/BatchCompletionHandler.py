@@ -29,6 +29,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES = frozenset({'long_epoch_name', 'long_laps', 'long_replays', 'short_epoch_name', 'short_laps', 'short_replays'})
 _KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES = frozenset({'long_epoch_name', 'long_n_laps', 'long_n_replays', 'short_epoch_name', 'short_n_laps', 'short_n_replays'})
+_KDIBA_ONLY_EXTENDED_COMPUTATIONS = frozenset({'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis', 'rank_order_shuffle_analysis', 'perform_wcorr_shuffle_analysis', 'extended_pf_peak_information', 'pf_dt_sequential_surprise'})
 
 @unique
 class SavingOptions(Enum):
@@ -470,28 +471,64 @@ class BatchSessionCompletionHandler:
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
-        try:
-            ## To file only:
-            with matplotlib_file_only():
-                # Perform non-interactive Matplotlib operations with 'AGG' backend
-                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+        if not curr_active_pipeline.is_kdiba_session():
+            ## Non-KDiba session
+            #TODO 2026-06-20 07:10: - [ ] All non-KDiba sessions assumed to be Bapun
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
 
-            # IF thst's done, clear all the plots:
-            # from matplotlib import pyplot as plt
-            # plt.close('all') # this takes care of the matplotlib-backed figures.
-            curr_active_pipeline.clear_display_outputs()
-            curr_active_pipeline.clear_registered_output_files()
-            return True # completed successfully (without raising an error at least).
+            # print(f'\tskipping main_complete_figure_generations for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})')
+            print(f'\ttrying main_complete_figure_generations for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})...')
 
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'main_complete_figure_generations failed with exception: {e}')
-            if self.fail_on_exception:
-                raise e.exc
+            try:
+                ## To file only:
+                with matplotlib_file_only():
+                    # Perform non-interactive Matplotlib operations with 'AGG' backend
+                    # main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+                    _rendering_out_dict = BapunBatchHelpers.run_all_rendering(curr_active_pipeline=curr_active_pipeline)
 
-            return False
+                # IF thst's done, clear all the plots:
+                # from matplotlib import pyplot as plt
+                # plt.close('all') # this takes care of the matplotlib-backed figures.
+                curr_active_pipeline.clear_display_outputs()
+                curr_active_pipeline.clear_registered_output_files()
+                return True # completed successfully (without raising an error at least).
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'\tmain_complete_figure_generations failed with exception: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
+
+                return False
+
+
+            # return False
+
+        else:
+            ## KDiba-specific session:
+            try:
+                ## To file only:
+                with matplotlib_file_only():
+                    # Perform non-interactive Matplotlib operations with 'AGG' backend
+                    # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
+                    main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+
+                # IF thst's done, clear all the plots:
+                # from matplotlib import pyplot as plt
+                # plt.close('all') # this takes care of the matplotlib-backed figures.
+                curr_active_pipeline.clear_display_outputs()
+                curr_active_pipeline.clear_registered_output_files()
+                return True # completed successfully (without raising an error at least).
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'main_complete_figure_generations failed with exception: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
+
+                return False
 
 
     def try_output_neruon_identity_table_to_File(self, file_path, curr_active_pipeline):
@@ -613,6 +650,14 @@ class BatchSessionCompletionHandler:
         if self.global_computations_options.should_compute:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
+            is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()
+            batch_extended_fail_on_exception: bool = True
+            if not is_kdiba_session:
+                dropped_kdiba_only_computations = [a_name for a_name in active_extended_computations_include_includelist if a_name in _KDIBA_ONLY_EXTENDED_COMPUTATIONS]
+                if len(dropped_kdiba_only_computations) > 0:
+                    print(f'\tskipping kdiba-only extended computations for non-kdiba session: {dropped_kdiba_only_computations}')
+                active_extended_computations_include_includelist = [a_name for a_name in active_extended_computations_include_includelist if a_name not in _KDIBA_ONLY_EXTENDED_COMPUTATIONS]
+                batch_extended_fail_on_exception = False
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
             force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute? It seems to force it to recompute
             # ## #TODO 2024-11-06 14:21: - [ ] I think we should use `batch_evaluate_required_computations` instead of `batch_extended_computations` to avoid forcing recomputations.
@@ -624,7 +669,7 @@ class BatchSessionCompletionHandler:
                 with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
                     curr_active_pipeline.reload_default_computation_functions()
                     #TODO 2024-11-06 13:44: - [ ] `force_recompute_override_computations_includelist` is actually comming in with the specified override (when I was just trying to override the parameters)`
-                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
+                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=batch_extended_fail_on_exception, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
                                                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
                                                                         computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
                     #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
@@ -812,30 +857,34 @@ class BatchSessionCompletionHandler:
         # print(f'common_file_path: {common_file_path}')
         # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
 
-        try:
-            print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.003) # 3ms, 10ms
-            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
+        _out_inst_fr_comps = None
+        _out_recomputed_inst_fr_comps = None
+        if is_kdiba_session:
+            try:
+                print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+                _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.003) # 3ms, 10ms
+                _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
+                _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
 
-            if not self.use_multiprocessing:
-                # Only modify self in non-multiprocessing mode (only shows 1 always).
-                self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
-                print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+                if not self.use_multiprocessing:
+                    # Only modify self in non-multiprocessing mode (only shows 1 always).
+                    self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
+                    print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
 
-            # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-            # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-            print(f'\t\t done (success).')
+                # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+                # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
+                print(f'\t\t done (success).')
 
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            # if self.fail_on_exception:
-            #     raise e.exc
-            _out_inst_fr_comps = None
-            _out_recomputed_inst_fr_comps = None
-            pass
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+                # if self.fail_on_exception:
+                #     raise e.exc
+                _out_inst_fr_comps = None
+                _out_recomputed_inst_fr_comps = None
+        else:
+            print(f'\tskipping InstantaneousSpikeRateGroupsComputation for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})')
 
         
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
