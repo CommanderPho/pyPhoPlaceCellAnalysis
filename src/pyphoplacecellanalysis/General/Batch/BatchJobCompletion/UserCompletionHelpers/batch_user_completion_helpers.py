@@ -3533,7 +3533,7 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         return across_session_results_extended_dict
 
-    fig, ax = BapunPositionDecodingPerformance.perform_plot_bapun_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df)
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = 'sq_err', title_string = 'Test Lap Decoded vs Measured Pos')
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
     display_context = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_sq_err')
