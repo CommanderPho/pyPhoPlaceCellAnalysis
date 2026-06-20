@@ -753,7 +753,7 @@ def build_vscode_workspace(script_paths, python_executable=None):
     #     "name": "gen_scripts_root"
     # },
     vscode_workspace_path = top_level_script_folders_path.joinpath('run_workspace.code-workspace').resolve()
-    print(f'vscode_workspace_path: {vscode_workspace_path}')
+    # print(f'vscode_workspace_path: {vscode_workspace_path}')
 
     # Set up Jinja2 environment
     template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
