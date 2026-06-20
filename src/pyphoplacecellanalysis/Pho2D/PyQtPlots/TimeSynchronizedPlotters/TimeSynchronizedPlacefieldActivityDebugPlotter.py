@@ -134,6 +134,9 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         self.params.debug_view_mode = True
         
         self.AnimalTrajectoryPlottingMixin_on_setup()
+        self.params.current_position_marker_size = 6.0
+        self.params.current_position_marker_brush = pg.mkBrush(255, 255, 255, 120)
+        self.params.current_position_marker_pen = pg.mkPen(None)
     
     def _compute_peak_linearized_positions(self):
         """Compute peak linearized position for each cell and return sorted cell indices.
@@ -235,6 +238,18 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
                     activity_levels[neuron_idx] = activity_level
         
         return activity_levels
+
+
+    def _get_current_measured_position_xy(self) -> Optional[Tuple[float, float]]:
+        curr_t = self.last_window_time
+        if curr_t is None:
+            return None
+        pos_df = self.active_one_step_decoder.pf.filtered_pos_df
+        pos_up_to_t = pos_df[pos_df['t'] <= curr_t]
+        if len(pos_up_to_t) == 0:
+            return None
+        row = pos_up_to_t.iloc[-1]
+        return float(row['x']), float(row['y'])
     
     def _apply_cell_colors(self, placefield_image: np.ndarray, neuron_idx: int, activity_level: float):
         """Apply cell identity color to a placefield image with activity level.
@@ -268,6 +283,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         # Initialize arrays to store plot components
         self.ui.img_item_array = []
         self.ui.plot_array = []
+        self.ui.position_marker_array = []
         
         # Create root graphics layout widget
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
@@ -315,6 +331,8 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # Create image item (will be updated with RGB data in _update_plots)
             img_item = pg.ImageItem(border='w')
             curr_plot.addItem(img_item, defaultPadding=0.0)
+            curr_position_marker = pg.PlotDataItem(pen=None, shadowPen=None, symbol='o', pxMode=False, symbolSize=self.params.current_position_marker_size, symbolPen=self.params.current_position_marker_pen, symbolBrush=self.params.current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}')
+            curr_plot.addItem(curr_position_marker)
             
             # Configure axes visibility
             is_first_column = (col == 0)
@@ -343,6 +361,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # Store components
             self.ui.img_item_array.append(img_item)
             self.ui.plot_array.append(curr_plot)
+            self.ui.position_marker_array.append(curr_position_marker)
         
         # Add root graphics layout widget to main layout
         self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0)
@@ -526,10 +545,15 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # pyqtgraph ImageItem can handle RGB images as (H, W, 3) uint8 arrays
             img_item.setImage(colored_image_display, rect=self.params.image_bounds_extent, autoLevels=False)
         
+        curr_xy = self._get_current_measured_position_xy()
+        for position_marker in self.ui.position_marker_array:
+            if curr_xy is None:
+                position_marker.setData(x=None, y=None)
+            else:
+                position_marker.setData(x=[curr_xy[0]], y=[curr_xy[1]])
+        
         # Update window title
         self.setWindowTitle(f'TimeSynchronizedPlacefieldActivityDebugPlotter - t = {curr_t:.2f}')
-        
-        # Note: AnimalTrajectoryPlottingMixin_update_plots() not called as trajectory is not shown in grid layout
 
 
     # @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
