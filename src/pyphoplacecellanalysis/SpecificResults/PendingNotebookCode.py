@@ -531,7 +531,59 @@ class BapunBatchHelpers:
     
     """
     @classmethod
-    def run_all(cls, curr_active_pipeline):
+    def run_all(cls, curr_active_pipeline, time_bin_size: float = 0.020, epochs_decoding_time_bin_size = 0.200, **kwargs):
+        """ runs all post-computation (plotting, rendering, etc) batch operations for the Bapun OpenFiled-type sessions 
+        """
+        ## TODO: currently forces recompute no matter what:
+        curr_active_pipeline = cls.run_all_computations(curr_active_pipeline, time_bin_size=time_bin_size, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+
+        _out_dict = None
+        try:
+            _out_dict = cls.run_all_rendering(curr_active_pipeline)
+        except Exception as e:
+            print(f'BapunBatchHelpers.run_all_rendering(...) failed with exception: {e}. Continuing.')
+            # raise e
+            pass
+
+        return curr_active_pipeline, _out_dict
+
+    @classmethod
+    def run_all_computations(cls, curr_active_pipeline, time_bin_size: float = 0.020, epochs_decoding_time_bin_size = 0.200):
+        """ runs all computation batch operations for the Bapun OpenFiled-type sessions 
+        """
+        from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+        from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder, DataSessionFormatBaseRegisteredClass
+        from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+
+        try:
+        # time_bin_size: float = 0.010 # 10ms bins
+         # 20ms bins
+            curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=False, time_bin_size=time_bin_size)
+            # curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
+        except Exception as e:
+            print(f'exception: {e}')
+            # raise e
+            pass
+
+        ## 9m
+        # desired_time_bin_size = 0.010 # 10ms
+        # desired_time_bin_size = 0.250 # 250ms
+        # desired_time_bin_size = epochs_decoding_time_bin_size # 250ms
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': epochs_decoding_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=False, debug_print=False)
+
+        # # 2m 12s for 250ms
+        # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_non_kdiba_directional_decoders
+        # # epochs_decoding_time_bin_size = 0.2 ## 200ms for speed here
+        # new_decoder_dict, continuous_specific_decoded_results_dict, (contextual_pf2D_Decoder, contextual_pf2D_dict) = build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_time_bin_size=epochs_decoding_time_bin_size)
+        # # 22m 8.5s - for 200ms
+
+        return curr_active_pipeline
+
+
+
+    @classmethod
+    def run_all_rendering(cls, curr_active_pipeline):
         """ runs all post-computation (plotting, rendering, etc) batch operations for the Bapun OpenFiled-type sessions 
         """
         from neuropy.utils.matplotlib_helpers import matplotlib_file_only, matplotlib_configuration, matplotlib_configuration_update
@@ -727,6 +779,8 @@ class BapunBatchHelpers:
 
         _out_dict['export_video_paths'] = export_video_paths
         return _out_dict
+
+
 
     @classmethod
     def build_agg_df_to_matr(cls, agg_pos_df: pd.DataFrame, bin_info, col_name: str='t_count') -> NDArray:

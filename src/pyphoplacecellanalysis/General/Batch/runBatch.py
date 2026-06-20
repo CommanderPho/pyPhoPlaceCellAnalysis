@@ -1190,8 +1190,10 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     if preflight_bapun_batch_helpers_run_all:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
         new_print(f'{_line_sweep} runBatch Bapun preflight: BapunBatchHelpers.run_all {_line_sweep}')
-        _preflight_out_dict = BapunBatchHelpers.run_all(curr_active_pipeline=curr_active_pipeline)
-        new_print(f'Bapun preflight complete; _preflight_out_dict keys: {list(_preflight_out_dict.keys()) if isinstance(_preflight_out_dict, dict) else type(_preflight_out_dict)!r}')
+        curr_active_pipeline, _preflight_out_dict = BapunBatchHelpers.run_all(curr_active_pipeline=curr_active_pipeline)
+        new_print(f'Bapun preflight complete;')
+        if _preflight_out_dict is not None:
+            new_print(f'\t_preflight_out_dict keys: {list(_preflight_out_dict.keys()) if isinstance(_preflight_out_dict, dict) else type(_preflight_out_dict)!r}')
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
