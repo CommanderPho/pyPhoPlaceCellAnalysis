@@ -27,6 +27,8 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
+_KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES = frozenset({'long_epoch_name', 'long_laps', 'long_replays', 'short_epoch_name', 'short_laps', 'short_replays'})
+
 @unique
 class SavingOptions(Enum):
     NEVER = "NEVER"
@@ -65,19 +67,34 @@ class BatchComputationProcessOptions(HDF_SerializationMixin, AttrsBasedClassHelp
 @custom_define(slots=False)
 class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Class representing the specific results extracted from the loaded pipeline and returned as return values from the post-execution callback function. """
-    long_epoch_name: str = serialized_attribute_field()
-    long_laps: Epoch = serialized_field()
-    long_replays: Epoch = serialized_field()
-
-    short_epoch_name: str = serialized_attribute_field()
-    short_laps: Epoch = serialized_field()
-    short_replays: Epoch = serialized_field()
-
     delta_since_last_compute: timedelta = non_serialized_field() #serialized_attribute_field(serialization_fn=HDF_Converter._prepare_datetime_timedelta_value_to_for_hdf_fn)
     outputs_local: Dict[str, Optional[Path]] = non_serialized_field() # serialization_fn=(lambda f, k, v: f[f'{key}/{sub_k}'] = str(sub_v) for sub_k, sub_v in value.items()), is_hdf_handled_custom=True
     outputs_global: Dict[str, Optional[Path]] = non_serialized_field()
 
     across_session_results: Dict[str, Optional[object]] = non_serialized_field()
+
+    def __setstate__(self, state):
+        if type(self) is PipelineCompletionResult and _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.intersection(state):
+            self.__class__ = KDibaPipelineCompletionResult
+        self.__dict__.update(state)
+        loaded_keys = list(state.keys())
+        modern_keys = [a.name for a in self.__class__.__attrs_attrs__]
+        for a in self.__class__.__attrs_attrs__:
+            if a.name not in loaded_keys and a.default is not None:
+                self.__dict__[a.name] = a.default
+
+
+    @classmethod
+    def migrate_session_batch_output(cls, result: Optional["PipelineCompletionResult"]) -> Optional["PipelineCompletionResult"]:
+        """Upgrade in-memory legacy instances after pickle load."""
+        if result is None:
+            return None
+        if isinstance(result, KDibaPipelineCompletionResult):
+            return result
+        if _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.intersection(result.__dict__):
+            return KDibaPipelineCompletionResult.from_legacy_pipeline_completion_result(result)
+        return result
+
 
      # HDFMixin Conformances ______________________________________________________________________________________________ #
 
@@ -102,6 +119,33 @@ class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         #     outputs_global_key = f"{key}/outputs_global"
         #     for sub_k, sub_v in value.items():
         #         an_outputs_global_group[f'{outputs_global_key}/{sub_k}'] = str(sub_v)
+
+
+
+@custom_define(slots=False)
+class KDibaPipelineCompletionResult(PipelineCompletionResult):
+    """ KDiba-specific pipeline completion results with long/short epoch laps and replays. """
+    long_epoch_name: str = serialized_attribute_field()
+    long_laps: Epoch = serialized_field()
+    long_replays: Epoch = serialized_field()
+
+    short_epoch_name: str = serialized_attribute_field()
+    short_laps: Epoch = serialized_field()
+    short_replays: Epoch = serialized_field()
+
+
+    @classmethod
+    def from_legacy_pipeline_completion_result(cls, obj: PipelineCompletionResult) -> "KDibaPipelineCompletionResult":
+        """Build KDiba subclass from a legacy base instance that still carries KDiba attrs in __dict__."""
+        if isinstance(obj, cls):
+            return obj
+        kdiba_kwargs = {a_field_name: getattr(obj, a_field_name) for a_field_name in _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES if hasattr(obj, a_field_name)}
+        if not _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.issubset(kdiba_kwargs.keys()):
+            raise TypeError(f"Cannot migrate {type(obj).__name__} to {cls.__name__}: missing kdiba fields {sorted(_KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES - kdiba_kwargs.keys())}")
+        return cls(long_epoch_name=kdiba_kwargs['long_epoch_name'], long_laps=kdiba_kwargs['long_laps'], long_replays=kdiba_kwargs['long_replays'], short_epoch_name=kdiba_kwargs['short_epoch_name'], short_laps=kdiba_kwargs['short_laps'], short_replays=kdiba_kwargs['short_replays'], delta_since_last_compute=obj.delta_since_last_compute, outputs_local=obj.outputs_local, outputs_global=obj.outputs_global, across_session_results=obj.across_session_results)
+
+
+
 
 
 class PipelineCompletionResultTable(tb.IsDescription):
@@ -655,15 +699,17 @@ class BatchSessionCompletionHandler:
         """
         print(f'>>> on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): BEGIN ======')
         # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # Get existing laps from session:
-        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
-        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
-        if self.debug_print:
-            print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
+        is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
+        if is_kdiba_session:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            # Get existing laps from session:
+            long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
+            # short_replays.n_epochs: 6, long_replays.n_epochs: 8
+            if self.debug_print:
+                print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
+                print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
         was_updated = False
@@ -786,12 +832,10 @@ class BatchSessionCompletionHandler:
             
         print(f'<<< on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): COMPLETED ======')
 
-        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
-                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
-                                           delta_since_last_compute=delta_since_last_compute,
-                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
-                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps, 'recomputed_inst_fr_comps': _out_recomputed_inst_fr_comps, **across_session_results_extended_dict})
+        common_completion_result_kwargs = dict(delta_since_last_compute=delta_since_last_compute, outputs_local={'pkl': curr_active_pipeline.pickle_path}, outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path}, across_session_results={'inst_fr_comps': _out_inst_fr_comps, 'recomputed_inst_fr_comps': _out_recomputed_inst_fr_comps, **across_session_results_extended_dict})
+        if is_kdiba_session:
+            return KDibaPipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays, short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays, **common_completion_result_kwargs)
+        return PipelineCompletionResult(**common_completion_result_kwargs)
 
 
 

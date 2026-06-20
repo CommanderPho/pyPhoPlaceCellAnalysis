@@ -30,7 +30,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
-from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, KDibaPipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
@@ -336,6 +336,8 @@ class BatchRun(HDF_SerializationMixin):
 
         # BEGIN FUNCTION BODY
         global_batch_run = _try_load_global_batch_result()
+        if global_batch_run is not None:
+            global_batch_run.session_batch_outputs = {a_session_context: PipelineCompletionResult.migrate_session_batch_output(a_result) for a_session_context, a_result in global_batch_run.session_batch_outputs.items()}
         if (global_batch_run is not None) and (not skip_root_path_conversion):
             # One was loaded from file, meaning it has the potential to have the wrong paths. Check.
             global_batch_run.change_global_root_path(global_data_root_parent_path) # Convert the paths to work on the new system:
@@ -738,13 +740,20 @@ class BatchRun(HDF_SerializationMixin):
                     row = files_table.row
 
                     # Fill in the fields of the table with data from the PipelineCompletionResult object
-                    row['long_epoch_name'] = a_result.long_epoch_name
-                    row['long_n_laps'] = a_result.long_laps.n_epochs
-                    row['long_n_replays'] = a_result.long_replays.n_epochs
-                    
-                    row['short_epoch_name'] = a_result.short_epoch_name
-                    row['short_n_laps'] = a_result.short_laps.n_epochs
-                    row['short_n_replays'] = a_result.short_replays.n_epochs
+                    if isinstance(a_result, KDibaPipelineCompletionResult):
+                        row['long_epoch_name'] = a_result.long_epoch_name
+                        row['long_n_laps'] = a_result.long_laps.n_epochs
+                        row['long_n_replays'] = a_result.long_replays.n_epochs
+                        row['short_epoch_name'] = a_result.short_epoch_name
+                        row['short_n_laps'] = a_result.short_laps.n_epochs
+                        row['short_n_replays'] = a_result.short_replays.n_epochs
+                    else:
+                        row['long_epoch_name'] = ''
+                        row['long_n_laps'] = 0
+                        row['long_n_replays'] = 0
+                        row['short_epoch_name'] = ''
+                        row['short_n_laps'] = 0
+                        row['short_n_replays'] = 0
                     
 
 
@@ -870,7 +879,7 @@ class BatchResultDataframeAccessor():
         out_counts = []
         out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
         for ctx, output_v in global_batch_run.session_batch_outputs.items():
-            if output_v is not None:
+            if output_v is not None and isinstance(output_v, KDibaPipelineCompletionResult):
                 # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
                 # Extracting (long_laps, long_replays) tuple
                 long_laps = output_v.long_laps
