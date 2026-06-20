@@ -156,7 +156,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         x_coords = position_df['x'].values
         y_coords = position_df['y'].values
         
-        # Get placefield data: shape (n_neurons, y_bins, x_bins)
+        # Get placefield data: shape (n_neurons, x_bins, y_bins) — histogram2d stores x on axis 0, y on axis 1
         tuning_curves = ratemap.normalized_tuning_curves
         xbin = self.active_one_step_decoder.xbin
         ybin = self.active_one_step_decoder.ybin
@@ -171,7 +171,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         for neuron_idx in range(n_neurons):
             # Find peak location in 2D placefield
             placefield = tuning_curves[neuron_idx, :, :]
-            peak_y_idx, peak_x_idx = np.unravel_index(np.nanargmax(placefield), placefield.shape)
+            peak_x_idx, peak_y_idx = np.unravel_index(np.nanargmax(placefield), placefield.shape)
             
             # Get 2D coordinates of peak
             peak_x = xbin_centers[peak_x_idx]
@@ -274,7 +274,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         # Get placefield data
         ratemap = self.active_one_step_decoder.ratemap
-        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, y_bins, x_bins)
+        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, x_bins, y_bins)
         occupancy = ratemap.occupancy
         
         # Compute sorted cell indices by peak linearized position
@@ -475,7 +475,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         # Get placefield data
         ratemap = self.active_one_step_decoder.ratemap
-        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, y_bins, x_bins)
+        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, x_bins, y_bins)
         occupancy = ratemap.occupancy
         
         # Get sorted cell indices (computed once, cached if needed)
@@ -513,7 +513,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # pyqtgraph expects (H, W) for grayscale or (H, W, 3) for RGB color
             # We need to transpose and handle axis order, and convert to uint8
             if self.params.shared_axis_order == 'col-major':
-                # Image is (y_bins, x_bins), need to transpose for display
+                # Image is (x_bins, y_bins), need to transpose for pyqtgraph col-major display
                 colored_image_display = np.transpose(colored_image, (1, 0, 2))
             else:
                 colored_image_display = colored_image
