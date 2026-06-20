@@ -484,7 +484,7 @@ class BatchSessionCompletionHandler:
                 with matplotlib_file_only():
                     # Perform non-interactive Matplotlib operations with 'AGG' backend
                     # main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
-                    _rendering_out_dict = BapunBatchHelpers.run_all_rendering(curr_active_pipeline=curr_active_pipeline)
+                    _rendering_out_dict = BapunBatchHelpers.run_all_rendering(curr_active_pipeline=curr_active_pipeline, save_figures_only=True)
 
                 # IF thst's done, clear all the plots:
                 # from matplotlib import pyplot as plt

@@ -583,8 +583,11 @@ class BapunBatchHelpers:
 
 
     @classmethod
-    def run_all_rendering(cls, curr_active_pipeline):
+    def run_all_rendering(cls, curr_active_pipeline, save_figures_only:bool=False):
         """ runs all post-computation (plotting, rendering, etc) batch operations for the Bapun OpenFiled-type sessions 
+
+        Now attempting to be analagous to `pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper.main_complete_figure_generations` fcn for Bapun (non-KDiba) sessions.
+
         """
         from neuropy.utils.matplotlib_helpers import matplotlib_file_only, matplotlib_configuration, matplotlib_configuration_update
         from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
