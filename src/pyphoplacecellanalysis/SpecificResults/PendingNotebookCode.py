@@ -517,6 +517,184 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
 # - The "context axis" in the posterior is size-2 (maze1, maze2) rather than size-4 (long_LR, long_RL, short_LR, short_RL), matching the 2-decoder case detected by `is_track_identity_only_pseudo2D_decoder` in [`perform_compute_specific_marginals`](https://phohale.sourcegraph.app/r/github.com/CommanderPho/pyPhoPlaceCellAnalysis/-/blob/src/pyphoplacecellanalysis/General/Pipeline/Stages/ComputationFunctions/MultiContextComputationFunctions/DirectionalPlacefieldGlobalComputationFunctions.py?L1682-1690).
 # - `DecodedContextCorrectnessArraysTuple.is_decoded_dir_correct` is set to all-True as direction is not being discriminated; only context identity is evaluated.
 
+from sklearn.metrics import mean_squared_error
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult
+# from neuropy.core.epoch import EpochHelpers
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting, get_proper_global_spikes_df, CustomDecodeEpochsResult
+
+@metadata_attributes(short_name=None, tags=['performance', 'laps', 'position', 'Bapun', '2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-06-20 10:15', related_items=[])
+class BapunPositionDecodingPerformance:
+    """ helps evaluate the performance of the position decoders
+
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+
+    test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline, laps_decoding_time_bin_size=0.250)
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm')
+
+    """
+
+    @classmethod
+    def compute_max_possible_maze_err_cm(cls, curr_active_pipeline):
+        ## compute the maximum error in cm from only the observed positions:
+        pos_df = curr_active_pipeline.sess.position.to_dataframe()
+        
+        pos_column_names = ['x', 'y'] # , 'lin_pos'
+        ## get the nanmin/nanmax of each column, excluding values that exceed the 95% outlier criteria (filtering out rare jumps from position tracking errors)
+        # pos_df[pos_column_names]
+
+        # Calculate the bounds for the central 95% of the data (ignoring NaNs automatically)
+        robust_mins = pos_df[pos_column_names].quantile(0.025)
+        robust_maxs = pos_df[pos_column_names].quantile(0.975)
+
+        # print("Robust Minimums:\n", robust_mins)
+        # print("\nRobust Maximums:\n", robust_maxs)
+
+        # robust_mins.to_numpy(), robust_maxs.to_numpy() 
+
+        range_x, range_y = np.squeeze(robust_maxs.to_numpy() - robust_mins.to_numpy())
+        # range_x, range_y
+        observed_pos_range_max_distance_cm: float = np.sqrt(np.sum(np.power(([range_x, range_y]), 2)))
+        return observed_pos_range_max_distance_cm
+
+    @function_attributes(short_name=None, tags=['MAIN', 'bapun', 'train-test', 'decoder', 'error], input_requires=[], output_provides=[], uses=['compute_train_test_split_epochs_decoders'], used_by=[], creation_date='2026-06-20 10:14', related_items=[])
+    @classmethod
+    def compute_bapun_train_test_decoder_error_distance(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False):
+        """ computes new decoders based on the "train" data -- defined as a certain percentage of each lap, and then determine the decoder errors per lap (in cm) for each lap
+
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting, get_proper_global_spikes_df, CustomDecodeEpochsResult
+
+        test_data_portion: float = 1.0 - training_data_portion # test data portion is 1/6 of the total duration
+
+        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
+
+        # laps_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.laps.to_dataframe())
+
+        # laps_training_df, laps_test_df = EpochHelpers.split_epochs_into_training_and_test(epochs_df=laps_df, training_data_portion=training_data_portion, debug_print=debug_print)
+
+        # laps_df
+        # laps_training_df
+        # laps_test_df 
+
+        ## 2026-06-19 - Working part
+
+        # OpenField: maze_epoch_names=['roam', 'sprinkle']  |  TwoMaze: ['maze1', 'maze2']
+        train_test_result = compute_train_test_split_epochs_decoders(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, training_data_portion=training_data_portion, debug_print=debug_print)
+
+        global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
+        test_decode_results: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_pf1D_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
+
+        ## INPUTS: test_decode_results
+        global_measured_position_df: pd.DataFrame = curr_active_pipeline.sess.position.to_dataframe().dropna(subset=['lap'])
+
+        # test only (held-out)
+        test_measured, test_decoded, test_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results, global_measured_position_df=global_measured_position_df)
+        for k, df in test_err_df_dict.items():
+            df['maze'] = k
+        test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
+
+        # Performed 2 aggregations grouped on column: 'maze'
+        test_err_agg_df = test_err_df.groupby(['maze']).agg(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean')).reset_index()
+
+        # ## INPUTS: test_err_df_dict
+        # test_err_df_dict = {k:an_err_df.rename(columns={'sq_err': f'sq_err_{k}', 'err_cm': f'err_cm_{k}'}) for k, an_err_df in test_err_df_dict.items()}
+        # test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
+        test_err_df
+
+        ## OUTPUTS: test_err_df, test_err_agg_df
+        test_err_agg_df
+
+        # # optional: decode train epochs too for comparison
+        # train_decode_results = TrainTestLapsSplitting.decode_using_new_decoders(
+        #     get_proper_global_spikes_df(curr_active_pipeline),
+        #     train_test_result.train_lap_specific_pf1D_Decoder_dict,
+        #     train_test_result.train_epochs_dict,
+        #     laps_decoding_time_bin_size=0.250, # 250ms
+        # )
+        # train_measured, train_decoded, train_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(train_decode_results, global_measured_position_df=global_measured_position_df)
+
+        # ## INPUTS: train_err_df_dict
+        # train_err_df_dict = {k:train_err_df.rename(columns={'sq_err': f'sq_err_{k}', 'err_cm': f'err_cm_{k}'}) for k, train_err_df in train_err_df_dict.items()}
+        # train_err_df: pd.DataFrame = pd.concat(list(train_err_df_dict.values()))
+        # train_err_df
+
+        # train_measured
+        # train_decoded
+        ## OUTPUTS: train_err_df_dict, test_err_df_dict
+        # test_err_df_dict
+
+        return (test_err_agg_df, test_err_df, test_decode_results)
+
+
+    @function_attributes(short_name=None, tags=['plot', 'bapun', 'train-test', 'decoder', 'figure'], input_requires=[], output_provides=[], uses=['compute_max_possible_maze_err_cm'], used_by=[], creation_date='2026-06-20 09:47', related_items=[])
+    @classmethod
+    def perform_plot_test_decoder_performance_error_distance(cls, curr_active_pipeline, test_err_df: pd.DataFrame, y_col_name='sq_err', title_string: str = 'Test Lap Decoded vs Measured Position Squared Error', subtitle_string: Optional[str] = None, ax = None):
+        """ plots the train/test split performance results across laps/time
+        """
+        from flexitext import flexitext
+        from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+        def _subfn_plot_max_possible_maze_err_cm(observed_pos_range_max_distance_cm, ax):
+            # a_max_line = ax.hlines(observed_pos_range_max_distance_cm)
+
+            # a_max_line = ax.hlines(observed_pos_range_max_distance_cm)
+            # Assuming 'ax' is your existing Axes object and 'y_value' is where you want the line
+            a_max_line = ax.axhline(y=observed_pos_range_max_distance_cm, color='r', linestyle='--', linewidth=1.5, )
+            # 1. Plot the horizontal line
+
+            # 2. Add the text label at the right edge of the plot
+            a_max_line_label = ax.text(
+                x=0.01,                      # 0.01 puts it just slightly off the left edge (0.0 is the exact edge)
+                # x=1.01,                      # Just past the right edge (1.0 is the far right)
+                y=observed_pos_range_max_distance_cm,                   # Align perfectly with the line's y-value
+                s=f"Max Err [cm]: {observed_pos_range_max_distance_cm:.2f}",   # Your label string
+                color='r',
+                va='top',                    # 'top' means the top of the text sits on the y-value (pushing text below the line)
+                # va='bottom',                    # 'top' means the top of the text sits on the y-value (pushing text below the line)
+                ha='left',                   # 'left' aligns the left side of the text with your x-coordinate
+                transform=ax.get_yaxis_transform() # Crucial: x is in axes coords (0-1), y is in data coords
+            )
+
+            ax.set_ylim([0.0, observed_pos_range_max_distance_cm + (observed_pos_range_max_distance_cm * 0.02)])
+            return {'max_line': a_max_line, 'max_line_label': a_max_line_label}
+
+        observed_pos_range_max_distance_cm: float = cls.compute_max_possible_maze_err_cm(curr_active_pipeline)
+
+
+        if subtitle_string is None:
+            subtitle_string = f'metric: {y_col_name}, all_epochs'
+
+        active_context = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_sq_err')
+        title_string = 'Test Lap Decoded vs Measured Position Error'
+        
+        ax = test_err_df.plot.scatter(x='t', y=y_col_name, ax=ax)
+        # ax = test_err_df.plot.scatter(x='t', y='sq_err_sprinkle', ax=ax, color='orange', label='sprinkle')
+
+        ## split by maze mode:
+        # ax = test_err_df.plot.scatter(x='t', y='sq_err_roam', label='roam')
+        # ax = test_err_df.plot.scatter(x='t', y='sq_err_sprinkle', ax=ax, color='orange', label='sprinkle')
+
+        _max_line_artists = _subfn_plot_max_possible_maze_err_cm(observed_pos_range_max_distance_cm=observed_pos_range_max_distance_cm, ax=ax)
+
+        fig = ax.get_figure()
+        ax.legend()
+        fig.suptitle('')
+        ax.set_title('')
+
+        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.82, left_margin=0.18, right_margin=0.95, bottom_margin=0.18)
+        text_formatter.setup_margins(fig)
+        flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction")
+        text_formatter.add_flexitext_context_footer(active_context=active_context)
+        fig.canvas.manager.set_window_title(f'{title_string} - {active_context.get_description(separator=" | ")}')
+
+        return fig, ax
+
+
+
+
 
 
 
