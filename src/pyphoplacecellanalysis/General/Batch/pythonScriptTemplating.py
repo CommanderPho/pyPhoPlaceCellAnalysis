@@ -333,7 +333,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
-         batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+         batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, session_global_data_root_parent_paths: Optional[Dict[IdentifyingContext, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -444,7 +444,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         if curr_session_context not in session_batch_basedirs:
             print(f'WARN: skipping script generation for {curr_session_context}: no session basedir in session_batch_basedirs')
             continue
-        curr_session_basedir = session_batch_basedirs[curr_session_context]        
+        curr_session_basedir = session_batch_basedirs[curr_session_context]
+        curr_global_data_root_parent_path = (session_global_data_root_parent_paths or {}).get(curr_session_context, global_data_root_parent_path)
         if (job_suffix is not None) and (len(job_suffix) > 0):
             curr_session_complete_identifier: str = f"{curr_session_context}_{job_suffix}"
         else:
@@ -471,7 +472,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         # Run Script _________________________________________________________________________________________________________ #
         python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
         with open(python_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                     curr_session_complete_identifier=curr_session_complete_identifier,
                                                     job_suffix=job_suffix,
@@ -489,7 +490,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         # Figures Script _____________________________________________________________________________________________________ #
         python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
         with open(python_figures_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                     curr_session_complete_identifier=curr_session_complete_identifier,
                                                     job_suffix=job_suffix,
@@ -533,7 +534,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
             script_path = Path(python_script_path).resolve()
             _temp_notebook_python_script_path = Path(os.path.join(curr_batch_script_rundir, f'_TEMP_NOTEBOOK_run_{curr_session_context}.py'))
             with open(_temp_notebook_python_script_path, 'wb') as script_file:
-                script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
+                script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
                                                         curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
                                                         curr_session_basedir=curr_session_basedir, 
                                                         batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
