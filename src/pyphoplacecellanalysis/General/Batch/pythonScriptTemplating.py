@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import platform
 import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
@@ -317,6 +318,15 @@ class ProcessingScriptPhases(Enum):
         return _out_run_config
 
 
+def build_slurm_job_name(curr_session_context: str, job_suffix: Optional[str] = None, max_length: int = 64) -> str:
+    """Build a Slurm-safe job name. Unquoted #SBATCH --job-name values are split on commas (e.g. qclu_[1, 2, 4])."""
+    raw_name = f"job_{curr_session_context}"
+    if job_suffix:
+        raw_name = f"{raw_name}_{job_suffix}"
+    safe_name = re.sub(r'[\[\],\s]+', '-', raw_name).strip('-')
+    return safe_name[:max_length]
+
+
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
          create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
@@ -354,8 +364,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     """
     def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_curr_session_complete_identifier, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None, a_venv_activate_path: Optional[str]=None):
         slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_complete_identifier}.sh')
+        slurm_job_name = build_slurm_job_name(curr_session_context=f"{a_curr_session_context}", job_suffix=job_suffix)
         with open(slurm_script_path, 'w') as script_file:
-            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, job_suffix=job_suffix, venv_activate_path=a_venv_activate_path)
+            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", slurm_job_name=slurm_job_name, python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, venv_activate_path=a_venv_activate_path)
             script_file.write(script_content)
         return slurm_script_path
     
