@@ -3440,68 +3440,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 # Bapun Train-Test Decoder Error                                                                                       #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'error'], input_requires=[], output_provides=[], uses=['compute_train_test_split_epochs_decoders', 'TrainTestLapsSplitting.decode_using_new_decoders', 'CustomDecodeEpochsResult.build_measured_decoded_position_comparison'], used_by=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'], creation_date='2026-06-19 12:00', related_items=[])
-def compute_bapun_train_test_decoder_error_distance(curr_active_pipeline, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, Dict]:
-    """Computes train-only decoders per Bapun maze context, decodes held-out test lap segments, and returns per-time-bin and aggregated decoder error (cm).
-
-    OpenField contexts: roam / sprinkle. TwoMaze contexts: maze1 / maze2.
-
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance
-
-    test_err_agg_df, test_err_df, test_decode_results = compute_bapun_train_test_decoder_error_distance(curr_active_pipeline, laps_decoding_time_bin_size=0.250)
-    """
-    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting, get_proper_global_spikes_df, CustomDecodeEpochsResult
-
-    test_data_portion: float = 1.0 - training_data_portion
-    if debug_print:
-        print(f'training_data_portion: {training_data_portion}, test_data_portion: {test_data_portion}')
-
-    train_test_result = compute_train_test_split_epochs_decoders(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, training_data_portion=training_data_portion, debug_print=debug_print)
-    global_spikes_df: pd.DataFrame = get_proper_global_spikes_df(curr_active_pipeline)
-    test_decode_results: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_pf1D_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
-
-    global_measured_position_df: pd.DataFrame = curr_active_pipeline.sess.position.to_dataframe().dropna(subset=['lap'])
-    _test_measured, _test_decoded, test_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results, global_measured_position_df=global_measured_position_df)
-    for k, df in test_err_df_dict.items():
-        df['maze'] = k
-    test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
-    test_err_agg_df = test_err_df.groupby(['maze']).agg(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean')).reset_index()
-    return test_err_agg_df, test_err_df, test_decode_results
-
-
-
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure'], input_requires=[], output_provides=[], uses=['flexitext', 'FormattedFigureText'], used_by=['figures_plot_bapun_train_test_decoder_error_distance_completion_function'], creation_date='2026-06-19 12:00', related_items=['compute_bapun_train_test_decoder_error_distance'])
-def perform_plot_bapun_test_decoder_performance_error_distance(curr_active_pipeline, test_err_df: pd.DataFrame, title_string: str = 'Test Lap Decoded vs Measured Position Squared Error', subtitle_string: Optional[str] = None):
-    """Plots held-out test lap decoder squared error vs time, colored by maze context."""
-    from flexitext import flexitext
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-
-    if subtitle_string is None:
-        subtitle_string = ' vs '.join(sorted(test_err_df['maze'].dropna().unique()))
-
-    active_context = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_sq_err')
-    ax = None
-    maze_color_map = {'roam': 'C0', 'sprinkle': 'C1', 'maze1': 'C0', 'maze2': 'C1'}
-    for a_maze_name, a_maze_df in test_err_df.groupby('maze'):
-        ax = a_maze_df.plot.scatter(x='t', y='sq_err', ax=ax, color=maze_color_map.get(a_maze_name, None), label=a_maze_name)
-    assert ax is not None, 'test_err_df has no maze groups to plot'
-    fig = ax.get_figure()
-    ax.legend()
-    fig.suptitle('')
-    ax.set_title('')
-
-    text_formatter = FormattedFigureText.init_from_margins(top_margin=0.82, left_margin=0.18, right_margin=0.95, bottom_margin=0.18)
-    text_formatter.setup_margins(fig)
-    flexitext(0.01, 0.85, f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>', va="bottom", xycoords="figure fraction")
-    text_formatter.add_flexitext_context_footer(active_context=active_context)
-    fig.canvas.manager.set_window_title(f'{title_string} - {active_context.get_description(separator=" | ")}')
-    return fig, ax
-
-
-
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['compute_bapun_train_test_decoder_error_distance'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function'])
 def compute_and_export_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, save_csv: bool = True, debug_print: bool = False) -> dict:
     """Computes Bapun train/test lap decoder error and exports per-bin and aggregated CSVs to collected_outputs.
 
@@ -3511,7 +3450,8 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     """
     import sys
     from pyphocorehelpers.exception_helpers import CapturedException
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance
+    # from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
         print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
@@ -3529,7 +3469,8 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     err = None
 
     try:
-        test_err_agg_df, test_err_df, test_decode_results = compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
+        test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
+
         callback_outputs['test_err_agg_df'] = test_err_agg_df
         callback_outputs['test_decode_results_keys'] = list(test_decode_results.keys())
 
@@ -3556,11 +3497,11 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
 
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['perform_plot_bapun_test_decoder_performance_error_distance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False) -> dict:
     """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance, perform_plot_bapun_test_decoder_performance_error_distance
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
         print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
@@ -3585,14 +3526,14 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
     elif force_recompute:
         print(f'\tCSV not found; force_recompute=True, recomputing test_err_df...')
-        _test_err_agg_df, test_err_df, _test_decode_results = compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
     else:
         print(f'WARN: test_err_df CSV not found at "{test_err_df_csv_path}" and force_recompute=False; skipping figure export.')
         across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
         print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         return across_session_results_extended_dict
 
-    fig, ax = perform_plot_bapun_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df)
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_bapun_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df)
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
     display_context = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_sq_err')
