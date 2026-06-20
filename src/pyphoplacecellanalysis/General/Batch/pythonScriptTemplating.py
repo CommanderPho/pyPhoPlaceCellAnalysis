@@ -323,7 +323,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
-        batch_session_completion_handler_kwargs: Optional[Dict]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+        batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -352,17 +352,17 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         
     """
-    def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None):
-        slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_context}.sh')
+    def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_curr_session_complete_identifier, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None, a_venv_activate_path: Optional[str]=None):
+        slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_complete_identifier}.sh')
         with open(slurm_script_path, 'w') as script_file:
-            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, job_suffix=job_suffix)
+            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, job_suffix=job_suffix, venv_activate_path=a_venv_activate_path)
             script_file.write(script_content)
         return slurm_script_path
     
-    def _subfn_build_non_slurm_bash_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_bash_script_name_prefix:str='run'):
-        bash_script_path = os.path.join(curr_batch_script_rundir, f'{a_bash_script_name_prefix}_{a_curr_session_context}.sh')
+    def _subfn_build_non_slurm_bash_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_curr_session_complete_identifier, a_bash_script_name_prefix:str='run', a_venv_activate_path: Optional[str]=None):
+        bash_script_path = os.path.join(curr_batch_script_rundir, f'{a_bash_script_name_prefix}_{a_curr_session_complete_identifier}.sh')
         with open(bash_script_path, 'w') as script_file:
-            script_content = bash_non_slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+            script_content = bash_non_slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, venv_activate_path=a_venv_activate_path)
             script_file.write(script_content)
         return bash_script_path
 
@@ -409,6 +409,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     slurm_template = env.get_template('slurm_template.sh.j2')
     bash_non_slurm_template = env.get_template('bash_template.sh.j2')
 
+    if venv_activate_path is None:
+        _python_executable = Path(sys.executable).resolve()
+        _candidate_activate = _python_executable.parent / 'activate'
+        venv_activate_path = str(_candidate_activate) if _candidate_activate.exists() else '/home/halechr/repos/Spike3D/.venv/bin/activate'
+
     output_python_scripts = []
     output_jupyter_notebooks = []
     
@@ -432,9 +437,14 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         if use_separate_run_directories:
             curr_batch_script_rundir = os.path.join(output_directory, f"run_{curr_session_context}") # "gen_scripts/run_kdiba_gor01_one_2006-6-07_11-26-53/"
+            if batch_script_subdirectory is not None:
+                curr_batch_script_rundir = os.path.join(curr_batch_script_rundir, batch_script_subdirectory)
             os.makedirs(curr_batch_script_rundir, exist_ok=True)
         else:
             curr_batch_script_rundir = output_directory
+            if batch_script_subdirectory is not None:
+                curr_batch_script_rundir = os.path.join(curr_batch_script_rundir, batch_script_subdirectory)
+                os.makedirs(curr_batch_script_rundir, exist_ok=True)
 
         rs_kwargs_base = dict(renderer_script_generation_kwargs.get('run_specific_batch_kwargs') or {})
         run_specific_batch_kwargs_for_run_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': (getattr(curr_session_context, 'format_name', None) == 'bapun')}
@@ -460,7 +470,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         # output_python_scripts.append(python_script_path)
 
         # Figures Script _____________________________________________________________________________________________________ #
-        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_context}.py') ## #TODO 2025-07-09 04:50: - [ ] Only need one figures script, not a bunch of them for each configuration
+        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
         with open(python_figures_script_path, 'wb') as script_file:
             script_content = python_template.render(global_data_root_parent_path=global_data_root_parent_path,
                                                     curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
@@ -483,22 +493,22 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         # Create the SLURM script
         if create_slurm_scripts:
             if should_generate_run_scripts:
-                slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='run', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix)
+                slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='run', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['run'].append(slurm_run_script_path)
 
             if should_generate_figure_scripts or should_perform_figure_generation_to_file:
-                slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_slurm_script_name_prefix='figs', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix)
+                slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='figs', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['figs'].append(slurm_figure_script_path)
 
 
         ## Create the non-slurm bash script:
         if create_non_slurm_bash_scripts:
             if should_generate_run_scripts:
-                bash_run_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_bash_script_name_prefix='run')
+                bash_run_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='run', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['run'].append(bash_run_script_path)
 
             if should_generate_figure_scripts or should_perform_figure_generation_to_file:
-                bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_bash_script_name_prefix='figs')
+                bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='figs', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['figs'].append(bash_figure_script_path)
 
 
