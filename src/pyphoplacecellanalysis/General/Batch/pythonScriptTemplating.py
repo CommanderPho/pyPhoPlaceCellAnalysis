@@ -423,7 +423,9 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     if venv_activate_path is None:
         _python_executable = Path(sys.executable).resolve()
         _candidate_activate = _python_executable.parent / 'activate'
-        venv_activate_path = str(_candidate_activate) if _candidate_activate.exists() else '/home/halechr/repos/Spike3D/.venv/bin/activate'
+        # venv_activate_path = str(_candidate_activate) if _candidate_activate.exists() else '/home/halechr/repos/Spike3D/.venv/bin/activate'
+        venv_activate_path = str(_candidate_activate) if _candidate_activate.exists() else '/scratch/kdiba_root/kdiba99/halechr/repos/Spike3D_ExploreEnv/Spike3D/.venv/bin/activate'
+
 
     output_python_scripts = []
     output_jupyter_notebooks = []
