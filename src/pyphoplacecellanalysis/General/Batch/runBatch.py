@@ -30,7 +30,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
-from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, KDibaPipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, KDibaPipelineCompletionResult, PipelineCompletionResultTable, KDibaPipelineCompletionResultTable, fill_pipeline_completion_result_table_common_row_fields, fill_kdiba_pipeline_completion_result_table_row_from_result, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
@@ -727,8 +727,9 @@ class BatchRun(HDF_SerializationMixin):
             # Create a new group at the specified key
             root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
 
-            # Create a new table for each PipelineCompletionResult object
-            files_table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+            has_kdiba_results = any(isinstance(a_result, KDibaPipelineCompletionResult) for a_result in session_batch_outputs if a_result is not None)
+            table_class = KDibaPipelineCompletionResultTable if has_kdiba_results else PipelineCompletionResultTable
+            files_table = h5file.create_table(root_group, f"batch_run_table", table_class) # the table is actually at the top level yeah? Each session only has one of these?
             
             # table.
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
@@ -739,32 +740,10 @@ class BatchRun(HDF_SerializationMixin):
                     
                     row = files_table.row
 
-                    # Fill in the fields of the table with data from the PipelineCompletionResult object
-                    if isinstance(a_result, KDibaPipelineCompletionResult):
-                        row['long_epoch_name'] = a_result.long_epoch_name
-                        row['long_n_laps'] = a_result.long_laps.n_epochs
-                        row['long_n_replays'] = a_result.long_replays.n_epochs
-                        row['short_epoch_name'] = a_result.short_epoch_name
-                        row['short_n_laps'] = a_result.short_laps.n_epochs
-                        row['short_n_replays'] = a_result.short_replays.n_epochs
+                    if has_kdiba_results:
+                        fill_kdiba_pipeline_completion_result_table_row_from_result(row, a_result)
                     else:
-                        row['long_epoch_name'] = ''
-                        row['long_n_laps'] = 0
-                        row['long_n_replays'] = 0
-                        row['short_epoch_name'] = ''
-                        row['short_n_laps'] = 0
-                        row['short_n_replays'] = 0
-                    
-
-
-
-                    # Convert timedelta to seconds and then to nanoseconds
-                    time_in_seconds = a_result.delta_since_last_compute.total_seconds()
-                    time_in_nanoseconds = int(time_in_seconds * 1e9)
-                    # Convert to np.int64 (64-bit integer) for tb.Time64Col()
-                    time_as_np_int64 = np.int64(time_in_nanoseconds)
-
-                    row['delta_since_last_compute'] = time_as_np_int64
+                        fill_pipeline_completion_result_table_common_row_fields(row, a_result)
 
                     # Handle outputs_local and outputs_global dictionaries
                     # if result.outputs_local is not None:

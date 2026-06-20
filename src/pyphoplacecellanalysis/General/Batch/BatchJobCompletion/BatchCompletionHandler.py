@@ -28,6 +28,7 @@ from neuropy.utils.result_context import IdentifyingContext
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
 _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES = frozenset({'long_epoch_name', 'long_laps', 'long_replays', 'short_epoch_name', 'short_laps', 'short_replays'})
+_KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES = frozenset({'long_epoch_name', 'long_n_laps', 'long_n_replays', 'short_epoch_name', 'short_n_laps', 'short_n_replays'})
 
 @unique
 class SavingOptions(Enum):
@@ -149,24 +150,54 @@ class KDibaPipelineCompletionResult(PipelineCompletionResult):
 
 
 class PipelineCompletionResultTable(tb.IsDescription):
-    """ PyTables class representing epoch data built from a dictionary. """
+    """PyTables row schema for format-agnostic pipeline completion summary."""
+    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
+
+
+
+class KDibaPipelineCompletionResultTable(PipelineCompletionResultTable):
+    """PyTables row schema for KDiba long/short lap/replay counts."""
     long_epoch_name = tb.StringCol(itemsize=100)
-    # long_laps = EpochTable()
-    # long_replays = EpochTable()
     long_n_laps = tb.UInt16Col()
     long_n_replays = tb.UInt16Col()
     short_epoch_name = tb.StringCol(itemsize=100)
-    # short_laps = EpochTable()
-    # short_replays = EpochTable()
     short_n_laps = tb.UInt16Col()
     short_n_replays = tb.UInt16Col()
 
-    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
 
-    # outputs_local = OutputFilesTable()
-    # outputs_global = OutputFilesTable()
 
-    # across_sessions_batch_results_inst_fr_comps = tb.StringCol(itemsize=100)
+def fill_pipeline_completion_result_table_common_row_fields(row, a_result: PipelineCompletionResult):
+    time_in_nanoseconds = int(a_result.delta_since_last_compute.total_seconds() * 1e9)
+    row['delta_since_last_compute'] = np.int64(time_in_nanoseconds)
+
+
+def fill_kdiba_pipeline_completion_result_table_kdiba_row_fields(row, a_result: KDibaPipelineCompletionResult):
+    row['long_epoch_name'] = a_result.long_epoch_name
+    row['long_n_laps'] = a_result.long_laps.n_epochs
+    row['long_n_replays'] = a_result.long_replays.n_epochs
+    row['short_epoch_name'] = a_result.short_epoch_name
+    row['short_n_laps'] = a_result.short_laps.n_epochs
+    row['short_n_replays'] = a_result.short_replays.n_epochs
+
+
+def fill_kdiba_pipeline_completion_result_table_row_from_result(row, a_result: PipelineCompletionResult):
+    if isinstance(a_result, KDibaPipelineCompletionResult):
+        fill_kdiba_pipeline_completion_result_table_kdiba_row_fields(row, a_result)
+    else:
+        row['long_epoch_name'] = ''
+        row['long_n_laps'] = 0
+        row['long_n_replays'] = 0
+        row['short_epoch_name'] = ''
+        row['short_n_laps'] = 0
+        row['short_n_replays'] = 0
+    fill_pipeline_completion_result_table_common_row_fields(row, a_result)
+
+
+def resolve_pipeline_completion_result_table_class_from_hdf_colnames(colnames) -> type:
+    """Return KDiba subclass if legacy/full schema columns are present."""
+    if _KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES.intersection(colnames):
+        return KDibaPipelineCompletionResultTable
+    return PipelineCompletionResultTable
 
 
 @define(slots=False, repr=False)
