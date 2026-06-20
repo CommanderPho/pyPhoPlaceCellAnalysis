@@ -557,6 +557,7 @@ class BapunPositionDecodingPerformance:
         observed_pos_range_max_distance_cm: float = np.sqrt(np.sum(np.power(([range_x, range_y]), 2)))
         return observed_pos_range_max_distance_cm
 
+
     @function_attributes(short_name=None, tags=['MAIN', 'bapun', 'train-test', 'decoder', 'error'], input_requires=[], output_provides=[], uses=['compute_train_test_split_epochs_decoders'], used_by=[], creation_date='2026-06-20 10:14', related_items=[])
     @classmethod
     def compute_bapun_train_test_decoder_error_distance(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False):

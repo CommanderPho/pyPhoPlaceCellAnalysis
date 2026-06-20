@@ -3440,19 +3440,26 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 # Bapun Train-Test Decoder Error                                                                                       #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'])
 def compute_and_export_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, save_csv: bool = True, debug_print: bool = False) -> dict:
-    """Computes Bapun train/test lap decoder error and exports per-bin and aggregated CSVs to collected_outputs.
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, save_csv: bool = True, evaluate_context_decoder: bool = True, debug_print: bool = False) -> dict:
+    """Computes Bapun train/test lap decoder error and two-maze context decoder performance; exports CSVs to collected_outputs.
+
+    Train/test position decoding and context decoder evaluation each run in separate try/except blocks.
+    Context decoder failures are logged and stored in ``context_decoder_error`` but never re-raised,
+    even when ``self.fail_on_exception`` is True.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_bapun_train_test_decoder_error_distance_completion_function
 
     callback_outputs = across_session_results_extended_dict['compute_and_export_bapun_train_test_decoder_error_distance_completion_function']
+    test_err_agg_df = callback_outputs['test_err_agg_df']
+    context_decoder_overall_percent_correct = callback_outputs['context_decoder_overall_percent_correct']
+    context_decoder_combined_laps_df = callback_outputs['context_decoder_combined_laps_df']
     """
     import sys
     from pyphocorehelpers.exception_helpers import CapturedException
-    # from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_bapun_train_test_decoder_error_distance
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
         print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
@@ -3466,7 +3473,12 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-    callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size}
+    resolved_maze_epoch_names: Optional[List[str]] = maze_epoch_names
+    if resolved_maze_epoch_names is None:
+        hardcoded_params = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+        resolved_maze_epoch_names = hardcoded_params.non_global_activity_session_names
+
+    callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size, 'context_decoder_evaluated': False, 'context_decoder_maze_epoch_names': None, 'context_decoder_overall_percent_correct': None, 'context_decoder_per_maze_percent_correct': None, 'context_decoder_combined_laps_df': None, 'context_decoder_summary_agg_df': None, 'context_decoder_laps_csv_path': None, 'context_decoder_summary_agg_csv_path': None, 'context_decoder_skip_reason': None, 'context_decoder_error': None}
     err = None
 
     try:
@@ -3488,9 +3500,54 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"ERROR: compute_and_export_bapun_train_test_decoder_error_distance_completion_function encountered exception {err}")
+        print(f"ERROR: compute_and_export_bapun_train_test_decoder_error_distance_completion_function train/test decoder error encountered exception {err}")
         if self.fail_on_exception:
             raise err.exc
+
+    if evaluate_context_decoder:
+        try:
+            if len(resolved_maze_epoch_names) != 2:
+                callback_outputs['context_decoder_skip_reason'] = f'expected exactly 2 maze_epoch_names, got {resolved_maze_epoch_names}'
+                print(f'WARN: context decoder evaluation skipped for {curr_session_context}: {callback_outputs["context_decoder_skip_reason"]}')
+            else:
+                context_result = evaluate_bapun_context_decoder_performance(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=resolved_maze_epoch_names, laps_decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=debug_print)
+                context_decoder_per_maze_percent_correct: Dict[str, float] = {maze_name: correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly for maze_name, correctness in context_result.per_maze_context_correctness.items()}
+                context_decoder_summary_rows: List[dict] = []
+                for maze_name, correctness in context_result.per_maze_context_correctness.items():
+                    n_laps = len(context_result.per_maze_laps_marginals_df[maze_name])
+                    pct = correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly
+                    context_decoder_summary_rows.append({'maze': maze_name, 'n_laps': n_laps, 'percent_context_correct': pct, 'n_correct': int(round(pct * n_laps))})
+                n_total_laps = len(context_result.combined_laps_df)
+                n_total_correct = int(context_result.combined_laps_df['is_context_correct'].sum())
+                context_decoder_summary_rows.append({'maze': 'OVERALL', 'n_laps': n_total_laps, 'percent_context_correct': context_result.overall_percent_correct, 'n_correct': n_total_correct})
+                context_decoder_summary_agg_df = pd.DataFrame(context_decoder_summary_rows)
+
+                callback_outputs['context_decoder_evaluated'] = True
+                callback_outputs['context_decoder_maze_epoch_names'] = list(resolved_maze_epoch_names)
+                callback_outputs['context_decoder_overall_percent_correct'] = context_result.overall_percent_correct
+                callback_outputs['context_decoder_per_maze_percent_correct'] = context_decoder_per_maze_percent_correct
+                callback_outputs['context_decoder_combined_laps_df'] = context_result.combined_laps_df
+                callback_outputs['context_decoder_summary_agg_df'] = context_decoder_summary_agg_df
+
+                print(f'\tOverall context-correct: {context_result.overall_percent_correct:.1%}')
+                for maze_name, pct in context_decoder_per_maze_percent_correct.items():
+                    print(f'\t  {maze_name}: {pct:.1%}')
+
+                if save_csv:
+                    context_decoder_laps_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_context_decoder_laps.csv').resolve()
+                    context_decoder_summary_agg_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_context_decoder_summary_agg.csv').resolve()
+                    context_result.combined_laps_df.to_csv(context_decoder_laps_csv_path, index=False)
+                    context_decoder_summary_agg_df.to_csv(context_decoder_summary_agg_csv_path, index=False)
+                    callback_outputs['context_decoder_laps_csv_path'] = context_decoder_laps_csv_path
+                    callback_outputs['context_decoder_summary_agg_csv_path'] = context_decoder_summary_agg_csv_path
+                    print(f'\tsaved context_decoder combined_laps_df CSV: "{context_decoder_laps_csv_path}"')
+                    print(f'\tsaved context_decoder summary_agg_df CSV: "{context_decoder_summary_agg_csv_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            context_err = CapturedException(e, exception_info)
+            callback_outputs['context_decoder_error'] = context_err
+            print(f"WARN: context decoder evaluation failed independently of train/test position decoding for {curr_session_context}: {context_err}")
 
     across_session_results_extended_dict['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
