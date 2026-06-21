@@ -3973,11 +3973,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 else:
                     raise NotImplementedError(f'needs displayman!')
 
-                relative_data_output_parent_folder = Path('data').resolve()
-                Assert.path_exists(relative_data_output_parent_folder)
-
                 ## INPUTS: im_posterior_x_stack, track_labels, 
-                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf')
                 print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
                 ## Export the wrapped tracks:
                 included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)

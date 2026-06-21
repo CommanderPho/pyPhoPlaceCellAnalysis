@@ -1618,6 +1618,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
+        if dDisplayItem is not None and getattr(dDisplayItem.config, 'showTimelineSyncModeButton', True):
+            self._connect_dock_timeline_sync_mode_button(dDisplayItem, name)
+
         return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 
@@ -1678,6 +1681,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if sync_mode is not None:
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
+
+        if dDisplayItem is not None and getattr(dDisplayItem.config, 'showTimelineSyncModeButton', True):
+            self._connect_dock_timeline_sync_mode_button(dDisplayItem, name)
             
         return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item, dDisplayItem
     
@@ -1828,6 +1834,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 return None
 
             elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
+                # disable any existing sync connection before re-linking
+                sync_connection = self.ui.connections.get(identifier, None)
+                if sync_connection is not None:
+                    print(f'\tdisconnecting window_scrolled for "{identifier}"')
+                    self.window_scrolled.disconnect(sync_connection)
+                    self.ui.connections[identifier] = None
+                    del self.ui.connections[identifier]
                 # Perform Initial (one-time) update from source -> controlled:
                 active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
                 sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
@@ -2246,11 +2259,8 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 else:
                     raise NotImplementedError(f'needs displayman!')
 
-                relative_data_output_parent_folder = Path('data').resolve()
-                Assert.path_exists(relative_data_output_parent_folder)
-
                 ## INPUTS: im_posterior_x_stack, track_labels, 
-                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf')
                 print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
                 ## Export the wrapped tracks:
                 included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)

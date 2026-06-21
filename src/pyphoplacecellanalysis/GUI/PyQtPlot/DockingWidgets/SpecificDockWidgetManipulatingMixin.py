@@ -122,6 +122,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
                     # For TO_WINDOW: link to main plot widget so it tracks the active window
                     if main_plot_widget is not None:
                         target_plot_item.setXLink(main_plot_widget)
+                    # One-time jump to the current active timeline window (re-link alone may not update immediately)
+                    target_plot_item.setXRange(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time, padding=0)
                 elif sync_mode.name == SynchronizedPlotMode.NO_SYNC.name:
                     # For NO_SYNC: unlink from main plot widget and leave the current range as-is
                     if main_plot_widget is not None:
@@ -133,6 +135,17 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         
         print('\tdone.')
 
+
+    def _connect_dock_timeline_sync_mode_button(self, dock_item, identifier_name):
+        if 'button_action_callbacks' not in dock_item.connections:
+            dock_item.connections['button_action_callbacks'] = {}
+        _out_connections = dock_item.connections['button_action_callbacks']
+        _prev_conn = _out_connections.pop(identifier_name, None)
+        if _prev_conn is not None:
+            dock_item.sigToggleTimelineSyncModeClicked.disconnect(_prev_conn)
+        assert identifier_name == dock_item._name
+        _out_connections[identifier_name] = dock_item.sigToggleTimelineSyncModeClicked.connect(self.on_toggle_timeline_sync_mode)
+        dock_item.connections['button_action_callbacks'] = _out_connections
 
 
     @classmethod
