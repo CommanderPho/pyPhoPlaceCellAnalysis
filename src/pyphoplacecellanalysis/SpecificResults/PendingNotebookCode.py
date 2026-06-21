@@ -413,12 +413,37 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
     per_maze_context_correctness: Dict[str, CompleteDecodedContextCorrectness] = {}
     per_maze_combined_rows: List[pd.DataFrame] = []
 
+    maze_name_to_id = {name: i for i, name in enumerate(maze_epoch_names)}
+
     for maze_name in maze_epoch_names:
         if debug_print:
             print(f"\n── Decoding laps for {maze_name} ──")
 
         # 3a. Get the lap epochs for this maze's filtered session
         filtered_sess = curr_active_pipeline.filtered_sessions[maze_name]
+
+        if filtered_sess.laps is None:
+            assert curr_active_pipeline.sess.laps is not None, f"main session is also missing laps, nothing to do!"
+            global_laps_df = curr_active_pipeline.sess.laps.to_dataframe()
+
+            # filtered_sess.laps = curr_active_pipeline.sess.laps.time_slice(filtered_sess.epochs.starts[0], filtered_sess.epochs.stops[-1]) # also could do `filtered_sess.t_start``
+            print(f'adding laps for filtered_sessions[{maze_name}]:')
+            maze_laps_df = global_laps_df[global_laps_df['maze_id'] == maze_name].copy()
+            
+            # Fix lap_dir NaNs from non_kdiba direction estimation
+            if 'lap_dir' in maze_laps_df.columns and maze_laps_df['lap_dir'].isna().any():
+                if '_bak_lap_dir' in maze_laps_df.columns:
+                    maze_laps_df['lap_dir'] = maze_laps_df['lap_dir'].fillna(maze_laps_df['_bak_lap_dir'])
+                maze_laps_df['lap_dir'] = maze_laps_df['lap_dir'].astype(int)
+            
+            # Optional: integer maze_id to silence NeuroPy warnings
+            maze_laps_df['maze_id'] = maze_name_to_id[maze_name]
+            # filtered_sess.laps = curr_active_pipeline.sess.laps.time_slice(filtered_sess.epochs.starts[0], filtered_sess.epochs.stops[-1]) # also could do `filtered_sess.t_start``
+            filtered_sess.laps = Laps(maze_laps_df)
+            print(f'\tlaps updated: {maze_laps_df}')
+
+
+
         laps_obj: Laps = deepcopy(filtered_sess.laps)
         laps_epoch_obj: Epoch = ensure_Epoch(laps_obj)
 
@@ -470,6 +495,8 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
         row_df['true_context_is_maze0'] = (maze_name == maze_epoch_names[0])
         row_df['is_context_correct'] = correctness.correctness_arrays_tuple.is_decoded_track_correct
         per_maze_combined_rows.append(row_df)
+
+    ## END for maze_name in maze_epoch_names...
 
     # ── 4. Combined summary across both mazes ─────────────────────────────────
     combined_laps_df = pd.concat(per_maze_combined_rows, axis='index', ignore_index=True)
