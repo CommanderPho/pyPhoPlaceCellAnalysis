@@ -102,8 +102,9 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     ## Begin main run of the pipeline (load or execute):
+    skip_save_on_initial_load = kwargs.pop('skip_save_on_initial_load', True) # if False, the freshly-built/updated pipeline is saved immediately after the initial load/rebuild (before extended computations), so a session pickle exists even if later computations fail.
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=skip_save_on_initial_load, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     
     curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
     

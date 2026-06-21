@@ -193,6 +193,7 @@ force_recompute_override_computation_kwargs_dict = {{force_recompute_override_co
 should_force_reload_all = {{should_force_reload_all|default('False')}}
 should_freeze_pipeline_updates = {{should_freeze_pipeline_updates|default('False')}}
 should_symlink_output_pickles = {{should_symlink_output_pickles|default('False')}}
+skip_save_on_initial_load = {{skip_save_on_initial_load|default('True')}} # if False, save the pipeline immediately after the initial load/rebuild (before extended computations)
 fail_on_exception: bool = {{fail_on_exception|default('False')}} # 2025-08-27 - for some reason `fail_on_exception == True` seems to prevent it from hanging artificially with caught exceptions or something.
 
 {% if should_freeze_pipeline_updates %}
@@ -292,6 +293,7 @@ with VizTracer(
                                                     force_reload = result_handler.force_reload_all,
                                                     post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                     fail_on_exception=fail_on_exception,
+                                                    skip_save_on_initial_load=skip_save_on_initial_load,
                                                     saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
 {% else %}
 run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent_path=Path(r'{{ global_data_root_parent_path }}').resolve(),
@@ -302,6 +304,7 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
                                                 force_reload = result_handler.force_reload_all,
                                                 post_run_callback_fn=result_handler.on_complete_success_execution_session,
                                                 fail_on_exception=fail_on_exception,
+                                                skip_save_on_initial_load=skip_save_on_initial_load,
                                                 saving_mode=result_handler.saving_mode, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **run_specific_batch_kwargs)
 {% endif %}
 
@@ -335,6 +338,7 @@ new_print(f'/* should_freeze_pipeline_updates: {should_freeze_pipeline_updates} 
 new_print(f'/* should_force_reload_all: {should_force_reload_all} __________________________________________________________________________________ */')
 new_print(f'/* should_perform_figure_generation_to_file: {should_perform_figure_generation_to_file} __________________________________________________________________________________ */')
 new_print(f'/* should_symlink_output_pickles: {should_symlink_output_pickles} __________________________________________________________________________________ */')
+new_print(f'/* skip_save_on_initial_load: {skip_save_on_initial_load} __________________________________________________________________________________ */')
 new_print(f'/* extended_computations_include_includelist: {extended_computations_include_includelist} __________________________________________________________________________________ */')
 new_print(f'/* force_recompute_override_computations_includelist: {force_recompute_override_computations_includelist} __________________________________________________________________________________ */')
 new_print(f'/* batch_session_completion_handler_kwargs: {batch_session_completion_handler_kwargs} __________________________________________________________________________________ */')
