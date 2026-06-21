@@ -620,7 +620,7 @@ class BapunPositionDecodingPerformance:
 
         # test only (held-out)
         test_measured, test_decoded, test_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results, global_measured_position_df=global_measured_position_df)
-        if train_test_result.train_lap_specific_lin_pos_Decoder_dict:
+        if getattr(train_test_result, 'train_lap_specific_lin_pos_Decoder_dict', None):
             test_decode_results_lin_pos: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_lin_pos_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
             _, _, test_err_df_dict_lin_pos = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results_lin_pos, global_measured_position_df=global_measured_position_df)
             for maze_name, df_2d in test_err_df_dict.items():
@@ -634,6 +634,8 @@ class BapunPositionDecodingPerformance:
 
         # Performed 2 aggregations grouped on column: 'maze'
         agg_kwargs = dict(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean'))
+        if 'err_cm_2D' in test_err_df.columns:
+            agg_kwargs.update(sq_err_2D_mean=('sq_err_2D', 'mean'), err_cm_2D_mean=('err_cm_2D', 'mean'))
         if 'err_cm_1D' in test_err_df.columns:
             agg_kwargs.update(sq_err_1D_mean=('sq_err_1D', 'mean'), err_cm_1D_mean=('err_cm_1D', 'mean'))
         test_err_agg_df = test_err_df.groupby(['maze']).agg(**agg_kwargs).reset_index()
@@ -13300,7 +13302,10 @@ def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str,
             train_lap_specific_lin_pos_Decoder_dict = None
     test_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_test', maxsplit=1)[0]: v for k, v in train_test_split_epochs_df_dict.items() if k.endswith('_test')}
     train_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_train', maxsplit=1)[0]: v for k, v in train_test_split_epochs_df_dict.items() if k.endswith('_train')}
-    return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion, test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict, train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict, train_lap_specific_lin_pos_Decoder_dict=train_lap_specific_lin_pos_Decoder_dict)
+    train_test_split_result = TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion, test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict, train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict)
+    if train_lap_specific_lin_pos_Decoder_dict is not None:
+        train_test_split_result.train_lap_specific_lin_pos_Decoder_dict = train_lap_specific_lin_pos_Decoder_dict
+    return train_test_split_result
 
 
 @function_attributes(short_name=None, tags=['split', 'train-test', 'bapun'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2025-01-27 22:14', related_items=[])

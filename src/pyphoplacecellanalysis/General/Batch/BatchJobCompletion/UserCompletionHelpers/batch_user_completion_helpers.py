@@ -3592,7 +3592,7 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         return across_session_results_extended_dict
 
-    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D']"
+    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
     fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos')
     custom_figure_output_path = self.collected_outputs_path
     custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
@@ -3607,6 +3607,13 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
         callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
         print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
+
+    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D')
+        figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
+        print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
 
     across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')

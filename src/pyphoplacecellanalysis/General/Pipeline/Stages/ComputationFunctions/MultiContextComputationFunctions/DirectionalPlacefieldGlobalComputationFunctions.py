@@ -5208,7 +5208,9 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
 
-        When `lin_pos` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns to ``decoded_measured_diff_df``. These columns are not emitted for 2D decoders whose positions are x-marginals.
+        When the decoder produces multi-dimensional positions (2D or higher, e.g. ``pf2D_Decoder``), adds ``sq_err_2D`` / ``err_cm_2D``: RMSE of Euclidean distance in ``(x, y)`` vs interpolated measured ``x`` and ``y``. ``sq_err`` / ``err_cm`` remain x-marginal vs measured ``x`` for backward compatibility.
+
+        When ``lin_pos`` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns.
         
         """
         from sklearn.metrics import mean_squared_error
@@ -5227,7 +5229,9 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             measured_positions_dfs_list.append(interpolated_measured_df)
 
             raw_decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
-            is_native_1D_decode = np.ndim(raw_decoded_positions) < 2
+            raw_decoded_positions_arr = np.asarray(raw_decoded_positions, dtype=float)
+            is_native_1D_decode = raw_decoded_positions_arr.ndim < 2
+            is_multi_dimensional_decode = (not is_native_1D_decode) and (raw_decoded_positions_arr.shape[-1] >= 2)
             decoded_positions = raw_decoded_positions if is_native_1D_decode else a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
             if not is_native_1D_decode:
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
@@ -5276,6 +5280,24 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
             diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm}
+            if is_multi_dimensional_decode:
+                decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
+                if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
+                    decoded_xy = decoded_xy.T
+                interpolated_measured_y = interpolated_measured_df['y'].to_numpy()
+                n_spatial_dims = min(decoded_xy.shape[-1], 2)
+                timebin_is_valid_for_2D: NDArray = np.all(np.isfinite(decoded_xy[:, :n_spatial_dims]), axis=1) & np.isfinite(interpolated_measured_x) & np.isfinite(interpolated_measured_y)
+                num_valid_timebins_2D = np.sum(timebin_is_valid_for_2D)
+                if num_valid_timebins_2D == 0:
+                    diff_row['sq_err_2D'] = np.nan
+                    diff_row['err_cm_2D'] = np.nan
+                else:
+                    dx = decoded_xy[timebin_is_valid_for_2D, 0] - interpolated_measured_x[timebin_is_valid_for_2D]
+                    dy = decoded_xy[timebin_is_valid_for_2D, 1] - interpolated_measured_y[timebin_is_valid_for_2D]
+                    sq_err_per_bin = dx ** 2 + dy ** 2
+                    test_decoded_measured_diff_2D: float = float(np.mean(sq_err_per_bin))
+                    diff_row['sq_err_2D'] = test_decoded_measured_diff_2D
+                    diff_row['err_cm_2D'] = float(np.sqrt(test_decoded_measured_diff_2D))
             if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
                 interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
                 timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
