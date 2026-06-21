@@ -620,12 +620,23 @@ class BapunPositionDecodingPerformance:
 
         # test only (held-out)
         test_measured, test_decoded, test_err_df_dict = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results, global_measured_position_df=global_measured_position_df)
+        if train_test_result.train_lap_specific_lin_pos_Decoder_dict:
+            test_decode_results_lin_pos: Dict[str, DecodedFilterEpochsResult] = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df, train_lap_specific_pf1D_Decoder_dict=train_test_result.train_lap_specific_lin_pos_Decoder_dict, test_epochs_dict=train_test_result.test_epochs_dict, laps_decoding_time_bin_size=laps_decoding_time_bin_size)
+            _, _, test_err_df_dict_lin_pos = CustomDecodeEpochsResult.build_measured_decoded_position_comparison(test_decode_results_lin_pos, global_measured_position_df=global_measured_position_df)
+            for maze_name, df_2d in test_err_df_dict.items():
+                df_lin = test_err_df_dict_lin_pos[maze_name][['t', 'sq_err_1D', 'err_cm_1D']]
+                test_err_df_dict[maze_name] = df_2d.merge(df_lin, on='t', how='left')
+            if debug_print:
+                print(f'merged lin_pos decoder errors for mazes: {list(test_err_df_dict_lin_pos.keys())}')
         for k, df in test_err_df_dict.items():
             df['maze'] = k
         test_err_df: pd.DataFrame = pd.concat(list(test_err_df_dict.values()))
 
         # Performed 2 aggregations grouped on column: 'maze'
-        test_err_agg_df = test_err_df.groupby(['maze']).agg(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean')).reset_index()
+        agg_kwargs = dict(sq_err_mean=('sq_err', 'mean'), err_cm_mean=('err_cm', 'mean'))
+        if 'err_cm_1D' in test_err_df.columns:
+            agg_kwargs.update(sq_err_1D_mean=('sq_err_1D', 'mean'), err_cm_1D_mean=('err_cm_1D', 'mean'))
+        test_err_agg_df = test_err_df.groupby(['maze']).agg(**agg_kwargs).reset_index()
 
         # ## INPUTS: test_err_df_dict
         # test_err_df_dict = {k:an_err_df.rename(columns={'sq_err': f'sq_err_{k}', 'err_cm': f'err_cm_{k}'}) for k, an_err_df in test_err_df_dict.items()}
@@ -689,7 +700,11 @@ class BapunPositionDecodingPerformance:
             ax.set_ylim([0.0, observed_pos_range_max_distance_cm + (observed_pos_range_max_distance_cm * 0.02)])
             return {'max_line': a_max_line, 'max_line_label': a_max_line_label}
 
-        observed_pos_range_max_distance_cm: float = cls.compute_max_possible_maze_err_cm(curr_active_pipeline)
+        if y_col_name in ('err_cm_1D', 'sq_err_1D'):
+            pos_df = curr_active_pipeline.sess.position.to_dataframe()
+            observed_pos_range_max_distance_cm: float = float(np.nanmax(pos_df['lin_pos'].to_numpy()) - np.nanmin(pos_df['lin_pos'].to_numpy())) if ('lin_pos' in pos_df.columns) else cls.compute_max_possible_maze_err_cm(curr_active_pipeline)
+        else:
+            observed_pos_range_max_distance_cm: float = cls.compute_max_possible_maze_err_cm(curr_active_pipeline)
 
 
         if subtitle_string is None:
@@ -13251,17 +13266,45 @@ def _bapun_train_test_split_group_params(laps_df: pd.DataFrame) -> Tuple[str, Li
     return group_column_name, identity_cols
 
 
-def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str, pd.DataFrame], split_train_test_epoch_specific_pfND_Decoder_dict: Dict[str, BasePositionDecoder], training_data_portion: float, test_data_portion: float) -> TrainTestSplitResult:
+def _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline, maze_epoch_names: List[str]) -> bool:
+    """Return True when session has usable lin_pos and each maze has pf1D_Decoder."""
+    pos_df = curr_active_pipeline.sess.position.to_dataframe()
+    if ('lin_pos' not in pos_df.columns) or (not pos_df['lin_pos'].notna().any()):
+        return False
+    for a_maze_name in maze_epoch_names:
+        computed_data = curr_active_pipeline.computation_results[a_maze_name].computed_data
+        if (not hasattr(computed_data, 'pf1D_Decoder')) or (computed_data.pf1D_Decoder is None):
+            return False
+    return True
+
+
+def _bapun_split_maze_train_test_decoder(curr_active_pipeline, maze_name: str, a_decoder: BasePositionDecoder, training_data_portion: float, laps_resolution_decoder: Optional[BasePositionDecoder] = None, debug_print: bool = False):
+    """Split laps for one Bapun maze and retrain ``a_decoder`` on train epochs only."""
+    laps_resolution_decoder = a_decoder if laps_resolution_decoder is None else laps_resolution_decoder
+    a_prev_computation_epochs_df: pd.DataFrame = _resolve_bapun_train_test_split_laps_df(curr_active_pipeline=curr_active_pipeline, maze_name=maze_name, a_decoder=laps_resolution_decoder)
+    group_column_name, identity_cols = _bapun_train_test_split_group_params(a_prev_computation_epochs_df)
+    if debug_print:
+        print(f'a_maze_name: {maze_name}, n_laps: {len(a_prev_computation_epochs_df)}, group_column_name: {group_column_name}, identity_cols: {identity_cols}')
+    an_epoch_training_df, an_epoch_test_df = a_prev_computation_epochs_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name=group_column_name, additional_epoch_identity_column_names=identity_cols, skip_get_non_overlapping=False, debug_print=False)
+    return _single_compute_train_test_split_epochs_decoders(a_decoder=a_decoder, a_config=None, an_epoch_training_df=an_epoch_training_df, an_epoch_test_df=an_epoch_test_df, a_modern_name=maze_name, debug_print=debug_print)
+
+
+def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str, pd.DataFrame], split_train_test_epoch_specific_pfND_Decoder_dict: Dict[str, BasePositionDecoder], training_data_portion: float, test_data_portion: float, split_train_test_epoch_specific_lin_pos_Decoder_dict: Optional[Dict[str, BasePositionDecoder]] = None) -> TrainTestSplitResult:
     """Build TrainTestSplitResult from per-decoder train/test split artefacts."""
     train_epoch_names: List[str] = [k for k in train_test_split_epochs_df_dict.keys() if k.endswith('_train')]
     train_lap_specific_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = {k.split('_train', maxsplit=1)[0]: split_train_test_epoch_specific_pfND_Decoder_dict[k] for k in train_epoch_names}
+    train_lap_specific_lin_pos_Decoder_dict: Optional[Dict[str, BasePositionDecoder]] = None
+    if (split_train_test_epoch_specific_lin_pos_Decoder_dict is not None) and (len(split_train_test_epoch_specific_lin_pos_Decoder_dict) > 0):
+        train_lap_specific_lin_pos_Decoder_dict = {k.split('_train', maxsplit=1)[0]: split_train_test_epoch_specific_lin_pos_Decoder_dict[k] for k in train_epoch_names if k in split_train_test_epoch_specific_lin_pos_Decoder_dict}
+        if len(train_lap_specific_lin_pos_Decoder_dict) == 0:
+            train_lap_specific_lin_pos_Decoder_dict = None
     test_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_test', maxsplit=1)[0]: v for k, v in train_test_split_epochs_df_dict.items() if k.endswith('_test')}
     train_epochs_dict: Dict[str, pd.DataFrame] = {k.split('_train', maxsplit=1)[0]: v for k, v in train_test_split_epochs_df_dict.items() if k.endswith('_train')}
-    return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion, test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict, train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict)
+    return TrainTestSplitResult(is_global=True, training_data_portion=training_data_portion, test_data_portion=test_data_portion, test_epochs_dict=test_epochs_dict, train_epochs_dict=train_epochs_dict, train_lap_specific_pf1D_Decoder_dict=train_lap_specific_pf1D_Decoder_dict, train_lap_specific_lin_pos_Decoder_dict=train_lap_specific_lin_pos_Decoder_dict)
 
 
 @function_attributes(short_name=None, tags=['split', 'train-test', 'bapun'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2025-01-27 22:14', related_items=[])
-def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=5.0/6.0, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
+def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=5.0/6.0, include_lin_pos_decoder: bool = True, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
     """Split lap epochs into train/test periods and rebuild decoders on training data only.
 
     Supports two input modes:
@@ -13359,6 +13402,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
     split_train_test_epoch_specific_configs = {}
     split_train_test_epoch_specific_pfND_dict: Dict[str, PfND] = {}
     split_train_test_epoch_specific_pfND_Decoder_dict: Dict[str, BasePositionDecoder] = {}
+    split_train_test_epoch_specific_lin_pos_Decoder_dict: Dict[str, BasePositionDecoder] = {}
 
     if is_bapun_mode:
         from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
@@ -13367,21 +13411,22 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
             maze_epoch_names = hardcoded_params.non_global_activity_session_names
         if debug_print:
             print(f'Bapun mode: maze_epoch_names={maze_epoch_names}')
+        should_include_lin_pos_decoder: bool = include_lin_pos_decoder and _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names)
+        if include_lin_pos_decoder and (not should_include_lin_pos_decoder) and debug_print:
+            print('Bapun mode: skipping lin_pos decoder train/test split (missing lin_pos and/or pf1D_Decoder on one or more mazes).')
         for a_maze_name in maze_epoch_names:
             computed_data = curr_active_pipeline.computation_results[a_maze_name].computed_data
             assert hasattr(computed_data, 'pf2D_Decoder') and (computed_data.pf2D_Decoder is not None), f"computation_results['{a_maze_name}'] is missing pf2D_Decoder; run placefield computation first."
-            a_decoder: BasePositionDecoder = deepcopy(computed_data.pf2D_Decoder)
-            a_prev_computation_epochs_df: pd.DataFrame = _resolve_bapun_train_test_split_laps_df(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=a_decoder)
-            group_column_name, identity_cols = _bapun_train_test_split_group_params(a_prev_computation_epochs_df)
-            if debug_print:
-                print(f'a_maze_name: {a_maze_name}, n_laps: {len(a_prev_computation_epochs_df)}, group_column_name: {group_column_name}, identity_cols: {identity_cols}')
-            an_epoch_training_df, an_epoch_test_df = a_prev_computation_epochs_df.epochs.split_into_training_and_test(training_data_portion=training_data_portion, group_column_name=group_column_name, additional_epoch_identity_column_names=identity_cols, skip_get_non_overlapping=False, debug_print=False)
-            (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), _, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pf1D, a_sliced_pf1D_Decoder) = _single_compute_train_test_split_epochs_decoders(a_decoder=a_decoder, a_config=None, an_epoch_training_df=an_epoch_training_df, an_epoch_test_df=an_epoch_test_df, a_modern_name=a_maze_name, debug_print=debug_print)
+            pf2D_decoder_for_laps: BasePositionDecoder = deepcopy(computed_data.pf2D_Decoder)
+            (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), _, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pfND, a_sliced_pf2D_Decoder) = _bapun_split_maze_train_test_decoder(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=deepcopy(computed_data.pf2D_Decoder), training_data_portion=training_data_portion, laps_resolution_decoder=pf2D_decoder_for_laps, debug_print=debug_print)
             train_test_split_epochs_df_dict.update(a_training_test_split_epochs_df_dict)
             train_test_split_epoch_obj_dict.update(a_training_test_split_epochs_epoch_obj_dict)
             split_train_test_epoch_specific_configs[an_epoch_period_description] = a_config_copy
-            split_train_test_epoch_specific_pfND_dict[an_epoch_period_description] = epoch_filtered_curr_pf1D
-            split_train_test_epoch_specific_pfND_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
+            split_train_test_epoch_specific_pfND_dict[an_epoch_period_description] = epoch_filtered_curr_pfND
+            split_train_test_epoch_specific_pfND_Decoder_dict[an_epoch_period_description] = a_sliced_pf2D_Decoder
+            if should_include_lin_pos_decoder:
+                _, _, (_, _, _, a_sliced_pf1D_Decoder) = _bapun_split_maze_train_test_decoder(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=deepcopy(computed_data.pf1D_Decoder), training_data_portion=training_data_portion, laps_resolution_decoder=pf2D_decoder_for_laps, debug_print=debug_print)
+                split_train_test_epoch_specific_lin_pos_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
 
     else:
         decoders_dict = deepcopy(track_templates.get_decoders_dict())
@@ -13407,7 +13452,9 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
 
     if debug_print:
         print(list(split_train_test_epoch_specific_pfND_Decoder_dict.keys()))
-    return _assemble_train_test_split_result(train_test_split_epochs_df_dict=train_test_split_epochs_df_dict, split_train_test_epoch_specific_pfND_Decoder_dict=split_train_test_epoch_specific_pfND_Decoder_dict, training_data_portion=training_data_portion, test_data_portion=test_data_portion)
+        if len(split_train_test_epoch_specific_lin_pos_Decoder_dict) > 0:
+            print(f'lin_pos decoders: {list(split_train_test_epoch_specific_lin_pos_Decoder_dict.keys())}')
+    return _assemble_train_test_split_result(train_test_split_epochs_df_dict=train_test_split_epochs_df_dict, split_train_test_epoch_specific_pfND_Decoder_dict=split_train_test_epoch_specific_pfND_Decoder_dict, training_data_portion=training_data_portion, test_data_portion=test_data_portion, split_train_test_epoch_specific_lin_pos_Decoder_dict=split_train_test_epoch_specific_lin_pos_Decoder_dict if len(split_train_test_epoch_specific_lin_pos_Decoder_dict) > 0 else None)
 
 
 

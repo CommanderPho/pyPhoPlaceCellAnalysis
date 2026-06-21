@@ -5207,24 +5207,29 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     @classmethod
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
+
+        When `lin_pos` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns to ``decoded_measured_diff_df``. These columns are not emitted for 2D decoders whose positions are x-marginals.
         
         """
         from sklearn.metrics import mean_squared_error
 
         decoded_time_bin_centers_list = deepcopy([a_cont.centers for a_cont in a_decoder_decoding_result.time_bin_containers]) # this is NOT the same for all decoders because they could have different numbers of test laps because different directions/configs might have different numbers of general laps
 
+        should_compute_1D_lin_pos_comparison = ('lin_pos' in global_measured_position_df.columns) and global_measured_position_df['lin_pos'].notna().any()
+        additional_interp_column_names = ['lin_pos'] if should_compute_1D_lin_pos_comparison else None
+
         measured_positions_dfs_list = []
         decoded_positions_df_list = [] # one per epoch
-        decoded_measured_diff_df = [] # one per epoch
+        decoded_measured_diff_rows = [] # one per epoch
 
         for epoch_idx, a_sample_times in enumerate(decoded_time_bin_centers_list):
-            interpolated_measured_df = TrainTestLapsSplitting.interpolate_positions(global_measured_position_df, a_sample_times)
+            interpolated_measured_df = TrainTestLapsSplitting.interpolate_positions(global_measured_position_df, a_sample_times, additional_interp_column_names=additional_interp_column_names)
             measured_positions_dfs_list.append(interpolated_measured_df)
 
-            decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
-            if np.ndim(decoded_positions) > 1:
-                ## 2D positions, need to get only the x or get the marginals
-                decoded_positions = a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
+            raw_decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
+            is_native_1D_decode = np.ndim(raw_decoded_positions) < 2
+            decoded_positions = raw_decoded_positions if is_native_1D_decode else a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
+            if not is_native_1D_decode:
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
@@ -5239,7 +5244,6 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             a_valid_interpolated_measured_x = interpolated_measured_x[timebin_is_valid_for_both]
             assert len(a_valid_sample_times) == len(a_valid_decoded_positions), f"len(a_valid_sample_times): {len(a_valid_sample_times)} == len(a_valid_decoded_positions): {len(a_valid_decoded_positions)}"
             
-
             ## one for each decoder:
             # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
 
@@ -5271,10 +5275,24 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
-            decoded_measured_diff_df.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
+            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm}
+            if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
+                interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
+                timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
+                num_valid_timebins_1D = np.sum(timebin_is_valid_for_both_1D)
+                if num_valid_timebins_1D == 0:
+                    diff_row['sq_err_1D'] = np.nan
+                    diff_row['err_cm_1D'] = np.nan
+                else:
+                    a_valid_interpolated_measured_lin_pos = interpolated_measured_lin_pos[timebin_is_valid_for_both_1D]
+                    a_valid_decoded_positions_1D = decoded_positions[timebin_is_valid_for_both_1D]
+                    test_decoded_measured_diff_1D: float = mean_squared_error(a_valid_interpolated_measured_lin_pos, a_valid_decoded_positions_1D)
+                    diff_row['sq_err_1D'] = test_decoded_measured_diff_1D
+                    diff_row['err_cm_1D'] = np.sqrt(test_decoded_measured_diff_1D)
+            decoded_measured_diff_rows.append(diff_row)
 
             ## END FOR
-        decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_df, columns=['t', 'sq_err', 'err_cm']) # convert list of tuples to a single df
+        decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_rows)
 
         # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
         return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
@@ -5821,7 +5839,7 @@ class TrainTestSplitResult(ComputedResult):
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult
 
     """
-    _VersionedResultMixin_version: str = "2024.04.09_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2026.06.21_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     training_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     test_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=False)
@@ -5829,14 +5847,17 @@ class TrainTestSplitResult(ComputedResult):
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None)
+    train_lap_specific_lin_pos_Decoder_dict: Optional[Dict[types.DecoderName, BasePositionDecoder]] = serialized_field(default=None)
 
     def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
         """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
-        Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
+        Only `self.train_lap_specific_pf1D_Decoder_dict` and `self.train_lap_specific_lin_pos_Decoder_dict` are affected
         
         """
         _obj = deepcopy(self) # temporary copy of the object
         _obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
+        if _obj.train_lap_specific_lin_pos_Decoder_dict is not None:
+            _obj.train_lap_specific_lin_pos_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_lin_pos_Decoder_dict.items()}
         return _obj
     
 
@@ -6091,7 +6112,7 @@ class TrainTestLapsSplitting:
         # return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
 
     @classmethod
-    def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't') -> pd.DataFrame:
+    def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't', additional_interp_column_names: Optional[List[str]] = None) -> pd.DataFrame:
         """
         Interpolates position data to new sample times using SciPy's interp1d.
 
@@ -6099,6 +6120,7 @@ class TrainTestLapsSplitting:
         df (pd.DataFrame): Original DataFrame with position columns.
         sample_times (NDArray): Array of new sample times at which to interpolate.
         time_column_name (str): Name of the time column in df.
+        additional_interp_column_names (Optional[List[str]]): Extra columns to interpolate (e.g. 'lin_pos') when present in df.
 
         Returns:
         pd.DataFrame: New DataFrame with interpolated positional data.
@@ -6131,6 +6153,16 @@ class TrainTestLapsSplitting:
             'y': new_y_positions,
             # If you have z_positions, include 'z': new_z_positions
         })
+
+        for col_name in (additional_interp_column_names or []):
+            if col_name not in df.columns:
+                continue
+            col_df = df.dropna(subset=[time_column_name, col_name])
+            if len(col_df) == 0:
+                interpolated_df[col_name] = np.nan
+                continue
+            fcol = interp1d(col_df[time_column_name].values, col_df[col_name].values, kind='linear', bounds_error=False, fill_value='extrapolate')
+            interpolated_df[col_name] = fcol(sample_times)
 
         return interpolated_df
 
