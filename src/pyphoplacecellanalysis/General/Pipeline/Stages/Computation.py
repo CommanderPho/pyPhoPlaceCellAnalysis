@@ -614,14 +614,17 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         each_epoch_latest_computation_time = {} # the most recent computation for each of the epochs
         # find update time of latest function:
         for k, v in self.computation_results.items():
-            extracted_computation_times_dict = v.computation_times
+            if v is None:
+                continue # skip epochs whose computation failed/was never completed (left a None result); avoids AttributeError on `None.computation_times`
+            extracted_computation_times_dict = getattr(v, 'computation_times', None) or {}
             each_epoch_each_result_computation_completion_times[k] = {inverse_computation_times_key_fn(k):v for k,v in extracted_computation_times_dict.items()}
             each_epoch_latest_computation_time[k] = max(list(each_epoch_each_result_computation_completion_times[k].values()), default=datetime.min)
 
         non_global_any_most_recent_computation_time: datetime = max(list(each_epoch_latest_computation_time.values()), default=datetime.min) # newest computation out of any of the epochs
 
         ## Global computations:
-        global_computation_completion_times = {inverse_computation_times_key_fn(k):v for k,v in self.global_computation_results.computation_times.items()}
+        global_computation_times = getattr(self.global_computation_results, 'computation_times', None) or {}
+        global_computation_completion_times = {inverse_computation_times_key_fn(k):v for k,v in global_computation_times.items()}
         global_computations_latest_computation_time: datetime = max(list(global_computation_completion_times.values()), default=datetime.min)
 
         ## Any (global or non-global) computation most recent time):

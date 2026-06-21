@@ -29,7 +29,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES = frozenset({'long_epoch_name', 'long_laps', 'long_replays', 'short_epoch_name', 'short_laps', 'short_replays'})
 _KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES = frozenset({'long_epoch_name', 'long_n_laps', 'long_n_replays', 'short_epoch_name', 'short_n_laps', 'short_n_replays'})
-_KDIBA_ONLY_EXTENDED_COMPUTATIONS = frozenset({'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis', 'rank_order_shuffle_analysis', 'perform_wcorr_shuffle_analysis', 'extended_pf_peak_information', 'pf_dt_sequential_surprise'})
+_KDIBA_ONLY_EXTENDED_COMPUTATIONS = frozenset({'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis', 'rank_order_shuffle_analysis', 'perform_wcorr_shuffle_analysis', 'extended_pf_peak_information', 'pf_dt_sequential_surprise',
+                                                # directional analyses depend on `find_LongShortGlobal_epoch_names()` (long/short track structure), which is kdiba-only; skip them for non-kdiba (e.g. bapun) sessions to avoid hard errors.
+                                                'split_to_directional_laps', 'merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'})
 
 @unique
 class SavingOptions(Enum):

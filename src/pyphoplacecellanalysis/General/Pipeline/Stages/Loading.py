@@ -53,6 +53,7 @@ def safeSaveData(pkl_path: Union[str, Path], db: Any, should_append:bool=False, 
     """
     if not isinstance(pkl_path, Path):
         pkl_path = Path(pkl_path).resolve()
+    pkl_path.parent.mkdir(parents=True, exist_ok=True) # ensure the output directory exists (e.g. the session's `output/` subfolder) before writing
     if should_append:
         file_mode = 'ab' # 'ab' opens the file as binary and appends to the end
     else:
@@ -131,6 +132,7 @@ def saveData(pkl_path, db, should_append=False, safe_save:bool=True):
             file_mode = 'w+b' # 'w+b' opens and truncates the file to 0 bytes (overwritting)
         if not isinstance(pkl_path, Path):
             pkl_path = Path(pkl_path).resolve()
+        pkl_path.parent.mkdir(parents=True, exist_ok=True) # ensure the output directory exists before writing
             
         with ProgressMessagePrinter(filepath=pkl_path, action=f"Saving (file mode '{file_mode}')", contents_description='pickle file', finished_message='saved pickle file', returns_string=False):
             with open(pkl_path, file_mode) as dbfile: 
