@@ -2,7 +2,7 @@ import sys
 import logging
 import pathlib
 from pathlib import Path
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Optional, Union, Callable, Tuple
 # import datetime
 from datetime import datetime
 import numpy as np
@@ -16,7 +16,7 @@ import builtins
 from enum import Enum, unique  # SessionBatchProgress
 
 ## Pho's Custom Libraries:
-from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
+from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path, build_cross_root_copydict, save_copydict_to_text_file, sync_file_copydict_with_verification
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import get_now_time_precise_str
 from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
@@ -239,6 +239,76 @@ class ConcreteSessionFolder:
         return copy_dict
 
 
+    def _get_session_stem_from_xml(self) -> Optional[str]:
+        xml_files = list(self.path.glob('*.xml'))
+        if len(xml_files) == 0:
+            return None
+        return xml_files[0].stem
+
+
+    def discover_syncable_result_files(self, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None) -> List[Path]:
+        """Return extant paths for core pipeline outputs and optional session-preprocessing .npy files in the session folder.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+            syncable_files = a_session_folder.discover_syncable_result_files()
+        """
+        syncable_files: List[Path] = []
+        core_pipeline_files = [self.session_pickle, self.global_computation_result_pickle, self.pipeline_results_h5]
+        for a_file in core_pipeline_files:
+            if a_file.is_file():
+                syncable_files.append(a_file.resolve())
+        if include_preprocessing_npy:
+            session_stem = self._get_session_stem_from_xml()
+            if session_stem is not None:
+                for a_npy_file in self.path.glob(f'{session_stem}*.npy'):
+                    if a_npy_file.is_file():
+                        syncable_files.append(a_npy_file.resolve())
+        if extra_globs is not None:
+            for a_glob_pattern in extra_globs:
+                for a_matched_file in self.path.glob(a_glob_pattern):
+                    if a_matched_file.is_file():
+                        syncable_files.append(a_matched_file.resolve())
+        return list(dict.fromkeys(syncable_files))
+
+
+    @classmethod
+    def build_cross_root_results_sync_copydict(cls, fast_session_folders: List["ConcreteSessionFolder"], session_fast_roots: Dict[IdentifyingContext, Path], archive_data_root: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, skip_if_dest_newer_or_equal: bool = True, debug_print: bool = False) -> Dict[Path, Path]:
+        """Build a fast->archive hierarchical copydict for computed session results, skipping sessions already on archive root or missing archive folders.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+            copy_dict = ConcreteSessionFolder.build_cross_root_results_sync_copydict(good_session_concrete_folders, session_global_data_root_parent_paths, archive_data_root)
+        """
+        archive_data_root = Path(archive_data_root).resolve()
+        sync_copydict: Dict[Path, Path] = {}
+        for a_session_folder in fast_session_folders:
+            fast_data_root = session_fast_roots.get(a_session_folder.context)
+            if fast_data_root is None:
+                if debug_print:
+                    print(f'WARN: skipping {a_session_folder.context}: no fast data root in session_fast_roots')
+                continue
+            fast_data_root = Path(fast_data_root).resolve()
+            if fast_data_root == archive_data_root:
+                if debug_print:
+                    print(f'skipping {a_session_folder.context}: fast root equals archive root ({fast_data_root})')
+                continue
+            archive_session_basedir = convert_filelist_to_new_parent([a_session_folder.path.resolve()], original_parent_path=fast_data_root, dest_parent_path=archive_data_root)[0].resolve()
+            if not archive_session_basedir.is_dir():
+                print(f'WARN: skipping {a_session_folder.context}: archive session folder missing: {archive_session_basedir}')
+                continue
+            source_files = a_session_folder.discover_syncable_result_files(include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs)
+            if len(source_files) == 0:
+                if debug_print:
+                    print(f'skipping {a_session_folder.context}: no syncable source files found under {a_session_folder.path}')
+                continue
+            session_copydict = build_cross_root_copydict(source_files, source_data_root=fast_data_root, dest_data_root=archive_data_root, skip_if_dest_newer_or_equal=skip_if_dest_newer_or_equal)
+            if debug_print:
+                print(f'{a_session_folder.context}: {len(session_copydict)} file(s) to sync from {fast_data_root} -> {archive_data_root}')
+            sync_copydict.update(session_copydict)
+        return sync_copydict
+
+
     @classmethod
     def build_concrete_session_folders(cls, global_data_root_parent_path: Path, included_session_contexts: list, debug_print=False) -> List["ConcreteSessionFolder"]:
         """ 
@@ -265,6 +335,48 @@ class ConcreteSessionFolder:
         
         good_session_concrete_folders = [ConcreteSessionFolder(a_context, a_basedir) for a_context, a_basedir in included_output_session_basedir_dict.items()]
         return good_session_concrete_folders
+
+
+def sync_computed_session_results_to_archive_root(fast_session_folders: List[ConcreteSessionFolder], session_fast_roots: Dict[IdentifyingContext, Path], archive_data_root: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, skip_if_dest_newer_or_equal: bool = True, dry_run: bool = False, print_progress: bool = True, debug_print: bool = False, save_copydict_path: Optional[Path] = None) -> Tuple[Dict[Path, Path], Optional[Dict[Path, Path]]]:
+    """Sync computed session results from fast storage to the corresponding archive session folders.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.runBatch import sync_computed_session_results_to_archive_root
+        planned_copydict, moved_files_dict = sync_computed_session_results_to_archive_root(good_session_concrete_folders, session_global_data_root_parent_paths, archive_data_root, dry_run=True)
+    """
+    archive_data_root = Path(archive_data_root).resolve()
+    assert archive_data_root.exists(), f"archive_data_root: {archive_data_root} does not exist!"
+    planned_copydict = ConcreteSessionFolder.build_cross_root_results_sync_copydict(fast_session_folders, session_fast_roots, archive_data_root, include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs, skip_if_dest_newer_or_equal=skip_if_dest_newer_or_equal, debug_print=debug_print)
+    print(f'sync_computed_session_results_to_archive_root: {len(planned_copydict)} file(s) planned for sync to archive root {archive_data_root}')
+    if save_copydict_path is not None:
+        save_copydict_to_text_file(planned_copydict, filelist_path=Path(save_copydict_path).resolve(), debug_print=debug_print)
+    if dry_run or len(planned_copydict) == 0:
+        return planned_copydict, None
+    moved_files_dict = copy_movedict(planned_copydict, print_progress=print_progress)
+    return planned_copydict, moved_files_dict
+
+
+def sync_staged_session_results_with_verification(shm_session_folder: "ConcreteSessionFolder", source_data_root: Path, shm_data_root: Path, manifest_path: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, max_attempts: int = 5, per_file_retries: int = 3, verify_checksum: bool = False, print_progress: bool = True, fail_on_empty_copydict: bool = True) -> bool:
+    """Copy computed session artifacts from shm staging back to source_data_root with verified atomic writes and retries.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.runBatch import sync_staged_session_results_with_verification
+        ok = sync_staged_session_results_with_verification(shm_session_folder, source_data_root, shm_data_root, manifest_path)
+    """
+    source_data_root = Path(source_data_root).resolve()
+    shm_data_root = Path(shm_data_root).resolve()
+    manifest_path = Path(manifest_path).resolve()
+    source_files = shm_session_folder.discover_syncable_result_files(include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs)
+    if len(source_files) == 0:
+        msg = f'sync_staged_session_results_with_verification: no syncable source files under {shm_session_folder.path}'
+        print(msg)
+        return not fail_on_empty_copydict
+    file_copydict = build_cross_root_copydict(source_files, source_data_root=shm_data_root, dest_data_root=source_data_root, skip_if_dest_newer_or_equal=False)
+    if len(file_copydict) == 0:
+        msg = f'sync_staged_session_results_with_verification: empty copydict for {shm_session_folder.context}'
+        print(msg)
+        return not fail_on_empty_copydict
+    return sync_file_copydict_with_verification(file_copydict, manifest_path=manifest_path, max_attempts=max_attempts, per_file_retries=per_file_retries, verify_checksum=verify_checksum, print_progress=print_progress)
 
 
 @unique
