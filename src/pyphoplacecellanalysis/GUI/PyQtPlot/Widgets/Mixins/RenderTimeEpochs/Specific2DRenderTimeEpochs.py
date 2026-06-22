@@ -41,17 +41,6 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         active_df['series_vertical_offset', 'series_height', 'pen', 'brush']
         
         """        
-        ## broadcast helper: a single-config series produces length-1 lists (one config representing all N rows). Broadcast those to all rows so positional assignment to the N-row df works (avoids a length-mismatch ValueError).
-        n_rows: int = len(active_df)
-        def _broadcast_if_singleton(v):
-            if isinstance(v, (list, tuple)) and (len(v) == 1) and (n_rows != 1):
-                return list(v) * n_rows
-            return v
-        y_location = _broadcast_if_singleton(y_location)
-        height = _broadcast_if_singleton(height)
-        pen_color = _broadcast_if_singleton(pen_color)
-        brush_color = _broadcast_if_singleton(brush_color)
-
         # Update only the provided columns while leaving the others intact
         if y_location is not None:
             ## y_location:
@@ -85,20 +74,12 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
                 # Scalar value assignment:
                 active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
 
-        text_label = _broadcast_if_singleton(kwargs.get('label', kwargs.get('name', None)))
+        text_label = kwargs.get('label', kwargs.get('name', None))
         if text_label is not None and 'label' in active_df.columns:
             if isinstance(text_label, (list, tuple)):
                 active_df['label'] = list(text_label)
             else:
                 active_df['label'] = text_label
-
-        ## per-row (per-epoch) visibility: accept either `is_visible` or `isVisible` (scalar or list), mirroring the pen/brush list handling. A `None` entry means 'unspecified' and is treated as visible.
-        is_visible = _broadcast_if_singleton(kwargs.get('is_visible', kwargs.get('isVisible', None)))
-        if is_visible is not None:
-            if isinstance(is_visible, (list, tuple, np.ndarray, pd.Series)):
-                active_df['is_visible'] = [True if v is None else bool(v) for v in is_visible]
-            else:
-                active_df['is_visible'] = bool(is_visible)
 
         return active_df #, kwargs
     

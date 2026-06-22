@@ -38,11 +38,11 @@ class Render2DEventRectanglesHelper:
         ## Validate that it has all required columns:
         assert np.isin(cls._required_interval_visualization_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_interval_visualization_columns}, current: {df.columns} "
         # return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
-        has_label: bool = ('label' in df.columns)
-        ## per-row (per-epoch) visibility: default True when the column is absent.
-        is_visible_list = [bool(v) for v in df['is_visible']] if ('is_visible' in df.columns) else [True] * len(df)
-        label_list = list(df['label']) if has_label else [None] * len(df)
-        return [IntervalRectsItemData(start_t, series_vertical_offset, duration_t, series_height, pen, brush, label=label, is_visible=is_visible) for (start_t, series_vertical_offset, duration_t, series_height, pen, brush, label, is_visible) in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush, label_list, is_visible_list)]
+        if 'label' in df.columns:
+            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush, df.label)]
+        else:
+            ## most basic
+            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush)]
 
 
         
