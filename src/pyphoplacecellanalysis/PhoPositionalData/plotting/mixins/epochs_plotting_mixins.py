@@ -186,14 +186,19 @@ class EpochDisplayConfig(BasePlotDataParams):
         """
         included_columns = ['series_vertical_offset','series_height','pen','brush']
         
+        from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers
+
         try:
             a_serializable_df = a_ds.df.copy() ## try this first
             assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns)) ## require only unique labels
             label_names: List[str] = a_serializable_df['label'].to_list()
             unique_label_names: List[str] = np.unique(label_names)
             assert len(unique_label_names) == len(a_serializable_df), f"len(unique_label_names): {len(unique_label_names)}, unique_label_names: {unique_label_names} != len(a_serializable_df): {len(a_serializable_df)}\n\ta_serializable_df: {a_serializable_df}"
+            ## serialize the raw QPen/QBrush objects to tuples so `init_from_visualization_dataframe_row` (which does `len(...)`) doesn't crash. isinstance guards pass through already-serialized tuples unchanged.
+            pen_tuples = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) if isinstance(a_pen, QPen) else a_pen for a_pen in a_serializable_df['pen']]
+            brush_tuples = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) if isinstance(a_brush, QBrush) else a_brush for a_brush in a_serializable_df['brush']]
             # out_list = [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
-            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(label_names, a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], pen_tuples, brush_tuples)]
             return out_list
 
         except Exception as e:
