@@ -37,6 +37,7 @@ class IntervalRectsItemData(UnpackableMixin):
     pen: QtGui.QPen = field()
     brush: QtGui.QBrush = field()
     label: Optional[str] = field(default=None)
+    is_visible: bool = field(default=True) ## per-row (per-epoch) visibility. When False the row is not drawn/labelled/hit-tested. Excluded from the unpacking allowlist below to preserve 6-tuple back-compat.
     
 
     def UnpackableMixin_unpacking_includes(self) -> Optional[List]:
@@ -143,6 +144,12 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         
 
 
+    @staticmethod
+    def _row_is_visible(a_rect_data) -> bool:
+        """ per-row visibility. Plain tuples (which lack an `is_visible` field) are treated as always-visible for back-compat. """
+        return bool(getattr(a_rect_data, 'is_visible', True))
+
+
     def generatePicture(self):
         ## pre-computing a QPicture object allows paint() to run much more quickly, 
         ## rather than re-drawing the shapes every time.
@@ -157,7 +164,10 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             # # QRectF: (left, top, width, height)
             # p.drawRect(QtCore.QRectF(start_t, series_offset-series_height, duration_t, series_height))
             
-        for (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in self.data:
+        for a_rect_data in self.data:
+            if not self._row_is_visible(a_rect_data):
+                continue ## skip drawing hidden (per-epoch) rows
+            (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = a_rect_data
             p.setPen(pen)
             p.setBrush(brush) # filling of the rectangles by a passed color:
             # p.drawRect(QtCore.QRectF(start_t, series_vertical_offset-series_height, duration_t, series_height)) # QRectF: (left, top, width, height)
@@ -233,6 +243,8 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             ## Build labels
             for rect_index in np.arange(len(self.data)):
                 rect_data_tuple = self.data[rect_index]
+                if not self._row_is_visible(rect_data_tuple):
+                    continue ## no label for hidden (per-epoch) rows
                 (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
                 label_text: str = self.item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
                 a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
@@ -329,7 +341,10 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         Returns:
             int or None: Index of the rectangle containing the position, or None
         """
-        for i, (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in enumerate(self.data):
+        for i, a_rect_data in enumerate(self.data):
+            if not self._row_is_visible(a_rect_data):
+                continue ## hidden (per-epoch) rows are not hit-testable
+            (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = a_rect_data
             rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)
             if rect.contains(pos):
                 return i

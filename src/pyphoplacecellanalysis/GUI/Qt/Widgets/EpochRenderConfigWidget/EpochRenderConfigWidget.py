@@ -373,7 +373,7 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
     def __init__(self, configs: Optional[Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]]=None, parent=None): # 
         self.ui = PhoUIContainer()
         super().__init__(parent=parent) # Call the inherited classes __init__ method
-        self.configs = configs or {}
+        self.configs = self._normalize_configs_to_lists(configs or {}) ## always-list model
         # self.out_render_config_widgets_dict = 
         self._is_programmatic_update = False  # Flag to track programmatic updates and prevent circular updates
         if parent is not None:
@@ -381,46 +381,45 @@ class EpochRenderConfigsListWidget(pg.Qt.QtWidgets.QWidget):
         self.initUI()
 
 
-    def _build_children_widgets(self, configs: Union[EpochDisplayConfig, List[EpochDisplayConfig]]):
+    @classmethod
+    def _normalize_configs_to_lists(cls, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]) -> Dict[str, List[EpochDisplayConfig]]:
+        """ Normalize every series to a `List[EpochDisplayConfig]` (even length-1), so the widget model, round-trip, and apply path are uniform (no `len==1` collapse asymmetry). """
+        out = {}
+        for a_config_name, a_config in configs.items():
+            out[a_config_name] = list(a_config) if isinstance(a_config, (list, tuple)) else [a_config]
+        return out
+
+
+    def _build_children_widgets(self, configs: Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]):
         """
         updates:
             self.ui.config_widget_layout
             self.ui.out_render_config_widgets_dict
 
+        Every series (even single-config) is rendered as a container row with a title, a series-level eye toggle, and a horizontal scroll-list of per-epoch sub-widgets (each with its own eye toggle). The internal model `out_render_config_widgets_dict[name]` is ALWAYS a list.
         """
         assert self.ui.config_widget_layout is not None
         assert self.ui.out_render_config_widgets_dict is not None
         assert len(self.ui.out_render_config_widgets_dict) == 0
 
-        added_widget_dict = {}
         _connections_dict = {}
-        
-        # self.ui.out_render_config_widgets_dict = {}
-        for a_config_name, a_config in configs.items():
 
-            if isinstance(a_config, (list, tuple)):
-                # a list of configs
-                if len(a_config) == 1:
-                    curr_widget = build_single_epoch_display_config_widget(a_config[0]) # 
-                    self.ui.config_widget_layout.addWidget(curr_widget)
-                    self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-                    added_widget_dict[a_config[0]] = [curr_widget]
-                    
-                else:
-                    ## extract all items
-                    # Create a vertical container layout for title + scrollable horizontal layout
-                    a_config_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
-                    a_config_container_layout.setSpacing(0)
-                    a_config_container_layout.setContentsMargins(0, 0, 0, 0)
-                    a_config_container_layout.setObjectName(f"containerLayout[{a_config_name}]")
-                    
-                    # Create a widget container to hold the layout (so we can apply stylesheet)
-                    a_config_container_widget = pg.Qt.QtWidgets.QWidget()
-                    a_config_container_widget.setLayout(a_config_container_layout)
-                    a_config_container_widget.setObjectName(f"containerWidget[{a_config_name}]")
-                    a_config_container_widget.setMinimumSize(150, 112)
-                    # Set stylesheet for the container widget
-                    custom_stylesheet = """
+        normalized_configs = self._normalize_configs_to_lists(configs)
+        for a_config_name, a_config in normalized_configs.items():
+            ## extract all items
+            # Create a vertical container layout for title + scrollable horizontal layout
+            a_config_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
+            a_config_container_layout.setSpacing(0)
+            a_config_container_layout.setContentsMargins(0, 0, 0, 0)
+            a_config_container_layout.setObjectName(f"containerLayout[{a_config_name}]")
+
+            # Create a widget container to hold the layout (so we can apply stylesheet)
+            a_config_container_widget = pg.Qt.QtWidgets.QWidget()
+            a_config_container_widget.setLayout(a_config_container_layout)
+            a_config_container_widget.setObjectName(f"containerWidget[{a_config_name}]")
+            a_config_container_widget.setMinimumSize(150, 112)
+            # Set stylesheet for the container widget
+            custom_stylesheet = """
 background-color: rgba(71, 65, 60, 180);
 border-color: rgb(0, 0, 0);
 color: rgb(244, 244, 244);
@@ -433,39 +432,39 @@ QToolTip {
     font-size: 12px;
 }
 """
-                    a_config_container_widget.setStyleSheet(custom_stylesheet)
-                    
-                    # Create horizontal layout for title row (title button + visibility toggle button)
-                    a_config_title_row_layout = pg.Qt.QtWidgets.QHBoxLayout()
-                    a_config_title_row_layout.setSpacing(0)
-                    a_config_title_row_layout.setContentsMargins(0, 0, 0, 0)
-                    a_config_title_row_layout.setObjectName(f"titleRowLayout_{a_config_name}")
-                    
-                    # Add a button showing the config name, matching EpochRenderConfigWidget's btnTitle exactly
-                    # btnTitle is a disabled flat QPushButton - use the same widget type for consistency
-                    a_config_title_button = pg.Qt.QtWidgets.QPushButton(a_config_name)
-                    a_config_title_button.setObjectName(f"titleButton_{a_config_name}")
-                    a_config_title_button.setEnabled(False)  # Disabled like btnTitle
-                    a_config_title_button.setFlat(True)  # Flat like btnTitle
-                    font = a_config_title_button.font()
-                    font.setPointSize(10)
-                    font.setBold(True)
-                    a_config_title_button.setFont(font)
-                    # Color will inherit from parent container widget's stylesheet (rgb(244, 244, 244))
-                    a_config_title_row_layout.addWidget(a_config_title_button)
-                    
-                    # Create visibility toggle button for the row
-                    a_config_visibility_toggle_button = pg.Qt.QtWidgets.QToolButton()
-                    a_config_visibility_toggle_button.setObjectName(f"visibilityToggleButton_{a_config_name}")
-                    a_config_visibility_toggle_button.setMinimumSize(20, 25)
-                    a_config_visibility_toggle_button.setBaseSize(20, 25)
-                    a_config_visibility_toggle_button.setToolTip("Toggle visibility of all items in this row")
-                    a_config_visibility_toggle_button.setCheckable(True)
-                    a_config_visibility_toggle_button.setToolButtonStyle(pg.Qt.QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
-                    # Set eye icons (same as chkbtnVisible)
-                    a_config_visibility_toggle_button.setIcon(pg.Qt.QtGui.QIcon(":/State/Icons/actions/eye.png"))
-                    # Style similar to chkbtnVisible
-                    a_config_visibility_toggle_button.setStyleSheet("""
+            a_config_container_widget.setStyleSheet(custom_stylesheet)
+
+            # Create horizontal layout for title row (title button + visibility toggle button)
+            a_config_title_row_layout = pg.Qt.QtWidgets.QHBoxLayout()
+            a_config_title_row_layout.setSpacing(0)
+            a_config_title_row_layout.setContentsMargins(0, 0, 0, 0)
+            a_config_title_row_layout.setObjectName(f"titleRowLayout_{a_config_name}")
+
+            # Add a button showing the config name, matching EpochRenderConfigWidget's btnTitle exactly
+            # btnTitle is a disabled flat QPushButton - use the same widget type for consistency
+            a_config_title_button = pg.Qt.QtWidgets.QPushButton(a_config_name)
+            a_config_title_button.setObjectName(f"titleButton_{a_config_name}")
+            a_config_title_button.setEnabled(False)  # Disabled like btnTitle
+            a_config_title_button.setFlat(True)  # Flat like btnTitle
+            font = a_config_title_button.font()
+            font.setPointSize(10)
+            font.setBold(True)
+            a_config_title_button.setFont(font)
+            # Color will inherit from parent container widget's stylesheet (rgb(244, 244, 244))
+            a_config_title_row_layout.addWidget(a_config_title_button)
+
+            # Create series-level visibility toggle button for the row (whole-series on/off)
+            a_config_visibility_toggle_button = pg.Qt.QtWidgets.QToolButton()
+            a_config_visibility_toggle_button.setObjectName(f"visibilityToggleButton_{a_config_name}")
+            a_config_visibility_toggle_button.setMinimumSize(20, 25)
+            a_config_visibility_toggle_button.setBaseSize(20, 25)
+            a_config_visibility_toggle_button.setToolTip("Toggle visibility of all items in this series")
+            a_config_visibility_toggle_button.setCheckable(True)
+            a_config_visibility_toggle_button.setToolButtonStyle(pg.Qt.QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+            # Set eye icons (same as chkbtnVisible)
+            a_config_visibility_toggle_button.setIcon(pg.Qt.QtGui.QIcon(":/State/Icons/actions/eye.png"))
+            # Style similar to chkbtnVisible
+            a_config_visibility_toggle_button.setStyleSheet("""
 QToolButton {
     color: rgb(244, 244, 244);
 }
@@ -484,120 +483,105 @@ QToolButton:checked {
 QToolButton:!checked {
 }
 """)
-                    # Connect toggle button to toggle method
-                    a_config_visibility_toggle_button.clicked.connect(lambda checked, name=a_config_name: self._toggle_row_visibility(name))
-                    a_config_title_row_layout.addWidget(a_config_visibility_toggle_button)
-                    
-                    # Add the title row layout to the container layout
-                    a_config_container_layout.addLayout(a_config_title_row_layout)
-                    
-                    # Create horizontal layout for the widgets
-                    a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
-                    a_sub_config_widget_layout.setSpacing(0)
-                    a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
-                    a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
-                    
-                    # Create a widget to hold the horizontal layout (layouts can't be directly added to scroll areas)
-                    a_sub_config_widget_container = pg.Qt.QtWidgets.QWidget()
-                    a_sub_config_widget_container.setLayout(a_sub_config_widget_layout)
-                    a_sub_config_widget_container.setObjectName(f"widgetContainer[{a_config_name}]")
+            # Connect toggle button to toggle method
+            a_config_visibility_toggle_button.clicked.connect(lambda checked, name=a_config_name: self._toggle_row_visibility(name))
+            a_config_title_row_layout.addWidget(a_config_visibility_toggle_button)
+
+            # Add the title row layout to the container layout
+            a_config_container_layout.addLayout(a_config_title_row_layout)
+
+            # Create horizontal layout for the widgets
+            a_sub_config_widget_layout = pg.Qt.QtWidgets.QHBoxLayout()
+            a_sub_config_widget_layout.setSpacing(0)
+            a_sub_config_widget_layout.setContentsMargins(0, 0, 0, 0)
+            a_sub_config_widget_layout.setObjectName(f"horizontalLayout[{a_config_name}]")
+
+            # Create a widget to hold the horizontal layout (layouts can't be directly added to scroll areas)
+            a_sub_config_widget_container = pg.Qt.QtWidgets.QWidget()
+            a_sub_config_widget_container.setLayout(a_sub_config_widget_layout)
+            a_sub_config_widget_container.setObjectName(f"widgetContainer[{a_config_name}]")
 
 
-                    # --- Begin block to make scroll bar NOT cover bottom of widgets
-                    # Place the scroll area inside a QWidget with a QVBoxLayout to act as a spacer/padding container
-                    a_sub_config_scroll_container = pg.Qt.QtWidgets.QWidget()
-                    a_sub_config_scroll_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
-                    a_sub_config_scroll_container_layout.setSpacing(0)
-                    a_sub_config_scroll_container_layout.setContentsMargins(0, 0, 0, 0)
-                    a_sub_config_scroll_container_layout.setObjectName(f"scrollContainerLayout[{a_config_name}]")
-                    a_sub_config_scroll_container.setLayout(a_sub_config_scroll_container_layout)
-                    a_sub_config_scroll_container.setObjectName(f"scrollContainerWidget[{a_config_name}]")
+            # --- Begin block to make scroll bar NOT cover bottom of widgets
+            # Place the scroll area inside a QWidget with a QVBoxLayout to act as a spacer/padding container
+            a_sub_config_scroll_container = pg.Qt.QtWidgets.QWidget()
+            a_sub_config_scroll_container_layout = pg.Qt.QtWidgets.QVBoxLayout()
+            a_sub_config_scroll_container_layout.setSpacing(0)
+            a_sub_config_scroll_container_layout.setContentsMargins(0, 0, 0, 0)
+            a_sub_config_scroll_container_layout.setObjectName(f"scrollContainerLayout[{a_config_name}]")
+            a_sub_config_scroll_container.setLayout(a_sub_config_scroll_container_layout)
+            a_sub_config_scroll_container.setObjectName(f"scrollContainerWidget[{a_config_name}]")
 
-                    # Create a scroll area with horizontal scrolling
-                    a_sub_config_scroll_area = pg.Qt.QtWidgets.QScrollArea()
-                    a_sub_config_scroll_area.setWidget(a_sub_config_widget_container)
-                    a_sub_config_scroll_area.setWidgetResizable(False)  # Don't resize widget, enable scrolling
-                    a_sub_config_scroll_area.setHorizontalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-                    a_sub_config_scroll_area.setVerticalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-                    a_sub_config_scroll_area.setFrameShape(pg.Qt.QtWidgets.QFrame.Shape.NoFrame)
-                    a_sub_config_scroll_area.setObjectName(f"scrollArea[{a_config_name}]")
+            # Create a scroll area with horizontal scrolling
+            a_sub_config_scroll_area = pg.Qt.QtWidgets.QScrollArea()
+            a_sub_config_scroll_area.setWidget(a_sub_config_widget_container)
+            a_sub_config_scroll_area.setWidgetResizable(False)  # Don't resize widget, enable scrolling
+            a_sub_config_scroll_area.setHorizontalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            a_sub_config_scroll_area.setVerticalScrollBarPolicy(pg.Qt.QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            a_sub_config_scroll_area.setFrameShape(pg.Qt.QtWidgets.QFrame.Shape.NoFrame)
+            a_sub_config_scroll_area.setObjectName(f"scrollArea[{a_config_name}]")
 
-                    # Reserve vertical space for horizontal scroll bar (QScrollArea sizeHint doesn't include it with ScrollBarAsNeeded)
-                    scroll_bar_height = a_sub_config_scroll_area.style().pixelMetric(pg.Qt.QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent)
-                    if scroll_bar_height <= 0:
-                        scroll_bar_height = a_sub_config_scroll_area.horizontalScrollBar().sizeHint().height()
-                    if scroll_bar_height <= 0:
-                        scroll_bar_height = 16  # fallback default
+            # Reserve vertical space for horizontal scroll bar (QScrollArea sizeHint doesn't include it with ScrollBarAsNeeded)
+            scroll_bar_height = a_sub_config_scroll_area.style().pixelMetric(pg.Qt.QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent)
+            if scroll_bar_height <= 0:
+                scroll_bar_height = a_sub_config_scroll_area.horizontalScrollBar().sizeHint().height()
+            if scroll_bar_height <= 0:
+                scroll_bar_height = 16  # fallback default
 
-                    # Add a bottom margin so the section's preferred height includes the scroll bar
-                    margin_pixels = max(scroll_bar_height, 4)
-                    a_sub_config_scroll_container_layout.addWidget(a_sub_config_scroll_area)
-                    a_sub_config_scroll_container_layout.addSpacing(margin_pixels)
+            # Add a bottom margin so the section's preferred height includes the scroll bar
+            margin_pixels = max(scroll_bar_height, 4)
+            a_sub_config_scroll_container_layout.addWidget(a_sub_config_scroll_area)
+            a_sub_config_scroll_container_layout.addSpacing(margin_pixels)
 
-                    # Add scroll area container to container layout instead of directly adding the scroll area
-                    a_config_container_layout.addWidget(a_sub_config_scroll_container)
-                    # --- End of block
-                    
-                    self.ui.out_render_config_widgets_dict[a_config_name] = [] # start with an empty list
-                    # added_widget_dict[a_config] = []
+            # Add scroll area container to container layout instead of directly adding the scroll area
+            a_config_container_layout.addWidget(a_sub_config_scroll_container)
+            # --- End of block
 
-                    print(f'a_config_name: "{a_config_name}" with {len(a_config)} sub-items:')
-                    for i, a_sub_config in enumerate(a_config):
-                        a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config, is_config_list=True)
-                        a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
-                        a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
-                        # self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-                        self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
-                        # added_widget_dict[a_config].append(a_sub_curr_widget)
-                        added_widget_dict[a_sub_config] = [a_sub_curr_widget]
-                        
-                        # Connect individual widget visibility changes to update toggle button state
-                        a_sub_curr_widget.ui.chkbtnVisible.toggled.connect(lambda checked, name=a_config_name: self._update_row_visibility_toggle_button_state(name))
-                    ## END for i, a_sub_config in enumerate(a_config)...
-                    
+            self.ui.out_render_config_widgets_dict[a_config_name] = [] # start with an empty list (ALWAYS a list)
 
-                    # Update the widget container's size after adding all widgets
-                    # This is critical when setWidgetResizable(False) - the container needs explicit sizing
-                    # Calculate size hint based on the tallest widget and total width of all widgets
-                    if len(self.ui.out_render_config_widgets_dict[a_config_name]) > 0:
-                        max_height = max([w.sizeHint().height() for w in self.ui.out_render_config_widgets_dict[a_config_name]], default=50)
-                        total_width = sum([w.sizeHint().width() for w in self.ui.out_render_config_widgets_dict[a_config_name]], 0)
-                        # Set minimum size to ensure content is visible, but allow horizontal scrolling
-                        a_sub_config_widget_container.setMinimumSize(total_width, max_height)
-                        # Set size policy to allow vertical expansion but maintain horizontal scrollability
-                        size_policy = pg.Qt.QtWidgets.QSizePolicy(pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum, pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum)
-                        a_sub_config_widget_container.setSizePolicy(size_policy)
-                        # Reserve height for content + horizontal scroll bar so nothing is cut off
-                        a_sub_config_scroll_area.setMinimumHeight(max_height + scroll_bar_height)
-                        # Update the scroll area's viewport to show the content properly
-                        a_sub_config_scroll_area.updateGeometry()
+            print(f'a_config_name: "{a_config_name}" with {len(a_config)} sub-items:')
+            for i, a_sub_config in enumerate(a_config):
+                a_sub_curr_widget = build_single_epoch_display_config_widget(a_sub_config, is_config_list=True)
+                a_sub_curr_widget.setObjectName(f"config[{a_config_name}][{i}]")
+                a_sub_config_widget_layout.addWidget(a_sub_curr_widget)
+                self.ui.out_render_config_widgets_dict[a_config_name].append(a_sub_curr_widget)
 
-                        # Set container minimum height so the section's preferred height includes title + scroll area + scroll bar
-                        title_row_height = a_config_title_button.sizeHint().height()
-                        min_container_height = title_row_height + (max_height + scroll_bar_height) + margin_pixels
-                        a_config_container_widget.setMinimumHeight(max(112, min_container_height))
+                # Connect each sub-widget's signals exactly once (here, at creation time)
+                _connections_dict[a_sub_curr_widget] = [a_sub_curr_widget.sigConfigChanged.connect(self.on_config_ui_updated),
+                                                        a_sub_curr_widget.sigRemoveRequested.connect(self.on_remove_epoch_series)]
+                # Connect individual widget visibility changes to update the series toggle button state
+                a_sub_curr_widget.ui.chkbtnVisible.toggled.connect(lambda checked, name=a_config_name: self._update_row_visibility_toggle_button_state(name))
+            ## END for i, a_sub_config in enumerate(a_config)...
 
-                        # Set initial state of the visibility toggle button based on current widget states
-                        self._update_row_visibility_toggle_button_state(a_config_name)
 
-                    # Add the container widget (with title + scroll area) to the parent layout
-                    self.ui.config_widget_layout.addWidget(a_config_container_widget)
+            # Update the widget container's size after adding all widgets
+            # This is critical when setWidgetResizable(False) - the container needs explicit sizing
+            # Calculate size hint based on the tallest widget and total width of all widgets
+            if len(self.ui.out_render_config_widgets_dict[a_config_name]) > 0:
+                max_height = max([w.sizeHint().height() for w in self.ui.out_render_config_widgets_dict[a_config_name]], default=50)
+                total_width = sum([w.sizeHint().width() for w in self.ui.out_render_config_widgets_dict[a_config_name]], 0)
+                # Set minimum size to ensure content is visible, but allow horizontal scrolling
+                a_sub_config_widget_container.setMinimumSize(total_width, max_height)
+                # Set size policy to allow vertical expansion but maintain horizontal scrollability
+                size_policy = pg.Qt.QtWidgets.QSizePolicy(pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum, pg.Qt.QtWidgets.QSizePolicy.Policy.Minimum)
+                a_sub_config_widget_container.setSizePolicy(size_policy)
+                # Reserve height for content + horizontal scroll bar so nothing is cut off
+                a_sub_config_scroll_area.setMinimumHeight(max_height + scroll_bar_height)
+                # Update the scroll area's viewport to show the content properly
+                a_sub_config_scroll_area.updateGeometry()
 
-            else:
-                # Otherwise a straight-up config
-                curr_widget = build_single_epoch_display_config_widget(a_config)
-                self.ui.config_widget_layout.addWidget(curr_widget)
-                self.ui.out_render_config_widgets_dict[a_config_name] = curr_widget
-                added_widget_dict[a_config] = [curr_widget]
+                # Set container minimum height so the section's preferred height includes title + scroll area + scroll bar
+                title_row_height = a_config_title_button.sizeHint().height()
+                min_container_height = title_row_height + (max_height + scroll_bar_height) + margin_pixels
+                a_config_container_widget.setMinimumHeight(max(112, min_container_height))
 
-            ## Connect signals to widgets
-            for a_config, a_widget_list in added_widget_dict.items():
-                _connections_dict[a_config] = []
-                for a_widget in a_widget_list:
-                    # self.ui.out_render_config_widgets_dict[a_config_name]
-                    _connections_dict[a_config].append(a_widget.sigConfigChanged.connect(self.on_config_ui_updated))
-                    _connections_dict[a_config].append(a_widget.sigRemoveRequested.connect(self.on_remove_epoch_series))
-                    
+                # Set initial state of the visibility toggle button based on current widget states
+                self._update_row_visibility_toggle_button_state(a_config_name)
+
+            # Add the container widget (with title + scroll area) to the parent layout
+            self.ui.config_widget_layout.addWidget(a_config_container_widget)
+        ## END for a_config_name, a_config in normalized_configs.items()...
+
 
     def initUI(self):
         # self.ui.rootWidget = pg.Qt.QtWidgets.QWidget()
@@ -722,41 +706,46 @@ QToolButton:!checked {
             toggle_button.setChecked(visible_count == total_count)
 
     def _toggle_row_visibility(self, config_name: str):
-        """Toggle visibility of all sub-config widgets in a row.
-        
+        """Toggle the whole-series visibility of all sub-config widgets in a row.
+
+        Batches the change: child-widget signals are blocked while all checkboxes are flipped, then exactly ONE `sigAnyConfigChanged` is emitted (avoiding the prior signal storm of one full apply per child checkbox).
+
         Args:
             config_name: The name of the config row to toggle visibility for
         """
         if config_name not in self.ui.out_render_config_widgets_dict:
             return
-        
+
         widget_list = self.ui.out_render_config_widgets_dict[config_name]
         if not isinstance(widget_list, (list, tuple)) or len(widget_list) == 0:
             return
-        
+
         # Determine current state: count how many are visible
         visible_count = sum(1 for w in widget_list if w.ui.chkbtnVisible.isChecked())
         total_count = len(widget_list)
-        
+
         # Determine target state:
-        # - If all visible or mixed → set all to hidden
-        # - If all hidden → set all to visible
-        if visible_count == total_count:
-            # All visible → set all to hidden
-            target_visible = False
-        else:
-            # All hidden or mixed → set all to visible
-            target_visible = True
-        
-        # Update all widgets' visibility checkboxes
+        # - If all visible → set all to hidden
+        # - If all hidden or mixed → set all to visible
+        target_visible: bool = not (visible_count == total_count)
+
+        # Flip all child checkboxes with the sub-widget's signals blocked so each one's `sigConfigChanged` doesn't independently fire a full apply. The sub-widget's own `on_update_config` still runs and keeps its `self.config` in sync; only the upward `sigConfigChanged` emission is suppressed.
         for widget in widget_list:
             if widget.ui.chkbtnVisible.isChecked() != target_visible:
-                widget.ui.chkbtnVisible.setChecked(target_visible)
-        
+                was_blocked = widget.blockSignals(True)
+                try:
+                    widget.ui.chkbtnVisible.setChecked(target_visible)
+                finally:
+                    widget.blockSignals(was_blocked)
+
         # Update the toggle button's checked state to reflect the new state
         toggle_button = self._get_row_visibility_toggle_button(config_name)
         if toggle_button is not None:
             toggle_button.setChecked(target_visible)
+
+        # Emit a single batched change (suppressed during programmatic updates)
+        if not self._is_programmatic_update:
+            self.sigAnyConfigChanged.emit(self)
 
 
     ## Programmatic Update/Retrieval:    
@@ -776,121 +765,68 @@ QToolButton:!checked {
         # This prevents on_config_ui_updated() from emitting sigAnyConfigChanged during updates
         self._is_programmatic_update = True
         try:
-            # Check if structure changed significantly
+            ## normalize the incoming configs to the always-list model so structure comparison and in-place update are uniform.
+            normalized_configs = self._normalize_configs_to_lists(configs)
+
+            # A true structure change is: the set of series keys differs, OR a series' per-epoch count differs, OR there are orphaned widgets. Only then do we clear+rebuild (which is what causes flicker / state loss).
             structure_changed = False
-            if self.configs is None or set(configs.keys()) != set(self.configs.keys()):
+            if self.configs is None or (set(normalized_configs.keys()) != set(self.ui.out_render_config_widgets_dict.keys())):
                 structure_changed = True
             else:
-                # Check if any config changed from single to list or vice versa
-                for key in configs.keys():
-                    old_is_list = isinstance(self.configs.get(key, None), (list, tuple))
-                    new_is_list = isinstance(configs[key], (list, tuple))
-                    if old_is_list != new_is_list:
+                for key, a_config_list in normalized_configs.items():
+                    extant_widget_list = self.ui.out_render_config_widgets_dict.get(key, None)
+                    if (not isinstance(extant_widget_list, (list, tuple))) or (len(extant_widget_list) != len(a_config_list)):
                         structure_changed = True
                         break
-                    if new_is_list:
-                        if len(self.configs[key]) != len(configs[key]):
-                            structure_changed = True
-                            break
-            
-            # Detect orphaned widgets (widgets that exist but configs don't)
-            orphaned_widget_keys = set(self.ui.out_render_config_widgets_dict.keys()) - set(configs.keys())
-            if orphaned_widget_keys:
-                structure_changed = True  # Need to rebuild to remove orphaned widgets
-            
+
             if structure_changed:
-                # Structure changed, need to rebuild
                 # IMPORTANT: Update self.configs BEFORE clearing widgets to ensure consistency
-                self.configs = configs
+                self.configs = normalized_configs
                 self.clear_all_child_widgets()
                 self._build_children_widgets(configs=self.configs)
             else:
-                # Structure same, update widgets in-place
-                # Update self.configs first to keep it in sync
-                self.configs = configs
-                for a_config_name, a_config in configs.items():
-                    widget_or_list = self.ui.out_render_config_widgets_dict.get(a_config_name, None)
-                    if widget_or_list is None:
-                        continue  # Skip if widget doesn't exist
-                    
-                    if isinstance(a_config, (list, tuple)):
-                        if isinstance(widget_or_list, list):
-                            # Update list of widgets
-                            for i, a_sub_config in enumerate(a_config):
-                                if i < len(widget_or_list):
-                                    # Block signals on child widget during programmatic update
-                                    child_widget = widget_or_list[i]
-                                    was_child_blocked = child_widget.blockSignals(True)
-                                    try:
-                                        child_widget.update_from_config(a_sub_config)
-                                    finally:
-                                        child_widget.blockSignals(was_child_blocked)
-                        else:
-                            # Widget is single but config is list - need to rebuild this one
-                            # This shouldn't happen if structure check worked, but handle it
-                            structure_changed = True
-                            break
-                    else:
-                        if isinstance(widget_or_list, list):
-                            # Config is single but widget is list - need to rebuild this one
-                            structure_changed = True
-                            break
-                        else:
-                            # Update single widget in-place
-                            # Block signals on child widget during programmatic update
-                            was_child_blocked = widget_or_list.blockSignals(True)
+                # Structure same: update each sub-widget in place (signals blocked) to preserve widget identity and avoid feedback loops.
+                self.configs = normalized_configs
+                for a_config_name, a_config_list in normalized_configs.items():
+                    extant_widget_list = self.ui.out_render_config_widgets_dict.get(a_config_name, None)
+                    if extant_widget_list is None:
+                        continue
+                    for i, a_sub_config in enumerate(a_config_list):
+                        if i < len(extant_widget_list):
+                            child_widget = extant_widget_list[i]
+                            was_child_blocked = child_widget.blockSignals(True)
                             try:
-                                widget_or_list.update_from_config(a_config)
+                                child_widget.update_from_config(a_sub_config)
                             finally:
-                                widget_or_list.blockSignals(was_child_blocked)
-                
-                # If we found a mismatch during in-place update, rebuild everything
-                if structure_changed:
-                    # IMPORTANT: Update self.configs BEFORE clearing widgets to ensure consistency
-                    self.configs = configs
-                    self.clear_all_child_widgets()
-                    self._build_children_widgets(configs=self.configs)
+                                child_widget.blockSignals(was_child_blocked)
+                    # Keep the series-level toggle button in sync with the updated child states
+                    self._update_row_visibility_toggle_button_state(a_config_name)
         finally:
             # Always reset flag, even if an exception occurred
             self._is_programmatic_update = False
 
 
-    def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, Union[EpochDisplayConfig, List[EpochDisplayConfig]]]:
-        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+    def configs_from_states(self, as_EpochDisplayConfig_obj: bool=True) -> Dict[str, List[EpochDisplayConfig]]:
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model.
+
+        The internal model is always-list, so every series is returned as a `List[EpochDisplayConfig]` (even length-1). Each config carries per-row `isVisible`.
+        """
         _out_configs = {}
         assert self.ui.out_render_config_widgets_dict is not None, f"self.ui.out_render_config_widgets_dict is None!"
-        for a_config_name, a_widget_or_widget_list in self.ui.out_render_config_widgets_dict.items():
-            if isinstance(a_widget_or_widget_list, (list, tuple)):
-                # a list of configs
-                if len(a_widget_or_widget_list) == 1:
-                    curr_widget = a_widget_or_widget_list[0]
-                    _out_configs[a_config_name] = curr_widget.config_from_state()
-                else:
-                    ## extract all items                    
-                    _out_configs[a_config_name] = [] # start with an empty list
-                    for i, a_sub_curr_widget in enumerate(a_widget_or_widget_list):
-                        _out_configs[a_config_name].append(a_sub_curr_widget.config_from_state())
-            else:
-                # Otherwise a straight-up config
-                curr_widget = a_widget_or_widget_list
-                _out_configs[a_config_name] = curr_widget.config_from_state()
-                
+        for a_config_name, a_widget_list in self.ui.out_render_config_widgets_dict.items():
+            ## always-list model: `a_widget_list` is a list of sub-widgets
+            _out_configs[a_config_name] = [a_sub_curr_widget.config_from_state() for a_sub_curr_widget in a_widget_list]
+
         ## END FOR
         if as_EpochDisplayConfig_obj:
             return _out_configs
         else:
-            ## convert the EpochDisplayConfig objects to dicts
-            update_dict = {}
-            for k, v in _out_configs.items():
-                if not isinstance(v, (list, tuple)):
-                    update_dict[k] = v.to_dict()
-                else:
-                    update_dict[k] = [sub_v.to_dict() for sub_v in v] ## get the sub-items in the list
-            return update_dict
-        
+            ## convert the EpochDisplayConfig objects to dicts (always a list of dicts per series)
+            return {k: [sub_v.to_dict() for sub_v in v] for k, v in _out_configs.items()}
 
-    def config_dicts_from_states(self) -> Dict[str, Union[Dict, List[Dict]]]:
-        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. """
+
+    def config_dicts_from_states(self) -> Dict[str, List[Dict]]:
+        """ called to retrieve a valid config from the UI's properties... this means it could have just held a config as its model. Returns a consistent `Dict[str, List[dict]]` so the apply path always takes the list branch. """
         return self.configs_from_states(as_EpochDisplayConfig_obj=False) # type: ignore
 
     def on_config_ui_updated(self, *args, **kwargs):

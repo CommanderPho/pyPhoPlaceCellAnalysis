@@ -124,7 +124,7 @@ class EpochDisplayConfig(BasePlotDataParams):
 
 
     @classmethod
-    def init_from_visualization_dataframe_row(cls, name: str, y_location, height, pen_tuple, brush_tuple):
+    def init_from_visualization_dataframe_row(cls, name: str, y_location, height, pen_tuple, brush_tuple, is_visible: bool = True):
         """
 
         Example Usage:
@@ -164,7 +164,7 @@ class EpochDisplayConfig(BasePlotDataParams):
         else:
             raise NotImplementedError
 
-        return cls(name=name, isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
+        return cls(name=name, isVisible=bool(is_visible), y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
 
 
     @classmethod
@@ -197,8 +197,10 @@ class EpochDisplayConfig(BasePlotDataParams):
             ## serialize the raw QPen/QBrush objects to tuples so `init_from_visualization_dataframe_row` (which does `len(...)`) doesn't crash. isinstance guards pass through already-serialized tuples unchanged.
             pen_tuples = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) if isinstance(a_pen, QPen) else a_pen for a_pen in a_serializable_df['pen']]
             brush_tuples = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) if isinstance(a_brush, QBrush) else a_brush for a_brush in a_serializable_df['brush']]
+            ## per-row (per-epoch) visibility: read from df if present, else default visible.
+            is_visible_list = [bool(v) for v in a_serializable_df['is_visible']] if ('is_visible' in a_serializable_df.columns) else [True] * len(a_serializable_df)
             # out_list = [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
-            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(label_names, a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], pen_tuples, brush_tuples)]
+            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple, is_visible=a_is_visible) for a_name, y_location, height, a_pen_tuple, a_brush_tuple, a_is_visible in zip(label_names, a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], pen_tuples, brush_tuples, is_visible_list)]
             return out_list
 
         except Exception as e:
