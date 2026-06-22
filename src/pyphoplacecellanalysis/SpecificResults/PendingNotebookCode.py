@@ -4902,6 +4902,8 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_l
     curr_paradigm_df['y_location'] = y_location
     curr_paradigm_df['height'] = height
 
+    #TODO 2026-06-22 08:15: - [ ] `curr_paradigm_df` is correct here
+
     ## INPUTS: curr_paradigm_df
     # active_2d_plot.get_added_rect_item_required_y_value()
     a_final_interval_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df=curr_paradigm_df, required_columns_synonym_dict=IntervalsDatasource._time_column_name_synonyms)
