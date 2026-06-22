@@ -460,7 +460,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     # Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource
     def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False, 
         position_mode: AddedEpochPositionNormalizationMode=AddedEpochPositionNormalizationMode.ABSOLUTE,
-        **vis_kwargs):
+        is_named_multi_epoch_series: Optional[bool] = None, **vis_kwargs):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -500,6 +500,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             
         # Update the custom datasource name with the provided name
         interval_datasource.custom_datasource_name = name
+        interval_datasource.is_named_multi_epoch_series = is_named_multi_epoch_series
         
         rendered_intervals_list_did_change = False
         extant_datasource = self.interval_datasources.get(name, None)
@@ -1185,7 +1186,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         rendered_epoch_names = self.interval_datasource_names
         for a_name in rendered_epoch_names:
             a_ds = self.interval_datasources[a_name]
-            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds)
+            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds, is_named_multi_epoch_series=getattr(a_ds, 'is_named_multi_epoch_series', None))
             out_configs_dict[a_name] = result
 
         return out_configs_dict

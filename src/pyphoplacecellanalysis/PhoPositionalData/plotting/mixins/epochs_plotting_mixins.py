@@ -167,8 +167,32 @@ class EpochDisplayConfig(BasePlotDataParams):
         return cls(name=name, isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity)
 
 
+    @staticmethod
+    def _labels_autoqualify_for_named_multi_epoch_mode(label_names: List[str], series_name: str, a_df, max_rows: int = 20) -> bool:
+        """True only for semantic named epochs (pre/maze1/post1), not lap-index labels ('1','2',...) or bulk uniform series."""
+        n_rows: int = len(label_names)
+        if n_rows == 0 or n_rows > max_rows:
+            return False
+        unique_labels: List[str] = list(dict.fromkeys(str(x) for x in label_names))
+        if len(unique_labels) != n_rows:
+            return False
+        if 'lap_id' in a_df.columns and np.all(a_df['label'].astype(str).to_numpy() == a_df['lap_id'].astype(str).to_numpy()):
+            return False
+        if all(lbl.strip().isdigit() for lbl in unique_labels):
+            return False
+        return True
+
+
     @classmethod
-    def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
+    def _init_configs_list_single_series_fallback(cls, name: str, a_ds) -> List["EpochDisplayConfig"]:
+        """Single series-level config from compressed viz rows (Laps/PBEs/Ripples and forced-single mode)."""
+        a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
+        assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
+        return [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+
+
+    @classmethod
+    def init_configs_list_from_interval_datasource_df(cls, name: str, a_ds, is_named_multi_epoch_series: Optional[bool] = None) -> List["EpochDisplayConfig"]:
         """
 
         Example Usage:
@@ -184,30 +208,30 @@ class EpochDisplayConfig(BasePlotDataParams):
 
 
         """
-        included_columns = ['series_vertical_offset','series_height','pen','brush']
-        
+        if is_named_multi_epoch_series is None:
+            is_named_multi_epoch_series = getattr(a_ds, 'is_named_multi_epoch_series', None)
+        if is_named_multi_epoch_series is False:
+            return cls._init_configs_list_single_series_fallback(name, a_ds)
+
         from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers
 
         try:
             a_serializable_df = a_ds.df.copy() ## try this first
-            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns)) ## require only unique labels
+            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
             label_names: List[str] = a_serializable_df['label'].to_list()
             unique_label_names: List[str] = np.unique(label_names)
             assert len(unique_label_names) == len(a_serializable_df), f"len(unique_label_names): {len(unique_label_names)}, unique_label_names: {unique_label_names} != len(a_serializable_df): {len(a_serializable_df)}\n\ta_serializable_df: {a_serializable_df}"
+            if is_named_multi_epoch_series is not True and not cls._labels_autoqualify_for_named_multi_epoch_mode(label_names, name, a_serializable_df):
+                raise ValueError(f"series {name!r} is not a named multi-epoch series (labels={list(unique_label_names)[:8]}{'...' if len(unique_label_names) > 8 else ''})")
             ## serialize the raw QPen/QBrush objects to tuples so `init_from_visualization_dataframe_row` (which does `len(...)`) doesn't crash. isinstance guards pass through already-serialized tuples unchanged.
             pen_tuples = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) if isinstance(a_pen, QPen) else a_pen for a_pen in a_serializable_df['pen']]
             brush_tuples = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) if isinstance(a_brush, QBrush) else a_brush for a_brush in a_serializable_df['brush']]
-            # out_list = [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
             out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(label_names, a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], pen_tuples, brush_tuples)]
             return out_list
 
         except Exception as e:
             print(f'WARNING: FALLBACK to old method that does not work for multi-interval items (due to error: {e}).')
-            ## old fallback way that drops datasource names
-            a_serializable_df = a_ds.get_serialized_data(drop_duplicates=True)
-            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns))
-            # return [cls(name=f'{name}', isVisible=True, y_location=y_location, height=height, pen_color=pen_color, pen_opacity=pen_opacity, brush_color=brush_color, brush_opacity=brush_opacity) for y_location, height, (pen_color, pen_opacity, pen_width), (brush_color, brush_opacity) in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
-            return [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            return cls._init_configs_list_single_series_fallback(name, a_ds)
         
 
 
