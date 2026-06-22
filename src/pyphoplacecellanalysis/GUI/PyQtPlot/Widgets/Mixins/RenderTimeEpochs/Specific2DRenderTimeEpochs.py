@@ -43,28 +43,6 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         """        
         ## broadcast helper: a single-config series produces length-1 lists (one config representing all N rows). Broadcast those to all rows so positional assignment to the N-row df works (avoids a length-mismatch ValueError).
         n_rows: int = len(active_df)
-
-        ## LABEL-KEYED REORDER (multi-epoch series, e.g. custom_paradigm): the per-config kwargs arrive as parallel lists in WIDGET/config order, which is not guaranteed to match the df's row order. If a `name`/`label` list matches `active_df['label']` 1:1 and uniquely, reorder every per-config list into df-label order so the positional assignment below applies each config to the correct row (prevents toggling one epoch from clobbering another's visibility/colors). Single-config series (length-1 lists) are untouched and handled by the singleton broadcast.
-        _config_labels = kwargs.get('name', kwargs.get('label', None))
-        if isinstance(_config_labels, (list, tuple)) and (len(_config_labels) > 1) and ('label' in active_df.columns):
-            _df_labels = [str(x) for x in active_df['label'].tolist()]
-            _cfg_labels = [str(x) for x in _config_labels]
-            if (len(_cfg_labels) == len(_df_labels)) and (len(set(_df_labels)) == len(_df_labels)) and (sorted(_cfg_labels) == sorted(_df_labels)):
-                _cfg_label_to_index = {lbl: i for i, lbl in enumerate(_cfg_labels)}
-                _df_order = [_cfg_label_to_index[lbl] for lbl in _df_labels] ## _df_order[df_pos] -> source config index
-                def _reorder_by_label(v):
-                    if isinstance(v, (list, tuple)) and (len(v) == len(_df_order)):
-                        return [v[i] for i in _df_order]
-                    return v
-                y_location = _reorder_by_label(y_location)
-                height = _reorder_by_label(height)
-                pen_color = _reorder_by_label(pen_color)
-                brush_color = _reorder_by_label(brush_color)
-                kwargs = {k: _reorder_by_label(v) for k, v in kwargs.items()}
-            elif (len(_cfg_labels) == n_rows):
-                ## same count as rows but labels don't cleanly match (non-unique df labels, or differing label sets): we cannot key by label, so the assignment below falls back to POSITIONAL order. Warn so a silent mis-alignment is at least visible in logs.
-                print(f"WARNING: _update_df_visualization_columns: {len(_cfg_labels)} per-config items but labels do not match df['label'] 1:1 (df_labels={_df_labels}, cfg_labels={_cfg_labels}); applying POSITIONALLY (order-dependent).")
-
         def _broadcast_if_singleton(v):
             if isinstance(v, (list, tuple)) and (len(v) == 1) and (n_rows != 1):
                 return list(v) * n_rows

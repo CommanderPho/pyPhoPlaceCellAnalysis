@@ -184,33 +184,24 @@ class EpochDisplayConfig(BasePlotDataParams):
 
 
         """
-        ## Decide between a SINGLE series-level config (Laps/PBEs/Ripples: many rows but identical visualization) and a per-epoch MULTI config (true paradigm series: a handful of rows, each with a distinct color/label). The deciding factor is the number of UNIQUE visualization rows, not the number of unique `label` values (Laps uses `label = str(lap_id)`, so labels are all unique but the viz is uniform).
-        MAX_NUM_PER_EPOCH_WIDGETS: int = 20 ## above this we never build one-widget-per-row (keeps the UI usable and fast for 100s-of-rows series)
+        included_columns = ['series_vertical_offset','series_height','pen','brush']
+        
         from pyphocorehelpers.gui.Qt.color_helpers import ColorDataframeColumnHelpers
 
         try:
-            a_full_df = a_ds.df.copy()
-            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_full_df.columns))
-            num_full_rows: int = len(a_full_df)
-            ## per-row (per-epoch) visibility read once for reuse below.
-            full_is_visible_list = [bool(v) for v in a_full_df['is_visible']] if ('is_visible' in a_full_df.columns) else [True] * num_full_rows
-            ## compressed (unique) visualization rows, using the datasource's own serialization (pen/brush -> hashable tuples) so drop_duplicates works.
-            compressed_viz_df = a_ds.get_serialized_data(drop_duplicates=True)
-            num_compressed_rows: int = len(compressed_viz_df)
-
-            is_multi_epoch_paradigm_series: bool = (num_compressed_rows > 1) and (num_compressed_rows == num_full_rows) and (num_full_rows <= MAX_NUM_PER_EPOCH_WIDGETS)
-
-            if is_multi_epoch_paradigm_series:
-                ## one config per row, keyed by `label`, carrying per-row `is_visible`. Serialize raw QPen/QBrush objects to tuples so `init_from_visualization_dataframe_row` (which does `len(...)`) doesn't crash; isinstance guards pass through already-serialized tuples unchanged.
-                label_names: List[str] = a_full_df['label'].to_list()
-                pen_tuples = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) if isinstance(a_pen, QPen) else a_pen for a_pen in a_full_df['pen']]
-                brush_tuples = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) if isinstance(a_brush, QBrush) else a_brush for a_brush in a_full_df['brush']]
-                return [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple, is_visible=a_is_visible) for a_name, y_location, height, a_pen_tuple, a_brush_tuple, a_is_visible in zip(label_names, a_full_df['series_vertical_offset'], a_full_df['series_height'], pen_tuples, brush_tuples, full_is_visible_list)]
-            else:
-                ## SINGLE series-level config named after the series (e.g. 'Laps', 'PBEs'). Use the first compressed viz row; series is visible if ANY row is visible.
-                series_is_visible: bool = (len(full_is_visible_list) == 0) or any(full_is_visible_list)
-                first_compressed_row = compressed_viz_df.iloc[0]
-                return [cls.init_from_visualization_dataframe_row(name, first_compressed_row['series_vertical_offset'], first_compressed_row['series_height'], first_compressed_row['pen'], first_compressed_row['brush'], is_visible=series_is_visible)]
+            a_serializable_df = a_ds.df.copy() ## try this first
+            assert np.all(np.isin(['series_vertical_offset','series_height','pen','brush'], a_serializable_df.columns)) ## require only unique labels
+            label_names: List[str] = a_serializable_df['label'].to_list()
+            unique_label_names: List[str] = np.unique(label_names)
+            assert len(unique_label_names) == len(a_serializable_df), f"len(unique_label_names): {len(unique_label_names)}, unique_label_names: {unique_label_names} != len(a_serializable_df): {len(a_serializable_df)}\n\ta_serializable_df: {a_serializable_df}"
+            ## serialize the raw QPen/QBrush objects to tuples so `init_from_visualization_dataframe_row` (which does `len(...)`) doesn't crash. isinstance guards pass through already-serialized tuples unchanged.
+            pen_tuples = [ColorDataframeColumnHelpers.QPen_to_tuple(a_pen) if isinstance(a_pen, QPen) else a_pen for a_pen in a_serializable_df['pen']]
+            brush_tuples = [ColorDataframeColumnHelpers.QBrush_to_tuple(a_brush) if isinstance(a_brush, QBrush) else a_brush for a_brush in a_serializable_df['brush']]
+            ## per-row (per-epoch) visibility: read from df if present, else default visible.
+            is_visible_list = [bool(v) for v in a_serializable_df['is_visible']] if ('is_visible' in a_serializable_df.columns) else [True] * len(a_serializable_df)
+            # out_list = [cls.init_from_visualization_dataframe_row(name, y_location, height, a_pen_tuple, a_brush_tuple) for a_name, y_location, height, a_pen_tuple, a_brush_tuple in zip(a_serializable_df['label'], a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], a_serializable_df['pen'], a_serializable_df['brush'])]
+            out_list = [cls.init_from_visualization_dataframe_row(a_name, y_location, height, a_pen_tuple, a_brush_tuple, is_visible=a_is_visible) for a_name, y_location, height, a_pen_tuple, a_brush_tuple, a_is_visible in zip(label_names, a_serializable_df['series_vertical_offset'], a_serializable_df['series_height'], pen_tuples, brush_tuples, is_visible_list)]
+            return out_list
 
         except Exception as e:
             print(f'WARNING: FALLBACK to old method that does not work for multi-interval items (due to error: {e}).')
