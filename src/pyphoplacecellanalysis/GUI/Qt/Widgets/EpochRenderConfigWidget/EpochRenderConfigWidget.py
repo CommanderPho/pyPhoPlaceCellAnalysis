@@ -92,6 +92,11 @@ class EpochRenderConfigWidget(pg.Qt.QtWidgets.QWidget):
         self.ui.connections['doubleSpinBoxHeight'] = self.ui.doubleSpinBoxHeight.valueChanged.connect(self.on_update_config)
         self.ui.connections['doubleSpinBoxOffset'] = self.ui.doubleSpinBoxOffset.valueChanged.connect(self.on_update_config)
         self.ui.connections['btnTitle'] = self.ui.btnTitle.pressed.connect(self.on_update_config)
+
+        hl = self.ui.horizontalLayout
+        hl.setStretch(hl.indexOf(self.ui.chkbtnVisible), 0)
+        hl.setStretch(hl.indexOf(self.ui.btnFillColor), 2)
+        hl.setStretch(hl.indexOf(self.ui.btnPenColor), 1)
         
         # for a_config_property, a_widget in zip(bound_config_value_list, ui_element_list):
         #     a_widget_type = type(a_widget)
