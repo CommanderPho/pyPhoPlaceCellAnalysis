@@ -5178,7 +5178,7 @@ def _non_kdiba_session_preprocessing_is_complete(sess, active_maze_epoch_names) 
     return True
 
 
-def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5, overwrite_extant: bool=False):
+def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5, overwrite_extant: bool=False, **kwargs):
     """ Main non-kdiba processing/computation function (for Bapun/Rachel/etc sessions)
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
@@ -5199,11 +5199,11 @@ def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True,
     # linearization_method: str = hardcoded_params.lap_estimation_parameters.pop('linearization_method', 'umap') # 'shapely'
     # print(f'linearization_method: {linearization_method}')
     # active_data_mode_name = 'rachel'
-    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size, overwrite_extant=overwrite_extant)
+    return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size, overwrite_extant=overwrite_extant, **kwargs)
 
     
 @function_attributes(short_name=None, tags=['bapun'], input_requires=[], output_provides=[], uses=['post_process_non_kdiba', 'LapsAccessor.non_kdiba_laps_determine_directions'], used_by=[], creation_date='2025-09-19 17:50', related_items=[])
-def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5, overwrite_extant: bool=False):
+def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name: str = 'bapun', posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, time_bin_size=0.5, overwrite_extant: bool=False, **kwargs):
     """ Recompute or resume Bapun/Rachel (non-KDiba) session processing and placefield computations.
 
     When ``overwrite_extant=False`` (default), skips session preprocessing steps whose outputs already exist
@@ -5270,7 +5270,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     session_epochs
 
     if linearization_kwargs.get('method') == 'shapely' and linearization_kwargs.get('all_session_mazes') is not None:
-        linearization_kwargs['all_session_mazes'] = build_shapely_maze_collection_for_session(pos_df=curr_active_pipeline.sess.position.to_dataframe(), geometry_template=linearization_kwargs['all_session_mazes'], maze_epoch_keys=hardcoded_params.non_global_activity_session_names, epochs_df=curr_active_pipeline.sess.epochs.to_dataframe(), valid_epochs_override=linearization_kwargs.pop('valid_epochs_override', None))
+
+        
+        linearization_kwargs['all_session_mazes'] = build_shapely_maze_collection_for_session(curr_active_pipeline, pos_df=curr_active_pipeline.sess.position.to_dataframe(), geometry_template=linearization_kwargs['all_session_mazes'], maze_epoch_keys=hardcoded_params.non_global_activity_session_names, epochs_df=curr_active_pipeline.sess.epochs.to_dataframe(),
+                                                                                                valid_epochs_override=linearization_kwargs.pop('valid_epochs_override', linearization_kwargs['all_session_mazes'].valid_epochs))
 
     curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
     print(f'curr_epoch_names: {curr_epoch_names}')
@@ -5292,7 +5295,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
             print(f'computing linearized position for session using method="{linearization_method}"...')
             sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
             print(f'estimating the laps from the linear position...')
-            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False, **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
+            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
         else:
             print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
             sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
@@ -5448,15 +5451,15 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
                                                     #  'extended_pf_peak_information',
                                                     ] # 'ratemap_peaks_prominence2d'
 
-
     print(f'beginning compute...')
     for i, a_config in enumerate(active_session_computation_configs):
         active_epoch_names: List[str] = a_config.pf_params.computation_epochs.labels.tolist() ## should be same as config
         print(f'i: {i}, active_epoch_names: {active_epoch_names}') # (activity_only_epoch_names)
 
+        #BUG 2026-06-23 08:35: - [ ] IMPORTANT: `overwrite_extant_results` should never be True in the following call, or else each run overwrites all previous ones so you only end up with the last filtered session:
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_excludelist=['_perform_spike_burst_detection_computation', '_perform_velocity_vs_pf_density_computation', '_perform_velocity_vs_pf_simplified_count_density_computation']) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
         # curr_active_pipeline.perform_computations(active_session_computation_configs[0], computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=activity_only_epoch_names, overwrite_extant_results=True, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
-        curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=False, debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
+        curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=kwargs.get('fail_on_exception', False), debug_print=True) # SpikeAnalysisComputations._perform_spike_burst_detection_computation
         # curr_active_pipeline.perform_computations(a_config, computation_functions_name_includelist=active_computation_functions_name_includelist, enabled_filter_names=active_epoch_names, overwrite_extant_results=False, fail_on_exception=False, debug_print=True)
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -5465,7 +5468,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     print(f'\tcompute done!')
     
     # curr_active_pipeline.computation_results['maze'].accumulated_errors
-    curr_active_pipeline.clear_all_failed_computations()
+    try:
+        curr_active_pipeline.clear_all_failed_computations()
+    except Exception as e:
+        print(f'failed to clear the computations with error {e}')
 
     curr_active_pipeline.prepare_for_display(root_output_dir=r'Output', should_smooth_maze=True) # TODO: pass a display config
     # curr_active_pipeline.prepare_for_display(root_output_dir=r'W:\Data\Output', should_smooth_maze=True) # TODO: pass a display config
