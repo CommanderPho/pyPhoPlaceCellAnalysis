@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 from attrs import Factory, define, field
@@ -190,47 +190,38 @@ class Rois:
 
 
     def print_maze_rois_for_reward_zones(self) -> List[str]:
-        """Emit python initializers box(minx, miny, maxx, maxy, ccw=True)
-        """
-        def _format_tuple(pt):
-            return f"{float(pt[1]):.8f}, {float(pt[0]):.8f}"
+        """Emit shapely box(minx, miny, maxx, maxy, ccw=True) initializers for reward zones."""
+        def _format_coord(value: float) -> str:
+            return f"{float(value):.8f}"
 
-        lines = []
+        def _rect_bounds_from_pos_size(pos: Tuple[float, float], size: Tuple[float, float]) -> Tuple[float, float, float, float]:
+            xmin, ymin = float(pos[0]), float(pos[1])
+            xmax, ymax = float(pos[0] + size[0]), float(pos[1] + size[1])
+            return min(xmin, xmax), min(ymin, ymax), max(xmin, xmax), max(ymin, ymax)
+
+        lines: List[str] = []
+        zone_idx = 0
         for roi in self.rois:
             roi_type = type(roi).__name__
             state = roi.saveState()
 
-            if roi_type == "LineROI":
-                # handles = self.get_roi_coordinates(roi)
-                # p0, p1 = handles[0], handles[-1]
-                # lines.append(
-                #     f"rois.append(bod({_format_tuple(p0)}, {_format_tuple(p1)})" # box(minx, miny, maxx, maxy, ccw=True)
-                # )
-                raise NotImplementedError(f'#TODO 2026-06-23 05:15: - [ ]')
-            elif roi_type == "RectROI":
-                # box(minx, miny, maxx, maxy, ccw=True)
-                pos = tuple(state["pos"])
-                size = tuple(state["size"])
-
-                other_corner = np.array(pos) + np.array(size)
-
-                lines.append(
-                    f"rois.append(pg.RectROI({_format_tuple(pos)}, {_format_tuple(size)}, "
-                )
+            if roi_type == "RectROI":
+                xmin, ymin, xmax, ymax = _rect_bounds_from_pos_size(tuple(state["pos"]), tuple(state["size"]))
+                zone_idx += 1
+                lines.append(f"zone{zone_idx} = box({_format_coord(xmin)}, {_format_coord(ymin)}, {_format_coord(xmax)}, {_format_coord(ymax)}),  # box(minx, miny, maxx, maxy, ccw=True)")
             elif roi_type == "EllipseROI":
-                # pos = tuple(state["pos"])
-                # size = tuple(state["size"])
-                # lines.append(
-                #     f"rois.append(pg.EllipseROI({_format_tuple(pos)}, {_format_tuple(size)}, "
-                #     f"pen={roi.pen.color().getRgb()[:3]}))"
-                # )
-                raise NotImplementedError(f'#TODO 2026-06-23 05:15: - [ ]')
-
+                xmin, ymin, xmax, ymax = _rect_bounds_from_pos_size(tuple(state["pos"]), tuple(state["size"]))
+                zone_idx += 1
+                lines.append(f"zone{zone_idx} = box({_format_coord(xmin)}, {_format_coord(ymin)}, {_format_coord(xmax)}, {_format_coord(ymax)}),  # box(minx, miny, maxx, maxy, ccw=True) [EllipseROI bbox]")
+            elif roi_type == "LineROI":
+                handles = self.get_roi_coordinates(roi)
+                p0, p1 = handles[0], handles[-1]
+                xmin, xmax = min(p0[0], p1[0]), max(p0[0], p1[0])
+                ymin, ymax = min(p0[1], p1[1]), max(p0[1], p1[1])
+                zone_idx += 1
+                lines.append(f"zone{zone_idx} = box({_format_coord(xmin)}, {_format_coord(ymin)}, {_format_coord(xmax)}, {_format_coord(ymax)}),  # box(minx, miny, maxx, maxy, ccw=True) [LineROI bbox]")
             else:
-                # Fallback: dump generic ROI state so you can restore manually later.
-                lines.append(
-                    f"# Unsupported ROI type {roi_type}; state = {state!r}"
-                )
+                lines.append(f"# Unsupported ROI type {roi_type}; state = {state!r}")
 
         print("\n".join(lines))
         return lines
