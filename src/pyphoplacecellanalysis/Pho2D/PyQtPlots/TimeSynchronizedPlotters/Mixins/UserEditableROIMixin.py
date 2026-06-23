@@ -189,6 +189,53 @@ class Rois:
         return lines
 
 
+    def print_maze_rois_for_reward_zones(self) -> List[str]:
+        """Emit python initializers box(minx, miny, maxx, maxy, ccw=True)
+        """
+        def _format_tuple(pt):
+            return f"{float(pt[1]):.8f}, {float(pt[0]):.8f}"
+
+        lines = []
+        for roi in self.rois:
+            roi_type = type(roi).__name__
+            state = roi.saveState()
+
+            if roi_type == "LineROI":
+                # handles = self.get_roi_coordinates(roi)
+                # p0, p1 = handles[0], handles[-1]
+                # lines.append(
+                #     f"rois.append(bod({_format_tuple(p0)}, {_format_tuple(p1)})" # box(minx, miny, maxx, maxy, ccw=True)
+                # )
+                raise NotImplementedError(f'#TODO 2026-06-23 05:15: - [ ]')
+            elif roi_type == "RectROI":
+                # box(minx, miny, maxx, maxy, ccw=True)
+                pos = tuple(state["pos"])
+                size = tuple(state["size"])
+
+                other_corner = np.array(pos) + np.array(size)
+
+                lines.append(
+                    f"rois.append(pg.RectROI({_format_tuple(pos)}, {_format_tuple(size)}, "
+                )
+            elif roi_type == "EllipseROI":
+                # pos = tuple(state["pos"])
+                # size = tuple(state["size"])
+                # lines.append(
+                #     f"rois.append(pg.EllipseROI({_format_tuple(pos)}, {_format_tuple(size)}, "
+                #     f"pen={roi.pen.color().getRgb()[:3]}))"
+                # )
+                raise NotImplementedError(f'#TODO 2026-06-23 05:15: - [ ]')
+
+            else:
+                # Fallback: dump generic ROI state so you can restore manually later.
+                lines.append(
+                    f"# Unsupported ROI type {roi_type}; state = {state!r}"
+                )
+
+        print("\n".join(lines))
+        return lines
+
+
 
     def on_roi_update(self, an_roi):
         if self.on_roi_update_callback is not None:

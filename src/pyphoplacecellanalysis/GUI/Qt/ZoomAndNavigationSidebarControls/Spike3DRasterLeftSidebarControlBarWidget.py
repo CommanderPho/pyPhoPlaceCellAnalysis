@@ -85,6 +85,15 @@ class Spike3DRasterLeftSidebarControlBar(QWidget):
             self.ui.lblCrosshairTraceValue.setVisible(False)
 
 
+    def set_total_data_time_range_labels(self, start_t: float, end_t: float) -> None:
+        duration = end_t - start_t
+        tooltip = f"start: {start_t} s\nend: {end_t} s\nduration: {duration} s"
+        self.ui.lblTotalDataStartTime.setText(str(int(round(start_t))))
+        self.ui.lblTotalDataEndTime.setText(str(int(round(end_t))))
+        self.ui.lblTotalDataStartTime.setToolTip(tooltip)
+        self.ui.lblTotalDataEndTime.setToolTip(tooltip)
+
+
     def __init__(self, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self._enable_debug_print = True 
@@ -286,6 +295,8 @@ class SpikeRasterLeftSidebarControlsMixin:
         left_side_bar_controls.ui.spinAnimationTimeStep.blockSignals(False)
         left_side_bar_controls.ui.spinTemporalZoomFactor.blockSignals(False)
         left_side_bar_controls.ui.spinRenderWindowDuration.blockSignals(False)
+
+        left_side_bar_controls.set_total_data_time_range_labels(self.total_data_start_time, self.total_data_end_time)
         
         
     @pyqtExceptionPrintingSlot()

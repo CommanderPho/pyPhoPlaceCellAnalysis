@@ -1156,6 +1156,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # _out_args = []
         # _out_args = {}
         _all_outputs_dict = {}
+
+        ## unless other context is provided, default to using the global context
+        active_session_configuration_context = kwargs.get('active_session_configuration_context', None)
+        if (active_session_configuration_context is None):
+            ## get default global context:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
+            active_session_configuration_context = deepcopy(global_epoch_context) # e.g. IdentifyingContext(format_name='bapun',animal='RatJ',session_name='Day3TwoNovel',filter_name='maze_GLOBAL')
+            kwargs['active_session_configuration_context'] = active_session_configuration_context
         
         if len(found_spike_raster_windows) < 1:
             # no existing spike_raster_windows. Make a new one
