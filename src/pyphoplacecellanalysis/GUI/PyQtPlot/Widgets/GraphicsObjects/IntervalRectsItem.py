@@ -37,6 +37,7 @@ class IntervalRectsItemData(UnpackableMixin):
     pen: QtGui.QPen = field()
     brush: QtGui.QBrush = field()
     label: Optional[str] = field(default=None)
+    isVisible: bool = field(default=True)
     
 
     def UnpackableMixin_unpacking_includes(self) -> Optional[List]:
@@ -157,10 +158,26 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             # # QRectF: (left, top, width, height)
             # p.drawRect(QtCore.QRectF(start_t, series_offset-series_height, duration_t, series_height))
             
-        for (start_t, series_vertical_offset, duration_t, series_height, pen, brush) in self.data:
+        for item in self.data:
+            if isinstance(item, tuple):
+                # plain tuple compatibility
+                start_t, series_vertical_offset, duration_t, series_height, pen, brush = item[:6]
+                is_visible = True
+            else:
+                # IntervalRectsItemData
+                start_t = item.start_t
+                series_vertical_offset = item.series_vertical_offset
+                duration_t = item.duration_t
+                series_height = item.series_height
+                pen = item.pen
+                brush = item.brush
+                is_visible = getattr(item, 'isVisible', True)
+
+            if not is_visible:
+                continue
+
             p.setPen(pen)
             p.setBrush(brush) # filling of the rectangles by a passed color:
-            # p.drawRect(QtCore.QRectF(start_t, series_vertical_offset-series_height, duration_t, series_height)) # QRectF: (left, top, width, height)
             p.drawRect(QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)) # QRectF: (left, top, width, height)
 
         p.end()

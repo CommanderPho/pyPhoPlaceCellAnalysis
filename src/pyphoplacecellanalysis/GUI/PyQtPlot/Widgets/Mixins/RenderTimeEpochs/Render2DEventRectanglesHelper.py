@@ -37,12 +37,29 @@ class Render2DEventRectanglesHelper:
         """    
         ## Validate that it has all required columns:
         assert np.isin(cls._required_interval_visualization_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {cls._required_interval_visualization_columns}, current: {df.columns} "
-        # return list(zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush))
-        if 'label' in df.columns:
-            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush, df.label)]
-        else:
-            ## most basic
-            return [IntervalRectsItemData(*row) for row in zip(df.t_start, df.series_vertical_offset, df.t_duration, df.series_height, df.pen, df.brush)]
+
+        # Check optional columns
+        has_label = 'label' in df.columns
+        has_is_visible = 'isVisible' in df.columns
+
+        result = []
+        for i, row in df.iterrows():
+            item_kwargs = {
+                'start_t': row['t_start'],
+                'series_vertical_offset': row['series_vertical_offset'],
+                'duration_t': row['t_duration'],
+                'series_height': row['series_height'],
+                'pen': row['pen'],
+                'brush': row['brush']
+            }
+            if has_label:
+                item_kwargs['label'] = row['label']
+            if has_is_visible:
+                item_kwargs['isVisible'] = row['isVisible']
+
+            result.append(IntervalRectsItemData(**item_kwargs))
+
+        return result
 
 
         
