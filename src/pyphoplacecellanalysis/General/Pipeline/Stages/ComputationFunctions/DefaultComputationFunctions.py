@@ -64,6 +64,12 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             print(f'\tdid_change: {did_change}')
             
         ## filtered_spikes_df version:
+        if computation_result.computed_data['pf1D'].ratemap.n_neurons == 0:
+            print('WARNING: skipping position decoding because pf1D has zero neurons for this filtered context.')
+            computation_result.computed_data['pf1D_Decoder'] = None
+            computation_result.computed_data['pf2D_Decoder'] = None
+            return computation_result
+
         computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
         assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
         computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it

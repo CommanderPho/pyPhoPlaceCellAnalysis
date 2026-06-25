@@ -5179,26 +5179,12 @@ def _non_kdiba_session_preprocessing_is_complete(sess, active_maze_epoch_names) 
 
 
 def final_process_bapun_all_comps(curr_active_pipeline, posthoc_save: bool=True, override_parameters_flat_keypaths_dict=None, active_data_mode_name = 'bapun', time_bin_size=0.5, overwrite_extant: bool=False, **kwargs):
-    """ Main non-kdiba processing/computation function (for Bapun/Rachel/etc sessions)
+    """ Main non-kdiba processing/computation function (for Bapun/Rachel/DANDI NWB/etc sessions)
     
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
     curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, posthoc_save=True)
     
     """
-    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
-    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-    from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
-    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
-    from neuropy.analyses.placefields import Position
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import post_process_non_kdiba
-    from neuropy.analyses.laps import estimate_session_laps
-
-    hardcoded_params: HardcodedProcessingParameters = deepcopy(BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context()))
-    # linearization_method: str = hardcoded_params.lap_estimation_parameters.pop('linearization_method', 'umap') # 'shapely'
-    # print(f'linearization_method: {linearization_method}')
-    # active_data_mode_name = 'rachel'
     return final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_name=active_data_mode_name, posthoc_save=posthoc_save, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, time_bin_size=time_bin_size, overwrite_extant=overwrite_extant, **kwargs)
 
     
@@ -5265,8 +5251,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     linearization_kwargs = dict(hardcoded_params.linearization_parameters or {})
     linearization_method: str = linearization_kwargs.get('method', 'umap')
 
-    # session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
-    session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=overwrite_extant)
+    if hasattr(active_data_mode_registered_class, 'session_fixup_epochs'):
+        session_epochs: Epoch = active_data_mode_registered_class.session_fixup_epochs(sess=curr_active_pipeline.sess, override_extant=overwrite_extant)
+    else:
+        session_epochs: Epoch = deepcopy(curr_active_pipeline.sess.epochs)
     session_epochs
 
     if linearization_kwargs.get('method') == 'shapely' and linearization_kwargs.get('all_session_mazes') is not None:
@@ -5319,7 +5307,11 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
 
     # active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=['maze1', 'maze2', 'maze_GLOBAL']) ## ALL possible epochs
     active_session_filter_configurations = build_custom_epochs_filters(curr_active_pipeline.sess, epoch_name_includelist=hardcoded_params.decoder_building_session_names) ## ALL possible epochs
-    curr_active_pipeline.filter_sessions(active_session_filter_configurations)
+    if curr_active_pipeline.is_filtered:
+        print('INFO: forcing session filters to rebuild so stale filtered sessions are not reused.')
+        curr_active_pipeline.stage.select_filters(active_session_filter_configurations, clear_filtered_results=True, progress_logger=curr_active_pipeline.logger)
+    else:
+        curr_active_pipeline.filter_sessions(active_session_filter_configurations)
 
     # ==================================================================================================================================================================================================================================================================================== #
     # COMPUTATION CONFIGS                                                                                                                                                                                                                                                                  #

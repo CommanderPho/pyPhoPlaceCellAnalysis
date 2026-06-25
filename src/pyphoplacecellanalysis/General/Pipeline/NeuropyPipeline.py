@@ -426,11 +426,14 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
             did_add_property = False
             did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(curr_active_pipeline.sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
+            if active_data_mode_name == 'dandi_nwb':
+                from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+                did_add_property = NWBDataSessionFormatRegisteredClass._ensure_standard_paradigm_epoch_labels(curr_active_pipeline.sess, save_if_changed=True) or did_add_property
             ## Apply to all of the pipeline's filtered sessions:
             if hasattr(curr_active_pipeline, 'filtered_sessions'):
                 for a_sess in curr_active_pipeline.filtered_sessions.values():
                     did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
-                return did_add_property
+            return did_add_property
 
         ## BEGIN FUNCTION BODY
         if override_basepath is not None:
@@ -505,7 +508,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
-                if not skip_save_on_initial_load:
+                if (not skip_save_on_initial_load) or (type_name == 'dandi_nwb'):
                     curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
                 else:
                     if progress_print:
