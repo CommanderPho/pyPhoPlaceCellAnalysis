@@ -855,7 +855,7 @@ class BapunBatchHelpers:
                 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
                 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
                 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
-                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals
                 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import TimeSynchronizedPositionDecoderPlotter
                 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericPyQtGraphContainer
                 from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_combined_time_synchronized_Bapun_decoders_window
@@ -880,9 +880,9 @@ class BapunBatchHelpers:
                     print(f'Spike3DRasterWindowWidget.find_or_create_if_needed failed with exception: {e}. Continuing.')
 
                 try:
-                    a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
+                    a_rect_item, an_interval_ds = build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
                 except Exception as e:
-                    print(f'build_bapun_proper_epoch_intervals failed with exception: {e}. Continuing.')
+                    print(f'build_proper_epoch_intervals failed with exception: {e}. Continuing.')
 
                 try:
                     force_recompute: bool = True
@@ -4845,9 +4845,9 @@ from pyphoplacecellanalysis.General.Model.Datasources.IntervalDatasource import 
 from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
-@function_attributes(short_name=None, tags=['private', 'epochs', 'paradigm'], input_requires=[], output_provides=[], uses=[], used_by=['build_bapun_proper_epoch_intervals'], creation_date='2025-12-09 00:01', related_items=[])
+@function_attributes(short_name=None, tags=['BAPUN', 'private', 'epochs', 'paradigm'], input_requires=[], output_provides=[], uses=[], used_by=['build_proper_epoch_intervals'], creation_date='2025-12-09 00:01', related_items=[])
 def build_bapun_all_epochs_df(curr_active_pipeline):
-    """ builds all epochs
+    """ builds all epochs for Bapun sessions
     """
     import matplotlib.pyplot as plt
     from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
@@ -4882,17 +4882,83 @@ def build_bapun_all_epochs_df(curr_active_pipeline):
     curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
     return curr_paradigm_df
 
+@function_attributes(tags=['NWB', 'private', 'epochs', 'paradigm'], input_requires=[], output_provides=[], uses=[], used_by=['build_proper_epoch_intervals'], creation_date='2026-06-29 17:37', related_items=['build_bapun_all_epochs_df'])
+def build_NWB_all_epochs_df(curr_active_pipeline):
+    """ builds all epochs for W-maze NWB experiment
 
-@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
-def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
+    Usage:
+
+        curr_paradigm_df: pd.DataFrame = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+        curr_paradigm_df
+
+    """
+    import matplotlib.pyplot as plt
+    from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
+    from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
+
+    def ascending_red_hex_colors(n_colors: int) -> List[str]:
+        if n_colors <= 0:
+            return []
+        times = [1.0] if n_colors == 1 else [float(i) / float(n_colors - 1) for i in range(n_colors)]
+        return [plt.matplotlib.colors.rgb2hex(ColormapHelpers.make_saturating_red_cmap(t, min_alpha=1.0, max_alpha=1.0)(1.0)[:3]) for t in times]
+
+    def ascending_dark_purple_hex_colors(n_colors: int, vmin: float = 0.45, vmax: float = 0.95) -> List[str]:
+        if n_colors <= 0:
+            return []
+        cmap = plt.get_cmap('Purples')
+        positions = [vmax] if n_colors == 1 else np.linspace(vmin, vmax, n_colors).tolist()
+        return [plt.matplotlib.colors.rgb2hex(cmap(p)[:3]) for p in positions]
+
+    def assign_ascending_group_colors(df: pd.DataFrame, prefix: str, color_fn) -> None:
+        mask = df['label'].astype(str).str.startswith(prefix)
+        group_df = df.loc[mask].copy()
+        group_df['_sort_key'] = group_df['label'].astype(str).str.extract(r'(\d+)$', expand=False).astype(float).fillna(0)
+        sorted_indices = group_df.sort_values('_sort_key').index
+        df.loc[sorted_indices, 'lap_color'] = color_fn(len(sorted_indices))
+
+
+    sess = curr_active_pipeline.sess # global_session
+
+    # pos_df = sess.compute_position_laps() # ensures the laps are computed if they need to be:
+    position_obj = deepcopy(sess.position)
+    position_obj.compute_higher_order_derivatives()
+    pos_df = position_obj.compute_smoothed_position_info(N=20) ## Smooth the velocity curve to apply meaningful logic to it
+    pos_df = position_obj.to_dataframe()
+    # Drop rows with missing data in columns: 't', 'velocity_x_smooth' and 2 other columns. This occurs from smoothing
+    pos_df = pos_df.dropna(subset=['t', 'x_smooth', 'velocity_x_smooth', 'acceleration_x_smooth']).reset_index(drop=True)
+    # curr_laps_df = sess.laps.to_dataframe()
+
+    curr_paradigm_df = ensure_dataframe(sess.paradigm)
+    global_epoch_name='maze_GLOBAL'
+    curr_paradigm_df = curr_paradigm_df.epochs.adding_global_epoch_row(global_epoch_name=global_epoch_name) # global_epoch_name='maze_GLOBAL', included_epoch_names=['maze']
+    # curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['maze_GLOBAL', 'maze']))] ## exclude the global epoch
+    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], [global_epoch_name]))] ## exclude the global epoch
+
+    n_epochs: int = len(curr_paradigm_df)
+    curr_paradigm_df['lap_color'] = '#808080'  # fallback for unexpected labels
+    assign_ascending_group_colors(curr_paradigm_df, 'maze', ascending_red_hex_colors)
+    assign_ascending_group_colors(curr_paradigm_df, 'sleep', ascending_dark_purple_hex_colors)
+    curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+    return curr_paradigm_df
+
+
+@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df', 'build_NWB_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
+def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
     """ adds the proper session epochs to the timeline
     
+    History:
+        #2026-06-29 17:44: - renamed from `build_bapun_proper_epoch_intervals` to `build_proper_epoch_intervals`
+
     Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals, build_bapun_all_epochs_df
-        a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals
+        a_rect_item, an_interval_ds = build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
     
     """
-    curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+    session_format_name = str(getattr(curr_active_pipeline.active_sess_config, 'format_name', getattr(getattr(curr_active_pipeline.sess, 'config', None), 'format_name', ''))).lower()
+    if session_format_name == 'dandi_nwb':
+        curr_paradigm_df = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+    else:
+        curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
 
     ## INPUTS: curr_paradigm_df
 
@@ -4933,8 +4999,6 @@ def build_bapun_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_l
     a_rect_item: IntervalRectsItem = _added_items_dict['RootPlot']['rect_item']
 
     return a_rect_item, an_interval_ds
-
-
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -5290,7 +5354,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
             else:
                 sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
             print(f'estimating the laps from the linear position...')
-            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
+            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones', 'use_direction_dependent_laps', 'should_backup_extant_laps_obj', 'N'])) ## unfiltered session 
         else:
             print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
             sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
