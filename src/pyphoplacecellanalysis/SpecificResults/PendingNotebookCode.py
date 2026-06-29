@@ -5281,7 +5281,11 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     if overwrite_extant or not _non_kdiba_session_preprocessing_is_complete(curr_active_pipeline.sess, active_maze_epoch_names):
         if custom_lap_estimation_fn is None:
             print(f'computing linearized position for session using method="{linearization_method}"...')
-            sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)    
+            if linearization_method == 'track_graph' and active_data_mode_name == 'dandi_nwb':
+                from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+                NWBDataSessionFormatRegisteredClass._compute_linear_position_if_possible(curr_active_pipeline.sess)
+            else:
+                sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
             print(f'estimating the laps from the linear position...')
             sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones'])) ## unfiltered session 
         else:
