@@ -64,22 +64,23 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             print(f'\tdid_change: {did_change}')
             
         ## filtered_spikes_df version:
-        if computation_result.computed_data['pf1D'].ratemap.n_neurons == 0:
-            print('WARNING: skipping position decoding because pf1D has zero neurons for this filtered context.')
+        has_good_pf1D: bool = ('pf1D' in computation_result.computed_data) and (computation_result.computed_data.get('pf1D', None) is not None) and (computation_result.computed_data['pf1D'].ratemap.n_neurons > 0)
+        if has_good_pf1D:
+            pf = computation_result.computed_data['pf1D']
+            computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=pf.filtered_spikes_df.copy(), debug_print=kwargs.get('debug_print', False))
+            assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
+            computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
+        else:
+            print(f"WARNING: skipping 1D position decoding because pf1D is missing/None/has zero neurons for this filtered context.\n\tthis will set computation_result.computed_data['pf1D_Decoder'] = None")
             computation_result.computed_data['pf1D_Decoder'] = None
-            computation_result.computed_data['pf2D_Decoder'] = None
-            return computation_result
 
-        computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
-        assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
-        computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
-
-        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
+        has_good_pf2D: bool = ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None) and (computation_result.computed_data['pf2D'].ratemap.n_neurons > 0)
+        if has_good_pf2D:
             pf = computation_result.computed_data['pf2D']
-
-            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
+            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=pf.filtered_spikes_df.copy(), debug_print=kwargs.get('debug_print', False))
             computation_result.computed_data['pf2D_Decoder'].compute_all() # Changing to fIXED grid_bin_bounds ===> MUCH (10x?) slower than before
         else:
+            print(f"WARNING: skipping 2D position decoding because pf2D is missing/None/has zero neurons for this filtered context.\n\tthis will set computation_result.computed_data['pf2D_Decoder'] = None")
             computation_result.computed_data['pf2D_Decoder'] = None
             
         return computation_result
