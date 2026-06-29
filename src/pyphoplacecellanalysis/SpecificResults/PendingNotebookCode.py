@@ -5369,7 +5369,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
     if len(activity_only_epochs_df) < len(hardcoded_params.non_global_activity_session_names):
         print(f'WARNING: issue with hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
-        activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)]
+        activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].reset_index(drop=True)
         activity_only_epochs_df.loc[1, 'stop'] = activity_only_epochs_df.loc[2, 'start'] - 0.001
         activity_only_epochs_df.loc[1, 'label'] = 'roam' 
         activity_only_epochs_df['duration'] = activity_only_epochs_df['stop'] -  activity_only_epochs_df['start']
