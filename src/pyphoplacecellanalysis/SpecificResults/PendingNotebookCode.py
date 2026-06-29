@@ -5370,18 +5370,20 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     if len(activity_only_epochs_df) < len(hardcoded_params.non_global_activity_session_names):
         print(f'WARNING: issue with hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names}')
         activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].reset_index(drop=True)
-        activity_only_epochs_df.loc[1, 'stop'] = activity_only_epochs_df.loc[2, 'start'] - 0.001
-        activity_only_epochs_df.loc[1, 'label'] = 'roam' 
-        activity_only_epochs_df['duration'] = activity_only_epochs_df['stop'] -  activity_only_epochs_df['start']
-        assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
-        activity_only_epochs_df = activity_only_epochs_df.epochs.get_non_overlapping_df()
-        assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"post-activity_only_epochs_df.epochs.get_non_overlapping_df(): len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
-        ## override the bad sessions:
-        new_non_global_activity_session_names = ['roam', 'sprinkle']
-        print(f'\toverriding hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names} -> new_non_global_activity_session_names: {new_non_global_activity_session_names}')
-        hardcoded_params.non_global_activity_session_names = new_non_global_activity_session_names
-        print('\tdone.')
-
+        if (active_data_mode_name == 'bapun'):
+            activity_only_epochs_df.loc[1, 'stop'] = activity_only_epochs_df.loc[2, 'start'] - 0.001
+            activity_only_epochs_df.loc[1, 'label'] = 'roam' 
+            activity_only_epochs_df['duration'] = activity_only_epochs_df['stop'] -  activity_only_epochs_df['start']
+            assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
+            activity_only_epochs_df = activity_only_epochs_df.epochs.get_non_overlapping_df()
+            assert len(activity_only_epochs_df) == len(hardcoded_params.non_global_activity_session_names), f"post-activity_only_epochs_df.epochs.get_non_overlapping_df(): len(activity_only_epochs_df): {len(activity_only_epochs_df)} != len(hardcoded_params.non_global_activity_session_names): {len(hardcoded_params.non_global_activity_session_names)}"
+            ## override the bad sessions:
+            new_non_global_activity_session_names = ['roam', 'sprinkle']
+            print(f'\toverriding hardcoded_params.non_global_activity_session_names: {hardcoded_params.non_global_activity_session_names} -> new_non_global_activity_session_names: {new_non_global_activity_session_names}')
+            hardcoded_params.non_global_activity_session_names = new_non_global_activity_session_names
+            print('\tdone.')
+        else:
+            raise NotImplementedError(f'unexpected need to session of type active_data_mode_name: "{active_data_mode_name}". Can currently only fix Bapun-type sessions (e.g. active_data_mode_name == "Bapun")! Aborting.')
 
 
     activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=curr_active_pipeline.sess.epochs.metadata)
