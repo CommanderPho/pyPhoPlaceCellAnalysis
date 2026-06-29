@@ -5275,7 +5275,10 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
         curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
 
 
-    lap_estimation_parameters = (hardcoded_params.lap_estimation_parameters or {})
+    try:
+        lap_estimation_parameters = dict(curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.laps.to_dict())
+    except AttributeError:
+        lap_estimation_parameters = (hardcoded_params.lap_estimation_parameters or {})
     custom_lap_estimation_fn = lap_estimation_parameters.get('custom_lap_estimation_fn', None) ## defines a custom function to estimate the laps
 
     if overwrite_extant or not _non_kdiba_session_preprocessing_is_complete(curr_active_pipeline.sess, active_maze_epoch_names):

@@ -429,10 +429,13 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             if active_data_mode_name == 'dandi_nwb':
                 from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
                 did_add_property = NWBDataSessionFormatRegisteredClass._ensure_standard_paradigm_epoch_labels(curr_active_pipeline.sess, save_if_changed=True) or did_add_property
+                did_add_property = NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(curr_active_pipeline.sess) or did_add_property
             ## Apply to all of the pipeline's filtered sessions:
             if hasattr(curr_active_pipeline, 'filtered_sessions'):
                 for a_sess in curr_active_pipeline.filtered_sessions.values():
                     did_add_property = did_add_property or _ensure_unpickled_session_up_to_date(a_sess, active_data_mode_name=active_data_mode_name, basedir=basedir, desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
+                    if active_data_mode_name == 'dandi_nwb':
+                        did_add_property = NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(a_sess) or did_add_property
             return did_add_property
 
         ## BEGIN FUNCTION BODY

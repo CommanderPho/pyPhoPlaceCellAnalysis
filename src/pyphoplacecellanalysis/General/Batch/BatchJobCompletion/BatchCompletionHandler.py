@@ -350,11 +350,16 @@ class BatchSessionCompletionHandler:
                         'replays': default_replay_estimation_parameters
                     }))
                 return True
-            else:
-                if debug_print:
-                    print(f'\t\tpreprocessing parameters exist.')
-                # TODO: update them as needed?
-                return False
+            format_name = getattr(sess.config, 'format_name', None)
+            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            if format_name in active_data_session_types_registered_classes_dict:
+                active_format_class = active_data_session_types_registered_classes_dict[format_name]
+                ensure_fn = getattr(active_format_class, 'ensure_preprocessing_epoch_estimation_parameters', None)
+                if ensure_fn is not None and ensure_fn(sess):
+                    return True
+            if debug_print:
+                print(f'\t\tpreprocessing parameters exist.')
+            return False
             
 
         def _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file:bool):
