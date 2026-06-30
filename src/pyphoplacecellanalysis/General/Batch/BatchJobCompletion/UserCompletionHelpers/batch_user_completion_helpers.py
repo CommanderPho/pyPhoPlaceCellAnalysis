@@ -3458,11 +3458,12 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     """
     import sys
     from pyphocorehelpers.exception_helpers import CapturedException
-    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance, _resolve_maze_epoch_names_for_multi_context_eval
 
-    if getattr(curr_session_context, 'format_name', None) != 'bapun':
-        print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
+        print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
         return across_session_results_extended_dict
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -3475,8 +3476,12 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
     resolved_maze_epoch_names: Optional[List[str]] = maze_epoch_names
     if resolved_maze_epoch_names is None:
-        hardcoded_params = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
-        resolved_maze_epoch_names = hardcoded_params.non_global_activity_session_names
+        try:
+            resolved_maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+        except ValueError as resolve_err:
+            resolved_maze_epoch_names = None
+            if debug_print:
+                print(f'WARN: could not resolve maze_epoch_names: {resolve_err}')
 
     callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size, 'context_decoder_evaluated': False, 'context_decoder_maze_epoch_names': None, 'context_decoder_overall_percent_correct': None, 'context_decoder_per_maze_percent_correct': None, 'context_decoder_combined_laps_df': None, 'context_decoder_summary_agg_df': None, 'context_decoder_laps_csv_path': None, 'context_decoder_summary_agg_csv_path': None, 'context_decoder_skip_reason': None, 'context_decoder_error': None}
     err = None
@@ -3506,8 +3511,8 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
     if evaluate_context_decoder:
         try:
-            if len(resolved_maze_epoch_names) != 2:
-                callback_outputs['context_decoder_skip_reason'] = f'expected exactly 2 maze_epoch_names, got {resolved_maze_epoch_names}'
+            if resolved_maze_epoch_names is None or len(resolved_maze_epoch_names) < 2:
+                callback_outputs['context_decoder_skip_reason'] = f'need at least 2 maze_epoch_names with pf2D_Decoder, got {resolved_maze_epoch_names}'
                 print(f'WARN: context decoder evaluation skipped for {curr_session_context}: {callback_outputs["context_decoder_skip_reason"]}')
             else:
                 context_result = evaluate_bapun_context_decoder_performance(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=resolved_maze_epoch_names, laps_decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=debug_print)

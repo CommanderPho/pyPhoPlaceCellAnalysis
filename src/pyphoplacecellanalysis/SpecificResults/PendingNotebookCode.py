@@ -131,7 +131,7 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
 # ============================================================================================================================ #
-# Bapun Two-Maze Context Decoder Performance Evaluation
+# Multi-Context (N-Maze) Context Decoder Performance Evaluation
 # ============================================================================================================================ #
 
 # from __future__ import annotations
@@ -161,38 +161,112 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 )
 
 
+def _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline, maze_epoch_names: Optional[List[str]] = None, minimum_contexts: int = 2, debug_print: bool = False) -> List[str]:
+    """Resolve maze epoch names for multi-context decoder evaluation.
+
+    Resolution order when ``maze_epoch_names`` is None:
+    1. ``sess.active_maze_epochs_df['label']`` if present
+    2. Format-registered class ``non_global_activity_session_names`` (Bapun, NWB, etc.)
+    3. ``NWBDataSessionFormatRegisteredClass._get_activity_epoch_labels(sess)``
+
+    Filters to contexts with a non-None ``pf2D_Decoder`` in ``computation_results``.
+    Requires at least ``minimum_contexts`` contexts (default 2 for context-decoder eval).
+    """
+    from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+    from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+
+    candidate_names: Optional[List[str]] = list(maze_epoch_names) if maze_epoch_names is not None else None
+    if candidate_names is None:
+        if hasattr(curr_active_pipeline.sess, 'active_maze_epochs_df') and (curr_active_pipeline.sess.active_maze_epochs_df is not None):
+            candidate_names = ensure_dataframe(curr_active_pipeline.sess.active_maze_epochs_df)['label'].astype(str).tolist()
+            if debug_print:
+                print(f'_resolve_maze_epoch_names: from active_maze_epochs_df: {candidate_names}')
+        else:
+            format_name: str = curr_active_pipeline.get_session_format_name()
+            format_registry = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            if format_name in format_registry:
+                hardcoded_params = format_registry[format_name]._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+                candidate_names = list(hardcoded_params.non_global_activity_session_names)
+                if debug_print:
+                    print(f'_resolve_maze_epoch_names: from {format_name} hardcoded_params: {candidate_names}')
+            else:
+                candidate_names = NWBDataSessionFormatRegisteredClass._get_activity_epoch_labels(curr_active_pipeline.sess)
+                if debug_print:
+                    print(f'_resolve_maze_epoch_names: from _get_activity_epoch_labels fallback: {candidate_names}')
+
+    resolved_names: List[str] = []
+    for a_name in candidate_names:
+        if a_name not in curr_active_pipeline.computation_results:
+            if debug_print:
+                print(f'  skipping {a_name!r}: not in computation_results')
+            continue
+        computed_data = curr_active_pipeline.computation_results[a_name].computed_data
+        if (not hasattr(computed_data, 'pf2D_Decoder')) or (computed_data.pf2D_Decoder is None):
+            if debug_print:
+                print(f'  skipping {a_name!r}: missing pf2D_Decoder')
+            continue
+        resolved_names.append(a_name)
+
+    if hasattr(curr_active_pipeline, 'filtered_sessions'):
+        missing_filtered = [n for n in resolved_names if n not in curr_active_pipeline.filtered_sessions]
+        if missing_filtered and debug_print:
+            print(f'WARN: maze epoch names missing from filtered_sessions (laps may still resolve via time-slice): {missing_filtered}')
+
+    if len(resolved_names) < minimum_contexts:
+        raise ValueError(f'At least {minimum_contexts} maze context(s) with pf2D_Decoder are required; got {resolved_names} (candidates were {candidate_names})')
+    return resolved_names
+
+
+def _rebuild_contextual_pf2D_decoder_from_pf2D_dict(pf2D_Decoder_dict: Dict[str, BasePositionDecoder], debug_print: bool = False) -> Tuple[PfND, BasePositionDecoder]:
+    """Conform bin grids and merge per-context pf2D decoders into one pseudo-context decoder."""
+    contextual_pf2D_dict: Dict[str, PfND] = {name: deepcopy(dec.pf) for name, dec in pf2D_Decoder_dict.items()}
+    reference_pf: Optional[PfND] = None
+    for name, a_pf in contextual_pf2D_dict.items():
+        if reference_pf is None:
+            reference_pf = a_pf
+        else:
+            contextual_pf2D_dict[name], did_update = a_pf.conform_to_position_bins(reference_pf)
+            if debug_print:
+                print(f"  conform_to_position_bins({name}): did_update={did_update}")
+    contextual_pf2D: PfND = PfND.build_merged_directional_placefields(contextual_pf2D_dict, debug_print=debug_print)
+    contextual_pf2D_Decoder: BasePositionDecoder = BasePositionDecoder(contextual_pf2D, setup_on_init=True, post_load_on_init=True, debug_print=False)
+    return contextual_pf2D, contextual_pf2D_Decoder
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Result container
 # ──────────────────────────────────────────────────────────────────────────────
 
 @define(slots=False, repr=False, eq=False)
-class BapunContextDecoderPerformanceResult:
-    """ Bapun Two-Maze Context Decoder Performance Evaluation
-    Holds all artefacts produced by ``evaluate_bapun_context_decoder_performance``.
+class ContextDecoderPerformanceResult:
+    """Multi-context maze identity decoder performance evaluation.
+
+    Holds all artefacts produced by ``evaluate_context_decoder_performance``.
 
     Fields
     ------
     maze_epoch_names : list[str]
-        The two epoch names that were used as contexts (e.g. ``['maze1', 'maze2']``).
+        Epoch names used as contexts (e.g. ``['maze1', 'maze2']``, ``['roam', 'sprinkle']``,
+        or NWB ``['maze0', ..., 'maze7']``).
     pf2D_Decoder_dict : dict[str, BasePositionDecoder]
         One per-context 2-D place-field decoder, keyed by maze epoch name.
     contextual_pf2D : PfND
-        The merged pseudo-context PfND built from the two per-maze pf2Ds.
+        The merged pseudo-context PfND built from the per-maze pf2Ds.
     contextual_pf2D_Decoder : BasePositionDecoder
         The merged decoder used to decode laps.
     per_maze_laps_decoder_result : dict[str, DecodedFilterEpochsResult]
         Raw ``decode_specific_epochs`` result for the lap epochs of each maze.
     per_maze_laps_marginals_df : dict[str, pd.DataFrame]
         Per-epoch context-marginal summary df for each maze
-        (columns: ``lap_idx``, ``lap_start_t``, ``P_maze1``, ``P_maze2``,
-        ``is_most_likely_context_maze1``).
+        (one probability column per context, plus ``decoded_most_likely_context``).
     per_maze_context_correctness : dict[str, CompleteDecodedContextCorrectness]
         ``CompleteDecodedContextCorrectness`` object for each maze.
     combined_laps_df : pd.DataFrame
         All lap epochs concatenated with ground-truth and decoded columns,
-        plus ``source_maze`` and ``is_context_correct`` convenience columns.
+        plus ``source_maze``, ``true_context``, ``decoded_most_likely_context``,
+        and ``is_context_correct`` convenience columns.
     overall_percent_correct : float
-        Fraction of laps across both mazes where the most-likely decoded
+        Fraction of laps across all mazes where the most-likely decoded
         context matches the actual maze that generated the lap.
     """
     maze_epoch_names: List[str] = field()
@@ -210,81 +284,80 @@ class BapunContextDecoderPerformanceResult:
     # Internal helpers
     # ──────────────────────────────────────────────────────────────────────────────
     @classmethod
-    def _build_bapun_context_marginals_df(cls, decoder_result: DecodedFilterEpochsResult, maze_epoch_names: List[str]) -> pd.DataFrame:
-        """Compute a per-epoch marginal posterior df over the two contexts.
+    def _build_context_marginals_df(cls, decoder_result: DecodedFilterEpochsResult, maze_epoch_names: List[str]) -> pd.DataFrame:
+        """Compute a per-epoch marginal posterior df over all contexts.
 
-        The pseudo-context decoder stacks the two per-maze pf2Ds along the
-        *second* spatial axis (context axis), so marginalising over x and y
-        gives a (n_contexts, n_time_bins) posterior.  We sum time bins inside
-        each epoch to get one probability per epoch per context.
+        The pseudo-context decoder stacks per-maze pf2Ds along the context axis,
+        so marginalising over x and y gives a (n_contexts, n_time_bins) posterior.
+        We sum time bins inside each epoch to get one probability per epoch per context.
 
         Returns a DataFrame with columns:
-            ``lap_idx``, ``lap_start_t``, ``<maze1_name>``, ``<maze2_name>``,
-            ``is_most_likely_context_<maze1_name>``
+            ``lap_idx``, ``lap_start_t``, one column per context name,
+            ``decoded_most_likely_context``, and (for 2 contexts only)
+            ``is_most_likely_context_<first_name>`` for backward compatibility.
         """
-        ctx_name_0, ctx_name_1 = maze_epoch_names  # e.g. 'maze1', 'maze2'
-
+        n_contexts: int = len(maze_epoch_names)
         n_epochs = decoder_result.num_filter_epochs
-        p_ctx0_per_epoch: List[float] = []
-        p_ctx1_per_epoch: List[float] = []
+        p_ctx_per_epoch: Dict[str, List[float]] = {name: [] for name in maze_epoch_names}
 
         for epoch_idx in range(n_epochs):
             p_x_given_n = decoder_result.p_x_given_n_list[epoch_idx]
-            # p_x_given_n.shape: (n_xbins, n_ybins, n_contexts=2, n_tbins)
-            # Marginalise over spatial dimensions → (n_contexts, n_tbins)
-            marginal_ctx = np.nansum(p_x_given_n, axis=(0, 1))          # (2, n_tbins)
-            # Normalise each time bin then average across time bins per epoch
+            # p_x_given_n.shape: (n_xbins, n_ybins, n_contexts, n_tbins)
+            marginal_ctx = np.nansum(p_x_given_n, axis=(0, 1))          # (n_contexts, n_tbins)
             col_sums = np.nansum(marginal_ctx, axis=0, keepdims=True)    # (1, n_tbins)
-            col_sums[col_sums == 0] = 1.0                                # guard /0
-            marginal_ctx_norm = marginal_ctx / col_sums                  # (2, n_tbins)
-            epoch_mean = np.nanmean(marginal_ctx_norm, axis=1)           # (2,)
-            p_ctx0_per_epoch.append(float(epoch_mean[0]))
-            p_ctx1_per_epoch.append(float(epoch_mean[1]))
+            col_sums[col_sums == 0] = 1.0
+            marginal_ctx_norm = marginal_ctx / col_sums
+            epoch_mean = np.nanmean(marginal_ctx_norm, axis=1)           # (n_contexts,)
+            for ctx_idx, ctx_name in enumerate(maze_epoch_names):
+                p_ctx_per_epoch[ctx_name].append(float(epoch_mean[ctx_idx]))
 
         filter_epochs_df = ensure_dataframe(decoder_result.filter_epochs)
-        marginals_df = pd.DataFrame({
-            'lap_idx':                             np.arange(n_epochs),
-            'lap_start_t':                         filter_epochs_df['start'].to_numpy(),
-            'start':                               filter_epochs_df['start'].to_numpy(),
-            'stop':                                filter_epochs_df['stop'].to_numpy(),
-            'duration':                            filter_epochs_df['duration'].to_numpy(),
-            ctx_name_0:                            np.array(p_ctx0_per_epoch),
-            ctx_name_1:                            np.array(p_ctx1_per_epoch),
-        })
-        marginals_df['is_most_likely_context_' + ctx_name_0] = (
-            marginals_df[ctx_name_0] >= marginals_df[ctx_name_1]
-        )
+        marginals_data: Dict[str, np.ndarray] = {
+            'lap_idx': np.arange(n_epochs),
+            'lap_start_t': filter_epochs_df['start'].to_numpy(),
+            'start': filter_epochs_df['start'].to_numpy(),
+            'stop': filter_epochs_df['stop'].to_numpy(),
+            'duration': filter_epochs_df['duration'].to_numpy(),
+        }
+        for ctx_name in maze_epoch_names:
+            marginals_data[ctx_name] = np.array(p_ctx_per_epoch[ctx_name])
+        marginals_df = pd.DataFrame(marginals_data)
+
+        prob_array = marginals_df[maze_epoch_names].to_numpy()
+        most_likely_idx = prob_array.argmax(axis=1)
+        marginals_df['decoded_most_likely_context'] = [maze_epoch_names[i] for i in most_likely_idx]
+
+        if n_contexts == 2:
+            ctx_name_0, ctx_name_1 = maze_epoch_names
+            marginals_df['is_most_likely_context_' + ctx_name_0] = (marginals_df[ctx_name_0] >= marginals_df[ctx_name_1])
         return marginals_df
 
 
     @classmethod
-    def _check_bapun_context_correctness(cls, marginals_df: pd.DataFrame, true_maze_name: str, maze_epoch_names: List[str]) -> "CompleteDecodedContextCorrectness":
+    def _build_bapun_context_marginals_df(cls, decoder_result: DecodedFilterEpochsResult, maze_epoch_names: List[str]) -> pd.DataFrame:
+        """Backward-compatible alias for ``_build_context_marginals_df``."""
+        return cls._build_context_marginals_df(decoder_result=decoder_result, maze_epoch_names=maze_epoch_names)
+
+
+    @classmethod
+    def _check_context_correctness(cls, marginals_df: pd.DataFrame, true_maze_name: str, maze_epoch_names: List[str]) -> "CompleteDecodedContextCorrectness":
         """Compute correctness arrays and percentages for one maze's laps.
 
         ``true_maze_name`` is the ground-truth context (e.g. ``'maze1'``).
-        A lap is correct if the most-likely decoded context matches
-        ``true_maze_name``.
+        A lap is correct if ``decoded_most_likely_context`` equals ``true_maze_name``.
         """
-        ctx_name_0 = maze_epoch_names[0]
-        is_true_context_maze0: bool = (true_maze_name == ctx_name_0)
-
-        is_context_correct: np.ndarray = (
-            marginals_df['is_most_likely_context_' + ctx_name_0].to_numpy()
-            if is_true_context_maze0
-            else ~marginals_df['is_most_likely_context_' + ctx_name_0].to_numpy()
-        )
+        is_context_correct: np.ndarray = (marginals_df['decoded_most_likely_context'] == true_maze_name).to_numpy()
         n_laps = len(marginals_df)
         percent_correct = float(np.sum(is_context_correct)) / n_laps
 
-        # Re-use the existing named tuple types so downstream code is compatible
         correctness_arrays = DecodedContextCorrectnessArraysTuple(
             is_decoded_track_correct=is_context_correct,
-            is_decoded_dir_correct=np.ones(n_laps, dtype=bool),   # N/A for context-only
+            is_decoded_dir_correct=np.ones(n_laps, dtype=bool),
             are_both_decoded_properties_correct=is_context_correct,
         )
         percent_tuple = PercentDecodedContextCorrectnessTuple(
             percent_laps_track_identity_estimated_correctly=percent_correct,
-            percent_laps_direction_estimated_correctly=1.0,        # N/A
+            percent_laps_direction_estimated_correctly=1.0,
             percent_laps_estimated_correctly=percent_correct,
         )
         return CompleteDecodedContextCorrectness(
@@ -293,119 +366,72 @@ class BapunContextDecoderPerformanceResult:
         )
 
 
+    @classmethod
+    def _check_bapun_context_correctness(cls, marginals_df: pd.DataFrame, true_maze_name: str, maze_epoch_names: List[str]) -> "CompleteDecodedContextCorrectness":
+        """Backward-compatible alias for ``_check_context_correctness``."""
+        return cls._check_context_correctness(marginals_df=marginals_df, true_maze_name=true_maze_name, maze_epoch_names=maze_epoch_names)
+
+
+BapunContextDecoderPerformanceResult = ContextDecoderPerformanceResult
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Public entry-point
 # ──────────────────────────────────────────────────────────────────────────────
 
-@function_attributes(short_name=None, tags=['IMPORTANT', 'bapun', 'two-maze', 'context-decoding', 'performance', 'WORKING'], input_requires=[], output_provides=[], uses=[ 'build_contextual_pf2D_decoder', 'PfND.build_merged_directional_placefields', 'BasePositionDecoder.decode_specific_epochs', 'DirectionalPseudo2DDecodersResult._check_result_laps_epochs_df_performance', ], used_by=[], creation_date='2026-06-10 00:00', related_items=[ 'build_contextual_pf2D_decoder', 'decode_using_contextual_pf2D_decoder', 'LapDecodingGroundTruth._perform_variable_time_bin_lap_groud_truth_performance_testing', ])
-def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_names: List[str] = None, laps_decoding_time_bin_size: float = 0.5, included_neuron_IDs: Optional[np.ndarray] = None, debug_print: bool = False) -> BapunContextDecoderPerformanceResult:
-    """Build a two-context (Bapun-style) pseudo-2D decoder from the per-maze
-    pf2Ds and evaluate how well it recovers maze identity during laps.
+@function_attributes(short_name=None, tags=['IMPORTANT', 'multi-context', 'context-decoding', 'performance', 'WORKING', 'bapun', 'nwb'], input_requires=[], output_provides=[], uses=['build_contextual_pf2D_decoder', 'PfND.build_merged_directional_placefields', 'BasePositionDecoder.decode_specific_epochs', '_resolve_maze_epoch_names_for_multi_context_eval', '_resolve_bapun_train_test_split_laps_df'], used_by=[], creation_date='2026-06-10 00:00', related_items=['build_contextual_pf2D_decoder', 'decode_using_contextual_pf2D_decoder', 'LapDecodingGroundTruth._perform_variable_time_bin_lap_groud_truth_performance_testing'])
+def evaluate_context_decoder_performance(curr_active_pipeline, maze_epoch_names: List[str] = None, laps_decoding_time_bin_size: float = 0.5, included_neuron_IDs: Optional[np.ndarray] = None, debug_print: bool = False) -> ContextDecoderPerformanceResult:
+    """Build an N-context pseudo-2D decoder from per-maze pf2Ds and evaluate maze-identity recovery during laps.
 
-    The function mirrors the logic of
-    :func:`LapDecodingGroundTruth._perform_variable_time_bin_lap_groud_truth_performance_testing`
-    but is self-contained and works with the arbitrary ``maze_epoch_names``
-    that a Bapun two-maze pipeline exposes instead of the hard-coded
-    ``long / short`` directional nomenclature.
+    Supports Bapun sessions (``maze1``/``maze2``, ``roam``/``sprinkle``), NWB W-track
+    sessions (``maze0``–``maze7``), and any pipeline with ≥2 computed per-context pf2D decoders.
 
     Parameters
     ----------
     curr_active_pipeline:
         A fully-computed pipeline whose ``computation_results`` contain
-        ``pf2D_Decoder`` entries for every name in ``maze_epoch_names``,
-        and whose ``filtered_sessions`` contain ``.laps`` for each maze.
+        ``pf2D_Decoder`` entries for every name in ``maze_epoch_names``.
     maze_epoch_names:
-        The two filtered-session / computation-result keys that correspond
-        to the two mazes.  Defaults to ``['maze1', 'maze2']``.
+        Filtered-session / computation-result keys for each context maze.
+        When None, resolved via ``_resolve_maze_epoch_names_for_multi_context_eval``.
     laps_decoding_time_bin_size:
-        Desired time-bin size in seconds.  Will be clamped to the minimum
-        lap duration found in each maze (same logic as
-        ``_perform_variable_time_bin_lap_groud_truth_performance_testing``).
+        Desired time-bin size in seconds. Clamped to minimum lap duration per maze.
     included_neuron_IDs:
-        Optional subset of ACLUs.  When provided the per-maze decoders are
-        restricted via ``.get_by_id(...)`` before being merged.
+        Optional subset of ACLUs. Restricts decoders via ``.get_by_id(...)`` before merge.
     debug_print:
         Print intermediate progress information.
 
     Returns
     -------
-    BapunContextDecoderPerformanceResult
-        All intermediate and final artefacts (decoders, raw decoding results,
-        per-maze correctness, combined summary df, and overall accuracy).
+    ContextDecoderPerformanceResult
 
-    Usage
-    -----
+    Usage — Bapun TwoMaze
+    ---------------------
     .. code-block:: python
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import evaluate_bapun_context_decoder_performance, BapunContextDecoderPerformanceResult
-        
-        result = evaluate_bapun_context_decoder_performance(
-            curr_active_pipeline,
-            maze_epoch_names=['maze1', 'maze2'],
-            laps_decoding_time_bin_size=0.5,
-        )
+        result = evaluate_context_decoder_performance(curr_active_pipeline, maze_epoch_names=['maze1', 'maze2'])
 
-        print(f"Overall context-correct: {result.overall_percent_correct:.1%}")
-        for maze_name, correctness in result.per_maze_context_correctness.items():
-            pct = correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly
-            print(f"  {maze_name}: {pct:.1%}")
+    Usage — NWB W-track
+    -------------------
+    .. code-block:: python
 
-        result.combined_laps_df  # full per-lap summary DataFrame
+        result = evaluate_context_decoder_performance(curr_active_pipeline)  # auto-resolves maze0–maze7 subset
     """
-    if maze_epoch_names is None:
-        maze_epoch_names = ['maze1', 'maze2']
+    maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
 
-    assert len(maze_epoch_names) == 2, (
-        f"exactly two maze_epoch_names are required, got {maze_epoch_names}"
-    )
+    # ── 1. Build merged pseudo-context decoder ────────────────────────────────
+    pf2D_Decoder_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=maze_epoch_names)
 
-    # ── 1. Build one pf2D_Decoder per maze ────────────────────────────────────
-    pf2D_Decoder_dict: Dict[str, BasePositionDecoder] = {
-        name: deepcopy(curr_active_pipeline.computation_results[name].computed_data.pf2D_Decoder)
-        for name in maze_epoch_names
-    }
-
-    # Optional: restrict to the requested neuron subset
     if included_neuron_IDs is not None:
-        pf2D_Decoder_dict = {
-            name: dec.get_by_id(included_neuron_IDs)
-            for name, dec in pf2D_Decoder_dict.items()
-        }
+        pf2D_Decoder_dict = {name: dec.get_by_id(included_neuron_IDs) for name, dec in pf2D_Decoder_dict.items()}
+        contextual_pf2D, contextual_pf2D_Decoder = _rebuild_contextual_pf2D_decoder_from_pf2D_dict(pf2D_Decoder_dict, debug_print=debug_print)
         if debug_print:
             print(f"Restricted decoders to {len(included_neuron_IDs)} neurons.")
 
-    # ── 2. Conform bin grids and merge into one pseudo-context pf2D ───────────
-    # Replicate the bin-conforming loop from build_contextual_pf2D_decoder so
-    # that both per-maze spatial grids are identical before merging.
-    contextual_pf2D_dict: Dict[str, PfND] = {
-        name: deepcopy(dec.pf)
-        for name, dec in pf2D_Decoder_dict.items()
-    }
-    reference_pf: Optional[PfND] = None
-    for name, a_pf in contextual_pf2D_dict.items():
-        if reference_pf is None:
-            reference_pf = a_pf
-        else:
-            contextual_pf2D_dict[name], did_update = a_pf.conform_to_position_bins(reference_pf)
-            if debug_print:
-                print(f"  conform_to_position_bins({name}): did_update={did_update}")
-
-    # PfND.build_merged_directional_placefields concatenates the tuning curves
-    # along a new "context" axis — the same mechanism used for the directional
-    # (long/short) decoder, now applied to maze1/maze2.
-    contextual_pf2D: PfND = PfND.build_merged_directional_placefields(
-        contextual_pf2D_dict, debug_print=debug_print
-    )
-    contextual_pf2D_Decoder: BasePositionDecoder = BasePositionDecoder(
-        contextual_pf2D, setup_on_init=True, post_load_on_init=True, debug_print=False
-    )
     if debug_print:
-        print(
-            f"Merged context decoder: {contextual_pf2D_Decoder.pf.ratemap.n_neurons} neurons, "
-            f"context axis size = {contextual_pf2D.xbin.shape}"
-        )
+        print(f"Merged context decoder: {contextual_pf2D_Decoder.pf.ratemap.n_neurons} neurons, n_contexts={len(maze_epoch_names)}")
 
-    # ── 3. Decode laps for each maze individually ──────────────────────────────
+    # ── 2. Decode laps for each maze individually ─────────────────────────────
     global_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
 
     per_maze_laps_decoder_result: Dict[str, DecodedFilterEpochsResult] = {}
@@ -413,75 +439,25 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
     per_maze_context_correctness: Dict[str, CompleteDecodedContextCorrectness] = {}
     per_maze_combined_rows: List[pd.DataFrame] = []
 
-    maze_name_to_id = {name: i for i, name in enumerate(maze_epoch_names)}
-
     for maze_name in maze_epoch_names:
         if debug_print:
             print(f"\n── Decoding laps for {maze_name} ──")
 
-        # 3a. Get the lap epochs for this maze's filtered session
-        filtered_sess = curr_active_pipeline.filtered_sessions[maze_name]
+        laps_df: pd.DataFrame = _resolve_bapun_train_test_split_laps_df(curr_active_pipeline=curr_active_pipeline, maze_name=maze_name, a_decoder=contextual_pf2D_Decoder)
+        laps_epoch_obj: Epoch = ensure_Epoch(laps_df)
 
-        if filtered_sess.laps is None:
-            assert curr_active_pipeline.sess.laps is not None, f"main session is also missing laps, nothing to do!"
-            global_laps_df = curr_active_pipeline.sess.laps.to_dataframe()
-
-            # filtered_sess.laps = curr_active_pipeline.sess.laps.time_slice(filtered_sess.epochs.starts[0], filtered_sess.epochs.stops[-1]) # also could do `filtered_sess.t_start``
-            print(f'adding laps for filtered_sessions[{maze_name}]:')
-            maze_laps_df = global_laps_df[global_laps_df['maze_id'] == maze_name].copy()
-            
-            # Fix lap_dir NaNs from non_kdiba direction estimation
-            if 'lap_dir' in maze_laps_df.columns and maze_laps_df['lap_dir'].isna().any():
-                if '_bak_lap_dir' in maze_laps_df.columns:
-                    maze_laps_df['lap_dir'] = maze_laps_df['lap_dir'].fillna(maze_laps_df['_bak_lap_dir'])
-                maze_laps_df['lap_dir'] = maze_laps_df['lap_dir'].astype(int)
-            
-            # Optional: integer maze_id to silence NeuroPy warnings
-            maze_laps_df['maze_id'] = maze_name_to_id[maze_name]
-            # filtered_sess.laps = curr_active_pipeline.sess.laps.time_slice(filtered_sess.epochs.starts[0], filtered_sess.epochs.stops[-1]) # also could do `filtered_sess.t_start``
-            filtered_sess.laps = Laps(maze_laps_df)
-            print(f'\tlaps updated: {maze_laps_df}')
-
-
-
-        laps_obj: Laps = deepcopy(filtered_sess.laps)
-        laps_epoch_obj: Epoch = ensure_Epoch(laps_obj)
-
-        # Clamp time-bin size to the shortest lap so we always get ≥1 bin/lap
-        min_lap_duration: float = find_minimum_time_bin_duration(
-            ensure_dataframe(laps_epoch_obj)['duration'].to_numpy()
-        )
+        min_lap_duration: float = find_minimum_time_bin_duration(ensure_dataframe(laps_epoch_obj)['duration'].to_numpy())
         effective_time_bin_size: float = min(laps_decoding_time_bin_size, min_lap_duration)
         if debug_print:
-            print(
-                f"  {maze_name}: min_lap_duration={min_lap_duration:.3f}s, "
-                f"effective_time_bin_size={effective_time_bin_size:.3f}s"
-            )
+            print(f"  {maze_name}: min_lap_duration={min_lap_duration:.3f}s, effective_time_bin_size={effective_time_bin_size:.3f}s")
 
-        # 3b. Decode
-        a_decoder_result: DecodedFilterEpochsResult = (
-            contextual_pf2D_Decoder.decode_specific_epochs(
-                spikes_df=deepcopy(global_spikes_df),
-                filter_epochs=laps_epoch_obj,
-                decoding_time_bin_size=effective_time_bin_size,
-                debug_print=False,
-            )
-        )
+        a_decoder_result: DecodedFilterEpochsResult = contextual_pf2D_Decoder.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=laps_epoch_obj, decoding_time_bin_size=effective_time_bin_size, debug_print=False)
         per_maze_laps_decoder_result[maze_name] = a_decoder_result
 
-        # 3c. Build a per-epoch context marginal summary df
-        marginals_df: pd.DataFrame = BapunContextDecoderPerformanceResult._build_bapun_context_marginals_df(
-            decoder_result=a_decoder_result,
-            maze_epoch_names=maze_epoch_names,
-        )
+        marginals_df: pd.DataFrame = ContextDecoderPerformanceResult._build_context_marginals_df(decoder_result=a_decoder_result, maze_epoch_names=maze_epoch_names)
         per_maze_laps_marginals_df[maze_name] = marginals_df
 
-        # 3d. Evaluate correctness (the true context IS this maze)
-        correctness: CompleteDecodedContextCorrectness = BapunContextDecoderPerformanceResult._check_bapun_context_correctness(
-            marginals_df=marginals_df,
-            true_maze_name=maze_name,
-            maze_epoch_names=maze_epoch_names,
-        )
+        correctness: CompleteDecodedContextCorrectness = ContextDecoderPerformanceResult._check_context_correctness(marginals_df=marginals_df, true_maze_name=maze_name, maze_epoch_names=maze_epoch_names)
         per_maze_context_correctness[maze_name] = correctness
 
         pct = correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly
@@ -489,30 +465,22 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
             n_laps = len(marginals_df)
             print(f"  {maze_name}: {int(round(pct * n_laps))}/{n_laps} laps correct ({pct:.1%})")
 
-        # 3e. Annotate and collect for the combined df
         row_df = marginals_df.copy()
         row_df['source_maze'] = maze_name
-        row_df['true_context_is_maze0'] = (maze_name == maze_epoch_names[0])
+        row_df['true_context'] = maze_name
+        if len(maze_epoch_names) == 2:
+            row_df['true_context_is_maze0'] = (maze_name == maze_epoch_names[0])
         row_df['is_context_correct'] = correctness.correctness_arrays_tuple.is_decoded_track_correct
         per_maze_combined_rows.append(row_df)
 
-    ## END for maze_name in maze_epoch_names...
-
-    # ── 4. Combined summary across both mazes ─────────────────────────────────
     combined_laps_df = pd.concat(per_maze_combined_rows, axis='index', ignore_index=True)
-
-    overall_percent_correct: float = float(
-        combined_laps_df['is_context_correct'].mean()
-    )
+    overall_percent_correct: float = float(combined_laps_df['is_context_correct'].mean())
     if debug_print:
         n_total = len(combined_laps_df)
         n_correct = int(combined_laps_df['is_context_correct'].sum())
-        print(
-            f"\nOverall: {n_correct}/{n_total} laps decoded correctly "
-            f"({overall_percent_correct:.1%})"
-        )
+        print(f"\nOverall: {n_correct}/{n_total} laps decoded correctly ({overall_percent_correct:.1%})")
 
-    return BapunContextDecoderPerformanceResult(
+    return ContextDecoderPerformanceResult(
         maze_epoch_names=maze_epoch_names,
         pf2D_Decoder_dict=pf2D_Decoder_dict,
         contextual_pf2D=contextual_pf2D,
@@ -523,6 +491,9 @@ def evaluate_bapun_context_decoder_performance(curr_active_pipeline, maze_epoch_
         combined_laps_df=combined_laps_df,
         overall_percent_correct=overall_percent_correct,
     )
+
+
+evaluate_bapun_context_decoder_performance = evaluate_context_decoder_performance
 
 # ### Design notes
 
@@ -13483,10 +13454,8 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
     split_train_test_epoch_specific_lin_pos_Decoder_dict: Dict[str, BasePositionDecoder] = {}
 
     if is_bapun_mode:
-        from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
         if maze_epoch_names is None:
-            hardcoded_params = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
-            maze_epoch_names = hardcoded_params.non_global_activity_session_names
+            maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, minimum_contexts=1, debug_print=debug_print)
         if debug_print:
             print(f'Bapun mode: maze_epoch_names={maze_epoch_names}')
         should_include_lin_pos_decoder: bool = include_lin_pos_decoder and _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names)
