@@ -3559,61 +3559,6 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     return across_session_results_extended_dict
 
 
-# ==================================================================================================================== #
-# NWB W-maze Manual Pipeline Recomputations                                                                            #
-# ==================================================================================================================== #
-
-@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
-def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False) -> dict:
-    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, and failed-computation retry.
-
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function
-
-    callback_outputs = across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
-    failed_computations_summary = callback_outputs['failed_computations_summary']
-    n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
-    """
-    import sys
-    from pyphocorehelpers.exception_helpers import CapturedException
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
-
-    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
-    if session_format_name != 'dandi_nwb':
-        print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function skipped for unsupported session format: {curr_session_context}')
-        return across_session_results_extended_dict
-
-    resolved_active_data_mode_name: str = active_data_mode_name or session_format_name or 'dandi_nwb'
-
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'recompute_nwb_wmaze_pipeline_computations_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-
-    callback_outputs = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'overwrite_extant': overwrite_extant, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None}
-
-    try:
-        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, active_data_mode_name=resolved_active_data_mode_name, posthoc_save=posthoc_save, time_bin_size=final_process_time_bin_size, overwrite_extant=overwrite_extant, fail_on_exception=fail_on_exception)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': directional_decode_time_bin_size, 'should_disable_cache': should_disable_cache}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=debug_print)
-        curr_active_pipeline.rerun_failed_computations(fail_on_exception=fail_on_exception)
-        failed_computations = curr_active_pipeline.get_failed_computations()
-        failed_computations_summary: Dict[str, Dict[str, str]] = {str(filter_context_name): {str(computation_name): str(captured_exc) for computation_name, captured_exc in computation_exceptions_dict.items()} for filter_context_name, computation_exceptions_dict in failed_computations.items()}
-        callback_outputs['failed_computations_summary'] = failed_computations_summary
-        callback_outputs['n_failed_computation_contexts'] = len(failed_computations_summary)
-        if len(failed_computations_summary) > 0:
-            print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function: {len(failed_computations_summary)} filter context(s) still have failed computations: {failed_computations_summary}')
-
-    except Exception as e:
-        exception_info = sys.exc_info()
-        err = CapturedException(e, exception_info)
-        callback_outputs['recompute_error'] = err
-        print(f"ERROR: recompute_nwb_wmaze_pipeline_computations_completion_function encountered exception {err}")
-        if self.fail_on_exception:
-            raise err.exc
-
-    across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function'] = callback_outputs
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    return across_session_results_extended_dict
-
-
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
@@ -3679,6 +3624,60 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     return across_session_results_extended_dict
 
+
+# ==================================================================================================================== #
+# NWB W-maze Manual Pipeline Recomputations                                                                            #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False) -> dict:
+    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, and failed-computation retry.
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function
+
+    callback_outputs = across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
+    failed_computations_summary = callback_outputs['failed_computations_summary']
+    n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
+    """
+    import sys
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name != 'dandi_nwb':
+        print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    resolved_active_data_mode_name: str = active_data_mode_name or session_format_name or 'dandi_nwb'
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'recompute_nwb_wmaze_pipeline_computations_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    callback_outputs = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'overwrite_extant': overwrite_extant, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None}
+
+    try:
+        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, active_data_mode_name=resolved_active_data_mode_name, posthoc_save=posthoc_save, time_bin_size=final_process_time_bin_size, overwrite_extant=overwrite_extant, fail_on_exception=fail_on_exception)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': directional_decode_time_bin_size, 'should_disable_cache': should_disable_cache}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        curr_active_pipeline.rerun_failed_computations(fail_on_exception=fail_on_exception)
+        failed_computations = curr_active_pipeline.get_failed_computations()
+        failed_computations_summary: Dict[str, Dict[str, str]] = {str(filter_context_name): {str(computation_name): str(captured_exc) for computation_name, captured_exc in computation_exceptions_dict.items()} for filter_context_name, computation_exceptions_dict in failed_computations.items()}
+        callback_outputs['failed_computations_summary'] = failed_computations_summary
+        callback_outputs['n_failed_computation_contexts'] = len(failed_computations_summary)
+        if len(failed_computations_summary) > 0:
+            print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function: {len(failed_computations_summary)} filter context(s) still have failed computations: {failed_computations_summary}')
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        callback_outputs['recompute_error'] = err
+        print(f"ERROR: recompute_nwb_wmaze_pipeline_computations_completion_function encountered exception {err}")
+        if self.fail_on_exception:
+            raise err.exc
+
+    across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
 
 
 # ==================================================================================================================== #
