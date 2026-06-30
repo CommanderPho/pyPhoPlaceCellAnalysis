@@ -272,6 +272,21 @@ class DisplayColorsEnum:
             return fg_color, bg_color, border_color
 
 
+        @classmethod
+        def get_custom_dock_colors(cls, orientation, is_dim,
+                                        bg_color = '#bd00c7', fg_color = '#fff',
+            ):
+            """ used for CustomDockDisplayConfig for odd laps
+            """
+            border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)         
+            if is_dim:
+                bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+                border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+            return fg_color, bg_color, border_color
+
+
+
+
 
 
 

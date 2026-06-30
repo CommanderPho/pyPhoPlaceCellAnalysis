@@ -10728,21 +10728,57 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             ## set the user-provided dock_group_name first:
             _common_dock_config_kwargs['dock_group_names'] = [*_common_dock_config_kwargs['dock_group_names'], override_dock_group_name]
         
-        dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
-                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
-                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_global_dock_colors, **_common_dock_config_kwargs))))
+        dock_configs = None
+        session_format_name = str(getattr(curr_active_pipeline.active_sess_config, 'format_name', getattr(getattr(curr_active_pipeline.sess, 'config', None), 'format_name', ''))).lower()
+        if session_format_name == 'dandi_nwb':
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_NWB_all_epochs_df
+            curr_paradigm_df = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+            # 'lap_color', 'lap_accent_color'
+            # curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
+            # curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
+
+
+
+        elif session_format_name == 'bapun':
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_all_epochs_df
+            curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+            # 'lap_color', 'lap_accent_color'
+            # curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
+            # curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
+            
+        else:
+            ## KDIBA:
+            dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
+                                                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
+                                                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_global_dock_colors, **_common_dock_config_kwargs))))
+
+
+        if dock_configs is None:
+            dock_configs = {a_label:CustomDockDisplayConfig(custom_get_colors_callback_fn=(lambda orientation, is_dim: DisplayColorsEnum.Epochs.get_custom_dock_colors(orientation, is_dim, bg_color=c)), **_common_dock_config_kwargs) for a_label, c in zip(curr_paradigm_df['label'].tolist(), curr_paradigm_df['lap_accent_color'].tolist())} 
+
+
+
 
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
         for a_decoder_name, a_decoded_result in continuously_decoded_dict.items():
-            a_dock_config = dock_configs[a_decoder_name]
-            assert len(a_decoded_result.p_x_given_n_list) == 1
-            p_x_given_n = a_decoded_result.p_x_given_n_list[0]
-            # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
-            time_bin_containers = a_decoded_result.time_bin_containers[0]
-            time_window_centers = time_bin_containers.centers
-                    
+            a_dock_config = dock_configs.get(a_decoder_name, None)
+            if a_dock_config is None:
+                a_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=(lambda orientation, is_dim: DisplayColorsEnum.Epochs.get_custom_dock_colors(orientation, is_dim, bg_color='#000000', fg_color='#ffffff')), **_common_dock_config_kwargs)
+
+            if hasattr(a_decoded_result, 'p_x_given_n_list'): # not isinstance(a_decoded_result, SingleEpochDecodedResult):
+                assert len(a_decoded_result.p_x_given_n_list) == 1
+                p_x_given_n = a_decoded_result.p_x_given_n_list[0]
+                # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+                time_bin_containers = a_decoded_result.time_bin_containers[0]
+                time_window_centers = time_bin_containers.centers
+            else:
+                # SingleEpochDecodedResult
+                p_x_given_n = a_decoded_result.p_x_given_n
+                # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+                time_bin_container = a_decoded_result.time_bin_container
+                time_window_centers = time_bin_container.centers 
 
             _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=SimpleDecoderDummy(xbin=xbin),
                                                                         time_window_centers=time_window_centers, a_1D_posterior=p_x_given_n, extended_dock_title_info=info_string)
