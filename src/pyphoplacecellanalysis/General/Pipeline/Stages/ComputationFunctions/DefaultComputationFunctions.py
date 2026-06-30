@@ -86,23 +86,60 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
     def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: float = 1000.0, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        import logging
         clusterless_params = clusterless_params if clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=sampling_frequency_hz)
         sess = computation_result.sess
 
+        # Cache for multiunits computed from the session to avoid redundant expensive computations
+        _multiunits_cache = {}
+
         def _build_decoder_for_pf(pf):
+            if pf is None:
+                return None
+
             pos_df = pf.filtered_pos_df
-            source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
+            if pos_df is None or pos_df.empty:
+                logging.warning("pos_df is empty or None. Skipping clusterless decoder.")
+                return None
+
+            if 't' in pos_df.columns:
+                source_times = pos_df['t'].to_numpy(dtype=float)
+            elif 't_seconds' in pos_df.columns:
+                source_times = pos_df['t_seconds'].to_numpy(dtype=float)
+            else:
+                logging.warning("No time column found in pos_df. Skipping clusterless decoder.")
+                return None
+
+            if len(source_times) == 0:
+                logging.warning("source_times is empty. Skipping clusterless decoder.")
+                return None
+
             t_start = float(source_times.min())
             t_end = float(source_times.max())
-            if multiunits is not None:
-                pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
-            else:
-                pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, clusterless_params.clusterless_sampling_frequency_hz, t_start, t_end, spikes_df=pf.filtered_spikes_df.copy())
-            decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
-            decoder.compute_all()
-            return decoder
 
-        computation_result.computed_data['pf1D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf1D'])
+            try:
+                if multiunits is not None:
+                    pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+                else:
+                    cache_key = (t_start, t_end)
+                    if cache_key in _multiunits_cache:
+                        pf_multiunits, pf_rtc_time = _multiunits_cache[cache_key]
+                    else:
+                        pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, clusterless_params.clusterless_sampling_frequency_hz, t_start, t_end, spikes_df=pf.filtered_spikes_df)
+                        _multiunits_cache[cache_key] = (pf_multiunits, pf_rtc_time)
+
+                decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
+                decoder.compute_all()
+                return decoder
+            except Exception as e:
+                logging.error(f"Error building clusterless decoder: {e}")
+                return None
+
+        if ('pf1D' in computation_result.computed_data) and (computation_result.computed_data.get('pf1D', None) is not None):
+            computation_result.computed_data['pf1D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf1D'])
+        else:
+            computation_result.computed_data['pf1D_ClusterlessDecoder'] = None
+
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf2D'])
         else:
