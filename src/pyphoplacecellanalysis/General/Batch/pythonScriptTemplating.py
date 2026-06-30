@@ -47,6 +47,7 @@ class BatchScriptsCollection:
     output_slurm_scripts: Dict = field(default=Factory(dict))
     output_non_slurm_bash_scripts: Dict = field(default=Factory(dict))
     vscode_workspace_path: Path = field(default=None)
+    batch_scripts_root_directory: Path = field(default=None)
     
 
     def __add__(self, other):
@@ -86,12 +87,37 @@ class BatchScriptsCollection:
             result.vscode_workspace_path = self.vscode_workspace_path
         elif isinstance(other.vscode_workspace_path, Path):
             result.vscode_workspace_path = other.vscode_workspace_path
+
+        if isinstance(self.batch_scripts_root_directory, Path):
+            result.batch_scripts_root_directory = self.batch_scripts_root_directory
+        elif isinstance(other.batch_scripts_root_directory, Path):
+            result.batch_scripts_root_directory = other.batch_scripts_root_directory
         
         return result
     
 
 
 from enum import Enum
+
+
+def resolve_batch_scripts_root_directory(output_directory: Path, batch_script_subdirectory: Optional[str] = None) -> Path:
+    root = Path(output_directory).resolve()
+    if batch_script_subdirectory:
+        root = root.joinpath(batch_script_subdirectory)
+    return root
+
+
+def _infer_batch_scripts_root_directory(script_paths) -> Path:
+    assert script_paths, "script_paths list cannot be empty!"
+    script_parent_paths = [Path(a_path).resolve().parent for a_path in script_paths]
+    if len(script_parent_paths) == 1:
+        return script_parent_paths[0].parent
+
+    common_parent_path = Path(os.path.commonpath([str(a_path) for a_path in script_parent_paths])).resolve()
+    common_leaf_names = {a_path.name for a_path in script_parent_paths}
+    if len(common_leaf_names) == 1:
+        return common_parent_path.joinpath(next(iter(common_leaf_names))).resolve()
+    return common_parent_path
 
 
 
@@ -437,8 +463,10 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
     ## INPUTS: job_suffix, 
 
-    # Make sure the output directory exists
+    # Make sure the output directories exist
     os.makedirs(output_directory, exist_ok=True)
+    batch_scripts_root_directory = resolve_batch_scripts_root_directory(output_directory=output_directory, batch_script_subdirectory=batch_script_subdirectory)
+    batch_scripts_root_directory.mkdir(parents=True, exist_ok=True)
     
     for curr_session_context in included_session_contexts:
         if curr_session_context not in session_batch_basedirs:
@@ -578,13 +606,13 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         else:
             python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
 
-        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable)
+        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable, batch_scripts_root_directory=batch_scripts_root_directory)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
     else:
         vscode_workspace_path = None
 
 
-    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_jupyter_notebooks=output_jupyter_notebooks, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path)
+    return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_jupyter_notebooks=output_jupyter_notebooks, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path, batch_scripts_root_directory=batch_scripts_root_directory)
     # return included_session_contexts, output_python_scripts, output_slurm_scripts
 
 
@@ -720,7 +748,7 @@ def get_python_environment(active_venv_path: Path, debug_print:bool=True):
 
 
 @function_attributes(short_name=None, tags=['vscode_workspace', 'vscode'], input_requires=[], output_provides=[], uses=['get_running_python'], used_by=[], creation_date='2024-04-15 10:35', related_items=[])
-def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, Path]]=None):
+def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, Path]]=None, batch_scripts_root_directory: Optional[Path]=None):
     """ builds a VSCode workspace for the batch python scripts
     
         from pyphoplacecellanalysis.General.Batch.pythonScriptTemplating import build_vscode_workspace
@@ -743,7 +771,8 @@ def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, 
         is_platform_windows = False
 
     assert len(script_paths) > 0, f"script_paths is empty!"
-    top_level_script_folders_path: Path = Path(script_paths[0]).resolve().parent.parent # parent of the parents
+    top_level_script_folders_path: Path = Path(batch_scripts_root_directory).resolve() if batch_scripts_root_directory is not None else _infer_batch_scripts_root_directory(script_paths)
+    top_level_script_folders_path.mkdir(parents=True, exist_ok=True)
     script_folders: List[Path] = [top_level_script_folders_path] + [Path(a_path).parent.resolve() for a_path in script_paths]
     print(f'script_folders: {script_folders}')
     # {
@@ -790,7 +819,7 @@ def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, 
 def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int = 3,
                                         activate_path=r'H:\TEMP\Spike3DEnv_ExploreUpgrade\Spike3DWorkEnv\Spike3D\.venv\Scripts\activate.ps1',
                                         python_executable=r'H:\TEMP\Spike3DEnv_ExploreUpgrade\Spike3DWorkEnv\Spike3D\.venv\Scripts\python.exe',
-                                        script_name: str = 'run_scripts'):
+                                        script_name: str = 'run_scripts', batch_scripts_root_directory: Optional[Path]=None):
     """
     Builds a Powershell script to run Python scripts in parallel on Windows.
 
@@ -806,7 +835,8 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     assert script_paths, "script_paths list cannot be empty!"
 
     # Get the top-level directory to save the Powershell script
-    top_level_script_folders_path = Path(script_paths[0]).resolve().parent.parent
+    top_level_script_folders_path = Path(batch_scripts_root_directory).resolve() if batch_scripts_root_directory is not None else _infer_batch_scripts_root_directory(script_paths)
+    top_level_script_folders_path.mkdir(parents=True, exist_ok=True)
     ps_script_path = top_level_script_folders_path.joinpath(f'{script_name}.ps1').resolve()
     print(f'ps_script_path: {ps_script_path}')
 
