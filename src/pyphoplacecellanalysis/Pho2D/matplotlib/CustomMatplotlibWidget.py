@@ -725,13 +725,12 @@ class CustomMatplotlibWidget(CrosshairsTracingMixin, ToastShowingWidgetMixin, Pl
         from PIL import Image
         
         debug_print = kwargs.pop('debug_print', False)
-        
-        # # Output the image to bytes
-        # output = io.BytesIO()
-        # image.convert('RGB').save(output, img_format)
-        # data = output.getvalue()
-        # output.close()
-        
+        apply_chunk_xlim = kwargs.pop('apply_chunk_xlim', True)
+
+        if apply_chunk_xlim and (start is not None) and (end is not None):
+            for curr_ax in self.axes:
+                curr_ax.set_xlim(start, end)
+
         canvas = self.ui.canvas
         canvas.draw()  # Ensure the canvas has been drawn once before copying the figure        
         buf = io.BytesIO()

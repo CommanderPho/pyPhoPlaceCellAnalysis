@@ -571,69 +571,46 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         from PyQt5.QtGui import QImage
 
         debug_print = kwargs.pop('debug_print', False)
-        
-        # pyqtgraph-backed tracks
-        
-        # # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
-        # # y_min, y_max = t.getViewBox().viewRange()[1]
-        # # h = y_max - y_min
-        # # extent = [x_min, x_max, y_offset, y_offset+h]
 
-        # ## Figure units version:
-        # #t.get_extent() is like [-2.84147705365001e-15, 1458.5500000000002, 0.0, 287.7697841726619] and in data units
-        # y_min = 0.0
-        # y_max = track_heights[track_IDX] ## these are in data units, like [0.0, 287.7697841726619] and so the same for many tracks
-        # h = y_max - y_min ## in data units
-        # extent = [x_min, x_max, y_offset, (y_offset+h)]
+        pi = self.active_plot_target
+        vb = pi.getViewBox()
+        orig_x, orig_y = vb.viewRange()
+        orig_x_link = vb.linkedView(pg.ViewBox.XAxis)
+        if orig_x_link is not None:
+            pi.setXLink(None)
+        try:
+            if (start is not None) and (end is not None):
+                pi.setXRange(start, end, padding=0)
+            pi.setYRange(*orig_y, padding=0)
 
-        # t = self.active_plot_target
-        # info = dict(kind="pg", subkind="PlotItem", obj=t, extent=extent, y_height=h)
-        
-        # ## have info obj:
-        # pi = info['obj']
-        # vb = pi.getViewBox()
-        # orig_x, orig_y = vb.viewRange()
-        
-        # # Temporarily break X-link if present (e.g., for new_curves_separate_plot)
-        # # This prevents the linked plot from overriding the X range change during export
-        # orig_x_link = vb.linkedView(pg.ViewBox.XAxis)  # Get current X-axis link
-        # if orig_x_link is not None:
-        #     pi.setXLink(None)  # Temporarily unlink
-        
-        # pi.setXRange(start, end, padding=0) ## set to this chunk
-        # pi.setYRange(*orig_y, padding=0)
+            exporter = ImageExporter(pi)
+            if (start is not None) or (end is not None):
+                exporter.parameters()['width'] = max(1, int((end - start) * dpi))
+            if (info is not None):
+                exporter.parameters()['height'] = max(1, int((info['extent'][3] - info['extent'][2]) * dpi))
 
-
-        exporter = ImageExporter(self.active_plot_target)
-        if (start is not None) or (end is not None):
-            # exporter.parameters()['width'] = int(figsize[0]*dpi)
-            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
-            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
-        if (info is not None):
-            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
-            
-
-        if debug_print:
-            print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
-        # exporter.parameters()['width'] = int(figsize[0]*dpi)
-        # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
-        img = exporter.export(toBytes=True)
-        if isinstance(img, QImage):
-            w, h = img.width(), img.height()
-            ptr = img.bits(); ptr.setsize(img.byteCount())
-            # QImage from pyqtgraph is typically in BGRA byte order.
-            raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
-            b = raw[:, :, 0]
-            g = raw[:, :, 1]
-            r = raw[:, :, 2]
-            a = raw[:, :, 3]
-            rgb = np.stack([r, g, b], axis=-1)
-            # Composite over white background so grid and image blend as on-screen
-            bg = np.ones_like(rgb)
-            comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
-            arr = (comp * 255).astype(np.uint8)
-        else:
-            arr = np.array(img)
+            if debug_print:
+                print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+            img = exporter.export(toBytes=True)
+            if isinstance(img, QImage):
+                w, h = img.width(), img.height()
+                ptr = img.bits(); ptr.setsize(img.byteCount())
+                raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
+                b = raw[:, :, 0]
+                g = raw[:, :, 1]
+                r = raw[:, :, 2]
+                a = raw[:, :, 3]
+                rgb = np.stack([r, g, b], axis=-1)
+                bg = np.ones_like(rgb)
+                comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+                arr = (comp * 255).astype(np.uint8)
+            else:
+                arr = np.array(img)
+        finally:
+            pi.setXRange(*orig_x, padding=0)
+            pi.setYRange(*orig_y, padding=0)
+            if orig_x_link is not None:
+                pi.setXLink(orig_x_link)
 
         return arr
 

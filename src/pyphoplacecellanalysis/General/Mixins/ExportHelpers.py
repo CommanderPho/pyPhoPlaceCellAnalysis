@@ -928,6 +928,72 @@ class FigureToImageHelpers:
 
 
 
+    @classmethod
+    def _helper_compute_normalized_track_heights(cls, found_track_widgets, min_track_height_px: int=1, debug_print: bool=False) -> np.ndarray:
+        """Compute normalized track heights from dock widget geometry, with fallbacks for zero-height widgets."""
+        from qtpy import QtWidgets
+        QtWidgets.QApplication.processEvents()
+        track_heights = []
+        for a_widget in found_track_widgets:
+            size_hint_h = a_widget.sizeHint().height() if hasattr(a_widget, 'sizeHint') else 0
+            h = max(a_widget.height(), size_hint_h, min_track_height_px)
+            track_heights.append(h)
+            if debug_print:
+                print(f'_helper_compute_normalized_track_heights: widget={type(a_widget).__name__}, height={a_widget.height()}, sizeHint={size_hint_h}, used={h}')
+        track_heights = np.array(track_heights, dtype=float)
+        if np.sum(track_heights) <= 0:
+            print(f'WARN: all track heights are zero; using equal weights for {len(found_track_widgets)} tracks.')
+            normalized_track_heights = np.ones(len(found_track_widgets), dtype=float) / len(found_track_widgets)
+        else:
+            normalized_track_heights = track_heights / np.sum(track_heights)
+        return normalized_track_heights
+
+
+    @classmethod
+    def _helper_sync_export_chunk_window(cls, active_2d_plot, start, end, included_track_dock_identifiers, found_track_widgets, debug_print: bool=False):
+        """Synchronously update active_2d_plot and each dock track for the export chunk time window."""
+        import inspect
+        from qtpy import QtWidgets
+        from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
+
+        if hasattr(active_2d_plot, 'perform_update_zoomed_plot'):
+            active_2d_plot.perform_update_zoomed_plot(min_t=start, max_t=end)
+        if hasattr(active_2d_plot, 'update_scroll_window_region'):
+            active_2d_plot.update_scroll_window_region(start, end, block_signals=True)
+
+        ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
+
+        for dock_id, widget in zip(included_track_dock_identifiers, found_track_widgets):
+            if widget is None:
+                continue
+            is_to_window_matplotlib = (dock_id in ui_connections and dock_id != 'tracks')
+            if is_to_window_matplotlib and hasattr(widget, 'on_window_changed'):
+                if debug_print:
+                    print(f'_helper_sync_export_chunk_window: TO_WINDOW matplotlib track "{dock_id}"')
+                widget.on_window_changed(start, end)
+            elif isinstance(widget, PyqtgraphTimeSynchronizedWidget) or (hasattr(widget, 'getRootPlotItem') and callable(getattr(widget, 'getRootPlotItem', None))):
+                if hasattr(widget, 'on_window_changed'):
+                    if debug_print:
+                        print(f'_helper_sync_export_chunk_window: pyqtgraph track "{dock_id}"')
+                    widget.on_window_changed(start, end)
+            elif hasattr(widget, 'on_window_changed'):
+                try:
+                    sig = inspect.signature(widget.on_window_changed)
+                    if 'defer_render' in sig.parameters:
+                        if debug_print:
+                            print(f'_helper_sync_export_chunk_window: defer_render track "{dock_id}"')
+                        widget.on_window_changed(start, end, defer_render=False)
+                    else:
+                        widget.on_window_changed(start, end)
+                except (TypeError, ValueError):
+                    widget.on_window_changed(start, end)
+
+        QtWidgets.QApplication.processEvents()
+        if hasattr(active_2d_plot, 'repaint'):
+            active_2d_plot.repaint()
+        QtWidgets.QApplication.processEvents()
+
+
     @function_attributes(short_name=None, tags=['NEW', 'tracks', 'MAIN', 'save', 'export', 'pdf', 'multi-page-pdf', 'timeline'], input_requires=[], output_provides=[], uses=['_helper_extract_renderables_from_track_widgets', 'perform_export_wrapped_tracks_to_paged_pdf'], used_by=[], creation_date='2025-08-22 08:13', related_items=[])
     @classmethod
     def export_wrapped_tracks_to_paged_df(cls, active_2d_plot, output_pdf_path: str, included_track_dock_identifiers: Optional[List]=None, **kwargs):
@@ -952,9 +1018,6 @@ class FigureToImageHelpers:
             included_track_dock_identifiers = active_2d_plot.dock_manager_widget.get_leaf_only_flat_dock_identifiers_list()
 
         found_track_widgets = [active_2d_plot.find_dock_item_tuple(an_id)[-1] for an_id in included_track_dock_identifiers]
-        track_heights = np.array([a_widget.height() for a_widget in found_track_widgets])
-        normalized_track_heights = track_heights / np.sum(track_heights)
-
 
         # Unpack keyword arguments with defaults (kwargs with default values as individual assignments)
         # found_track_widgets = kwargs.pop('tracks', None)
@@ -965,9 +1028,13 @@ class FigureToImageHelpers:
         figsize = kwargs.pop('figsize', (8, 11))
         dpi = kwargs.pop('dpi', 600)
         # normalized_track_heights = kwargs.pop('normalized_track_heights', None)
-        debug_max_num_pages = kwargs.pop('debug_max_num_pages', 5)
+        debug_max_num_pages = kwargs.pop('debug_max_num_pages', None)
         track_labels = kwargs.pop('track_labels', None)
         debug_print = kwargs.pop('debug_print', False)
+        min_track_height_px = kwargs.pop('min_track_height_px', 1)
+        min_track_height_inches = kwargs.pop('min_track_height_inches', 0.05)
+
+        normalized_track_heights = cls._helper_compute_normalized_track_heights(found_track_widgets, min_track_height_px=min_track_height_px, debug_print=debug_print)
 
         # found_heterogeneous_stack, normalized_track_heights, included_track_dock_identifiers = cls._helper_extract_renderables_from_track_widgets(active_2d_plot, included_track_dock_identifiers=included_track_dock_identifiers)
 
@@ -1000,8 +1067,9 @@ class FigureToImageHelpers:
         if normalized_track_heights is not None:
             ## converts the track heights into matplotlib figure units (inches):
             fig_total_height: float = float(figsize[1])
-            # track_rel_heights = deepcopy(normalized_track_heights)
-            track_heights = (normalized_track_heights * fig_total_height)
+            track_heights = np.maximum(normalized_track_heights * fig_total_height, min_track_height_inches)
+            if np.sum(track_heights) > fig_total_height:
+                track_heights = track_heights * (fig_total_height / np.sum(track_heights))
 
 
         x_min, x_max = x_extent
@@ -1030,6 +1098,8 @@ class FigureToImageHelpers:
         if debug_max_num_pages is not None:
             pages = pages[:debug_max_num_pages]
 
+        ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
+
         with backend_pdf.PdfPages(output_pdf_path) as pdf:
             for page_chunks in pages:
                 fig, axes = plt.subplots(nrows=len(page_chunks), figsize=figsize, dpi=dpi, constrained_layout=True)
@@ -1038,18 +1108,23 @@ class FigureToImageHelpers:
 
                 first_chunk = True
                 for ax, (start, end) in zip(axes, page_chunks): 
-                    ## one temp axes to draw into:
-                    active_2d_plot.Render2DScrollWindowPlot_on_window_update(start, end)
-                    active_2d_plot.TimeCurvesViewMixin_on_window_update(new_start=start, new_end=end) ## the passed times don't actually do anything, but it does trigger the curve updates
+                    cls._helper_sync_export_chunk_window(active_2d_plot, start, end, included_track_dock_identifiers, found_track_widgets, debug_print=debug_print)
 
                     # render each track
                     for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos)):
-                        # for info in export_infos:
+                        dock_id = included_track_dock_identifiers[track_IDX]
                         if debug_print:
-                            print(f'track_IDX: {track_IDX} \t info["extent"]: {info["extent"]}')
+                            print(f'track_IDX: {track_IDX} dock_id: "{dock_id}" info["extent"]: {info["extent"]}')
 
-
-                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info)
+                        apply_chunk_xlim = (dock_id in ui_connections and dock_id != 'tracks')
+                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print)
+                        if arr is None or arr.size == 0:
+                            print(f'WARN: empty export for track "{dock_id}" (track_IDX={track_IDX}) chunk ({start}, {end}); skipping imshow.')
+                            continue
+                        if debug_print:
+                            print(f'\ttrack "{dock_id}" arr.shape: {arr.shape}')
+                        if arr.shape[0] < 2 or arr.shape[1] < 2:
+                            print(f'WARN: export for track "{dock_id}" is very small ({arr.shape}); content may be blank.')
                         ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
                         ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
 
