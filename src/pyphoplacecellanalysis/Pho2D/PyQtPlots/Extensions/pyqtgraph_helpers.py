@@ -286,19 +286,40 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
-def block_until_render_complete(qapp_name:str='', max_wait_time_sec: int=(60*5)) -> None:
-    """ synchronously blocks until all rendering of the UI is complete. 
+def configure_pyqtgraph_for_unattended_rendering(qapp_name: str = 'unattended_pyqtgraph_rendering'):
+    """Configure Qt/pyqtgraph for headless or offscreen batch export without a display server."""
+    import os
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    os.environ.setdefault('QT_OPENGL', 'software')
+    if QtWidgets.QApplication.instance() is None:
+        try:
+            QtWidgets.QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)
+        except Exception:
+            pass
+    app = pg.mkQApp(qapp_name)
+    pg.setConfigOptions(useOpenGL=False)
+    pg.setConfigOption('antialias', False)
+    return app
+
+
+def block_until_render_complete(qapp_name: str = '', max_wait_time_sec: int = (60 * 5), poll_interval_sec: float = 0.05) -> None:
+    """Synchronously pump the Qt event loop so deferred QTimer/repaint work can finish (batch/offscreen safe).
+
     Usage:
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
 
         print(f'waiting until complete....')
         block_until_render_complete()
         print(f'\tblock_until_render_complete is done. Continuing execution.')
-    
+
     """
-    ## INPUTS: out_custom_formats_dict
+    import time
     app = pg.mkQApp(name=qapp_name)
-    app.processEvents(pg.QtCore.QEventLoop.ProcessEventsFlag.AllEvents, max_wait_time_sec) ## 5 minutes is max time
+    poll_ms = max(1, int(poll_interval_sec * 1000))
+    deadline = time.monotonic() + max_wait_time_sec
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, poll_ms)
+        time.sleep(poll_interval_sec)
     return
 
 
