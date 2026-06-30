@@ -5262,6 +5262,9 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     ## define lienarization kwargs:
     # linearization_kwargs = dict(method=linearization_method, all_session_mazes=all_session_mazes)
 
+
+    active_computation_functions_name_includelist = kwargs.pop('active_computation_functions_name_includelist', None)
+
     active_data_mode_registered_class, active_data_mode_type_properties = curr_active_pipeline.sess.config.get_format_data_session_type_class_info()
 
     if (active_data_mode_name == 'bapun'):
@@ -5325,7 +5328,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
             else:
                 sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
             print(f'estimating the laps from the linear position...')
-            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones', 'use_direction_dependent_laps', 'should_backup_extant_laps_obj', 'N'])) ## unfiltered session 
+            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=kwargs.get('should_plot_laps_2d', False), **get_dict_subset(lap_estimation_parameters, subset_excludelist=['custom_lap_estimation_fn', 'reward_zones', 'use_direction_dependent_laps', 'should_backup_extant_laps_obj', 'N', 'linearization_method'])) ## unfiltered session 
         else:
             print(f'estimating the laps using the custom_lap_estimation_fn: {custom_lap_estimation_fn}...')
             sess = custom_lap_estimation_fn(curr_active_pipeline.sess) ## missing 'is_LR_dir'
@@ -5479,13 +5482,16 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     # ==================================================================================================================================================================================================================================================================================== #
 
     curr_active_pipeline.reload_default_computation_functions()
-        
-    active_computation_functions_name_includelist = ['pf_computation',
-                                                    'pfdt_computation',
-                                                    'position_decoding',
-                                                    #  'position_decoding_two_step',
-                                                    #  'extended_pf_peak_information',
-                                                    ] # 'ratemap_peaks_prominence2d'
+
+    if (active_computation_functions_name_includelist is None) or (len(active_computation_functions_name_includelist) == 0):
+        active_computation_functions_name_includelist = ['pf_computation',
+                                                        'pfdt_computation',
+                                                        'position_decoding',
+                                                        'position_decoding_clusterless',
+                                                        #  'position_decoding_two_step',
+                                                        #  'extended_pf_peak_information',
+                                                        ] # 'ratemap_peaks_prominence2d'
+
 
     print(f'beginning compute...')
     for i, a_config in enumerate(active_session_computation_configs):

@@ -35,11 +35,18 @@ def _pfnd_position_range(pf: PfND) -> Optional[np.ndarray]:
     if grid_bin_bounds is None:
         return None
     if pf.ndim == 1:
-        bounds_1d = grid_bin_bounds[0] if isinstance(grid_bin_bounds[0], (tuple, list, np.ndarray)) else grid_bin_bounds
-        return np.array([bounds_1d, None], dtype=object)
-    x_bounds = grid_bin_bounds[0]
-    y_bounds = grid_bin_bounds[1]
-    return np.array([x_bounds, y_bounds], dtype=object)
+        bounds_1d = getattr(pf.config, 'grid_bin_bounds_1D', None)
+        if bounds_1d is None:
+            return None
+        bounds_1d = np.asarray(bounds_1d, dtype=float)
+        if bounds_1d.ndim == 0:
+            bounds_1d = np.asarray(grid_bin_bounds, dtype=float)
+        return bounds_1d.reshape(1, 2)
+    grid_bin_bounds = np.asarray(grid_bin_bounds, dtype=float)
+    if grid_bin_bounds.shape == (4,):
+        xmin, ymin, xmax, ymax = grid_bin_bounds
+        return np.array([[xmin, xmax], [ymin, ymax]], dtype=float)
+    return grid_bin_bounds.reshape(2, 2)
 
 
 def position_array_from_pfnd(pf: PfND) -> np.ndarray:
@@ -52,7 +59,10 @@ def position_array_from_pfnd(pf: PfND) -> np.ndarray:
 
 
 def build_rtc_environment_from_pfnd(pf: PfND, environment_name: str = "", place_bin_size_override: Optional[float] = None) -> Environment:
-    return Environment(environment_name=environment_name, place_bin_size=_pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override), position_range=_pfnd_position_range(pf), infer_track_interior=True)
+    position_range = _pfnd_position_range(pf)
+    if position_range is None:
+        return Environment(environment_name=environment_name, place_bin_size=_pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override), infer_track_interior=True)
+    return Environment(environment_name=environment_name, place_bin_size=_pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override), position_range=position_range, infer_track_interior=True)
 
 
 def resample_position_to_rtc_clock(position_array: np.ndarray, source_times: np.ndarray, t_start: float, t_end: float, sampling_frequency_hz: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -73,11 +83,18 @@ def build_is_training_mask_from_pfnd(pf: PfND, rtc_time: np.ndarray, source_time
     return speed_at_rtc >= float(pf.config.speed_thresh)
 
 
+def _drop_empty_multiunit_electrodes(multiunits: np.ndarray) -> np.ndarray:
+    has_spikes_by_electrode = np.any(np.any(np.isfinite(multiunits), axis=1), axis=0)
+    if not np.any(has_spikes_by_electrode):
+        raise ValueError("Clusterless decoding requires at least one electrode with finite waveform marks.")
+    return multiunits[:, :, has_spikes_by_electrode]
+
+
 def build_multiunits_from_array(multiunits: np.ndarray, time: Optional[np.ndarray] = None) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     multiunits = np.asarray(multiunits, dtype=float)
     if multiunits.ndim != 3:
         raise ValueError(f"multiunits must have shape (n_time, n_marks, n_electrodes); got {multiunits.shape}")
-    return multiunits, time
+    return _drop_empty_multiunit_electrodes(multiunits), time
 
 
 def build_multiunits_from_rtc_simulation(n_runs: int = 5, **kwargs) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -153,7 +170,7 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
     if len(mark_features) == 0:
         raise ValueError("No spikes could be mapped to waveform marks for clusterless decoding.")
     _assign_spike_marks_to_multiunits(multiunits, time_bin_indices[:len(mark_features)], np.asarray(electrode_indices, dtype=int), np.asarray(mark_features, dtype=float))
-    return multiunits, rtc_time
+    return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
 def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None) -> np.ndarray:

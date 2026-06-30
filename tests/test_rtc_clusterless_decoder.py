@@ -2,21 +2,63 @@ import ast
 from pathlib import Path
 
 import numpy as np
-import pytest
 import xarray as xr
 
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import build_multiunits_from_rtc_simulation, rtc_posterior_to_p_x_given_n
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
+
+
+class _MockPfConfig:
+    def __init__(self, grid_bin_bounds=None):
+        self.grid_bin_bounds = grid_bin_bounds
+
+
+    @property
+    def grid_bin_bounds_1D(self):
+        if self.grid_bin_bounds is None:
+            return None
+        if np.isscalar(self.grid_bin_bounds):
+            return self.grid_bin_bounds
+        if len(self.grid_bin_bounds) == 2 and not isinstance(self.grid_bin_bounds[0], (tuple, list, np.ndarray)):
+            return self.grid_bin_bounds
+        return self.grid_bin_bounds[0]
 
 
 class _MockPfND:
-    def __init__(self, n_bins: int, ndim: int = 1):
+    def __init__(self, n_bins: int, ndim: int = 1, grid_bin_bounds=None, pos_bin_size: float = 2.0):
         self.ndim = ndim
+        self.config = _MockPfConfig(grid_bin_bounds=grid_bin_bounds)
+        self.pos_bin_size = pos_bin_size if ndim == 1 else (pos_bin_size, pos_bin_size)
         self.occupancy = np.ones(n_bins if ndim == 1 else (n_bins, n_bins))
         self.xbin_centers = np.arange(n_bins, dtype=float)
         self.ybin_centers = np.arange(n_bins, dtype=float) if ndim == 2 else None
+
+
+def test_pfnd_position_range_shapes():
+    range_1d_nested = _pfnd_position_range(_MockPfND(n_bins=10, ndim=1, grid_bin_bounds=((0.0, 100.0), (-20.0, 20.0))))
+    assert range_1d_nested.shape == (1, 2)
+    np.testing.assert_allclose(range_1d_nested, np.array([[0.0, 100.0]]))
+    assert np.diff(range_1d_nested, axis=1).shape == (1, 1)
+
+    range_1d_flat = _pfnd_position_range(_MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0)))
+    assert range_1d_flat.shape == (1, 2)
+    np.testing.assert_allclose(range_1d_flat, np.array([[0.0, 100.0]]))
+    assert np.diff(range_1d_flat, axis=1).shape == (1, 1)
+
+    range_2d_nested = _pfnd_position_range(_MockPfND(n_bins=10, ndim=2, grid_bin_bounds=((0.0, 100.0), (-20.0, 20.0))))
+    assert range_2d_nested.shape == (2, 2)
+    np.testing.assert_allclose(range_2d_nested, np.array([[0.0, 100.0], [-20.0, 20.0]]))
+    assert np.diff(range_2d_nested, axis=1).shape == (2, 1)
+
+
+def test_build_rtc_environment_fit_place_grid():
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    environment = build_rtc_environment_from_pfnd(mock_pf)
+    position = np.linspace(0.0, 100.0, 50)[:, np.newaxis]
+    environment.fit_place_grid(position)
+    assert environment.place_bin_centers_.shape[1] == 1
 
 
 def test_build_multiunits_from_rtc_simulation_shapes():
@@ -24,6 +66,15 @@ def test_build_multiunits_from_rtc_simulation_shapes():
     assert len(time) == multiunits.shape[0]
     assert position.shape[0] == multiunits.shape[0]
     assert multiunits.ndim == 3
+
+
+def test_build_multiunits_from_array_drops_empty_electrodes():
+    multiunits = np.full((10, 4, 3), np.nan, dtype=float)
+    multiunits[2, :, 1] = np.array([1.0, 2.0, 3.0, 4.0])
+    filtered_multiunits, filtered_time = build_multiunits_from_array(multiunits)
+    assert filtered_time is None
+    assert filtered_multiunits.shape == (10, 4, 1)
+    np.testing.assert_allclose(filtered_multiunits[2, :, 0], np.array([1.0, 2.0, 3.0, 4.0]))
 
 
 def test_rtc_clusterless_classifier_simulation_roundtrip():

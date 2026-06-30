@@ -540,6 +540,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         # finalized_loaded_sess_pickle_path
         return curr_active_pipeline
     
+
     @classmethod
     def build_pipeline_compare_dict(cls, a_pipeline):
         """ Builds a dictionary that can be used to compare the progress of two neuropy_pipeline objects
