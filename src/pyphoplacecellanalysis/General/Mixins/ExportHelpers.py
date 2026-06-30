@@ -1044,12 +1044,15 @@ class FigureToImageHelpers:
 
         # If argument assignment was previously done in call, do it explicitly now:
         # found_track_widgets = found_heterogeneous_stack
-        x_extent = (active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
-        chunk_width = active_2d_plot.active_window_duration
+        if x_extent is None:
+            x_extent = (active_2d_plot.total_data_start_time, active_2d_plot.total_data_end_time)
 
+        if chunk_width is None:
+            chunk_width = active_2d_plot.active_window_duration
 
         # Styling like matplotlib version
-        track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        # track_separator_line_kwargs = dict(color='white', linewidth=2, linestyle='-', alpha=0.8)
+        track_separator_line_kwargs = dict(color='black', linewidth=1, linestyle='-', alpha=0.95)
         time_label_formatting_kwargs = dict(fontsize=10, color='black')
         multi_track_label_formatting_kwargs = dict(fontsize=9, color='black')
 
@@ -1078,15 +1081,31 @@ class FigureToImageHelpers:
 
         x_min, x_max = x_extent
 
-        # Collect metadata dictionary for stacking
+        # Collect metadata dictionary for stacking — reserve y space for inter-track separator lines
+        separator_height_inches = float(track_separator_line_kwargs.get('linewidth', 1)) / 72.0
+        num_tracks = len(found_track_widgets)
+        num_separators = max(0, num_tracks - 1)
+        total_separator_space = num_separators * separator_height_inches
+        if total_separator_space > 0 and np.sum(track_heights) > 0:
+            content_total_height = float(fig_total_height) - total_separator_space
+            if content_total_height > 0:
+                track_heights = track_heights * (content_total_height / np.sum(track_heights))
+            elif debug_print:
+                print(f'WARN: insufficient vertical space for {num_separators} separator(s); not reserving separator gaps.')
+                separator_height_inches = 0.0
 
-        y_offsets = np.cumsum(np.concatenate([[0], track_heights])) ## this better be correct
-        # Assert.same_length(y_offsets, found_track_widgets)
-        Assert.len_equals(y_offsets, required_length=(len(found_track_widgets)+1)) # same_length(y_offsets, found_track_widgets)
-
-        export_infos = [dict(extent=[x_min, x_max, y_offsets[track_IDX], (y_offsets[track_IDX]+(track_heights[track_IDX] - 0.0))], y_height=(track_heights[track_IDX] - 0.0)) for track_IDX, t in enumerate(found_track_widgets)]
+        export_infos = []
+        y_cursor = 0.0
+        for track_IDX, track_h in enumerate(track_heights):
+            y_bottom, y_top = y_cursor, y_cursor + track_h
+            export_infos.append(dict(extent=[x_min, x_max, y_bottom, y_top], y_height=track_h))
+            y_cursor = y_top
+            if track_IDX < num_tracks - 1 and separator_height_inches > 0:
+                y_cursor += separator_height_inches
+        y_offsets = [info['extent'][2] for info in export_infos] + [y_cursor]
+        Assert.len_equals(y_offsets, required_length=(num_tracks + 1))
         total_y_min = 0.0
-        total_y_max = y_offsets[-1]
+        total_y_max = y_cursor
 
         if debug_print:
             print(f'export_infos: {export_infos}')
@@ -1119,13 +1138,13 @@ class FigureToImageHelpers:
                     _subfn_sync_export_chunk_window(start, end, included_track_dock_identifiers, found_track_widgets, debug_print=debug_print)
 
                     # render each track
-                    for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos)):
+                    for track_IDX, (a_widget, info) in enumerate(zip(found_track_widgets, export_infos)):
                         dock_id = included_track_dock_identifiers[track_IDX]
                         if debug_print:
                             print(f'track_IDX: {track_IDX} dock_id: "{dock_id}" info["extent"]: {info["extent"]}')
 
                         apply_chunk_xlim = (dock_id in ui_connections and dock_id != 'tracks')
-                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print, max_export_width_px=max_export_width_px)
+                        arr = a_widget.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print, max_export_width_px=max_export_width_px, force_render_interval_labels=True)
                         if arr is None or arr.size == 0:
                             print(f'WARN: empty export for track "{dock_id}" (track_IDX={track_IDX}) chunk ({start}, {end}); skipping imshow.')
                             continue
@@ -1135,12 +1154,14 @@ class FigureToImageHelpers:
                             print(f'WARN: export for track "{dock_id}" is very small ({arr.shape}); content may be blank.')
                         ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
                         ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
+                    ## END for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos))...
 
-                    # separators between tracks
-                    if len(export_infos) > 1:
-                        for i, info in enumerate(export_infos[:-1]):
-                            sep_y = info['extent'][3]
+                    # separators between tracks (drawn in reserved gap above each track's content extent)
+                    if len(export_infos) > 1 and separator_height_inches > 0:
+                        for info in export_infos[:-1]:
+                            sep_y = info['extent'][3] + separator_height_inches / 2.0
                             ax.axhline(y=sep_y, **track_separator_line_kwargs)
+                        ## END for i, info in enumerate(export_infos[:-1])...
 
                     ax.set_xlim(start, end)
                     ax.set_ylim(total_y_min, total_y_max)
@@ -1151,6 +1172,9 @@ class FigureToImageHelpers:
                             yc = (info['extent'][2]+info['extent'][3])/2
                             ynorm = (yc-total_y_min)/(total_y_max-total_y_min)
                             ax.text(-0.01, ynorm, lbl, rotation=90, va='center', ha='center', transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+                        ## END for info, lbl in zip(export_infos, track_labels)...
+                    ## END if first_chunk and has_labels...
+
 
                     # start/end time outside edges
                     ax.text(-0.02 if has_labels else -0.01, 0.5, f"{start:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
@@ -1158,6 +1182,8 @@ class FigureToImageHelpers:
 
                     ax.set_xticks([]); ax.set_yticks([])
                     first_chunk = False
+
+                ## END for ax, (start, end) in zip(axes, page_chunks)...
 
                 pdf.savefig(fig)
                 try:

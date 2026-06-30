@@ -639,11 +639,14 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from PyQt5.QtGui import QImage
         from PyQt5.QtWidgets import QApplication
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
         debug_print = kwargs.pop('debug_print', False)
         max_export_width_px = kwargs.pop('max_export_width_px', None)
         max_export_dimension = kwargs.pop('max_export_dimension', 8192)
         
+        force_render_interval_labels: bool = kwargs.pop('force_render_interval_labels', True)
+
         # # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
         # # y_min, y_max = t.getViewBox().viewRange()[1]
         # # h = y_max - y_min
@@ -678,12 +681,52 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         orig_x, orig_y = vb.viewRange()
         orig_x_link = vb.linkedView(pg.ViewBox.XAxis)
 
-        def _refresh_interval_rect_labels_for_plot_item(canvas_width_px: int, canvas_height_px: int):
-            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
-            view_range = vb.viewRange()
+        def _collect_interval_rect_items():
+            """Find IntervalRectsItem instances attached to this plot, including nested children."""
+            seen_item_ids = set()
+            out_items = []
+
+            def _visit_graphics_item(a_graphics_item):
+                if a_graphics_item is None:
+                    return
+                item_id = id(a_graphics_item)
+                if item_id in seen_item_ids:
+                    return
+                seen_item_ids.add(item_id)
+                if isinstance(a_graphics_item, IntervalRectsItem):
+                    out_items.append(a_graphics_item)
+                child_items_fn = getattr(a_graphics_item, 'childItems', None)
+                if callable(child_items_fn):
+                    try:
+                        child_items = list(child_items_fn())
+                    except RuntimeError:
+                        child_items = []
+                    for a_child_item in child_items:
+                        _visit_graphics_item(a_child_item)
+
             for a_plot_item in list(getattr(pi, 'items', [])):
-                if isinstance(a_plot_item, IntervalRectsItem):
-                    a_plot_item.refresh_visible_labels(canvas_width_px=canvas_width_px, canvas_height_px=canvas_height_px, x_range=view_range[0], y_range=view_range[1], immediate=True)
+                _visit_graphics_item(a_plot_item)
+            _visit_graphics_item(pi)
+            _visit_graphics_item(vb)
+            return out_items
+
+        interval_rect_items = _collect_interval_rect_items()
+        interval_label_states = [(a_plot_item, a_plot_item.labels_min_pixel_width, a_plot_item.labels_min_pixel_height, a_plot_item.labels_padding_px, a_plot_item.max_visible_labels) for a_plot_item in interval_rect_items]
+
+        def _refresh_interval_rect_labels_for_plot_item(canvas_width_px: int, canvas_height_px: int, force_all_labels: bool=False):
+            """Refresh IntervalRectsItem labels for the current export/restored view range."""
+            view_range = vb.viewRange()
+            for a_plot_item in interval_rect_items:
+                if force_all_labels:
+                    a_plot_item.labels_min_pixel_width = 0.0
+                    a_plot_item.labels_min_pixel_height = 0.0
+                    a_plot_item.labels_padding_px = 0.0
+                    a_plot_item.max_visible_labels = 9999
+                    a_plot_item.rebuild_label_items()
+                a_plot_item.refresh_visible_labels(canvas_width_px=canvas_width_px, canvas_height_px=canvas_height_px, x_range=view_range[0], y_range=view_range[1], immediate=True, force_render_all=force_all_labels)
+                if debug_print:
+                    print(f"\tIntervalRectsItem labels: active={len(getattr(a_plot_item, '_active_label_items', {}))}, total={len(getattr(a_plot_item, '_label_text', []))}, force_all={force_all_labels}")
+
 
         if orig_x_link is not None:
             pi.setXLink(None)
@@ -691,6 +734,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
             if (start is not None) and (end is not None):
                 pi.setXRange(start, end, padding=0)
             pi.setYRange(*orig_y, padding=0)
+            QApplication.processEvents()
 
             export_h = max(1, int((info['extent'][3] - info['extent'][2]) * dpi)) if (info is not None) else max(1, int(vb.height()))
             if (start is not None) and (end is not None):
@@ -702,12 +746,14 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
             view_w, view_h = self._compute_aspect_matched_view_size(export_w, export_h)
 
             with self._with_export_view_geometry(view_w, view_h):
+                QApplication.processEvents()
                 exporter = ImageExporter(pi)
                 exporter.parameters()['width'] = export_w
                 exporter.parameters()['height'] = export_h
                 if debug_print:
                     print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}, view_resize: ({view_w}, {view_h})")
-                _refresh_interval_rect_labels_for_plot_item(canvas_width_px=export_w, canvas_height_px=export_h)
+                _refresh_interval_rect_labels_for_plot_item(canvas_width_px=export_w, canvas_height_px=export_h, force_all_labels=force_render_interval_labels)
+                QApplication.processEvents()
                 img = exporter.export(toBytes=True)
             if isinstance(img, QImage):
                 if img.isNull() or img.width() < 1 or img.height() < 1:
@@ -733,7 +779,13 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
             pi.setYRange(*orig_y, padding=0)
             if orig_x_link is not None:
                 pi.setXLink(orig_x_link)
-            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(vb.width())), canvas_height_px=max(1, int(vb.height())))
+            for a_plot_item, labels_min_pixel_width, labels_min_pixel_height, labels_padding_px, max_visible_labels in interval_label_states:
+                a_plot_item.labels_min_pixel_width = labels_min_pixel_width
+                a_plot_item.labels_min_pixel_height = labels_min_pixel_height
+                a_plot_item.labels_padding_px = labels_padding_px
+                a_plot_item.max_visible_labels = max_visible_labels
+            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(vb.width())), canvas_height_px=max(1, int(vb.height())), force_all_labels=False)
+            QApplication.processEvents()
 
 
         # exporter = ImageExporter(self.active_plot_target)

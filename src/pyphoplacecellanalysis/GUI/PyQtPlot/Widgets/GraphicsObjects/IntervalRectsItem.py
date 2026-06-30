@@ -329,6 +329,9 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         a_text_item.setText(label_text)
         a_text_item.updatePosition()
         a_text_item.setVisible(True)
+        if hasattr(a_text_item, 'updateTransform'):
+            a_text_item.updateTransform(force=True)
+        a_text_item.update()
 
 
     def _visible_label_metadata_indices(self, x_range: Tuple[float, float], y_range: Tuple[float, float]) -> np.ndarray:
@@ -349,8 +352,8 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         return candidate_indices[visible_mask]
 
 
-    def refresh_visible_labels(self, canvas_width_px: int, canvas_height_px: int, x_range: Optional[Tuple[float, float]]=None, y_range: Optional[Tuple[float, float]]=None, immediate: bool=True):
-        """Show only labels whose full text fits inside their interval rect for the given canvas size."""
+    def refresh_visible_labels(self, canvas_width_px: int, canvas_height_px: int, x_range: Optional[Tuple[float, float]]=None, y_range: Optional[Tuple[float, float]]=None, immediate: bool=True, force_render_all: bool=False):
+        """Show labels for the given canvas size, optionally bypassing text-fit culling for export."""
         self._build_label_metadata()
         if len(self._label_start_t) == 0:
             self._clear_active_label_items()
@@ -379,6 +382,9 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
             rect_width_px = abs((self._label_end_t[metadata_index] - self._label_start_t[metadata_index]) / x_span) * canvas_width_px_f
             rect_height_px = abs(self._label_height[metadata_index] / y_span) * canvas_height_px_f
             if (rect_width_px < self.labels_min_pixel_width) or (rect_height_px < self.labels_min_pixel_height):
+                continue
+            if force_render_all:
+                fitting_candidates.append((rect_width_px, int(metadata_index)))
                 continue
             text_rect = metrics.boundingRect(label_text)
             if ((text_rect.width() + self.labels_padding_px) <= rect_width_px) and ((text_rect.height() + self.labels_padding_px) <= rect_height_px):
