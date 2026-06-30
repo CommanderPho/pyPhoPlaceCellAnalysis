@@ -82,6 +82,8 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
                 ## Copy tooltip function
                 if rendered_rects_item.format_item_tooltip_fn is not None:
                     self[a_plot].format_item_tooltip_fn = deepcopy(rendered_rects_item.format_item_tooltip_fn)
+                if rendered_rects_item.item_label_format_fn is not None:
+                    self[a_plot].item_label_format_fn = deepcopy(rendered_rects_item.item_label_format_fn)
 
 
 
@@ -565,10 +567,25 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             return tooltip_text
 
 
+        def _custom_format_label_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> Optional[str]:
+            """In-rect label text for each epoch. Returning None keeps dense or unlabeled intervals cheap."""
+            a_label = getattr(rect_data_tuple, 'label', None)
+            if a_label is None:
+                return None
+            try:
+                if np.isnan(a_label):
+                    return None
+            except TypeError:
+                pass
+            a_label = str(a_label)
+            return a_label if len(a_label) > 0 else None
+
+
 
         # Build the rendered interval item:
-        new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+        new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data))
         new_interval_rects_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+        new_interval_rects_item.item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
         # new_interval_rects_item.setToolTip(name) # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
         
         ######### PLOTS:
@@ -593,6 +610,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     extant_rect_plot_item.update_data(new_data)
                     # Preserve tooltip function
                     extant_rect_plot_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    extant_rect_plot_item.item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rect_plot_item)
                     # Adjust the bounds to fit any children:
                     EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rect_plot_item, position_mode=position_mode)
@@ -600,8 +618,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 else:
                     # New plot, add new item
                     independent_data_copy = ColorDataframeColumnHelpers.copy_data(new_interval_rects_item.data)
-                    extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+                    extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data))
                     extant_rects_plot_items_container[a_plot].format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    extant_rects_plot_items_container[a_plot].item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
                     self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                     # Adjust the bounds to fit any children:
@@ -613,7 +632,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
-            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data)) # set the plot item
+            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data)) # set the plot item
             for a_plot, a_rect_item in self.rendered_epochs[name].items(): ## iterate through the plots now:
                 if not isinstance(a_rect_item, str):
                     if debug_print:

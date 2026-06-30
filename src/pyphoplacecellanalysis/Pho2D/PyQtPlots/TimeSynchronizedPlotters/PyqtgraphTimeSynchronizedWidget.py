@@ -569,6 +569,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from PyQt5.QtGui import QImage
+        from PyQt5.QtWidgets import QApplication
 
         debug_print = kwargs.pop('debug_print', False)
         
@@ -607,6 +608,14 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         vb = pi.getViewBox()
         orig_x, orig_y = vb.viewRange()
         orig_x_link = vb.linkedView(pg.ViewBox.XAxis)
+
+        def _refresh_interval_rect_labels_for_plot_item(canvas_width_px: int, canvas_height_px: int):
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
+            view_range = vb.viewRange()
+            for a_plot_item in list(getattr(pi, 'items', [])):
+                if isinstance(a_plot_item, IntervalRectsItem):
+                    a_plot_item.refresh_visible_labels(canvas_width_px=canvas_width_px, canvas_height_px=canvas_height_px, x_range=view_range[0], y_range=view_range[1], immediate=True)
+
         if orig_x_link is not None:
             pi.setXLink(None)
         try:
@@ -615,13 +624,15 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
             pi.setYRange(*orig_y, padding=0)
 
             exporter = ImageExporter(pi)
-            if (start is not None) or (end is not None):
+            if (start is not None) and (end is not None):
                 exporter.parameters()['width'] = max(1, int((end - start) * dpi))
             if (info is not None):
                 exporter.parameters()['height'] = max(1, int((info['extent'][3] - info['extent'][2]) * dpi))
 
             if debug_print:
                 print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(exporter.parameters()['width'])), canvas_height_px=max(1, int(exporter.parameters()['height'])))
+            QApplication.processEvents()
             img = exporter.export(toBytes=True)
             if isinstance(img, QImage):
                 w, h = img.width(), img.height()
@@ -642,6 +653,7 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
             pi.setYRange(*orig_y, padding=0)
             if orig_x_link is not None:
                 pi.setXLink(orig_x_link)
+            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(vb.width())), canvas_height_px=max(1, int(vb.height())))
 
 
         # exporter = ImageExporter(self.active_plot_target)
