@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
 
@@ -13,7 +14,8 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step, ClusterlessRTCPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -64,25 +66,47 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             print(f'\tdid_change: {did_change}')
             
         ## filtered_spikes_df version:
-        has_good_pf1D: bool = ('pf1D' in computation_result.computed_data) and (computation_result.computed_data.get('pf1D', None) is not None) and (computation_result.computed_data['pf1D'].ratemap.n_neurons > 0)
-        if has_good_pf1D:
-            pf = computation_result.computed_data['pf1D']
-            computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=pf.filtered_spikes_df.copy(), debug_print=kwargs.get('debug_print', False))
-            assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
-            computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
-        else:
-            print(f"WARNING: skipping 1D position decoding because pf1D is missing/None/has zero neurons for this filtered context.\n\tthis will set computation_result.computed_data['pf1D_Decoder'] = None")
-            computation_result.computed_data['pf1D_Decoder'] = None
+        computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
+        assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
+        computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
 
-        has_good_pf2D: bool = ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None) and (computation_result.computed_data['pf2D'].ratemap.n_neurons > 0)
-        if has_good_pf2D:
+        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
             pf = computation_result.computed_data['pf2D']
-            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=pf.filtered_spikes_df.copy(), debug_print=kwargs.get('debug_print', False))
+
+            computation_result.computed_data['pf2D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf, spikes_df=computation_result.computed_data['pf2D'].filtered_spikes_df.copy(), debug_print=False)
             computation_result.computed_data['pf2D_Decoder'].compute_all() # Changing to fIXED grid_bin_bounds ===> MUCH (10x?) slower than before
         else:
-            print(f"WARNING: skipping 2D position decoding because pf2D is missing/None/has zero neurons for this filtered context.\n\tthis will set computation_result.computed_data['pf2D_Decoder'] = None")
             computation_result.computed_data['pf2D_Decoder'] = None
             
+        return computation_result
+    
+
+    @function_attributes(short_name='position_decoding_clusterless', tags=['decoding', 'position', 'clusterless'],
+                          input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
+    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: float = 1000.0, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
+        """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        clusterless_params = clusterless_params if clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=sampling_frequency_hz)
+        sess = computation_result.sess
+
+        def _build_decoder_for_pf(pf):
+            pos_df = pf.filtered_pos_df
+            source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
+            t_start = float(source_times.min())
+            t_end = float(source_times.max())
+            if multiunits is not None:
+                pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+            else:
+                pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, clusterless_params.clusterless_sampling_frequency_hz, t_start, t_end, spikes_df=pf.filtered_spikes_df.copy())
+            decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
+            decoder.compute_all()
+            return decoder
+
+        computation_result.computed_data['pf1D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf1D'])
+        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
+            computation_result.computed_data['pf2D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf2D'])
+        else:
+            computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
         return computation_result
     
 
@@ -93,7 +117,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
-        from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 
         def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
             """ captures debug_print 

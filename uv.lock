@@ -1343,6 +1343,33 @@ wheels = [
 ]
 
 [[package]]
+name = "distributed"
+version = "2024.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "cloudpickle" },
+    { name = "dask" },
+    { name = "jinja2" },
+    { name = "locket" },
+    { name = "msgpack" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "sortedcontainers" },
+    { name = "tblib" },
+    { name = "toolz" },
+    { name = "tornado" },
+    { name = "urllib3" },
+    { name = "zict" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/61/09/f3640d43559876a8b9b03204e684ed3be259d04dd017260b002b6cfe8401/distributed-2024.8.0.tar.gz", hash = "sha256:b99caf0a7f257f59477a70a334e081c1241f7cd9860211cc669742e6450e1310", size = 1112136, upload-time = "2024-08-06T20:23:51.017Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/95/8a/d828dea3a1b6d7e796bebd8c64dc40d44d9a60762f759a11a61386eb38b5/distributed-2024.8.0-py3-none-any.whl", hash = "sha256:11af55d22dd6e04eb868b87f166b8f59ef1b300f659f87c016643b7f98280ec6", size = 1019423, upload-time = "2024-08-06T20:23:45.136Z" },
+]
+
+[[package]]
 name = "distro"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -6029,6 +6056,7 @@ dependencies = [
     { name = "pyqt5-qt5" },
     { name = "qtawesome" },
     { name = "qtmodern" },
+    { name = "replay-trajectory-classification" },
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "setuptools" },
@@ -6112,6 +6140,7 @@ requires-dist = [
     { name = "pyqt5-qt5", specifier = "==5.15.2" },
     { name = "qtawesome", specifier = ">=1.4.0" },
     { name = "qtmodern", specifier = ">=0.2.0,<0.3" },
+    { name = "replay-trajectory-classification", specifier = ">=1.4.1" },
     { name = "scikit-learn", specifier = "~=1.5" },
     { name = "setuptools", specifier = ">=78.1.0" },
     { name = "shapely", specifier = ">=2.0.1,<3" },
@@ -6722,6 +6751,56 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2f/db/98b5c277be99dd18bfd91dd04e1b759cad18d1a338188c936e92f921c7e2/referencing-0.36.2.tar.gz", hash = "sha256:df2e89862cd09deabbdba16944cc3f10feb6b3e6f18e902f7cc25609a34775aa", size = 74744, upload-time = "2025-01-25T08:48:16.138Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/b1/3baf80dc6d2b7bc27a95a67752d0208e410351e3feb4eb78de5f77454d8d/referencing-0.36.2-py3-none-any.whl", hash = "sha256:e8699adbbf8b5c7de96d8ffa0eb5c158b3beafce084968e2ea8bb08c6794dcd0", size = 26775, upload-time = "2025-01-25T08:48:14.241Z" },
+]
+
+[[package]]
+name = "regularized-glm"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "statsmodels" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/13/0b/8b318eb811739e3d09665af5c1105e09d2b7e7ff9e0c3aa35a35942711f3/regularized_glm-1.0.2.tar.gz", hash = "sha256:9a69e68aa85c925f0158247e8b05cddfa493b4f9d582335ae4180b5d0f7dc99d", size = 5634, upload-time = "2022-01-23T19:58:28.605Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/23/97e21f7d0640ccda1d2022b188711472d110bbed8f36003bd73234127647/regularized_glm-1.0.2-py3-none-any.whl", hash = "sha256:c8bc4b9ed5688e1b336be59ffd9a12405124c21f553f45aa0aac086e599eecf2", size = 6211, upload-time = "2022-01-23T19:58:26.625Z" },
+]
+
+[[package]]
+name = "replay-trajectory-classification"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dask" },
+    { name = "distributed" },
+    { name = "joblib" },
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "networkx", version = "3.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "numba", version = "0.60.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "numba", version = "0.61.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "patsy" },
+    { name = "regularized-glm" },
+    { name = "scikit-image" },
+    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "seaborn" },
+    { name = "statsmodels" },
+    { name = "tqdm" },
+    { name = "track-linearization" },
+    { name = "xarray" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/02/19/76a4f80a47a44ab9ea22a15f78bd45c5dc001ee91d9f28c7182c9803584a/replay_trajectory_classification-1.4.1.tar.gz", hash = "sha256:50b6b87f424e41f002595c1b0640ca373f2274cac39a6e1d9f5ff99694de73a1", size = 55947, upload-time = "2024-09-06T18:15:52.143Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/bb/9837d6c4c3f622b7ba3423ab2a179bb8d12971d53b1c42f61e8e99b6ea0a/replay_trajectory_classification-1.4.1-py3-none-any.whl", hash = "sha256:0950fca200396a4787a1232f5021ed3840f7d7699ef99cf910e13b1d9e2631cb", size = 75064, upload-time = "2024-09-06T18:15:50.747Z" },
 ]
 
 [[package]]
@@ -7756,6 +7835,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tblib"
+version = "3.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/8a/14c15ae154895cc131174f858c707790d416c444fc69f93918adfd8c4c0b/tblib-3.2.2.tar.gz", hash = "sha256:e9a652692d91bf4f743d4a15bc174c0b76afc750fe8c7b6d195cc1c1d6d2ccec", size = 35046, upload-time = "2025-11-12T12:21:16.572Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/be/5d2d47b1fb58943194fb59dcf222f7c4e35122ec0ffe8c36e18b5d728f0b/tblib-3.2.2-py3-none-any.whl", hash = "sha256:26bdccf339bcce6a88b2b5432c988b266ebbe63a4e593f6b578b1d2e723d2b76", size = 12893, upload-time = "2025-11-12T12:21:14.407Z" },
+]
+
+[[package]]
 name = "text-unidecode"
 version = "1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -8444,6 +8532,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/10/9a/2fef89272d98b799e4daa50201c5582ec76bdd4e92a1a7e3deb74c52b7fa/zc_lockfile-4.0.tar.gz", hash = "sha256:d3ab0f53974296a806db3219b9191ba0e6d5cbbd1daa2e0d17208cb9b29d2102", size = 10956, upload-time = "2025-09-18T07:32:34.412Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/7f/3a614b65bc4b181578b1d50a78663ee02d5d2d3b859712f3d3597c8afe6f/zc_lockfile-4.0-py3-none-any.whl", hash = "sha256:aa3aa295257bebaa09ea9ad5cb288bf9f98f88de6932f96b6659f62715d83581", size = 9143, upload-time = "2025-09-18T07:32:33.517Z" },
+]
+
+[[package]]
+name = "zict"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/ac/3c494dd7ec5122cff8252c1a209b282c0867af029f805ae9befd73ae37eb/zict-3.0.0.tar.gz", hash = "sha256:e321e263b6a97aafc0790c3cfb3c04656b7066e6738c37fffcca95d803c9fba5", size = 33238, upload-time = "2023-04-17T21:41:16.041Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/ab/11a76c1e2126084fde2639514f24e6111b789b0bfa4fc6264a8975c7e1f1/zict-3.0.0-py2.py3-none-any.whl", hash = "sha256:5796e36bd0e0cc8cf0fbc1ace6a68912611c1dbd74750a3f3026b9b9d6a327ae", size = 43332, upload-time = "2023-04-17T21:41:13.444Z" },
 ]
 
 [[package]]

@@ -46,6 +46,7 @@ dependencies = [
     "pyclustering>=0.10.1.2",
     "silx>=2.2.0,<3",
     "numba>=0.57,<0.62",
+    "replay-trajectory-classification>=1.4.1",
 ]
 
 [dependency-groups]
