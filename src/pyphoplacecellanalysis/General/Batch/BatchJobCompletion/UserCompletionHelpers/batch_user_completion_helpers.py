@@ -3559,6 +3559,61 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     return across_session_results_extended_dict
 
 
+# ==================================================================================================================== #
+# NWB W-maze Manual Pipeline Recomputations                                                                            #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False) -> dict:
+    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, and failed-computation retry.
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function
+
+    callback_outputs = across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
+    failed_computations_summary = callback_outputs['failed_computations_summary']
+    n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
+    """
+    import sys
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name != 'dandi_nwb':
+        print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    resolved_active_data_mode_name: str = active_data_mode_name or session_format_name or 'dandi_nwb'
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'recompute_nwb_wmaze_pipeline_computations_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    callback_outputs = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'overwrite_extant': overwrite_extant, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None}
+
+    try:
+        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, active_data_mode_name=resolved_active_data_mode_name, posthoc_save=posthoc_save, time_bin_size=final_process_time_bin_size, overwrite_extant=overwrite_extant, fail_on_exception=fail_on_exception)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': directional_decode_time_bin_size, 'should_disable_cache': should_disable_cache}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=debug_print)
+        curr_active_pipeline.rerun_failed_computations(fail_on_exception=fail_on_exception)
+        failed_computations = curr_active_pipeline.get_failed_computations()
+        failed_computations_summary: Dict[str, Dict[str, str]] = {str(filter_context_name): {str(computation_name): str(captured_exc) for computation_name, captured_exc in computation_exceptions_dict.items()} for filter_context_name, computation_exceptions_dict in failed_computations.items()}
+        callback_outputs['failed_computations_summary'] = failed_computations_summary
+        callback_outputs['n_failed_computation_contexts'] = len(failed_computations_summary)
+        if len(failed_computations_summary) > 0:
+            print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function: {len(failed_computations_summary)} filter context(s) still have failed computations: {failed_computations_summary}')
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        callback_outputs['recompute_error'] = err
+        print(f"ERROR: recompute_nwb_wmaze_pipeline_computations_completion_function encountered exception {err}")
+        if self.fail_on_exception:
+            raise err.exc
+
+    across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
@@ -3621,6 +3676,124 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
 
     across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+# ==================================================================================================================== #
+# NWB W-maze Display/Figures Export                                                                                    #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'nwb', 'wmaze', 'figure', 'batch', 'timeline'], input_requires=['DirectionalDecodersDecoded'], output_provides=[], uses=['programmatic_render_to_file', 'Spike3DRasterWindowWidget', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand', 'build_proper_epoch_intervals'], used_by=[], creation_date='2026-06-30 12:00', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function'])
+def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = True, laps_decoding_time_bin_size: float = 0.250, included_track_dock_identifiers: Optional[List[str]] = None, debug_print: bool = False, fail_on_exception_for_debugging: bool = False) -> dict:
+    """Exports NWB W-maze placefield figures and spike-raster timeline PDF (with context-decoder marginal track)."""
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, programmatic_render_to_file
+    from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+    from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedEpochMarginal_MatplotlibPlotCommand, decoding_continuous_cache_key
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+    if getattr(curr_session_context, 'format_name', None) != 'dandi_nwb':
+        print(f'WARN: figures_export_nwb_wmaze_display_completion_function skipped for non-dandi_nwb session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_export_nwb_wmaze_display_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    _batch_figure_kwargs = dict(override_fig_man=custom_fig_man)
+
+    callback_outputs = {'figure_output_paths': [], 'timeline_pdf_path': None, 'export_all_tracks_result': None, 'subset_includelist': None, 'included_track_dock_identifiers': None}
+
+    hardcoded_params = NWBDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    subset_includelist = hardcoded_params.decoder_building_session_names
+    callback_outputs['subset_includelist'] = list(subset_includelist)
+    print(f'\tsubset_includelist: {subset_includelist}')
+
+    display_fn_kwargs = dict(subplots=(None, 9), fig_column_width=None, fig_row_height=1.0, resolution_multiplier=1.0)
+
+    try:
+        curr_active_pipeline.reload_default_display_functions()
+        curr_active_pipeline.prepare_for_display()
+    except Exception as e:
+        print(f'WARN: figures_export_nwb_wmaze_display_completion_function display setup failed: {e}')
+        if self.fail_on_exception:
+            raise
+
+    for curr_display_function_name, extra_kwargs in [
+        ('_display_2d_placefield_result_plot_ratemaps_2D', display_fn_kwargs),
+        ('_display_2d_placefield_occupancy', {}),
+        ('_display_1d_placefields', display_fn_kwargs),
+    ]:
+        try:
+            out_paths = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name=curr_display_function_name, subset_includelist=subset_includelist, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, **_batch_figure_kwargs, **extra_kwargs)
+            callback_outputs['figure_output_paths'].extend(out_paths or [])
+            print(f'\t{curr_display_function_name} figure_output_paths: {out_paths}')
+        except Exception as e:
+            print(f'WARN: programmatic_render_to_file `{curr_display_function_name}` failed: {e}')
+            if self.fail_on_exception:
+                raise
+
+    cache_key = decoding_continuous_cache_key(laps_decoding_time_bin_size, None)
+    directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+    continuously_decoded_cache = getattr(directional_decoders_decode_result, 'continuously_decoded_result_cache_dict', None) if directional_decoders_decode_result is not None else None
+    if continuously_decoded_cache is None or cache_key not in continuously_decoded_cache:
+        print(f'WARN: DirectionalDecodersDecoded missing cache_key {cache_key}; skipping spike-raster timeline export.')
+        across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
+        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        return across_session_results_extended_dict
+
+    try:
+        app = pg.mkQApp('figures_export_nwb_wmaze_display_completion_function')
+        pg.setConfigOptions(useOpenGL=True)
+        pg.setConfigOption('antialias', False)
+
+        global_context = curr_active_pipeline.filtered_contexts['maze_GLOBAL']
+        spike_raster_window, (active_2d_plot, *_rest) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context=global_context)
+
+        build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, height=1.5)
+
+        active_2d_plot.params.enable_non_marginalized_raw_result = False
+        active_2d_plot.params.enable_marginal_over_direction = False
+        active_2d_plot.params.enable_marginal_over_track_ID = True
+
+        cmd = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_time_bin_sizes_whitelist=[cache_key])
+        cmd.execute()
+
+        try:
+            identifier_name = f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}'
+            a_dock = active_2d_plot.find_display_dock(identifier_name)
+            if a_dock is not None:
+                a_dock.setFixedHeight(130)
+        except Exception as dock_err:
+            print(f'WARN: could not set marginal dock fixed height: {dock_err}')
+
+        block_until_render_complete()
+
+        default_included_track_dock_identifiers = ['intervals', 'rasters[raster_window]', 'new_curves_separate_plot', f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}']
+        resolved_included_track_dock_identifiers = list(reversed(included_track_dock_identifiers or default_included_track_dock_identifiers))
+        callback_outputs['included_track_dock_identifiers'] = resolved_included_track_dock_identifiers
+
+        export_result = active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=self.collected_outputs_path, curr_active_pipeline=curr_active_pipeline, included_track_dock_identifiers=resolved_included_track_dock_identifiers, fail_on_exception_for_debugging=fail_on_exception_for_debugging)
+        callback_outputs['export_all_tracks_result'] = export_result
+        callback_outputs['timeline_pdf_path'] = export_result.get('fig_save_path', None) if isinstance(export_result, dict) else None
+        print(f'\ttimeline_pdf_path: {callback_outputs["timeline_pdf_path"]}')
+
+    except Exception as e:
+        print(f'WARN: figures_export_nwb_wmaze_display_completion_function spike-raster timeline export failed: {e}')
+        if fail_on_exception_for_debugging or self.fail_on_exception:
+            raise
+
+    across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     return across_session_results_extended_dict
 
