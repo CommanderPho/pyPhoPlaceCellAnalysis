@@ -1,5 +1,6 @@
+from contextlib import contextmanager
 from copy import deepcopy
-from typing import Optional
+from typing import Iterator, Optional, Tuple
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -559,6 +560,74 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
     # PlotImageExportableMixin Conformances                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
 
+    @staticmethod
+    def _cap_pixel_size_preserving_aspect(width_px: int, height_px: int, max_dimension: int) -> Tuple[int, int]:
+        """Cap pixel width/height while preserving aspect ratio."""
+        width_px = max(1, int(width_px))
+        height_px = max(1, int(height_px))
+        max_dimension = max(1, int(max_dimension))
+        if max(width_px, height_px) <= max_dimension:
+            return width_px, height_px
+        if width_px >= height_px:
+            capped_w = max_dimension
+            capped_h = max(1, int(round(capped_w * height_px / width_px)))
+        else:
+            capped_h = max_dimension
+            capped_w = max(1, int(round(capped_h * width_px / height_px)))
+        return capped_w, capped_h
+
+
+    @staticmethod
+    def _compute_aspect_matched_view_size(export_w: int, export_h: int, max_view_dimension: int = 8192) -> Tuple[int, int]:
+        """Return view resize dimensions with the same aspect ratio as export, capped to avoid huge on-screen buffers."""
+        return PyqtgraphTimeSynchronizedWidget._cap_pixel_size_preserving_aspect(export_w, export_h, max_view_dimension)
+
+
+    @contextmanager
+    def _with_export_view_geometry(self, view_w: int, view_h: int) -> Iterator[None]:
+        """Temporarily resize the plot view so ViewBox aspect ratio matches the ImageExporter target aspect ratio."""
+        from qtpy.QtWidgets import QApplication
+
+        view_w = max(1, int(view_w))
+        view_h = max(1, int(view_h))
+        layout = self.getRootGraphicsLayoutWidget()
+        orig_layout_min, orig_layout_max, orig_layout_size = layout.minimumSize(), layout.maximumSize(), layout.size()
+        orig_self_min, orig_self_max, orig_self_size = self.minimumSize(), self.maximumSize(), self.size()
+        orig_layout_updates_enabled, orig_self_updates_enabled = layout.updatesEnabled(), self.updatesEnabled()
+        parent_size_constraints: list[Tuple[QtWidgets.QWidget, int, int]] = []
+        parent_widget = self.parentWidget()
+        while parent_widget is not None:
+            parent_size_constraints.append((parent_widget, parent_widget.maximumHeight(), parent_widget.maximumWidth()))
+            if (parent_widget.maximumHeight() > 0) and (parent_widget.maximumHeight() < view_h):
+                parent_widget.setMaximumHeight(view_h)
+            if (parent_widget.maximumWidth() > 0) and (parent_widget.maximumWidth() < view_w):
+                parent_widget.setMaximumWidth(view_w)
+            parent_widget = parent_widget.parentWidget()
+        layout.setUpdatesEnabled(False)
+        self.setUpdatesEnabled(False)
+        try:
+            layout.setMinimumSize(view_w, view_h)
+            layout.setMaximumSize(view_w, view_h)
+            layout.resize(view_w, view_h)
+            self.setMinimumSize(view_w, view_h)
+            self.setMaximumSize(view_w, view_h)
+            self.resize(view_w, view_h)
+            yield
+        finally:
+            layout.setMinimumSize(orig_layout_min)
+            layout.setMaximumSize(orig_layout_max)
+            layout.resize(orig_layout_size)
+            self.setMinimumSize(orig_self_min)
+            self.setMaximumSize(orig_self_max)
+            self.resize(orig_self_size)
+            for a_parent_widget, orig_max_height, orig_max_width in parent_size_constraints:
+                a_parent_widget.setMaximumHeight(orig_max_height)
+                a_parent_widget.setMaximumWidth(orig_max_width)
+            layout.setUpdatesEnabled(orig_layout_updates_enabled)
+            self.setUpdatesEnabled(orig_self_updates_enabled)
+            QApplication.processEvents()
+
+
     def export_as_img_arr(self, start=None, end=None, dpi=150,
                           info=None,
                         #    y_offset = 0, y_min = 0.0,
@@ -572,8 +641,8 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         from PyQt5.QtWidgets import QApplication
 
         debug_print = kwargs.pop('debug_print', False)
-        
-        # pyqtgraph-backed tracks
+        max_export_width_px = kwargs.pop('max_export_width_px', None)
+        max_export_dimension = kwargs.pop('max_export_dimension', 8192)
         
         # # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
         # # y_min, y_max = t.getViewBox().viewRange()[1]
@@ -623,20 +692,31 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
                 pi.setXRange(start, end, padding=0)
             pi.setYRange(*orig_y, padding=0)
 
-            exporter = ImageExporter(pi)
+            export_h = max(1, int((info['extent'][3] - info['extent'][2]) * dpi)) if (info is not None) else max(1, int(vb.height()))
             if (start is not None) and (end is not None):
-                exporter.parameters()['width'] = max(1, int((end - start) * dpi))
-            if (info is not None):
-                exporter.parameters()['height'] = max(1, int((info['extent'][3] - info['extent'][2]) * dpi))
+                nominal_export_w = max(1, int((end - start) * dpi))
+                export_w = max(1, min(nominal_export_w, int(max_export_width_px))) if (max_export_width_px is not None) else nominal_export_w
+            else:
+                export_w = max(1, int(vb.width()))
+            export_w, export_h = self._cap_pixel_size_preserving_aspect(export_w, export_h, max_export_dimension)
+            view_w, view_h = self._compute_aspect_matched_view_size(export_w, export_h)
 
-            if debug_print:
-                print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
-            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(exporter.parameters()['width'])), canvas_height_px=max(1, int(exporter.parameters()['height'])))
-            QApplication.processEvents()
-            img = exporter.export(toBytes=True)
+            with self._with_export_view_geometry(view_w, view_h):
+                exporter = ImageExporter(pi)
+                exporter.parameters()['width'] = export_w
+                exporter.parameters()['height'] = export_h
+                if debug_print:
+                    print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}, view_resize: ({view_w}, {view_h})")
+                _refresh_interval_rect_labels_for_plot_item(canvas_width_px=export_w, canvas_height_px=export_h)
+                img = exporter.export(toBytes=True)
             if isinstance(img, QImage):
+                if img.isNull() or img.width() < 1 or img.height() < 1:
+                    raise ValueError(f"ImageExporter returned an empty image (size=({img.width()}, {img.height()}))")
                 w, h = img.width(), img.height()
-                ptr = img.bits(); ptr.setsize(img.byteCount())
+                ptr = img.bits()
+                if ptr is None:
+                    raise ValueError(f"ImageExporter returned a null image buffer for size ({w}, {h})")
+                ptr.setsize(img.byteCount())
                 raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
                 b = raw[:, :, 0]
                 g = raw[:, :, 1]

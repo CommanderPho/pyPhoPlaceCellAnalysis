@@ -1103,6 +1103,7 @@ class FigureToImageHelpers:
             pages = pages[:debug_max_num_pages]
 
         ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
+        max_export_width_px = int(figsize[0] * dpi)
 
         with backend_pdf.PdfPages(output_pdf_path) as pdf:
             for page_chunks in pages:
@@ -1124,7 +1125,7 @@ class FigureToImageHelpers:
                             print(f'track_IDX: {track_IDX} dock_id: "{dock_id}" info["extent"]: {info["extent"]}')
 
                         apply_chunk_xlim = (dock_id in ui_connections and dock_id != 'tracks')
-                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print)
+                        arr = t.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print, max_export_width_px=max_export_width_px)
                         if arr is None or arr.size == 0:
                             print(f'WARN: empty export for track "{dock_id}" (track_IDX={track_IDX}) chunk ({start}, {end}); skipping imshow.')
                             continue
