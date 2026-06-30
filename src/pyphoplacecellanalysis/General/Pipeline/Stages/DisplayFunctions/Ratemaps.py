@@ -77,10 +77,12 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, plot_pos_bin_axes: bool=True, **kwargs):
         """ displays placefield occupancy in a MATPLOTLIB window 
         """
+        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+        # fontsize = kwargs.get('fontsize', 10)
+
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
-        
         display_outputs = computation_result.computed_data['pf1D'].plot_occupancy(active_context=active_display_ctx, **({'plot_pos_bin_axes': plot_pos_bin_axes} | kwargs))
         
         # plot_variable_name = ({'plot_variable': None} | kwargs)
@@ -91,7 +93,10 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2) # Adds the parameters text.
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2,
+            # fontsize=kwargs.get('fontsize', 10),
+            **param_text_box_kwargs,
+        ) # Adds the parameters text.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
@@ -122,6 +127,8 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
+        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='_display_2d_placefield_result_plot_ratemaps_2D')
         
@@ -133,8 +140,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
         
-        
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params) # Adds the parameters text. #TODO 2023-06-13 11:10: - [ ] Fix how this renders at least for PDF output. It's too big and positioned poorly.
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, **param_text_box_kwargs) # Adds the parameters text. #TODO 2023-06-13 11:10: - [ ] Fix how this renders at least for PDF output. It's too big and positioned poorly.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
@@ -167,8 +173,11 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             optionally shows peak firing rates
             
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
-        
+
         """
+        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+
+
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
         # active_display_ctx_string = active_display_ctx.get_description(separator='|')
@@ -183,7 +192,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
         active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2) # Adds the parameters text.
+        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2, **param_text_box_kwargs) # Adds the parameters text.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
@@ -217,6 +226,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         # return occupancy_fig, active_pf_2D_figures
         return MatplotlibRenderPlots(figures=[occupancy_fig, active_pf_2D_figures])   
+
 
     @function_attributes(short_name='placemaps_pyqtplot_2D', tags=['display', 'placefields', '2D', 'pyqtgraph', 'pyqtplot'], conforms_to=['context_returning'], input_requires=["computation_result.computed_data['pf2D']"], output_provides=[], uses=['display_all_pf_2D_pyqtgraph_binned_image_rendering'], used_by=[], creation_date='2023-04-11 03:05')
     def _display_placemaps_pyqtplot_2D(computation_result, active_config, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
@@ -252,6 +262,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
             out_all_pf_2D_pyqtgraph_binned_image_fig.show()
 
         return PyqtgraphRenderPlots(parent_root_widget=out_all_pf_2D_pyqtgraph_binned_image_fig, context=active_context)
+
 
     @function_attributes(short_name='recurrsive_latent_placefield_comparisons', tags=['display', 'recurrsive', 'placefields', '2D', 'pyqtplot'], input_requires=["computation_result.computed_data['pf2D_RecursiveLatent']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=[], uses=[], used_by=[], creation_date='2023-04-11 03:05')
     def _display_recurrsive_latent_placefield_comparisons(computation_result, active_config, owning_pipeline_reference=None, enable_saving_to_disk=False, active_context=None, defer_show:bool=False, **kwargs):
