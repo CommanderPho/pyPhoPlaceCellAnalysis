@@ -83,6 +83,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
 
         return active_df #, kwargs
     
+
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
@@ -102,6 +103,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
+
 
     @classmethod
     def build_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
@@ -137,6 +139,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         else:
             raise NotImplementedError
         return general_epochs_interval_datasource
+
 
     @classmethod
     def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:

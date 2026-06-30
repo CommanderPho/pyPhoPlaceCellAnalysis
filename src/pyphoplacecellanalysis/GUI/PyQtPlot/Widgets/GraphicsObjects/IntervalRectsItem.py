@@ -116,7 +116,7 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     
     
 
-    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False, labels_min_pixel_width: float=8.0, labels_min_pixel_height: float=6.0, labels_padding_px: float=4.0, max_visible_labels: int=128, label_update_debounce_ms: int=40):
+    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False, labels_min_pixel_width: float=4.0, labels_min_pixel_height: float=0.9, labels_padding_px: float=0.2, max_visible_labels: int=128, label_update_debounce_ms: int=40):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
         self.menu = None
