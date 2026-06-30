@@ -10,11 +10,11 @@
 #SBATCH --mem=92000m
 #SBATCH --partition=largemem
 {% else %}
-#SBATCH --mem=84000m
+#SBATCH --mem=64000m
 #SBATCH --partition=standard
 {% endif %}
-#SBATCH --time=16:00:00
-#SBATCH --account=kdiba1
+#SBATCH --time=8:00:00
+#SBATCH --account=kdiba99
 
 
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
