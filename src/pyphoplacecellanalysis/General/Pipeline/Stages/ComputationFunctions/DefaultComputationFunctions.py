@@ -1,7 +1,7 @@
 from copy import deepcopy
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
@@ -85,13 +85,32 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     @function_attributes(short_name='position_decoding_clusterless', tags=['decoding', 'position', 'clusterless'],
                           input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
-    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_spike_events=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
+    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None,
+                                                           multiunits: Optional[np.ndarray] = None, rtc_time: Optional[np.ndarray] = None,
+                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        from neuropy.core.clusterless_spike_events import default_clusterless_spike_events_path
         from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
 
         sess = computation_result.sess
         assert sess is not None
         pos_sampling_rate_Hz: float = sess.position.metadata.get('sampling_rate', 120.0) ## Hz ##
+        
+
+        # ... after sess = computation_result.sess ...
+
+        if clusterless_spike_events is None:
+            clusterless_spike_events = getattr(sess, 'clusterless_spike_events', None)
+        if clusterless_spike_events is None:
+            session_basedir = Path(getattr(sess, 'basepath', None) or Path(sess.filePrefix).parent)
+            session_name = getattr(getattr(sess, 'config', None), 'session_name', None) or getattr(sess, 'name', None) or Path(sess.filePrefix).stem
+            clusterless_events_path = default_clusterless_spike_events_path(session_basedir, session_name)
+            if clusterless_events_path.is_file():
+                clusterless_spike_events = load_clusterless_spike_events(clusterless_events_path)
+                sess.clusterless_spike_events = clusterless_spike_events  # cache for reuse
+
+        assert clusterless_spike_events is not None, f'2026-06-30 - requires clusterless_spike_events, but clusterless_spike_events is None'
+        active_events: ClusterlessSpikeEvents = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
 
 
         if time_bin_size is None:
@@ -112,8 +131,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         
 
         def _build_decoder_for_pf(pf):
-            """ captures: clusterless_params """
-            
+            """ captures: active_events, clusterless_params """
+            assert active_events is not None, f'2026-06-30 - \t in _build_decoder_for_pf()\t requires active_events, but active_events is None'
+            assert clusterless_params is not None, f'2026-06-30 - \t in _build_decoder_for_pf()\t requires clusterless_params, but clusterless_params is None'
+
             pos_df = pf.filtered_pos_df
             # pos_sampling_rate_Hz: float = pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
             # pos_sampling_rate_Hz
@@ -124,7 +145,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 ## 2D
                 active_pos_arr = pos_df[['x', 'y']].to_numpy()
 
-            movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
+            # movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
             # # If your marks are integers, use this algorithm because it is much faster
             # clusterless_algorithm = 'multiunit_likelihood'
             # clusterless_algorithm_params = {
@@ -147,20 +168,22 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             t_start = float(source_times.min())
             t_end = float(source_times.max())
             
-            if clusterless_spike_events is not None:
-                active_events = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
-                pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=t_start, t_end=t_end, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz)
-            elif (multiunits is not None):
-                raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events`')
-                pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
-            else:
-                raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events`')
-                pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
-                                                                            t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
+
+            pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=t_start, t_end=t_end, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz)
+
+            # elif (multiunits is not None):
+            #     raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events` - clusterless_spike_events is None and multiunits is not None')
+            #     pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+            # else:
+            #     raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events` - clusterless_spike_events is None and multiunits is None')
+            #     pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
+            #                                                                 t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
 
             decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
             decoder.compute_all()
             return decoder
+        ## END def _build_decoder_for_pf(...
+
 
         computation_result.computed_data['pf1D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf1D'])
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
