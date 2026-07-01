@@ -385,8 +385,8 @@ def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, plac
     x_centers = pf.xbin_centers
     y_centers = pf.ybin_centers
     n_x = len(x_centers)
-    x_idx = most_likely_flat_indices // len(y_centers)
-    y_idx = most_likely_flat_indices % len(y_centers)
+    x_idx = most_likely_flat_indices % n_x
+    y_idx = most_likely_flat_indices // n_x
     return np.column_stack([x_centers[np.clip(x_idx, 0, n_x - 1)], y_centers[np.clip(y_idx, 0, len(y_centers) - 1)]])
 
 
@@ -397,8 +397,7 @@ def build_clusterless_training_data_from_pfnd(pf: PfND, multiunits: np.ndarray, 
     from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
 
     source_pos_df = pf.filtered_pos_df
-    pos_sampling_rate_Hz: float = source_pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
-    pos_sampling_rate_Hz
+    # pos_sampling_rate_Hz removed
 
 
     source_times = source_pos_df['t'].to_numpy(dtype=float) if 't' in source_pos_df.columns else source_pos_df['t_seconds'].to_numpy(dtype=float)

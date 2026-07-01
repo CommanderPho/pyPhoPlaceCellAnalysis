@@ -87,7 +87,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
     def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_spike_events=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
-        from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
+        from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity
 
         sess = computation_result.sess
         assert sess is not None
@@ -124,24 +124,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                 ## 2D
                 active_pos_arr = pos_df[['x', 'y']].to_numpy()
 
-            movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
-            # # If your marks are integers, use this algorithm because it is much faster
-            # clusterless_algorithm = 'multiunit_likelihood'
-            # clusterless_algorithm_params = {
-            #     'mark_std': 1.0,
-            #     'position_std': 12.5,
-            # }
-            # environment = Environment(place_bin_size=np.sqrt(movement_var))
-            # continuous_transition_types = [[RandomWalk(movement_var=movement_var * 120),  Uniform(), Identity()],
-            #                                 [Uniform(),                                   Uniform(), Uniform()],
-            #                                 [RandomWalk(movement_var=movement_var * 120), Uniform(), Identity()],
-            #                             ]
-            # classifier: ClusterlessClassifier = ClusterlessClassifier(environments=environment,
-            #                                         continuous_transition_types=continuous_transition_types,
-            #                                         clusterless_algorithm=clusterless_algorithm,
-            #                                         clusterless_algorithm_params=clusterless_algorithm_params,
-            #                                     )
-            # classifier.fit(active_pos_arr, multiunits)
+            # handled in ClusterlessRTCPositionDecoder
 
             source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
             t_start = float(source_times.min())
