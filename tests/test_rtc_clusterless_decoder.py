@@ -1,4 +1,5 @@
 import ast
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,6 +39,13 @@ class _MockPfND:
         self.occupancy = np.ones(n_bins if ndim == 1 else (n_bins, n_bins))
         self.xbin_centers = np.arange(n_bins, dtype=float)
         self.ybin_centers = np.arange(n_bins, dtype=float) if ndim == 2 else None
+        self.epochs = None
+
+
+    def replacing_computation_epochs(self, epochs):
+        replaced_pf = _MockPfND(n_bins=len(self.xbin_centers), ndim=self.ndim, grid_bin_bounds=self.config.grid_bin_bounds, pos_bin_size=float(np.mean(np.atleast_1d(self.pos_bin_size))))
+        replaced_pf.epochs = epochs
+        return replaced_pf
 
 
 def test_pfnd_position_range_shapes():
@@ -241,6 +249,34 @@ def test_clusterless_decode_rejects_spike_counts():
         decoder.decode(spike_counts, time_bin_size=0.05, debug_print=False)
 
 
+def test_clusterless_replacing_computation_epochs_preserves_type_and_state():
+    time, _position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    decoder.classifier = object()
+    decoder.rtc_results = object()
+    decoder.p_x_given_n = np.ones((10, 5))
+    decoder.flat_p_x_given_n = np.ones((10, 5))
+    decoder.most_likely_positions = np.ones(5)
+    decoder.rtc_position_bin_centers = np.ones((10, 1))
+    replacement_epochs = pd.DataFrame({"start": [float(time[100])], "stop": [float(time[200])], "label": ["train"]})
+
+    replaced_decoder = decoder.replacing_computation_epochs(replacement_epochs)
+
+    assert isinstance(replaced_decoder, ClusterlessRTCPositionDecoder)
+    assert replaced_decoder is not decoder
+    assert replaced_decoder.pf is not decoder.pf
+    np.testing.assert_allclose(replaced_decoder.multiunits, decoder.multiunits)
+    np.testing.assert_allclose(replaced_decoder.rtc_time, decoder.rtc_time)
+    assert replaced_decoder.sampling_frequency_hz == decoder.sampling_frequency_hz
+    assert replaced_decoder.classifier is None
+    assert replaced_decoder.rtc_results is None
+    assert replaced_decoder.p_x_given_n is None
+    assert replaced_decoder.flat_p_x_given_n is None
+    assert replaced_decoder.most_likely_positions is None
+    assert replaced_decoder.rtc_position_bin_centers is None
+
+
 def test_clusterless_decode_specific_epochs_uses_multiunits_for_epoch_windows():
     time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
     mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
@@ -248,7 +284,7 @@ def test_clusterless_decode_specific_epochs_uses_multiunits_for_epoch_windows():
     filter_epochs = pd.DataFrame({"start": [float(time[100]), float(time[250])], "stop": [float(time[119]), float(time[269])]})
     is_training = np.ones(len(time), dtype=bool)
     with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
-        result = decoder.decode_specific_epochs(pd.DataFrame({"ignored": []}), filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
+        result = decoder.decode_specific_epochs(None, filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
     assert isinstance(result, DecodedFilterEpochsResult)
     assert result.num_filter_epochs == len(filter_epochs)
     assert np.all(result.nbins > 0)
@@ -257,14 +293,16 @@ def test_clusterless_decode_specific_epochs_uses_multiunits_for_epoch_windows():
     assert all(len(positions) == n_bins for positions, n_bins in zip(result.most_likely_positions_list, result.nbins))
 
 
-def test_clusterless_decode_specific_epochs_ignores_spikes_df():
+def test_clusterless_decode_specific_epochs_requires_none_spikes_df():
     time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
     mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
     decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
     filter_epochs = pd.DataFrame({"start": [float(time[100])], "stop": [float(time[119])]})
     is_training = np.ones(len(time), dtype=bool)
+    with pytest.raises(AssertionError, match="spikes_df MUST be None"):
+        decoder.decode_specific_epochs(pd.DataFrame(), filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
     with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
-        result = decoder.decode_specific_epochs(pd.DataFrame(), filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
+        result = decoder.decode_specific_epochs(None, filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
     assert result.num_filter_epochs == 1
     assert result.nbins[0] > 0
     assert len(result.most_likely_positions_list[0]) == result.nbins[0]
@@ -277,7 +315,38 @@ def test_clusterless_decode_specific_epochs_single_time_bin_per_epoch():
     filter_epochs = pd.DataFrame({"start": [float(time[100]), float(time[250])], "stop": [float(time[119]), float(time[269])]})
     is_training = np.ones(len(time), dtype=bool)
     with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
-        result = decoder.decode_specific_epochs(pd.DataFrame(), filter_epochs, decoding_time_bin_size=0.001, use_single_time_bin_per_epoch=True, debug_print=False)
+        result = decoder.decode_specific_epochs(None, filter_epochs, decoding_time_bin_size=0.001, use_single_time_bin_per_epoch=True, debug_print=False)
     assert np.all(result.nbins == 1)
     assert all(len(container.centers) == 1 for container in result.time_bin_containers)
     assert all(len(positions) == 1 for positions in result.most_likely_positions_list)
+
+
+def test_decode_using_new_decoders_passes_none_spikes_df_for_clusterless():
+    class _SpyClusterlessDecoder(ClusterlessRTCPositionDecoder):
+        def __init__(self):
+            pass
+
+
+        def decode_specific_epochs(self, spikes_df, filter_epochs, decoding_time_bin_size: float = 0.05, use_single_time_bin_per_epoch: bool = False, slideby=None, debug_print=False):
+            self.received_spikes_df = spikes_df
+            self.received_filter_epochs = filter_epochs
+            return "clusterless-result"
+
+    source_path = Path(__file__).resolve().parents[1] / "src" / "pyphoplacecellanalysis" / "General" / "Pipeline" / "Stages" / "ComputationFunctions" / "MultiContextComputationFunctions" / "DirectionalPlacefieldGlobalComputationFunctions.py"
+    source_tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    class_node = next(node for node in source_tree.body if isinstance(node, ast.ClassDef) and node.name == "TrainTestLapsSplitting")
+    method_node = next(node for node in class_node.body if isinstance(node, ast.FunctionDef) and node.name == "decode_using_new_decoders")
+    class_node = ast.ClassDef(name="TrainTestLapsSplitting", bases=[], keywords=[], body=[method_node], decorator_list=[])
+    ast.fix_missing_locations(class_node)
+    namespace = {"deepcopy": deepcopy, "Dict": dict, "DecodedFilterEpochsResult": object}
+    exec(compile(ast.Module(body=[class_node], type_ignores=[]), filename=str(source_path), mode="exec"), namespace)
+    TrainTestLapsSplitting = namespace["TrainTestLapsSplitting"]
+
+    decoder = _SpyClusterlessDecoder()
+    global_spikes_df = pd.DataFrame({"spike": [1]})
+    test_epochs = pd.DataFrame({"start": [0.0], "stop": [1.0]})
+
+    result = TrainTestLapsSplitting.decode_using_new_decoders(global_spikes_df=global_spikes_df, train_lap_specific_pf1D_Decoder_dict={"maze1": decoder}, test_epochs_dict={"maze1": test_epochs}, laps_decoding_time_bin_size=0.25)
+
+    assert result == {"maze1": "clusterless-result"}
+    assert decoder.received_spikes_df is None

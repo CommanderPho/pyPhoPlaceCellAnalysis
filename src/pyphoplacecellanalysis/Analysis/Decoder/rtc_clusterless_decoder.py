@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
@@ -145,6 +146,23 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
     def get_by_id(self, ids, defer_compute_all:bool=False):
         raise NotImplementedError("ClusterlessRTCPositionDecoder does not support neuron-based slicing (get_by_id) because it relies on multiunits.")
+
+
+    @classmethod
+    def is_clusterless_decoder(cls, decoder) -> bool:
+        return isinstance(decoder, cls)
+
+
+    def replacing_computation_epochs(self, epochs):
+        """Return a train-epoch copy without dropping clusterless multiunit state."""
+        from neuropy.core.epoch import Epoch, ensure_dataframe
+
+        new_epochs_obj = Epoch(ensure_dataframe(deepcopy(epochs)).epochs.get_valid_df()).get_non_overlapping()
+        updated_decoder = deepcopy(self)
+        updated_decoder.pf = self.pf.replacing_computation_epochs(deepcopy(new_epochs_obj))
+        for attr_name in ('classifier', 'rtc_results', 'p_x_given_n', 'flat_p_x_given_n', 'most_likely_positions', 'revised_most_likely_positions', 'most_likely_position_flat_indicies', 'time_binning_container', 'is_training_mask', 'rtc_position_bin_centers', 'estimated_log_likelihood_memory_bytes'):
+            setattr(updated_decoder, attr_name, None)
+        return updated_decoder
 
 
     def decode(self,
