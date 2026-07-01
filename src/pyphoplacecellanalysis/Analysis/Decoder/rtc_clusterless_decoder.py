@@ -92,7 +92,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return estimated_bytes
 
 
-    def compute_all(self, is_compute_acausal=True, use_gpu=True, debug_print: bool = False) -> None:
+    def compute_all(self, is_compute_acausal=True, use_gpu=False, debug_print: bool = True) -> None:
         if self.multiunits is None or self.rtc_time is None:
             raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
