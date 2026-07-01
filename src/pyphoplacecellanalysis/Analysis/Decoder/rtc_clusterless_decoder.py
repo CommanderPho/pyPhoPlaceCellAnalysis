@@ -92,9 +92,33 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return estimated_bytes
 
 
-    def compute_all(self, is_compute_acausal=True, use_gpu=False, debug_print: bool = True) -> None:
+    @staticmethod
+    def _is_rtc_gpu_acceleration_available() -> bool:
+        """Return True when CuPy can run RTC-style GPU posterior kernels (device + NVRTC)."""
+        try:
+            import cupy as cp
+            from cupy_backends.cuda.libs import nvrtc
+            if int(cp.cuda.runtime.getDeviceCount()) <= 0:
+                return False
+            nvrtc.getVersion()
+            _ = float(cp.arange(4, dtype=cp.float32).sum())
+            return True
+        except Exception:
+            return False
+
+
+    def compute_all(self, is_compute_acausal=True, use_gpu: Optional[bool] = None, debug_print: bool = True) -> None:
         if self.multiunits is None or self.rtc_time is None:
             raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
+        if use_gpu is None:
+            use_gpu = self._is_rtc_gpu_acceleration_available()
+            if not use_gpu:
+                print("Warning: ClusterlessRTCPositionDecoder GPU acceleration unavailable; falling back to CPU decoding.")
+        elif use_gpu and not self._is_rtc_gpu_acceleration_available():
+            print("Warning: ClusterlessRTCPositionDecoder GPU requested but unavailable; falling back to CPU decoding.")
+            use_gpu = False
+        elif use_gpu and (debug_print or self.debug_print):
+            print("ClusterlessRTCPositionDecoder.compute_all(): using GPU acceleration (CuPy).")
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
         place_bin_size_override = params.rtc_place_bin_size_override
         if (place_bin_size_override is None) and (self.ndim > 1):
