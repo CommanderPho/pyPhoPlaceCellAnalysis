@@ -128,6 +128,26 @@ def test_extract_clusterless_spike_events_synthetic_phy(tmp_path):
     assert np.all((events.spike_times_sec >= 1.0) & (events.spike_times_sec <= 2.0))
 
 
+def test_extract_clusterless_spike_events_infers_session_times_from_params(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder, sample_rate_hz=30000.0)
+    (phy_folder / "params.py").write_text("sample_rate = 30000.0\nn_samples_dat = 90000\n", encoding="utf-8")
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, electrode_mode="channel")
+    assert events.t_start == 0.0
+    assert events.t_end == pytest.approx(3.0)
+    assert len(events.spike_times_sec) == 5
+
+
+def test_extract_clusterless_spike_events_infers_missing_t_end_from_params(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder, sample_rate_hz=30000.0)
+    (phy_folder / "params.py").write_text("sample_rate = 30000.0\nn_samples_dat = 90000\n", encoding="utf-8")
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, t_start=1.0, electrode_mode="channel")
+    assert events.t_start == 1.0
+    assert events.t_end == pytest.approx(3.0)
+    assert len(events.spike_times_sec) == 5
+
+
 def test_save_load_clusterless_spike_events_roundtrip(tmp_path):
     phy_folder = tmp_path / "phy"
     _write_synthetic_phy_folder(phy_folder)

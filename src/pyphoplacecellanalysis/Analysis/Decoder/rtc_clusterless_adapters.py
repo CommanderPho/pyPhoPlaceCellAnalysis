@@ -184,15 +184,19 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'GOOD', 'load', 'phy', 'clusterless'], input_requires=[], output_provides=[], uses=[], used_by=['build_multiunits_from_phy_folder'], creation_date='2026-07-01 10:12', related_items=[])
-def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path], t_start: float, t_end: float, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000, sampling_frequency_hz: float = 1000.0) -> ClusterlessSpikeEvents:
+def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path], t_start: Optional[float] = None, t_end: Optional[float] = None, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000, sampling_frequency_hz: float = 1000.0) -> ClusterlessSpikeEvents:
     """Extract sparse clusterless spike events from a Phy/Kilosort folder without allocating dense multiunits.
 
     Saves portable spike times, electrode indices, and PC marks for later epoch-local binning.
     Do not materialize full-session dense multiunits at 1 kHz on long recordings.
+
+    When ``t_start`` and/or ``t_end`` are omitted, the session span is inferred from ``params.py``
+    (``t_start``/``tmin``, ``t_end``/``tmax``/``duration``, ``n_samples_dat``, or ``dat_path`` file size)
+    and falls back to the last spike time if no recording duration is available.
     """
     _PHY_CLUSTERLESS_REQUIRED_FILES = ("params.py", "spike_times.npy", "spike_templates.npy", "pc_features.npy", "pc_feature_ind.npy")
 
-    def _subfn_read_phy_params(phy_path: Path) -> float:
+    def _subfn_read_phy_params(phy_path: Path) -> dict[str, str]:
         params: dict[str, str] = {}
         with (phy_path / "params.py").open("r", encoding="utf-8") as params_file:
             for line in params_file:
@@ -201,7 +205,71 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
                     params[line_values[0].strip()] = line_values[1].strip()
         if "sample_rate" not in params:
             raise ValueError(f"params.py in {phy_path} is missing sample_rate.")
-        return float(params["sample_rate"])
+        return params
+
+
+    def _subfn_parse_phy_param_float(params: dict[str, str], key: str) -> Optional[float]:
+        if key not in params:
+            return None
+        return float(params[key])
+
+
+    def _subfn_resolve_phy_dat_path(phy_path: Path, params: dict[str, str]) -> Optional[Path]:
+        dat_path = params.get("dat_path")
+        if dat_path is None or dat_path in {"", "no_path.bin"}:
+            return None
+        dat_file = Path(dat_path)
+        if not dat_file.is_absolute():
+            for candidate_path in (phy_path / dat_file, phy_path.parent / dat_file, phy_path.parent.parent / dat_file):
+                if candidate_path.is_file():
+                    return candidate_path.resolve()
+            return None
+        return dat_file if dat_file.is_file() else None
+
+
+    def _subfn_infer_recording_duration_from_dat(params: dict[str, str], phy_path: Path, sample_rate_hz: float) -> Optional[float]:
+        dat_file = _subfn_resolve_phy_dat_path(phy_path, params)
+        if dat_file is None:
+            return None
+        n_channels = _subfn_parse_phy_param_float(params, "n_channels_dat")
+        if n_channels is None or n_channels <= 0:
+            return None
+        dtype_str = params.get("dtype", "int16")
+        byte_offset = int(_subfn_parse_phy_param_float(params, "offset") or 0.0)
+        n_bytes = dat_file.stat().st_size - byte_offset
+        if n_bytes <= 0:
+            return None
+        n_samples = n_bytes // (int(n_channels) * np.dtype(dtype_str).itemsize)
+        return float(n_samples) / sample_rate_hz
+
+
+    def _subfn_infer_phy_session_times(phy_path: Path, params: dict[str, str], spike_times: np.ndarray, sample_rate_hz: float) -> Tuple[float, float]:
+        inferred_t_start = 0.0
+        for key in ("t_start", "tmin", "start_time"):
+            parsed_value = _subfn_parse_phy_param_float(params, key)
+            if parsed_value is not None:
+                inferred_t_start = parsed_value
+                break
+        inferred_t_end: Optional[float] = None
+        for key in ("t_end", "t_stop", "tmax", "duration"):
+            parsed_value = _subfn_parse_phy_param_float(params, key)
+            if parsed_value is not None:
+                inferred_t_end = parsed_value
+                break
+        if inferred_t_end is None:
+            n_samples_dat = _subfn_parse_phy_param_float(params, "n_samples_dat")
+            if n_samples_dat is not None:
+                inferred_t_end = n_samples_dat / sample_rate_hz
+        if inferred_t_end is None:
+            inferred_t_end = _subfn_infer_recording_duration_from_dat(params, phy_path, sample_rate_hz)
+        if inferred_t_end is None:
+            if len(spike_times) == 0:
+                raise ValueError(f"No spikes in Phy folder {phy_path}; cannot infer session t_end.")
+            inferred_t_end = float(np.max(spike_times)) / sample_rate_hz
+            warnings.warn(f"Could not infer recording duration for {phy_path} from params.py or dat file; using last spike time ({inferred_t_end:.6f} s) as t_end.", stacklevel=2)
+        if inferred_t_end <= inferred_t_start:
+            raise ValueError(f"Inferred invalid session time range t_start={inferred_t_start} t_end={inferred_t_end} for {phy_path}.")
+        return inferred_t_start, inferred_t_end
 
     def _subfn_resolve_channel_shanks(phy_path: Path) -> Optional[np.ndarray]:
         candidate_paths = [phy_path / "channel_shanks.npy", phy_path.parent / "sorter_output" / "channel_shanks.npy"]
@@ -271,13 +339,20 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
     missing_files = [a_file for a_file in _PHY_CLUSTERLESS_REQUIRED_FILES if not (phy_path / a_file).is_file()]
     if missing_files:
         raise FileNotFoundError(f"Phy folder {phy_path} is missing required files: {missing_files}")
-    sample_rate_hz = _subfn_read_phy_params(phy_path)
+    phy_params = _subfn_read_phy_params(phy_path)
+    sample_rate_hz = float(phy_params["sample_rate"])
     spike_times = np.asarray(np.load(phy_path / "spike_times.npy", mmap_mode="r")).reshape(-1)
     spike_templates = np.asarray(np.load(phy_path / "spike_templates.npy", mmap_mode="r")).reshape(-1)
     pc_features = np.load(phy_path / "pc_features.npy", mmap_mode="r")
     pc_feature_ind = np.load(phy_path / "pc_feature_ind.npy")
     channel_map = np.load(phy_path / "channel_map.npy") if (phy_path / "channel_map.npy").is_file() else None
     channel_shanks = _subfn_resolve_channel_shanks(phy_path)
+    if t_start is None or t_end is None:
+        inferred_t_start, inferred_t_end = _subfn_infer_phy_session_times(phy_path, phy_params, spike_times, sample_rate_hz)
+        if t_start is None:
+            t_start = inferred_t_start
+        if t_end is None:
+            t_end = inferred_t_end
     epoch_slice = _subfn_get_epoch_spike_slice(spike_times, sample_rate_hz, t_start, t_end)
     if epoch_slice.start >= epoch_slice.stop:
         raise ValueError(f"No spikes found in Phy folder for epoch t=[{t_start}, {t_end}] seconds.")
@@ -295,6 +370,7 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
         electrode_chunks.append(electrode_indices.astype(np.int16, copy=False))
         marks_chunks.append(np.asarray(marks, dtype=np.float32))
     return ClusterlessSpikeEvents(spike_times_sec=np.concatenate(spike_times_chunks), electrode_indices=np.concatenate(electrode_chunks), marks=np.concatenate(marks_chunks), sampling_frequency_hz=float(sampling_frequency_hz), electrode_mode=effective_electrode_mode, n_mark_dims=int(n_mark_dims), t_start=float(t_start), t_stop=float(t_end), source_phy_path=str(phy_path))
+
 
 @function_attributes(short_name=None, tags=['spikes'], input_requires=[], output_provides=[], uses=['_assign_spike_marks_to_multiunits'], used_by=[], creation_date='2026-07-01 10:11', related_items=[])
 def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: float, t_end: float, sampling_frequency_hz: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:

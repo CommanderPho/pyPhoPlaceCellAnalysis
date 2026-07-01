@@ -4592,7 +4592,7 @@ wheels = [
 
 [[package]]
 name = "neuropy"
-version = "0.2.9"
+version = "0.3.0"
 source = { editable = "../NeuroPy" }
 dependencies = [
     { name = "build", version = "1.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
