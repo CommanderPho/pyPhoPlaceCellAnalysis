@@ -190,6 +190,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf2D'])
         else:
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
+
         return computation_result
     
 

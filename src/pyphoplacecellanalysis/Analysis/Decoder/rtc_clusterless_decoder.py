@@ -37,7 +37,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
         Usage:
 
-            from pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+            from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
 
     """
 
@@ -388,3 +388,44 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)
         if debug_print or self.debug_print:
             print(f"ClusterlessRTCPositionDecoder.compute_all(): p_x_given_n.shape={self.p_x_given_n.shape}, most_likely_positions.shape={np.shape(self.most_likely_positions)}")
+
+
+    @classmethod
+    def overwrite_standard_decoders(cls, curr_active_pipeline, enable_force_overwrite: bool = False, include_includelist=None, debug_print=True):
+        """ helper for the pipeline computations.
+            if the typical pf1D/pf2D Decoders from units are missing, replace them with the clusterless ones if they exist.
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+
+            ClusterlessRTCPositionDecoder.overwrite_standard_decoders(curr_active_pipeline, enable_force_overwrite=False)
+
+
+        """
+        if include_includelist is None:
+            include_includelist = list(curr_active_pipeline.computation_results.keys())
+
+        for filter_name, comp_r in curr_active_pipeline.computation_results.items():
+            if filter_name in include_includelist:
+                # cd = curr_active_pipeline.computation_results[filter_name].computed_data
+                cd = comp_r.computed_data
+
+                if enable_force_overwrite or (cd.get('pf1D_Decoder', None) is None):
+                    a_pf1D_ClusterlessDecoder = cd.get('pf1D_ClusterlessDecoder', None)
+                    if a_pf1D_ClusterlessDecoder is not None:
+                        cd['pf1D_Decoder'] = a_pf1D_ClusterlessDecoder
+                        if debug_print:
+                            print(filter_name, a_pf1D_ClusterlessDecoder.p_x_given_n.shape if a_pf1D_ClusterlessDecoder else None)
+
+
+                if enable_force_overwrite or (cd.get('pf2D_Decoder', None) is None):
+                    a_pf2D_ClusterlessDecoder = cd.get('pf2D_ClusterlessDecoder', None)
+                    if a_pf2D_ClusterlessDecoder is not None:
+                        cd['pf2D_Decoder'] = a_pf2D_ClusterlessDecoder
+                        if debug_print:
+                            print(filter_name, a_pf2D_ClusterlessDecoder.p_x_given_n.shape if a_pf2D_ClusterlessDecoder else None)
+            ## END if filter_name in include_includelist:...
+
+        ## END for filter_name, comp_r in curr_active_...
+
