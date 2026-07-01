@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from neuropy.analyses.placefields import PfND
+from neuropy.core.clusterless_spike_events import ClusterlessSpikeEvents, CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION, default_clusterless_spike_events_path, load_clusterless_spike_events, save_clusterless_spike_events
 from pyphocorehelpers.function_helpers import function_attributes
 from replay_trajectory_classification.environments import Environment
 
@@ -26,55 +27,6 @@ class ClusterlessDecodingParameters:
     state_index_for_posterior: Optional[int] = None
     max_log_likelihood_memory_gib: Optional[float] = 8.0
     should_match_pf_grid: bool = False
-
-
-CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION: int = 1
-
-
-@dataclass
-class ClusterlessSpikeEvents:
-    """Sparse clusterless spike events for portable transfer (one row per detected spike).
-
-    Usage Building from Phy Folder and export to .npz file:
-        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
-            extract_clusterless_spike_events_from_phy_folder, save_clusterless_spike_events,
-        )
-
-        sess = curr_active_pipeline.sess
-        events = extract_clusterless_spike_events_from_phy_folder(phy_path, t_start=sess.t_start, t_end=sess.t_stop, electrode_mode="channel")
-
-        clusterless_save_path = basedir / f"{sess.name}.clusterless_spikes.npz" # '/media/halechr/BETAMAX1/Data/Bapun/RatJ/Day3TwoNovel/RatJ_Day3TwoNovel_2019-06-14_04-08-48.clusterless_spikes.npz'
-        save_clusterless_spike_events(clusterless_save_path, events) # '/media/halechr/BETAMAX1/Data/Bapun/RatJ/Day3TwoNovel/RatJ_Day3TwoNovel_2019-06-14_04-08-48.clusterless_spikes.npz'
-
-
-    Usage Loading from .npz file and building multiunits:
-
-        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
-            load_clusterless_spike_events, build_multiunits_from_spike_events,
-        )
-
-        clusterless_save_path = basedir / f"{sess.name}.clusterless_spikes.npz"
-        assert clusterless_save_path.exists(), f"clusterless_save_path does not exist: '{clusterless_save_path}'"
-
-        events = load_clusterless_spike_events(clusterless_save_path)
-
-        # multiunits, rtc_time = build_multiunits_from_spike_events(events, t_start=11510.0, t_end=14693.0)
-
-        # Or via pipeline:
-        # perform_computations(..., clusterless_spike_events=events)
-
-
-    """
-    spike_times_sec: np.ndarray
-    electrode_indices: np.ndarray
-    marks: np.ndarray
-    sampling_frequency_hz: float = 1000.0
-    electrode_mode: str = "channel"
-    n_mark_dims: int = 4
-    t_start: float = 0.0
-    t_end: float = 0.0
-    source_phy_path: Optional[str] = None
-
 
 def _pfnd_place_bin_size(pf: PfND, place_bin_size_override: Optional[float] = None) -> float:
     if place_bin_size_override is not None:
@@ -231,10 +183,6 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
-def default_clusterless_spike_events_path(session_basedir: Union[str, Path], session_name: str) -> Path:
-    return Path(session_basedir) / f"{session_name}.clusterless_spikes.npz"
-
-
 def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path], t_start: float, t_end: float, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000, sampling_frequency_hz: float = 1000.0) -> ClusterlessSpikeEvents:
     """Extract sparse clusterless spike events from a Phy/Kilosort folder without allocating dense multiunits.
 
@@ -345,25 +293,7 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
         spike_times_chunks.append(spike_times_sec)
         electrode_chunks.append(electrode_indices.astype(np.int16, copy=False))
         marks_chunks.append(np.asarray(marks, dtype=np.float32))
-    return ClusterlessSpikeEvents(spike_times_sec=np.concatenate(spike_times_chunks), electrode_indices=np.concatenate(electrode_chunks), marks=np.concatenate(marks_chunks), sampling_frequency_hz=float(sampling_frequency_hz), electrode_mode=effective_electrode_mode, n_mark_dims=int(n_mark_dims), t_start=float(t_start), t_end=float(t_end), source_phy_path=str(phy_path))
-
-
-def save_clusterless_spike_events(filepath: Union[str, Path], events: ClusterlessSpikeEvents) -> Path:
-    filepath = Path(filepath)
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(filepath, version=np.array([CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION], dtype=np.int32), spike_times_sec=np.asarray(events.spike_times_sec, dtype=np.float32), electrode_indices=np.asarray(events.electrode_indices, dtype=np.int16), marks=np.asarray(events.marks, dtype=np.float32), sampling_frequency_hz=np.array([events.sampling_frequency_hz], dtype=np.float64), electrode_mode=np.array([events.electrode_mode]), n_mark_dims=np.array([events.n_mark_dims], dtype=np.int32), t_start=np.array([events.t_start], dtype=np.float64), t_end=np.array([events.t_end], dtype=np.float64), source_phy_path=np.array([events.source_phy_path or ""], dtype=object))
-    return filepath
-
-
-def load_clusterless_spike_events(filepath: Union[str, Path]) -> ClusterlessSpikeEvents:
-    data = np.load(Path(filepath), allow_pickle=True)
-    file_version = int(data["version"].item()) if "version" in data else CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION
-    if file_version != CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION:
-        raise ValueError(f"Unsupported clusterless spike events file version {file_version}; expected {CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION}.")
-    source_phy_path = str(data["source_phy_path"].item()) if "source_phy_path" in data else None
-    if source_phy_path == "":
-        source_phy_path = None
-    return ClusterlessSpikeEvents(spike_times_sec=np.asarray(data["spike_times_sec"], dtype=np.float32), electrode_indices=np.asarray(data["electrode_indices"], dtype=np.int16), marks=np.asarray(data["marks"], dtype=np.float32), sampling_frequency_hz=float(data["sampling_frequency_hz"].item()), electrode_mode=str(data["electrode_mode"].item()), n_mark_dims=int(data["n_mark_dims"].item()), t_start=float(data["t_start"].item()), t_end=float(data["t_end"].item()), source_phy_path=source_phy_path)
+    return ClusterlessSpikeEvents(spike_times_sec=np.concatenate(spike_times_chunks), electrode_indices=np.concatenate(electrode_chunks), marks=np.concatenate(marks_chunks), sampling_frequency_hz=float(sampling_frequency_hz), electrode_mode=effective_electrode_mode, n_mark_dims=int(n_mark_dims), t_start=float(t_start), t_stop=float(t_end), source_phy_path=str(phy_path))
 
 
 def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: float, t_end: float, sampling_frequency_hz: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
