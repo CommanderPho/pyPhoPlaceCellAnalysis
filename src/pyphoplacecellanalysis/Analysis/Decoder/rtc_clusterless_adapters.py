@@ -34,7 +34,38 @@ _PHY_CLUSTERLESS_REQUIRED_FILES = ("params.py", "spike_times.npy", "spike_templa
 
 @dataclass
 class ClusterlessSpikeEvents:
-    """Sparse clusterless spike events for portable transfer (one row per detected spike)."""
+    """Sparse clusterless spike events for portable transfer (one row per detected spike).
+
+    Usage Building from Phy Folder and export to .npz file:
+        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
+            extract_clusterless_spike_events_from_phy_folder, save_clusterless_spike_events,
+        )
+
+        sess = curr_active_pipeline.sess
+        events = extract_clusterless_spike_events_from_phy_folder(phy_path, t_start=sess.t_start, t_end=sess.t_stop, electrode_mode="channel")
+
+        clusterless_save_path = basedir / f"{sess.name}.clusterless_spikes.npz" # '/media/halechr/BETAMAX1/Data/Bapun/RatJ/Day3TwoNovel/RatJ_Day3TwoNovel_2019-06-14_04-08-48.clusterless_spikes.npz'
+        save_clusterless_spike_events(clusterless_save_path, events) # '/media/halechr/BETAMAX1/Data/Bapun/RatJ/Day3TwoNovel/RatJ_Day3TwoNovel_2019-06-14_04-08-48.clusterless_spikes.npz'
+
+
+    Usage Loading from .npz file and building multiunits:
+
+        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
+            load_clusterless_spike_events, build_multiunits_from_spike_events,
+        )
+
+        clusterless_save_path = basedir / f"{sess.name}.clusterless_spikes.npz"
+        assert clusterless_save_path.exists(), f"clusterless_save_path does not exist: '{clusterless_save_path}'"
+
+        events = load_clusterless_spike_events(clusterless_save_path)
+
+        # multiunits, rtc_time = build_multiunits_from_spike_events(events, t_start=11510.0, t_end=14693.0)
+
+        # Or via pipeline:
+        # perform_computations(..., clusterless_spike_events=events)
+
+
+    """
     spike_times_sec: np.ndarray
     electrode_indices: np.ndarray
     marks: np.ndarray
