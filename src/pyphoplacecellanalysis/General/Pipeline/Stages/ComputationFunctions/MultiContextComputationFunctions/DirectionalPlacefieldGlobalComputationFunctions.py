@@ -5936,7 +5936,12 @@ class TrainTestLapsSplitting:
 
         """
         ## NOTE: they currently only decode the correct test epochs, as in the test epochs corresponding to their train epochs and not others:
-        test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
+        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+
+        test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {}
+        for k, v in train_lap_specific_pf1D_Decoder_dict.items():
+            active_spikes_df = None if ClusterlessRTCPositionDecoder.is_clusterless_decoder(v) else deepcopy(global_spikes_df)
+            test_laps_decoder_results_dict[k] = v.decode_specific_epochs(spikes_df=active_spikes_df, filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
         return test_laps_decoder_results_dict
 
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])

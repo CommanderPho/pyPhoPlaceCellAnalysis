@@ -3442,7 +3442,7 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'])
 def compute_and_export_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, save_csv: bool = True, evaluate_context_decoder: bool = True, debug_print: bool = False) -> dict:
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, save_csv: bool = True, evaluate_context_decoder: bool = True, debug_print: bool = False) -> dict:
     """Computes Bapun train/test lap decoder error and two-maze context decoder performance; exports CSVs to collected_outputs.
 
     Train/test position decoding and context decoder evaluation each run in separate try/except blocks.
@@ -3483,11 +3483,11 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
             if debug_print:
                 print(f'WARN: could not resolve maze_epoch_names: {resolve_err}')
 
-    callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size, 'context_decoder_evaluated': False, 'context_decoder_maze_epoch_names': None, 'context_decoder_overall_percent_correct': None, 'context_decoder_per_maze_percent_correct': None, 'context_decoder_combined_laps_df': None, 'context_decoder_summary_agg_df': None, 'context_decoder_laps_csv_path': None, 'context_decoder_summary_agg_csv_path': None, 'context_decoder_skip_reason': None, 'context_decoder_error': None}
+    callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size, 'use_clusterless_decoders': use_clusterless_decoders, 'context_decoder_evaluated': False, 'context_decoder_maze_epoch_names': None, 'context_decoder_overall_percent_correct': None, 'context_decoder_per_maze_percent_correct': None, 'context_decoder_combined_laps_df': None, 'context_decoder_summary_agg_df': None, 'context_decoder_laps_csv_path': None, 'context_decoder_summary_agg_csv_path': None, 'context_decoder_skip_reason': None, 'context_decoder_error': None}
     err = None
 
     try:
-        test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
+        test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
 
         callback_outputs['test_err_agg_df'] = test_err_agg_df
         callback_outputs['test_decode_results_keys'] = list(test_decode_results.keys())
@@ -3515,7 +3515,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
                 callback_outputs['context_decoder_skip_reason'] = f'need at least 2 maze_epoch_names with pf2D_Decoder, got {resolved_maze_epoch_names}'
                 print(f'WARN: context decoder evaluation skipped for {curr_session_context}: {callback_outputs["context_decoder_skip_reason"]}')
             else:
-                context_result = evaluate_bapun_context_decoder_performance(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=resolved_maze_epoch_names, laps_decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=debug_print)
+                context_result = evaluate_bapun_context_decoder_performance(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=resolved_maze_epoch_names, laps_decoding_time_bin_size=laps_decoding_time_bin_size, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
                 context_decoder_per_maze_percent_correct: Dict[str, float] = {maze_name: correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly for maze_name, correctness in context_result.per_maze_context_correctness.items()}
                 context_decoder_summary_rows: List[dict] = []
                 for maze_name, correctness in context_result.per_maze_context_correctness.items():
@@ -3562,7 +3562,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
-        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
@@ -3579,7 +3579,7 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
     print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
 
-    callback_outputs = {'figure_output_paths': []}
+    callback_outputs = {'figure_output_paths': [], 'use_clusterless_decoders': use_clusterless_decoders}
     prior_compute_outputs = across_session_results_extended_dict.get('compute_and_export_bapun_train_test_decoder_error_distance_completion_function', {})
     test_err_df_csv_path = prior_compute_outputs.get('test_err_df_csv_path', None)
     if test_err_df_csv_path is None:
@@ -3590,7 +3590,7 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
         print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
     elif force_recompute:
         print(f'\tCSV not found; force_recompute=True, recomputing test_err_df...')
-        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, debug_print=debug_print)
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
     else:
         print(f'WARN: test_err_df CSV not found at "{test_err_df_csv_path}" and force_recompute=False; skipping figure export.')
         across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
