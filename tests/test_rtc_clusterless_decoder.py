@@ -101,6 +101,27 @@ def test_drop_empty_multiunit_electrodes_respects_training_mask():
     np.testing.assert_allclose(filtered_multiunits[10:20, :, 0], multiunits[10:20, :, 0])
 
 
+def test_build_is_training_mask_matches_pfnd_filtered_by_speed_intervals():
+    from neuropy.analyses.placefields import PlacefieldComputationParameters
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_speed_filtered_training_intervals, build_is_training_mask_from_pfnd
+
+    class _SpeedPf(_MockPfND):
+        def __init__(self):
+            super().__init__(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 4.0), pos_bin_size=1.0)
+            self.config = PlacefieldComputationParameters(speed_thresh=10.0, grid_bin=1.0, smooth=(0.0, 0.0), frate_thresh=1.0)
+            self.should_smooth_speed = False
+            self.epochs = None
+            self.position = type("Pos", (), {"t_start": 0.0, "t_stop": 4.0, "to_dataframe": lambda self: pd.DataFrame({'t': np.arange(5, dtype=float), 'x': np.arange(5, dtype=float), 'speed': np.array([0.0, 5.0, 15.0, 5.0, 20.0], dtype=float)})})()
+
+    pf = _SpeedPf()
+    position_df = pf.position.to_dataframe()
+    included_intervals = _pfnd_speed_filtered_training_intervals(pf, position_df=position_df)
+    np.testing.assert_allclose(included_intervals, np.array([[0.0, 3.0]]))
+    rtc_time = np.array([0.5, 1.5, 2.5, 3.5], dtype=float)
+    is_training = build_is_training_mask_from_pfnd(pf, rtc_time)
+    np.testing.assert_array_equal(is_training, np.array([True, True, True, False]))
+
+
 def _write_synthetic_phy_folder(phy_folder: Path, sample_rate_hz: float = 30000.0) -> None:
     phy_folder.mkdir(parents=True, exist_ok=True)
     (phy_folder / "params.py").write_text(f"sample_rate = {sample_rate_hz}\n", encoding="utf-8")
