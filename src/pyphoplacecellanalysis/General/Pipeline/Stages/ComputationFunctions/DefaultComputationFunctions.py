@@ -1,5 +1,6 @@
 from copy import deepcopy
 import sys
+from pathlib import Path
 from typing import List, Optional
 from nptyping import NDArray
 import numpy as np
@@ -15,7 +16,7 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step, ClusterlessRTCPositionDecoder
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -84,7 +85,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     @function_attributes(short_name='position_decoding_clusterless', tags=['decoding', 'position', 'clusterless'],
                           input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
-    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
+    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_spike_events=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
         from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
 
@@ -141,6 +142,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             t_end = float(source_times.max())
             if multiunits is not None:
                 pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+            elif clusterless_spike_events is not None:
+                active_events = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
+                pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=t_start, t_end=t_end, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz)
             else:
                 pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
                                                                             t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())

@@ -10,7 +10,7 @@ import xarray as xr
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_multiunits_from_spike_events, build_rtc_environment_from_pfnd, extract_clusterless_spike_events_from_phy_folder, load_clusterless_spike_events, rtc_posterior_to_p_x_given_n, save_clusterless_spike_events
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder, DecodedFilterEpochsResult
 
 
@@ -114,6 +114,46 @@ def test_build_multiunits_from_phy_folder_synthetic_roundtrip(tmp_path):
     assert filtered_multiunits.shape[0] == len(filtered_rtc_time)
     assert filtered_multiunits.shape[1] == 4
     assert filtered_multiunits.shape[2] >= 1
+
+
+def test_extract_clusterless_spike_events_synthetic_phy(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder)
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, electrode_mode="channel")
+    assert events.spike_times_sec.dtype == np.float32
+    assert events.electrode_indices.dtype == np.int16
+    assert events.marks.dtype == np.float32
+    assert events.marks.shape[1] == 4
+    assert len(events.spike_times_sec) == 5
+    assert np.all((events.spike_times_sec >= 1.0) & (events.spike_times_sec <= 2.0))
+
+
+def test_save_load_clusterless_spike_events_roundtrip(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder)
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, electrode_mode="channel")
+    events_path = tmp_path / "test.clusterless_spikes.npz"
+    save_clusterless_spike_events(events_path, events)
+    loaded_events = load_clusterless_spike_events(events_path)
+    np.testing.assert_allclose(loaded_events.spike_times_sec, events.spike_times_sec)
+    np.testing.assert_array_equal(loaded_events.electrode_indices, events.electrode_indices)
+    np.testing.assert_allclose(loaded_events.marks, events.marks)
+    assert loaded_events.electrode_mode == events.electrode_mode
+    assert loaded_events.n_mark_dims == events.n_mark_dims
+
+
+def test_build_multiunits_from_spike_events_matches_phy_folder(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder)
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, electrode_mode="channel", sampling_frequency_hz=1000.0)
+    from_events, rtc_time_from_events = build_multiunits_from_spike_events(events, t_start=1.0, t_end=2.0, sampling_frequency_hz=1000.0)
+    from_phy, rtc_time_from_phy = build_multiunits_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, sampling_frequency_hz=1000.0, electrode_mode="channel")
+    np.testing.assert_allclose(rtc_time_from_events, rtc_time_from_phy)
+    assert from_events.shape == from_phy.shape
+    finite_from_events = np.isfinite(from_events)
+    finite_from_phy = np.isfinite(from_phy)
+    np.testing.assert_array_equal(finite_from_events, finite_from_phy)
+    np.testing.assert_allclose(from_events[finite_from_events], from_phy[finite_from_phy])
 
 
 def test_rtc_clusterless_classifier_simulation_roundtrip():
