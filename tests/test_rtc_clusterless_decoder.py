@@ -11,7 +11,7 @@ from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder, DecodedFilterEpochsResult
 
 
 class _MockPfConfig:
@@ -136,8 +136,43 @@ def test_clusterless_decode_rejects_spike_counts():
         decoder.decode(spike_counts, time_bin_size=0.05, debug_print=False)
 
 
-def test_clusterless_decode_specific_epochs_not_implemented():
+def test_clusterless_decode_specific_epochs_uses_multiunits_for_epoch_windows():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
     mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
-    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, setup_on_init=False, post_load_on_init=False, debug_print=False)
-    with pytest.raises(NotImplementedError, match="multiunits"):
-        decoder.decode_specific_epochs(pd.DataFrame(), pd.DataFrame(), decoding_time_bin_size=0.05)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    filter_epochs = pd.DataFrame({"start": [float(time[100]), float(time[250])], "stop": [float(time[119]), float(time[269])]})
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        result = decoder.decode_specific_epochs(pd.DataFrame({"ignored": []}), filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
+    assert isinstance(result, DecodedFilterEpochsResult)
+    assert result.num_filter_epochs == len(filter_epochs)
+    assert np.all(result.nbins > 0)
+    assert all(len(container.centers) == n_bins for container, n_bins in zip(result.time_bin_containers, result.nbins))
+    assert all(posterior.shape[-1] == n_bins for posterior, n_bins in zip(result.p_x_given_n_list, result.nbins))
+    assert all(len(positions) == n_bins for positions, n_bins in zip(result.most_likely_positions_list, result.nbins))
+
+
+def test_clusterless_decode_specific_epochs_ignores_spikes_df():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    filter_epochs = pd.DataFrame({"start": [float(time[100])], "stop": [float(time[119])]})
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        result = decoder.decode_specific_epochs(pd.DataFrame(), filter_epochs, decoding_time_bin_size=0.001, debug_print=False)
+    assert result.num_filter_epochs == 1
+    assert result.nbins[0] > 0
+    assert len(result.most_likely_positions_list[0]) == result.nbins[0]
+
+
+def test_clusterless_decode_specific_epochs_single_time_bin_per_epoch():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    filter_epochs = pd.DataFrame({"start": [float(time[100]), float(time[250])], "stop": [float(time[119]), float(time[269])]})
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        result = decoder.decode_specific_epochs(pd.DataFrame(), filter_epochs, decoding_time_bin_size=0.001, use_single_time_bin_per_epoch=True, debug_print=False)
+    assert np.all(result.nbins == 1)
+    assert all(len(container.centers) == 1 for container in result.time_bin_containers)
+    assert all(len(positions) == 1 for positions in result.most_likely_positions_list)

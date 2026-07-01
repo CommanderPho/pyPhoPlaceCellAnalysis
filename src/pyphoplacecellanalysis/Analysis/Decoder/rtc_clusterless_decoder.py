@@ -11,7 +11,7 @@ import pandas as pd
 import xarray as xr
 from nptyping import NDArray
 from neuropy.utils.dynamic_container import DynamicContainer
-from neuropy.utils.mixins.binning_helpers import BinningContainer, compute_spanning_bins
+from neuropy.utils.mixins.binning_helpers import BinningInfo, BinningContainer, compute_spanning_bins
 from replay_trajectory_classification import ClusterlessClassifier
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
@@ -34,6 +34,11 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         position : array_like, shape (n_time, n_position_dims)
         multiunits : array_like, shape (n_time, n_marks, n_electrodes)
         is_training : None or array_like, shape (n_time,)
+
+        Usage:
+
+            from pyPhoPlaceCellAnalysis.src.pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+
     """
 
     sampling_frequency_hz: float = 1000.0
@@ -183,7 +188,108 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
 
     def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size: float = 0.05, use_single_time_bin_per_epoch: bool = False, slideby: Optional[float] = None, debug_print=False) -> "DecodedFilterEpochsResult":
-        raise NotImplementedError("ClusterlessRTCPositionDecoder does not support decode_specific_epochs because it requires multiunits (n_time, n_marks, n_electrodes), not per-neuron binned spike counts. Use compute_all() for full-session decoding or decode(multiunits, time_bin_size, rtc_time=...) for custom windows.")
+        """Decode clusterless multiunits for each provided epoch.
+
+        ``spikes_df`` is intentionally ignored: clusterless RTC decoding uses ``self.multiunits`` and ``self.rtc_time``.
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+        assert (spikes_df is None), f"spikes_df MUST be None, it will not be used for Clusterless-decoding."
+
+        if self.multiunits is None or self.rtc_time is None:
+            raise ValueError("ClusterlessRTCPositionDecoder.decode_specific_epochs() requires self.multiunits and self.rtc_time.")
+
+        active_multiunits = np.asarray(self.multiunits, dtype=float)
+        active_rtc_time = np.asarray(self.rtc_time, dtype=float)
+        if active_multiunits.ndim != 3:
+            raise ValueError("ClusterlessRTCPositionDecoder.decode_specific_epochs() requires self.multiunits with shape (n_time, n_marks, n_electrodes).")
+        if len(active_rtc_time) != active_multiunits.shape[0]:
+            raise ValueError(f"rtc_time length {len(active_rtc_time)} != multiunits n_time {active_multiunits.shape[0]}")
+
+        filter_epochs_df = filter_epochs.copy() if isinstance(filter_epochs, pd.DataFrame) else filter_epochs.to_dataframe()
+        if not {'start', 'stop'}.issubset(filter_epochs_df.columns):
+            raise ValueError("filter_epochs must provide 'start' and 'stop' columns.")
+
+        half_bin = self.time_bin_size / 2.0
+        num_filter_epochs = len(filter_epochs_df)
+        most_likely_positions_list = []
+        p_x_given_n_list = []
+        marginal_x_list = []
+        marginal_y_list = []
+        marginal_z_list = []
+        most_likely_position_indicies_list = []
+        decoded_multiunits_list = []
+        nbins = np.zeros(num_filter_epochs, dtype=int)
+        time_bin_containers = []
+        time_bin_edges = []
+        ndim = getattr(self, 'ndim', getattr(self.pf, 'ndim', 1))
+
+        for epoch_idx, epoch_row in enumerate(filter_epochs_df.itertuples(index=False)):
+            epoch_start = float(getattr(epoch_row, 'start'))
+            epoch_stop = float(getattr(epoch_row, 'stop'))
+            if epoch_stop < epoch_start:
+                raise ValueError(f"filter_epochs row {epoch_idx} has stop < start: start={epoch_start}, stop={epoch_stop}")
+
+            if use_single_time_bin_per_epoch:
+                epoch_midpoint = epoch_start + ((epoch_stop - epoch_start) / 2.0)
+                epoch_indices = np.asarray([int(np.argmin(np.abs(active_rtc_time - epoch_midpoint)))], dtype=int) if len(active_rtc_time) > 0 else np.asarray([], dtype=int)
+            else:
+                epoch_indices = np.flatnonzero((active_rtc_time >= epoch_start) & (active_rtc_time <= epoch_stop))
+                if len(epoch_indices) == 0 and len(active_rtc_time) > 0:
+                    epoch_midpoint = epoch_start + ((epoch_stop - epoch_start) / 2.0)
+                    nearest_idx = int(np.argmin(np.abs(active_rtc_time - epoch_midpoint)))
+                    nearest_time = active_rtc_time[nearest_idx]
+                    if (epoch_start - half_bin) <= nearest_time <= (epoch_stop + half_bin):
+                        epoch_indices = np.asarray([nearest_idx], dtype=int)
+
+            selected_rtc_time = active_rtc_time[epoch_indices]
+            selected_multiunits = active_multiunits[epoch_indices, :, :]
+            curr_epoch_num_time_bins = len(selected_rtc_time)
+            nbins[epoch_idx] = curr_epoch_num_time_bins
+            decoded_multiunits_list.append(selected_multiunits)
+
+            if curr_epoch_num_time_bins > 0:
+                curr_time_bin_edges = np.concatenate([[selected_rtc_time[0] - half_bin], selected_rtc_time + half_bin])
+                curr_edge_info = BinningInfo(**dict(variable_extents=(curr_time_bin_edges[0], curr_time_bin_edges[-1]), step=self.time_bin_size, num_bins=len(curr_time_bin_edges)))
+                curr_center_info = BinningInfo(**dict(variable_extents=(curr_time_bin_edges[0], curr_time_bin_edges[-1]), step=self.time_bin_size, num_bins=curr_epoch_num_time_bins))
+                curr_time_bin_container = BinningContainer(edges=curr_time_bin_edges, centers=selected_rtc_time, edge_info=curr_edge_info, center_info=curr_center_info)
+                ## main call: calls self.decode(...) 
+                most_likely_positions, p_x_given_n, most_likely_position_indicies, _flat_outputs_container = self.decode(selected_multiunits, time_bin_size=self.time_bin_size, rtc_time=selected_rtc_time, output_flat_versions=False,
+                                                                                                                            debug_print=debug_print)
+            else:
+                ## empty epoch (not t bins)
+                curr_time_bin_edges = np.asarray([], dtype=float)
+                empty_info = BinningInfo(**dict(variable_extents=(epoch_start, epoch_stop), step=self.time_bin_size, num_bins=0))
+                curr_time_bin_container = BinningContainer(edges=curr_time_bin_edges, centers=np.asarray([], dtype=float), edge_info=empty_info, center_info=empty_info)
+                pf_occupancy = getattr(self.pf, 'occupancy', None)
+                empty_position_shape = tuple(np.shape(pf_occupancy)) if pf_occupancy is not None else (0,)
+                p_x_given_n = np.empty((*empty_position_shape, 0), dtype=float)
+                most_likely_positions = np.empty((0, ndim), dtype=float) if ndim > 1 else np.asarray([], dtype=float)
+                most_likely_position_indicies = np.empty((ndim, 0), dtype=int) if ndim > 1 else np.asarray([], dtype=int)
+
+            most_likely_positions = np.atleast_1d(most_likely_positions)
+            p_x_given_n = np.atleast_1d(p_x_given_n)
+            curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+            most_likely_positions_list.append(most_likely_positions)
+            p_x_given_n_list.append(p_x_given_n)
+            most_likely_position_indicies_list.append(np.atleast_1d(most_likely_position_indicies))
+            marginal_x_list.append(curr_unit_marginal_x)
+            marginal_y_list.append(curr_unit_marginal_y)
+            marginal_z_list.append(None)
+            time_bin_containers.append(curr_time_bin_container)
+            time_bin_edges.append(curr_time_bin_edges)
+        ## END for epoch_idx, epoch_row in enumerate(filter_epochs_df.itertuples(index=False))..
+
+
+        if debug_print:
+            print(f"ClusterlessRTCPositionDecoder.decode_specific_epochs(): decoded {num_filter_epochs} epochs, nbins={nbins}")
+
+        result_kwargs = dict(decoding_time_bin_size=decoding_time_bin_size, slideby=slideby, filter_epochs=filter_epochs_df, num_filter_epochs=num_filter_epochs,
+                             most_likely_positions_list=most_likely_positions_list, p_x_given_n_list=p_x_given_n_list,
+                             marginal_x_list=marginal_x_list, marginal_y_list=marginal_y_list, marginal_z_list=marginal_z_list,
+                             most_likely_position_indicies_list=most_likely_position_indicies_list, spkcount=decoded_multiunits_list, nbins=nbins,
+                             time_bin_containers=time_bin_containers, time_bin_edges=time_bin_edges, pos_bin_edges=getattr(self, 'xbin', None))
+        return DecodedFilterEpochsResult(**result_kwargs)
 
 
     @staticmethod
