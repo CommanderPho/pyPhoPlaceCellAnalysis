@@ -21,7 +21,7 @@ except ModuleNotFoundError as e:
 finally:
     from neuropy.analyses.placefields import PfND
     from neuropy.analyses.decoders import epochs_spkcount
-    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult
 
 
 DecodingContinuousCacheKey = Tuple[float, float]
@@ -148,6 +148,29 @@ class TestDecodingContinuousCacheKey(unittest.TestCase):
         self.assertEqual(normalize_continuous_decoding_cache_lookup_key((0.1, 0.02)), (0.1, 0.02))
 
 
+class TestDecodeSpecificEpochsSlideby(unittest.TestCase):
+
+
+    def test_decode_specific_epochs_accepts_and_forwards_slideby(self):
+        class SlidebyForwardingDecoder:
+
+
+            def pre_build_epochs_decoding_result(self, **kwargs):
+                self.pre_build_kwargs = kwargs
+                return kwargs
+
+
+            def perform_pre_built_specific_epochs_decoding(self, **kwargs):
+                self.perform_kwargs = kwargs
+                return kwargs['filter_epochs_decoder_result']
+
+        decoder = SlidebyForwardingDecoder()
+        result = BayesianPlacemapPositionDecoder.decode_specific_epochs(decoder, spikes_df=pd.DataFrame(), filter_epochs=pd.DataFrame(), decoding_time_bin_size=0.1, slideby=0.05, debug_print=False)
+
+        self.assertEqual(result['slideby'], 0.05)
+        self.assertEqual(decoder.pre_build_kwargs['slideby'], 0.05)
+
+
 class TestEpochsSpkcountMethods(unittest.TestCase):
 
     def setUp(self):
@@ -206,6 +229,15 @@ class TestEpochsSpkcountMethods(unittest.TestCase):
             slideby=0.05
         )
         self.assertTrue(all(n > 0 for n in nbins))
+
+
+    def test_decode_specific_epochs_shell_stores_slideby(self):
+        test_spikes_df = self.test_spikes_df.assign(t=self.test_spikes_df['t_rel_seconds'])
+        result_shell = BayesianPlacemapPositionDecoder._build_decode_specific_epochs_result_shell(neuron_IDs=np.array([1, 2, 3]), spikes_df=test_spikes_df, filter_epochs=self.test_epochs_df, decoding_time_bin_size=0.1, slideby=0.05, debug_print=False)
+        decoded_result = DecodedFilterEpochsResult(**result_shell.to_dict())
+
+        self.assertEqual(decoded_result.slideby, 0.05)
+
 
     def test_empty_epochs(self):
         empty_epochs_df = pd.DataFrame({
