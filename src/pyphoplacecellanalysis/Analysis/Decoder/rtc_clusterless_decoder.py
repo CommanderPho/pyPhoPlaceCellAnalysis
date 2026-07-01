@@ -113,8 +113,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute P_x independently. It directly computes p_x_given_n.")
 
 
-    @staticmethod
-    def estimate_log_likelihood_memory_bytes(n_time: int, n_position_bins: int, dtype=np.float32) -> int:
+    @classmethod
+    def estimate_log_likelihood_memory_bytes(cls, n_time: int, n_position_bins: int, dtype=np.float32) -> int:
         return int(n_time) * int(n_position_bins) * int(np.dtype(dtype).itemsize)
 
 
@@ -129,8 +129,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return estimated_bytes
 
 
-    @staticmethod
-    def _is_rtc_gpu_acceleration_available() -> bool:
+    @classmethod
+    def _is_rtc_gpu_acceleration_available(cls) -> bool:
         """Return True when CuPy can run RTC-style GPU posterior kernels (device + NVRTC)."""
         try:
             import cupy as cp
