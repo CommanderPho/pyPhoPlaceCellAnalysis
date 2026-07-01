@@ -1,7 +1,9 @@
 """Adapters between NeuroPy PfND / session data and replay_trajectory_classification clusterless decoders."""
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional, Tuple, Union
 
 import numpy as np
@@ -173,6 +175,140 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
     if len(mark_features) == 0:
         raise ValueError("No spikes could be mapped to waveform marks for clusterless decoding.")
     _assign_spike_marks_to_multiunits(multiunits, time_bin_indices[:len(mark_features)], np.asarray(electrode_indices, dtype=int), np.asarray(mark_features, dtype=float))
+    return _drop_empty_multiunit_electrodes(multiunits), rtc_time
+
+
+_PHY_CLUSTERLESS_REQUIRED_FILES = ("params.py", "spike_times.npy", "spike_templates.npy", "pc_features.npy", "pc_feature_ind.npy")
+
+
+def _subfn_read_phy_params(phy_path: Path) -> float:
+    params: dict[str, str] = {}
+    with (phy_path / "params.py").open("r", encoding="utf-8") as params_file:
+        for line in params_file:
+            line_values = line.replace("\n", "").replace('r"', '"').replace('"', "").split("=")
+            if len(line_values) >= 2:
+                params[line_values[0].strip()] = line_values[1].strip()
+    if "sample_rate" not in params:
+        raise ValueError(f"params.py in {phy_path} is missing sample_rate.")
+    return float(params["sample_rate"])
+
+
+def _subfn_resolve_channel_shanks(phy_path: Path) -> Optional[np.ndarray]:
+    candidate_paths = [phy_path / "channel_shanks.npy", phy_path.parent / "sorter_output" / "channel_shanks.npy"]
+    for candidate_path in candidate_paths:
+        if candidate_path.is_file():
+            return np.load(candidate_path)
+    return None
+
+
+def _subfn_get_epoch_spike_slice(spike_times: np.ndarray, sample_rate_hz: float, t_start: float, t_end: float) -> slice:
+    sample_start = int(np.floor(float(t_start) * sample_rate_hz))
+    sample_end = int(np.ceil(float(t_end) * sample_rate_hz))
+    spike_start = int(np.searchsorted(spike_times, sample_start, side="left"))
+    spike_end = int(np.searchsorted(spike_times, sample_end, side="right"))
+    return slice(spike_start, spike_end)
+
+
+def _subfn_build_channel_inverse_map(channel_map: np.ndarray) -> np.ndarray:
+    channel_map = np.asarray(channel_map, dtype=int)
+    inverse_map = np.full(int(channel_map.max()) + 1, -1, dtype=int)
+    for recording_idx, probe_channel in enumerate(channel_map):
+        inverse_map[int(probe_channel)] = int(recording_idx)
+    return inverse_map
+
+
+def _subfn_extract_peak_channel_marks(pc_features: np.ndarray, pc_feature_ind: np.ndarray, spike_templates: np.ndarray, spike_indices: np.ndarray, n_mark_dims: int = 4) -> Tuple[np.ndarray, np.ndarray]:
+    n_spikes = len(spike_indices)
+    n_slots = int(pc_features.shape[2])
+    channels = np.empty(n_spikes, dtype=int)
+    marks = np.empty((n_spikes, n_mark_dims), dtype=float)
+    for spike_offset, spike_index in enumerate(spike_indices):
+        template_index = int(spike_templates[spike_index])
+        template_channels = pc_feature_ind[template_index]
+        spike_pcs = pc_features[spike_index]
+        slot_norms = np.array([np.linalg.norm(spike_pcs[:, slot_idx]) if template_channels[slot_idx] >= 0 else -1.0 for slot_idx in range(n_slots)], dtype=float)
+        peak_slot = int(np.argmax(slot_norms))
+        channels[spike_offset] = int(template_channels[peak_slot])
+        marks[spike_offset, :] = spike_pcs[:n_mark_dims, peak_slot]
+    return channels, marks
+
+
+def _subfn_map_channels_to_electrodes(channels: np.ndarray, electrode_mode: str, channel_map: Optional[np.ndarray], channel_shanks: Optional[np.ndarray]) -> np.ndarray:
+    channels = np.asarray(channels, dtype=int)
+    if electrode_mode == "shank":
+        if channel_shanks is None:
+            raise ValueError("channel_shanks is required for electrode_mode='shank'.")
+        inverse_map = _subfn_build_channel_inverse_map(channel_map) if channel_map is not None else None
+        electrode_indices = np.empty(len(channels), dtype=int)
+        for spike_idx, probe_channel in enumerate(channels):
+            recording_idx = int(inverse_map[probe_channel]) if inverse_map is not None and probe_channel < len(inverse_map) and inverse_map[probe_channel] >= 0 else int(probe_channel)
+            electrode_indices[spike_idx] = int(channel_shanks[recording_idx])
+        return electrode_indices
+    if electrode_mode != "channel":
+        raise ValueError(f"electrode_mode must be 'shank' or 'channel'; got {electrode_mode!r}")
+    if channel_map is not None:
+        inverse_map = _subfn_build_channel_inverse_map(channel_map)
+        return np.array([int(inverse_map[probe_channel]) if probe_channel < len(inverse_map) and inverse_map[probe_channel] >= 0 else int(probe_channel) for probe_channel in channels], dtype=int)
+    return channels.astype(int, copy=False)
+
+
+def _subfn_bin_spikes_to_multiunits(multiunits: np.ndarray, spike_times_sec: np.ndarray, marks: np.ndarray, electrode_indices: np.ndarray, rtc_time: np.ndarray) -> None:
+    time_bin_indices = np.clip(np.searchsorted(rtc_time, spike_times_sec), 0, len(rtc_time) - 1)
+    _assign_spike_marks_to_multiunits(multiunits, time_bin_indices, electrode_indices, marks)
+
+
+def build_multiunits_from_phy_folder(phy_path: Union[str, Path], t_start: float, t_end: float, sampling_frequency_hz: float, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000) -> Tuple[np.ndarray, np.ndarray]:
+    """Build RTC clusterless multiunits from a Phy/Kilosort export folder.
+
+    Reads per-spike PC marks from pc_features.npy (all detected spikes; ignores spike_clusters).
+    Epoch filtering is applied before binning to limit memory use. Full-session clusterless
+    decoding at 1 kHz can still require large RAM for long epochs.
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import build_multiunits_from_phy_folder
+
+        multiunits, rtc_time = build_multiunits_from_phy_folder(
+            phy_path, t_start=11510.0, t_end=14693.0, sampling_frequency_hz=1000.0, electrode_mode="channel"
+        )
+        # Pass to pipeline: perform_specific_computation(..., multiunits=multiunits, rtc_time=rtc_time)
+
+    """
+    phy_path = Path(phy_path)
+    missing_files = [a_file for a_file in _PHY_CLUSTERLESS_REQUIRED_FILES if not (phy_path / a_file).is_file()]
+    if missing_files:
+        raise FileNotFoundError(f"Phy folder {phy_path} is missing required files: {missing_files}")
+    sample_rate_hz = _subfn_read_phy_params(phy_path)
+    spike_times = np.asarray(np.load(phy_path / "spike_times.npy", mmap_mode="r")).reshape(-1)
+    spike_templates = np.asarray(np.load(phy_path / "spike_templates.npy", mmap_mode="r")).reshape(-1)
+    pc_features = np.load(phy_path / "pc_features.npy", mmap_mode="r")
+    pc_feature_ind = np.load(phy_path / "pc_feature_ind.npy")
+    channel_map = np.load(phy_path / "channel_map.npy") if (phy_path / "channel_map.npy").is_file() else None
+    channel_shanks = _subfn_resolve_channel_shanks(phy_path)
+    epoch_slice = _subfn_get_epoch_spike_slice(spike_times, sample_rate_hz, t_start, t_end)
+    if epoch_slice.start >= epoch_slice.stop:
+        raise ValueError(f"No spikes found in Phy folder for epoch t=[{t_start}, {t_end}] seconds.")
+    n_time = max(1, int(np.round((t_end - t_start) * sampling_frequency_hz)))
+    rtc_time = t_start + (np.arange(n_time, dtype=float) + 0.5) / sampling_frequency_hz
+    rtc_time = rtc_time[rtc_time <= t_end]
+    effective_electrode_mode = electrode_mode
+    if electrode_mode == "shank" and (channel_shanks is None or len(np.unique(channel_shanks)) <= 1):
+        warnings.warn(f"channel_shanks missing or degenerate in {phy_path}; falling back to electrode_mode='channel'.", stacklevel=2)
+        effective_electrode_mode = "channel"
+    if effective_electrode_mode == "shank":
+        assert channel_shanks is not None
+        n_electrodes = int(np.max(channel_shanks)) + 1
+    elif channel_map is not None:
+        n_electrodes = len(channel_map)
+    else:
+        n_electrodes = int(pc_feature_ind[pc_feature_ind >= 0].max()) + 1
+    multiunits = np.full((len(rtc_time), n_mark_dims, n_electrodes), np.nan, dtype=float)
+    for chunk_start in range(epoch_slice.start, epoch_slice.stop, chunk_size):
+        chunk_stop = min(chunk_start + chunk_size, epoch_slice.stop)
+        spike_indices = np.arange(chunk_start, chunk_stop, dtype=int)
+        channels, marks = _subfn_extract_peak_channel_marks(pc_features, pc_feature_ind, spike_templates, spike_indices, n_mark_dims=n_mark_dims)
+        electrode_indices = _subfn_map_channels_to_electrodes(channels, effective_electrode_mode, channel_map, channel_shanks)
+        spike_times_sec = np.asarray(spike_times[spike_indices], dtype=float) / sample_rate_hz
+        _subfn_bin_spikes_to_multiunits(multiunits, spike_times_sec, marks, electrode_indices, rtc_time)
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 

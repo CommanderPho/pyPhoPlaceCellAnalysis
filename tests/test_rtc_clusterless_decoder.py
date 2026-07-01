@@ -10,7 +10,7 @@ import xarray as xr
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder
 
 
@@ -79,6 +79,41 @@ def test_build_multiunits_from_array_drops_empty_electrodes():
     assert filtered_time is None
     assert filtered_multiunits.shape == (10, 4, 1)
     np.testing.assert_allclose(filtered_multiunits[2, :, 0], np.array([1.0, 2.0, 3.0, 4.0]))
+
+
+def _write_synthetic_phy_folder(phy_folder: Path, sample_rate_hz: float = 30000.0) -> None:
+    phy_folder.mkdir(parents=True, exist_ok=True)
+    (phy_folder / "params.py").write_text(f"sample_rate = {sample_rate_hz}\n", encoding="utf-8")
+    spike_times = np.array([int(1.0 * sample_rate_hz), int(1.001 * sample_rate_hz), int(1.002 * sample_rate_hz), int(1.5 * sample_rate_hz), int(2.0 * sample_rate_hz)], dtype=np.int64)
+    spike_templates = np.array([0, 0, 1, 1, 0], dtype=np.int64)
+    pc_feature_ind = np.array([[0, 1, -1, -1], [1, 2, -1, -1]], dtype=np.int64)
+    pc_features = np.zeros((len(spike_times), 4, 4), dtype=np.float32)
+    pc_features[0, :, 0] = np.array([1.0, 0.1, 0.2, 0.3], dtype=np.float32)
+    pc_features[1, :, 1] = np.array([2.0, 0.4, 0.5, 0.6], dtype=np.float32)
+    pc_features[2, :, 0] = np.array([3.0, 0.7, 0.8, 0.9], dtype=np.float32)
+    pc_features[3, :, 1] = np.array([4.0, 1.0, 1.1, 1.2], dtype=np.float32)
+    pc_features[4, :, 0] = np.array([5.0, 1.3, 1.4, 1.5], dtype=np.float32)
+    channel_map = np.array([0, 1, 2], dtype=np.int32)
+    np.save(phy_folder / "spike_times.npy", spike_times)
+    np.save(phy_folder / "spike_templates.npy", spike_templates)
+    np.save(phy_folder / "pc_feature_ind.npy", pc_feature_ind)
+    np.save(phy_folder / "pc_features.npy", pc_features)
+    np.save(phy_folder / "channel_map.npy", channel_map)
+
+
+def test_build_multiunits_from_phy_folder_synthetic_roundtrip(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder)
+    multiunits, rtc_time = build_multiunits_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, sampling_frequency_hz=1000.0, electrode_mode="channel")
+    assert multiunits.ndim == 3
+    assert multiunits.shape[1] == 4
+    assert multiunits.shape[0] == len(rtc_time)
+    assert multiunits.shape[2] >= 1
+    assert np.isfinite(multiunits).any()
+    filtered_multiunits, filtered_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+    assert filtered_multiunits.shape[0] == len(filtered_rtc_time)
+    assert filtered_multiunits.shape[1] == 4
+    assert filtered_multiunits.shape[2] >= 1
 
 
 def test_rtc_clusterless_classifier_simulation_roundtrip():
