@@ -73,12 +73,12 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
     @property
     def active_time_windows(self):
+        if self.time_binning_container is not None and self.time_binning_container.edges is not None:
+            edges = self.time_binning_container.edges
+            return list(zip(edges[:-1], edges[1:]))
         window_starts = self.time_window_centers - (self.time_bin_size / 2.0)
         window_ends = self.time_window_centers + (self.time_bin_size / 2.0)
-        if self.time_binning_container is not None and self.time_binning_container.center_info is not None:
-            return [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
-        else:
-            return list(zip(window_starts, window_ends))
+        return list(zip(window_starts, window_ends))
 
 
     @property
@@ -110,7 +110,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
     @property
     def P_x(self):
-        return None
+        raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute P_x independently. It directly computes p_x_given_n.")
 
 
     @staticmethod
