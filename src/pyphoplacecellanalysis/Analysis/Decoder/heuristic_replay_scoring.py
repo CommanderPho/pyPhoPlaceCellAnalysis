@@ -3304,8 +3304,7 @@ def get_peaks_mask(a_p_x_given_n):
     with the peak value for each time bin.
     """
     peaks_mask = np.zeros_like(a_p_x_given_n, dtype=bool)
-    for t in range(a_p_x_given_n.shape[1]):  # iterate over time bins
-        peaks_mask[np.argmax(a_p_x_given_n[:, t]), t] = True
+    peaks_mask[np.argmax(a_p_x_given_n, axis=0), np.arange(a_p_x_given_n.shape[1])] = True
     return peaks_mask
 
 def expand_peaks_mask(peaks_mask, kernel=np.ones((3, 3))):
