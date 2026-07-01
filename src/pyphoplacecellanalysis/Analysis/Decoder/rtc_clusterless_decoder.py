@@ -113,8 +113,40 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute P_x independently. It directly computes p_x_given_n.")
 
 
-    @classmethod
-    def estimate_log_likelihood_memory_bytes(cls, n_time: int, n_position_bins: int, dtype=np.float32) -> int:
+    @property
+    def neuron_IDXs(self):
+        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (neuron_IDXs).")
+
+
+    @property
+    def neuron_IDs(self):
+        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (neuron_IDs).")
+
+
+    @property
+    def num_neurons(self) -> int:
+        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (num_neurons).")
+
+
+    @property
+    def F(self):
+        raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute standard place fields (F).")
+
+
+    def get_by_id(self, ids, defer_compute_all:bool=False):
+        raise NotImplementedError("ClusterlessRTCPositionDecoder does not support neuron-based slicing (get_by_id) because it relies on multiunits.")
+
+
+    def decode(self, *args, **kwargs):
+        raise NotImplementedError("ClusterlessRTCPositionDecoder uses `compute_all()` natively and does not support the generalized `decode` method.")
+
+
+    def decode_specific_epochs(self, *args, **kwargs):
+        raise NotImplementedError("ClusterlessRTCPositionDecoder uses `compute_all()` natively and does not currently support `decode_specific_epochs`.")
+
+
+    @staticmethod
+    def estimate_log_likelihood_memory_bytes(n_time: int, n_position_bins: int, dtype=np.float32) -> int:
         return int(n_time) * int(n_position_bins) * int(np.dtype(dtype).itemsize)
 
 
