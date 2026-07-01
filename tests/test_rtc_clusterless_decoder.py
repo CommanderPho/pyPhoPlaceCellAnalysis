@@ -89,6 +89,18 @@ def test_build_multiunits_from_array_drops_empty_electrodes():
     np.testing.assert_allclose(filtered_multiunits[2, :, 0], np.array([1.0, 2.0, 3.0, 4.0]))
 
 
+def test_drop_empty_multiunit_electrodes_respects_training_mask():
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _drop_empty_multiunit_electrodes
+    multiunits = np.full((100, 4, 3), np.nan, dtype=float)
+    multiunits[10:20, :, 0] = np.array([1.0, 2.0, 3.0, 4.0])
+    multiunits[80:90, :, 2] = np.array([5.0, 6.0, 7.0, 8.0])
+    is_training = np.zeros(100, dtype=bool)
+    is_training[10:20] = True
+    filtered_multiunits = _drop_empty_multiunit_electrodes(multiunits, time_mask=is_training)
+    assert filtered_multiunits.shape == (100, 4, 1)
+    np.testing.assert_allclose(filtered_multiunits[10:20, :, 0], multiunits[10:20, :, 0])
+
+
 def _write_synthetic_phy_folder(phy_folder: Path, sample_rate_hz: float = 30000.0) -> None:
     phy_folder.mkdir(parents=True, exist_ok=True)
     (phy_folder / "params.py").write_text(f"sample_rate = {sample_rate_hz}\n", encoding="utf-8")
@@ -239,6 +251,24 @@ def test_clusterless_decode_multiunits_roundtrip():
     assert most_likely_position_indicies.ndim >= 1
     assert flat_outputs_container is not None
     assert flat_outputs_container.flat_p_x_given_n.shape[1] == multiunits.shape[0]
+
+
+def test_clusterless_fit_drops_electrodes_without_training_spikes():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    multiunits = np.asarray(multiunits, dtype=float).copy()
+    original_n_electrodes = multiunits.shape[2]
+    multiunits[:, :, -1] = np.nan
+    multiunits[500:520, :, -1] = 1.0
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    is_training = np.zeros(len(time), dtype=bool)
+    is_training[:400] = True
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        decoder._ensure_fitted_classifier(multiunits_for_fit=multiunits, rtc_time_for_fit=time, debug_print=False)
+    assert decoder.classifier is not None
+    assert decoder.multiunit_electrode_keep_mask.shape[0] == original_n_electrodes
+    assert not decoder.multiunit_electrode_keep_mask[-1]
+    assert decoder.multiunits.shape[2] == int(np.sum(decoder.multiunit_electrode_keep_mask))
 
 
 def test_clusterless_decode_rejects_spike_counts():

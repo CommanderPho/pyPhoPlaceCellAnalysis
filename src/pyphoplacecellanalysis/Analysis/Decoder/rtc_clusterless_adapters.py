@@ -90,11 +90,16 @@ def build_is_training_mask_from_pfnd(pf: PfND, rtc_time: np.ndarray, source_time
     return speed_at_rtc >= float(pf.config.speed_thresh)
 
 
-def _drop_empty_multiunit_electrodes(multiunits: np.ndarray) -> np.ndarray:
-    has_spikes_by_electrode = np.any(np.any(np.isfinite(multiunits), axis=1), axis=0)
+def _get_multiunit_electrode_keep_mask(multiunits: np.ndarray, time_mask: Optional[np.ndarray] = None) -> np.ndarray:
+    active_multiunits = multiunits[time_mask, ...] if time_mask is not None else multiunits
+    has_spikes_by_electrode = np.any(np.any(np.isfinite(active_multiunits), axis=1), axis=0)
     if not np.any(has_spikes_by_electrode):
         raise ValueError("Clusterless decoding requires at least one electrode with finite waveform marks.")
-    return multiunits[:, :, has_spikes_by_electrode]
+    return has_spikes_by_electrode
+
+
+def _drop_empty_multiunit_electrodes(multiunits: np.ndarray, time_mask: Optional[np.ndarray] = None) -> np.ndarray:
+    return multiunits[:, :, _get_multiunit_electrode_keep_mask(multiunits, time_mask=time_mask)]
 
 
 def build_multiunits_from_array(multiunits: np.ndarray, time: Optional[np.ndarray] = None) -> Tuple[np.ndarray, Optional[np.ndarray]]:
