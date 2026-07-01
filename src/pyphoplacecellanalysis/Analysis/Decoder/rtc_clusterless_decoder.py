@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
+if TYPE_CHECKING:
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+
+import nptyping as ND
 import numpy as np
+import pandas as pd
 import xarray as xr
+from nptyping import NDArray
+from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.binning_helpers import BinningContainer, compute_spanning_bins
 from replay_trajectory_classification import ClusterlessClassifier
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
     ClusterlessDecodingParameters,
@@ -16,7 +24,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
 )
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
-from neuropy.utils.mixins.AttrsClassHelpers import custom_define, non_serialized_field
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, non_serialized_field, serialized_field
 
 
 @custom_define(slots=False, eq=False)
@@ -24,7 +32,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
     """Clusterless position decoder using replay_trajectory_classification on PfND spatial grids."""
 
     sampling_frequency_hz: float = 1000.0
-    multiunits: np.ndarray = None
+    multiunits: NDArray[ND.Shape["n_time, n_marks, n_electrodes"], np.floating] = serialized_field(default=None, metadata={'shape': ('n_time', 'n_marks', 'n_electrodes')})
     rtc_time: np.ndarray = None
     clusterless_params: ClusterlessDecodingParameters = None
     classifier: ClusterlessClassifier = non_serialized_field(default=None, repr=False)
@@ -109,40 +117,68 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
 
     @property
-    def P_x(self):
-        raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute P_x independently. It directly computes p_x_given_n.")
-
-
-    @property
-    def neuron_IDXs(self):
-        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (neuron_IDXs).")
-
-
-    @property
-    def neuron_IDs(self):
-        raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (neuron_IDs).")
-
-
-    @property
     def num_neurons(self) -> int:
         raise NotImplementedError("Clusterless decoding uses multiunits, not individual neurons (num_neurons).")
 
 
-    @property
-    def F(self):
-        raise NotImplementedError("ClusterlessRTCPositionDecoder does not compute standard place fields (F).")
+    def setup(self):
+        self.neuron_IDXs = None
+        self.neuron_IDs = None
+        self.F = None
+        self.P_x = None
+
+
+    def _setup_computation_variables(self):
+        """Clusterless decoders do not build Zhang F/P_x matrices."""
+        pass
 
 
     def get_by_id(self, ids, defer_compute_all:bool=False):
         raise NotImplementedError("ClusterlessRTCPositionDecoder does not support neuron-based slicing (get_by_id) because it relies on multiunits.")
 
 
-    def decode(self, *args, **kwargs):
-        raise NotImplementedError("ClusterlessRTCPositionDecoder uses `compute_all()` natively and does not support the generalized `decode` method.")
+    def decode(self,
+                unit_specific_time_binned_spike_counts,
+                time_bin_size: float, output_flat_versions=False, debug_print=True, multiunits=None, rtc_time=None, is_compute_acausal=True, use_gpu=None):
+        """Decode clusterless multiunits via RTC; does not alter internal decoder state.
+
+        Accepts multiunits with shape (n_time, n_marks, n_electrodes) as the first argument or via multiunits=.
+        Binned per-neuron spike counts (n_neurons, n_time_bins) are not supported.
+        """
+        active_multiunits = multiunits if multiunits is not None else unit_specific_time_binned_spike_counts
+        active_multiunits = np.asarray(active_multiunits, dtype=float)
+        if active_multiunits.ndim != 3:
+            raise ValueError("ClusterlessRTCPositionDecoder.decode() requires multiunits with shape (n_time, n_marks, n_electrodes). Binned spike counts (n_neurons, n_time_bins) are not supported.")
+        n_time = active_multiunits.shape[0]
+        if rtc_time is None:
+            active_rtc_time = (np.arange(n_time, dtype=float) + 0.5) * float(time_bin_size)
+        else:
+            active_rtc_time = np.asarray(rtc_time, dtype=float)
+        if len(active_rtc_time) != n_time:
+            raise ValueError(f"rtc_time length {len(active_rtc_time)} != multiunits n_time {n_time}")
+        if debug_print:
+            print(f"ClusterlessRTCPositionDecoder.decode(): n_time={n_time}, n_marks={active_multiunits.shape[1]}, n_electrodes={active_multiunits.shape[2]}")
+        with WrappingMessagePrinter(f"decode(...) called. Computing {n_time} windows for p_x_given_n...", begin_line_ending="... ", finished_message="decode completed.", enable_print=(debug_print or self.debug_print)):
+            p_x_given_n, flat_p_x_given_n, place_bin_centers, _rtc_results = self._predict_clusterless_posterior(active_multiunits, active_rtc_time, multiunits_for_fit=active_multiunits, rtc_time_for_fit=active_rtc_time, is_compute_acausal=is_compute_acausal, use_gpu=use_gpu, debug_print=debug_print)
+            num_time_windows = flat_p_x_given_n.shape[1]
+            pf_flat_size = int(np.prod(self.original_position_data_shape))
+            if pf_flat_size == flat_p_x_given_n.shape[0]:
+                p_x_given_n_out = np.reshape(flat_p_x_given_n, (*self.original_position_data_shape, num_time_windows))
+                position_shape_for_unravel = self.original_position_data_shape
+            else:
+                p_x_given_n_out = p_x_given_n
+                position_shape_for_unravel = (flat_p_x_given_n.shape[0],)
+            most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(flat_p_x_given_n, position_shape_for_unravel)
+            posterior_for_positions = p_x_given_n_out if (p_x_given_n_out.ndim > 1 and p_x_given_n_out.shape[0] == pf_flat_size) else flat_p_x_given_n
+            most_likely_positions = most_likely_positions_from_posterior(posterior_for_positions, self.pf, place_bin_centers=place_bin_centers)
+            flat_outputs_container = DynamicContainer(flat_p_x_given_n=flat_p_x_given_n, most_likely_position_flat_indicies=most_likely_position_flat_indicies) if output_flat_versions else None
+            if debug_print:
+                print(f"p_x_given_n_out.shape: {p_x_given_n_out.shape}")
+            return most_likely_positions, p_x_given_n_out, most_likely_position_indicies, flat_outputs_container
 
 
-    def decode_specific_epochs(self, *args, **kwargs):
-        raise NotImplementedError("ClusterlessRTCPositionDecoder uses `compute_all()` natively and does not currently support `decode_specific_epochs`.")
+    def decode_specific_epochs(self, spikes_df: pd.DataFrame, filter_epochs, decoding_time_bin_size: float = 0.05, use_single_time_bin_per_epoch: bool = False, slideby: Optional[float] = None, debug_print=False) -> "DecodedFilterEpochsResult":
+        raise NotImplementedError("ClusterlessRTCPositionDecoder does not support decode_specific_epochs because it requires multiunits (n_time, n_marks, n_electrodes), not per-neuron binned spike counts. Use compute_all() for full-session decoding or decode(multiunits, time_bin_size, rtc_time=...) for custom windows.")
 
 
     @staticmethod
@@ -176,9 +212,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
             return False
 
 
-    def compute_all(self, is_compute_acausal=True, use_gpu: Optional[bool] = None, debug_print: bool = True) -> None:
-        if self.multiunits is None or self.rtc_time is None:
-            raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
+    def _resolve_use_gpu(self, use_gpu: Optional[bool], debug_print: bool = False) -> bool:
         if use_gpu is None:
             use_gpu = self._is_rtc_gpu_acceleration_available()
             if not use_gpu:
@@ -187,24 +221,55 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
             print("Warning: ClusterlessRTCPositionDecoder GPU requested but unavailable; falling back to CPU decoding.")
             use_gpu = False
         elif use_gpu and (debug_print or self.debug_print):
-            print("ClusterlessRTCPositionDecoder.compute_all(): using GPU acceleration (CuPy).")
+            print("ClusterlessRTCPositionDecoder: using GPU acceleration (CuPy).")
+        return use_gpu
+
+
+    def _ensure_fitted_classifier(self, multiunits_for_fit=None, rtc_time_for_fit=None, debug_print: bool = False) -> Tuple[ClusterlessClassifier, np.ndarray]:
+        if self.classifier is not None and self.rtc_position_bin_centers is not None:
+            return self.classifier, self.rtc_position_bin_centers
+        training_multiunits = self.multiunits if self.multiunits is not None else multiunits_for_fit
+        training_rtc_time = self.rtc_time if self.rtc_time is not None else rtc_time_for_fit
+        if training_multiunits is None or training_rtc_time is None:
+            raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time on the decoder (or passed to decode()) before fitting the classifier.")
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
         place_bin_size_override = params.rtc_place_bin_size_override
         if (place_bin_size_override is None) and (self.ndim > 1):
             place_bin_size_override = params.rtc_2d_place_bin_size_override
         environment = build_rtc_environment_from_pfnd(self.pf, environment_name=params.rtc_environment_name, place_bin_size_override=place_bin_size_override)
         self.classifier = ClusterlessClassifier(environments=[environment], clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
-        position_train, multiunits_train, is_training = build_clusterless_training_data_from_pfnd(self.pf, self.multiunits, self.rtc_time, self.sampling_frequency_hz)
+        position_train, multiunits_train, is_training = build_clusterless_training_data_from_pfnd(self.pf, training_multiunits, training_rtc_time, self.sampling_frequency_hz)
         self.is_training_mask = is_training
         self.classifier.fit(position_train, multiunits_train, is_training=is_training)
         fitted_environment = self.classifier.environments[0]
         n_position_bins = int(np.asarray(fitted_environment.is_track_interior_).size)
         self.estimated_log_likelihood_memory_bytes = self.raise_if_log_likelihood_exceeds_memory_limit(n_time=len(multiunits_train), n_position_bins=n_position_bins, max_memory_gib=params.max_log_likelihood_memory_gib)
         self.rtc_position_bin_centers = np.asarray(fitted_environment.place_bin_centers_)
-        self.rtc_results = self.classifier.predict(multiunits_train, time=self.rtc_time[:len(multiunits_train)], is_compute_acausal=is_compute_acausal, use_gpu=use_gpu)
-        self.p_x_given_n = rtc_posterior_to_p_x_given_n(self.rtc_results, self.pf, state_index=params.state_index_for_posterior, should_match_pf_grid=params.should_match_pf_grid)
-        self.flat_p_x_given_n = self.p_x_given_n.reshape(self.flat_position_size, self.num_time_windows) if self.p_x_given_n.ndim > 2 else self.p_x_given_n
-        active_position_bin_centers = self.rtc_position_bin_centers if (self.rtc_position_bin_centers is not None and self.p_x_given_n.shape[0] == len(self.rtc_position_bin_centers)) else None
+        return self.classifier, self.rtc_position_bin_centers
+
+
+    def _predict_clusterless_posterior(self, multiunits, rtc_time, multiunits_for_fit=None, rtc_time_for_fit=None, is_compute_acausal=True, use_gpu=None, debug_print=False) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], xr.Dataset]:
+        use_gpu = self._resolve_use_gpu(use_gpu=use_gpu, debug_print=debug_print)
+        classifier, rtc_position_bin_centers = self._ensure_fitted_classifier(multiunits_for_fit=multiunits_for_fit, rtc_time_for_fit=rtc_time_for_fit, debug_print=debug_print)
+        params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
+        multiunits = np.asarray(multiunits, dtype=float)
+        rtc_time = np.asarray(rtc_time, dtype=float)
+        n_position_bins = int(np.asarray(classifier.environments[0].is_track_interior_).size)
+        self.raise_if_log_likelihood_exceeds_memory_limit(n_time=len(multiunits), n_position_bins=n_position_bins, max_memory_gib=params.max_log_likelihood_memory_gib)
+        rtc_results = classifier.predict(multiunits, time=rtc_time[:len(multiunits)], is_compute_acausal=is_compute_acausal, use_gpu=use_gpu)
+        p_x_given_n = rtc_posterior_to_p_x_given_n(rtc_results, self.pf, state_index=params.state_index_for_posterior, should_match_pf_grid=params.should_match_pf_grid)
+        flat_p_x_given_n = p_x_given_n.reshape(int(np.prod(p_x_given_n.shape[:-1])), p_x_given_n.shape[-1]) if p_x_given_n.ndim > 2 else p_x_given_n
+        place_bin_centers = rtc_position_bin_centers if (rtc_position_bin_centers is not None and p_x_given_n.shape[0] == len(rtc_position_bin_centers)) else None
+        return p_x_given_n, flat_p_x_given_n, place_bin_centers, rtc_results
+
+
+    def compute_all(self, is_compute_acausal=True, use_gpu: Optional[bool] = None, debug_print: bool = True) -> None:
+        """ main pre-compute function """
+        if self.multiunits is None or self.rtc_time is None:
+            raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
+        p_x_given_n, flat_p_x_given_n, active_position_bin_centers, self.rtc_results = self._predict_clusterless_posterior(self.multiunits, self.rtc_time, multiunits_for_fit=self.multiunits, rtc_time_for_fit=self.rtc_time, is_compute_acausal=is_compute_acausal, use_gpu=use_gpu, debug_print=(debug_print or self.debug_print))
+        self.p_x_given_n = p_x_given_n
+        self.flat_p_x_given_n = flat_p_x_given_n
         self.most_likely_positions = most_likely_positions_from_posterior(self.p_x_given_n, self.pf, place_bin_centers=active_position_bin_centers)
         self.revised_most_likely_positions = self.most_likely_positions.copy()
         self.most_likely_position_flat_indicies = np.argmax(self.p_x_given_n, axis=0)

@@ -1,13 +1,17 @@
 import ast
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
+import pandas as pd
+import pytest
 import xarray as xr
 
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_rtc_simulation, build_rtc_environment_from_pfnd, rtc_posterior_to_p_x_given_n
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder
 
 
 class _MockPfConfig:
@@ -107,3 +111,33 @@ def test_position_decoding_clusterless_registered_in_default_computation_functio
             method_names = [item.name for item in node.body if isinstance(item, ast.FunctionDef)]
     assert "_perform_clusterless_position_decoding_computation" in method_names
     assert "position_decoding_clusterless" in source_text
+
+
+def test_clusterless_decode_multiunits_roundtrip():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = decoder.decode(multiunits, time_bin_size=0.001, rtc_time=time, output_flat_versions=True, debug_print=False)
+    assert decoder.p_x_given_n is None
+    assert len(most_likely_positions) == multiunits.shape[0]
+    assert p_x_given_n.ndim >= 2
+    assert most_likely_position_indicies.ndim >= 1
+    assert flat_outputs_container is not None
+    assert flat_outputs_container.flat_p_x_given_n.shape[1] == multiunits.shape[0]
+
+
+def test_clusterless_decode_rejects_spike_counts():
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    spike_counts = np.zeros((5, 20))
+    with pytest.raises(ValueError, match="multiunits with shape"):
+        decoder.decode(spike_counts, time_bin_size=0.05, debug_print=False)
+
+
+def test_clusterless_decode_specific_epochs_not_implemented():
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    with pytest.raises(NotImplementedError, match="multiunits"):
+        decoder.decode_specific_epochs(pd.DataFrame(), pd.DataFrame(), decoding_time_bin_size=0.05)
