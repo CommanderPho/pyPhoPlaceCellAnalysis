@@ -123,7 +123,7 @@ def _assign_spike_marks_to_multiunits(multiunits: np.ndarray, time_bin_indices: 
             multiunits[t_idx, :n_features, e_idx] = mark_features[spike_idx, :n_features]
 
 
-@function_attributes(short_name=None, tags=['BAD', 'BUG', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 08:52', related_items=[])
+@function_attributes(short_name=None, tags=['BAD', 'BUG', 'ISSUE'], input_requires=[], output_provides=[], uses=['_assign_spike_marks_to_multiunits'], used_by=[], creation_date='2026-07-01 08:52', related_items=[])
 def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: float, t_end: float, spikes_df: Optional[pd.DataFrame] = None, n_mark_dims: int = 4) -> Tuple[np.ndarray, np.ndarray]:
     """ uses the `sess.neurons` object, so it is not true clusterless data as they have already been filtered by pyrmaidal/sua/etc 
     """
@@ -183,6 +183,7 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
+@function_attributes(short_name=None, tags=['MAIN', 'GOOD', 'load', 'phy', 'clusterless'], input_requires=[], output_provides=[], uses=[], used_by=['build_multiunits_from_phy_folder'], creation_date='2026-07-01 10:12', related_items=[])
 def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path], t_start: float, t_end: float, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000, sampling_frequency_hz: float = 1000.0) -> ClusterlessSpikeEvents:
     """Extract sparse clusterless spike events from a Phy/Kilosort folder without allocating dense multiunits.
 
@@ -295,7 +296,7 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
         marks_chunks.append(np.asarray(marks, dtype=np.float32))
     return ClusterlessSpikeEvents(spike_times_sec=np.concatenate(spike_times_chunks), electrode_indices=np.concatenate(electrode_chunks), marks=np.concatenate(marks_chunks), sampling_frequency_hz=float(sampling_frequency_hz), electrode_mode=effective_electrode_mode, n_mark_dims=int(n_mark_dims), t_start=float(t_start), t_stop=float(t_end), source_phy_path=str(phy_path))
 
-
+@function_attributes(short_name=None, tags=['spikes'], input_requires=[], output_provides=[], uses=['_assign_spike_marks_to_multiunits'], used_by=[], creation_date='2026-07-01 10:11', related_items=[])
 def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: float, t_end: float, sampling_frequency_hz: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
     """Materialize dense RTC multiunits for a time window from sparse clusterless spike events."""
 
@@ -320,7 +321,7 @@ def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: 
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
-@function_attributes(short_name=None, tags=['correct', 'mua', 'clusterless', 'correct'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 08:55', related_items=[])
+@function_attributes(tags=['correct', 'mua', 'clusterless', 'correct'], input_requires=[], output_provides=[], uses=['extract_clusterless_spike_events_from_phy_folder','build_multiunits_from_spike_events'], used_by=[], creation_date='2026-07-01 08:55', related_items=[])
 def build_multiunits_from_phy_folder(phy_path: Union[str, Path], t_start: float, t_end: float, sampling_frequency_hz: float, electrode_mode: str = "shank", n_mark_dims: int = 4, chunk_size: int = 100_000) -> Tuple[np.ndarray, np.ndarray]:
     """Build RTC clusterless multiunits from a Phy/Kilosort export folder.
 

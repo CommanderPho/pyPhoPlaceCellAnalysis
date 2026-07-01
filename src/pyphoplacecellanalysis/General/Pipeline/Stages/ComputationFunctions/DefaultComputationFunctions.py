@@ -117,35 +117,44 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             pos_df = pf.filtered_pos_df
             # pos_sampling_rate_Hz: float = pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
             # pos_sampling_rate_Hz
-            active_pos_arr = pos_df[['x', 'y']].to_numpy()
+            if 'y' not in pos_df:
+                # 1D
+                active_pos_arr = pos_df['x'].to_numpy()
+            else:
+                ## 2D
+                active_pos_arr = pos_df[['x', 'y']].to_numpy()
+
             movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
-            # If your marks are integers, use this algorithm because it is much faster
-            clusterless_algorithm = 'multiunit_likelihood'
-            clusterless_algorithm_params = {
-                'mark_std': 1.0,
-                'position_std': 12.5,
-            }
-            environment = Environment(place_bin_size=np.sqrt(movement_var))
-            continuous_transition_types = [[RandomWalk(movement_var=movement_var * 120),  Uniform(), Identity()],
-                                            [Uniform(),                                   Uniform(), Uniform()],
-                                            [RandomWalk(movement_var=movement_var * 120), Uniform(), Identity()],
-                                        ]
-            classifier: ClusterlessClassifier = ClusterlessClassifier(environments=environment,
-                                                    continuous_transition_types=continuous_transition_types,
-                                                    clusterless_algorithm=clusterless_algorithm,
-                                                    clusterless_algorithm_params=clusterless_algorithm_params,
-                                                )
-            classifier.fit(active_pos_arr, multiunits)
+            # # If your marks are integers, use this algorithm because it is much faster
+            # clusterless_algorithm = 'multiunit_likelihood'
+            # clusterless_algorithm_params = {
+            #     'mark_std': 1.0,
+            #     'position_std': 12.5,
+            # }
+            # environment = Environment(place_bin_size=np.sqrt(movement_var))
+            # continuous_transition_types = [[RandomWalk(movement_var=movement_var * 120),  Uniform(), Identity()],
+            #                                 [Uniform(),                                   Uniform(), Uniform()],
+            #                                 [RandomWalk(movement_var=movement_var * 120), Uniform(), Identity()],
+            #                             ]
+            # classifier: ClusterlessClassifier = ClusterlessClassifier(environments=environment,
+            #                                         continuous_transition_types=continuous_transition_types,
+            #                                         clusterless_algorithm=clusterless_algorithm,
+            #                                         clusterless_algorithm_params=clusterless_algorithm_params,
+            #                                     )
+            # classifier.fit(active_pos_arr, multiunits)
 
             source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
             t_start = float(source_times.min())
             t_end = float(source_times.max())
-            if multiunits is not None:
-                pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
-            elif clusterless_spike_events is not None:
+            
+            if clusterless_spike_events is not None:
                 active_events = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
                 pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=t_start, t_end=t_end, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz)
+            elif (multiunits is not None):
+                raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events`')
+                pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
             else:
+                raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events`')
                 pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
                                                                             t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
 
