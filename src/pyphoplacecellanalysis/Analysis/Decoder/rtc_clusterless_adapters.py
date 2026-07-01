@@ -122,7 +122,10 @@ def _assign_spike_marks_to_multiunits(multiunits: np.ndarray, time_bin_indices: 
             multiunits[t_idx, :n_features, e_idx] = mark_features[spike_idx, :n_features]
 
 
+@function_attributes(short_name=None, tags=['BAD', 'BUG', 'ISSUE'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 08:52', related_items=[])
 def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: float, t_end: float, spikes_df: Optional[pd.DataFrame] = None, n_mark_dims: int = 4) -> Tuple[np.ndarray, np.ndarray]:
+    """ uses the `sess.neurons` object, so it is not true clusterless data as they have already been filtered by pyrmaidal/sua/etc 
+    """
     neurons = sess.neurons
     if neurons.waveforms is None:
         raise ValueError("Clusterless decoding requires session.neurons.waveforms to be populated with per-neuron waveform mark features, or pass a pre-built multiunits array via the pipeline multiunits= kwarg. Expected RTC tensor shape: (n_time, n_marks, n_electrodes) with NaN for no spike and non-NaN mark features for spikes. See replay_trajectory_classification notebook 03-Decoding_with_Clusterless_Spikes.")
@@ -313,6 +316,12 @@ def build_multiunits_from_phy_folder(phy_path: Union[str, Path], t_start: float,
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Post Compute                                                                                                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
 def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None, should_match_pf_grid: bool = False) -> np.ndarray:
     posterior = rtc_results.acausal_posterior
     if state_index is None:
