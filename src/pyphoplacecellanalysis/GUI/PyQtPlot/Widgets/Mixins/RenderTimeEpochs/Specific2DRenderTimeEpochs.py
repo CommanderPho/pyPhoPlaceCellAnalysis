@@ -253,7 +253,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
         """Override to handle Bapun-type sessions with proper epoch intervals.
         
-        For Bapun sessions, uses the correct epoch intervals from build_bapun_proper_epoch_intervals.
+        For Bapun sessions, uses the correct epoch intervals from build_proper_epoch_intervals.
         For other sessions, falls back to the default behavior.
         """
         # Check if this is a Bapun session
@@ -270,7 +270,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             # Build the Bapun epochs dataframe
             curr_paradigm_df = cls._build_bapun_epochs_dataframe_from_session(sess)
             
-            # Add color columns (adapted from build_bapun_proper_epoch_intervals)
+            # Add color columns (adapted from build_proper_epoch_intervals)
             curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
             curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
             
