@@ -57,8 +57,35 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
 
 
     @property
+    def time_window_edges_binning_info(self):
+        return self.time_binning_container.edge_info if self.time_binning_container is not None else None
+
+
+    @property
+    def time_window_center_binning_info(self):
+        return self.time_binning_container.center_info if self.time_binning_container is not None else None
+
+
+    @property
     def num_time_windows(self) -> int:
         return len(self.rtc_time) if self.rtc_time is not None else 0
+
+
+    @property
+    def active_time_windows(self):
+        window_starts = self.time_window_centers - (self.time_bin_size / 2.0)
+        window_ends = self.time_window_centers + (self.time_bin_size / 2.0)
+        if self.time_binning_container is not None and self.time_binning_container.center_info is not None:
+            return [(window_starts[i], window_ends[i]) for i in self.time_window_center_binning_info.bin_indicies]
+        else:
+            return list(zip(window_starts, window_ends))
+
+
+    @property
+    def active_time_window_centers(self):
+        window_starts = self.time_window_centers - (self.time_bin_size / 2.0)
+        window_ends = self.time_window_centers + (self.time_bin_size / 2.0)
+        return window_starts + ((window_ends - window_starts) / 2.0)
 
 
     @property
@@ -74,6 +101,16 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         if spike_counts is None:
             return np.zeros(self.num_time_windows, dtype=bool)
         return spike_counts == 0
+
+
+    @property
+    def P_x_given_n(self):
+        return self.p_x_given_n
+
+
+    @property
+    def P_x(self):
+        return None
 
 
     @staticmethod

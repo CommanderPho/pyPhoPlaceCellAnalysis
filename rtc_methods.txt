@@ -1,0 +1,16 @@
+    @property
+    def time_bin_size(self) -> float:
+    @property
+    def time_window_centers(self) -> np.ndarray:
+    @property
+    def time_window_edges(self) -> np.ndarray:
+    @property
+    def num_time_windows(self) -> int:
+    @property
+    def total_spike_counts_per_window(self) -> np.ndarray:
+    @property
+    def is_non_firing_time_bin(self) -> np.ndarray:
+    def estimate_log_likelihood_memory_bytes(n_time: int, n_position_bins: int, dtype=np.float32) -> int:
+    def raise_if_log_likelihood_exceeds_memory_limit(cls, n_time: int, n_position_bins: int, max_memory_gib: Optional[float]) -> int:
+    def _is_rtc_gpu_acceleration_available() -> bool:
+    def compute_all(self, is_compute_acausal=True, use_gpu: Optional[bool] = None, debug_print: bool = True) -> None:
