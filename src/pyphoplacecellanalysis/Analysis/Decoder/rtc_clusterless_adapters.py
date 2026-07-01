@@ -15,10 +15,13 @@ from replay_trajectory_classification.environments import Environment
 class ClusterlessDecodingParameters:
     clusterless_sampling_frequency_hz: float = 1000.0
     rtc_place_bin_size_override: Optional[float] = None
+    rtc_2d_place_bin_size_override: Optional[float] = 16.0
     rtc_mark_std: float = 24.0
     rtc_position_std: float = 6.0
     rtc_environment_name: str = ""
     state_index_for_posterior: Optional[int] = None
+    max_log_likelihood_memory_gib: Optional[float] = 8.0
+    should_match_pf_grid: bool = False
 
 
 def _pfnd_place_bin_size(pf: PfND, place_bin_size_override: Optional[float] = None) -> float:
@@ -173,15 +176,18 @@ def build_multiunits_from_session(sess, sampling_frequency_hz: float, t_start: f
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
-def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None) -> np.ndarray:
-    posterior = rtc_results.acausal_posterior.values
-    if posterior.ndim == 4:
-        posterior = posterior[..., 0]
+def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None, should_match_pf_grid: bool = False) -> np.ndarray:
+    posterior = rtc_results.acausal_posterior
     if state_index is None:
-        posterior_time_bins = posterior.sum(axis=1)
+        posterior_time_bins = posterior.sum(dim="state")
     else:
-        posterior_time_bins = posterior[:, state_index, :]
-    p_x_given_n_rtc = posterior_time_bins.T
+        posterior_time_bins = posterior.isel(state=state_index)
+    spatial_dims = [a_dim for a_dim in posterior_time_bins.dims if a_dim != "time"]
+    posterior_time_bins = posterior_time_bins.transpose(*spatial_dims, "time")
+    posterior_values = posterior_time_bins.values
+    p_x_given_n_rtc = posterior_values.reshape((int(np.prod(posterior_values.shape[:-1])), posterior_values.shape[-1]), order="F")
+    if not should_match_pf_grid:
+        return p_x_given_n_rtc
     n_pf_bins = int(np.prod(np.shape(pf.occupancy)))
     n_rtc_bins = p_x_given_n_rtc.shape[0]
     if n_rtc_bins == n_pf_bins:
@@ -194,8 +200,12 @@ def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index:
     return padded
 
 
-def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND) -> np.ndarray:
+def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, place_bin_centers: Optional[np.ndarray] = None) -> np.ndarray:
     most_likely_flat_indices = np.argmax(p_x_given_n, axis=0)
+    if place_bin_centers is not None:
+        place_bin_centers = np.asarray(place_bin_centers)
+        most_likely_flat_indices = np.clip(most_likely_flat_indices, 0, len(place_bin_centers) - 1)
+        return np.squeeze(place_bin_centers[most_likely_flat_indices])
     if pf.ndim == 1:
         x_centers = pf.xbin_centers
         return x_centers[np.clip(most_likely_flat_indices, 0, len(x_centers) - 1)]

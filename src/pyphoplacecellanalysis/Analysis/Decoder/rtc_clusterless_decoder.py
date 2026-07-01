@@ -36,6 +36,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
     most_likely_position_flat_indicies: np.ndarray = non_serialized_field(default=None, repr=False)
     time_binning_container: BinningContainer = non_serialized_field(default=None, repr=False)
     is_training_mask: np.ndarray = non_serialized_field(default=None, repr=False)
+    rtc_position_bin_centers: np.ndarray = non_serialized_field(default=None, repr=False)
+    estimated_log_likelihood_memory_bytes: int = non_serialized_field(default=None, repr=False)
 
 
     @property
@@ -74,19 +76,43 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         return spike_counts == 0
 
 
-    def compute_all(self, debug_print: bool = False) -> None:
+    @staticmethod
+    def estimate_log_likelihood_memory_bytes(n_time: int, n_position_bins: int, dtype=np.float32) -> int:
+        return int(n_time) * int(n_position_bins) * int(np.dtype(dtype).itemsize)
+
+
+    @classmethod
+    def raise_if_log_likelihood_exceeds_memory_limit(cls, n_time: int, n_position_bins: int, max_memory_gib: Optional[float]) -> int:
+        estimated_bytes = cls.estimate_log_likelihood_memory_bytes(n_time=n_time, n_position_bins=n_position_bins, dtype=np.float32)
+        if max_memory_gib is not None:
+            max_memory_bytes = int(float(max_memory_gib) * (1024 ** 3))
+            if estimated_bytes > max_memory_bytes:
+                estimated_gib = estimated_bytes / float(1024 ** 3)
+                raise MemoryError(f"Clusterless likelihood would allocate {estimated_gib:.2f} GiB for shape ({int(n_time)}, {int(n_position_bins)}) float32, exceeding max_log_likelihood_memory_gib={float(max_memory_gib):.2f}. Reduce clusterless_sampling_frequency_hz, increase rtc_2d_place_bin_size_override, or raise the limit explicitly.")
+        return estimated_bytes
+
+
+    def compute_all(self, is_compute_acausal=True, use_gpu=True, debug_print: bool = False) -> None:
         if self.multiunits is None or self.rtc_time is None:
             raise ValueError("ClusterlessRTCPositionDecoder requires multiunits and rtc_time before compute_all().")
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
-        environment = build_rtc_environment_from_pfnd(self.pf, environment_name=params.rtc_environment_name, place_bin_size_override=params.rtc_place_bin_size_override)
+        place_bin_size_override = params.rtc_place_bin_size_override
+        if (place_bin_size_override is None) and (self.ndim > 1):
+            place_bin_size_override = params.rtc_2d_place_bin_size_override
+        environment = build_rtc_environment_from_pfnd(self.pf, environment_name=params.rtc_environment_name, place_bin_size_override=place_bin_size_override)
         self.classifier = ClusterlessClassifier(environments=[environment], clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
         position_train, multiunits_train, is_training = build_clusterless_training_data_from_pfnd(self.pf, self.multiunits, self.rtc_time, self.sampling_frequency_hz)
         self.is_training_mask = is_training
         self.classifier.fit(position_train, multiunits_train, is_training=is_training)
-        self.rtc_results = self.classifier.predict(multiunits_train, time=self.rtc_time[:len(multiunits_train)], is_compute_acausal=True, use_gpu=False)
-        self.p_x_given_n = rtc_posterior_to_p_x_given_n(self.rtc_results, self.pf, state_index=params.state_index_for_posterior)
+        fitted_environment = self.classifier.environments[0]
+        n_position_bins = int(np.asarray(fitted_environment.is_track_interior_).size)
+        self.estimated_log_likelihood_memory_bytes = self.raise_if_log_likelihood_exceeds_memory_limit(n_time=len(multiunits_train), n_position_bins=n_position_bins, max_memory_gib=params.max_log_likelihood_memory_gib)
+        self.rtc_position_bin_centers = np.asarray(fitted_environment.place_bin_centers_)
+        self.rtc_results = self.classifier.predict(multiunits_train, time=self.rtc_time[:len(multiunits_train)], is_compute_acausal=is_compute_acausal, use_gpu=use_gpu)
+        self.p_x_given_n = rtc_posterior_to_p_x_given_n(self.rtc_results, self.pf, state_index=params.state_index_for_posterior, should_match_pf_grid=params.should_match_pf_grid)
         self.flat_p_x_given_n = self.p_x_given_n.reshape(self.flat_position_size, self.num_time_windows) if self.p_x_given_n.ndim > 2 else self.p_x_given_n
-        self.most_likely_positions = most_likely_positions_from_posterior(self.p_x_given_n, self.pf)
+        active_position_bin_centers = self.rtc_position_bin_centers if (self.rtc_position_bin_centers is not None and self.p_x_given_n.shape[0] == len(self.rtc_position_bin_centers)) else None
+        self.most_likely_positions = most_likely_positions_from_posterior(self.p_x_given_n, self.pf, place_bin_centers=active_position_bin_centers)
         self.revised_most_likely_positions = self.most_likely_positions.copy()
         self.most_likely_position_flat_indicies = np.argmax(self.p_x_given_n, axis=0)
         time_window_edges, time_window_edges_binning_info = compute_spanning_bins(self.rtc_time, bin_size=self.time_bin_size)

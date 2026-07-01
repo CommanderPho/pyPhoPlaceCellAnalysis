@@ -84,9 +84,18 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     @function_attributes(short_name='position_decoding_clusterless', tags=['decoding', 'position', 'clusterless'],
                           input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
-    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: float = 1000.0, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
+    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
-        clusterless_params = clusterless_params if clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=sampling_frequency_hz)
+        if time_bin_size is None:
+            time_bin_size = getattr(getattr(computation_result.computation_config, 'pf_params', None), 'time_bin_size', None)
+        if clusterless_params is None:
+            if sampling_frequency_hz is None:
+                sampling_frequency_hz = 1000.0 if time_bin_size is None else (1.0 / float(time_bin_size))
+            clusterless_params = ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=float(sampling_frequency_hz))
+        else:
+            clusterless_params = deepcopy(clusterless_params)
+            if sampling_frequency_hz is not None:
+                clusterless_params.clusterless_sampling_frequency_hz = float(sampling_frequency_hz)
         sess = computation_result.sess
 
         def _build_decoder_for_pf(pf):
