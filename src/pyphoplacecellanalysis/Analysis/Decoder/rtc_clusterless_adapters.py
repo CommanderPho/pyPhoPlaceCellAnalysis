@@ -14,6 +14,7 @@ from replay_trajectory_classification.environments import Environment
 @dataclass
 class ClusterlessDecodingParameters:
     clusterless_sampling_frequency_hz: float = 1000.0
+    position_sampling_frequency_Hz: float = 120.0
     rtc_place_bin_size_override: Optional[float] = None
     rtc_2d_place_bin_size_override: Optional[float] = 16.0
     rtc_mark_std: float = 24.0
@@ -218,10 +219,24 @@ def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, plac
 
 
 def build_clusterless_training_data_from_pfnd(pf: PfND, multiunits: np.ndarray, rtc_time: np.ndarray, sampling_frequency_hz: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """ 
+
+    """
+    from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
+
     source_pos_df = pf.filtered_pos_df
+    pos_sampling_rate_Hz: float = source_pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
+    pos_sampling_rate_Hz
+
+
     source_times = source_pos_df['t'].to_numpy(dtype=float) if 't' in source_pos_df.columns else source_pos_df['t_seconds'].to_numpy(dtype=float)
     t_start = float(rtc_time[0] - 0.5 / sampling_frequency_hz)
     t_end = float(rtc_time[-1] + 0.5 / sampling_frequency_hz)
+
+    
+
+    # movement_var = estimate_movement_var(source_pos_df[['x', 'y']].to_numpy(), sampling_frequency=)
+
     position_source = position_array_from_pfnd(pf)
     _, resampled_position = resample_position_to_rtc_clock(position_source, source_times, t_start, t_end, sampling_frequency_hz)
     if len(resampled_position) != len(rtc_time):

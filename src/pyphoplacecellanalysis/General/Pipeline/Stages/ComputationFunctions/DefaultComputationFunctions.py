@@ -86,27 +86,65 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
     def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None, multiunits=None, rtc_time=None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
+
+        sess = computation_result.sess
+        assert sess is not None
+        pos_sampling_rate_Hz: float = sess.position.metadata.get('sampling_rate', 120.0) ## Hz ##
+
+
         if time_bin_size is None:
             time_bin_size = getattr(getattr(computation_result.computation_config, 'pf_params', None), 'time_bin_size', None)
         if clusterless_params is None:
             if sampling_frequency_hz is None:
                 sampling_frequency_hz = 1000.0 if time_bin_size is None else (1.0 / float(time_bin_size))
-            clusterless_params = ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=float(sampling_frequency_hz))
+            clusterless_params = ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=float(sampling_frequency_hz), position_sampling_frequency_Hz=float(pos_sampling_rate_Hz))
         else:
             clusterless_params = deepcopy(clusterless_params)
             if sampling_frequency_hz is not None:
                 clusterless_params.clusterless_sampling_frequency_hz = float(sampling_frequency_hz)
-        sess = computation_result.sess
+            if pos_sampling_rate_Hz is not None:
+                clusterless_params.position_sampling_frequency_Hz = float(pos_sampling_rate_Hz)
+
+        # movement_var = estimate_movement_var(source_pos_df[['x', 'y']].to_numpy(), sampling_frequency=clusterless_params.position_sampling_frequency_Hz)        
+        ## pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
+        
 
         def _build_decoder_for_pf(pf):
+            """ captures: clusterless_params """
+            
             pos_df = pf.filtered_pos_df
+            # pos_sampling_rate_Hz: float = pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
+            # pos_sampling_rate_Hz
+            active_pos_arr = pos_df[['x', 'y']].to_numpy()
+            movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
+            # If your marks are integers, use this algorithm because it is much faster
+            clusterless_algorithm = 'multiunit_likelihood'
+            clusterless_algorithm_params = {
+                'mark_std': 1.0,
+                'position_std': 12.5,
+            }
+            environment = Environment(place_bin_size=np.sqrt(movement_var))
+            continuous_transition_types = [[RandomWalk(movement_var=movement_var * 120),  Uniform(), Identity()],
+                                            [Uniform(),                                   Uniform(), Uniform()],
+                                            [RandomWalk(movement_var=movement_var * 120), Uniform(), Identity()],
+                                        ]
+            classifier: ClusterlessClassifier = ClusterlessClassifier(environments=environment,
+                                                    continuous_transition_types=continuous_transition_types,
+                                                    clusterless_algorithm=clusterless_algorithm,
+                                                    clusterless_algorithm_params=clusterless_algorithm_params,
+                                                )
+            classifier.fit(active_pos_arr, multiunits)
+
             source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
             t_start = float(source_times.min())
             t_end = float(source_times.max())
             if multiunits is not None:
                 pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
             else:
-                pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, clusterless_params.clusterless_sampling_frequency_hz, t_start, t_end, spikes_df=pf.filtered_spikes_df.copy())
+                pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
+                                                                            t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
+
             decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
             decoder.compute_all()
             return decoder
