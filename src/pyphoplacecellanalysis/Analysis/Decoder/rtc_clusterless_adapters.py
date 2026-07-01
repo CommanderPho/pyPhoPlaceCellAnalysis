@@ -373,8 +373,15 @@ def extract_clusterless_spike_events_from_phy_folder(phy_path: Union[str, Path],
 
 
 @function_attributes(short_name=None, tags=['spikes'], input_requires=[], output_provides=[], uses=['_assign_spike_marks_to_multiunits'], used_by=[], creation_date='2026-07-01 10:11', related_items=[])
-def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: float, t_end: float, sampling_frequency_hz: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
-    """Materialize dense RTC multiunits for a time window from sparse clusterless spike events."""
+def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: Optional[float] = None, t_end: Optional[float] = None, sampling_frequency_hz: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
+    """Materialize dense RTC multiunits for a time window from sparse clusterless spike events.
+
+    When ``t_start`` and/or ``t_end`` are omitted, missing bounds are taken from ``events.t_start`` and ``events.t_end``.
+    """
+    if t_start is None:
+        t_start = float(events.t_start)
+    if t_end is None:
+        t_end = float(events.t_end)
 
     def _subfn_bin_spikes_to_multiunits(multiunits: np.ndarray, spike_times_sec: np.ndarray, marks: np.ndarray, electrode_indices: np.ndarray, rtc_time: np.ndarray) -> None:
         time_bin_indices = np.clip(np.searchsorted(rtc_time, spike_times_sec), 0, len(rtc_time) - 1)

@@ -162,6 +162,16 @@ def test_save_load_clusterless_spike_events_roundtrip(tmp_path):
     assert loaded_events.n_mark_dims == events.n_mark_dims
 
 
+def test_build_multiunits_from_spike_events_uses_event_times_when_omitted(tmp_path):
+    phy_folder = tmp_path / "phy"
+    _write_synthetic_phy_folder(phy_folder)
+    events = extract_clusterless_spike_events_from_phy_folder(phy_folder, t_start=1.0, t_end=2.0, electrode_mode="channel", sampling_frequency_hz=1000.0)
+    explicit_multiunits, explicit_rtc_time = build_multiunits_from_spike_events(events, t_start=1.0, t_end=2.0, sampling_frequency_hz=1000.0)
+    inferred_multiunits, inferred_rtc_time = build_multiunits_from_spike_events(events, sampling_frequency_hz=1000.0)
+    np.testing.assert_allclose(inferred_rtc_time, explicit_rtc_time)
+    np.testing.assert_allclose(inferred_multiunits, explicit_multiunits)
+
+
 def test_build_multiunits_from_spike_events_matches_phy_folder(tmp_path):
     phy_folder = tmp_path / "phy"
     _write_synthetic_phy_folder(phy_folder)
