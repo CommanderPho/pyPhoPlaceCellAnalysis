@@ -17,6 +17,7 @@ from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
     ClusterlessDecodingParameters,
+    _get_multiunit_electrode_keep_mask,
     build_clusterless_training_data_from_pfnd,
     build_rtc_environment_from_pfnd,
     most_likely_positions_from_posterior,
@@ -54,6 +55,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
     most_likely_position_flat_indicies: np.ndarray = non_serialized_field(default=None, repr=False)
     time_binning_container: BinningContainer = non_serialized_field(default=None, repr=False)
     is_training_mask: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field(default=None, metadata={'shape': ('N_TIME_BINS',)})
+    multiunit_electrode_keep_mask: np.ndarray = non_serialized_field(default=None, repr=False)
     rtc_position_bin_centers: np.ndarray = non_serialized_field(default=None, repr=False)
     estimated_log_likelihood_memory_bytes: int = non_serialized_field(default=None, repr=False)
 
@@ -351,6 +353,10 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         self.classifier = ClusterlessClassifier(environments=[environment], clusterless_algorithm="multiunit_likelihood", clusterless_algorithm_params={"mark_std": params.rtc_mark_std, "position_std": params.rtc_position_std})
         position_train, multiunits_train, is_training = build_clusterless_training_data_from_pfnd(self.pf, training_multiunits, training_rtc_time, self.sampling_frequency_hz)
         self.is_training_mask = is_training
+        self.multiunit_electrode_keep_mask = _get_multiunit_electrode_keep_mask(multiunits_train, time_mask=is_training)
+        multiunits_train = multiunits_train[:, :, self.multiunit_electrode_keep_mask]
+        if self.multiunits is not None:
+            self.multiunits = np.asarray(self.multiunits, dtype=float)[:len(multiunits_train), :, self.multiunit_electrode_keep_mask]
         self.classifier.fit(position_train, multiunits_train, is_training=is_training)
         fitted_environment = self.classifier.environments[0]
         n_position_bins = int(np.asarray(fitted_environment.is_track_interior_).size)
@@ -364,6 +370,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         classifier, rtc_position_bin_centers = self._ensure_fitted_classifier(multiunits_for_fit=multiunits_for_fit, rtc_time_for_fit=rtc_time_for_fit, debug_print=debug_print)
         params = self.clusterless_params if self.clusterless_params is not None else ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=self.sampling_frequency_hz)
         multiunits = np.asarray(multiunits, dtype=float)
+        if self.multiunit_electrode_keep_mask is not None:
+            multiunits = multiunits[:, :, self.multiunit_electrode_keep_mask]
         rtc_time = np.asarray(rtc_time, dtype=float)
         n_position_bins = int(np.asarray(classifier.environments[0].is_track_interior_).size)
         self.raise_if_log_likelihood_exceeds_memory_limit(n_time=len(multiunits), n_position_bins=n_position_bins, max_memory_gib=params.max_log_likelihood_memory_gib)
