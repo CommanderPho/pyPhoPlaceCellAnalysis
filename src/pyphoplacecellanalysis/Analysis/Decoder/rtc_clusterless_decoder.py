@@ -29,10 +29,15 @@ from neuropy.utils.mixins.AttrsClassHelpers import custom_define, non_serialized
 
 @custom_define(slots=False, eq=False)
 class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClass, BasePositionDecoder):
-    """Clusterless position decoder using replay_trajectory_classification on PfND spatial grids."""
+    """Clusterless position decoder using replay_trajectory_classification on PfND spatial grids.
+
+        position : array_like, shape (n_time, n_position_dims)
+        multiunits : array_like, shape (n_time, n_marks, n_electrodes)
+        is_training : None or array_like, shape (n_time,)
+    """
 
     sampling_frequency_hz: float = 1000.0
-    multiunits: NDArray[ND.Shape["n_time, n_marks, n_electrodes"], np.floating] = serialized_field(default=None, metadata={'shape': ('n_time', 'n_marks', 'n_electrodes')})
+    multiunits: NDArray[ND.Shape["N_TIME_BINS, N_MARKS, N_ELECTRODES"], np.floating] = serialized_field(default=None, metadata={'shape': ('N_TIME_BINS', 'N_MARKS', 'N_ELECTRODES')})
     rtc_time: np.ndarray = None
     clusterless_params: ClusterlessDecodingParameters = None
     classifier: ClusterlessClassifier = non_serialized_field(default=None, repr=False)
@@ -43,7 +48,7 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
     revised_most_likely_positions: np.ndarray = non_serialized_field(default=None, repr=False)
     most_likely_position_flat_indicies: np.ndarray = non_serialized_field(default=None, repr=False)
     time_binning_container: BinningContainer = non_serialized_field(default=None, repr=False)
-    is_training_mask: np.ndarray = non_serialized_field(default=None, repr=False)
+    is_training_mask: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field(default=None, metadata={'shape': ('N_TIME_BINS',)})
     rtc_position_bin_centers: np.ndarray = non_serialized_field(default=None, repr=False)
     estimated_log_likelihood_memory_bytes: int = non_serialized_field(default=None, repr=False)
 
