@@ -383,10 +383,6 @@ def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: 
     if t_end is None:
         t_end = float(events.t_end)
 
-    def _subfn_bin_spikes_to_multiunits(multiunits: np.ndarray, spike_times_sec: np.ndarray, marks: np.ndarray, electrode_indices: np.ndarray, rtc_time: np.ndarray) -> None:
-        time_bin_indices = np.clip(np.searchsorted(rtc_time, spike_times_sec), 0, len(rtc_time) - 1)
-        _assign_spike_marks_to_multiunits(multiunits, time_bin_indices, electrode_indices, marks)
-
     sampling_frequency_hz = float(sampling_frequency_hz if sampling_frequency_hz is not None else events.sampling_frequency_hz)
     valid_spikes = (events.spike_times_sec >= t_start) & (events.spike_times_sec <= t_end)
     spike_times_sec = events.spike_times_sec[valid_spikes]
@@ -400,7 +396,8 @@ def build_multiunits_from_spike_events(events: ClusterlessSpikeEvents, t_start: 
     n_mark_dims = int(events.marks.shape[1])
     n_electrodes = int(np.max(electrode_indices)) + 1
     multiunits = np.full((len(rtc_time), n_mark_dims, n_electrodes), np.nan, dtype=float)
-    _subfn_bin_spikes_to_multiunits(multiunits, spike_times_sec.astype(float), marks.astype(float), electrode_indices.astype(int), rtc_time)
+    time_bin_indices = np.clip(np.searchsorted(rtc_time, spike_times_sec.astype(float)), 0, len(rtc_time) - 1)
+    _assign_spike_marks_to_multiunits(multiunits, time_bin_indices, electrode_indices.astype(int), marks.astype(float))
     return _drop_empty_multiunit_electrodes(multiunits), rtc_time
 
 
