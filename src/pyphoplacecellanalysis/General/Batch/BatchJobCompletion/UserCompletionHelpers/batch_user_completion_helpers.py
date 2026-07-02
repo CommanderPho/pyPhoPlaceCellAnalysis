@@ -2267,7 +2267,6 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 # Utility/Helpers                                                                                                      #
 # ==================================================================================================================== #
 
-from neuropy.utils.mixins.binning_helpers import safe_limit_num_grid_bin_values
 from neuropy.core.session.Formats.SessionSpecifications import SessionConfig
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
 from neuropy.core.session.Formats.Specific.KDibaOldDataSessionFormat import KDibaOldDataSessionFormatRegisteredClass
@@ -4361,3 +4360,157 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 
 # %%
+
+
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error', 'clusterless', 'comparison'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance'], used_by=[], creation_date='2024-07-03 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def compare_clusterless_vs_typical_decoder_performance(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, debug_print: bool = False) -> dict:
+    """Computes and compares Bapun train/test lap decoder error between typical and clusterless decoders; exports CSVs and visual comparisons to collected_outputs.
+    """
+    import sys
+    from pyphocorehelpers.exception_helpers import CapturedException
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, _resolve_maze_epoch_names_for_multi_context_eval
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file
+
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
+        print(f'WARN: compare_clusterless_vs_typical_decoder_performance skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compare_clusterless_vs_typical_decoder_performance(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    resolved_maze_epoch_names: Optional[List[str]] = maze_epoch_names
+    if resolved_maze_epoch_names is None:
+        try:
+            resolved_maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+        except ValueError as resolve_err:
+            resolved_maze_epoch_names = None
+            if debug_print:
+                print(f'WARN: could not resolve maze_epoch_names: {resolve_err}')
+
+    callback_outputs = {'typical_err_agg_df': None, 'clusterless_err_agg_df': None, 'comparison_err_df_csv_path': None}
+
+    # 1. Quantitative Comparison (CSV)
+    try:
+        typical_err_agg_df, typical_err_df, typical_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=False, debug_print=debug_print)
+        callback_outputs['typical_err_agg_df'] = typical_err_agg_df
+    except Exception as e:
+        print(f"ERROR computing typical decoder error: {e}")
+        typical_err_df = None
+
+    try:
+        clusterless_err_agg_df, clusterless_err_df, clusterless_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=True, debug_print=debug_print)
+        callback_outputs['clusterless_err_agg_df'] = clusterless_err_agg_df
+    except Exception as e:
+        print(f"ERROR computing clusterless decoder error: {e}")
+        clusterless_err_df = None
+
+    if typical_err_df is not None and clusterless_err_df is not None:
+        # Merge results into a single DataFrame
+        typical_err_df['decoder_type'] = 'typical'
+        clusterless_err_df['decoder_type'] = 'clusterless'
+        comparison_df = pd.concat([typical_err_df, clusterless_err_df], ignore_index=True)
+        comparison_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_decoder_comparison.csv').resolve()
+        comparison_df.to_csv(comparison_csv_path)
+        callback_outputs['comparison_err_df_csv_path'] = comparison_csv_path
+        print(f'\tSaved comparison CSV to {comparison_csv_path}')
+
+        # 2. Visual Comparison 1D (PNG)
+        try:
+            fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+            # Subplot 1: Typical
+            ax = axes[0]
+            ax.plot(typical_err_df.index, typical_err_df.get('err_cm', []), label='Typical Error (cm)', color='blue')
+            ax.set_title('Typical Decoder')
+            ax.set_ylabel('Error (cm)')
+            ax.legend()
+
+            # Subplot 2: Clusterless
+            ax = axes[1]
+            ax.plot(clusterless_err_df.index, clusterless_err_df.get('err_cm', []), label='Clusterless Error (cm)', color='red')
+            ax.set_title('Clusterless Decoder')
+            ax.set_xlabel('Sample / Time')
+            ax.set_ylabel('Error (cm)')
+            ax.legend()
+
+            png_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_1D_decoder_comparison.png').resolve()
+            fig.savefig(png_path)
+            plt.close(fig)
+            print(f'\tSaved 1D comparison PNG to {png_path}')
+            callback_outputs['1d_png_path'] = png_path
+        except Exception as e:
+            print(f"ERROR generating 1D PNG comparison: {e}")
+
+        # 3. Visual Comparison 2D (Video)
+        try:
+            fig_vid, ax_vid = plt.subplots(2, 1, figsize=(10, 10))
+            ax_vid[0].set_title('Typical Decoder 2D')
+            ax_vid[1].set_title('Clusterless Decoder 2D')
+
+            # Extract measured and decoded positions for typical
+            typ_measured_x = typical_err_df['x'].values if 'x' in typical_err_df.columns else np.zeros(len(typical_err_df))
+            typ_measured_y = typical_err_df['y'].values if 'y' in typical_err_df.columns else np.zeros(len(typical_err_df))
+            typ_decoded_x = typical_err_df['decoded_x'].values if 'decoded_x' in typical_err_df.columns else np.zeros(len(typical_err_df))
+            typ_decoded_y = typical_err_df['decoded_y'].values if 'decoded_y' in typical_err_df.columns else np.zeros(len(typical_err_df))
+
+            # Extract measured and decoded positions for clusterless
+            clus_measured_x = clusterless_err_df['x'].values if 'x' in clusterless_err_df.columns else np.zeros(len(clusterless_err_df))
+            clus_measured_y = clusterless_err_df['y'].values if 'y' in clusterless_err_df.columns else np.zeros(len(clusterless_err_df))
+            clus_decoded_x = clusterless_err_df['decoded_x'].values if 'decoded_x' in clusterless_err_df.columns else np.zeros(len(clusterless_err_df))
+            clus_decoded_y = clusterless_err_df['decoded_y'].values if 'decoded_y' in clusterless_err_df.columns else np.zeros(len(clusterless_err_df))
+
+            # Setup lines
+            typ_meas_line, = ax_vid[0].plot([], [], 'o-', label='Measured', color='orange')
+            typ_dec_line, = ax_vid[0].plot([], [], 'x--', label='Decoded', color='blue')
+            ax_vid[0].legend()
+
+            clus_meas_line, = ax_vid[1].plot([], [], 'o-', label='Measured', color='orange')
+            clus_dec_line, = ax_vid[1].plot([], [], 'x--', label='Decoded', color='red')
+            ax_vid[1].legend()
+
+            def init():
+                if len(typ_measured_x) > 0:
+                    ax_vid[0].set_xlim(np.nanmin(typ_measured_x)-5, np.nanmax(typ_measured_x)+5)
+                    ax_vid[0].set_ylim(np.nanmin(typ_measured_y)-5, np.nanmax(typ_measured_y)+5)
+                if len(clus_measured_x) > 0:
+                    ax_vid[1].set_xlim(np.nanmin(clus_measured_x)-5, np.nanmax(clus_measured_x)+5)
+                    ax_vid[1].set_ylim(np.nanmin(clus_measured_y)-5, np.nanmax(clus_measured_y)+5)
+                return typ_meas_line, typ_dec_line, clus_meas_line, clus_dec_line
+
+            def update(frame):
+                typ_meas_line.set_data(typ_measured_x[:frame], typ_measured_y[:frame])
+                typ_dec_line.set_data(typ_decoded_x[:frame], typ_decoded_y[:frame])
+
+                clus_meas_line.set_data(clus_measured_x[:frame], clus_measured_y[:frame])
+                clus_dec_line.set_data(clus_decoded_x[:frame], clus_decoded_y[:frame])
+                return typ_meas_line, typ_dec_line, clus_meas_line, clus_dec_line
+
+            n_frames = min(len(typical_err_df), len(clusterless_err_df), 100) # Limit to 100 frames for speed
+            if n_frames > 0:
+                ani = animation.FuncAnimation(fig_vid, update, frames=n_frames, init_func=init, interval=50, blit=True)
+                mp4_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_2D_decoder_comparison.mp4').resolve()
+                try:
+                    ani.save(mp4_path, writer='ffmpeg')
+                    print(f'\tSaved 2D comparison Video to {mp4_path}')
+                    callback_outputs['2d_video_path'] = mp4_path
+                except Exception as save_err:
+                    print(f"WARN: could not save mp4 (ffmpeg missing?): {save_err}")
+            plt.close(fig_vid)
+        except Exception as e:
+            print(f"ERROR generating 2D Video comparison: {e}")
+
+    across_session_results_extended_dict['compare_clusterless_vs_typical_decoder_performance'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
