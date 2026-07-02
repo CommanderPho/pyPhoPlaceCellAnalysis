@@ -326,6 +326,18 @@ def test_clusterless_decode_2d_p_x_given_n_shape():
     assert p_x_given_n.shape == (n_bins, n_bins, multiunits.shape[0])
 
 
+def test_clusterless_fit_classifier_on_init():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=True, post_load_on_init=False, debug_print=False)
+    assert decoder.classifier is not None
+    assert decoder.rtc_position_bin_centers is not None
+    assert decoder.multiunit_electrode_keep_mask is not None
+    assert decoder.p_x_given_n is None
+
+
 def test_clusterless_fit_drops_electrodes_without_training_spikes():
     time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
     multiunits = np.asarray(multiunits, dtype=float).copy()
