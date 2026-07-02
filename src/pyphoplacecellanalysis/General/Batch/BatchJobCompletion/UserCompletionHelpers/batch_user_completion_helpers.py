@@ -4369,7 +4369,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 @function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-06-30 12:00', related_items=[])
 def compute_and_pickle_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        debug_print: bool = False) -> dict:
+        pickle_clusterless_decoder: bool = True, debug_print: bool = False) -> dict:
     """Computes and exports Bapun pf2D_ClusterlessDecoder to a pickle file for redundancy."""
     import pickle
     from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
@@ -4397,12 +4397,13 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
                         if getattr(decoder, 'rtc_results', None) is None:
                             decoder.compute_all()
 
-                        output_path = self.collected_outputs_path.joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
-                        with open(output_path, 'wb') as f:
-                            pickle.dump(decoder, f)
+                        if pickle_clusterless_decoder:
+                            output_path = self.collected_outputs_path.joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
+                            with open(output_path, 'wb') as f:
+                                pickle.dump(decoder, f)
 
-                        print(f'\texported clusterless decoder for {filter_name} to: {output_path}')
-                        callback_outputs['exported_clusterless_decoder_paths'].append(output_path)
+                            print(f'\texported clusterless decoder for {filter_name} to: {output_path}')
+                            callback_outputs['exported_clusterless_decoder_paths'].append(output_path)
     except Exception as e:
         print(f'ERROR: Exception during compute_and_pickle_clusterless_decoder_completion_function: {e}')
 
@@ -4416,6 +4417,8 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
 # Bapun Clusterless Plotting                                                                                           #
 # ==================================================================================================================== #
 
+from typing import Optional, List
+from pyphocorehelpers.function_helpers import function_attributes
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
