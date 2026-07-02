@@ -86,8 +86,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                           input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
     def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None,
-                                                           multiunits: Optional[np.ndarray] = None, rtc_time: Optional[np.ndarray] = None,
-                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[ClusterlessDecodingParameters] = None, **kwargs):
+                                                        #    multiunits: Optional[np.ndarray] = None, rtc_time: Optional[np.ndarray] = None,
+                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[ClusterlessDecodingParameters] = None,
+                                                           should_defer_compute_all_decoded_times: bool = True,  
+                                                             **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
         from neuropy.core.clusterless_spike_events import default_clusterless_spike_events_path
         from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
@@ -115,9 +117,15 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         if time_bin_size is None:
             time_bin_size = getattr(getattr(computation_result.computation_config, 'pf_params', None), 'time_bin_size', None)
+    
+
+        if time_bin_size is not None:
+            print(f'WARN: time_bin_size (time_bin_size: {time_bin_size}) is not currently used in `_perform_clusterless_position_decoding_computation`... ')
+
         if clusterless_params is None:
             if sampling_frequency_hz is None:
-                sampling_frequency_hz = 1000.0 if time_bin_size is None else (1.0 / float(time_bin_size))
+                sampling_frequency_hz = 1000.0 # 1000Hz
+                # sampling_frequency_hz = 1000.0 if time_bin_size is None else (1.0 / float(time_bin_size))
             clusterless_params = ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=float(sampling_frequency_hz), position_sampling_frequency_Hz=float(pos_sampling_rate_Hz))
         else:
             clusterless_params = deepcopy(clusterless_params)
@@ -180,7 +188,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             #                                                                 t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
 
             decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
-            decoder.compute_all()
+            if not should_defer_compute_all_decoded_times:
+                decoder.compute_all() ## #TODO 2026-07-01 19:02: - [ ] is this full compute really needed? The BasePositionDecoder doesn't compute like this all (doesn't store results).
+            else:
+                print(f'\tWARN: should_defer_compute_all_decoded_times == True, so not running `decoder.compute_all()`.')
             return decoder
         ## END def _build_decoder_for_pf(...
 

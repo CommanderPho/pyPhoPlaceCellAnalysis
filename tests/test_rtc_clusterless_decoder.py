@@ -11,8 +11,8 @@ import xarray as xr
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_multiunits_from_spike_events, build_rtc_environment_from_pfnd, extract_clusterless_spike_events_from_phy_folder, load_clusterless_spike_events, rtc_posterior_to_p_x_given_n, save_clusterless_spike_events
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import ClusterlessRTCPositionDecoder, DecodedFilterEpochsResult
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import PfNDSyncedEnvironment, _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_multiunits_from_spike_events, build_rtc_environment_from_pfnd, extract_clusterless_spike_events_from_phy_folder, load_clusterless_spike_events, rtc_posterior_flat_p_x_given_n, rtc_posterior_to_p_x_given_n, save_clusterless_spike_events
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ClusterlessRTCPositionDecoder, DecodedFilterEpochsResult
 
 
 class _MockPfConfig:
@@ -37,8 +37,14 @@ class _MockPfND:
         self.config = _MockPfConfig(grid_bin_bounds=grid_bin_bounds)
         self.pos_bin_size = pos_bin_size if ndim == 1 else (pos_bin_size, pos_bin_size)
         self.occupancy = np.ones(n_bins if ndim == 1 else (n_bins, n_bins))
-        self.xbin_centers = np.arange(n_bins, dtype=float)
-        self.ybin_centers = np.arange(n_bins, dtype=float) if ndim == 2 else None
+        if ndim == 1:
+            self.xbin = np.linspace(0.0, float(n_bins * pos_bin_size), n_bins + 1, dtype=float)
+            self.ybin = None
+        else:
+            self.xbin = np.linspace(0.0, float(n_bins * pos_bin_size), n_bins + 1, dtype=float)
+            self.ybin = np.linspace(0.0, float(n_bins * pos_bin_size), n_bins + 1, dtype=float)
+        self.xbin_centers = self.xbin[:-1] + np.diff(self.xbin) / 2.0
+        self.ybin_centers = (self.ybin[:-1] + np.diff(self.ybin) / 2.0) if ndim == 2 else None
         self.epochs = None
 
 
@@ -68,9 +74,42 @@ def test_pfnd_position_range_shapes():
 def test_build_rtc_environment_fit_place_grid():
     mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
     environment = build_rtc_environment_from_pfnd(mock_pf)
+    assert isinstance(environment, PfNDSyncedEnvironment)
     position = np.linspace(0.0, 100.0, 50)[:, np.newaxis]
     environment.fit_place_grid(position)
     assert environment.place_bin_centers_.shape[1] == 1
+    assert environment.centers_shape_ == np.shape(mock_pf.occupancy)
+
+
+def test_rtc_environment_matches_pfnd_bin_shape():
+    mock_pf = _MockPfND(n_bins=8, ndim=2, grid_bin_bounds=((0.0, 80.0), (0.0, 80.0)), pos_bin_size=10.0)
+    environment = build_rtc_environment_from_pfnd(mock_pf)
+    position = np.column_stack([np.linspace(0.0, 80.0, 100), np.linspace(0.0, 80.0, 100)])
+    environment.fit_place_grid(position)
+    assert environment.centers_shape_ == np.shape(mock_pf.occupancy)
+
+
+def test_rtc_posterior_to_p_x_given_n_2d_shape():
+    n_time, n_x, n_y = 15, 6, 7
+    mock_pf = _MockPfND(n_bins=n_x, ndim=2)
+    mock_pf.occupancy = np.ones((n_x, n_y))
+    posterior = np.random.rand(n_time, n_x, n_y)
+    posterior /= posterior.sum(axis=(1, 2), keepdims=True)
+    rtc_results = xr.Dataset({"acausal_posterior": (("time", "x_position", "y_position"), posterior)})
+    p_x_given_n = rtc_posterior_to_p_x_given_n(rtc_results, mock_pf)
+    assert p_x_given_n.shape == (n_x, n_y, n_time)
+    flat_p_x_given_n = rtc_posterior_flat_p_x_given_n(rtc_results, mock_pf)
+    assert flat_p_x_given_n.shape == (n_x * n_y, n_time)
+
+
+def test_perform_build_marginals_with_shaped_posterior():
+    n_x, n_y, n_time = 5, 6, 20
+    p_x_given_n = np.random.rand(n_x, n_y, n_time)
+    p_x_given_n /= p_x_given_n.sum(axis=(0, 1), keepdims=True)
+    most_likely_positions = np.column_stack([np.arange(n_time, dtype=float), np.arange(n_time, dtype=float)])
+    marginal_x, marginal_y = BasePositionDecoder.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=False)
+    assert marginal_x.p_x_given_n.shape == (n_x, n_time)
+    assert marginal_y.p_x_given_n.shape == (n_y, n_time)
 
 
 def test_build_multiunits_from_rtc_simulation_shapes():
@@ -268,10 +307,23 @@ def test_clusterless_decode_multiunits_roundtrip():
         most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = decoder.decode(multiunits, time_bin_size=0.001, rtc_time=time, output_flat_versions=True, debug_print=False)
     assert decoder.p_x_given_n is None
     assert len(most_likely_positions) == multiunits.shape[0]
-    assert p_x_given_n.ndim >= 2
+    assert p_x_given_n.shape == (*np.shape(mock_pf.occupancy), multiunits.shape[0])
     assert most_likely_position_indicies.ndim >= 1
     assert flat_outputs_container is not None
-    assert flat_outputs_container.flat_p_x_given_n.shape[1] == multiunits.shape[0]
+    assert flat_outputs_container.flat_p_x_given_n.shape == (int(np.prod(mock_pf.occupancy.shape)), multiunits.shape[0])
+
+
+def test_clusterless_decode_2d_p_x_given_n_shape():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    n_bins = 10
+    mock_pf = _MockPfND(n_bins=n_bins, ndim=2, grid_bin_bounds=((0.0, 100.0), (0.0, 100.0)), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    position_2d = np.column_stack([position, np.zeros_like(position)])
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position_2d, multiunits, is_training)):
+        _most_likely_positions, p_x_given_n, _most_likely_position_indicies, _flat_outputs_container = decoder.decode(multiunits, time_bin_size=0.001, rtc_time=time, output_flat_versions=True, debug_print=False)
+    assert p_x_given_n.ndim == 3
+    assert p_x_given_n.shape == (n_bins, n_bins, multiunits.shape[0])
 
 
 def test_clusterless_fit_drops_electrodes_without_training_spikes():

@@ -14,7 +14,8 @@ from neuropy.analyses.placefields import PfND
 from neuropy.core.clusterless_spike_events import ClusterlessSpikeEvents, CLUSTERLESS_SPIKE_EVENTS_FILE_VERSION, default_clusterless_spike_events_path, load_clusterless_spike_events, save_clusterless_spike_events
 from neuropy.utils.efficient_interval_search import determine_event_interval_is_included
 from pyphocorehelpers.function_helpers import function_attributes
-from replay_trajectory_classification.environments import Environment
+from replay_trajectory_classification.core import atleast_2d, get_centers
+from replay_trajectory_classification.environments import Environment, get_track_boundary, get_track_interior
 
 
 @dataclass
@@ -22,13 +23,65 @@ class ClusterlessDecodingParameters:
     clusterless_sampling_frequency_hz: float = 1000.0
     position_sampling_frequency_Hz: float = 120.0
     rtc_place_bin_size_override: Optional[float] = None
-    rtc_2d_place_bin_size_override: Optional[float] = 16.0
+    rtc_2d_place_bin_size_override: Optional[float] = None
     rtc_mark_std: float = 24.0
     rtc_position_std: float = 6.0
     rtc_environment_name: str = ""
     state_index_for_posterior: Optional[int] = None
     max_log_likelihood_memory_gib: Optional[float] = 8.0
-    should_match_pf_grid: bool = False
+    should_match_pf_grid: bool = True
+
+
+@dataclass
+class PfNDSyncedEnvironment(Environment):
+    """RTC Environment whose spatial grid is aligned to PfND xbin/ybin edges when available."""
+
+    pf: Any = None
+
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            return self.environment_name == other
+        if isinstance(other, Environment):
+            return self.environment_name == other.environment_name
+        return NotImplemented
+
+
+    def fit_place_grid(self, position: Optional[np.ndarray] = None, infer_track_interior: bool = True):
+        pf_xbin = getattr(self.pf, 'xbin', None) if self.pf is not None else None
+        if pf_xbin is not None and len(np.asarray(pf_xbin)) >= 2:
+            if position is None:
+                raise ValueError("Must provide position when fitting PfNDSyncedEnvironment.")
+            position = atleast_2d(np.asarray(position, dtype=float))
+            is_nan = np.any(np.isnan(position), axis=1)
+            position = position[~is_nan]
+            x_edges = np.asarray(pf_xbin, dtype=float)
+            if self.pf.ndim == 1:
+                self.edges_ = (x_edges,)
+                x_centers = get_centers(x_edges)
+                self.centers_shape_ = (len(x_centers),)
+                self.place_bin_centers_ = x_centers[:, np.newaxis]
+                mesh_edges = np.meshgrid(x_edges, indexing='ij')
+                self.place_bin_edges_ = np.stack([mesh_edges[0].ravel(), mesh_edges[0].ravel()], axis=1)
+            else:
+                y_edges = np.asarray(self.pf.ybin, dtype=float)
+                self.edges_ = (x_edges, y_edges)
+                mesh_centers = np.meshgrid(get_centers(x_edges), get_centers(y_edges))
+                self.centers_shape_ = mesh_centers[0].T.shape
+                self.place_bin_centers_ = np.stack([center.ravel() for center in mesh_centers], axis=1)
+                mesh_edges = np.meshgrid(x_edges, y_edges)
+                self.place_bin_edges_ = np.stack([edge.ravel() for edge in mesh_edges], axis=1)
+            self.infer_track_interior = infer_track_interior
+            if self.is_track_interior is None and infer_track_interior:
+                self.is_track_interior_ = get_track_interior(position, bins=self.centers_shape_, fill_holes=self.fill_holes, dilate=self.dilate, bin_count_threshold=self.bin_count_threshold)
+            elif self.is_track_interior is None and not infer_track_interior:
+                self.is_track_interior_ = np.ones(self.centers_shape_, dtype=bool)
+            if len(self.edges_) > 1:
+                self.is_track_boundary_ = get_track_boundary(self.is_track_interior_, connectivity=1)
+            else:
+                self.is_track_boundary_ = None
+            return self
+        return super().fit_place_grid(position, infer_track_interior=infer_track_interior)
 
 def _pfnd_place_bin_size(pf: PfND, place_bin_size_override: Optional[float] = None) -> float:
     if place_bin_size_override is not None:
@@ -67,11 +120,12 @@ def position_array_from_pfnd(pf: PfND) -> np.ndarray:
     return np.column_stack([pos_df['x'].to_numpy(dtype=float), pos_df['y'].to_numpy(dtype=float)])
 
 
-def build_rtc_environment_from_pfnd(pf: PfND, environment_name: str = "", place_bin_size_override: Optional[float] = None) -> Environment:
+def build_rtc_environment_from_pfnd(pf: PfND, environment_name: str = "", place_bin_size_override: Optional[float] = None) -> PfNDSyncedEnvironment:
     position_range = _pfnd_position_range(pf)
-    if position_range is None:
-        return Environment(environment_name=environment_name, place_bin_size=_pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override), infer_track_interior=True)
-    return Environment(environment_name=environment_name, place_bin_size=_pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override), position_range=position_range, infer_track_interior=True)
+    place_bin_size = _pfnd_place_bin_size(pf, place_bin_size_override=place_bin_size_override)
+    if position_range is not None:
+        return PfNDSyncedEnvironment(environment_name=environment_name, place_bin_size=place_bin_size, position_range=position_range, infer_track_interior=True, pf=pf)
+    return PfNDSyncedEnvironment(environment_name=environment_name, place_bin_size=place_bin_size, infer_track_interior=True, pf=pf)
 
 
 def resample_position_to_rtc_clock(position_array: np.ndarray, source_times: np.ndarray, t_start: float, t_end: float, sampling_frequency_hz: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -294,28 +348,42 @@ def build_multiunits_from_phy_folder(phy_path: Union[str, Path], t_start: float,
 # ==================================================================================================================================================================================================================================================================================== #
 # Post Compute                                                                                                                                                                                                                                                                         #
 # ==================================================================================================================================================================================================================================================================================== #
-def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None, should_match_pf_grid: bool = False) -> np.ndarray:
+def _rtc_posterior_spatial_time_values(rtc_results: xr.Dataset, state_index: Optional[int] = None) -> np.ndarray:
     posterior = rtc_results.acausal_posterior
     if state_index is None:
-        posterior_time_bins = posterior.sum(dim="state")
+        posterior_time_bins = posterior.sum(dim="state") if "state" in posterior.dims else posterior
     else:
         posterior_time_bins = posterior.isel(state=state_index)
     spatial_dims = [a_dim for a_dim in posterior_time_bins.dims if a_dim != "time"]
-    posterior_time_bins = posterior_time_bins.transpose(*spatial_dims, "time")
-    posterior_values = posterior_time_bins.values
-    p_x_given_n_rtc = posterior_values.reshape((int(np.prod(posterior_values.shape[:-1])), posterior_values.shape[-1]), order="F")
+    return posterior_time_bins.transpose(*spatial_dims, "time").values
+
+
+def rtc_posterior_flat_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None) -> np.ndarray:
+    posterior_values = _rtc_posterior_spatial_time_values(rtc_results, state_index=state_index)
+    return posterior_values.reshape((int(np.prod(posterior_values.shape[:-1])), posterior_values.shape[-1]), order="F")
+
+
+def rtc_posterior_to_p_x_given_n(rtc_results: xr.Dataset, pf: PfND, state_index: Optional[int] = None, should_match_pf_grid: bool = True) -> np.ndarray:
+    posterior_values = _rtc_posterior_spatial_time_values(rtc_results, state_index=state_index)
+    position_shape = tuple(np.shape(pf.occupancy))
+    n_time = posterior_values.shape[-1]
+    flat_size = int(np.prod(posterior_values.shape[:-1]))
+    pf_flat_size = int(np.prod(position_shape))
+    if flat_size == pf_flat_size:
+        return posterior_values.reshape((*position_shape, n_time), order="F")
+    flat_p_x_given_n = posterior_values.reshape((flat_size, n_time), order="F")
     if not should_match_pf_grid:
-        return p_x_given_n_rtc
-    n_pf_bins = int(np.prod(np.shape(pf.occupancy)))
-    n_rtc_bins = p_x_given_n_rtc.shape[0]
-    if n_rtc_bins == n_pf_bins:
-        return p_x_given_n_rtc
-    n_time = p_x_given_n_rtc.shape[1]
-    if n_rtc_bins > n_pf_bins:
-        return p_x_given_n_rtc[:n_pf_bins, :]
-    padded = np.zeros((n_pf_bins, n_time), dtype=float)
-    padded[:n_rtc_bins, :] = p_x_given_n_rtc
-    return padded
+        warnings.warn(f"RTC posterior flat size {flat_size} != PfND occupancy size {pf_flat_size}; returning RTC spatial shape {posterior_values.shape}.", stacklevel=2)
+        return posterior_values
+    if flat_size > pf_flat_size:
+        warnings.warn(f"RTC posterior has {flat_size} bins but PfND occupancy has {pf_flat_size}; truncating to PfND grid.", stacklevel=2)
+        flat_p_x_given_n = flat_p_x_given_n[:pf_flat_size, :]
+    else:
+        warnings.warn(f"RTC posterior has {flat_size} bins but PfND occupancy has {pf_flat_size}; zero-padding to PfND grid.", stacklevel=2)
+        padded = np.zeros((pf_flat_size, n_time), dtype=posterior_values.dtype)
+        padded[:flat_size, :] = flat_p_x_given_n
+        flat_p_x_given_n = padded
+    return flat_p_x_given_n.reshape((*position_shape, n_time), order="F")
 
 
 def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, place_bin_centers: Optional[np.ndarray] = None) -> np.ndarray:
