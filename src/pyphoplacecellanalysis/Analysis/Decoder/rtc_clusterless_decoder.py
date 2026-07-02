@@ -141,11 +141,13 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         self.neuron_IDs = None
         self.F = None
         self.P_x = None
+        self._setup_computation_variables()
 
 
     def _setup_computation_variables(self):
-        """Clusterless decoders do not build Zhang F/P_x matrices."""
-        pass
+        """Clusterless decoders do not build Zhang F/P_x matrices; fit RTC classifier when training data is available."""
+        if self.multiunits is not None and self.rtc_time is not None:
+            self._ensure_fitted_classifier(debug_print=self.debug_print)
 
 
     def get_by_id(self, ids, defer_compute_all:bool=False):
@@ -390,8 +392,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         self.classifier.fit(position_train, multiunits_train, is_training=is_training)
         fitted_environment = self.classifier.environments[0]
         n_position_bins = int(np.prod(self.original_position_data_shape))
-        self.estimated_log_likelihood_memory_bytes = self.raise_if_log_likelihood_exceeds_memory_limit(n_time=len(multiunits_train), n_position_bins=n_position_bins, max_memory_gib=params.max_log_likelihood_memory_gib)
         self.rtc_position_bin_centers = np.asarray(fitted_environment.place_bin_centers_)
+        self.estimated_log_likelihood_memory_bytes = self.estimate_log_likelihood_memory_bytes(n_time=len(multiunits_train), n_position_bins=n_position_bins, dtype=np.float32)
         return self.classifier, self.rtc_position_bin_centers
 
 

@@ -28,13 +28,17 @@ class ClusterlessDecodingParameters:
     rtc_position_std: float = 6.0
     rtc_environment_name: str = ""
     state_index_for_posterior: Optional[int] = None
-    max_log_likelihood_memory_gib: Optional[float] = 8.0
+    max_log_likelihood_memory_gib: Optional[float] = 36.0 ## 36 GB
     should_match_pf_grid: bool = True
 
 
 @dataclass
 class PfNDSyncedEnvironment(Environment):
-    """RTC Environment whose spatial grid is aligned to PfND xbin/ybin edges when available."""
+    """RTC Environment whose spatial grid is aligned to PfND xbin/ybin edges when available.
+
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import PfNDSyncedEnvironment, ClusterlessDecodingParameters
+
+    """
 
     pf: Any = None
 
