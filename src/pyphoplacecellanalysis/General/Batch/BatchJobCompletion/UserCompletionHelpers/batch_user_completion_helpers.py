@@ -3457,6 +3457,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     context_decoder_combined_laps_df = callback_outputs['context_decoder_combined_laps_df']
     """
     import sys
+    from typing import Dict, Optional, List
     from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance, _resolve_maze_epoch_names_for_multi_context_eval
 
@@ -3564,6 +3565,8 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
 def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
+    import pandas as pd
+    from typing import Optional, List
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
@@ -3661,6 +3664,7 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
 
     """
     import sys
+    from typing import Dict, Optional
     from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
 
@@ -3708,6 +3712,7 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
 def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = True, laps_decoding_time_bin_size: float = 0.250, included_track_dock_identifiers: Optional[List[str]] = None, debug_print: bool = False, fail_on_exception_for_debugging: bool = False) -> dict:
     """Exports NWB W-maze placefield figures and spike-raster timeline PDF (with context-decoder marginal track)."""
     import os
+    from typing import Optional, List
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     os.environ.setdefault('QT_OPENGL', 'software')
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, programmatic_render_to_file, FigureToImageHelpers
@@ -4334,6 +4339,12 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
+                                    'compute_and_export_bapun_train_test_decoder_error_distance_completion_function': compute_and_export_bapun_train_test_decoder_error_distance_completion_function,
+                                    'figures_plot_bapun_train_test_decoder_error_distance_completion_function': figures_plot_bapun_train_test_decoder_error_distance_completion_function,
+                                    'recompute_nwb_wmaze_pipeline_computations_completion_function': recompute_nwb_wmaze_pipeline_computations_completion_function,
+                                    'figures_export_nwb_wmaze_display_completion_function': figures_export_nwb_wmaze_display_completion_function,
+                                    'compute_and_pickle_clusterless_decoder_completion_function': compute_and_pickle_clusterless_decoder_completion_function,
+                                    'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function,
                                     }
     else:
         # use the user one:
@@ -4371,7 +4382,9 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 def compute_and_pickle_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         pickle_clusterless_decoder: bool = True, debug_print: bool = False) -> dict:
     """Computes and exports Bapun pf2D_ClusterlessDecoder to a pickle file for redundancy."""
+    import sys
     import pickle
+    from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
 
     if getattr(curr_session_context, 'format_name', None) != 'bapun':
@@ -4398,14 +4411,18 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
                             decoder.compute_all()
 
                         if pickle_clusterless_decoder:
-                            output_path = self.collected_outputs_path.joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
+                            output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
                             with open(output_path, 'wb') as f:
                                 pickle.dump(decoder, f)
 
                             print(f'\texported clusterless decoder for {filter_name} to: {output_path}')
                             callback_outputs['exported_clusterless_decoder_paths'].append(output_path)
     except Exception as e:
-        print(f'ERROR: Exception during compute_and_pickle_clusterless_decoder_completion_function: {e}')
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f'ERROR: Exception during compute_and_pickle_clusterless_decoder_completion_function: {err}')
+        if self.fail_on_exception:
+            raise err.exc
 
     across_session_results_extended_dict['compute_and_pickle_clusterless_decoder_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -4417,15 +4434,14 @@ def compute_and_pickle_clusterless_decoder_completion_function(self, global_data
 # Bapun Clusterless Plotting                                                                                           #
 # ==================================================================================================================== #
 
-from typing import Optional, List
-from pyphocorehelpers.function_helpers import function_attributes
 @function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
         training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
     """Plots and exports Bapun clusterless train/test decoder squared-error scatter figure."""
+    import pandas as pd
+    from typing import Optional, List
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
-    import pandas as pd
 
     use_clusterless_decoders = True # force True
 
