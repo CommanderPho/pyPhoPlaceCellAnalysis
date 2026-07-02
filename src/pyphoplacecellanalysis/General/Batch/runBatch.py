@@ -1253,6 +1253,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
     active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
                                             '_perform_position_decoding_computation', 
+                                            '_perform_clusterless_position_decoding_computation',
                                             '_perform_firing_rate_trends_computation',
                                         ]
     
@@ -1394,6 +1395,7 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
                                             # '_perform_time_dependent_placefield_computation',
                                             '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
+                                            '_perform_clusterless_position_decoding_computation',
                                             '_perform_firing_rate_trends_computation',
                                             '_perform_pf_find_ratemap_peaks_computation',
                                             # '_perform_time_dependent_pf_sequential_surprise_computation'
