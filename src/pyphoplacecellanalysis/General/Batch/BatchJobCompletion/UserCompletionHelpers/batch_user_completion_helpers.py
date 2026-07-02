@@ -3585,11 +3585,11 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     if test_err_df_csv_path is None:
         test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_train_test_decoder_error.csv').resolve()
 
-    if test_err_df_csv_path.exists():
+    if test_err_df_csv_path.exists() and not force_recompute:
         test_err_df = pd.read_csv(test_err_df_csv_path)
         print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
-    elif force_recompute:
-        print(f'\tCSV not found; force_recompute=True, recomputing test_err_df...')
+    elif force_recompute or not test_err_df_csv_path.exists():
+        print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
         _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
     else:
         print(f'WARN: test_err_df CSV not found at "{test_err_df_csv_path}" and force_recompute=False; skipping figure export.')
@@ -4361,3 +4361,118 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 
 # %%
+
+
+# ==================================================================================================================== #
+# Bapun Clusterless Decoder Pickle Export                                                                              #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-06-30 12:00', related_items=[])
+def compute_and_pickle_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        pickle_clusterless_decoder: bool = True, debug_print: bool = False) -> dict:
+    """Computes and exports Bapun pf2D_ClusterlessDecoder to a pickle file for redundancy."""
+    import pickle
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+
+    if getattr(curr_session_context, 'format_name', None) != 'bapun':
+        if debug_print:
+            print(f'WARN: compute_and_pickle_clusterless_decoder_completion_function skipped for non-bapun session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_pickle_clusterless_decoder_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'exported_clusterless_decoder_paths': []}
+
+    try:
+        if curr_active_pipeline.computation_results is not None:
+            for filter_name, comp_result in curr_active_pipeline.computation_results.items():
+                if comp_result.computed_data is not None and 'pf2D_ClusterlessDecoder' in comp_result.computed_data:
+                    decoder: ClusterlessRTCPositionDecoder = comp_result.computed_data.get('pf2D_ClusterlessDecoder', None)
+                    if decoder is not None:
+                        # Ensure compute_all has been run
+                        if getattr(decoder, 'rtc_results', None) is None:
+                            decoder.compute_all()
+
+                        if pickle_clusterless_decoder:
+                            output_path = self.collected_outputs_path.joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
+                            with open(output_path, 'wb') as f:
+                                pickle.dump(decoder, f)
+
+                            print(f'\texported clusterless decoder for {filter_name} to: {output_path}')
+                            callback_outputs['exported_clusterless_decoder_paths'].append(output_path)
+    except Exception as e:
+        print(f'ERROR: Exception during compute_and_pickle_clusterless_decoder_completion_function: {e}')
+
+    across_session_results_extended_dict['compute_and_pickle_clusterless_decoder_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+# ==================================================================================================================== #
+# Bapun Clusterless Plotting                                                                                           #
+# ==================================================================================================================== #
+
+from typing import Optional, List
+from pyphocorehelpers.function_helpers import function_attributes
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun clusterless train/test decoder squared-error scatter figure."""
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+    import pandas as pd
+
+    use_clusterless_decoders = True # force True
+
+    if getattr(curr_session_context, 'format_name', None) != 'bapun':
+        print(f'WARN: figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'figure_output_paths': [], 'use_clusterless_decoders': use_clusterless_decoders}
+
+    test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{curr_session_name}_bapun_clusterless_train_test_decoder_error.csv').resolve()
+
+    if test_err_df_csv_path.exists() and not force_recompute:
+        test_err_df = pd.read_csv(test_err_df_csv_path)
+        print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
+    else:
+        print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+
+    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos (Clusterless)')
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    display_context = curr_active_pipeline.build_display_context_for_session(f'test_decoded_measured_{y_col_name}_clusterless')
+    figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+    callback_outputs['figure_output_paths'].extend(figure_output_paths)
+    print(f'\tfigure_output_paths: {figure_output_paths}')
+
+    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error (Clusterless)')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D_clusterless')
+        figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
+        print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
+
+    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error (Clusterless)')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D_clusterless')
+        figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
+        print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
+
+    across_session_results_extended_dict['figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
