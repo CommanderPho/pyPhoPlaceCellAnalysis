@@ -11,7 +11,7 @@ import xarray as xr
 from replay_trajectory_classification import ClusterlessClassifier
 from replay_trajectory_classification.environments import Environment
 
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import PfNDSyncedEnvironment, _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_multiunits_from_spike_events, build_rtc_environment_from_pfnd, extract_clusterless_spike_events_from_phy_folder, load_clusterless_spike_events, rtc_posterior_flat_p_x_given_n, rtc_posterior_to_p_x_given_n, save_clusterless_spike_events
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import PfNDSyncedEnvironment, _pfnd_position_range, build_multiunits_from_array, build_multiunits_from_phy_folder, build_multiunits_from_rtc_simulation, build_multiunits_from_spike_events, build_rtc_environment_from_pfnd, epochs_multiunits, extract_clusterless_spike_events_from_phy_folder, load_clusterless_spike_events, rtc_posterior_flat_p_x_given_n, rtc_posterior_to_p_x_given_n, save_clusterless_spike_events
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ClusterlessRTCPositionDecoder, DecodedFilterEpochsResult
 
 
@@ -390,6 +390,46 @@ def test_clusterless_replacing_computation_epochs_preserves_type_and_state():
     assert replaced_decoder.flat_p_x_given_n is None
     assert replaced_decoder.most_likely_positions is None
     assert replaced_decoder.rtc_position_bin_centers is None
+
+
+def test_epochs_multiunits_coarsens_dense_multiunits():
+    rtc_time = (np.arange(20, dtype=float) + 0.5) * 0.001
+    multiunits = np.full((20, 4, 2), np.nan, dtype=float)
+    multiunits[2, :, 0] = np.array([1.0, 2.0, 3.0, 4.0])
+    multiunits[5, :, 0] = np.array([10.0, 20.0, 30.0, 40.0])
+    multiunits[7, :, 1] = np.array([5.0, 6.0, 7.0, 8.0])
+    filter_epochs = pd.DataFrame({"start": [0.0], "stop": [0.02]})
+    coarse_multiunits_list, coarse_rtc_time_list, nbins, time_bin_containers = epochs_multiunits(multiunits, rtc_time, filter_epochs, bin_size=0.05, fine_bin_size=0.001, debug_print=False)
+    assert nbins[0] == 1
+    assert coarse_multiunits_list[0].shape[0] == 1
+    np.testing.assert_allclose(coarse_multiunits_list[0][0, :, 0], np.array([10.0, 20.0, 30.0, 40.0]))
+    np.testing.assert_allclose(coarse_multiunits_list[0][0, :, 1], np.array([5.0, 6.0, 7.0, 8.0]))
+    assert len(time_bin_containers[0].centers) == 1
+    assert np.isclose(time_bin_containers[0].edge_info.step, 0.02)
+
+
+def test_clusterless_decode_specific_epochs_coarse_bins():
+    time, position, multiunits, _position_1d = build_multiunits_from_rtc_simulation(n_runs=2)
+    mock_pf = _MockPfND(n_bins=10, ndim=1, grid_bin_bounds=(0.0, 100.0), pos_bin_size=10.0)
+    decoder = ClusterlessRTCPositionDecoder(pf=mock_pf, sampling_frequency_hz=1000.0, multiunits=multiunits, rtc_time=time, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    filter_epochs = pd.DataFrame({"start": [float(time[100])], "stop": [float(time[119])]})
+    is_training = np.ones(len(time), dtype=bool)
+    with patch("pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder.build_clusterless_training_data_from_pfnd", return_value=(position, multiunits, is_training)):
+        result = decoder.decode_specific_epochs(None, filter_epochs, decoding_time_bin_size=0.05, debug_print=False)
+    assert result.nbins[0] == 1
+    assert len(result.time_bin_containers[0].centers) == 1
+    assert result.p_x_given_n_list[0].shape[-1] == 1
+    assert len(result.most_likely_positions_list[0]) == 1
+    assert len(result.time_bin_containers[0].edges) == 2
+
+
+def test_epochs_multiunits_coarse_bin_step_on_long_epoch():
+    rtc_time = (np.arange(500, dtype=float) + 0.5) * 0.001
+    multiunits = np.full((500, 4, 1), np.nan, dtype=float)
+    filter_epochs = pd.DataFrame({"start": [0.0], "stop": [0.5]})
+    _coarse_multiunits_list, _coarse_rtc_time_list, nbins, time_bin_containers = epochs_multiunits(multiunits, rtc_time, filter_epochs, bin_size=0.05, fine_bin_size=0.001, debug_print=False)
+    assert nbins[0] == 10
+    assert np.isclose(time_bin_containers[0].edge_info.step, 0.05)
 
 
 def test_clusterless_decode_specific_epochs_uses_multiunits_for_epoch_windows():

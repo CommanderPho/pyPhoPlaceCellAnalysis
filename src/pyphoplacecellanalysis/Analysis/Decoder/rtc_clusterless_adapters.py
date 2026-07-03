@@ -5,7 +5,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -108,12 +108,14 @@ def _pfnd_position_range(pf: PfND) -> Optional[np.ndarray]:
         if bounds_1d.ndim == 0:
             bounds_1d = np.asarray(grid_bin_bounds, dtype=float)
         return bounds_1d.reshape(1, 2)
-    grid_bin_bounds = np.asarray(grid_bin_bounds, dtype=float)
-    if grid_bin_bounds.shape == (4,):
-        xmin, ymin, xmax, ymax = grid_bin_bounds
-        return np.array([[xmin, xmax], [ymin, ymax]], dtype=float)
-    return grid_bin_bounds.reshape(2, 2)
-
+    elif pf.ndim == 2:
+        grid_bin_bounds = np.asarray(grid_bin_bounds, dtype=float)
+        if grid_bin_bounds.shape == (4,):
+            xmin, ymin, xmax, ymax = grid_bin_bounds
+            return np.array([[xmin, xmax], [ymin, ymax]], dtype=float)
+        return grid_bin_bounds.reshape(2, 2)
+    else:
+        raise NotImplementedError(f'pf.ndim: {pf.ndim} not handled! Only 1D, 2D implemented')
 
 def position_array_from_pfnd(pf: PfND) -> np.ndarray:
     pos_df = pf.filtered_pos_df
@@ -405,6 +407,134 @@ def most_likely_positions_from_posterior(p_x_given_n: np.ndarray, pf: PfND, plac
     x_idx = most_likely_flat_indices // len(y_centers)
     y_idx = most_likely_flat_indices % len(y_centers)
     return np.column_stack([x_centers[np.clip(x_idx, 0, n_x - 1)], y_centers[np.clip(y_idx, 0, len(y_centers) - 1)]])
+
+
+def _sliding_epoch_window_time_edges(epoch_start: float, epoch_stop: float, window_width: float, hop: float) -> Tuple[np.ndarray, np.ndarray]:
+    """Left-aligned windows [t, t+window_width) while t+window_width <= epoch_stop; mirrors neuropy.analyses.decoders._sliding_epoch_window_spike_counts."""
+    t0, t1 = float(epoch_start), float(epoch_stop)
+    W, H = float(window_width), float(hop)
+    dur = t1 - t0
+    if dur <= 0:
+        starts = np.array([t0], dtype=np.float64)
+        ends = np.array([t0 + W], dtype=np.float64)
+    elif dur < W:
+        starts = np.array([t0], dtype=np.float64)
+        ends = np.array([t1], dtype=np.float64)
+    else:
+        n_windows = int(np.floor((dur - W) / H)) + 1
+        if n_windows < 1:
+            n_windows = 1
+            starts = np.array([t0], dtype=np.float64)
+            ends = np.array([t1], dtype=np.float64)
+        else:
+            starts = t0 + np.arange(n_windows, dtype=np.float64) * H
+            ends = starts + W
+    return starts, ends
+
+
+def _aggregate_multiunits_last_spike_in_windows(multiunits: np.ndarray, rtc_time: np.ndarray, window_starts: np.ndarray, window_stops: np.ndarray, inclusive_stop: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """Aggregate fine multiunits into coarse windows; per electrode keep marks from the last fine bin with a spike in each window."""
+    multiunits = np.asarray(multiunits, dtype=float)
+    rtc_time = np.asarray(rtc_time, dtype=float)
+    n_marks, n_electrodes = multiunits.shape[1], multiunits.shape[2]
+    n_windows = len(window_starts)
+    coarse_multiunits = np.full((n_windows, n_marks, n_electrodes), np.nan, dtype=float)
+    coarse_rtc_time = (np.asarray(window_starts, dtype=float) + np.asarray(window_stops, dtype=float)) / 2.0
+    for w_idx, (w_start, w_stop) in enumerate(zip(window_starts, window_stops)):
+        if inclusive_stop:
+            in_window = (rtc_time >= w_start) & (rtc_time <= w_stop)
+        else:
+            in_window = (rtc_time >= w_start) & (rtc_time < w_stop)
+        fine_indices = np.flatnonzero(in_window)
+        if len(fine_indices) == 0:
+            continue
+        for e_idx in range(n_electrodes):
+            has_spike = np.any(np.isfinite(multiunits[fine_indices, :, e_idx]), axis=1)
+            if not np.any(has_spike):
+                continue
+            last_idx = fine_indices[np.flatnonzero(has_spike)[-1]]
+            coarse_multiunits[w_idx, :, e_idx] = multiunits[last_idx, :, e_idx]
+    return coarse_multiunits, coarse_rtc_time
+
+
+def epochs_multiunits(multiunits: np.ndarray, rtc_time: np.ndarray, epochs: Union[pd.DataFrame, Any], bin_size: float, fine_bin_size: Optional[float] = None, slideby: Optional[float] = None, use_single_time_bin_per_epoch: bool = False, debug_print: bool = False) -> Tuple[List[np.ndarray], List[np.ndarray], np.ndarray, List[Any]]:
+    """Re-bin dense clusterless multiunits per epoch for coarse decoding; mirrors epochs_spkcount temporal binning."""
+    from neuropy.core.epoch import ensure_dataframe
+    from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo, compute_spanning_bins
+
+    multiunits = np.asarray(multiunits, dtype=float)
+    rtc_time = np.asarray(rtc_time, dtype=float)
+    if multiunits.ndim != 3:
+        raise ValueError(f"multiunits must have shape (n_time, n_marks, n_electrodes); got {multiunits.shape}")
+    if len(rtc_time) != multiunits.shape[0]:
+        raise ValueError(f"rtc_time length {len(rtc_time)} != multiunits n_time {multiunits.shape[0]}")
+    if fine_bin_size is None:
+        fine_bin_size = float(np.median(np.diff(rtc_time))) if len(rtc_time) > 1 else float(bin_size)
+    if float(bin_size) < float(fine_bin_size) - 1e-9:
+        raise ValueError(f"epochs_multiunits bin_size ({bin_size}) must be >= fine_bin_size ({fine_bin_size}); cannot upsample dense multiunits without spike events.")
+
+    epoch_df = ensure_dataframe(epochs)
+    n_epochs = len(epoch_df)
+    coarse_multiunits_list: List[np.ndarray] = []
+    coarse_rtc_time_list: List[np.ndarray] = []
+    time_bin_containers_list: List[BinningContainer] = []
+    nbins = np.zeros(n_epochs, dtype=int)
+    resolved_window_W: Optional[float] = None
+    resolved_hop_H: Optional[float] = None
+    if not use_single_time_bin_per_epoch:
+        resolved_window_W = float(bin_size)
+        resolved_hop_H = float(slideby) if slideby is not None else resolved_window_W
+        assert resolved_hop_H > 0, f"slideby must be > 0, got {resolved_hop_H}"
+        assert resolved_hop_H <= resolved_window_W + 1e-9, f"slideby ({resolved_hop_H}) must be <= bin_size ({resolved_window_W})"
+
+    for i, epoch in enumerate(epoch_df.itertuples()):
+        epoch_start, epoch_stop = float(epoch.start), float(epoch.stop)
+        if epoch_stop < epoch_start:
+            raise ValueError(f"filter_epochs row {i} has stop < start: start={epoch_start}, stop={epoch_stop}")
+        epoch_duration = epoch_stop - epoch_start
+
+        if use_single_time_bin_per_epoch:
+            time_bin_edges = np.array([epoch_start, epoch_stop], dtype=float)
+            _edur = float(epoch_duration)
+            _step = _edur if _edur > 0 else 0.01
+            time_bin_edges_binning_info = BinningInfo(variable_extents=(epoch_start, epoch_stop), step=_step, num_bins=2)
+            window_starts, window_stops = np.array([epoch_start], dtype=float), np.array([epoch_stop], dtype=float)
+            coarse_multiunits, coarse_rtc_time = _aggregate_multiunits_last_spike_in_windows(multiunits, rtc_time, window_starts, window_stops, inclusive_stop=True)
+            bin_container = BinningContainer.init_from_edges(edges=time_bin_edges, edge_info=time_bin_edges_binning_info)
+        else:
+            assert resolved_window_W is not None and resolved_hop_H is not None
+            W, H = resolved_window_W, resolved_hop_H
+            use_sliding = not np.isclose(H, W, rtol=0.0, atol=1e-12)
+            if use_sliding:
+                window_starts, window_stops = _sliding_epoch_window_time_edges(epoch_start, epoch_stop, W, H)
+                coarse_multiunits, coarse_rtc_time = _aggregate_multiunits_last_spike_in_windows(multiunits, rtc_time, window_starts, window_stops, inclusive_stop=False)
+                bin_container = BinningContainer.from_sliding_windows(window_start_edges=window_starts, window_stop_edges=window_stops, epoch_variable_extents=(epoch_start, epoch_stop), window_width=W, hop=H)
+            elif epoch_duration < bin_size:
+                if epoch_duration <= 0:
+                    time_bin_edges = np.array([epoch_start, epoch_start + bin_size], dtype=float)
+                    time_bin_edges_binning_info = BinningInfo(variable_extents=(epoch_start, epoch_start + bin_size), step=bin_size, num_bins=2)
+                else:
+                    time_bin_edges = np.array([epoch_start, epoch_stop], dtype=float)
+                    time_bin_edges_binning_info = BinningInfo(variable_extents=(epoch_start, epoch_stop), step=epoch_duration, num_bins=2)
+                window_starts, window_stops = time_bin_edges[:1], time_bin_edges[1:]
+                coarse_multiunits, coarse_rtc_time = _aggregate_multiunits_last_spike_in_windows(multiunits, rtc_time, window_starts, window_stops, inclusive_stop=True)
+                bin_container = BinningContainer.init_from_edges(edges=time_bin_edges, edge_info=time_bin_edges_binning_info)
+            else:
+                time_bin_edges, time_bin_edges_binning_info = compute_spanning_bins(variable_values=None, bin_size=bin_size, variable_start_value=epoch_start, variable_end_value=epoch_stop)
+                window_starts, window_stops = time_bin_edges[:-1], time_bin_edges[1:]
+                coarse_multiunits, coarse_rtc_time = _aggregate_multiunits_last_spike_in_windows(multiunits, rtc_time, window_starts, window_stops, inclusive_stop=False)
+                bin_container = BinningContainer.init_from_edges(edges=time_bin_edges, edge_info=time_bin_edges_binning_info)
+
+        nbins[i] = len(coarse_rtc_time)
+        assert len(bin_container.centers) == nbins[i], f"epoch {i}: len(centers)={len(bin_container.centers)} != nbins={nbins[i]}"
+        assert coarse_multiunits.shape[0] == nbins[i], f"epoch {i}: coarse_multiunits n_time={coarse_multiunits.shape[0]} != nbins={nbins[i]}"
+        if debug_print:
+            print(f"epochs_multiunits epoch[{i}]: [{epoch_start}, {epoch_stop}], nbins={nbins[i]}, coarse_multiunits.shape={coarse_multiunits.shape}")
+        coarse_multiunits_list.append(coarse_multiunits)
+        coarse_rtc_time_list.append(coarse_rtc_time)
+        time_bin_containers_list.append(bin_container)
+
+    return coarse_multiunits_list, coarse_rtc_time_list, nbins, time_bin_containers_list
 
 
 def build_clusterless_training_data_from_pfnd(pf: PfND, multiunits: np.ndarray, rtc_time: np.ndarray, sampling_frequency_hz: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

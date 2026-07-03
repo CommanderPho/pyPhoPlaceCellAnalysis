@@ -4645,7 +4645,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "build", specifier = ">=1.4.4" },
-    { name = "cupy-cuda13x", specifier = ">=13.6.0,<14" },
+    { name = "cupy-cuda13x", specifier = ">=13.6.0" },
     { name = "dill", extras = ["graph"], specifier = "==0.3.5.1" },
     { name = "dvc", extras = ["all"], specifier = ">=3.63.0" },
     { name = "flexitext", git = "https://github.com/CommanderPho/flexitext.git?rev=main" },

@@ -21,6 +21,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import (
     _get_multiunit_electrode_keep_mask,
     build_clusterless_training_data_from_pfnd,
     build_rtc_environment_from_pfnd,
+    epochs_multiunits,
     rtc_posterior_flat_p_x_given_n,
     rtc_posterior_to_p_x_given_n,
 )
@@ -246,7 +247,10 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         if not {'start', 'stop'}.issubset(filter_epochs_df.columns):
             raise ValueError("filter_epochs must provide 'start' and 'stop' columns.")
 
-        half_bin = self.time_bin_size / 2.0
+        if decoding_time_bin_size is None:
+            decoding_time_bin_size = self.time_bin_size
+
+        coarse_multiunits_list, coarse_rtc_time_list, nbins, time_bin_containers = epochs_multiunits(active_multiunits, active_rtc_time, filter_epochs_df, bin_size=decoding_time_bin_size, fine_bin_size=self.time_bin_size, slideby=slideby, use_single_time_bin_per_epoch=use_single_time_bin_per_epoch, debug_print=debug_print)
         num_filter_epochs = len(filter_epochs_df)
         most_likely_positions_list = []
         p_x_given_n_list = []
@@ -255,48 +259,18 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
         marginal_z_list = []
         most_likely_position_indicies_list = []
         decoded_multiunits_list = []
-        nbins = np.zeros(num_filter_epochs, dtype=int)
-        time_bin_containers = []
         time_bin_edges = []
         ndim = getattr(self, 'ndim', getattr(self.pf, 'ndim', 1))
 
-        for epoch_idx, epoch_row in enumerate(filter_epochs_df.itertuples(index=False)):
-            epoch_start = float(getattr(epoch_row, 'start'))
-            epoch_stop = float(getattr(epoch_row, 'stop'))
-            if epoch_stop < epoch_start:
-                raise ValueError(f"filter_epochs row {epoch_idx} has stop < start: start={epoch_start}, stop={epoch_stop}")
-
-            if use_single_time_bin_per_epoch:
-                epoch_midpoint = epoch_start + ((epoch_stop - epoch_start) / 2.0)
-                epoch_indices = np.asarray([int(np.argmin(np.abs(active_rtc_time - epoch_midpoint)))], dtype=int) if len(active_rtc_time) > 0 else np.asarray([], dtype=int)
-            else:
-                epoch_indices = np.flatnonzero((active_rtc_time >= epoch_start) & (active_rtc_time <= epoch_stop))
-                if len(epoch_indices) == 0 and len(active_rtc_time) > 0:
-                    epoch_midpoint = epoch_start + ((epoch_stop - epoch_start) / 2.0)
-                    nearest_idx = int(np.argmin(np.abs(active_rtc_time - epoch_midpoint)))
-                    nearest_time = active_rtc_time[nearest_idx]
-                    if (epoch_start - half_bin) <= nearest_time <= (epoch_stop + half_bin):
-                        epoch_indices = np.asarray([nearest_idx], dtype=int)
-
-            selected_rtc_time = active_rtc_time[epoch_indices]
-            selected_multiunits = active_multiunits[epoch_indices, :, :]
-            curr_epoch_num_time_bins = len(selected_rtc_time)
-            nbins[epoch_idx] = curr_epoch_num_time_bins
+        for epoch_idx, (selected_multiunits, selected_rtc_time, curr_time_bin_container) in enumerate(zip(coarse_multiunits_list, coarse_rtc_time_list, time_bin_containers)):
+            curr_epoch_num_time_bins = int(nbins[epoch_idx])
             decoded_multiunits_list.append(selected_multiunits)
 
             if curr_epoch_num_time_bins > 0:
-                curr_time_bin_edges = np.concatenate([[selected_rtc_time[0] - half_bin], selected_rtc_time + half_bin])
-                curr_edge_info = BinningInfo(**dict(variable_extents=(curr_time_bin_edges[0], curr_time_bin_edges[-1]), step=self.time_bin_size, num_bins=len(curr_time_bin_edges)))
-                curr_center_info = BinningInfo(**dict(variable_extents=(curr_time_bin_edges[0], curr_time_bin_edges[-1]), step=self.time_bin_size, num_bins=curr_epoch_num_time_bins))
-                curr_time_bin_container = BinningContainer(edges=curr_time_bin_edges, centers=selected_rtc_time, edge_info=curr_edge_info, center_info=curr_center_info)
-                ## main call: calls self.decode(...) 
-                most_likely_positions, p_x_given_n, most_likely_position_indicies, _flat_outputs_container = self.decode(selected_multiunits, time_bin_size=self.time_bin_size, rtc_time=selected_rtc_time, output_flat_versions=False,
-                                                                                                                            debug_print=debug_print)
+                most_likely_positions, p_x_given_n, most_likely_position_indicies, _flat_outputs_container = self.decode(selected_multiunits, time_bin_size=decoding_time_bin_size, rtc_time=selected_rtc_time, output_flat_versions=False, debug_print=debug_print)
             else:
-                ## empty epoch (not t bins)
-                curr_time_bin_edges = np.asarray([], dtype=float)
-                empty_info = BinningInfo(**dict(variable_extents=(epoch_start, epoch_stop), step=self.time_bin_size, num_bins=0))
-                curr_time_bin_container = BinningContainer(edges=curr_time_bin_edges, centers=np.asarray([], dtype=float), edge_info=empty_info, center_info=empty_info)
+                epoch_start = float(filter_epochs_df.iloc[epoch_idx]['start'])
+                epoch_stop = float(filter_epochs_df.iloc[epoch_idx]['stop'])
                 pf_occupancy = getattr(self.pf, 'occupancy', None)
                 empty_position_shape = tuple(np.shape(pf_occupancy)) if pf_occupancy is not None else (0,)
                 p_x_given_n = np.empty((*empty_position_shape, 0), dtype=float)
@@ -312,9 +286,8 @@ class ClusterlessRTCPositionDecoder(SerializedAttributesAllowBlockSpecifyingClas
             marginal_x_list.append(curr_unit_marginal_x)
             marginal_y_list.append(curr_unit_marginal_y)
             marginal_z_list.append(None)
-            time_bin_containers.append(curr_time_bin_container)
-            time_bin_edges.append(curr_time_bin_edges)
-        ## END for epoch_idx, epoch_row in enumerate(filter_epochs_df.itertuples(index=False))..
+            time_bin_edges.append(np.atleast_1d(curr_time_bin_container.edges))
+        ## END for epoch_idx, (selected_multiunits, selected_rtc_time, curr_time_bin_container) in enumerate(...)
 
 
         if debug_print:
