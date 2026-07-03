@@ -1,6 +1,6 @@
 [project]
 name = "pyphoplacecellanalysis"
-version = "0.3.8"
+version = "0.3.9"
 description = ""
 authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
 requires-python = ">=3.9,<3.12"
@@ -29,7 +29,7 @@ dependencies = [
     "napari[pyqt5]>=0.4.18,<0.5",
     "napari-animated-gif-io>=0.1.2,<0.2",
     "napari-animation>=0.0.8,<0.0.9",
-    "panel>=1.2.3,<2",
+    "panel>=1.4,<2",
     "params>=0.9.0,<0.10",
     "jupyter-bokeh>=3.0.7,<4",
     "pyqt-builder>=1.15.3,<2",
@@ -47,6 +47,7 @@ dependencies = [
     "silx>=2.2.0,<3",
     "numba>=0.57,<0.62",
     "replay-trajectory-classification>=1.4.1",
+    "spyglass-neuro",
 ]
 
 [dependency-groups]
@@ -96,6 +97,7 @@ neuropy = { path = "../NeuroPy", editable = true }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
 vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
+spyglass-neuro = { path = "../spyglass", editable = true }
 
 [build-system]
 requires = ["hatchling"]
