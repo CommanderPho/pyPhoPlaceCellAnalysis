@@ -1,4 +1,3 @@
- 
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 
@@ -32,7 +31,7 @@ from neuropy.analyses.decoders import epochs_spkcount # for decode_specific_epoc
 from neuropy.utils.mixins.binning_helpers import BinningContainer # for epochs_spkcount getting the correct time bins
 from neuropy.analyses.placefields import PfND # for BasePositionDecoder
 from neuropy.utils.mixins.AttrsClassHelpers import keys_only_repr
-
+from neuropy.utils.misc import split_array
 
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.general_helpers import OrderedMeta
@@ -41,12 +40,18 @@ from neuropy.utils.mixins.binning_helpers import compute_spanning_bins, build_sp
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.indexing_helpers import safe_get_variable_shape
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
+from pyphocorehelpers.assertion_helpers import Assert
 
 from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers import _compare_computation_results # for finding common neurons in `prune_to_shared_aclus_only`
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 from neuropy.utils.mixins.peak_location_representing import ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin
     
+
+from typing import Literal
+# Define a type that can only be one of these specific strings
+MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
+
 
 # cut_bins = np.linspace(59200, 60800, 9)
 # pd.cut(df['column_name'], bins=cut_bins)
@@ -845,9 +850,6 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         raise NotImplementedError("read_hdf not implemented")
 
 
-from typing import Literal
-# Define a type that can only be one of these specific strings
-MaskedTimeBinFillType = Literal['ignore', 'last_valid', 'nan_filled', 'dropped'] ## used in `DecodedFilterEpochsResult.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(...)` to specify how invalid bins (due to too few spikes) are treated.
 
 
 @custom_define(slots=False, repr=False, eq=False)
