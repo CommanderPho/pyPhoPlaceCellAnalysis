@@ -87,6 +87,7 @@ class PfNDSyncedEnvironment(Environment):
             return self
         return super().fit_place_grid(position, infer_track_interior=infer_track_interior)
 
+
 def _pfnd_place_bin_size(pf: PfND, place_bin_size_override: Optional[float] = None) -> float:
     if place_bin_size_override is not None:
         return float(place_bin_size_override)
