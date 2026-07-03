@@ -1,11 +1,16 @@
 import numpy as np
 import warnings
 from copy import deepcopy
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from nptyping import NDArray
+from pyphocorehelpers.programming_helpers import metadata_attributes
+from pyphocorehelpers.function_helpers import function_attributes
 
 # Import the base decoder from your pyphoplacecellanalysis repo
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
+@metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-03 11:04', related_items=[])
 class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     """
     Dempster-Shafer Theory (DST) updated Position Decoder.
