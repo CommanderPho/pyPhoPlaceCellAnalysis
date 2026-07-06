@@ -1293,6 +1293,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
         self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
+
     def update_3D_time_curves(self):
         """ initialize the graphics objects if needed, or update them if they already exist. """
         if self.params.time_curves_datasource is None:
@@ -1346,6 +1347,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 # end for curr_data_series_index in np.arange(num_data_series)
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+
 
     def _build_or_update_time_curves_legend(self, parent_item):
         """ Build a legend for each of the curves 
