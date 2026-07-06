@@ -173,7 +173,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         elif isinstance(curr_sess, (Epoch, pd.DataFrame, tuple)):
             active_Epochs = curr_sess  # <Epoch> object passed directly
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'.add_render_time_epochs(...): unexpected type for curr_sess: {type(curr_sess)}, curr_sess: {curr_sess}.')
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
