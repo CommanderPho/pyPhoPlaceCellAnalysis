@@ -203,8 +203,11 @@ def add_neuron_identity_info_if_needed(computation_result, active_config):
         len(active_config.plotting_config.pf_colors)
     except (AttributeError, KeyError, TypeError):
         # add the attributes 
-        active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
-
+        if 'pf2D' in computation_result.computed_data:
+            active_config.plotting_config.pf_neuron_identities, active_config.plotting_config.pf_sort_ind, active_config.plotting_config.pf_colors, active_config.plotting_config.pf_colormap, active_config.plotting_config.pf_listed_colormap = get_neuron_identities(computation_result.computed_data['pf2D'])
+        else:
+            print(f'failed to set display properties because missing computation_result.computed_data["pf2D"]')
+            raise
     except Exception as e:
         # other exception
         print(f'Unexpected exception e: {e}')
@@ -517,10 +520,15 @@ class PipelineWithDisplayPipelineStageMixin:
             
             # Note that there may be different numbers of neurons included in the different configs (which include different epochs/filters) so a single one-size-fits-all approach to assigning color identities won't work here.
             if an_active_config_name in self.computation_results:
-                self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
-                self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
-                self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
-        
+
+                try:
+                    self.active_configs[an_active_config_name] = add_neuron_identity_info_if_needed(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name])
+                    self.active_configs[an_active_config_name] = add_custom_plotting_options_if_needed(self.active_configs[an_active_config_name], should_smooth_maze=should_smooth_maze)
+                    self.active_configs[an_active_config_name] = update_figure_files_output_path(self.computation_results[an_active_config_name], self.active_configs[an_active_config_name], root_output_dir=root_output_dir)
+
+                except BaseException as e:
+                    print(f'encountered exception e: {e} while trying to setupt display for an_active_config_name: {an_active_config_name}. Skipping and continuing.')
+
         self.reload_default_display_functions() # reload default display functions first
 
 

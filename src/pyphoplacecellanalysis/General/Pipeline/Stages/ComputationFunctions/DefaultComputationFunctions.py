@@ -15,7 +15,8 @@ from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationResult
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step, ClusterlessRTCPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
@@ -96,9 +97,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
 
         sess = computation_result.sess
         assert sess is not None
-        pos_sampling_rate_Hz: float = sess.position.metadata.get('sampling_rate', 120.0) ## Hz ##
+        pos_sampling_rate_Hz: float = float((getattr(sess.position, 'metadata', None) or {}).get('sampling_rate', sess.position_sampling_rate))  ## Hz ##
         
-
         # ... after sess = computation_result.sess ...
 
         if clusterless_spike_events is None:
