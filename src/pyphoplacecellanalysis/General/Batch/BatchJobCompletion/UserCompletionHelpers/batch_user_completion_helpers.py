@@ -4638,13 +4638,19 @@ def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_
 
 @function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch', 'spyglass'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-07 15:00', related_items=[])
 def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        pickle_spyglass_clusterless_decoder: bool = True, debug_print: bool = False) -> dict:
+        pickle_spyglass_clusterless_decoder: bool = True, debug_print: bool = False, force_recompute: bool = False) -> dict:
     """Computes and exports Bapun pf2D_SpyglassClusterlessDecoder to a pickle file for redundancy."""
     import sys
     import pickle
     from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
-
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters
+    
     _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
@@ -4677,28 +4683,53 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
                             print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
                             callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
                 else:
-                    ## Attempt to recompute the missing pf2D_SpyglassClusterlessDecoder result
+                    ## Attempt to recompute the missing pf2D_SpyglassClusterlessDecoder result by calling 'position_decoding_spyglass_clusterless'
                     try:
-                        if hasattr(comp_result, 'computation_function') and callable(comp_result.computation_function):
-                            # Try to recompute using the available computation function
-                            comp_result.computation_function(force_recompute=True)
-                            # Try again to get the decoder
-                            decoder = comp_result.computed_data.get('pf2D_SpyglassClusterlessDecoder', None)
-                            if decoder is not None:
-                                if getattr(decoder, 'nld_results', None) is None:
-                                    decoder.compute_all()
+                        curr_active_pipeline.reload_default_computation_functions()
 
-                                if pickle_spyglass_clusterless_decoder:
-                                    output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_SpyglassClusterlessDecoder.pkl").resolve()
-                                    with open(output_path, 'wb') as f:
-                                        pickle.dump(decoder, f)
+                        ## Next wave of computations
+                        extended_computations_include_includelist = ['position_decoding_spyglass_clusterless',] # do only specified
 
-                                    print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
-                                    callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
-                            else:
-                                print(f"WARN: pf2D_SpyglassClusterlessDecoder recompute unsuccessful for filter: {filter_name} on {curr_session_name}")
+                        spyglass_computation_params: SpyglassClusterlessDecodingParameters = SpyglassClusterlessDecodingParameters()
+                        computation_kwargs_dict = {'position_decoding_spyglass_clusterless': dict(spyglass_params=spyglass_computation_params, should_defer_compute_all_decoded_times=True), }
+
+                        # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
+                        force_recompute_override_computations_includelist = []
+                        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist,  included_computation_filter_names = [filter_name], ## only pass this epoch
+                                                                                                                                                                    include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                                                                                                                    force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+
+                        if debug_print:
+                            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+                        # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+                        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, 
+                                                                            computation_kwargs_dict=computation_kwargs_dict,
+                                                                            debug_print=False)
+
+                        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, included_computation_filter_names = [filter_name], ## only pass this epoch
+                                                                                                                                                                    include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                                                                                                                    force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                        if debug_print:
+                            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+                        print(f'\t...recomputation done.')
+                        decoder: SpyglassClusterlessDecoder = comp_result.computed_data.get('pf2D_SpyglassClusterlessDecoder', None)
+                        assert decoder is not None, f"decoder is still None ever after attempted recomputation!!"        
+                        if decoder is not None:
+                            if getattr(decoder, 'nld_results', None) is None:
+                                decoder.compute_all()
+
+                            if pickle_spyglass_clusterless_decoder:
+                                output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_SpyglassClusterlessDecoder.pkl").resolve()
+                                with open(output_path, 'wb') as f:
+                                    pickle.dump(decoder, f)
+
+                                print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
+                                callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
                         else:
-                            print(f"WARN: comp_result for {filter_name} is missing both computed_data and a callable computation_function; cannot recompute pf2D_SpyglassClusterlessDecoder.")
+                            print(f"WARN: pf2D_SpyglassClusterlessDecoder recompute unsuccessful for filter: {filter_name} on {curr_session_name}")
+
                     except Exception as recompute_e:
                         print(f"ERROR: Exception during recomputation of pf2D_SpyglassClusterlessDecoder for filter: {filter_name}: {recompute_e}")
             ## END for filter_name, comp_result in curr_active_pipeline.computation_results.items()....
