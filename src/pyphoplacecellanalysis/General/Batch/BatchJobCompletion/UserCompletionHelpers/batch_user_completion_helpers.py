@@ -3709,7 +3709,7 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['dandi_nwb', 'nwb', 'wmaze', 'figure', 'batch', 'timeline'], input_requires=['DirectionalDecodersDecoded'], output_provides=[], uses=['programmatic_render_to_file', 'Spike3DRasterWindowWidget', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand', 'build_proper_epoch_intervals'], used_by=[], creation_date='2026-06-30 12:00', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function'])
-def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = True, laps_decoding_time_bin_size: float = 0.250, included_track_dock_identifiers: Optional[List[str]] = None, debug_print: bool = False, fail_on_exception_for_debugging: bool = False) -> dict:
+def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = True, laps_decoding_time_bin_size: float = 0.250, included_track_dock_identifiers: Optional[List[str]] = None, debug_print: bool = False, fail_on_exception_for_debugging: bool = False, skip_widget_required_plots: bool=False) -> dict:
     """Exports NWB W-maze placefield figures and spike-raster timeline PDF (with context-decoder marginal track)."""
     import os
     from typing import Optional, List
@@ -3811,6 +3811,7 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
             ax_pf = composite_fig.add_subplot(composite_grid[1, col_idx])
             ax_pf.imshow(placefield_images[col_idx])
             ax_pf.axis('off')
+            ax_pf.set_anchor('N')  # top-align the placefield image within its grid cell
             if col_idx == 0:
                 ax_pf.set_ylabel('2D Placefields', fontsize=10)
 
@@ -3823,6 +3824,9 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
         return composite_out_paths
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
     if getattr(curr_session_context, 'format_name', None) != 'dandi_nwb':
         print(f'WARN: figures_export_nwb_wmaze_display_completion_function skipped for non-dandi_nwb session: {curr_session_context}')
         return across_session_results_extended_dict
@@ -3856,19 +3860,24 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
         if self.fail_on_exception:
             raise
 
+    resolution_multiplier = 4.0
+    param_text_box_kwargs = dict(should_disable=True, text_args={'fontsize': 7})
+
     for curr_display_function_name, extra_kwargs in [
         ('_display_2d_placefield_result_plot_ratemaps_2D', display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE,  # aclu only, no shank/cluster/qclu
                 # fig_column_width=32.0, fig_row_height=4.0,
-                resolution_multiplier=4.0, 
-                param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
+                resolution_multiplier=resolution_multiplier, 
+                # param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
+                param_text_box_kwargs=deepcopy(param_text_box_kwargs),
+
             ),
         ),
-        ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
-        )),
+        # ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}),
+        ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=deepcopy(param_text_box_kwargs))),
         # ('_display_1d_placefields', display_fn_kwargs),
     ]:
         try:
-            out_paths = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name=curr_display_function_name, subset_includelist=subset_includelist, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, **_batch_figure_kwargs, **extra_kwargs)
+            out_paths = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name=curr_display_function_name, subset_includelist=subset_includelist, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, **deepcopy(_batch_figure_kwargs), **deepcopy(extra_kwargs))
             callback_outputs['figure_output_paths'].extend(out_paths or [])
             print(f'\t{curr_display_function_name} figure_output_paths: {out_paths}')
             plt.close('all')
@@ -3883,8 +3892,8 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
 
     ## END for curr_display_function_name, extra_kwargs in...
 
-    composite_occupancy_display_kwargs = {}
-    composite_ratemap_display_kwargs = display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE, resolution_multiplier=4.0, param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}))
+    composite_occupancy_display_kwargs = dict(param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}))
+    composite_ratemap_display_kwargs = display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE, resolution_multiplier=4.0, param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}))
     try:
         composite_out_paths = _subfn_build_composite_maze_occupancy_placefields_figure(curr_active_pipeline, subset_includelist, occupancy_display_kwargs=composite_occupancy_display_kwargs, ratemaps_display_kwargs=composite_ratemap_display_kwargs, fig_man=custom_fig_man, write_png=write_png, write_vector_format=write_vector_format, debug_print=debug_print)
         callback_outputs['figure_output_paths'].extend(composite_out_paths or [])
@@ -3896,72 +3905,78 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
     finally:
         plt.close('all')
 
-    cache_key = decoding_continuous_cache_key(laps_decoding_time_bin_size, None)
-    directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
-    continuously_decoded_cache = getattr(directional_decoders_decode_result, 'continuously_decoded_result_cache_dict', None) if directional_decoders_decode_result is not None else None
-    if continuously_decoded_cache is None or cache_key not in continuously_decoded_cache:
-        print(f'WARN: DirectionalDecodersDecoded missing cache_key {cache_key}; skipping spike-raster timeline export.')
-        across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
-        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-        return across_session_results_extended_dict
 
-    spike_raster_window = None
-    try:
-        configure_pyqtgraph_for_unattended_rendering('figures_export_nwb_wmaze_display_completion_function')
+    if not skip_widget_required_plots:
+        cache_key = decoding_continuous_cache_key(laps_decoding_time_bin_size, None)
+        directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+        continuously_decoded_cache = getattr(directional_decoders_decode_result, 'continuously_decoded_result_cache_dict', None) if directional_decoders_decode_result is not None else None
+        if continuously_decoded_cache is None or cache_key not in continuously_decoded_cache:
+            print(f'WARN: DirectionalDecodersDecoded missing cache_key {cache_key}; skipping spike-raster timeline export.')
+            across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
+            print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            return across_session_results_extended_dict
 
-        global_context = curr_active_pipeline.filtered_contexts['maze_GLOBAL']
-        spike_raster_window, (active_2d_plot, *_rest) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context=global_context)
-
+        spike_raster_window = None
         try:
-            main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) if hasattr(active_2d_plot, 'ui') else None
-            if main_graphics_layout_widget is not None and hasattr(main_graphics_layout_widget, 'useOpenGL'):
-                main_graphics_layout_widget.useOpenGL(False)
-        except Exception as opengl_err:
-            print(f'WARN: could not disable Spike2DRaster OpenGL for unattended export: {opengl_err}')
+            configure_pyqtgraph_for_unattended_rendering('figures_export_nwb_wmaze_display_completion_function')
 
-        build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, height=1.5)
+            global_context = curr_active_pipeline.filtered_contexts['maze_GLOBAL']
+            spike_raster_window, (active_2d_plot, *_rest) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context=global_context)
 
-        active_2d_plot.params.enable_non_marginalized_raw_result = False
-        active_2d_plot.params.enable_marginal_over_direction = False
-        active_2d_plot.params.enable_marginal_over_track_ID = True
-
-        cmd = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_time_bin_sizes_whitelist=[cache_key])
-        cmd.execute()
-
-        try:
-            identifier_name = f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}'
-            a_dock = active_2d_plot.find_display_dock(identifier_name)
-            if a_dock is not None:
-                a_dock.setFixedHeight(130)
-        except Exception as dock_err:
-            print(f'WARN: could not set marginal dock fixed height: {dock_err}')
-
-        block_until_render_complete(qapp_name='figures_export_nwb_wmaze_display_completion_function', max_wait_time_sec=180)
-
-        default_included_track_dock_identifiers = ['intervals', 'rasters[raster_window]', 'new_curves_separate_plot', f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}']
-        resolved_included_track_dock_identifiers = list(reversed(included_track_dock_identifiers or default_included_track_dock_identifiers))
-        callback_outputs['included_track_dock_identifiers'] = resolved_included_track_dock_identifiers
-
-        display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
-        timeline_output_pdf_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False).with_suffix('.pdf')
-        saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=timeline_output_pdf_path, included_track_dock_identifiers=resolved_included_track_dock_identifiers, debug_max_num_pages=25)
-        export_result = {'fig_save_path': saved_output_pdf_path}
-        callback_outputs['export_all_tracks_result'] = export_result
-        callback_outputs['timeline_pdf_path'] = export_result.get('fig_save_path', None)
-        print(f'\ttimeline_pdf_path: {callback_outputs["timeline_pdf_path"]}')
-
-    except Exception as e:
-        print(f'WARN: figures_export_nwb_wmaze_display_completion_function spike-raster timeline export failed: {e}')
-        if fail_on_exception_for_debugging or self.fail_on_exception:
-            raise
-
-    finally:
-        if spike_raster_window is not None:
             try:
-                spike_raster_window.close()
-                pg.mkQApp('figures_export_nwb_wmaze_display_completion_function').processEvents()
-            except Exception as close_err:
-                print(f'WARN: could not close spike raster window after timeline export: {close_err}')
+                main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) if hasattr(active_2d_plot, 'ui') else None
+                if main_graphics_layout_widget is not None and hasattr(main_graphics_layout_widget, 'useOpenGL'):
+                    main_graphics_layout_widget.useOpenGL(False)
+            except Exception as opengl_err:
+                print(f'WARN: could not disable Spike2DRaster OpenGL for unattended export: {opengl_err}')
+
+            build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, height=1.5)
+
+            active_2d_plot.params.enable_non_marginalized_raw_result = False
+            active_2d_plot.params.enable_marginal_over_direction = False
+            active_2d_plot.params.enable_marginal_over_track_ID = True
+
+            cmd = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_time_bin_sizes_whitelist=[cache_key])
+            cmd.execute()
+
+            try:
+                identifier_name = f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}'
+                a_dock = active_2d_plot.find_display_dock(identifier_name)
+                if a_dock is not None:
+                    a_dock.setFixedHeight(130)
+            except Exception as dock_err:
+                print(f'WARN: could not set marginal dock fixed height: {dock_err}')
+
+            block_until_render_complete(qapp_name='figures_export_nwb_wmaze_display_completion_function', max_wait_time_sec=180)
+
+            default_included_track_dock_identifiers = ['intervals', 'rasters[raster_window]', 'new_curves_separate_plot', f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}']
+            resolved_included_track_dock_identifiers = list(reversed(included_track_dock_identifiers or default_included_track_dock_identifiers))
+            callback_outputs['included_track_dock_identifiers'] = resolved_included_track_dock_identifiers
+
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+            timeline_output_pdf_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False).with_suffix('.pdf')
+            saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=timeline_output_pdf_path, included_track_dock_identifiers=resolved_included_track_dock_identifiers, debug_max_num_pages=25)
+            export_result = {'fig_save_path': saved_output_pdf_path}
+            callback_outputs['export_all_tracks_result'] = export_result
+            callback_outputs['timeline_pdf_path'] = export_result.get('fig_save_path', None)
+            print(f'\ttimeline_pdf_path: {callback_outputs["timeline_pdf_path"]}')
+
+        except Exception as e:
+            print(f'WARN: figures_export_nwb_wmaze_display_completion_function spike-raster timeline export failed: {e}')
+            if fail_on_exception_for_debugging or self.fail_on_exception:
+                raise
+
+        finally:
+            if spike_raster_window is not None:
+                try:
+                    spike_raster_window.close()
+                    pg.mkQApp('figures_export_nwb_wmaze_display_completion_function').processEvents()
+                except Exception as close_err:
+                    print(f'WARN: could not close spike raster window after timeline export: {close_err}')
+
+    else:
+        ## skip_widget_required_plots == True
+        print(f'WARN: skip_widget_required_plots == True so skipping SpikeRaster2D/window plot')
 
     across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')

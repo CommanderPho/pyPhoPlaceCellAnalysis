@@ -77,7 +77,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
     def _display_1d_placefield_occupancy(computation_result, active_config, enable_saving_to_disk=False, active_context=None, plot_pos_bin_axes: bool=True, **kwargs):
         """ displays placefield occupancy in a MATPLOTLIB window 
         """
-        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+        param_text_box_kwargs = dict(kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))) # shallow-copy so `.pop('should_disable')` doesn't mutate a dict shared across filtered-context iterations
         # fontsize = kwargs.get('fontsize', 10)
         should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
@@ -129,7 +129,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
         
         """
-        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+        param_text_box_kwargs = dict(kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))) # shallow-copy so `.pop('should_disable')` doesn't mutate a dict shared across filtered-context iterations
         should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
         assert active_context is not None
@@ -179,7 +179,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         TODO: plot the information about the source of the data, such as the session information? Or perhaps we could just leave that encoded in the exported file name? It is hard to track the figures though
 
         """
-        param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+        param_text_box_kwargs = dict(kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))) # shallow-copy so `.pop('should_disable')` doesn't mutate a dict shared across filtered-context iterations
         should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
         assert active_context is not None
