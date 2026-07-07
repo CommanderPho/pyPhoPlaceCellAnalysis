@@ -48,6 +48,7 @@ dependencies = [
     "numba>=0.57,<0.62",
     "replay-trajectory-classification>=1.4.1",
     "spyglass-neuro",
+    "non-local-detector>=0.6.9",
 ]
 
 [dependency-groups]

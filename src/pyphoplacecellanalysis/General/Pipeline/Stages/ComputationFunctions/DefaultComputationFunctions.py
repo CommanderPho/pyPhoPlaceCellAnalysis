@@ -18,6 +18,8 @@ from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMix
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
+from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters, build_is_training_mask, clusterless_events_to_spyglass_spike_lists, epochs_from_pfnd, pfnd_to_spyglass_position_info
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -201,6 +203,63 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf2D'])
         else:
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
+
+        return computation_result
+    
+
+    @function_attributes(short_name='position_decoding_spyglass_clusterless', tags=['decoding', 'position', 'clusterless', 'spyglass'],
+                          input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_SpyglassClusterlessDecoder']", "computation_result.computed_data['pf2D_SpyglassClusterlessDecoder']"], uses=['SpyglassClusterlessDecoder', 'ClusterlessDetector'], used_by=[], creation_date='2026-07-07 00:00', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_SpyglassClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_SpyglassClusterlessDecoder', None)), is_global=False)
+    def _perform_spyglass_clusterless_position_decoding_computation(computation_result: ComputationResult, clusterless_spike_events: Optional[Any] = None, spyglass_params: Optional[SpyglassClusterlessDecodingParameters] = None, should_defer_compute_all_decoded_times: bool = True, **kwargs):
+        """ Builds Spyglass/non_local_detector clusterless 2D position decoders on PfND spatial grids. """
+        from neuropy.core.clusterless_spike_events import ClusterlessSpikeEvents, default_clusterless_spike_events_path
+
+        sess = computation_result.sess
+        assert sess is not None
+
+        if clusterless_spike_events is None:
+            clusterless_spike_events = getattr(sess, 'clusterless_spike_events', None)
+        if clusterless_spike_events is None:
+            session_basedir = Path(getattr(sess, 'basepath', None) or Path(sess.filePrefix).parent)
+            session_name = getattr(getattr(sess, 'config', None), 'session_name', None) or getattr(sess, 'name', None) or Path(sess.filePrefix).stem
+            clusterless_events_path = default_clusterless_spike_events_path(session_basedir, session_name)
+            if clusterless_events_path.is_file():
+                clusterless_spike_events = load_clusterless_spike_events(clusterless_events_path)
+                sess.clusterless_spike_events = clusterless_spike_events
+
+        assert clusterless_spike_events is not None, 'requires clusterless_spike_events, but clusterless_spike_events is None'
+        active_events: ClusterlessSpikeEvents = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
+        spike_times, spike_waveform_features = clusterless_events_to_spyglass_spike_lists(active_events)
+
+        if spyglass_params is None:
+            spyglass_params = SpyglassClusterlessDecodingParameters()
+        else:
+            spyglass_params = deepcopy(spyglass_params)
+
+        def _build_spyglass_decoder_for_pf(pf):
+            if pf is None:
+                return None
+            if getattr(pf, 'ndim', 1) < 2:
+                print('WARN: SpyglassClusterlessDecoder (ContFragClusterlessClassifier) supports 2D placefields only; skipping pf1D.')
+                return None
+            position_info = pfnd_to_spyglass_position_info(pf, upsample_hz=spyglass_params.position_upsample_hz, position_variable_names=spyglass_params.resolved_position_variable_names(pf))
+            encoding_interval, decoding_interval = epochs_from_pfnd(pf)
+            position_variable_names = spyglass_params.resolved_position_variable_names(pf)
+            is_training_mask = build_is_training_mask(position_info, encoding_interval, position_variable_names)
+            decoder = SpyglassClusterlessDecoder(pf=pf, position_upsample_hz=spyglass_params.position_upsample_hz, position_info=position_info, spike_times=spike_times, spike_waveform_features=spike_waveform_features, encoding_interval=encoding_interval, decoding_interval=decoding_interval, position_variable_names=position_variable_names, spyglass_params=spyglass_params, is_training_mask=is_training_mask, setup_on_init=True, post_load_on_init=False, debug_print=False)
+            if not should_defer_compute_all_decoded_times:
+                decoder.compute_all()
+            else:
+                print('\tWARN: should_defer_compute_all_decoded_times == True, so not running `decoder.compute_all()`.')
+            return decoder
+        ## END def _build_spyglass_decoder_for_pf(...)
+
+
+        computation_result.computed_data['pf1D_SpyglassClusterlessDecoder'] = _build_spyglass_decoder_for_pf(computation_result.computed_data.get('pf1D', None))
+        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
+            computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = _build_spyglass_decoder_for_pf(computation_result.computed_data['pf2D'])
+        else:
+            computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = None
 
         return computation_result
     
