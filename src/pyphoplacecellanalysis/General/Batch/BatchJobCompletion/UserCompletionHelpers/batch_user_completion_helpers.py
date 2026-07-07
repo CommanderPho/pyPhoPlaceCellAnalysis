@@ -4645,9 +4645,11 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
     from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
 
-    if getattr(curr_session_context, 'format_name', None) != 'bapun':
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
         if debug_print:
-            print(f'WARN: compute_and_pickle_spyglass_clusterless_decoder_completion_function skipped for non-bapun session: {curr_session_context}')
+            print(f'WARN: compute_and_pickle_spyglass_clusterless_decoder_completion_function skipped for unsupported session format: {curr_session_context}')
         return across_session_results_extended_dict
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -4702,8 +4704,10 @@ def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_co
 
     use_spyglass_clusterless_decoders = True
 
-    if getattr(curr_session_context, 'format_name', None) != 'bapun':
-        print(f'WARN: figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
+        print(f'WARN: figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
         return across_session_results_extended_dict
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
