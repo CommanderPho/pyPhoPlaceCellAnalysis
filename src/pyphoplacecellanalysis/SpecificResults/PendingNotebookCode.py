@@ -5589,6 +5589,7 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
                                                         'pfdt_computation',
                                                         'position_decoding',
                                                         # 'position_decoding_clusterless',
+                                                        # 'position_decoding_spyglass_clusterless',
                                                         #  'position_decoding_two_step',
                                                         #  'extended_pf_peak_information',
                                                         ] # 'ratemap_peaks_prominence2d'

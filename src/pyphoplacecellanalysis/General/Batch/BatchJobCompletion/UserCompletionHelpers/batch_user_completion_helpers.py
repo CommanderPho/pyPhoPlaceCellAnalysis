@@ -4676,6 +4676,33 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
 
                             print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
                             callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
+                else:
+                    ## Attempt to recompute the missing pf2D_SpyglassClusterlessDecoder result
+                    try:
+                        if hasattr(comp_result, 'computation_function') and callable(comp_result.computation_function):
+                            # Try to recompute using the available computation function
+                            comp_result.computation_function(force_recompute=True)
+                            # Try again to get the decoder
+                            decoder = comp_result.computed_data.get('pf2D_SpyglassClusterlessDecoder', None)
+                            if decoder is not None:
+                                if getattr(decoder, 'nld_results', None) is None:
+                                    decoder.compute_all()
+
+                                if pickle_spyglass_clusterless_decoder:
+                                    output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_SpyglassClusterlessDecoder.pkl").resolve()
+                                    with open(output_path, 'wb') as f:
+                                        pickle.dump(decoder, f)
+
+                                    print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
+                                    callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
+                            else:
+                                print(f"WARN: pf2D_SpyglassClusterlessDecoder recompute unsuccessful for filter: {filter_name} on {curr_session_name}")
+                        else:
+                            print(f"WARN: comp_result for {filter_name} is missing both computed_data and a callable computation_function; cannot recompute pf2D_SpyglassClusterlessDecoder.")
+                    except Exception as recompute_e:
+                        print(f"ERROR: Exception during recomputation of pf2D_SpyglassClusterlessDecoder for filter: {filter_name}: {recompute_e}")
+            ## END for filter_name, comp_result in curr_active_pipeline.computation_results.items()....
+
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
