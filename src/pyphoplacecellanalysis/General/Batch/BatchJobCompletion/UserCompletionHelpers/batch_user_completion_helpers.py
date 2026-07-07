@@ -3863,7 +3863,8 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
                 param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
             ),
         ),
-        ('_display_2d_placefield_occupancy', {}),
+        ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
+        )),
         # ('_display_1d_placefields', display_fn_kwargs),
     ]:
         try:

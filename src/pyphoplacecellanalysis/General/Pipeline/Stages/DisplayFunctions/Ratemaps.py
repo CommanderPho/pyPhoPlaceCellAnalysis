@@ -79,6 +79,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         """
         param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
         # fontsize = kwargs.get('fontsize', 10)
+        should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy_1D')
@@ -91,12 +92,13 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         active_figure = plt.gcf()
         
-        # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
-        active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2,
-            # fontsize=kwargs.get('fontsize', 10),
-            **param_text_box_kwargs,
-        ) # Adds the parameters text.
+        if (not should_disable_params_text_box):
+            # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
+            active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
+            _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2,
+                # fontsize=kwargs.get('fontsize', 10),
+                **param_text_box_kwargs,
+            ) # Adds the parameters text.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
@@ -128,6 +130,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         
         """
         param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
+        should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='_display_2d_placefield_result_plot_ratemaps_2D')
@@ -138,10 +141,11 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         plot_variable_name = kwargs.get('plot_variable', enumTuningMap2DPlotVariables.TUNING_MAPS).name
         active_figure = plt.gcf()
         
-        active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
+        if (not should_disable_params_text_box):
+            active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)            
+            _display_add_computation_param_text_box(active_figure, active_pf_computation_params, **param_text_box_kwargs) # Adds the parameters text. #TODO 2023-06-13 11:10: - [ ] Fix how this renders at least for PDF output. It's too big and positioned poorly.
         
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, **param_text_box_kwargs) # Adds the parameters text. #TODO 2023-06-13 11:10: - [ ] Fix how this renders at least for PDF output. It's too big and positioned poorly.
-        
+
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
         fig_label = f'{plot_variable_name} | plot_ratemaps_2D | {session_identifier} | {active_figure.number}'
@@ -176,7 +180,7 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         """
         param_text_box_kwargs = kwargs.pop('param_text_box_kwargs', dict(text_args={'fontsize': 10}))
-
+        should_disable_params_text_box: bool = param_text_box_kwargs.pop('should_disable', False)
 
         assert active_context is not None
         active_display_ctx = active_context.adding_context('display_fn', display_fn_name='plot_occupancy')
@@ -190,9 +194,10 @@ class DefaultRatemapDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
 
         active_figure = plt.gcf()
         
-        # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
-        active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
-        _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2, **param_text_box_kwargs) # Adds the parameters text.
+        if (not should_disable_params_text_box):
+            # TODO 2023-06-02 - should drop the: 'computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size'
+            active_pf_computation_params = unwrap_placefield_computation_parameters(active_config.computation_config)
+            _display_add_computation_param_text_box(active_figure, active_pf_computation_params, subset_excludelist=['computation_epochs', 'speed_thresh', 'frate_thresh', 'time_bin_size','frateThresh'], override_float_precision=2, **param_text_box_kwargs) # Adds the parameters text.
         
         ## Setup the plot title and add the session information:
         session_identifier = computation_result.sess.get_description() # 'sess_bapun_RatN_Day4_2019-10-15_11-30-06'
