@@ -265,8 +265,11 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
         for a_command in menu_commands:
             assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
-            # add_renderables_menu[a_command].trigger()
-            global_flat_action_dict[a_command].trigger()
+            an_action = global_flat_action_dict[a_command]
+            if an_action.isEnabled():
+                an_action.trigger()
+            elif debug_print:
+                print(f'\t_skipping disabled interval menu command: {a_command}')
 
         # # active_2d_plot.activeMenuReference
         # # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict

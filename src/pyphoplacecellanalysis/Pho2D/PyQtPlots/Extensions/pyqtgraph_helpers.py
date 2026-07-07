@@ -297,8 +297,8 @@ def configure_pyqtgraph_for_unattended_rendering(qapp_name: str = 'unattended_py
         except Exception:
             pass
     app = pg.mkQApp(qapp_name)
-    pg.setConfigOptions(useOpenGL=False)
-    pg.setConfigOption('antialias', False)
+    pg.setConfigOptions(useOpenGL=False, enableExperimental=False, antialias=False)
+
     return app
 
 

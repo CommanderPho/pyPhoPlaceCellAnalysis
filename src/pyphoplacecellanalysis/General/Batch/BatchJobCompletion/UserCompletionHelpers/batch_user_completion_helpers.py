@@ -3716,13 +3716,111 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     os.environ.setdefault('QT_OPENGL', 'software')
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, programmatic_render_to_file, FigureToImageHelpers
+    from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
     from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
     from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedEpochMarginal_MatplotlibPlotCommand, decoding_continuous_cache_key
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete, configure_pyqtgraph_for_unattended_rendering
+    import io
+    import numpy as np
     import matplotlib.pyplot as plt
+    from matplotlib import gridspec
     import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+
+    def _subfn_render_display_fn_to_image(curr_active_pipeline, display_fn_name: str, a_filtered_context, capture_dpi: float = 200.0, debug_print: bool = False, **display_kwargs):
+        rendered_image = None
+        with plt.ioff():
+            out_display_var = curr_active_pipeline.display(display_fn_name, a_filtered_context, **display_kwargs)
+            out_figures = getattr(out_display_var, 'figures', None)
+            if out_figures is not None and len(out_figures) > 0:
+                active_fig = out_figures[0]
+            else:
+                active_fig = plt.gcf()
+
+            if active_fig is None:
+                if debug_print:
+                    print(f'WARN: no figure found for display_fn `{display_fn_name}` in context `{a_filtered_context}`.')
+                return None
+
+            buffer = io.BytesIO()
+            active_fig.savefig(buffer, format='png', dpi=capture_dpi, bbox_inches='tight')
+            buffer.seek(0)
+            rendered_image = np.asarray(plt.imread(buffer))
+            buffer.close()
+            plt.close(active_fig)
+            plt.close('all')
+
+        return rendered_image
+
+
+    def _subfn_build_composite_maze_occupancy_placefields_figure(curr_active_pipeline, subset_includelist, occupancy_display_kwargs: dict, ratemaps_display_kwargs: dict, fig_man, write_png: bool, write_vector_format: bool, debug_print: bool = False):
+        candidate_filtered_items = list(curr_active_pipeline.filtered_contexts.items())
+        if subset_includelist is not None:
+            subset_names = set(subset_includelist)
+            selected_filtered_items = [(filter_name, a_filtered_context) for filter_name, a_filtered_context in candidate_filtered_items if filter_name in subset_names]
+        else:
+            selected_filtered_items = list(candidate_filtered_items)
+
+        selected_filtered_items = [(filter_name, a_filtered_context) for filter_name, a_filtered_context in selected_filtered_items if (filter_name != 'maze_GLOBAL')]
+        if len(selected_filtered_items) == 0:
+            if len(candidate_filtered_items) == 0:
+                print(f'WARN: _subfn_build_composite_maze_occupancy_placefields_figure found no filtered contexts.')
+                return []
+            selected_filtered_items = list(candidate_filtered_items)
+            print(f'WARN: composite figure fallback using all filtered contexts: {[k for k, _ in selected_filtered_items]}')
+
+        occupancy_images = []
+        placefield_images = []
+        column_labels = []
+        for filter_name, a_filtered_context in selected_filtered_items:
+            try:
+                occupancy_img = _subfn_render_display_fn_to_image(curr_active_pipeline, '_display_2d_placefield_occupancy', a_filtered_context, debug_print=debug_print, **occupancy_display_kwargs)
+                placefield_img = _subfn_render_display_fn_to_image(curr_active_pipeline, '_display_2d_placefield_result_plot_ratemaps_2D', a_filtered_context, debug_print=debug_print, **ratemaps_display_kwargs)
+            except Exception as e:
+                print(f'WARN: composite figure render failed for context `{filter_name}`: {e}')
+                continue
+
+            if placefield_img is None:
+                print(f'WARN: skipping composite column `{filter_name}` due to missing placefield image.')
+                continue
+            if occupancy_img is None:
+                print(f'WARN: occupancy image missing for `{filter_name}`, using placefield image as placeholder.')
+                occupancy_img = placefield_img
+
+            occupancy_images.append(occupancy_img)
+            placefield_images.append(placefield_img)
+            column_labels.append(str(filter_name))
+
+        n_columns = len(column_labels)
+        if n_columns == 0:
+            print(f'WARN: no columns rendered for composite occupancy/placefield figure.')
+            return []
+
+        composite_fig = plt.figure(figsize=(max(4.0 * float(n_columns), 8.0), 8.0), constrained_layout=True)
+        composite_grid = gridspec.GridSpec(2, n_columns, figure=composite_fig, hspace=0.02, wspace=0.02)
+        for col_idx in range(n_columns):
+            ax_occ = composite_fig.add_subplot(composite_grid[0, col_idx])
+            ax_occ.imshow(occupancy_images[col_idx])
+            ax_occ.axis('off')
+            ax_occ.set_title(column_labels[col_idx], fontsize=10)
+            if col_idx == 0:
+                ax_occ.set_ylabel('Occupancy', fontsize=10)
+
+            ax_pf = composite_fig.add_subplot(composite_grid[1, col_idx])
+            ax_pf.imshow(placefield_images[col_idx])
+            ax_pf.axis('off')
+            if col_idx == 0:
+                ax_pf.set_ylabel('2D Placefields', fontsize=10)
+
+        try:
+            final_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='composite_occupancy_placefields_2D')
+        except Exception:
+            final_context = curr_active_pipeline.get_session_context().adding_context('display_fn', display_fn_name='composite_occupancy_placefields_2D')
+        composite_out_paths, _ = curr_active_pipeline.output_figure(final_context, composite_fig, write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man, debug_print=debug_print)
+        plt.close(composite_fig)
+        return composite_out_paths
 
 
     if getattr(curr_session_context, 'format_name', None) != 'dandi_nwb':
@@ -3759,7 +3857,12 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
             raise
 
     for curr_display_function_name, extra_kwargs in [
-        ('_display_2d_placefield_result_plot_ratemaps_2D', display_fn_kwargs),
+        ('_display_2d_placefield_result_plot_ratemaps_2D', display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE,  # aclu only, no shank/cluster/qclu
+                # fig_column_width=32.0, fig_row_height=4.0,
+                resolution_multiplier=4.0, 
+                param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
+            ),
+        ),
         ('_display_2d_placefield_occupancy', {}),
         # ('_display_1d_placefields', display_fn_kwargs),
     ]:
@@ -3777,6 +3880,20 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
         finally:
             plt.close('all')
 
+    ## END for curr_display_function_name, extra_kwargs in...
+
+    composite_occupancy_display_kwargs = {}
+    composite_ratemap_display_kwargs = display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE, resolution_multiplier=4.0, param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}))
+    try:
+        composite_out_paths = _subfn_build_composite_maze_occupancy_placefields_figure(curr_active_pipeline, subset_includelist, occupancy_display_kwargs=composite_occupancy_display_kwargs, ratemaps_display_kwargs=composite_ratemap_display_kwargs, fig_man=custom_fig_man, write_png=write_png, write_vector_format=write_vector_format, debug_print=debug_print)
+        callback_outputs['figure_output_paths'].extend(composite_out_paths or [])
+        print(f'\tcomposite_occupancy_placefields_2D figure_output_paths: {composite_out_paths}')
+    except Exception as e:
+        print(f'WARN: composite occupancy/placefields export failed: {e}')
+        if self.fail_on_exception:
+            raise
+    finally:
+        plt.close('all')
 
     cache_key = decoding_continuous_cache_key(laps_decoding_time_bin_size, None)
     directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
