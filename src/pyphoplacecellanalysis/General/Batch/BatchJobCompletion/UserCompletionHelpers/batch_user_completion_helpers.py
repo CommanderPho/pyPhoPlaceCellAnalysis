@@ -3570,8 +3570,10 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
-    if getattr(curr_session_context, 'format_name', None) != 'bapun':
-        print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
+        print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
         return across_session_results_extended_dict
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
