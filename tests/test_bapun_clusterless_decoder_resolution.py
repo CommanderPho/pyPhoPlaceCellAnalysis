@@ -26,8 +26,8 @@ def _load_context_stacker_under_test():
     return namespace["_stack_context_posteriors_for_epoch"]
 
 
-def _computed_data(unit_1d=None, unit_2d=None, clusterless_1d=None, clusterless_2d=None):
-    return DynamicContainer(pf1D_Decoder=unit_1d, pf2D_Decoder=unit_2d, pf1D_ClusterlessDecoder=clusterless_1d, pf2D_ClusterlessDecoder=clusterless_2d)
+def _computed_data(unit_1d=None, unit_2d=None, clusterless_1d=None, clusterless_2d=None, spyglass_clusterless_1d=None, spyglass_clusterless_2d=None):
+    return DynamicContainer(pf1D_Decoder=unit_1d, pf2D_Decoder=unit_2d, pf1D_ClusterlessDecoder=clusterless_1d, pf2D_ClusterlessDecoder=clusterless_2d, pf1D_SpyglassClusterlessDecoder=spyglass_clusterless_1d, pf2D_SpyglassClusterlessDecoder=spyglass_clusterless_2d)
 
 
 def test_resolve_bapun_position_decoder_defaults_to_standard_when_available():
@@ -61,6 +61,30 @@ def test_resolve_bapun_position_decoder_explicit_standard_requires_standard_deco
 
     with pytest.raises(ValueError, match="pf1D_Decoder"):
         resolve_bapun_position_decoder(computed_data, decoder_dim="1D", use_clusterless_decoders=False, context_name="maze1")
+
+
+def test_resolve_bapun_position_decoder_explicit_spyglass_clusterless_requires_spyglass_decoder():
+    resolve_bapun_position_decoder = _load_resolver_under_test()
+    spyglass_decoder = object()
+    computed_data = _computed_data(unit_2d=object(), clusterless_2d=object(), spyglass_clusterless_2d=spyglass_decoder)
+
+    assert resolve_bapun_position_decoder(computed_data, decoder_dim="2D", use_clusterless_decoders=None, use_spyglass_clusterless_decoders=True, context_name="maze1") is spyglass_decoder
+
+
+def test_resolve_bapun_position_decoder_explicit_spyglass_clusterless_raises_when_missing():
+    resolve_bapun_position_decoder = _load_resolver_under_test()
+    computed_data = _computed_data(unit_2d=object(), clusterless_2d=object(), spyglass_clusterless_2d=None)
+
+    with pytest.raises(ValueError, match="pf2D_SpyglassClusterlessDecoder"):
+        resolve_bapun_position_decoder(computed_data, decoder_dim="2D", use_clusterless_decoders=None, use_spyglass_clusterless_decoders=True, context_name="maze1")
+
+
+def test_resolve_bapun_position_decoder_rejects_both_clusterless_flags_true():
+    resolve_bapun_position_decoder = _load_resolver_under_test()
+    computed_data = _computed_data(unit_2d=object(), clusterless_2d=object(), spyglass_clusterless_2d=object())
+
+    with pytest.raises(ValueError, match="cannot both be True"):
+        resolve_bapun_position_decoder(computed_data, decoder_dim="2D", use_clusterless_decoders=True, use_spyglass_clusterless_decoders=True, context_name="maze1")
 
 
 def test_stack_context_posteriors_for_epoch_flattens_and_normalizes_context_axis():

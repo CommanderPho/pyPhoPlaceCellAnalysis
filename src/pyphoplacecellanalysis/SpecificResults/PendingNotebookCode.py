@@ -648,7 +648,7 @@ class BapunPositionDecodingPerformance:
 
     @function_attributes(short_name=None, tags=['MAIN', 'bapun', 'train-test', 'decoder', 'error'], input_requires=[], output_provides=[], uses=['compute_train_test_split_epochs_decoders'], used_by=[], creation_date='2026-06-20 10:14', related_items=[])
     @classmethod
-    def compute_bapun_train_test_decoder_error_distance(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, debug_print: bool = False):
+    def compute_bapun_train_test_decoder_error_distance(cls, curr_active_pipeline, training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_print: bool = False):
         """ computes new decoders based on the "train" data -- defined as a certain percentage of each lap, and then determine the decoder errors per lap (in cm) for each lap
 
         use_clusterless_decoders:
@@ -659,8 +659,7 @@ class BapunPositionDecodingPerformance:
             spike counts. ``laps_decoding_time_bin_size`` remains the DecodedFilterEpochsResult
             metadata value; measured positions are compared at the decoded bin centers.
         """
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-        from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, is_clusterless_position_decoder
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_train_test_split_epochs_decoders
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting, get_proper_global_spikes_df, CustomDecodeEpochsResult
 
@@ -679,10 +678,10 @@ class BapunPositionDecodingPerformance:
         ## 2026-06-19 - Working part
 
         # OpenField: maze_epoch_names=['roam', 'sprinkle']  |  TwoMaze: ['maze1', 'maze2']
-        train_test_result = compute_train_test_split_epochs_decoders(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, training_data_portion=training_data_portion, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+        train_test_result = compute_train_test_split_epochs_decoders(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, training_data_portion=training_data_portion, use_clusterless_decoders=use_clusterless_decoders, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders, debug_print=debug_print)
 
         def _has_non_clusterless_decoders(decoder_dict) -> bool:
-            return (decoder_dict is not None) and any(not ClusterlessRTCPositionDecoder.is_clusterless_decoder(a_decoder) for a_decoder in decoder_dict.values())
+            return (decoder_dict is not None) and any(not is_clusterless_position_decoder(a_decoder) for a_decoder in decoder_dict.values())
 
         needs_global_spikes_df = _has_non_clusterless_decoders(train_test_result.train_lap_specific_pf1D_Decoder_dict) or _has_non_clusterless_decoders(getattr(train_test_result, 'train_lap_specific_lin_pos_Decoder_dict', None))
         global_spikes_df: Optional[pd.DataFrame] = get_proper_global_spikes_df(curr_active_pipeline) if needs_global_spikes_df else None
@@ -13424,15 +13423,21 @@ def _computed_data_get(computed_data, key: str):
     return computed_data.get(key, None) if hasattr(computed_data, 'get') else getattr(computed_data, key, None)
 
 
-def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_clusterless_decoders: Optional[bool], context_name: Optional[str] = None) -> BasePositionDecoder:
+def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_clusterless_decoders: Optional[bool], context_name: Optional[str] = None, use_spyglass_clusterless_decoders: Optional[bool] = None) -> BasePositionDecoder:
     """Resolve Bapun position decoder keys while preserving standard-decoder defaults."""
+    if use_clusterless_decoders is True and use_spyglass_clusterless_decoders is True:
+        raise ValueError("use_clusterless_decoders and use_spyglass_clusterless_decoders cannot both be True.")
     if decoder_dim not in ('1D', '2D'):
         raise ValueError(f"decoder_dim must be '1D' or '2D', got {decoder_dim!r}.")
     standard_key = f'pf{decoder_dim}_Decoder'
     clusterless_key = f'pf{decoder_dim}_ClusterlessDecoder'
+    spyglass_clusterless_key = f'pf{decoder_dim}_SpyglassClusterlessDecoder'
     standard_decoder = _computed_data_get(computed_data, standard_key)
     clusterless_decoder = _computed_data_get(computed_data, clusterless_key)
-    if use_clusterless_decoders is True:
+    spyglass_clusterless_decoder = _computed_data_get(computed_data, spyglass_clusterless_key)
+    if use_spyglass_clusterless_decoders is True:
+        active_key, active_decoder = spyglass_clusterless_key, spyglass_clusterless_decoder
+    elif use_clusterless_decoders is True:
         active_key, active_decoder = clusterless_key, clusterless_decoder
     elif use_clusterless_decoders is False:
         active_key, active_decoder = standard_key, standard_decoder
@@ -13442,11 +13447,11 @@ def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_cluster
         active_key, active_decoder = clusterless_key, clusterless_decoder
     if active_decoder is None:
         context_suffix = f" for context '{context_name}'" if context_name is not None else ""
-        raise ValueError(f"Could not resolve {active_key}{context_suffix}; available standard={standard_decoder is not None}, clusterless={clusterless_decoder is not None}.")
+        raise ValueError(f"Could not resolve {active_key}{context_suffix}; available standard={standard_decoder is not None}, clusterless={clusterless_decoder is not None}, spyglass_clusterless={spyglass_clusterless_decoder is not None}.")
     return active_decoder
 
 
-def _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline, maze_epoch_names: List[str], use_clusterless_decoders: Optional[bool] = None) -> bool:
+def _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline, maze_epoch_names: List[str], use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None) -> bool:
     """Return True when session has usable lin_pos and each maze has a resolved 1D decoder."""
     pos_df = curr_active_pipeline.sess.position.to_dataframe()
     if ('lin_pos' not in pos_df.columns) or (not pos_df['lin_pos'].notna().any()):
@@ -13454,7 +13459,7 @@ def _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline, maze_epoc
     for a_maze_name in maze_epoch_names:
         computed_data = curr_active_pipeline.computation_results[a_maze_name].computed_data
         try:
-            _resolve_bapun_position_decoder(computed_data, decoder_dim='1D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name)
+            _resolve_bapun_position_decoder(computed_data, decoder_dim='1D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders)
         except ValueError:
             return False
     return True
@@ -13489,7 +13494,7 @@ def _assemble_train_test_split_result(train_test_split_epochs_df_dict: Dict[str,
 
 
 @function_attributes(short_name=None, tags=['split', 'train-test', 'bapun'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2025-01-27 22:14', related_items=[])
-def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=5.0/6.0, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
+def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[DirectionalLapsResult] = None, track_templates: Optional[TrackTemplates] = None, curr_active_pipeline=None, maze_epoch_names: Optional[List[str]] = None, training_data_portion: float=5.0/6.0, include_lin_pos_decoder: bool = True, use_clusterless_decoders: Optional[bool] = None, use_spyglass_clusterless_decoders: Optional[bool] = None, debug_output_hdf5_file_path=None, debug_plot: bool = False, debug_print: bool = False) -> TrainTestSplitResult:
     """Split lap epochs into train/test periods and rebuild decoders on training data only.
 
     Supports two input modes:
@@ -13598,12 +13603,12 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
             maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, minimum_contexts=1, debug_print=debug_print)
         if debug_print:
             print(f'Bapun mode: maze_epoch_names={maze_epoch_names}')
-        should_include_lin_pos_decoder: bool = include_lin_pos_decoder and _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders)
+        should_include_lin_pos_decoder: bool = include_lin_pos_decoder and _bapun_session_supports_lin_pos_decoder_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders)
         if include_lin_pos_decoder and (not should_include_lin_pos_decoder) and debug_print:
             print('Bapun mode: skipping lin_pos decoder train/test split (missing lin_pos and/or resolved 1D decoder on one or more mazes).')
         for a_maze_name in maze_epoch_names:
             computed_data = curr_active_pipeline.computation_results[a_maze_name].computed_data
-            pf2D_decoder = _resolve_bapun_position_decoder(computed_data, decoder_dim='2D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name)
+            pf2D_decoder = _resolve_bapun_position_decoder(computed_data, decoder_dim='2D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders)
             pf2D_decoder_for_laps: BasePositionDecoder = deepcopy(pf2D_decoder)
             (a_training_test_split_epochs_df_dict, a_training_test_split_epochs_epoch_obj_dict), _, (an_epoch_period_description, a_config_copy, epoch_filtered_curr_pfND, a_sliced_pf2D_Decoder) = _bapun_split_maze_train_test_decoder(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=deepcopy(pf2D_decoder), training_data_portion=training_data_portion, laps_resolution_decoder=pf2D_decoder_for_laps, debug_print=debug_print)
             train_test_split_epochs_df_dict.update(a_training_test_split_epochs_df_dict)
@@ -13612,7 +13617,7 @@ def compute_train_test_split_epochs_decoders(directional_laps_results: Optional[
             split_train_test_epoch_specific_pfND_dict[an_epoch_period_description] = epoch_filtered_curr_pfND
             split_train_test_epoch_specific_pfND_Decoder_dict[an_epoch_period_description] = a_sliced_pf2D_Decoder
             if should_include_lin_pos_decoder:
-                pf1D_decoder = _resolve_bapun_position_decoder(computed_data, decoder_dim='1D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name)
+                pf1D_decoder = _resolve_bapun_position_decoder(computed_data, decoder_dim='1D', use_clusterless_decoders=use_clusterless_decoders, context_name=a_maze_name, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders)
                 _, _, (_, _, _, a_sliced_pf1D_Decoder) = _bapun_split_maze_train_test_decoder(curr_active_pipeline=curr_active_pipeline, maze_name=a_maze_name, a_decoder=deepcopy(pf1D_decoder), training_data_portion=training_data_portion, laps_resolution_decoder=pf2D_decoder_for_laps, debug_print=debug_print)
                 split_train_test_epoch_specific_lin_pos_Decoder_dict[an_epoch_period_description] = a_sliced_pf1D_Decoder
 

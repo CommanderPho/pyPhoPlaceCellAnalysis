@@ -160,6 +160,22 @@ def test_spyglass_is_clusterless_decoder_type_check():
     assert SpyglassClusterlessDecoder.is_spyglass_clusterless_decoder(decoder)
 
 
+def test_spyglass_replacing_computation_epochs_refreshes_encoding_interval():
+    from neuropy.core.epoch import Epoch
+
+    mock_pf = _MockPfND(n_bins=6, ndim=2)
+    full_epochs_df = pd.DataFrame({'start': [0.0, 0.5], 'stop': [0.4, 1.0], 'label': ['a', 'b']})
+    train_epochs_df = pd.DataFrame({'start': [0.0], 'stop': [0.4], 'label': ['a']})
+    mock_pf.epochs = Epoch(full_epochs_df)
+    encoding_interval = np.array([[0.0, 1.0]])
+    decoding_interval = np.array([[0.0, 1.0]])
+    decoder = SpyglassClusterlessDecoder(pf=mock_pf, encoding_interval=encoding_interval, decoding_interval=decoding_interval, setup_on_init=False, post_load_on_init=False, debug_print=False)
+    train_decoder = decoder.replacing_computation_epochs(Epoch(train_epochs_df))
+    np.testing.assert_array_equal(train_decoder.encoding_interval, np.array([[0.0, 0.4]]))
+    np.testing.assert_array_equal(train_decoder.decoding_interval, np.array([[0.0, 0.4]]))
+    assert train_decoder.classifier is None
+
+
 def test_position_decoding_spyglass_clusterless_registered_in_default_computation_functions():
     source_path = Path(__file__).resolve().parents[1] / "src" / "pyphoplacecellanalysis" / "General" / "Pipeline" / "Stages" / "ComputationFunctions" / "DefaultComputationFunctions.py"
     source_text = source_path.read_text(encoding="utf-8")

@@ -2238,6 +2238,13 @@ from neuropy.utils.mixins.binning_helpers import GridBinDebuggableMixin, DebugBi
 # Stateless Decoders (New 2023-04-06)                                                                                  #
 # ==================================================================================================================== #
 
+def is_clusterless_position_decoder(decoder) -> bool:
+    """Return True when ``decoder`` is an RTC or Spyglass clusterless position decoder."""
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
+    return ClusterlessRTCPositionDecoder.is_clusterless_decoder(decoder) or SpyglassClusterlessDecoder.is_clusterless_decoder(decoder)
+
+
 @custom_define(slots=False, eq=False)
 class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
