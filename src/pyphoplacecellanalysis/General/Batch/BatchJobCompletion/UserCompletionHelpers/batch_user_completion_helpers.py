@@ -3634,16 +3634,18 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
 # NWB W-maze Manual Pipeline Recomputations                                                                            #
 # ==================================================================================================================== #
 
-@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba', 'pbe', 'replay', '2D-decode', 'export'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'DecodeSpecificEpochsResultWithDecodingInfo', 'PosteriorExporting'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
 def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False) -> dict:
-    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, and failed-computation retry.
+        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, export_pbe_replay_decoding: bool = True, export_pkl: bool = True, export_hdf: bool = False) -> dict:
+    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, PBE/replay 2D decode+export, and failed-computation retry.
 
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function
 
     callback_outputs = across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
     failed_computations_summary = callback_outputs['failed_computations_summary']
     n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
+    pbe_pkl_path = callback_outputs['pbe_pkl_path']
+    replay_hdf_path = callback_outputs['replay_hdf_path']
 
 
     Example Full Run from Notebook:
@@ -3666,9 +3668,13 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
 
     """
     import sys
+    from pathlib import Path
     from typing import Dict, Optional
+    from neuropy.core.epoch import ensure_dataframe, ensure_Epoch
+    from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
     from pyphocorehelpers.exception_helpers import CapturedException
-    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps, ensure_nwb_wmaze_pbe_and_replay_epochs, build_contextual_pf2D_decoder, _resolve_maze_epoch_names_for_multi_context_eval, DecodeSpecificEpochsResultWithDecodingInfo
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
 
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name != 'dandi_nwb':
@@ -3680,11 +3686,66 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'recompute_nwb_wmaze_pipeline_computations_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
 
-    callback_outputs = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'overwrite_extant': overwrite_extant, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None}
+    callback_outputs = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'pbe_replay_decoding_time_bin_size': pbe_replay_decoding_time_bin_size, 'overwrite_extant': overwrite_extant, 'overwrite_pbe_replay_epochs': overwrite_pbe_replay_epochs, 'export_pbe_replay_decoding': export_pbe_replay_decoding, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None, 'pbe_replay_epochs_summary': None, 'pbe_pkl_path': None, 'replay_pkl_path': None, 'pbe_hdf_path': None, 'replay_hdf_path': None, 'pbe_replay_decode_error': None, 'resolved_maze_epoch_names': None}
 
     try:
         curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, active_data_mode_name=resolved_active_data_mode_name, posthoc_save=posthoc_save, time_bin_size=final_process_time_bin_size, overwrite_extant=overwrite_extant, fail_on_exception=fail_on_exception)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': directional_decode_time_bin_size, 'should_disable_cache': should_disable_cache}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=debug_print)
+
+        try:
+            pbe_replay_epochs_summary: dict = ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline=curr_active_pipeline, overwrite_extant=overwrite_pbe_replay_epochs)
+            callback_outputs['pbe_replay_epochs_summary'] = deepcopy(pbe_replay_epochs_summary)
+
+            if export_pbe_replay_decoding:
+                resolved_maze_epoch_names: list = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+                callback_outputs['resolved_maze_epoch_names'] = list(resolved_maze_epoch_names)
+                _pf2D_Decoder_dict, _contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=resolved_maze_epoch_names)
+                global_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+                pbes = deepcopy(curr_active_pipeline.sess.pbe)
+                replays = deepcopy(curr_active_pipeline.sess.replay)
+
+                pbe_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='pbe'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(pbes), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+                replay_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='replay'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(replays), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+
+                assert self.collected_outputs_path.exists()
+                curr_session_name: str = curr_active_pipeline.session_name
+                CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+
+                if export_pkl:
+                    pbe_pkl_path: Path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_pbe_2d_decoded_result.pkl').resolve()
+                    replay_pkl_path: Path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_replay_2d_decoded_result.pkl').resolve()
+                    pbe_full_result.save(pkl_output_path=pbe_pkl_path)
+                    replay_full_result.save(pkl_output_path=replay_pkl_path)
+                    callback_outputs['pbe_pkl_path'] = pbe_pkl_path
+                    callback_outputs['replay_pkl_path'] = replay_pkl_path
+                    print(f'\tsaved pbe_full_result PKL: "{pbe_pkl_path}"')
+                    print(f'\tsaved replay_full_result PKL: "{replay_pkl_path}"')
+
+                if export_hdf:
+                    _complete_session_context, (session_context, _additional_session_context) = curr_active_pipeline.get_complete_session_context()
+                    _, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+                    custom_params_hdf_key: str = custom_suffix.strip('_')
+                    _parent_save_context: DisplaySpecifyingIdentifyingContext = deepcopy(session_context).overwriting_context(custom_suffix=custom_params_hdf_key, display_fn_name='save_decoded_posteriors_to_HDF5')
+                    _parent_save_context.display_dict = {'custom_suffix': lambda k, v: f"{v}", 'display_fn_name': lambda k, v: f"{v}"}
+
+                    pbe_hdf_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(pbe_decoded_posteriors)', a_tbin_size=pbe_replay_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+                    _pbe_out_contexts, _pbe_hdf_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict={'contextual_pf2D': pbe_full_result.decoder_result}, decoder_ripple_filter_epochs_decoder_result_dict=None, _save_context=_parent_save_context.get_raw_identifying_context(), save_path=pbe_hdf_path, should_overwrite_extant_file=True)
+                    callback_outputs['pbe_hdf_path'] = pbe_hdf_path
+                    print(f'\tsaved pbe decoded posteriors HDF: "{pbe_hdf_path}"')
+
+                    replay_hdf_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(replay_decoded_posteriors)', a_tbin_size=pbe_replay_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+                    _replay_out_contexts, _replay_hdf_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None, decoder_ripple_filter_epochs_decoder_result_dict={'contextual_pf2D': replay_full_result.decoder_result}, _save_context=_parent_save_context.get_raw_identifying_context(), save_path=replay_hdf_path, should_overwrite_extant_file=True)
+                    callback_outputs['replay_hdf_path'] = replay_hdf_path
+                    print(f'\tsaved replay decoded posteriors HDF: "{replay_hdf_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            pbe_replay_err = CapturedException(e, exception_info)
+            callback_outputs['pbe_replay_decode_error'] = pbe_replay_err
+            print(f"WARN: recompute_nwb_wmaze_pipeline_computations_completion_function PBE/replay 2D decode/export failed: {pbe_replay_err}")
+            if fail_on_exception:
+                raise pbe_replay_err.exc
+
         curr_active_pipeline.rerun_failed_computations(fail_on_exception=fail_on_exception)
         failed_computations = curr_active_pipeline.get_failed_computations()
         failed_computations_summary: Dict[str, Dict[str, str]] = {str(filter_context_name): {str(computation_name): str(captured_exc) for computation_name, captured_exc in computation_exceptions_dict.items()} for filter_context_name, computation_exceptions_dict in failed_computations.items()}
@@ -4507,6 +4568,9 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# Clusterless and Alternative Decoders                                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
 
 # %%
 

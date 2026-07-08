@@ -5831,6 +5831,71 @@ def build_non_kdiba_directional_decoders(curr_active_pipeline, epochs_decoding_t
     return new_decoder_dict, continuous_specific_decoded_results_dict, (contextual_pf2D_Decoder, contextual_pf2D_dict)
 
 
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'pbe', 'replay', 'epochs'], input_requires=[], output_provides=[], uses=['NWBDataSessionFormatRegisteredClass.POSTLOAD_estimate_laps_and_replays'], used_by=['recompute_nwb_wmaze_pipeline_computations_completion_function'], creation_date='2026-07-08 12:00', related_items=['POSTLOAD_estimate_laps_and_replays'])
+def ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline, overwrite_extant: bool = False) -> dict:
+    """Ensure PBE and replay epochs exist on a DANDI W-Maze session (compute if missing).
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ensure_nwb_wmaze_pbe_and_replay_epochs
+
+    summary = ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline=curr_active_pipeline)
+    """
+    from neuropy.core.epoch import Epoch, ensure_dataframe
+    from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+
+    def _epoch_count(epoch_obj) -> int:
+        if epoch_obj is None:
+            return 0
+        try:
+            return len(epoch_obj)
+        except TypeError:
+            return len(ensure_dataframe(epoch_obj))
+
+    def _subfn_estimate_pbe_replay_from_existing_laps(sess) -> None:
+        """PBE/replay/non_pbe only — mirrors POSTLOAD_estimate_laps_and_replays after laps exist."""
+        from neuropy.core.session.dataSession import DataSession
+        NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(sess)
+        if getattr(sess, 'mua', None) is None:
+            sess.mua = DataSession.compute_neurons_mua(sess, save_on_compute=False)
+        non_running_periods = Epoch.from_PortionInterval(sess.laps.as_epoch_obj().to_PortionInterval().complement())
+        PBE_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.PBEs
+        assert PBE_estimation_parameters is not None
+        PBE_estimation_parameters.require_intersecting_epoch = non_running_periods
+        sess.pbe = sess.compute_pbe_epochs(sess, active_parameters=PBE_estimation_parameters)
+        sess.compute_spikes_PBEs()
+        replay_estimation_parameters = sess.config.preprocessing_parameters.epoch_estimation_parameters.replays
+        assert replay_estimation_parameters is not None
+        replay_estimation_parameters.require_intersecting_epoch = non_running_periods
+        replay_estimation_parameters.min_inclusion_fr_active_thresh = 1.0
+        replay_estimation_parameters.min_num_unique_aclu_inclusions = 5
+        sess.replace_session_replays_with_estimates(**replay_estimation_parameters)
+        sess.non_pbe = sess.compute_non_PBE_epochs(sess, active_parameters=PBE_estimation_parameters, save_on_compute=True)
+
+    session_format_name: str = str(getattr(curr_active_pipeline.get_session_context(), 'format_name', '') or getattr(getattr(curr_active_pipeline.sess, 'config', None), 'format_name', ''))
+    if session_format_name != 'dandi_nwb':
+        raise ValueError(f'ensure_nwb_wmaze_pbe_and_replay_epochs requires format_name="dandi_nwb", got {session_format_name!r}')
+
+    sess = curr_active_pipeline.sess
+    n_pbe_before: int = _epoch_count(getattr(sess, 'pbe', None))
+    n_replay_before: int = _epoch_count(getattr(sess, 'replay', None))
+    n_laps: int = _epoch_count(getattr(sess, 'laps', None))
+    needs_recompute: bool = overwrite_extant or (n_pbe_before == 0) or (n_replay_before == 0)
+    if not needs_recompute:
+        n_non_pbe: int = _epoch_count(getattr(sess, 'non_pbe', None))
+        print(f'INFO: ensure_nwb_wmaze_pbe_and_replay_epochs skipped recompute (n_pbe={n_pbe_before}, n_replay={n_replay_before}, n_non_pbe={n_non_pbe})')
+        return {'did_recompute_epochs': False, 'n_pbe': n_pbe_before, 'n_replay': n_replay_before, 'n_non_pbe': n_non_pbe}
+
+    print(f'INFO: ensure_nwb_wmaze_pbe_and_replay_epochs recomputing epochs (overwrite_extant={overwrite_extant}, n_pbe_before={n_pbe_before}, n_replay_before={n_replay_before}, n_laps={n_laps})...')
+    if n_laps > 0:
+        _subfn_estimate_pbe_replay_from_existing_laps(sess)
+    else:
+        NWBDataSessionFormatRegisteredClass.POSTLOAD_estimate_laps_and_replays(sess)
+    n_pbe: int = _epoch_count(sess.pbe)
+    n_replay: int = _epoch_count(sess.replay)
+    n_non_pbe: int = _epoch_count(getattr(sess, 'non_pbe', None))
+    print(f'INFO: ensure_nwb_wmaze_pbe_and_replay_epochs done (n_pbe={n_pbe}, n_replay={n_replay}, n_non_pbe={n_non_pbe})')
+    return {'did_recompute_epochs': True, 'n_pbe': n_pbe, 'n_replay': n_replay, 'n_non_pbe': n_non_pbe}
+
+
 @function_attributes(short_name=None, tags=['rachel', 'bapun'], input_requires=[], output_provides=[], uses=[], used_by=['final_process_non_kdiba_all_comps'], creation_date='2025-09-10 07:01', related_items=[])
 def post_process_non_kdiba(curr_active_pipeline, overwrite_extant: bool=False):
     """ processes either Bapun or Rachel sessions
