@@ -3634,62 +3634,6 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
 # NWB W-maze Manual Pipeline Recomputations                                                                            #
 # ==================================================================================================================== #
 
-def _build_contextual_pf2D_posterior_image_data(p_x_given_n: np.ndarray) -> np.ndarray:
-    """Marginalize contextual 2D posteriors to (n_contexts, n_time_bins) for heatmap export."""
-    p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
-    if p_x.ndim == 4:
-        img_data: np.ndarray = np.nansum(p_x, axis=(0, 1))
-    elif p_x.ndim == 3:
-        img_data = np.nansum(p_x, axis=(0, 1), keepdims=True)
-    elif p_x.ndim == 2:
-        img_data = p_x
-    else:
-        raise ValueError(f'_build_contextual_pf2D_posterior_image_data expected 2-4D p_x_given_n, got shape {p_x.shape}')
-    denom: np.ndarray = np.nansum(img_data, axis=0, keepdims=True)
-    return np.divide(img_data, denom, out=np.zeros_like(img_data), where=denom > 0)
-
-
-def _export_wmaze_contextual_pf2D_posterior_images(curr_active_pipeline, decoded_epochs_result, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', desired_height: int = 1200, custom_export_formats: Optional[Dict] = None) -> dict:
-    """Export per-epoch contextual 2D posterior heatmap images (context x time marginals; mirrors generalized decode export formats)."""
-    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
-    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, ImagePostRenderFunctionSets
-
-    parent_output_folder.mkdir(parents=True, exist_ok=True)
-    posterior_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name).resolve()
-    posterior_out_folder.mkdir(parents=True, exist_ok=True)
-    if custom_export_formats is None:
-        custom_export_formats = {'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict)}
-
-    out_custom_formats_dict: dict = {f'{epochs_name}.{decoder_name}': {}}
-    flat_save_out_paths: list = []
-    num_filter_epochs: int = decoded_epochs_result.num_filter_epochs
-    num_required_zero_padding: int = len(str(num_filter_epochs))
-
-    for export_format_name, export_format_config in custom_export_formats.items():
-        export_format_folder: Path = posterior_out_folder.joinpath(export_format_name).resolve()
-        export_format_folder.mkdir(parents=True, exist_ok=True)
-        export_format_config_list: list = []
-        for epoch_idx in np.arange(num_filter_epochs):
-            active_epoch_result = decoded_epochs_result.get_result_for_epoch(active_epoch_idx=epoch_idx)
-            img_data: np.ndarray = _build_contextual_pf2D_posterior_image_data(active_epoch_result.p_x_given_n)
-            curr_epoch_info_dict = active_epoch_result.epoch_info_tuple._asdict()
-            active_epoch_id = curr_epoch_info_dict.get('label', epoch_idx)
-            complete_epoch_identifier_str: str = f"p_x_given_n[{int(active_epoch_id):0{num_required_zero_padding}d}]"
-            out_path: Path = export_format_folder.joinpath(f'{complete_epoch_identifier_str}.png').resolve()
-            export_grayscale: bool = export_format_name.startswith('greyscale')
-            colormap: str = getattr(export_format_config, 'colormap', 'viridis')
-            vmin = getattr(export_format_config, 'vmin', None)
-            vmax = getattr(export_format_config, 'vmax', None)
-            posterior_image, posterior_save_path = save_array_as_image(img_data, desired_height=getattr(export_format_config, 'desired_height', desired_height), export_kind=getattr(export_format_config, 'export_kind', None), out_path=out_path, colormap=colormap, skip_img_normalization=True, export_grayscale=export_grayscale, vmin=vmin, vmax=vmax, allow_override_aspect_ratio=True)
-            export_format_config.posterior_saved_image = posterior_image
-            export_format_config.posterior_saved_path = posterior_save_path
-            export_format_config_list.append(deepcopy(export_format_config))
-            flat_save_out_paths.append(posterior_save_path)
-        out_custom_formats_dict[f'{epochs_name}.{decoder_name}'][export_format_name] = export_format_config_list
-
-    return {'parent_output_folder': parent_output_folder, 'epochs_name': epochs_name, 'decoder_name': decoder_name, 'posterior_out_folder': posterior_out_folder, 'out_custom_formats_dict': out_custom_formats_dict, 'flat_save_out_paths': flat_save_out_paths}
-
-
 @function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba', 'pbe', 'replay', '2D-decode', 'export'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'DecodeSpecificEpochsResultWithDecodingInfo', 'PosteriorExporting'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function', 'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function'])
 def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
         active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, export_pbe_replay_decoding: bool = True, export_pkl: bool = True, export_hdf: bool = True) -> dict:
@@ -3823,7 +3767,7 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'pbe', 'replay', 'posterior-images', '2D-decode'], input_requires=[], output_provides=[], uses=['_export_wmaze_contextual_pf2D_posterior_images', 'DecodeSpecificEpochsResultWithDecodingInfo', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_contextual_pf2D_decoder'], used_by=[], creation_date='2026-07-08 14:30', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'pbe', 'replay', 'posterior-images', '2D-decode'], input_requires=[], output_provides=[], uses=['DecodeSpecificEpochsResultWithDecodingInfo', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_contextual_pf2D_decoder', 'HeatmapExportConfig', 'save_array_as_image'], used_by=[], creation_date='2026-07-08 14:30', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_pbe_posterior_images: bool = True, export_replay_posterior_images: bool = False, posterior_images_desired_height: int = 1200, force_redecode: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, debug_print: bool = False) -> dict:
     """Export W-Maze contextual 2D PBE/replay posterior heatmap images (greyscale_shared_norm + viridis_shared_norm per epoch).
 
@@ -3840,7 +3784,61 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
     from typing import Optional
     from neuropy.core.epoch import ensure_Epoch
     from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, ImagePostRenderFunctionSets
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ensure_nwb_wmaze_pbe_and_replay_epochs, build_contextual_pf2D_decoder, _resolve_maze_epoch_names_for_multi_context_eval, DecodeSpecificEpochsResultWithDecodingInfo
+
+    def _subfn_build_contextual_pf2D_posterior_image_data(p_x_given_n: np.ndarray) -> np.ndarray:
+        """Marginalize contextual 2D posteriors to (n_contexts, n_time_bins) for heatmap export."""
+        p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
+        if p_x.ndim == 4:
+            img_data: np.ndarray = np.nansum(p_x, axis=(0, 1))
+        elif p_x.ndim == 3:
+            img_data = np.nansum(p_x, axis=(0, 1), keepdims=True)
+        elif p_x.ndim == 2:
+            img_data = p_x
+        else:
+            raise ValueError(f'_subfn_build_contextual_pf2D_posterior_image_data expected 2-4D p_x_given_n, got shape {p_x.shape}')
+        denom: np.ndarray = np.nansum(img_data, axis=0, keepdims=True)
+        return np.divide(img_data, denom, out=np.zeros_like(img_data), where=denom > 0)
+
+
+    def _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', desired_height: int = 1200, custom_export_formats: Optional[Dict] = None) -> dict:
+        """Export per-epoch contextual 2D posterior heatmap images (context x time marginals; mirrors generalized decode export formats)."""
+        parent_output_folder.mkdir(parents=True, exist_ok=True)
+        posterior_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name).resolve()
+        posterior_out_folder.mkdir(parents=True, exist_ok=True)
+        if custom_export_formats is None:
+            custom_export_formats = {'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict)}
+
+        out_custom_formats_dict: dict = {f'{epochs_name}.{decoder_name}': {}}
+        flat_save_out_paths: list = []
+        num_filter_epochs: int = decoded_epochs_result.num_filter_epochs
+        num_required_zero_padding: int = len(str(num_filter_epochs))
+
+        for export_format_name, export_format_config in custom_export_formats.items():
+            export_format_folder: Path = posterior_out_folder.joinpath(export_format_name).resolve()
+            export_format_folder.mkdir(parents=True, exist_ok=True)
+            export_format_config_list: list = []
+            for epoch_idx in np.arange(num_filter_epochs):
+                active_epoch_result = decoded_epochs_result.get_result_for_epoch(active_epoch_idx=epoch_idx)
+                img_data: np.ndarray = _subfn_build_contextual_pf2D_posterior_image_data(active_epoch_result.p_x_given_n)
+                curr_epoch_info_dict = active_epoch_result.epoch_info_tuple._asdict()
+                active_epoch_id = curr_epoch_info_dict.get('label', epoch_idx)
+                complete_epoch_identifier_str: str = f"p_x_given_n[{int(active_epoch_id):0{num_required_zero_padding}d}]"
+                out_path: Path = export_format_folder.joinpath(f'{complete_epoch_identifier_str}.png').resolve()
+                export_grayscale: bool = export_format_name.startswith('greyscale')
+                colormap: str = getattr(export_format_config, 'colormap', 'viridis')
+                vmin = getattr(export_format_config, 'vmin', None)
+                vmax = getattr(export_format_config, 'vmax', None)
+                posterior_image, posterior_save_path = save_array_as_image(img_data, desired_height=getattr(export_format_config, 'desired_height', desired_height), export_kind=getattr(export_format_config, 'export_kind', None), out_path=out_path, colormap=colormap, skip_img_normalization=True, export_grayscale=export_grayscale, vmin=vmin, vmax=vmax, allow_override_aspect_ratio=True)
+                export_format_config.posterior_saved_image = posterior_image
+                export_format_config.posterior_saved_path = posterior_save_path
+                export_format_config_list.append(deepcopy(export_format_config))
+                flat_save_out_paths.append(posterior_save_path)
+            out_custom_formats_dict[f'{epochs_name}.{decoder_name}'][export_format_name] = export_format_config_list
+
+        return {'parent_output_folder': parent_output_folder, 'epochs_name': epochs_name, 'decoder_name': decoder_name, 'posterior_out_folder': posterior_out_folder, 'out_custom_formats_dict': out_custom_formats_dict, 'flat_save_out_paths': flat_save_out_paths}
 
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name != 'dandi_nwb':
@@ -3890,13 +3888,13 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
 
         if export_pbe_posterior_images:
             assert pbe_full_result is not None, f'PBE decode result missing (pbe_pkl_path exists={pbe_pkl_path.exists()}, force_redecode={force_redecode})'
-            pbe_posterior_images_export_summary: dict = _export_wmaze_contextual_pf2D_posterior_images(curr_active_pipeline=curr_active_pipeline, decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', desired_height=posterior_images_desired_height)
+            pbe_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', desired_height=posterior_images_desired_height)
             callback_outputs['pbe_posterior_images_export_summary'] = deepcopy(pbe_posterior_images_export_summary)
             print(f'\tsaved pbe posterior images: "{pbe_posterior_images_export_summary["posterior_out_folder"]}"')
 
         if export_replay_posterior_images:
             assert replay_full_result is not None, f'replay decode result missing (replay_pkl_path exists={replay_pkl_path.exists()}, force_redecode={force_redecode})'
-            replay_posterior_images_export_summary: dict = _export_wmaze_contextual_pf2D_posterior_images(curr_active_pipeline=curr_active_pipeline, decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', desired_height=posterior_images_desired_height)
+            replay_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', desired_height=posterior_images_desired_height)
             callback_outputs['replay_posterior_images_export_summary'] = deepcopy(replay_posterior_images_export_summary)
             print(f'\tsaved replay posterior images: "{replay_posterior_images_export_summary["posterior_out_folder"]}"')
 
