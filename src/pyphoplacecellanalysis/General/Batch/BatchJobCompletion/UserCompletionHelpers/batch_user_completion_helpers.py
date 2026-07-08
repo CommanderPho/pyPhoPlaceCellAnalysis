@@ -4638,7 +4638,7 @@ def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_
 
 @function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch', 'spyglass'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-07 15:00', related_items=[])
 def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        pickle_spyglass_clusterless_decoder: bool = True, debug_print: bool = False, force_recompute: bool = False) -> dict:
+        pickle_spyglass_clusterless_decoder: bool = True, debug_print: bool = False, force_recompute: bool = True) -> dict:
     """Computes and exports Bapun pf2D_SpyglassClusterlessDecoder to a pickle file for redundancy."""
     import sys
     import pickle
