@@ -72,3 +72,4 @@ src/pyphoplacecellanalysis/External/test.hdf5
 
 typings
 src/pyphoplacecellanalysis/test_burst_detection.png
+templating/uv_deps_switcher/backups/pyproject.toml.bak

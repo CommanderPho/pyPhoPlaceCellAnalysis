@@ -272,6 +272,21 @@ class DisplayColorsEnum:
             return fg_color, bg_color, border_color
 
 
+        @classmethod
+        def get_custom_dock_colors(cls, orientation, is_dim,
+                                        bg_color = '#bd00c7', fg_color = '#fff',
+            ):
+            """ used for CustomDockDisplayConfig for odd laps
+            """
+            border_color = DisplayColorsEnum.apply_dock_border_color_adjustment(bg_color)         
+            if is_dim:
+                bg_color, fg_color = DisplayColorsEnum.apply_dock_dimming_adjustment(bg_color, fg_color)
+                border_color = DisplayColorsEnum.apply_dock_dimming_adjustment(border_color)
+            return fg_color, bg_color, border_color
+
+
+
+
 
 
 
@@ -661,7 +676,9 @@ class PlottingHelpers:
 
     @function_attributes(short_name=None, tags=['matplotlib', 'draw'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-01 18:44', related_items=[])
     @classmethod
-    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False, additional_label_kwargs:dict=None, **kwargs) -> Dict[str, Dict]:
+    def helper_matplotlib_add_pseudo2D_marginal_labels(cls, ax, y_bin_labels: List[str], enable_draw_decoder_labels: bool = True, enable_draw_decoder_colored_lines: bool = False, 
+                                                                enable_draw_separator_lines: bool = True,
+                                                                should_use_ax_fraction_positioning: bool = True, should_use_outer_labels: bool=False, additional_label_kwargs:dict=None, **kwargs) -> Dict[str, Dict]:
         """ adds fixed inner-y labels (along the inside left edge of the ax) containing reference names -- such as ('Long_LR', etc)
         
         should_use_ax_fraction_positioning: bool : if True, the labels and lines are positioned relative to the ax frame in [0, 1] coords, independent of the data ylims
@@ -671,6 +688,7 @@ class PlottingHelpers:
             y_bin_labels = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
             y_bin_labels = ['long', 'short']
             y_bin_labels = ['LR', 'RL']
+            y_bin_labels = ['roam', 'sprinkle']  # Bapun contextual pf2D (arbitrary 2-context names)
 
         Usage:
             from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
@@ -688,13 +706,19 @@ class PlottingHelpers:
         
 
         ## INPUTS: ax
-        assert set(y_bin_labels) in [set(['long_LR', 'long_RL', 'short_LR', 'short_RL']), set(['long', 'short']), set(['LR', 'RL'])], f"y_bin_labels must be one of the known marginal values but instead y_bin_labels: {y_bin_labels}"
+        _known_y_bin_label_sets = [set(['long_LR', 'long_RL', 'short_LR', 'short_RL']), set(['long', 'short']), set(['LR', 'RL'])]
         
         n_ybins: int = len(y_bin_labels)
         
         all_colors_dict: Dict[types.DecoderName, Tuple[str, str]] = DecoderIdentityColors.build_decoder_color_track_dir_tuple_dict()
     
-        active_color_dict = {k:all_colors_dict[k] for k in y_bin_labels}
+        if set(y_bin_labels) in _known_y_bin_label_sets:
+            active_color_dict = {k: all_colors_dict[k] for k in y_bin_labels}
+        elif n_ybins == 2:
+            # Bapun / contextual pf2D: arbitrary 2-context names; reuse long/short track-ID colors
+            active_color_dict = {y_bin_labels[0]: all_colors_dict['long'], y_bin_labels[1]: all_colors_dict['short']}
+        else:
+            active_color_dict = {k: (None, None) for k in y_bin_labels}
 
 
         # BEGIN PLOTTING: ____________________________________________________________________________________________________ #
@@ -720,7 +744,7 @@ class PlottingHelpers:
         y_bin_starts = (np.arange(n_ybins) * single_y_bin_height) + y_start_ax # array([0, 54.2272, 108.454, 162.682])
         y_bin_centers = y_bin_starts + (single_y_bin_height * 0.5)
         
-        if enable_draw_decoder_colored_lines:
+        if (enable_draw_decoder_colored_lines or enable_draw_separator_lines):
             center_offset: float = 0.25
             center_offset_px: float = (center_offset * single_y_bin_height)
             # center_offset_px: float = 5
@@ -747,6 +771,15 @@ class PlottingHelpers:
                     output_dict[f"{decoder_name}_track_ID"] = ax.hlines(track_ID_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_id_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
                 if a_track_dir_color is not None:
                     output_dict[f"{decoder_name}_track_dir"] = ax.hlines(track_dir_line_y[i], xmin=x_start_ax, xmax=x_stop_ax, color=a_track_dir_color, zorder=25, label=f'{decoder_name}', **_common_hlines_kwargs) # divider should be in very front
+
+            else:
+                if enable_draw_separator_lines:
+                    ## draw separtor lines
+                    _active_hlines_kwargs = _common_hlines_kwargs
+                    _active_hlines_kwargs['linewidths'] = 1.0
+                    output_dict[f"{decoder_name}_track_ID"] = ax.hlines(y_bin_starts[i], xmin=x_start_ax, xmax=x_stop_ax, color='black', zorder=25, **_active_hlines_kwargs) # divider should be in very front, label=f'{decoder_name}'
+
+
             if enable_draw_decoder_labels:
                 # output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (x_start_ax, y_bin_centers[i]), **_common_label_kwargs)
                 output_dict[f"{decoder_name}_label"] = ax.annotate(f'{decoder_name}', (label_x_position, y_bin_centers[i]), **_common_label_kwargs)

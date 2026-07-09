@@ -126,6 +126,7 @@ class Render2DScrollWindowPlotMixin:
         # Add the LinearRegionItem to the ViewBox, but tell the ViewBox to exclude this item when doing auto-range calculations.
         background_static_scroll_window_plot.addItem(self.ui.scroll_window_region, ignoreBounds=True)
         self.ui.scroll_window_region.sigRegionChanged.connect(self._Render2DScrollWindowPlot_on_linear_region_item_update)
+        self.ui.scroll_window_region.sigRegionChangeFinished.connect(self._Render2DScrollWindowPlot_on_linear_region_item_update)
 
         # Enable drag-to-replace functionality
         # This allows users to Ctrl+drag to define a new scroll window region

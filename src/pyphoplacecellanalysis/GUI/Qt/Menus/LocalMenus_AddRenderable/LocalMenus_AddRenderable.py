@@ -212,7 +212,7 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             # Show the context menu
             context_menu.exec_(global_pos)
 
-    @function_attributes(short_name=None, tags=['private', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:39', related_items=[])
+    # @function_attributes(short_name=None, tags=['private', 'main'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-06-13 07:39', related_items=[])
     @classmethod
     def _helper_append_custom_menu_to_widget_context_menu_universal(cls, parent_widget, additional_menu, debug_print=False):
         """ Universal helper that works with both pyqtgraph widgets and general QWidgets

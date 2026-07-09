@@ -1,4 +1,4 @@
-from neuropy.core.user_annotations import function_attributes
+# from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets, QtGui
@@ -300,8 +300,16 @@ a_plotter
 
     def update(self, t, defer_render=True):
         # Finds the nearest previous decoded position for the time t:
-        self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        centers = np.asarray(self.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self.last_window_index = None
+            self.last_window_time = None
+        else:
+            idx = int(np.searchsorted(centers, t, side='left')) # side='left' ensures that no future values (later than 't') are ever returned
+            idx = max(0, min(idx, n - 1))
+            self.last_window_index = idx
+            self.last_window_time = centers[idx]
         # Update the plots:
         if not defer_render:
             self._update_plots()
@@ -323,9 +331,17 @@ a_plotter
             return # return without updating
         
         main_data: NDArray = self.data['main']
-        
-        # assert np.shape(main_data)[-1] == len(
-        image = np.squeeze(main_data[:, :, curr_time_window_index]).copy()
+        included = getattr(self.parent, 'last_included_posterior_bin_indices', None)
+        if included is not None and len(included) > 0:
+            if len(included) > 1:
+                image = np.nansum(main_data[:, :, included], axis=-1).copy()
+                tot = float(np.nansum(image))
+                if tot > 0.0 and np.isfinite(tot):
+                    image = image / tot
+            else:
+                image = np.squeeze(main_data[:, :, int(included[0])]).copy()
+        else:
+            image = np.squeeze(main_data[:, :, curr_time_window_index]).copy()
         # image_title = f'{self.name}'
     
         if self.params.drop_below_threshold is not None:

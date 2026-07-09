@@ -33,8 +33,11 @@ def _display_add_computation_param_text_box(fig, computation_config, **kwargs):
     """
     if fig is None:
         fig = plt.gcf()
+
+    text_args = kwargs.pop('text_args', {})
+    bbox_args = kwargs.pop('bbox_args', {})
     render_text = computation_config.str_for_attributes_list_display(key_val_sep_char=':', **kwargs)
-    return add_figure_text_box(fig, render_text=render_text)
+    return add_figure_text_box(fig, render_text=render_text, text_args=text_args, bbox_args=bbox_args)
 # used by _display_2d_placefield_result_plot_ratemaps_2D
 
 """ 

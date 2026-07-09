@@ -82,6 +82,8 @@ class RenderedEpochsItemsContainer(iPythonKeyCompletingMixin, DynamicParameters)
                 ## Copy tooltip function
                 if rendered_rects_item.format_item_tooltip_fn is not None:
                     self[a_plot].format_item_tooltip_fn = deepcopy(rendered_rects_item.format_item_tooltip_fn)
+                if rendered_rects_item.item_label_format_fn is not None:
+                    self[a_plot].item_label_format_fn = deepcopy(rendered_rects_item.item_label_format_fn)
 
 
 
@@ -460,7 +462,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
     # Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource
     def add_rendered_intervals(self, interval_datasource: Union[pd.DataFrame, IntervalsDatasource], name=None, child_plots=None, debug_print=False, 
         position_mode: AddedEpochPositionNormalizationMode=AddedEpochPositionNormalizationMode.ABSOLUTE,
-        **vis_kwargs):
+        is_named_multi_epoch_series: Optional[bool] = None, **vis_kwargs):
         """ adds or updates the intervals specified by the interval_datasource to the plots 
         
         Inputs: 
@@ -500,6 +502,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             
         # Update the custom datasource name with the provided name
         interval_datasource.custom_datasource_name = name
+        interval_datasource.is_named_multi_epoch_series = is_named_multi_epoch_series
         
         rendered_intervals_list_did_change = False
         extant_datasource = self.interval_datasources.get(name, None)
@@ -564,10 +567,25 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
             return tooltip_text
 
 
+        def _custom_format_label_for_rect_data(rect_index: int, rect_data_tuple: Tuple) -> Optional[str]:
+            """In-rect label text for each epoch. Returning None keeps dense or unlabeled intervals cheap."""
+            a_label = getattr(rect_data_tuple, 'label', None)
+            if a_label is None:
+                return None
+            try:
+                if np.isnan(a_label):
+                    return None
+            except TypeError:
+                pass
+            a_label = str(a_label)
+            return a_label if len(a_label) > 0 else None
+
+
 
         # Build the rendered interval item:
-        new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+        new_interval_rects_item: IntervalRectsItem = Render2DEventRectanglesHelper.build_IntervalRectsItem_from_interval_datasource(interval_datasource, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data))
         new_interval_rects_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+        new_interval_rects_item.item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
         # new_interval_rects_item.setToolTip(name) # The tooltip is set generically here to 'PBEs', 'Replays' or whatever the dataseries name is
         
         ######### PLOTS:
@@ -592,6 +610,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     extant_rect_plot_item.update_data(new_data)
                     # Preserve tooltip function
                     extant_rect_plot_item.format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    extant_rect_plot_item.item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rect_plot_item)
                     # Adjust the bounds to fit any children:
                     EpochRenderingMixin.compute_bounds_adjustment_for_rect_item(a_plot, extant_rect_plot_item, position_mode=position_mode)
@@ -599,8 +618,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                 else:
                     # New plot, add new item
                     independent_data_copy = ColorDataframeColumnHelpers.copy_data(new_interval_rects_item.data)
-                    extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data))
+                    extant_rects_plot_items_container[a_plot] = IntervalRectsItem(data=independent_data_copy, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data))
                     extant_rects_plot_items_container[a_plot].format_item_tooltip_fn = deepcopy(_custom_format_tooltip_for_rect_data)
+                    extant_rects_plot_items_container[a_plot].item_label_format_fn = deepcopy(_custom_format_label_for_rect_data)
                     self._perform_add_render_item(a_plot, extant_rects_plot_items_container[a_plot])
                     returned_rect_items[a_plot.objectName()] = dict(plot=a_plot, rect_item=extant_rects_plot_items_container[a_plot])
                     # Adjust the bounds to fit any children:
@@ -612,7 +632,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     
         else:
             # Need to create a new RenderedEpochsItemsContainer with the items:
-            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data)) # set the plot item
+            self.rendered_epochs[name] = RenderedEpochsItemsContainer(new_interval_rects_item, child_plots, format_tooltip_fn=deepcopy(_custom_format_tooltip_for_rect_data), format_label_fn=deepcopy(_custom_format_label_for_rect_data)) # set the plot item
             for a_plot, a_rect_item in self.rendered_epochs[name].items(): ## iterate through the plots now:
                 if not isinstance(a_rect_item, str):
                     if debug_print:
@@ -1185,7 +1205,7 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         rendered_epoch_names = self.interval_datasource_names
         for a_name in rendered_epoch_names:
             a_ds = self.interval_datasources[a_name]
-            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds)
+            result = EpochDisplayConfig.init_configs_list_from_interval_datasource_df(a_name, a_ds, is_named_multi_epoch_series=getattr(a_ds, 'is_named_multi_epoch_series', None))
             out_configs_dict[a_name] = result
 
         return out_configs_dict
@@ -1210,13 +1230,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         """
         epoch_display_configs = self.extract_interval_display_config_lists()
         out_configs_df = []
-        for a_name, a_config_list in epoch_display_configs.items():
-            num_configs: int = len(a_config_list)
-            for (i, a_config) in enumerate(a_config_list):
-                if num_configs > 1:
-                    config_name: str = f'{a_name}[{i}]'
-                else:
-                    config_name: str = a_name
+        for a_config_list in epoch_display_configs.values():
+            for a_config in a_config_list:
+                config_name: str = a_config.name
                 # a_config
                 out_config_dict = {'name': config_name} | deepcopy(a_config.to_dict())
                 out_configs_df.append(out_config_dict) # [a_name] = result
@@ -1258,9 +1274,9 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
         epoch_display_configs = self.extract_interval_display_config_lists()
         an_epochs_display_list_widget = self.ui.get('epochs_render_configs_widget', None)
         if an_epochs_display_list_widget is None:
-            # create a new one:    
+            # create a new one:
             print(f'no epochs_render_configs_widget exists, creating a new one...')
-            an_epochs_display_list_widget:EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
+            an_epochs_display_list_widget: EpochRenderConfigsListWidget = EpochRenderConfigsListWidget(epoch_display_configs, parent=parent)
             self.ui.epochs_render_configs_widget = an_epochs_display_list_widget
             # Check if connection already exists before creating new one
             if 'epochs_render_configs_widget_updated' in self.ui.connections:
@@ -1285,6 +1301,8 @@ class EpochRenderingMixin(LiveWindowEventIntervalMonitoringMixin):
                     pass
             self.ui.connections['epochs_render_configs_widget_remove'] = an_epochs_display_list_widget.sigRemoveRequested.connect(self.on_remove_epoch_series_from_widget)
         else:
+            print(f'an_epochs_display_list_widget already exists, updating existing one with new configs: {epoch_display_configs}...')
+            
             an_epochs_display_list_widget.update_from_configs(configs=epoch_display_configs)
             # Ensure connection exists even when updating existing widget
             if 'epochs_render_configs_widget_updated' not in self.ui.connections:

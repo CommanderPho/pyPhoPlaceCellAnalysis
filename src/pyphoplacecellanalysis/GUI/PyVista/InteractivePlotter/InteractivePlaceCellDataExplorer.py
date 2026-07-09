@@ -5,7 +5,7 @@
 
 
 """
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pyvista as pv
 
@@ -47,6 +47,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     """
     
     sigOnUpdateMeshes = QtCore.Signal(float, float) # Emitted after meshes are updated to allow connected slots to be called to perform their own updates. args: t_start, t_stop
+    animal_triangle_kwargs: Dict[str, Dict[str, Any]] = {'animal_heading_triangle_quat': dict(color='orange', edge_color='orange', length=15.0, base_width=1.8),
+        'animal_momentum_triangle': dict(color='purple', edge_color='purple', length=16.0, base_width=2.0),
+        'animal_momentum_triangle_downsampled': dict(color='grey', edge_color='grey', length=18.0, base_width=1.9),
+        
+
+    }
+
     
     
     def __init__(self, active_config, active_session, extant_plotter=None, **kwargs):
@@ -69,6 +76,20 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
 
         ## old-style:
         self.debug.spike_positions_list_old = self.params.flattened_spike_positions_list
+
+        ## Smoothed velocity for inferred animal heading direction (used by `animal_heading_triangle`):
+        try:
+            _ = self.active_session.position.compute_higher_order_derivatives()
+            pos_df = self.active_session.position.compute_smoothed_position_info(N=15)
+            self.vx_smooth = pos_df['velocity_x_smooth'].to_numpy()
+            self.vy_smooth = pos_df['velocity_y_smooth'].to_numpy()
+        except Exception as e:
+            print(f'WARN: could not compute smoothed velocity for animal heading. Error {e}. Falling back to raw velocity.')
+            self.vx_smooth = np.asarray(self.active_session.position.velocity_x)
+            self.vy_smooth = np.asarray(self.active_session.position.velocity_y)
+        self._last_heading_unit_xy = (1.0, 0.0)
+
+
 
 
     def _setup_visualization(self):
@@ -102,8 +123,8 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # print('pre_computed_window_sample_indicies: {}\n shape: {}'.format(pre_computed_window_sample_indicies, np.shape(pre_computed_window_sample_indicies)))
 
         ## New Pre Computed Indicies Way:
-        self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.1) # this seems to be about position, not spikes
-
+        # self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.1) # this seems to be about position, not spikes
+        self.z_fixed = np.full((self.params.recent_spikes_window.duration_num_frames,), 1.01) # this seems to be about position, not spikes
 
         ## Opacity Helpers:
         last_only_opacity_values = np.zeros([self.params.curr_view_window_length_samples,])
@@ -124,6 +145,13 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         self.params.active_trail_size_values = np.linspace(1.2, 0.4, self.params.curr_view_window_length_samples) # fade from a scale of 0.2 to 0.6
         # active_trail_size_values[-1] = 6.0 # except for the end (current) point, which has a scale of 1.0
         # active_trail_size_values = sharply_fading_opacity_values.copy()
+
+        self.params.setdefault('enable_animal_local_coordinate_axes', True)
+        self.params.setdefault('animal_local_coordinate_axes_length', 15.0)
+        self.params.setdefault('animal_local_coordinate_axes_shaft_radius', 0.025)
+        self.params.setdefault('animal_local_coordinate_axes_tip_length', 0.4)
+        self.params.setdefault('animal_local_coordinate_axes_tip_radius', 0.09)
+        self.params.setdefault('animal_local_coordinate_axes_z_offset', 0.02)
 
         # Background Track/Maze rendering options:
         self.params.setdefault('should_use_linear_track_geometry', False) # should only be True on the linear track with known geometry, otherwise it will be obviously incorrect.
@@ -162,6 +190,32 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
     @property
     def animal_current_location_point(self):
         return self.plots.get('animal_current_location_point', None)
+
+
+    @property
+    def animal_heading_triangle(self):
+        return self.plots.get('animal_heading_triangle', None)
+
+    @property
+    def animal_heading_triangle_quot(self):
+        return self.plots.get('animal_heading_triangle_quot', None)
+
+
+    def _get_heading_unit_xy_at(self, idx) -> Tuple[float, float]:
+        """ Returns a unit (hx, hy) heading vector at position-sample index `idx`, derived from smoothed velocity.
+        Falls back to the last-known heading when the value is undefined (NaN) or speed is below a tiny threshold (animal stationary, or start of recording before rolling-mean is valid).
+
+        # ['approx_head_dir_degrees', 'head_dir_angle_binned']
+        # ['t', 'x', 'y', 'z', 'lin_pos', 'dt', 'velocity_x', 'acceleration_x', 'velocity_y', 'acceleration_y', 'velocity_z', 'acceleration_z', 'x_smooth', 'y_smooth', 'z_smooth', 'velocity_x_smooth', 'acceleration_x_smooth', 'velocity_y_smooth', 'acceleration_y_smooth', 'velocity_z_smooth', 'acceleration_z_smooth', 'speed', 'speed_xy', 'lap', 'lap_dir', 'approx_head_dir_degrees', 'head_dir_angle_binned', 'lap_dir_2D', 'lap_dir_1D', 'zone_id', 'novelty_lehman', 'novelty_knn_visited']
+        
+        """
+        idx = int(idx)
+
+        assert 'heading_unit_xy' in self.pos_df, f"'heading_unit_xy' not in self.pos_df.columns: {list(self.pos_df.columns)}" # ['approx_head_dir_degrees', 'head_dir_angle_binned']
+        heading_unit_xy = self.pos_df['heading_unit_xy'].iat[idx]
+        self._last_heading_unit_xy = heading_unit_xy
+        return heading_unit_xy
+
 
     def on_programmatic_data_update(self, active_included_all_historical_indicies=None, active_included_recent_only_indicies=None, active_window_sample_indicies=None, curr_animal_point=None):
         """ Called to programmatically update the interactive plot. """
@@ -208,6 +262,11 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         if curr_animal_point is not None:
             ## Animal Current Position:
             self.plots['animal_current_location_point'] = self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+            ## Animal Heading Triangle (red, points along inferred heading):
+            if active_window_sample_indicies is not None:
+                idx = int(np.atleast_1d(active_window_sample_indicies)[-1])
+                self.perform_update_animal_position_variables(idx=idx)
+                        
             needs_render = True
 
         if needs_render:
@@ -256,17 +315,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         curr_text_rendering_string = '(t_start: {:.2f}, t_stop: {:.2f})'.format(t_start, t_stop) # :.3f
         self.p.add_text(curr_text_rendering_string, name='lblCurrent_spike_range', position='lower_right', color='white', shadow=True, font_size=10)
         
+        ## Shared spike data needed by both the historical and recent blocks:
+        flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
+        flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
+        flattened_spike_positions_list = self.params.flattened_spike_positions_list
+
         ## Historical Spikes:
         if enable_historical_spikes:
             # active_included_all_historical_indicies = (flattened_spikes.flattened_spike_times < t_stop) # Accumulate Spikes mode. All spikes occuring prior to the end of the frame (meaning the current time) are plotted
             historical_t_start = (t_stop - self.params.longer_spikes_window.duration_seconds) # Get the earliest time that will be included in the search
-
-            # TODO: replace with properties that I implemented
-            flattened_spike_times = self.active_session.flattened_spiketrains.flattened_spike_times
-            # flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.spikes_df['fragile_linear_neuron_IDX'].values()
-            flattened_spike_active_unitIdentities = self.active_session.flattened_spiketrains.flattened_spike_identities
-            # flattened_spike_positions_list = self.active_session.flattened_spiketrains.spikes_df[["x", "y"]].to_numpy().T
-            flattened_spike_positions_list = self.params.flattened_spike_positions_list
 
             # evaluated as column names
             active_included_all_historical_indicies = ((flattened_spike_times > historical_t_start) & (flattened_spike_times < t_stop)) # Two Sided Range Mode
@@ -337,9 +394,9 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
                                                 render=False)
 
             ## Animal Current Position:
-            curr_animal_point = [self.x[active_included_all_window_position_indicies[-1]], self.y[active_included_all_window_position_indicies[-1]], self.z_fixed[-1]]
-            self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
-
+            idx = int(np.atleast_1d(active_included_all_window_position_indicies)[-1])
+            self.perform_update_animal_position_variables(idx=idx)
+            
 
         ## Maze Plotting Updates:
         self.on_update_current_window_MazeRenderingMixin(new_window_t_start=t_start, new_window_t_stop=t_stop)
@@ -349,6 +406,47 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         
         if render:
             self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
+
+
+
+    def perform_update_animal_position_variables(self, idx: int):
+        """ Animal Current Position-related item rendering - green curr pos circle, heading triangle, quaternion-dervived heading triangle 
+        """
+        ## Animal Current Position:
+        curr_animal_point = [self.x[idx], self.y[idx], self.z_fixed[-1]]
+        self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+        if self.params.get('enable_animal_local_coordinate_axes', True):
+            self.perform_plot_local_coordinate_axes('animal_current_local_coordinate_axes', curr_animal_point, axis_length=float(self.params.get('animal_local_coordinate_axes_length', 2.0)), shaft_radius=float(self.params.get('animal_local_coordinate_axes_shaft_radius', 0.05)), tip_length=float(self.params.get('animal_local_coordinate_axes_tip_length', 0.30)), tip_radius=float(self.params.get('animal_local_coordinate_axes_tip_radius', 0.12)), z_offset=float(self.params.get('animal_local_coordinate_axes_z_offset', 0.02)), render=False)
+
+        ## Animal Heading Triangle (red, points along inferred heading):
+        
+        heading_unit_xy = self._get_heading_unit_xy_at(idx)
+        self.perform_plot_animal_heading_triangle('animal_heading_triangle', curr_animal_point, heading_unit_xy, override_z=(curr_animal_point[-1]*1.1), render=False)
+
+        # ## quternion-derived heading direction as an orange arrow:
+        # heading_unit_xy_quat = self.pos_df['heading_unit_xy_quat'].iat[idx]
+        # self.perform_plot_animal_heading_triangle('animal_heading_triangle_quat', curr_animal_point, heading_unit_xy_quat, render=False, **self.animal_triangle_kwargs['animal_heading_triangle_quat'])
+
+        ## quternion-derived heading direction as an orange arrow:
+        # momentum_vector_xy = np.array(heading_unit_xy) * self.pos_df['speed_xy'].iat[idx]
+        momentum_vector_xy = np.array(heading_unit_xy) * self.pos_df['speed_xy_normalized'].iat[idx] / 20.0 
+        # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
+        ## TODO: scale to reasonable range
+        self.perform_plot_animal_heading_triangle('animal_momentum_triangle', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.2), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle'])
+        
+
+        ## DOWNSAMPLED VERSIONS:
+        # downsampled_idx = min((idx // 20), (len(self.pos_df_downsampled) - 1))
+        downsampled_idx = min((idx // int(round(self.downsampled_pos_rate))), (len(self.pos_df_downsampled) - 1))
+        
+        momentum_vector_xy = np.array(self.pos_df_downsampled['heading_unit_xy'].iat[downsampled_idx]) * self.pos_df_downsampled['speed_xy_normalized'].iat[downsampled_idx] / 20.0 # float(self.downsampled_pos_rate) #20.0
+        # momentum_vector_xy = self.pos_df['momentum_xy'].iat[idx]
+        ## TODO: scale to reasonable range
+        self.perform_plot_animal_heading_triangle('animal_momentum_triangle_downsampled', curr_animal_point, momentum_vector_xy, render=False, override_z=(curr_animal_point[-1]*1.25), opacity=0.75, **self.animal_triangle_kwargs['animal_momentum_triangle_downsampled'])
+        
+
+
+
 
 
     def on_slider_update_mesh(self, value):
@@ -372,16 +470,17 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
 
         self.on_active_window_update_mesh(t_start=t_start, t_stop=t_stop, enable_historical_spikes=enable_historical_spikes, enable_recent_spikes=enable_recent_spikes, enable_position_mesh_updates=enable_time_only_position_mesh_updates, render=False)
         
-        if not enable_time_only_position_mesh_updates:
+        if (not enable_time_only_position_mesh_updates):
             ## Animal Position and Location Trail Plotting:
             self.perform_plot_location_trail('animal_location_trail', self.x[active_window_sample_indicies], self.y[active_window_sample_indicies], self.z_fixed,
                                                 trail_fade_values=self.params.active_trail_opacity_values, trail_point_size_values=self.params.active_trail_size_values,
                                                 render=False)
-            
 
-            ## Animal Current Position:
-            curr_animal_point = [self.x[active_window_sample_indicies[-1]], self.y[active_window_sample_indicies[-1]], self.z_fixed[-1]]
-            self.perform_plot_location_point('animal_current_location_point', curr_animal_point, render=False)
+            ## Animal Heading Triangle (red, points along inferred heading):
+            if active_window_sample_indicies is not None:
+                idx = int(np.atleast_1d(active_window_sample_indicies)[-1])
+                self.perform_update_animal_position_variables(idx=idx)
+
         
         self.p.render() # renders to ensure it's updated after changing the ScalarVisibility above
         # self.p.update()
@@ -439,6 +538,15 @@ class InteractivePlaceCellDataExplorer(GlobalConnectionManagerAccessingMixin, In
         # self.p._before_close_callback = 
         
         # self.p._BasePlotter__before_close_callback.connect(self.GlobalConnectionManagerAccessingMixin_on_destroy)
+
+        ## add quaternion-derived heading direction
+        # # if 'quat_head_dir_degrees' not in self.pos_df.columns:
+        # quat_col_names = ('rx', 'ry', 'rz', 'rw')
+        # assert all((a_col in self.pos_df.columns) for a_col in quat_col_names)
+        # self.pos_df = self.pos_df.position.adding_quat_head_dir_degrees_columns()
+        # assert 'quat_head_dir_degrees' in self.pos_df.columns
+        # h: float = 1.0
+        # self.pos_df['heading_unit_xy_quat'] = self.pos_df['quat_head_dir_degrees'].map(lambda approx_head_dir_degrees: ((np.cos(np.radians(approx_head_dir_degrees)) * h), (np.sin(np.radians(approx_head_dir_degrees)) * h)))
 
         # p.background_color = 'black'
 

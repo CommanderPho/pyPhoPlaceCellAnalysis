@@ -1,4 +1,6 @@
 from __future__ import annotations
+from functools import partial
+import time
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Sequence, cast
 import numpy as np
 import pandas as pd
@@ -10,7 +12,7 @@ from vispy import scene
 from vispy.scene import visuals
 # from vispy.scene import Node
 from vispy.scene.node import Node
-from vispy.visuals.transforms import STTransform
+from vispy.visuals.transforms import STTransform, NullTransform, MatrixTransform
 
 from vispy.color import Color
 from vispy.util.transforms import translate
@@ -55,6 +57,7 @@ from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.assertion_helpers import Assert
 from pyphocorehelpers.plotting.heading_angle_helpers import HeadingAngleHelpers
+from pyphoplacecellanalysis.Pho2D.vispy.vispy_widgets import VispySceneTreeWidget
 
 # from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import AngleColoredLineVisual
 
@@ -188,6 +191,33 @@ def _ensure_closed_pos(pos: NDArray) -> NDArray:
     return np.vstack([pos, pos[0:1]]).astype(np.float32)
 
 
+def _triangulate_polygon_2d(pos_2d: NDArray) -> Optional[NDArray]:
+    """Triangulate a closed 2D polygon, returning (M, 3) int32 face indices or None on failure.
+
+    Tries vispy's built-in ear-clipping triangulation first; falls back to a simple fan
+    triangulation (works correctly for convex contours, approximate for concave ones).
+    pos_2d must be (N, 2) with N >= 3. The polygon should be closed (first == last) or open;
+    the function handles both cases.
+    """
+    pts = np.asarray(pos_2d, dtype=np.float32)
+    if pts.ndim != 2 or pts.shape[1] != 2 or pts.shape[0] < 3:
+        return None
+    if np.allclose(pts[0], pts[-1], atol=1e-6):
+        pts = pts[:-1]
+    n = len(pts)
+    if n < 3:
+        return None
+    try:
+        from vispy.geometry.triangulation import triangulate as _vispy_triangulate
+        vertices_out, faces_out = _vispy_triangulate(pts)
+        if faces_out is not None and len(faces_out) >= 1:
+            return np.asarray(faces_out, dtype=np.int32)
+    except Exception:
+        pass
+    faces = np.column_stack([np.zeros(n - 2, dtype=np.int32), np.arange(1, n - 1, dtype=np.int32), np.arange(2, n, dtype=np.int32)])
+    return faces
+
+
 def _color_to_rgba_tuple(c: Union[str, Tuple[float, float, float], Sequence], alpha: Optional[float] = None) -> Tuple[float, float, float, float]:
     """Return (r,g,b,a) tuple scaled 0..1. Accepts vispy color strings, matplotlib colors or RGB tuples."""
     try:
@@ -278,7 +308,7 @@ def contours_from_masks(masks: Union[Sequence[NDArray], NDArray], x_bounds: Tupl
 # ==================================================================================================================================================================================================================================================================================== #
 
 
-def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3) -> Tuple[List, List]:
+def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], parent: Node, line_width: float = 2.0, order: int = 10, fill: bool = False, fill_alpha: Optional[float] = 0.3, name: str='Contour') -> Tuple[List, List]:
     """Create vispy Line visuals from contour data and attach to parent. When fill=True, adds translucent Polygon fill (same RGB as line) behind each contour. Returns (lines, polygons) so callers can clear both on epoch change; polygons is empty when fill=False."""
     lines: List = []
     polygons: List = []
@@ -287,10 +317,10 @@ def create_contour_line_visuals(contour_data: List[Tuple[NDArray, Tuple]], paren
         if fill and len(pos) >= 3:
             pos_closed = _ensure_closed_pos(pos)
             fill_rgba = (float(rgba[0]), float(rgba[1]), float(rgba[2]), float(alpha))
-            polygon = vz.Polygon(pos=pos_closed, color=fill_rgba, border_width=0, parent=parent)  # type: ignore[call-arg]
+            polygon = vz.Polygon(pos=pos_closed, color=fill_rgba, border_width=0, parent=parent, name=f'{name}.Poly')  # type: ignore[call-arg]
             polygon.order = order - 1
             polygons.append(polygon)
-        line = vz.Line(pos=pos, color=rgba, width=line_width, parent=parent)  # type: ignore[call-arg]
+        line = vz.Line(pos=pos, color=rgba, width=line_width, parent=parent, name=f'{name}.Border')  # type: ignore[call-arg]
         line.order = order
         lines.append(line)
     return (lines, polygons)
@@ -437,6 +467,91 @@ class TrajectorySegmentsVisual(Node):
         return self._lines
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# VispySceneTreeWidget - A tree widget that allows interactive customization of the vispy view hiearchy                                                                                                                                                                                #
+# ==================================================================================================================================================================================================================================================================================== #
+
+def _format_transform_vector(values: Any, max_dims: int = 3, precision: int = 2) -> str:
+    """Format transform vector values for compact tree display."""
+    try:
+        arr = np.asarray(values, dtype=np.float64).reshape(-1)
+    except Exception:
+        return '(?)'
+    if arr.size <= 0:
+        return '()'
+    clipped = arr[:max_dims]
+    joined = ', '.join(f'{float(v):0.{precision}f}' for v in clipped)
+    return f'({joined})'
+
+
+def _extract_matrix_translation(matrix_obj: Any) -> Optional[np.ndarray]:
+    """Extract x/y/z translation from a 4x4 affine matrix."""
+    try:
+        matrix = np.asarray(matrix_obj, dtype=np.float64)
+    except Exception:
+        return None
+    if matrix.shape != (4, 4):
+        return None
+    col_translation = matrix[:3, 3]
+    row_translation = matrix[3, :3]
+    if np.linalg.norm(col_translation) > 0.0 or np.allclose(row_translation, 0.0):
+        return col_translation
+    return row_translation
+
+
+def render_transform_column(node: Node) -> str:
+    """Default Transform-column renderer with location summary."""
+    transform_obj = getattr(node, 'transform', None)
+    if transform_obj is None:
+        return ''
+    if isinstance(transform_obj, NullTransform):
+        return 'NullTransform (identity)'
+    if isinstance(transform_obj, STTransform):
+        translate_text = _format_transform_vector(getattr(transform_obj, 'translate', None))
+        scale_text = _format_transform_vector(getattr(transform_obj, 'scale', None))
+        return f'STTransform t{translate_text} s{scale_text}'
+    if isinstance(transform_obj, MatrixTransform):
+        matrix = getattr(transform_obj, 'matrix', None)
+        if matrix is not None:
+            matrix_arr = np.asarray(matrix, dtype=np.float64)
+            if matrix_arr.shape == (4, 4) and np.allclose(matrix_arr, np.eye(4)):
+                return 'MatrixTransform (identity)'
+            translation = _extract_matrix_translation(matrix_arr)
+            if translation is not None:
+                return f'MatrixTransform t{_format_transform_vector(translation)}'
+        return 'MatrixTransform'
+    return transform_obj.__class__.__name__
+
+
+class _BlendPresetDelegate(QtWidgets.QStyledItemDelegate):  # type: ignore[misc]
+    """Item delegate that shows a QComboBox for the GL Blend column."""
+
+    _BLEND_PRESETS = ('', 'opaque', 'translucent', 'additive')
+
+    def createEditor(self, parent: Any, option: Any, index: Any) -> Any:
+        combo = QtWidgets.QComboBox(parent)
+        for preset in self._BLEND_PRESETS:
+            combo.addItem(preset)
+        return combo
+
+
+    def setEditorData(self, editor: Any, index: Any) -> None:
+        current_text = str(index.data() or '')
+        idx = cast(Any, editor).findText(current_text)
+        if idx >= 0:
+            cast(Any, editor).setCurrentIndex(idx)
+        else:
+            cast(Any, editor).setCurrentIndex(0)
+
+
+    def setModelData(self, editor: Any, model: Any, index: Any) -> None:
+        model.setData(index, cast(Any, editor).currentText())
+
+
+
+
+
 @metadata_attributes(short_name=None, tags=['VispyHelpers', 'vispy'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-04 11:28', related_items=[])
 class VispyHelpers:
     """ helpers for vispy
@@ -455,19 +570,98 @@ class VispyHelpers:
             return contour_data
         line_lists = [create_contour_line_visuals(contour_data, parent, line_width=line_width, order=order, fill=fill, fill_alpha=fill_alpha)[0] for parent in parents]
         return (contour_data, line_lists)
-    
 
+
+    @classmethod
+    def create_scene_tree_widget(cls, canvas: scene.SceneCanvas, parent: Optional[Any] = None) -> VispySceneTreeWidget:
+        """Create a Qt scene-tree inspector widget rooted at `canvas.scene`."""
+        return VispySceneTreeWidget(root_node=canvas.scene, canvas=canvas, parent=parent)
+
+
+    @classmethod
+    def create_viewport_overlay_text(cls, canvas: scene.SceneCanvas, text: str = 'Overlay', color: Union[str, Tuple[float, float, float, float]] = 'white', font_size: float = 12.0, bold: bool = False, anchor_x: str = 'left', anchor_y: str = 'top', margin: Tuple[float, float] = (12.0, 12.0), order: int = 10_000, parent: Optional[Node] = None) -> Any:
+        """Create viewport-fixed text in pixel space (top-left by default) that does not move with camera pan/zoom. Returns the Text visual."""
+        overlay_parent = canvas.scene if parent is None else parent
+        overlay_text = vz.Text(text=text, pos=(0.0, 0.0), color=color, font_size=font_size, bold=bold, anchor_x=anchor_x, anchor_y=anchor_y, parent=overlay_parent)  # type: ignore[call-arg]
+        overlay_text.order = order
+
+        def _update_overlay_text_position(event=None):
+            width, height = canvas.size
+            margin_x, margin_y = margin
+            if anchor_x == 'left':
+                x_pos = float(margin_x)
+            elif anchor_x == 'center':
+                x_pos = (float(width) * 0.5) + float(margin_x)
+            else:
+                x_pos = float(width) - float(margin_x)
+            if anchor_y == 'top':
+                y_pos = float(height) - float(margin_y)
+            elif anchor_y == 'center':
+                y_pos = (float(height) * 0.5) + float(margin_y)
+            else:
+                y_pos = float(margin_y)
+            overlay_text.pos = np.array([x_pos, y_pos], dtype=np.float32)
+
+        def _disconnect_overlay_resize_handler():
+            try:
+                canvas.events.resize.disconnect(_update_overlay_text_position)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+        canvas.events.resize.connect(_update_overlay_text_position)  # type: ignore[attr-defined]
+        _update_overlay_text_position()
+        overlay_text._viewport_overlay_update_position = _update_overlay_text_position
+        overlay_text._viewport_overlay_disconnect = _disconnect_overlay_resize_handler
+        return overlay_text
+
+
+    @classmethod
+    def create_viewport_heading_compass_legend(cls, canvas: scene.SceneCanvas, margin: Tuple[float, float] = (18.0, 18.0), size_frac: float = 0.066, line_width: float = 2.0, line_points: int = 20, order: int = 10_000, parent: Optional[Node] = None, **rose_kwargs: Any) -> Any:
+        """Place a :class:`~pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle.HeadingCompassRoseVisual` in the bottom-right of the canvas in pixel space (parent ``canvas.scene``), matching heading colors used by :meth:`create_heading_rainbow_line`; pan/zoom on subplot views does not move the legend. ``STTransform`` translate uses y increasing downward so ``cy`` is measured from the top edge (unlike :meth:`create_viewport_overlay_text` text positions)."""
+        from pyphoplacecellanalysis.Pho2D.vispy.position_heading_angle import HeadingCompassRoseVisual
+        overlay_parent = canvas.scene if parent is None else parent
+        rose = HeadingCompassRoseVisual(parent=overlay_parent, line_width=line_width, line_points=line_points, **rose_kwargs)
+        rose.order = order
+        rose.line.order = order
+        if getattr(rose, 'labels', None) is not None:
+            rose.labels.order = order
+        rose.line.set_gl_state('translucent', depth_test=False)
+        _local_extent = float(rose_kwargs.get('label_pad', 0.12)) + float(rose_kwargs.get('major_length', 1.0)) + 0.03
+
+        def _update_compass_position(event: Any = None) -> None:
+            width_f, height_f = float(canvas.size[0]), float(canvas.size[1])
+            margin_x, margin_y = float(margin[0]), float(margin[1])
+            scale = float(size_frac) * max(8.0, min(width_f, height_f))
+            half = _local_extent * scale
+            cx = width_f - margin_x - half
+            cy = height_f - margin_y - half
+            rose.transform = STTransform(scale=(scale, scale), translate=(cx, cy))
+
+        def _disconnect_viewport_compass_handler() -> None:
+            try:
+                canvas.events.resize.disconnect(_update_compass_position)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+        canvas.events.resize.connect(_update_compass_position)  # type: ignore[attr-defined]
+        _update_compass_position()
+        setattr(rose, '_viewport_compass_update_position', _update_compass_position)
+        setattr(rose, '_viewport_compass_disconnect', _disconnect_viewport_compass_handler)
+        return rose
+    
 
     @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-02-09 10:27', related_items=[])
     @classmethod
-    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl') -> Any:
+    def create_heading_rainbow_line(cls, pos: NDArray, parent: Optional[Node] = None, headings_deg: Optional[NDArray] = None, vertex_colors: Optional[NDArray]=None, line_width: float = 2.0, order: int = 10, alpha: float = 1.0, method: str = 'gl', name: str = 'heading_rainbow_line') -> Any:
         """Create a vispy Line colored by heading: 0°=red, ROYGBIV, 359°≈violet. If headings_deg is None, headings are computed from pos (segment directions). Returns a vispy.scene.visuals.Line.
 
         from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import VispyHelpers
 
         line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
         line.set_gl_state('translucent', depth_test=False)
-
+        arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=24)
+        if arr is not None:
+            arr.set_gl_state('translucent', depth_test=False)
 
         """
         pos = np.asarray(pos, dtype=np.float32)
@@ -478,15 +672,148 @@ class VispyHelpers:
         else:
             headings_deg = np.asarray(headings_deg, dtype=np.float64)
             
-        # colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
-        colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
+        if (vertex_colors is None):
+            # colors = HeadingAngleHelpers.heading_angles_to_rainbow_colors(headings_deg, alpha=alpha)
+            colors = HeadingAngleHelpers._positions_to_vertex_colors(pos)
+        else:
+            colors = vertex_colors
 
         data_dict = dict(pos=pos, headings_deg=headings_deg, alpha=alpha, vertex_colors=colors)
 
-        line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent)  # type: ignore[call-arg]
+        line = vz.Line(pos=pos, color=colors, width=line_width, method=method, parent=parent, name=name)  # type: ignore[call-arg]
         # line = AngleColoredLineVisual(pos=pos, color=vertex_colors, method='gl')
         line.order = order
         return line, data_dict
+
+
+    @function_attributes(short_name=None, tags=['angle', 'heading', 'color', 'arrows'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-28', related_items=[])
+    @classmethod
+    def create_heading_rainbow_arrows_along_line(cls, data_dict: Optional[Dict[str, Any]] = None, pos: Optional[NDArray] = None, vertex_colors: Optional[NDArray] = None, parent: Optional[Node] = None, spacing: Optional[float] = None, n_arrows: Optional[int] = None,
+             arrow_length: Optional[float] = None, arrow_size: Optional[float] = None, arrow_type: str = 'triangle_30', width: float = 2.0, method: str = 'gl', order: int = 11, alpha: Optional[float] = None, end_margin_frac: float = 0.02, name: str = 'heading_rainbow_arrows') -> Tuple[Optional[Any], Dict[str, Any]]:
+        """Overlay batched arrow heads (no line shafts) along the same polyline as :meth:`create_heading_rainbow_line`, with per-head RGBA interpolated from ``vertex_colors`` and tangents along the path.
+
+        VisPy's :class:`~vispy.scene.visuals.Arrow` draws the shaft from ``pos`` and heads from ``arrows``. To keep heads-only appearance while satisfying :class:`~vispy.visuals.line.line.LineVisual` bounds (non-empty ``pos``), the shaft is encoded as one fully transparent segment per head—the same tail/center pairs as ``arrows``—not visible strokes.
+
+        line, dd = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
+        arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=dd, parent=scene_parent, n_arrows=24)
+        if arr is not None:
+            arr.set_gl_state('translucent', depth_test=False)
+
+        If both ``spacing`` and ``n_arrows`` are set, ``spacing`` is used. If both are omitted, ``n_arrows`` defaults to ``max(2, min(48, max(1, N - 1)))`` for ``N`` vertices. Returns ``(None, info)`` when the path is too short or no sample points fit inside the end margins. ``arrow_length`` only affects ``info`` / scaling hints, not the visual (heads use ``arrow_size``).
+
+        """
+        if data_dict is not None:
+            pos_arr = np.asarray(data_dict['pos'], dtype=np.float32)
+            vcolors = np.asarray(data_dict['vertex_colors'], dtype=np.float32)
+        elif pos is not None:
+            pos_arr = np.asarray(pos, dtype=np.float32)
+            if pos_arr.ndim == 1:
+                pos_arr = pos_arr.reshape(-1, 2)
+            if vertex_colors is None:
+                vcolors = HeadingAngleHelpers._positions_to_vertex_colors(pos_arr)
+            else:
+                vcolors = np.asarray(vertex_colors, dtype=np.float32)
+        else:
+            return None, {'reason': 'missing_data', 'detail': 'Provide data_dict or pos'}
+
+        if pos_arr.ndim == 1:
+            pos_arr = pos_arr.reshape(-1, 2)
+        n_points = int(pos_arr.shape[0])
+        if n_points < 2:
+            return None, {'reason': 'insufficient_points', 'n_points': n_points}
+        if vcolors.shape[0] != n_points or vcolors.shape[1] != 4:
+            return None, {'reason': 'vertex_colors_shape_mismatch', 'expected': (n_points, 4), 'got': tuple(int(x) for x in vcolors.shape)}
+
+        if alpha is not None:
+            vcolors = np.array(vcolors, dtype=np.float32, copy=True)
+            vcolors[:, 3] = np.clip(vcolors[:, 3] * float(alpha), 0.0, 1.0)
+
+        seg = np.diff(pos_arr.astype(np.float64), axis=0)
+        seg_lens = np.linalg.norm(seg, axis=1)
+        total_len = float(np.sum(seg_lens))
+        if total_len <= 1e-12:
+            return None, {'reason': 'zero_length', 'total_len': total_len}
+
+        cum = np.concatenate([[0.0], np.cumsum(seg_lens)])
+        margin = float(end_margin_frac) * total_len
+        lo, hi = margin, total_len - margin
+        if hi <= lo + 1e-9:
+            return None, {'reason': 'path_too_short_for_margin', 'total_len': total_len, 'margin': margin}
+
+        if spacing is not None and float(spacing) > 0.0:
+            sp = float(spacing)
+            sample_distances = np.arange(lo + 0.5 * sp, hi, sp, dtype=np.float64)
+        elif n_arrows is not None and int(n_arrows) > 0:
+            na = int(n_arrows)
+            sample_distances = np.linspace(lo, hi, na + 2, dtype=np.float64)[1:-1]
+        else:
+            na_default = max(2, min(48, max(1, n_points - 1)))
+            sample_distances = np.linspace(lo, hi, na_default + 2, dtype=np.float64)[1:-1]
+
+        sample_distances = np.asarray(sample_distances, dtype=np.float64)
+        if sample_distances.size == 0:
+            return None, {'reason': 'no_samples', 'lo': lo, 'hi': hi}
+
+        xmin, xmax = float(np.nanmin(pos_arr[:, 0])), float(np.nanmax(pos_arr[:, 0]))
+        ymin, ymax = float(np.nanmin(pos_arr[:, 1])), float(np.nanmax(pos_arr[:, 1]))
+        data_scale = float(np.hypot(max(xmax - xmin, 1e-12), max(ymax - ymin, 1e-12)))
+        if arrow_length is None:
+            arrow_length_f = min(0.03 * data_scale, 0.15 * total_len)
+        else:
+            arrow_length_f = float(arrow_length)
+        if arrow_size is None:
+            arrow_size_f = 0.05 * data_scale
+        else:
+            arrow_size_f = float(arrow_size)
+
+        pos64 = pos_arr.astype(np.float64)
+        v64 = vcolors.astype(np.float64)
+        seg64 = seg
+        eps = 1e-12
+        n_seg = n_points - 1
+        centers: list[np.ndarray] = []
+        tangents: list[np.ndarray] = []
+        rgba_centers: list[np.ndarray] = []
+        for s in sample_distances:
+            if s <= cum[0] + eps:
+                i = 0
+                t = 0.0
+            elif s >= cum[-1] - eps:
+                i = n_seg - 1
+                t = 1.0
+            else:
+                i = int(np.searchsorted(cum, s, side='right') - 1)
+                i = max(0, min(i, n_seg - 1))
+                denom = max(float(seg_lens[i]), eps)
+                t = float(np.clip((s - cum[i]) / denom, 0.0, 1.0))
+            xy = (1.0 - t) * pos64[i] + t * pos64[i + 1]
+            c = (1.0 - t) * v64[i] + t * v64[i + 1]
+            seg_vec = seg64[i]
+            slen = float(np.linalg.norm(seg_vec))
+            if slen < eps:
+                tan = np.array([1.0, 0.0], dtype=np.float64)
+            else:
+                tan = seg_vec / slen
+            centers.append(xy)
+            tangents.append(tan)
+            rgba_centers.append(c)
+
+        centers_a = np.asarray(centers, dtype=np.float64)
+        tangents_a = np.asarray(tangents, dtype=np.float64)
+        rgba_c = np.asarray(rgba_centers, dtype=np.float32)
+        n_arr = int(centers_a.shape[0])
+        orient_eps = max(1e-9, 1e-7 * data_scale)
+        v_tail = centers_a - orient_eps * tangents_a
+        arrows_batch = np.hstack([v_tail, centers_a]).astype(np.float32)
+        pos_line = np.empty((2 * n_arr, 2), dtype=np.float32)
+        pos_line[0::2] = arrows_batch[:, :2]
+        pos_line[1::2] = arrows_batch[:, 2:]
+        arrow_color = rgba_c
+        arrow = vz.Arrow(pos=pos_line, arrows=arrows_batch, arrow_color=arrow_color, arrow_type=arrow_type, arrow_size=arrow_size_f, color=(1.0, 1.0, 1.0, 0.0), width=width, method=method, connect='segments', parent=parent, name=name)  # type: ignore[call-arg]
+        arrow.order = order
+        eff_spacing = float(np.mean(np.diff(sample_distances))) if int(sample_distances.size) >= 2 else float(hi - lo)
+        info_dict: Dict[str, Any] = dict(n_arrows=n_arr, spacing_used=eff_spacing, sample_distances=sample_distances, sample_centers=centers_a.astype(np.float32), arrow_length=arrow_length_f, arrow_size=arrow_size_f, total_length=total_len, data_scale=data_scale)
+        return arrow, info_dict
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -654,6 +981,45 @@ def example_trajectory_segments_visual():
     app.run()
 
 
+def example_viewport_overlay_text():
+    """Example: draw viewport-fixed top-left text that stays in place while panning/zooming. Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_viewport_overlay_text; example_viewport_overlay_text()\"."""
+    from vispy import app
+    t = np.linspace(0, 6 * np.pi, 600)
+    x = 0.18 * t * np.cos(t)
+    y = 0.18 * t * np.sin(t)
+    pos = np.column_stack([x, y]).astype(np.float32)
+    canvas = scene.SceneCanvas(keys='interactive', size=(800, 600), show=True)
+    view = canvas.central_widget.add_view()
+    view.camera = 'panzoom'
+    line = vz.Line(pos=pos, color=(0.2, 0.8, 1.0, 1.0), width=2.0, method='gl', parent=view.scene)  # type: ignore[call-arg]
+    line.order = 10
+    line.set_gl_state('translucent', depth_test=False)
+    VispyHelpers.set_view_camera(view, pos, padding=0.15)
+    _overlay_text = VispyHelpers.create_viewport_overlay_text(canvas=canvas, text='Overlay: fixed to viewport top-left', color='white', font_size=12.0, bold=True, margin=(14.0, 14.0))
+    app.run()
+
+
+def example_scene_tree_widget():
+    """Example: show a Qt scene-tree inspector for a vispy scene. Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_scene_tree_widget; example_scene_tree_widget()\"."""
+    from vispy import app
+    canvas = scene.SceneCanvas(keys='interactive', size=(1100, 700), show=True, title='Vispy Scene Tree Example')
+    view = canvas.central_widget.add_view()
+    view.camera = 'turntable'
+    axis = vz.XYZAxis(parent=view.scene)
+    axis.order = 5
+    sphere = vz.Sphere(radius=0.55, method='latitude', parent=view.scene)
+    sphere.color = Color((0.4, 0.8, 1.0, 0.9)).rgba
+    sphere.order = 10
+    label = vz.Text(text='Sphere', pos=(0.0, 0.0, 0.75), color='white', font_size=12.0, parent=view.scene)  # type: ignore[call-arg]
+    label.order = 20
+    tree_widget = VispyHelpers.create_scene_tree_widget(canvas=canvas)
+    tree_widget.setWindowTitle('Vispy Scene Tree')
+    tree_widget.resize(700, 520)
+    tree_widget.show()
+    canvas._scene_tree_widget = tree_widget
+    app.run()
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # Examples                                                                                                                                                                                                                                                                             #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -699,6 +1065,7 @@ if __name__ == '__main__':
     def example_heading_rainbow_line():
         """Example: draw a path colored by heading (0°=red, ROYGBIV, 359°=violet). Run with: python -c \"from pyphoplacecellanalysis.Pho2D.vispy.vispy_helpers import example_heading_rainbow_line; example_heading_rainbow_line()\"."""
         from vispy import app
+
         t = np.linspace(0, 4 * np.pi, 200)
         x = 0.3 * t * np.cos(t)
         y = 0.3 * t * np.sin(t)
@@ -708,8 +1075,16 @@ if __name__ == '__main__':
         view.camera = 'panzoom'
         scene_parent = view.scene
         if scene_parent is not None:
-            line = create_heading_rainbow_line(pos, parent=scene_parent, line_width=3.0, order=10)
+            line, data_dict = VispyHelpers.create_heading_rainbow_line(pos=pos, parent=scene_parent, line_width=1.0, order=10)
             line.set_gl_state('translucent', depth_test=False)
+            # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=1.0, arrow_size=1.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+            arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=7, width=5.0, arrow_size=5.0, alpha=0.8, arrow_type='triangle_30', method='gl')
+            # arr, info = VispyHelpers.create_heading_rainbow_arrows_along_line(data_dict=data_dict, parent=scene_parent, n_arrows=5, width=20.0, alpha=0.8, arrow_type='stealth', method='agg')
+            if arr is not None:
+                arr.set_gl_state('translucent', depth_test=False)
+
+        VispyHelpers.create_viewport_heading_compass_legend(canvas=canvas, margin=(18.0, 18.0), size_frac=0.066)
+
         app.run()
 
 
@@ -730,4 +1105,5 @@ if __name__ == '__main__':
 
     # app.run()
 
-    example_trajectory_segments_visual()
+    # example_trajectory_segments_visual()
+    example_heading_rainbow_line()

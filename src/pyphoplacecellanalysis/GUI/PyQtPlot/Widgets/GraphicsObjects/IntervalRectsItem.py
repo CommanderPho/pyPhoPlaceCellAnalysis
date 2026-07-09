@@ -5,7 +5,6 @@ Demonstrate creation of a custom graphic (a candlestick plot)
 import copy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from attr import has
-from neuropy.core.user_annotations import function_attributes, metadata_attributes
 import numpy as np
 
 from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
@@ -117,7 +116,7 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
     
     
 
-    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False):
+    def __init__(self, data, format_tooltip_fn=None, format_label_fn=None, debug_print=False, labels_min_pixel_width: float=4.0, labels_min_pixel_height: float=0.9, labels_padding_px: float=0.2, max_visible_labels: int=128, label_update_debounce_ms: int=40):
         # menu creation is deferred because it is expensive and often
         # the user will never see the menu anyway.
         self.menu = None
@@ -139,7 +138,26 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         self._current_hovered_item_tooltip_format_fn = format_tooltip_fn
         self._item_label_format_fn = format_label_fn
 
+        self.labels_min_pixel_width = labels_min_pixel_width
+        self.labels_min_pixel_height = labels_min_pixel_height
+        self.labels_padding_px = labels_padding_px
+        self.max_visible_labels = max_visible_labels
+        self.label_update_debounce_ms = label_update_debounce_ms
         self._labels = []
+        self._active_label_items = {}
+        self._label_viewbox = None
+        self._label_viewbox_connection = None
+        self._label_metadata_needs_rebuild = True
+        self._label_start_t = np.array([], dtype=float)
+        self._label_end_t = np.array([], dtype=float)
+        self._label_y = np.array([], dtype=float)
+        self._label_height = np.array([], dtype=float)
+        self._label_text = np.array([], dtype=object)
+        self._label_sort_order = np.array([], dtype=int)
+        self._label_max_duration_t = 0.0
+        self._label_update_timer = QtCore.QTimer()
+        self._label_update_timer.setSingleShot(True)
+        self._label_update_timer.timeout.connect(self._refresh_visible_labels_from_viewbox)
         self.rebuild_label_items()
         
 
@@ -177,11 +195,10 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         self.data = new_data
         self.generatePicture()
         self.update()
-        # Rebuild labels if label format function exists
-        if self.item_label_format_fn is not None:
-            self.rebuild_label_items()
+        self.rebuild_label_items()
     
     def paint(self, p, *args):
+        self._ensure_label_viewbox_connection()
         p.drawPicture(0, 0, self.picture)
     
     def boundingRect(self):
@@ -217,53 +234,257 @@ class IntervalRectsItem(ReprPrintableItemMixin, pg.GraphicsObject):
         
 
     def rebuild_label_items(self, debug_print: bool=False):
-        """ rebuilds self._labels after update """
+        """Rebuilds lightweight label metadata without creating one text item per interval."""
         if debug_print:
-            print(f'IntervalRectsItem.rebuild_label_items(...): removing existing label items: len(self._labels): {len(self._labels)}')
-        ## remove existing label items:
+            print(f'IntervalRectsItem.rebuild_label_items(...): rebuilding label metadata.')
+        self._clear_active_label_items()
+        self._label_metadata_needs_rebuild = True
+        self._build_label_metadata()
+        self._schedule_label_refresh()
+
+        if debug_print:
+            print(f'\tdone.')
+
+
+    def _format_label_text_for_rect_data(self, rect_index: int, rect_data_tuple: Tuple) -> Optional[str]:
+        """Return the display label for a rectangle, preferring a custom formatter when provided."""
+        label_text = self.item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple) if self.item_label_format_fn is not None else getattr(rect_data_tuple, 'label', None)
+        if label_text is None:
+            return None
+        try:
+            if np.isnan(label_text):
+                return None
+        except TypeError:
+            pass
+        label_text = str(label_text)
+        if len(label_text) == 0:
+            return None
+        return label_text
+
+
+    def _build_label_metadata(self):
+        """Build array metadata for label culling while keeping QGraphicsItem count bounded."""
+        if not self._label_metadata_needs_rebuild:
+            return
+        starts, ends, ys, heights, labels = [], [], [], [], []
+        for rect_index, rect_data_tuple in enumerate(self.data):
+            start_t, series_vertical_offset, duration_t, series_height, pen, brush = rect_data_tuple
+            label_text = self._format_label_text_for_rect_data(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
+            if label_text is None:
+                continue
+            starts.append(float(start_t))
+            ends.append(float(start_t + duration_t))
+            ys.append(float(series_vertical_offset))
+            heights.append(float(series_height))
+            labels.append(label_text)
+        self._label_start_t = np.asarray(starts, dtype=float)
+        self._label_end_t = np.asarray(ends, dtype=float)
+        self._label_y = np.asarray(ys, dtype=float)
+        self._label_height = np.asarray(heights, dtype=float)
+        self._label_text = np.asarray(labels, dtype=object)
+        self._label_sort_order = np.argsort(self._label_start_t) if len(self._label_start_t) > 0 else np.array([], dtype=int)
+        durations = self._label_end_t - self._label_start_t
+        self._label_max_duration_t = float(np.nanmax(durations)) if len(durations) > 0 else 0.0
+        self._label_metadata_needs_rebuild = False
+
+
+    def _clear_active_label_items(self):
+        """Hide all active labels while keeping the small item pool available for reuse."""
+        for a_text_item in self._active_label_items.values():
+            a_text_item.setVisible(False)
+        self._active_label_items = {}
+
+
+    def _label_font(self):
+        if len(self._labels) > 0:
+            return self._labels[0].textItem.font()
+        app = QtWidgets.QApplication.instance()
+        return app.font() if app is not None else QtGui.QFont()
+
+
+    def _acquire_label_item(self) -> Optional[CustomRectBoundedTextItem]:
+        active_items = set(self._active_label_items.values())
         for a_text_item in self._labels:
-            # Properly remove from parent/scene
-            a_text_item.setParentItem(None)
-        self._labels = []
-        if debug_print:
-            print(f'\tdone.')
+            if a_text_item not in active_items:
+                return a_text_item
+        if len(self._labels) >= self.max_visible_labels:
+            return None
+        a_text_item = CustomRectBoundedTextItem(rect=QtCore.QRectF(), text='', parent=self)
+        a_text_item.setVisible(False)
+        self._labels.append(a_text_item)
+        return a_text_item
 
-        if self.item_label_format_fn is not None:
-            if debug_print:
-                print(f'\tbuilding labels...')
-            ## Build labels
-            for rect_index in np.arange(len(self.data)):
-                rect_data_tuple = self.data[rect_index]
-                (start_t, series_vertical_offset, duration_t, series_height, pen, brush) = rect_data_tuple
-                label_text: str = self.item_label_format_fn(rect_index=rect_index, rect_data_tuple=rect_data_tuple)
-                a_rect = QtCore.QRectF(start_t, series_vertical_offset, duration_t, series_height)  # QRectF: (left, top, width, height)
-                if debug_print:
-                    print(f'rect_index: {rect_index}, a_rect: {a_rect}, label_text: "{label_text}"')
-                # a_text_item: RectLabel = RectLabel(text=label_text, rect=a_rect)
-                a_text_item: CustomRectBoundedTextItem = CustomRectBoundedTextItem(rect=a_rect, text=label_text, parent=self)
-                           
-                self._labels.append(a_text_item)
-                if debug_print:
-                    print(f'\tadded label: {a_text_item}')
-                a_text_item.updatePosition()
-                
+
+    def _assign_label_item(self, metadata_index: int):
+        a_text_item = self._active_label_items.get(metadata_index, None)
+        if a_text_item is None:
+            a_text_item = self._acquire_label_item()
+            if a_text_item is None:
+                return
+            self._active_label_items[metadata_index] = a_text_item
+        a_rect = QtCore.QRectF(float(self._label_start_t[metadata_index]), float(self._label_y[metadata_index]), float(self._label_end_t[metadata_index] - self._label_start_t[metadata_index]), float(self._label_height[metadata_index]))
+        label_text = str(self._label_text[metadata_index])
+        a_text_item.desired_text_rect = a_rect
+        a_text_item.original_text = label_text
+        a_text_item.setText(label_text)
+        a_text_item.updatePosition()
+        a_text_item.setVisible(True)
+        if hasattr(a_text_item, 'updateTransform'):
+            a_text_item.updateTransform(force=True)
+        a_text_item.update()
+
+
+    def _visible_label_metadata_indices(self, x_range: Tuple[float, float], y_range: Tuple[float, float]) -> np.ndarray:
+        if len(self._label_start_t) == 0:
+            return np.array([], dtype=int)
+        x_min, x_max = sorted([float(x_range[0]), float(x_range[1])])
+        y_min, y_max = sorted([float(y_range[0]), float(y_range[1])])
+        sorted_starts = self._label_start_t[self._label_sort_order]
+        start_lower_bound = x_min - max(0.0, self._label_max_duration_t)
+        sorted_i0 = int(np.searchsorted(sorted_starts, start_lower_bound, side='left'))
+        sorted_i1 = int(np.searchsorted(sorted_starts, x_max, side='right'))
+        candidate_indices = self._label_sort_order[sorted_i0:sorted_i1]
+        if len(candidate_indices) == 0:
+            return candidate_indices
+        label_y0 = np.minimum(self._label_y[candidate_indices], self._label_y[candidate_indices] + self._label_height[candidate_indices])
+        label_y1 = np.maximum(self._label_y[candidate_indices], self._label_y[candidate_indices] + self._label_height[candidate_indices])
+        visible_mask = (self._label_end_t[candidate_indices] >= x_min) & (self._label_start_t[candidate_indices] <= x_max) & (label_y1 >= y_min) & (label_y0 <= y_max)
+        return candidate_indices[visible_mask]
+
+
+    def refresh_visible_labels(self, canvas_width_px: int, canvas_height_px: int, x_range: Optional[Tuple[float, float]]=None, y_range: Optional[Tuple[float, float]]=None, immediate: bool=True, force_render_all: bool=False):
+        """Show labels for the given canvas size, optionally bypassing text-fit culling for export."""
+        self._build_label_metadata()
+        if len(self._label_start_t) == 0:
+            self._clear_active_label_items()
+            return
+        if (x_range is None) or (y_range is None):
+            view_box = self._resolve_label_viewbox()
+            if view_box is None:
+                self._clear_active_label_items()
+                return
+            view_range = view_box.viewRange()
+            x_range = view_range[0] if x_range is None else x_range
+            y_range = view_range[1] if y_range is None else y_range
+        canvas_width_px_f = max(1.0, float(canvas_width_px))
+        canvas_height_px_f = max(1.0, float(canvas_height_px))
+        x_min, x_max = sorted([float(x_range[0]), float(x_range[1])])
+        y_min, y_max = sorted([float(y_range[0]), float(y_range[1])])
+        x_span = x_max - x_min
+        y_span = y_max - y_min
+        if (x_span <= 0.0) or (y_span <= 0.0):
+            self._clear_active_label_items()
+            return
+        metrics = QtGui.QFontMetricsF(self._label_font())
+        fitting_candidates = []
+        for metadata_index in self._visible_label_metadata_indices((x_min, x_max), (y_min, y_max)):
+            label_text = str(self._label_text[metadata_index])
+            rect_width_px = abs((self._label_end_t[metadata_index] - self._label_start_t[metadata_index]) / x_span) * canvas_width_px_f
+            rect_height_px = abs(self._label_height[metadata_index] / y_span) * canvas_height_px_f
+            if (rect_width_px < self.labels_min_pixel_width) or (rect_height_px < self.labels_min_pixel_height):
+                continue
+            if force_render_all:
+                fitting_candidates.append((rect_width_px, int(metadata_index)))
+                continue
+            text_rect = metrics.boundingRect(label_text)
+            if ((text_rect.width() + self.labels_padding_px) <= rect_width_px) and ((text_rect.height() + self.labels_padding_px) <= rect_height_px):
+                fitting_candidates.append((rect_width_px, int(metadata_index)))
+        fitting_candidates.sort(reverse=True)
+        desired_indices = [metadata_index for _, metadata_index in fitting_candidates[:self.max_visible_labels]]
+        desired_set = set(desired_indices)
+        for metadata_index, a_text_item in list(self._active_label_items.items()):
+            if metadata_index not in desired_set:
+                a_text_item.setVisible(False)
+                del self._active_label_items[metadata_index]
+        for metadata_index in desired_indices:
+            self._assign_label_item(metadata_index)
+
+
+    def _refresh_visible_labels_from_viewbox(self):
+        view_box = self._resolve_label_viewbox()
+        if view_box is None:
+            self._clear_active_label_items()
+            return
+        view_range = view_box.viewRange()
+        self.refresh_visible_labels(canvas_width_px=max(1, int(view_box.width())), canvas_height_px=max(1, int(view_box.height())), x_range=view_range[0], y_range=view_range[1], immediate=True)
+
+
+    def _schedule_label_refresh(self):
+        if len(self.data) == 0:
+            self._clear_active_label_items()
+            return
+        if self.label_update_debounce_ms <= 0:
+            self._refresh_visible_labels_from_viewbox()
         else:
-            if debug_print:
-                print(f'\tno self.item_label_format_fn, so not building labels.')
+            self._label_update_timer.start(self.label_update_debounce_ms)
 
-        if debug_print:
-            print(f'\tdone.')
-        
+
+    def _on_label_viewbox_range_changed(self, *args):
+        self._schedule_label_refresh()
+
+
+    def _disconnect_label_viewbox(self):
+        if (self._label_viewbox is not None) and (self._label_viewbox_connection is not None):
+            try:
+                self._label_viewbox.sigRangeChanged.disconnect(self._label_viewbox_connection)
+            except (TypeError, RuntimeError):
+                pass
+        self._label_viewbox = None
+        self._label_viewbox_connection = None
+
+
+    def _resolve_label_viewbox(self):
+        """Find the actual ViewBox for label range/size work; `getViewBox()` may fall back to the GraphicsView during scene changes."""
+        parent_item = self.parentItem()
+        while parent_item is not None:
+            if hasattr(parent_item, 'implements') and parent_item.implements('ViewBox') and hasattr(parent_item, 'sigRangeChanged') and hasattr(parent_item, 'viewRange'):
+                return parent_item
+            parent_item = parent_item.parentItem()
+        view_box = self.getViewBox()
+        if (view_box is not None) and hasattr(view_box, 'sigRangeChanged') and hasattr(view_box, 'viewRange'):
+            return view_box
+        return None
+
+
+    def _ensure_label_viewbox_connection(self):
+        view_box = self._resolve_label_viewbox()
+        if view_box is None:
+            return
+        if self._label_viewbox is view_box:
+            return
+        self._disconnect_label_viewbox()
+        self._label_viewbox = view_box
+        self._label_viewbox_connection = self._on_label_viewbox_range_changed
+        view_box.sigRangeChanged.connect(self._label_viewbox_connection)
+        self._schedule_label_refresh()
+
+
+    def itemChange(self, change, value):
+        if not hasattr(self, '_label_viewbox'):
+            return pg.GraphicsObject.itemChange(self, change, value)
+        try:
+            scene_has_changed = QtWidgets.QGraphicsItem.GraphicsItemChange.ItemSceneHasChanged
+        except AttributeError:
+            scene_has_changed = QtWidgets.QGraphicsItem.ItemSceneHasChanged
+        if change == scene_has_changed:
+            if value is None:
+                self._disconnect_label_viewbox()
+                self._clear_active_label_items()
+            else:
+                self._ensure_label_viewbox_connection()
+                self._schedule_label_refresh()
+        return pg.GraphicsObject.itemChange(self, change, value)
+
 
 
     ## Copy Constructors:
     def __copy__(self):
         independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
-        return IntervalRectsItem(independent_data_copy)
+        return IntervalRectsItem(independent_data_copy, format_tooltip_fn=self.format_item_tooltip_fn, format_label_fn=self.item_label_format_fn, labels_min_pixel_width=self.labels_min_pixel_width, labels_min_pixel_height=self.labels_min_pixel_height, labels_padding_px=self.labels_padding_px, max_visible_labels=self.max_visible_labels, label_update_debounce_ms=self.label_update_debounce_ms)
     
     def __deepcopy__(self, memo):
         independent_data_copy = ColorDataframeColumnHelpers.copy_data(self.data)
-        return IntervalRectsItem(independent_data_copy)
+        return IntervalRectsItem(independent_data_copy, format_tooltip_fn=copy.deepcopy(self.format_item_tooltip_fn, memo), format_label_fn=copy.deepcopy(self.item_label_format_fn, memo), labels_min_pixel_width=self.labels_min_pixel_width, labels_min_pixel_height=self.labels_min_pixel_height, labels_padding_px=self.labels_padding_px, max_visible_labels=self.max_visible_labels, label_update_debounce_ms=self.label_update_debounce_ms)
         # return IntervalRectsItem(copy.deepcopy(self.data, memo))
 
 

@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 

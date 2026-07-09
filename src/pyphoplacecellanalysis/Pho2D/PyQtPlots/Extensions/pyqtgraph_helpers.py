@@ -286,19 +286,40 @@ def build_scrollable_graphics_layout_widget_with_nested_viewbox_ui(name, window_
 
 
 
-def block_until_render_complete(qapp_name:str='', max_wait_time_sec: int=(60*5)) -> None:
-    """ synchronously blocks until all rendering of the UI is complete. 
+def configure_pyqtgraph_for_unattended_rendering(qapp_name: str = 'unattended_pyqtgraph_rendering'):
+    """Configure Qt/pyqtgraph for headless or offscreen batch export without a display server."""
+    import os
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    os.environ.setdefault('QT_OPENGL', 'software')
+    if QtWidgets.QApplication.instance() is None:
+        try:
+            QtWidgets.QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseSoftwareOpenGL, True)
+        except Exception:
+            pass
+    app = pg.mkQApp(qapp_name)
+    pg.setConfigOptions(useOpenGL=False, enableExperimental=False, antialias=False)
+
+    return app
+
+
+def block_until_render_complete(qapp_name: str = '', max_wait_time_sec: int = (60 * 5), poll_interval_sec: float = 0.05) -> None:
+    """Synchronously pump the Qt event loop so deferred QTimer/repaint work can finish (batch/offscreen safe).
+
     Usage:
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
 
         print(f'waiting until complete....')
         block_until_render_complete()
         print(f'\tblock_until_render_complete is done. Continuing execution.')
-    
+
     """
-    ## INPUTS: out_custom_formats_dict
+    import time
     app = pg.mkQApp(name=qapp_name)
-    app.processEvents(pg.QtCore.QEventLoop.ProcessEventsFlag.AllEvents, max_wait_time_sec) ## 5 minutes is max time
+    poll_ms = max(1, int(poll_interval_sec * 1000))
+    deadline = time.monotonic() + max_wait_time_sec
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, poll_ms)
+        time.sleep(poll_interval_sec)
     return
 
 
@@ -565,3 +586,144 @@ def try_find_child_viewbox(parent_widget) -> Optional[pg.ViewBox]:
     return viewbox
 
     
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Overflow/Non-working                                                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+# from pathlib import Path
+# from typing import List, Dict
+# from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
+# from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
+# from PyQt5 import QtCore
+# from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtWidgets
+# import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+# @function_attributes(short_name=None, tags=['NOT_WORKING', 'export', 'pyqtgraph', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-01 05:42', related_items=[])
+# def collect_topmost_pyqtgraph_graphics_objects(root: QtWidgets.QWidget) -> List[pg.GraphicsObject]:
+#     """Walk QWidget descendants of `root` and collect one top-level pg.GraphicsObject per pg container.
+
+#     When a GraphicsLayoutWidget is found, its GraphicsLayout (`ci`) is appended and its *internal*
+#     cell items are not expanded. PlotWidget contributes its PlotItem only.
+
+#     Usage:
+#         collect_topmost_pyqtgraph_graphics_objects(win)
+#     """
+#     out: List[pg.GraphicsObject] = []
+#     seen_go: Set[int] = set()
+#     seen_w: Set[int] = set()
+
+#     def add_go(obj: object) -> None:
+#         if obj is None or not isinstance(obj, pg.GraphicsObject):
+#             return
+#         i = id(obj)
+#         if i in seen_go:
+#             return
+#         seen_go.add(i)
+#         out.append(obj)
+
+#     def visit(w: QtWidgets.QWidget) -> None:
+#         if w is None:
+#             return
+#         wid = id(w)
+#         if wid in seen_w:
+#             return
+#         seen_w.add(wid)
+
+#         if isinstance(w, pg.GraphicsLayoutWidget):
+#             add_go(w.ci)
+#         elif isinstance(w, pg.PlotWidget):
+#             add_go(w.plotItem)
+
+#         for ch in w.children():
+#             if isinstance(ch, QtWidgets.QWidget):
+#                 visit(ch)
+
+#     visit(root)
+#     return out
+
+
+# @function_attributes(short_name=None, tags=['NOT_WORKING', 'export', 'pyqtgraph', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-04-01 05:42', related_items=[])
+# def export_dock_hierarchy(dock_area_window, output_folder: Path, export_format: str = '.png', **export_kwargs) -> Dict[str, Path]:
+#     """
+#     Export all PyQtGraph plots nested in pg.Dock items recursively.
+    
+#     Args:
+#         dock_area_window: PhoDockAreaContainingWindow or similar with .displayDockArea
+#         output_folder: Directory to save exports
+#         export_format: '.png' or '.svg'
+#         **export_kwargs: Additional args passed to export_pyqtgraph_plot (e.g., background, width)
+    
+#     Returns:
+#         Dictionary mapping dock identifiers to saved file paths
+
+#     Usage:
+
+#         exported_paths = export_dock_hierarchy(
+#             win,
+#             output_folder=Path('output/exports'),
+#             export_format='.png',
+#             background=pg.mkColor(0, 0, 0, 0),  # transparent background
+#             width=4096
+#         )
+#         exported_paths
+
+#     """
+#     output_folder = Path(output_folder)
+#     output_folder.mkdir(parents=True, exist_ok=True)
+    
+#     exported_paths = {}
+    
+#     # Get all docks recursively
+#     all_docks = dock_area_window.displayDockArea.findChildren(Dock, QtCore.QRegExp(".*"), QtCore.Qt.FindChildrenRecursively)
+    
+#     for dock in all_docks:
+#         dock_id = dock.name()
+        
+#         # Get widgets in this dock
+#         dock_widgets = dock.widgets
+        
+#         for i, widget in enumerate(dock_widgets):
+#             # Try to export if it's a pyqtgraph item
+#             try:
+#                 # Determine what type of pyqtgraph object this is
+#                 exportable_item = None
+                
+#                 sub_items = collect_topmost_pyqtgraph_graphics_objects(widget)
+                
+#                 if hasattr(widget, 'plotItem'):
+#                     # It's a PlotWidget
+#                     exportable_item = widget.plotItem
+#                 elif hasattr(widget, 'scene'):
+#                     # It's a GraphicsLayoutWidget or similar
+#                     exportable_item = widget.scene()
+#                 elif hasattr(widget, 'getViewBox'):
+#                     # Direct PlotItem
+#                     exportable_item = widget
+                
+#                 if exportable_item is not None:
+#                     # Build output filename
+#                     suffix = f'_{i}' if len(dock_widgets) > 1 else ''
+#                     safe_dock_id = dock_id.replace('/', '_').replace('\\', '_')
+#                     output_path = output_folder / f'{safe_dock_id}{suffix}{export_format}'
+                    
+#                     # Export
+#                     export_pyqtgraph_plot(
+#                         exportable_item, 
+#                         savepath=output_path,
+#                         progress_print=True,
+#                         **export_kwargs
+#                     )
+                    
+#                     exported_paths[f'{dock_id}{suffix}'] = output_path
+                    
+#             except Exception as e:
+#                 print(f'Could not export dock "{dock_id}": {e}')
+#                 continue
+    
+#     return exported_paths
+
+
+
+
+

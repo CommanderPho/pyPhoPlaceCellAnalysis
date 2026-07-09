@@ -144,10 +144,40 @@ class Interactive3dDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displ
             pass
         except Exception as e:
             raise e
-        
-        
-        
-        return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter}
+
+        # Build options widget and dock it next to the plotter (interactive mode only):
+        optionsWidget = None
+        root_dockAreaWindow = None
+        if (not active_config.video_output_config.active_is_video_output_mode) and kwargs.get('show_options_widget', True):
+            try:
+                from pyphoplacecellanalysis.GUI.Qt.Widgets.Interactive3dSpikeBehaviorOptionsWidget.Interactive3dSpikeBehaviorOptionsWidget import Interactive3dSpikeBehaviorOptionsWidget
+                optionsWidget = Interactive3dSpikeBehaviorOptionsWidget.build_for_explorer(ipspikesDataExplorer)
+                optionsWidget.show()
+                ipspikesDataExplorer.ui['optionsWidget'] = optionsWidget
+                active_root_main_widget = ipspikesDataExplorer.p.window()
+                root_dockAreaWindow, _options_dock_app = DockAreaWrapper.build_default_dockAreaWindow(title=ipspikesDataExplorer.data_explorer_name, defer_show=True)
+                from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
+                main_geom = active_root_main_widget.window().geometry()
+                main_x, main_y, main_w, main_h = main_geom.getRect()
+                opts_geom = optionsWidget.sizeHint()
+                opts_w = min(opts_geom.width(), 260)
+                new_main_w = main_w - opts_w
+                print(f'opts_w: {opts_w}, main_w: {main_w}, new_main_w: {new_main_w}')
+                # optionsWidget.setMaximumWidth(opts_w)
+
+                _, _dMain = root_dockAreaWindow.add_display_dock("3D View", dockSize=(new_main_w, main_h), widget=active_root_main_widget, dockAddLocationOpts=['left'], display_config=CustomDockDisplayConfig(showCloseButton=False))
+                _, _dOpts = root_dockAreaWindow.add_display_dock("Options", dockSize=(opts_w, main_h), widget=optionsWidget, dockAddLocationOpts=['right', _dMain], display_config=CustomCyclicColorsDockDisplayConfig(showCloseButton=False, named_color_scheme=NamedColorScheme.red))
+                root_dockAreaWindow.resize(main_w, main_h) ## should be unchanged
+                _dOpts.setMaximumWidth(opts_w)
+                root_dockAreaWindow.show()
+                ipspikesDataExplorer.ui['root_dockAreaWindow'] = root_dockAreaWindow
+            except Exception as e:
+                print(f'WARN: could not build/dock Interactive3dSpikeBehaviorOptionsWidget. Error {e}. Continuing.')
+                optionsWidget = None
+                root_dockAreaWindow = None
+
+        return {'ipspikesDataExplorer': ipspikesDataExplorer, 'plotter': pActiveInteractivePlaceSpikesPlotter, 'optionsWidget': optionsWidget, 'root_dockAreaWindow': root_dockAreaWindow}
+
 
     ## CustomDataExplorer 3D Plotter:
     @function_attributes(short_name='3d_interactive_custom_data_explorer', tags=['display', 'custom', '3D', 'pyqtgraph'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00')

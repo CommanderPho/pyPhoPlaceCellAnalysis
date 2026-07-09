@@ -219,9 +219,12 @@ QToolButton:!checked{
          </widget>
         </item>
         <item>
-         <widget class="ColorButton" name="btnPenColor">
-          <property name="enabled">
-           <bool>true</bool>
+         <widget class="ColorButton" name="btnFillColor">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
           </property>
           <property name="minimumSize">
            <size>
@@ -230,7 +233,7 @@ QToolButton:!checked{
            </size>
           </property>
           <property name="toolTip">
-           <string>Pen Color</string>
+           <string>Primary (Fill) Color</string>
           </property>
           <property name="text">
            <string/>
@@ -238,7 +241,16 @@ QToolButton:!checked{
          </widget>
         </item>
         <item>
-         <widget class="ColorButton" name="btnFillColor">
+         <widget class="ColorButton" name="btnPenColor">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="minimumSize">
            <size>
             <width>10</width>
@@ -246,7 +258,7 @@ QToolButton:!checked{
            </size>
           </property>
           <property name="toolTip">
-           <string>Fill Color</string>
+           <string>Accent (Pen) Color</string>
           </property>
           <property name="text">
            <string/>

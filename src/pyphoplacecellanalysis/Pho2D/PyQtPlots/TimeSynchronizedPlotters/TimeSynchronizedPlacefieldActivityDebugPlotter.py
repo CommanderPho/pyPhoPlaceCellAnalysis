@@ -1,4 +1,4 @@
-from neuropy.core.user_annotations import function_attributes
+# from neuropy.core.user_annotations import function_attributes
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -29,7 +29,7 @@ from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.User
 # @metadata_attributes(short_name=None, tags=['debug', 'window', 'visualization', 'activity', 'spikes', 'syncrhonized'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-03 15:41', related_items=[])
 class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
     """ Renders a `6 x n_cols` grid of subplots, each showing a heatmap of 2D place cells colored according to that' cells identity color, sorted according to their peak linearized 1D position (`lin_pos`) along the track.
-    All cell heatmaps start black, but **light up when the cell fires**, fading out back to black gradually over the following 3 seconds. 
+    All cell heatmaps start black, but **light up when the cell fires**, fading out back to black gradually over `fade_duration_seconds` (default 2.0 s). 
 
     """
     # Application/Window Configuration Options:
@@ -62,13 +62,14 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         return self.AnimalTrajectoryPlottingMixin_filtered_pos_df.iloc[-1:][['t','x','y']] # Get only the most recent row
 
     
-    def __init__(self, active_one_step_decoder, active_two_step_decoder=None, drop_below_threshold: float=0.0000001, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None, **param_kwargs):
+    def __init__(self, active_one_step_decoder, active_two_step_decoder=None, drop_below_threshold: float=0.0000001, fade_duration_seconds: float=2.0, posterior_variable_to_render='p_x_given_n', application_name=None, window_name=None, parent=None, **param_kwargs):
         """Initialize the Placefield Activity Debug Plotter.
         
         Args:
             active_one_step_decoder: Decoder object containing ratemap and placefield data
             active_two_step_decoder: Two-step decoder (optional, kept for compatibility, not used in new implementation)
             drop_below_threshold: Threshold below which placefield values are set to NaN
+            fade_duration_seconds: Seconds over which placefield brightness fades from 1.0 to 0.0 after a spike
             posterior_variable_to_render: Kept for compatibility, not used in new implementation
             application_name: Optional application name
             window_name: Optional window name
@@ -89,10 +90,12 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         if self.params.debug_print:
             print(f'TimeSynchronizedPlacefieldActivityDebugPlotter: params.debug_print is True, so debugging info will be printed!')
         self.params.drop_below_threshold = drop_below_threshold
+        self.params.fade_duration_seconds = fade_duration_seconds
         
         self.buildUI()
         self._update_plots()
         
+
     def setup(self):
         """Initialize parameters for grid layout, fading duration, and cell colors."""
         from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSeriesColorHelpers
@@ -106,9 +109,6 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         ratemap = self.active_one_step_decoder.ratemap
         n_neurons = ratemap.n_neurons
         self.params.grid_cols = int(np.ceil(n_neurons / self.params.grid_rows))
-        
-        # Fading duration: 3 seconds
-        self.params.fade_duration_seconds = 3.0
         
         # Build cell colors using existing color mapping utilities
         # colormap_source=None uses pyqtgraph's built-in colormaps (PAL-relaxed_bright)
@@ -134,7 +134,11 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         self.params.debug_view_mode = True
         
         self.AnimalTrajectoryPlottingMixin_on_setup()
+        self.params.current_position_marker_size = 6.0
+        self.params.current_position_marker_brush = pg.mkBrush(255, 255, 255, 120)
+        self.params.current_position_marker_pen = pg.mkPen(None)
     
+
     def _compute_peak_linearized_positions(self):
         """Compute peak linearized position for each cell and return sorted cell indices.
         
@@ -156,7 +160,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         x_coords = position_df['x'].values
         y_coords = position_df['y'].values
         
-        # Get placefield data: shape (n_neurons, y_bins, x_bins)
+        # Get placefield data: shape (n_neurons, x_bins, y_bins) — histogram2d stores x on axis 0, y on axis 1
         tuning_curves = ratemap.normalized_tuning_curves
         xbin = self.active_one_step_decoder.xbin
         ybin = self.active_one_step_decoder.ybin
@@ -171,7 +175,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         for neuron_idx in range(n_neurons):
             # Find peak location in 2D placefield
             placefield = tuning_curves[neuron_idx, :, :]
-            peak_y_idx, peak_x_idx = np.unravel_index(np.nanargmax(placefield), placefield.shape)
+            peak_x_idx, peak_y_idx = np.unravel_index(np.nanargmax(placefield), placefield.shape)
             
             # Get 2D coordinates of peak
             peak_x = xbin_centers[peak_x_idx]
@@ -192,6 +196,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         return sorted_indices, peak_lin_positions
     
+
     def _get_cell_activity_levels(self, current_time: float):
         """Compute fading activity levels for all cells based on spike times.
         
@@ -235,7 +240,20 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
                     activity_levels[neuron_idx] = activity_level
         
         return activity_levels
+
+
+    def _get_current_measured_position_xy(self) -> Optional[Tuple[float, float]]:
+        curr_t = self.last_window_time
+        if curr_t is None:
+            return None
+        pos_df = self.active_one_step_decoder.pf.filtered_pos_df
+        pos_up_to_t = pos_df[pos_df['t'] <= curr_t]
+        if len(pos_up_to_t) == 0:
+            return None
+        row = pos_up_to_t.iloc[-1]
+        return float(row['x']), float(row['y'])
     
+
     def _apply_cell_colors(self, placefield_image: np.ndarray, neuron_idx: int, activity_level: float):
         """Apply cell identity color to a placefield image with activity level.
         
@@ -261,24 +279,27 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         return rgb_image
 
+
     def _buildGraphics(self):
         """Create 6×N grid layout with ImageItems for each cell placefield."""
-        from pyphocorehelpers.print_helpers import generate_html_string
-        
         # Initialize arrays to store plot components
         self.ui.img_item_array = []
         self.ui.plot_array = []
+        self.ui.position_marker_array = []
         
         # Create root graphics layout widget
         self.ui.root_graphics_layout_widget = pg.GraphicsLayoutWidget()
         
         # Get placefield data
         ratemap = self.active_one_step_decoder.ratemap
-        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, y_bins, x_bins)
+        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, x_bins, y_bins)
         occupancy = ratemap.occupancy
         
         # Compute sorted cell indices by peak linearized position
         sorted_cell_indices, _ = self._compute_peak_linearized_positions()
+        image_extent = self.params.image_bounds_extent
+        aclu_label_x = image_extent[0] + (image_extent[2] * 0.02)
+        aclu_label_y = image_extent[1] + image_extent[3] - (image_extent[3] * 0.02)
         
         # Create grid of subplots
         for grid_idx, neuron_idx in enumerate(sorted_cell_indices):
@@ -306,15 +327,18 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
                     image[np.where(occupancy < self.params.drop_below_threshold)] = np.nan
             
             # Create plot for this cell
-            curr_plot = self.ui.root_graphics_layout_widget.addPlot(
-                row=row, col=col, 
-                title=generate_html_string(input_str=curr_cell_identifier_string, font_size=2, color='grey')
-            )
+            curr_plot = self.ui.root_graphics_layout_widget.addPlot(row=row, col=col)
             curr_plot.setObjectName(curr_plot_identifier_string)
             
             # Create image item (will be updated with RGB data in _update_plots)
             img_item = pg.ImageItem(border='w')
             curr_plot.addItem(img_item, defaultPadding=0.0)
+            curr_position_marker = pg.PlotDataItem(pen=None, shadowPen=None, symbol='o', pxMode=False, symbolSize=self.params.current_position_marker_size, symbolPen=self.params.current_position_marker_pen, symbolBrush=self.params.current_position_marker_brush, antialias=True, name=f'animal position - {curr_cell_identifier_string}')
+            curr_plot.addItem(curr_position_marker)
+            aclu_label = pg.TextItem(html=f'<span style="color:rgba(255, 255, 255, 0.2); font-size:9pt;">{int(cell_ID)}</span>', anchor=(0, 0))
+            aclu_label.setPos(aclu_label_x, aclu_label_y)
+            aclu_label.setZValue(10)
+            curr_plot.addItem(aclu_label)
             
             # Configure axes visibility
             is_first_column = (col == 0)
@@ -324,9 +348,15 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             if is_last_row:
                 curr_plot.showAxes('x', True)
                 curr_plot.showAxis('bottom', show=True)
+            else:
+                curr_plot.showAxes('x', False)
+                curr_plot.showAxis('bottom', show=False)
             if is_first_column:
                 curr_plot.showAxes('y', True)
                 curr_plot.showAxis('left', show=True)
+            else:
+                curr_plot.showAxes('y', False)
+                curr_plot.showAxis('left', show=False)
             
             curr_plot.hideButtons()
             curr_plot.setRange(xRange=self.params.x_range, yRange=self.params.y_range, padding=0.0, update=False, disableAutoRange=True)
@@ -343,6 +373,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # Store components
             self.ui.img_item_array.append(img_item)
             self.ui.plot_array.append(curr_plot)
+            self.ui.position_marker_array.append(curr_position_marker)
         
         # Add root graphics layout widget to main layout
         self.ui.layout.addWidget(self.ui.root_graphics_layout_widget, 0, 0)
@@ -351,7 +382,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         # self.AnimalTrajectoryPlottingMixin_on_buildUI()
 
     
-    @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
+    # @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
     def add_track_shapes(self, loaded_track_limits=None, override_ax=None, debug_print:bool=True, defer_draw:bool=False):
         """ Adds the Long and Short track shapes to the plotter:
     
@@ -475,7 +506,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
         
         # Get placefield data
         ratemap = self.active_one_step_decoder.ratemap
-        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, y_bins, x_bins)
+        tuning_curves = ratemap.normalized_tuning_curves.copy()  # Shape: (n_neurons, x_bins, y_bins)
         occupancy = ratemap.occupancy
         
         # Get sorted cell indices (computed once, cached if needed)
@@ -513,7 +544,7 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # pyqtgraph expects (H, W) for grayscale or (H, W, 3) for RGB color
             # We need to transpose and handle axis order, and convert to uint8
             if self.params.shared_axis_order == 'col-major':
-                # Image is (y_bins, x_bins), need to transpose for display
+                # Image is (x_bins, y_bins), need to transpose for pyqtgraph col-major display
                 colored_image_display = np.transpose(colored_image, (1, 0, 2))
             else:
                 colored_image_display = colored_image
@@ -526,13 +557,18 @@ class TimeSynchronizedPlacefieldActivityDebugPlotter(UserEditableROIMixin, Anima
             # pyqtgraph ImageItem can handle RGB images as (H, W, 3) uint8 arrays
             img_item.setImage(colored_image_display, rect=self.params.image_bounds_extent, autoLevels=False)
         
+        curr_xy = self._get_current_measured_position_xy()
+        for position_marker in self.ui.position_marker_array:
+            if curr_xy is None:
+                position_marker.setData(x=None, y=None)
+            else:
+                position_marker.setData(x=[curr_xy[0]], y=[curr_xy[1]])
+        
         # Update window title
         self.setWindowTitle(f'TimeSynchronizedPlacefieldActivityDebugPlotter - t = {curr_t:.2f}')
-        
-        # Note: AnimalTrajectoryPlottingMixin_update_plots() not called as trajectory is not shown in grid layout
 
 
-    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
+    # @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
         """Efficiently export a video from the TimeSynchronizedPlacefieldActivityDebugPlotter instance (faster than real-time playback)
         

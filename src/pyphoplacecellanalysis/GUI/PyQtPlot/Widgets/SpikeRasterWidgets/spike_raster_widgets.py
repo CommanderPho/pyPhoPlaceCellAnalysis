@@ -265,8 +265,11 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
         menu_commands = ['AddTimeIntervals.Replays', 'AddTimeIntervals.Laps', 'AddTimeIntervals.PBEs'] # , 'AddTimeIntervals.SessionEpochs', 'AddTimeIntervals.PBEs', 'AddTimeIntervals.Ripples',
         for a_command in menu_commands:
             assert a_command in global_flat_action_dict, f"a_command: '{a_command}' is not present in global_flat_action_dict: {list(global_flat_action_dict.keys())}"
-            # add_renderables_menu[a_command].trigger()
-            global_flat_action_dict[a_command].trigger()
+            an_action = global_flat_action_dict[a_command]
+            if an_action.isEnabled():
+                an_action.trigger()
+            elif debug_print:
+                print(f'\t_skipping disabled interval menu command: {a_command}')
 
         # # active_2d_plot.activeMenuReference
         # # active_2d_plot.ui.menus # .global_window_menus.docked_widgets.actions_dict
@@ -403,13 +406,13 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     _post_hoc_layout_resize(active_2d_plot=active_2d_plot, desired_static_area_height=144)
 
     # ## 2025-09-19 - Add Session Paradigm Epochs with a different color for each session
-    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_proper_epoch_intervals, build_bapun_all_epochs_df
+    # from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals, build_bapun_all_epochs_df
 
-    # a_rect_item, an_interval_ds = build_bapun_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
+    # a_rect_item, an_interval_ds = build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot)
 
 
     print(f'waiting until complete....')
-    block_until_render_complete()
+    block_until_render_complete(max_wait_time_sec=10)  # or 10 sec max wait time
     print(f'\tblock_until_render_complete is done. Continuing execution.')
 
 

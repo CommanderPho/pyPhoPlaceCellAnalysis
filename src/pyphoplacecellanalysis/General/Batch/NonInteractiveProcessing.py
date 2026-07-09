@@ -14,6 +14,7 @@ from matplotlib.backends import backend_pdf
 
 
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
+# from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass  # noqa: F401 - registers format_name='dandi_nwb'
 from neuropy.utils.misc import compute_paginated_grid_config # for paginating shared aclus
 from neuropy.utils.result_context import IdentifyingContext
 
@@ -85,7 +86,8 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     update_global_variable_fn = kwargs.pop('update_global_variable_fn', None)    
 
     saving_mode = PipelineSavingScheme.init(saving_mode)
-    epoch_name_includelist = kwargs.get('epoch_name_includelist', ['maze1','maze2','maze'])
+    # None => let the active format's build_default_filter_functions decide (Bapun: maze*/roam+sprinkle; KDIBA callers may pass explicit ['maze1','maze2','maze']).
+    epoch_name_includelist = kwargs.get('epoch_name_includelist', None)
     debug_print = kwargs.get('debug_print', False)
     assert 'skip_save' not in kwargs, f"use saving_mode=PipelineSavingScheme.SKIP_SAVING instead"
     # skip_save = kwargs.get('skip_save', False)
@@ -101,8 +103,9 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     active_data_mode_type_properties = known_data_session_type_properties_dict[active_data_mode_name]
 
     ## Begin main run of the pipeline (load or execute):
+    skip_save_on_initial_load = kwargs.pop('skip_save_on_initial_load', True) # if False, the freshly-built/updated pipeline is saved immediately after the initial load/rebuild (before extended computations), so a session pickle exists even if later computations fail.
     curr_active_pipeline = NeuropyPipeline.try_init_from_saved_pickle_or_reload_if_needed(active_data_mode_name, active_data_mode_type_properties,
-        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=True, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+        override_basepath=Path(basedir), force_reload=force_reload, active_pickle_filename=active_pickle_filename, skip_save_on_initial_load=skip_save_on_initial_load, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
     
     curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict) # should already be updated, but try it again anyway.
     

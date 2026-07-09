@@ -1,5 +1,6 @@
+from contextlib import contextmanager
 from copy import deepcopy
-from typing import Optional
+from typing import Iterator, Optional, Tuple
 import numpy as np
 import pandas as pd
 from qtpy import QtCore, QtWidgets
@@ -559,6 +560,74 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
     # PlotImageExportableMixin Conformances                                                                                                                                                                                                                                                #
     # ==================================================================================================================================================================================================================================================================================== #
 
+    @staticmethod
+    def _cap_pixel_size_preserving_aspect(width_px: int, height_px: int, max_dimension: int) -> Tuple[int, int]:
+        """Cap pixel width/height while preserving aspect ratio."""
+        width_px = max(1, int(width_px))
+        height_px = max(1, int(height_px))
+        max_dimension = max(1, int(max_dimension))
+        if max(width_px, height_px) <= max_dimension:
+            return width_px, height_px
+        if width_px >= height_px:
+            capped_w = max_dimension
+            capped_h = max(1, int(round(capped_w * height_px / width_px)))
+        else:
+            capped_h = max_dimension
+            capped_w = max(1, int(round(capped_h * width_px / height_px)))
+        return capped_w, capped_h
+
+
+    @staticmethod
+    def _compute_aspect_matched_view_size(export_w: int, export_h: int, max_view_dimension: int = 8192) -> Tuple[int, int]:
+        """Return view resize dimensions with the same aspect ratio as export, capped to avoid huge on-screen buffers."""
+        return PyqtgraphTimeSynchronizedWidget._cap_pixel_size_preserving_aspect(export_w, export_h, max_view_dimension)
+
+
+    @contextmanager
+    def _with_export_view_geometry(self, view_w: int, view_h: int) -> Iterator[None]:
+        """Temporarily resize the plot view so ViewBox aspect ratio matches the ImageExporter target aspect ratio."""
+        from qtpy.QtWidgets import QApplication
+
+        view_w = max(1, int(view_w))
+        view_h = max(1, int(view_h))
+        layout = self.getRootGraphicsLayoutWidget()
+        orig_layout_min, orig_layout_max, orig_layout_size = layout.minimumSize(), layout.maximumSize(), layout.size()
+        orig_self_min, orig_self_max, orig_self_size = self.minimumSize(), self.maximumSize(), self.size()
+        orig_layout_updates_enabled, orig_self_updates_enabled = layout.updatesEnabled(), self.updatesEnabled()
+        parent_size_constraints: list[Tuple[QtWidgets.QWidget, int, int]] = []
+        parent_widget = self.parentWidget()
+        while parent_widget is not None:
+            parent_size_constraints.append((parent_widget, parent_widget.maximumHeight(), parent_widget.maximumWidth()))
+            if (parent_widget.maximumHeight() > 0) and (parent_widget.maximumHeight() < view_h):
+                parent_widget.setMaximumHeight(view_h)
+            if (parent_widget.maximumWidth() > 0) and (parent_widget.maximumWidth() < view_w):
+                parent_widget.setMaximumWidth(view_w)
+            parent_widget = parent_widget.parentWidget()
+        layout.setUpdatesEnabled(False)
+        self.setUpdatesEnabled(False)
+        try:
+            layout.setMinimumSize(view_w, view_h)
+            layout.setMaximumSize(view_w, view_h)
+            layout.resize(view_w, view_h)
+            self.setMinimumSize(view_w, view_h)
+            self.setMaximumSize(view_w, view_h)
+            self.resize(view_w, view_h)
+            yield
+        finally:
+            layout.setMinimumSize(orig_layout_min)
+            layout.setMaximumSize(orig_layout_max)
+            layout.resize(orig_layout_size)
+            self.setMinimumSize(orig_self_min)
+            self.setMaximumSize(orig_self_max)
+            self.resize(orig_self_size)
+            for a_parent_widget, orig_max_height, orig_max_width in parent_size_constraints:
+                a_parent_widget.setMaximumHeight(orig_max_height)
+                a_parent_widget.setMaximumWidth(orig_max_width)
+            layout.setUpdatesEnabled(orig_layout_updates_enabled)
+            self.setUpdatesEnabled(orig_self_updates_enabled)
+            QApplication.processEvents()
+
+
     def export_as_img_arr(self, start=None, end=None, dpi=150,
                           info=None,
                         #    y_offset = 0, y_min = 0.0,
@@ -569,11 +638,15 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
         from PyQt5.QtGui import QImage
+        from PyQt5.QtWidgets import QApplication
+        from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.GraphicsObjects.IntervalRectsItem import IntervalRectsItem
 
         debug_print = kwargs.pop('debug_print', False)
+        max_export_width_px = kwargs.pop('max_export_width_px', None)
+        max_export_dimension = kwargs.pop('max_export_dimension', 8192)
         
-        # pyqtgraph-backed tracks
-        
+        force_render_interval_labels: bool = kwargs.pop('force_render_interval_labels', True)
+
         # # ## Data units version: for 3 tracks, we get [[-4.4, 0.4], [-4.0, 45.5], [0, 1]]
         # # y_min, y_max = t.getViewBox().viewRange()[1]
         # # h = y_max - y_min
@@ -603,37 +676,147 @@ class PyqtgraphTimeSynchronizedWidget(CrosshairsTracingMixin, PlotImageExportabl
         # pi.setXRange(start, end, padding=0) ## set to this chunk
         # pi.setYRange(*orig_y, padding=0)
 
+        pi = self.active_plot_target
+        vb = pi.getViewBox()
+        orig_x, orig_y = vb.viewRange()
+        orig_x_link = vb.linkedView(pg.ViewBox.XAxis)
 
-        exporter = ImageExporter(self.active_plot_target)
-        if (start is not None) or (end is not None):
-            # exporter.parameters()['width'] = int(figsize[0]*dpi)
-            # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
-            exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
-        if (info is not None):
-            exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
-            
+        def _collect_interval_rect_items():
+            """Find IntervalRectsItem instances attached to this plot, including nested children."""
+            seen_item_ids = set()
+            out_items = []
 
-        if debug_print:
-            print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
-        # exporter.parameters()['width'] = int(figsize[0]*dpi)
-        # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
-        img = exporter.export(toBytes=True)
-        if isinstance(img, QImage):
-            w, h = img.width(), img.height()
-            ptr = img.bits(); ptr.setsize(img.byteCount())
-            # QImage from pyqtgraph is typically in BGRA byte order.
-            raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
-            b = raw[:, :, 0]
-            g = raw[:, :, 1]
-            r = raw[:, :, 2]
-            a = raw[:, :, 3]
-            rgb = np.stack([r, g, b], axis=-1)
-            # Composite over white background so grid and image blend as on-screen
-            bg = np.ones_like(rgb)
-            comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
-            arr = (comp * 255).astype(np.uint8)
-        else:
-            arr = np.array(img)
+            def _visit_graphics_item(a_graphics_item):
+                if a_graphics_item is None:
+                    return
+                item_id = id(a_graphics_item)
+                if item_id in seen_item_ids:
+                    return
+                seen_item_ids.add(item_id)
+                if isinstance(a_graphics_item, IntervalRectsItem):
+                    out_items.append(a_graphics_item)
+                child_items_fn = getattr(a_graphics_item, 'childItems', None)
+                if callable(child_items_fn):
+                    try:
+                        child_items = list(child_items_fn())
+                    except RuntimeError:
+                        child_items = []
+                    for a_child_item in child_items:
+                        _visit_graphics_item(a_child_item)
+
+            for a_plot_item in list(getattr(pi, 'items', [])):
+                _visit_graphics_item(a_plot_item)
+            _visit_graphics_item(pi)
+            _visit_graphics_item(vb)
+            return out_items
+
+        interval_rect_items = _collect_interval_rect_items()
+        interval_label_states = [(a_plot_item, a_plot_item.labels_min_pixel_width, a_plot_item.labels_min_pixel_height, a_plot_item.labels_padding_px, a_plot_item.max_visible_labels) for a_plot_item in interval_rect_items]
+
+        def _refresh_interval_rect_labels_for_plot_item(canvas_width_px: int, canvas_height_px: int, force_all_labels: bool=False):
+            """Refresh IntervalRectsItem labels for the current export/restored view range."""
+            view_range = vb.viewRange()
+            for a_plot_item in interval_rect_items:
+                if force_all_labels:
+                    a_plot_item.labels_min_pixel_width = 0.0
+                    a_plot_item.labels_min_pixel_height = 0.0
+                    a_plot_item.labels_padding_px = 0.0
+                    a_plot_item.max_visible_labels = 9999
+                    a_plot_item.rebuild_label_items()
+                a_plot_item.refresh_visible_labels(canvas_width_px=canvas_width_px, canvas_height_px=canvas_height_px, x_range=view_range[0], y_range=view_range[1], immediate=True, force_render_all=force_all_labels)
+                if debug_print:
+                    print(f"\tIntervalRectsItem labels: active={len(getattr(a_plot_item, '_active_label_items', {}))}, total={len(getattr(a_plot_item, '_label_text', []))}, force_all={force_all_labels}")
+
+
+        if orig_x_link is not None:
+            pi.setXLink(None)
+        try:
+            if (start is not None) and (end is not None):
+                pi.setXRange(start, end, padding=0)
+            pi.setYRange(*orig_y, padding=0)
+            QApplication.processEvents()
+
+            export_h = max(1, int((info['extent'][3] - info['extent'][2]) * dpi)) if (info is not None) else max(1, int(vb.height()))
+            if (start is not None) and (end is not None):
+                nominal_export_w = max(1, int((end - start) * dpi))
+                export_w = max(1, min(nominal_export_w, int(max_export_width_px))) if (max_export_width_px is not None) else nominal_export_w
+            else:
+                export_w = max(1, int(vb.width()))
+            export_w, export_h = self._cap_pixel_size_preserving_aspect(export_w, export_h, max_export_dimension)
+            view_w, view_h = self._compute_aspect_matched_view_size(export_w, export_h)
+
+            with self._with_export_view_geometry(view_w, view_h):
+                QApplication.processEvents()
+                exporter = ImageExporter(pi)
+                exporter.parameters()['width'] = export_w
+                exporter.parameters()['height'] = export_h
+                if debug_print:
+                    print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}, view_resize: ({view_w}, {view_h})")
+                _refresh_interval_rect_labels_for_plot_item(canvas_width_px=export_w, canvas_height_px=export_h, force_all_labels=force_render_interval_labels)
+                QApplication.processEvents()
+                img = exporter.export(toBytes=True)
+            if isinstance(img, QImage):
+                if img.isNull() or img.width() < 1 or img.height() < 1:
+                    raise ValueError(f"ImageExporter returned an empty image (size=({img.width()}, {img.height()}))")
+                w, h = img.width(), img.height()
+                ptr = img.bits()
+                if ptr is None:
+                    raise ValueError(f"ImageExporter returned a null image buffer for size ({w}, {h})")
+                ptr.setsize(img.byteCount())
+                raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
+                b = raw[:, :, 0]
+                g = raw[:, :, 1]
+                r = raw[:, :, 2]
+                a = raw[:, :, 3]
+                rgb = np.stack([r, g, b], axis=-1)
+                bg = np.ones_like(rgb)
+                comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+                arr = (comp * 255).astype(np.uint8)
+            else:
+                arr = np.array(img)
+        finally:
+            pi.setXRange(*orig_x, padding=0)
+            pi.setYRange(*orig_y, padding=0)
+            if orig_x_link is not None:
+                pi.setXLink(orig_x_link)
+            for a_plot_item, labels_min_pixel_width, labels_min_pixel_height, labels_padding_px, max_visible_labels in interval_label_states:
+                a_plot_item.labels_min_pixel_width = labels_min_pixel_width
+                a_plot_item.labels_min_pixel_height = labels_min_pixel_height
+                a_plot_item.labels_padding_px = labels_padding_px
+                a_plot_item.max_visible_labels = max_visible_labels
+            _refresh_interval_rect_labels_for_plot_item(canvas_width_px=max(1, int(vb.width())), canvas_height_px=max(1, int(vb.height())), force_all_labels=False)
+            QApplication.processEvents()
+
+
+        # exporter = ImageExporter(self.active_plot_target)
+        # if (start is not None) or (end is not None):
+        #     # exporter.parameters()['width'] = int(figsize[0]*dpi)
+        #     # exporter.parameters()['height'] = int(((figsize[1]/len(page_chunks))*dpi)/len(tracks))
+        #     exporter.parameters()['width'] = int((end - start) * dpi) # AI suggests I should be using `figsize[0] * dpi` - I don't think this is right.
+        # if (info is not None):
+        #     exporter.parameters()['height'] = int((info['extent'][3] - info['extent'][2]) * dpi)
+        # if debug_print:
+        #     print(f"\texporter.parameters(): w: {exporter.parameters()['width']}, h: {exporter.parameters()['height']}")
+        # # exporter.parameters()['width'] = int(figsize[0]*dpi)
+        # # exporter.parameters()['height'] = int((figsize[1]/len(page_chunks))*dpi/len(tracks))
+        # img = exporter.export(toBytes=True)
+        # if isinstance(img, QImage):
+        #     w, h = img.width(), img.height()
+        #     ptr = img.bits(); ptr.setsize(img.byteCount())
+        #     # QImage from pyqtgraph is typically in BGRA byte order.
+        #     raw = np.array(ptr).reshape(h, w, 4).astype(np.float32) / 255.0
+        #     b = raw[:, :, 0]
+        #     g = raw[:, :, 1]
+        #     r = raw[:, :, 2]
+        #     a = raw[:, :, 3]
+        #     rgb = np.stack([r, g, b], axis=-1)
+        #     # Composite over white background so grid and image blend as on-screen
+        #     bg = np.ones_like(rgb)
+        #     comp = rgb * a[..., None] + bg * (1.0 - a[..., None])
+        #     arr = (comp * 255).astype(np.uint8)
+        # else:
+        #     arr = np.array(img)
+
 
         return arr
 

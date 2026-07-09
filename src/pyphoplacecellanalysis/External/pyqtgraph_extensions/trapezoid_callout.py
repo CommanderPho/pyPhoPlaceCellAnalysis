@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt, QPointF, QTimer, QEvent
 from PyQt5.QtGui import QPainter, QColor, QPolygonF, QBrush, QPen
-import pyqtgraph as pg
+from pyphoplacecellanalysis.External import pyqtgraph as pg
 from pyqtgraph.dockarea import DockArea, Dock
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes

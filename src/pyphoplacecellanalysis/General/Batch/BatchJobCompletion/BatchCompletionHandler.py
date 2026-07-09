@@ -27,6 +27,12 @@ from neuropy.utils.result_context import IdentifyingContext
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers
 
+_KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES = frozenset({'long_epoch_name', 'long_laps', 'long_replays', 'short_epoch_name', 'short_laps', 'short_replays'})
+_KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES = frozenset({'long_epoch_name', 'long_n_laps', 'long_n_replays', 'short_epoch_name', 'short_n_laps', 'short_n_replays'})
+_KDIBA_ONLY_EXTENDED_COMPUTATIONS = frozenset({'long_short_decoding_analyses', 'jonathan_firing_rate_analysis', 'long_short_fr_indicies_analyses', 'short_long_pf_overlap_analyses', 'long_short_post_decoding', 'long_short_inst_spike_rate_groups', 'long_short_endcap_analysis', 'rank_order_shuffle_analysis', 'perform_wcorr_shuffle_analysis', 'extended_pf_peak_information', 'pf_dt_sequential_surprise',
+                                                # directional analyses depend on `find_LongShortGlobal_epoch_names()` (long/short track structure), which is kdiba-only; skip them for non-kdiba (e.g. bapun) sessions to avoid hard errors.
+                                                'split_to_directional_laps', 'merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'})
+
 @unique
 class SavingOptions(Enum):
     NEVER = "NEVER"
@@ -65,19 +71,34 @@ class BatchComputationProcessOptions(HDF_SerializationMixin, AttrsBasedClassHelp
 @custom_define(slots=False)
 class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     """ Class representing the specific results extracted from the loaded pipeline and returned as return values from the post-execution callback function. """
-    long_epoch_name: str = serialized_attribute_field()
-    long_laps: Epoch = serialized_field()
-    long_replays: Epoch = serialized_field()
-
-    short_epoch_name: str = serialized_attribute_field()
-    short_laps: Epoch = serialized_field()
-    short_replays: Epoch = serialized_field()
-
     delta_since_last_compute: timedelta = non_serialized_field() #serialized_attribute_field(serialization_fn=HDF_Converter._prepare_datetime_timedelta_value_to_for_hdf_fn)
     outputs_local: Dict[str, Optional[Path]] = non_serialized_field() # serialization_fn=(lambda f, k, v: f[f'{key}/{sub_k}'] = str(sub_v) for sub_k, sub_v in value.items()), is_hdf_handled_custom=True
     outputs_global: Dict[str, Optional[Path]] = non_serialized_field()
 
     across_session_results: Dict[str, Optional[object]] = non_serialized_field()
+
+    def __setstate__(self, state):
+        if type(self) is PipelineCompletionResult and _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.intersection(state):
+            self.__class__ = KDibaPipelineCompletionResult
+        self.__dict__.update(state)
+        loaded_keys = list(state.keys())
+        modern_keys = [a.name for a in self.__class__.__attrs_attrs__]
+        for a in self.__class__.__attrs_attrs__:
+            if a.name not in loaded_keys and a.default is not None:
+                self.__dict__[a.name] = a.default
+
+
+    @classmethod
+    def migrate_session_batch_output(cls, result: Optional["PipelineCompletionResult"]) -> Optional["PipelineCompletionResult"]:
+        """Upgrade in-memory legacy instances after pickle load."""
+        if result is None:
+            return None
+        if isinstance(result, KDibaPipelineCompletionResult):
+            return result
+        if _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.intersection(result.__dict__):
+            return KDibaPipelineCompletionResult.from_legacy_pipeline_completion_result(result)
+        return result
+
 
      # HDFMixin Conformances ______________________________________________________________________________________________ #
 
@@ -104,25 +125,82 @@ class PipelineCompletionResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         #         an_outputs_global_group[f'{outputs_global_key}/{sub_k}'] = str(sub_v)
 
 
+
+@custom_define(slots=False)
+class KDibaPipelineCompletionResult(PipelineCompletionResult):
+    """ KDiba-specific pipeline completion results with long/short epoch laps and replays. """
+    long_epoch_name: str = serialized_attribute_field()
+    long_laps: Epoch = serialized_field()
+    long_replays: Epoch = serialized_field()
+
+    short_epoch_name: str = serialized_attribute_field()
+    short_laps: Epoch = serialized_field()
+    short_replays: Epoch = serialized_field()
+
+
+    @classmethod
+    def from_legacy_pipeline_completion_result(cls, obj: PipelineCompletionResult) -> "KDibaPipelineCompletionResult":
+        """Build KDiba subclass from a legacy base instance that still carries KDiba attrs in __dict__."""
+        if isinstance(obj, cls):
+            return obj
+        kdiba_kwargs = {a_field_name: getattr(obj, a_field_name) for a_field_name in _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES if hasattr(obj, a_field_name)}
+        if not _KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES.issubset(kdiba_kwargs.keys()):
+            raise TypeError(f"Cannot migrate {type(obj).__name__} to {cls.__name__}: missing kdiba fields {sorted(_KDIBA_PIPELINE_COMPLETION_RESULT_FIELD_NAMES - kdiba_kwargs.keys())}")
+        return cls(long_epoch_name=kdiba_kwargs['long_epoch_name'], long_laps=kdiba_kwargs['long_laps'], long_replays=kdiba_kwargs['long_replays'], short_epoch_name=kdiba_kwargs['short_epoch_name'], short_laps=kdiba_kwargs['short_laps'], short_replays=kdiba_kwargs['short_replays'], delta_since_last_compute=obj.delta_since_last_compute, outputs_local=obj.outputs_local, outputs_global=obj.outputs_global, across_session_results=obj.across_session_results)
+
+
+
+
+
 class PipelineCompletionResultTable(tb.IsDescription):
-    """ PyTables class representing epoch data built from a dictionary. """
+    """PyTables row schema for format-agnostic pipeline completion summary."""
+    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
+
+
+
+class KDibaPipelineCompletionResultTable(PipelineCompletionResultTable):
+    """PyTables row schema for KDiba long/short lap/replay counts."""
     long_epoch_name = tb.StringCol(itemsize=100)
-    # long_laps = EpochTable()
-    # long_replays = EpochTable()
     long_n_laps = tb.UInt16Col()
     long_n_replays = tb.UInt16Col()
     short_epoch_name = tb.StringCol(itemsize=100)
-    # short_laps = EpochTable()
-    # short_replays = EpochTable()
     short_n_laps = tb.UInt16Col()
     short_n_replays = tb.UInt16Col()
 
-    delta_since_last_compute = tb.Time64Col()  # Use tb.Time64Col for timedelta
 
-    # outputs_local = OutputFilesTable()
-    # outputs_global = OutputFilesTable()
 
-    # across_sessions_batch_results_inst_fr_comps = tb.StringCol(itemsize=100)
+def fill_pipeline_completion_result_table_common_row_fields(row, a_result: PipelineCompletionResult):
+    time_in_nanoseconds = int(a_result.delta_since_last_compute.total_seconds() * 1e9)
+    row['delta_since_last_compute'] = np.int64(time_in_nanoseconds)
+
+
+def fill_kdiba_pipeline_completion_result_table_kdiba_row_fields(row, a_result: KDibaPipelineCompletionResult):
+    row['long_epoch_name'] = a_result.long_epoch_name
+    row['long_n_laps'] = a_result.long_laps.n_epochs
+    row['long_n_replays'] = a_result.long_replays.n_epochs
+    row['short_epoch_name'] = a_result.short_epoch_name
+    row['short_n_laps'] = a_result.short_laps.n_epochs
+    row['short_n_replays'] = a_result.short_replays.n_epochs
+
+
+def fill_kdiba_pipeline_completion_result_table_row_from_result(row, a_result: PipelineCompletionResult):
+    if isinstance(a_result, KDibaPipelineCompletionResult):
+        fill_kdiba_pipeline_completion_result_table_kdiba_row_fields(row, a_result)
+    else:
+        row['long_epoch_name'] = ''
+        row['long_n_laps'] = 0
+        row['long_n_replays'] = 0
+        row['short_epoch_name'] = ''
+        row['short_n_laps'] = 0
+        row['short_n_replays'] = 0
+    fill_pipeline_completion_result_table_common_row_fields(row, a_result)
+
+
+def resolve_pipeline_completion_result_table_class_from_hdf_colnames(colnames) -> type:
+    """Return KDiba subclass if legacy/full schema columns are present."""
+    if _KDIBA_PIPELINE_COMPLETION_RESULT_TABLE_COLUMN_NAMES.intersection(colnames):
+        return KDibaPipelineCompletionResultTable
+    return PipelineCompletionResultTable
 
 
 @define(slots=False, repr=False)
@@ -261,7 +339,7 @@ class BatchSessionCompletionHandler:
             """ 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
             preprocessing_parameters = getattr(sess.config, 'preprocessing_parameters', None)
             if preprocessing_parameters is None:
-                print(f'No existing preprocessing parameters! Assigning them!')
+                print(f'\t\tNo existing preprocessing parameters! Assigning them!')
                 default_lap_estimation_parameters = DynamicContainer(N=20, should_backup_extant_laps_obj=True, use_direction_dependent_laps=True) # Passed as arguments to `sess.replace_session_laps_with_estimates(...)`
                 default_PBE_estimation_parameters = DynamicContainer(sigma=0.030, thresh=(0, 1.5), min_dur=0.030, merge_dur=0.100, max_dur=0.600) # 2023-10-05 Kamran's imposed Parameters, wants to remove the effect of the max_dur which was previously at 0.300
                 default_replay_estimation_parameters = DynamicContainer(require_intersecting_epoch=None, min_epoch_included_duration=0.06, max_epoch_included_duration=0.600, maximum_speed_thresh=None, min_inclusion_fr_active_thresh=0.01, min_num_unique_aclu_inclusions=5)
@@ -272,18 +350,23 @@ class BatchSessionCompletionHandler:
                         'replays': default_replay_estimation_parameters
                     }))
                 return True
-            else:
-                if debug_print:
-                    print(f'preprocessing parameters exist.')
-                # TODO: update them as needed?
-                return False
+            format_name = getattr(sess.config, 'format_name', None)
+            active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
+            if format_name in active_data_session_types_registered_classes_dict:
+                active_format_class = active_data_session_types_registered_classes_dict[format_name]
+                ensure_fn = getattr(active_format_class, 'ensure_preprocessing_epoch_estimation_parameters', None)
+                if ensure_fn is not None and ensure_fn(sess):
+                    return True
+            if debug_print:
+                print(f'\t\tpreprocessing parameters exist.')
+            return False
             
 
         def _subfn_update_session_missing_loaded_track_limits(curr_active_pipeline, always_reload_from_file:bool):
             """ 2024-04-09 - Adds the previously missing `sess.config.loaded_track_limits` to a single session. Called only by `_update_pipeline_missing_preprocessing_parameters` """
             loaded_track_limits = getattr(curr_active_pipeline.sess.config, 'loaded_track_limits', None)
             if (loaded_track_limits is None) or always_reload_from_file:
-                print(f'No existing loaded_track_limits parameters! Assigning them!')
+                print(f'\tNo existing loaded_track_limits parameters! Assigning them!')
                 active_data_mode_name: str = curr_active_pipeline.session_data_type
                 active_data_session_types_registered_classes_dict = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict()
                 active_data_mode_registered_class = active_data_session_types_registered_classes_dict[active_data_mode_name]
@@ -298,7 +381,7 @@ class BatchSessionCompletionHandler:
                 return True
             else:
                 if debug_print:
-                    print(f'loaded_track_limits parameters exist.')
+                    print(f'\tloaded_track_limits parameters exist.')
                 # TODO: update them as needed?
                 return False
             
@@ -321,7 +404,7 @@ class BatchSessionCompletionHandler:
             print(f'WARN: `_update_pipeline_missing_preprocessing_parameters(...): non-KDIBA format curr_active_pipeline.active_sess_config.format_name "{curr_active_pipeline.active_sess_config.format_name}" is not currently fully implemented/checked for all parameters. Filtered sessions might ahve wrong params.')
             for an_epoch_name, a_sess in curr_active_pipeline.filtered_sessions.items():
                 ## override
-                print(f'trying to process for {an_epoch_name}..')
+                print(f'\ttrying to process for {an_epoch_name}..')
                 was_updated = was_updated | _subfn_update_session_missing_preprocessing_parameters(a_sess)
 
 
@@ -395,28 +478,64 @@ class BatchSessionCompletionHandler:
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
     def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
-        try:
-            ## To file only:
-            with matplotlib_file_only():
-                # Perform non-interactive Matplotlib operations with 'AGG' backend
-                # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+        if not curr_active_pipeline.is_kdiba_session():
+            ## Non-KDiba session
+            #TODO 2026-06-20 07:10: - [ ] All non-KDiba sessions assumed to be Bapun
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
 
-            # IF thst's done, clear all the plots:
-            # from matplotlib import pyplot as plt
-            # plt.close('all') # this takes care of the matplotlib-backed figures.
-            curr_active_pipeline.clear_display_outputs()
-            curr_active_pipeline.clear_registered_output_files()
-            return True # completed successfully (without raising an error at least).
+            # print(f'\tskipping main_complete_figure_generations for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})')
+            print(f'\ttrying main_complete_figure_generations for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})...')
 
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'main_complete_figure_generations failed with exception: {e}')
-            if self.fail_on_exception:
-                raise e.exc
+            try:
+                ## To file only:
+                with matplotlib_file_only():
+                    # Perform non-interactive Matplotlib operations with 'AGG' backend
+                    # main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+                    _rendering_out_dict = BapunBatchHelpers.run_all_rendering(curr_active_pipeline=curr_active_pipeline, save_figures_only=True)
 
-            return False
+                # IF thst's done, clear all the plots:
+                # from matplotlib import pyplot as plt
+                # plt.close('all') # this takes care of the matplotlib-backed figures.
+                curr_active_pipeline.clear_display_outputs()
+                curr_active_pipeline.clear_registered_output_files()
+                return True # completed successfully (without raising an error at least).
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'\tmain_complete_figure_generations failed with exception: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
+
+                return False
+
+
+            # return False
+
+        else:
+            ## KDiba-specific session:
+            try:
+                ## To file only:
+                with matplotlib_file_only():
+                    # Perform non-interactive Matplotlib operations with 'AGG' backend
+                    # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
+                    main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+
+                # IF thst's done, clear all the plots:
+                # from matplotlib import pyplot as plt
+                # plt.close('all') # this takes care of the matplotlib-backed figures.
+                curr_active_pipeline.clear_display_outputs()
+                curr_active_pipeline.clear_registered_output_files()
+                return True # completed successfully (without raising an error at least).
+
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'main_complete_figure_generations failed with exception: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
+
+                return False
 
 
     def try_output_neruon_identity_table_to_File(self, file_path, curr_active_pipeline):
@@ -538,6 +657,14 @@ class BatchSessionCompletionHandler:
         if self.global_computations_options.should_compute:
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
+            is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()
+            batch_extended_fail_on_exception: bool = True
+            if not is_kdiba_session:
+                dropped_kdiba_only_computations = [a_name for a_name in active_extended_computations_include_includelist if a_name in _KDIBA_ONLY_EXTENDED_COMPUTATIONS]
+                if len(dropped_kdiba_only_computations) > 0:
+                    print(f'\tskipping kdiba-only extended computations for non-kdiba session: {dropped_kdiba_only_computations}')
+                active_extended_computations_include_includelist = [a_name for a_name in active_extended_computations_include_includelist if a_name not in _KDIBA_ONLY_EXTENDED_COMPUTATIONS]
+                batch_extended_fail_on_exception = False
             force_recompute_override_computations_includelist = self.force_recompute_override_computations_includelist or []
             force_recompute_override_computation_kwargs_dict = self.force_recompute_override_computation_kwargs_dict or {} # #TODO 2024-10-30 08:35: - [ ] is `force_recompute_override_computation_kwargs_dict` actually only used when forcing a recompute, or does passing it when it's the same as the already computed values force it to recompute? It seems to force it to recompute
             # ## #TODO 2024-11-06 14:21: - [ ] I think we should use `batch_evaluate_required_computations` instead of `batch_extended_computations` to avoid forcing recomputations.
@@ -549,7 +676,7 @@ class BatchSessionCompletionHandler:
                 with ExceptionPrintingContext(suppress=(not self.fail_on_exception)):
                     curr_active_pipeline.reload_default_computation_functions()
                     #TODO 2024-11-06 13:44: - [ ] `force_recompute_override_computations_includelist` is actually comming in with the specified override (when I was just trying to override the parameters)`
-                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=True, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
+                    newly_computed_values += batch_extended_computations(curr_active_pipeline, include_includelist=active_extended_computations_include_includelist, include_global_functions=True, fail_on_exception=batch_extended_fail_on_exception, progress_print=True, # #TODO 2024-11-01 19:33: - [ ] self.force_recompute is True for some reason!?!
                                                                         force_recompute=self.force_global_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist,
                                                                         computation_kwargs_dict=force_recompute_override_computation_kwargs_dict, debug_print=False)
                     #TODO 2023-07-11 19:20: - [ ] We want to save the global results if they are computed, but we don't want them to be needlessly written to disk even when they aren't changed.
@@ -655,15 +782,17 @@ class BatchSessionCompletionHandler:
         """
         print(f'>>> on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): BEGIN ======')
         # print(f'curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}')
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
-        # Get existing laps from session:
-        long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
-        # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
-        # short_replays.n_epochs: 6, long_replays.n_epochs: 8
-        if self.debug_print:
-            print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
-            print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
+        is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
+        if is_kdiba_session:
+            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
+            # Get existing laps from session:
+            long_laps, short_laps, global_laps = [curr_active_pipeline.filtered_sessions[an_epoch_name].laps.as_epoch_obj() for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            long_replays, short_replays, global_replays = [Epoch(curr_active_pipeline.filtered_sessions[an_epoch_name].replay.epochs.get_valid_df()) for an_epoch_name in [long_epoch_name, short_epoch_name, global_epoch_name]]
+            # short_laps.n_epochs: 40, n_long_laps.n_epochs: 40
+            # short_replays.n_epochs: 6, long_replays.n_epochs: 8
+            if self.debug_print:
+                print(f'\tshort_laps.n_epochs: {short_laps.n_epochs}, n_long_laps.n_epochs: {long_laps.n_epochs}')
+                print(f'\tshort_replays.n_epochs: {short_replays.n_epochs}, long_replays.n_epochs: {long_replays.n_epochs}')
 
 
         was_updated = False
@@ -735,30 +864,34 @@ class BatchSessionCompletionHandler:
         # print(f'common_file_path: {common_file_path}')
         # InstantaneousFiringRatesDataframeAccessor.add_results_to_inst_fr_results_table(curr_active_pipeline, common_file_path, file_mode='a')
 
-        try:
-            print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
-            _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.003) # 3ms, 10ms
-            _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
-            _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
+        _out_inst_fr_comps = None
+        _out_recomputed_inst_fr_comps = None
+        if is_kdiba_session:
+            try:
+                print(f'\t doing specific instantaneous firing rate computation for context: {curr_session_context}...')
+                _out_recomputed_inst_fr_comps = InstantaneousSpikeRateGroupsComputation(instantaneous_time_bin_size_seconds=0.003) # 3ms, 10ms
+                _out_recomputed_inst_fr_comps.compute(curr_active_pipeline=curr_active_pipeline, active_context=curr_active_pipeline.sess.get_context())
+                _out_inst_fr_comps = curr_active_pipeline.global_computation_results.computed_data['long_short_inst_spike_rate_groups']
 
-            if not self.use_multiprocessing:
-                # Only modify self in non-multiprocessing mode (only shows 1 always).
-                self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
-                print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
+                if not self.use_multiprocessing:
+                    # Only modify self in non-multiprocessing mode (only shows 1 always).
+                    self.across_sessions_instantaneous_fr_dict[curr_session_context] = _out_inst_fr_comps # instantaneous firing rates for this session, doesn't work in multiprocessing mode.
+                    print(f'\t\t Now have {len(self.across_sessions_instantaneous_fr_dict)} entries in self.across_sessions_instantaneous_fr_dict!')
 
-            # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
-            # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
-            print(f'\t\t done (success).')
+                # LxC_ReplayDeltaMinus, LxC_ReplayDeltaPlus, SxC_ReplayDeltaMinus, SxC_ReplayDeltaPlus = _out_inst_fr_comps.LxC_ReplayDeltaMinus, _out_inst_fr_comps.LxC_ReplayDeltaPlus, _out_inst_fr_comps.SxC_ReplayDeltaMinus, _out_inst_fr_comps.SxC_ReplayDeltaPlus
+                # LxC_ThetaDeltaMinus, LxC_ThetaDeltaPlus, SxC_ThetaDeltaMinus, SxC_ThetaDeltaPlus = _out_inst_fr_comps.LxC_ThetaDeltaMinus, _out_inst_fr_comps.LxC_ThetaDeltaPlus, _out_inst_fr_comps.SxC_ThetaDeltaMinus, _out_inst_fr_comps.SxC_ThetaDeltaPlus
+                print(f'\t\t done (success).')
 
-        except Exception as e:
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
-            # if self.fail_on_exception:
-            #     raise e.exc
-            _out_inst_fr_comps = None
-            _out_recomputed_inst_fr_comps = None
-            pass
+            except Exception as e:
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f"\t\tWARN: on_complete_success_execution_session: encountered exception {e} while trying to compute the instantaneous firing rates and set self.across_sessions_instantaneous_fr_dict[{curr_session_context}]")
+                # if self.fail_on_exception:
+                #     raise e.exc
+                _out_inst_fr_comps = None
+                _out_recomputed_inst_fr_comps = None
+        else:
+            print(f'\tskipping InstantaneousSpikeRateGroupsComputation for non-kdiba session (format_name: {curr_active_pipeline.active_sess_config.format_name})')
 
         
         # On large ram systems, we can return the whole pipeline? No, because the whole pipeline can't be pickled.
@@ -786,12 +919,10 @@ class BatchSessionCompletionHandler:
             
         print(f'<<< on_complete_success_execution_session(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...): COMPLETED ======')
 
-        return PipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays,
-                                           short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays,
-                                           delta_since_last_compute=delta_since_last_compute,
-                                           outputs_local={'pkl': curr_active_pipeline.pickle_path},
-                                            outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path},
-                                            across_session_results={'inst_fr_comps': _out_inst_fr_comps, 'recomputed_inst_fr_comps': _out_recomputed_inst_fr_comps, **across_session_results_extended_dict})
+        common_completion_result_kwargs = dict(delta_since_last_compute=delta_since_last_compute, outputs_local={'pkl': curr_active_pipeline.pickle_path}, outputs_global={'pkl': curr_active_pipeline.global_computation_results_pickle_path, 'hdf5': hdf5_output_path}, across_session_results={'inst_fr_comps': _out_inst_fr_comps, 'recomputed_inst_fr_comps': _out_recomputed_inst_fr_comps, **across_session_results_extended_dict})
+        if is_kdiba_session:
+            return KDibaPipelineCompletionResult(long_epoch_name=long_epoch_name, long_laps=long_laps, long_replays=long_replays, short_epoch_name=short_epoch_name, short_laps=short_laps, short_replays=short_replays, **common_completion_result_kwargs)
+        return PipelineCompletionResult(**common_completion_result_kwargs)
 
 
 

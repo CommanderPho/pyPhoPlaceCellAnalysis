@@ -179,39 +179,26 @@ class CustomDockDisplayConfig(DockDisplayConfig):
     
             return fg_color, bg_color, border_color
     
+
     @classmethod
-    def build_custom_get_colors_fn(cls, bg_color: str = '#44aa44', border_color: str = '#339933', fg_color: str = '#aaa'):
-            """ Builds the custom callback function from some colors:
-            
-            self.custom_get_colors_callback = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
-            
-            """
-            def _subfn_custom_get_colors(self, orientation, is_dim):
-                """ captures: bg_color, border_color, fg_color 
-                """
-                if self.custom_get_colors_callback is not None:
-                    # Use the custom function instead
-                    return self.custom_get_colors_callback(orientation, is_dim)
+    def build_custom_get_colors_fn(cls, bg_color: str = '#44aa44', border_color: str = '#339933', fg_color: str = '#aaa') -> Callable:
+        """Builds a valid custom callback function from fixed colors.
+        
+        Usage:
+            custom_get_colors_callback_fn = CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color='#44aa44', border_color='#339933')
+        """
+        base_bg_color = bg_color
+        base_border_color = border_color
+        base_fg_color = fg_color
 
-                else:
-                    # Common to all:
-                    if is_dim:
-                        fg_color = fg_color or '#aaa' # Grey
-                    else:
-                        fg_color = fg_color or '#fff' # White
-                    
-                    # Green-based by default, but custom-color if provided:
-                    if is_dim:
-                        bg_color = bg_color or '#44aa44' # (120°, 60%, 67%)
-                        border_color = border_color or '#339933' # (120°, 67%, 60%)
-                    else:
-                        bg_color = bg_color or '#66cc66' # (120°, 50, 80)
-                        border_color = border_color or '#54ba54' # (120°, 55%, 73%)
-                        
-                    return fg_color, bg_color, border_color
+        def _subfn_custom_get_colors(orientation, is_dim):
+            """Captures: base_bg_color, base_border_color, base_fg_color."""
+            resolved_fg_color = (base_fg_color or '#aaa') if is_dim else (base_fg_color or '#fff')
+            resolved_bg_color = (base_bg_color or '#44aa44') if is_dim else (base_bg_color or '#66cc66')
+            resolved_border_color = (base_border_color or '#339933') if is_dim else (base_border_color or '#54ba54')
+            return resolved_fg_color, resolved_bg_color, resolved_border_color
 
-            ## end def _subfn_custom_get_colors(...)
-            return _subfn_custom_get_colors
+        return _subfn_custom_get_colors
     
 
     # def get_stylesheet(self, orientation, is_dim):
@@ -359,6 +346,7 @@ class CustomCyclicColorsDockDisplayConfig(CustomDockDisplayConfig):
                     raise NotImplementedError
             # END else:
             return fg_color, bg_color, border_color
+
 
 @define(slots=False)
 class FigureWidgetDockDisplayConfig(CustomDockDisplayConfig):

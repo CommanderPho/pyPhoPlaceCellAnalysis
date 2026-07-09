@@ -5,7 +5,7 @@ from collections import OrderedDict
 import copy
 from typing import Optional, Dict, List, Tuple, Callable
 from attrs import define, field, Factory
-from neuropy.core.user_annotations import function_attributes, metadata_attributes
+# from neuropy.core.user_annotations import function_attributes, metadata_attributes
 from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch, EpochHelpers
 import numpy as np
 import pandas as pd

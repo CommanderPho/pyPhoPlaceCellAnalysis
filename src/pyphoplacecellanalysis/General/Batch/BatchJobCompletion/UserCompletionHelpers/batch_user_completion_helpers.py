@@ -3436,6 +3436,859 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
     return across_session_results_extended_dict
 
 
+# ==================================================================================================================== #
+# Bapun Train-Test Decoder Error                                                                                       #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'context-decoding', 'CSV', 'error'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'], used_by=[], creation_date='2026-06-19 12:00', related_items=['figures_plot_bapun_train_test_decoder_error_distance_completion_function', 'evaluate_bapun_context_decoder_performance', 'BapunContextDecoderPerformanceResult'])
+def compute_and_export_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, save_csv: bool = True, evaluate_context_decoder: bool = True, debug_print: bool = False) -> dict:
+    """Computes Bapun train/test lap decoder error and two-maze context decoder performance; exports CSVs to collected_outputs.
+
+    Train/test position decoding and context decoder evaluation each run in separate try/except blocks.
+    Context decoder failures are logged and stored in ``context_decoder_error`` but never re-raised,
+    even when ``self.fail_on_exception`` is True.
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_bapun_train_test_decoder_error_distance_completion_function
+
+    callback_outputs = across_session_results_extended_dict['compute_and_export_bapun_train_test_decoder_error_distance_completion_function']
+    test_err_agg_df = callback_outputs['test_err_agg_df']
+    context_decoder_overall_percent_correct = callback_outputs['context_decoder_overall_percent_correct']
+    context_decoder_combined_laps_df = callback_outputs['context_decoder_combined_laps_df']
+    """
+    import sys
+    from typing import Dict, Optional, List
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance, _resolve_maze_epoch_names_for_multi_context_eval
+
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
+        print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_export_bapun_train_test_decoder_error_distance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    resolved_maze_epoch_names: Optional[List[str]] = maze_epoch_names
+    if resolved_maze_epoch_names is None:
+        try:
+            resolved_maze_epoch_names = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+        except ValueError as resolve_err:
+            resolved_maze_epoch_names = None
+            if debug_print:
+                print(f'WARN: could not resolve maze_epoch_names: {resolve_err}')
+
+    callback_outputs = {'test_err_agg_df': None, 'test_err_df_csv_path': None, 'test_err_agg_csv_path': None, 'training_data_portion': training_data_portion, 'laps_decoding_time_bin_size': laps_decoding_time_bin_size, 'use_clusterless_decoders': use_clusterless_decoders, 'context_decoder_evaluated': False, 'context_decoder_maze_epoch_names': None, 'context_decoder_overall_percent_correct': None, 'context_decoder_per_maze_percent_correct': None, 'context_decoder_combined_laps_df': None, 'context_decoder_summary_agg_df': None, 'context_decoder_laps_csv_path': None, 'context_decoder_summary_agg_csv_path': None, 'context_decoder_skip_reason': None, 'context_decoder_error': None}
+    err = None
+
+    try:
+        test_err_agg_df, test_err_df, test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+
+        callback_outputs['test_err_agg_df'] = test_err_agg_df
+        callback_outputs['test_decode_results_keys'] = list(test_decode_results.keys())
+
+        if save_csv:
+            test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_train_test_decoder_error.csv').resolve()
+            test_err_agg_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_train_test_decoder_error_agg.csv').resolve()
+            test_err_df.to_csv(test_err_df_csv_path, index=False)
+            test_err_agg_df.to_csv(test_err_agg_csv_path, index=False)
+            callback_outputs['test_err_df_csv_path'] = test_err_df_csv_path
+            callback_outputs['test_err_agg_csv_path'] = test_err_agg_csv_path
+            print(f'\tsaved test_err_df CSV: "{test_err_df_csv_path}"')
+            print(f'\tsaved test_err_agg_df CSV: "{test_err_agg_csv_path}"')
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f"ERROR: compute_and_export_bapun_train_test_decoder_error_distance_completion_function train/test decoder error encountered exception {err}")
+        if self.fail_on_exception:
+            raise err.exc
+
+    if evaluate_context_decoder:
+        try:
+            if resolved_maze_epoch_names is None or len(resolved_maze_epoch_names) < 2:
+                callback_outputs['context_decoder_skip_reason'] = f'need at least 2 maze_epoch_names with pf2D_Decoder, got {resolved_maze_epoch_names}'
+                print(f'WARN: context decoder evaluation skipped for {curr_session_context}: {callback_outputs["context_decoder_skip_reason"]}')
+            else:
+                context_result = evaluate_bapun_context_decoder_performance(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=resolved_maze_epoch_names, laps_decoding_time_bin_size=laps_decoding_time_bin_size, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+                context_decoder_per_maze_percent_correct: Dict[str, float] = {maze_name: correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly for maze_name, correctness in context_result.per_maze_context_correctness.items()}
+                context_decoder_summary_rows: List[dict] = []
+                for maze_name, correctness in context_result.per_maze_context_correctness.items():
+                    n_laps = len(context_result.per_maze_laps_marginals_df[maze_name])
+                    pct = correctness.percent_correct_tuple.percent_laps_track_identity_estimated_correctly
+                    context_decoder_summary_rows.append({'maze': maze_name, 'n_laps': n_laps, 'percent_context_correct': pct, 'n_correct': int(round(pct * n_laps))})
+                n_total_laps = len(context_result.combined_laps_df)
+                n_total_correct = int(context_result.combined_laps_df['is_context_correct'].sum())
+                context_decoder_summary_rows.append({'maze': 'OVERALL', 'n_laps': n_total_laps, 'percent_context_correct': context_result.overall_percent_correct, 'n_correct': n_total_correct})
+                context_decoder_summary_agg_df = pd.DataFrame(context_decoder_summary_rows)
+
+                callback_outputs['context_decoder_evaluated'] = True
+                callback_outputs['context_decoder_maze_epoch_names'] = list(resolved_maze_epoch_names)
+                callback_outputs['context_decoder_overall_percent_correct'] = context_result.overall_percent_correct
+                callback_outputs['context_decoder_per_maze_percent_correct'] = context_decoder_per_maze_percent_correct
+                callback_outputs['context_decoder_combined_laps_df'] = context_result.combined_laps_df
+                callback_outputs['context_decoder_summary_agg_df'] = context_decoder_summary_agg_df
+
+                print(f'\tOverall context-correct: {context_result.overall_percent_correct:.1%}')
+                for maze_name, pct in context_decoder_per_maze_percent_correct.items():
+                    print(f'\t  {maze_name}: {pct:.1%}')
+
+                if save_csv:
+                    context_decoder_laps_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_context_decoder_laps.csv').resolve()
+                    context_decoder_summary_agg_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_context_decoder_summary_agg.csv').resolve()
+                    context_result.combined_laps_df.to_csv(context_decoder_laps_csv_path, index=False)
+                    context_decoder_summary_agg_df.to_csv(context_decoder_summary_agg_csv_path, index=False)
+                    callback_outputs['context_decoder_laps_csv_path'] = context_decoder_laps_csv_path
+                    callback_outputs['context_decoder_summary_agg_csv_path'] = context_decoder_summary_agg_csv_path
+                    print(f'\tsaved context_decoder combined_laps_df CSV: "{context_decoder_laps_csv_path}"')
+                    print(f'\tsaved context_decoder summary_agg_df CSV: "{context_decoder_summary_agg_csv_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            context_err = CapturedException(e, exception_info)
+            callback_outputs['context_decoder_error'] = context_err
+            print(f"WARN: context decoder evaluation failed independently of train/test position decoding for {curr_session_context}: {context_err}")
+
+    across_session_results_extended_dict['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-19 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def figures_plot_bapun_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = None, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun train/test decoder squared-error scatter figure. Loads prior CSV export when available."""
+    import pandas as pd
+    from typing import Optional, List
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
+        print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_bapun_train_test_decoder_error_distance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    callback_outputs = {'figure_output_paths': [], 'use_clusterless_decoders': use_clusterless_decoders}
+    prior_compute_outputs = across_session_results_extended_dict.get('compute_and_export_bapun_train_test_decoder_error_distance_completion_function', {})
+    test_err_df_csv_path = prior_compute_outputs.get('test_err_df_csv_path', None)
+    if test_err_df_csv_path is None:
+        test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_bapun_train_test_decoder_error.csv').resolve()
+
+    if test_err_df_csv_path.exists() and not force_recompute:
+        test_err_df = pd.read_csv(test_err_df_csv_path)
+        print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
+    elif force_recompute or not test_err_df_csv_path.exists():
+        print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+    else:
+        print(f'WARN: test_err_df CSV not found at "{test_err_df_csv_path}" and force_recompute=False; skipping figure export.')
+        across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
+        print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        return across_session_results_extended_dict
+
+    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos')
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    display_context = curr_active_pipeline.build_display_context_for_session(f'test_decoded_measured_{y_col_name}')
+    figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+    callback_outputs['figure_output_paths'].extend(figure_output_paths)
+    print(f'\tfigure_output_paths: {figure_output_paths}')
+
+    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D')
+        figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
+        print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
+
+    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D')
+        figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
+        print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
+
+    across_session_results_extended_dict['figures_plot_bapun_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+# ==================================================================================================================== #
+# NWB W-maze Manual Pipeline Recomputations                                                                            #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'recompute', 'directional-decoders', 'non-kdiba', 'pbe', 'replay', '2D-decode', 'export'], input_requires=[], output_provides=[], uses=['final_process_bapun_all_comps', 'directional_decoders_decode_continuous', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'DecodeSpecificEpochsResultWithDecodingInfo', 'PosteriorExporting'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function', 'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function'])
+def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        active_data_mode_name: Optional[str] = None, posthoc_save: bool = False, final_process_time_bin_size: float = 0.500, overwrite_extant: bool = True, directional_decode_time_bin_size: float = 0.250, should_disable_cache: bool = False, fail_on_exception: bool = True, debug_print: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, export_pbe_replay_decoding: bool = True, export_pkl: bool = True, export_hdf: bool = True) -> dict:
+    """Runs NWB W-maze manual recomputations: final_process, continuous directional decode, PBE/replay 2D decode+export, and failed-computation retry.
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function
+
+    callback_outputs = across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
+    failed_computations_summary = callback_outputs['failed_computations_summary']
+    n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
+    pbe_pkl_path = callback_outputs['pbe_pkl_path']
+    replay_hdf_path = callback_outputs['replay_hdf_path']
+
+
+    Example Full Run from Notebook:
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import recompute_nwb_wmaze_pipeline_computations_completion_function, SimpleBatchComputationDummy
+
+        a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
+
+        _across_session_results_extended_dict = {}
+        _across_session_results_extended_dict = _across_session_results_extended_dict | recompute_nwb_wmaze_pipeline_computations_completion_function(a_dummy, None,
+                                                        curr_session_context=curr_active_pipeline.get_session_context(), curr_session_basedir=curr_active_pipeline.sess.basepath.resolve(), curr_active_pipeline=curr_active_pipeline,
+                                                        across_session_results_extended_dict=_across_session_results_extended_dict,
+                                                        # time_bin_size = 0.500,
+                                                        )
+
+        callback_outputs = _across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function']
+        failed_computations_summary = callback_outputs['failed_computations_summary']
+        n_failed_computation_contexts = callback_outputs['n_failed_computation_contexts']
+
+
+
+    """
+    import sys
+    from pathlib import Path
+    from typing import Dict, Optional
+    from neuropy.core.epoch import ensure_dataframe, ensure_Epoch
+    from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import final_process_bapun_all_comps, ensure_nwb_wmaze_pbe_and_replay_epochs, build_contextual_pf2D_decoder, _resolve_maze_epoch_names_for_multi_context_eval, DecodeSpecificEpochsResultWithDecodingInfo
+    from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name != 'dandi_nwb':
+        print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    resolved_active_data_mode_name: str = active_data_mode_name or session_format_name or 'dandi_nwb'
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'recompute_nwb_wmaze_pipeline_computations_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    callback_outputs: dict[str, Any] = {'active_data_mode_name': resolved_active_data_mode_name, 'posthoc_save': posthoc_save, 'final_process_time_bin_size': final_process_time_bin_size, 'directional_decode_time_bin_size': directional_decode_time_bin_size, 'pbe_replay_decoding_time_bin_size': pbe_replay_decoding_time_bin_size, 'overwrite_extant': overwrite_extant, 'overwrite_pbe_replay_epochs': overwrite_pbe_replay_epochs, 'export_pbe_replay_decoding': export_pbe_replay_decoding, 'failed_computations_summary': None, 'n_failed_computation_contexts': None, 'recompute_error': None, 'pbe_replay_epochs_summary': None, 'pbe_pkl_path': None, 'replay_pkl_path': None, 'pbe_hdf_path': None, 'replay_hdf_path': None, 'pbe_replay_decode_error': None, 'resolved_maze_epoch_names': None}
+
+    try:
+        curr_active_pipeline = final_process_bapun_all_comps(curr_active_pipeline=curr_active_pipeline, active_data_mode_name=resolved_active_data_mode_name, posthoc_save=posthoc_save, time_bin_size=final_process_time_bin_size, overwrite_extant=overwrite_extant, fail_on_exception=fail_on_exception)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': directional_decode_time_bin_size, 'should_disable_cache': should_disable_cache}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=debug_print)
+
+        try:
+            pbe_replay_epochs_summary: dict = ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline=curr_active_pipeline, overwrite_extant=overwrite_pbe_replay_epochs)
+            callback_outputs['pbe_replay_epochs_summary'] = deepcopy(pbe_replay_epochs_summary)
+
+            if export_pbe_replay_decoding:
+                resolved_maze_epoch_names: list = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+                callback_outputs['resolved_maze_epoch_names'] = list(resolved_maze_epoch_names)
+                _pf2D_Decoder_dict, _contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=resolved_maze_epoch_names)
+                global_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+                pbes = deepcopy(curr_active_pipeline.sess.pbe)
+                replays = deepcopy(curr_active_pipeline.sess.replay)
+
+                pbe_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='pbe'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(pbes), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+                replay_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='replay'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(replays), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+
+                assert self.collected_outputs_path.exists()
+                curr_session_name: str = curr_active_pipeline.session_name
+                CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+
+                if export_pkl:
+                    pbe_pkl_path: Path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_pbe_2d_decoded_result.pkl').resolve()
+                    replay_pkl_path: Path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_replay_2d_decoded_result.pkl').resolve()
+                    pbe_full_result.save(pkl_output_path=pbe_pkl_path)
+                    replay_full_result.save(pkl_output_path=replay_pkl_path)
+                    callback_outputs['pbe_pkl_path'] = pbe_pkl_path
+                    callback_outputs['replay_pkl_path'] = replay_pkl_path
+                    print(f'\tsaved pbe_full_result PKL: "{pbe_pkl_path}"')
+                    print(f'\tsaved replay_full_result PKL: "{replay_pkl_path}"')
+
+                if export_hdf:
+                    _complete_session_context, (session_context, _additional_session_context) = curr_active_pipeline.get_complete_session_context()
+                    _, _, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+                    custom_params_hdf_key: str = custom_suffix.strip('_')
+                    _parent_save_context: DisplaySpecifyingIdentifyingContext = deepcopy(session_context).overwriting_context(custom_suffix=custom_params_hdf_key, display_fn_name='save_decoded_posteriors_to_HDF5')
+                    _parent_save_context.display_dict = {'custom_suffix': lambda k, v: f"{v}", 'display_fn_name': lambda k, v: f"{v}"}
+
+                    pbe_hdf_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(pbe_decoded_posteriors)', a_tbin_size=pbe_replay_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+                    _pbe_out_contexts, _pbe_hdf_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict={'contextual_pf2D': pbe_full_result.decoder_result}, decoder_ripple_filter_epochs_decoder_result_dict=None, _save_context=_parent_save_context.get_raw_identifying_context(), save_path=pbe_hdf_path, should_overwrite_extant_file=True)
+                    callback_outputs['pbe_hdf_path'] = pbe_hdf_path
+                    print(f'\tsaved pbe decoded posteriors HDF: "{pbe_hdf_path}"')
+
+                    replay_hdf_path: Path = PosteriorExporting.build_custom_export_to_h5_path(curr_active_pipeline, output_date_str=self.BATCH_DATE_TO_USE, data_identifier_str='(replay_decoded_posteriors)', a_tbin_size=pbe_replay_decoding_time_bin_size, parent_output_path=self.collected_outputs_path.resolve())
+                    _replay_out_contexts, _replay_hdf_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None, decoder_ripple_filter_epochs_decoder_result_dict={'contextual_pf2D': replay_full_result.decoder_result}, _save_context=_parent_save_context.get_raw_identifying_context(), save_path=replay_hdf_path, should_overwrite_extant_file=True)
+                    callback_outputs['replay_hdf_path'] = replay_hdf_path
+                    print(f'\tsaved replay decoded posteriors HDF: "{replay_hdf_path}"')
+
+        except Exception as e:
+            exception_info = sys.exc_info()
+            pbe_replay_err = CapturedException(e, exception_info)
+            callback_outputs['pbe_replay_decode_error'] = pbe_replay_err
+            print(f"WARN: recompute_nwb_wmaze_pipeline_computations_completion_function PBE/replay 2D decode/export failed: {pbe_replay_err}")
+            if fail_on_exception:
+                raise pbe_replay_err.exc
+
+        curr_active_pipeline.rerun_failed_computations(fail_on_exception=fail_on_exception)
+        failed_computations = curr_active_pipeline.get_failed_computations()
+        failed_computations_summary: Dict[str, Dict[str, str]] = {str(filter_context_name): {str(computation_name): str(captured_exc) for computation_name, captured_exc in computation_exceptions_dict.items()} for filter_context_name, computation_exceptions_dict in failed_computations.items()}
+        callback_outputs['failed_computations_summary'] = failed_computations_summary
+        callback_outputs['n_failed_computation_contexts'] = len(failed_computations_summary)
+        if len(failed_computations_summary) > 0:
+            print(f'WARN: recompute_nwb_wmaze_pipeline_computations_completion_function: {len(failed_computations_summary)} filter context(s) still have failed computations: {failed_computations_summary}')
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        callback_outputs['recompute_error'] = err
+        print(f"ERROR: recompute_nwb_wmaze_pipeline_computations_completion_function encountered exception {err}")
+        if self.fail_on_exception:
+            raise err.exc
+
+    across_session_results_extended_dict['recompute_nwb_wmaze_pipeline_computations_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'pbe', 'replay', 'posterior-images', '2D-decode', 'gif', 'spatial-animation'], input_requires=[], output_provides=[], uses=['DecodeSpecificEpochsResultWithDecodingInfo', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_contextual_pf2D_decoder', 'HeatmapExportConfig', 'save_array_as_image', 'AnimatedLoopingPosteriorGraphicsGridViewer', 'AnimationExportMode'], used_by=[], creation_date='2026-07-08 14:30', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
+def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_pbe_posterior_images: bool = True, export_replay_posterior_images: bool = False, export_pbe_spatial_gifs: bool = False, export_replay_spatial_gifs: bool = False, posterior_images_desired_height: int = 1200, spatial_gif_context_reduction: str = 'sum_contexts', spatial_gif_max_epochs: Optional[int] = None, spatial_gif_n_columns: int = 10, spatial_gif_viewer_width: int = 1000, spatial_gif_viewer_height: int = 1098, spatial_gif_frame_duration_ms: int = 50, spatial_gif_render_passes: int = 5, spatial_gif_normalize_global: bool = True, spatial_gif_export_single_grid: bool = True, spatial_gif_export_per_epoch: bool = True, force_redecode: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, debug_print: bool = False) -> dict:
+    """Export W-Maze contextual 2D PBE/replay posterior images and optional spatial animated GIFs.
+
+    PNG exports: per-epoch context x time marginal heatmaps (greyscale_shared_norm + viridis_shared_norm).
+    GIF exports: per-epoch spatial (nx, ny) animations via AnimatedLoopingPosteriorGraphicsGridViewer (4D contextual posteriors are reduced over context first).
+
+    Loads decoded results from prior `recompute_nwb_wmaze_pipeline_computations_completion_function` PKLs when available; otherwise decodes on demand.
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function
+
+    callback_outputs = across_session_results_extended_dict['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function']
+    pbe_posterior_images_parent_folder = callback_outputs['pbe_posterior_images_parent_folder']
+    pbe_spatial_gifs_export_summary = callback_outputs['pbe_spatial_gifs_export_summary']
+    """
+    import os
+    import pickle
+    import sys
+    from pathlib import Path
+    from typing import Optional
+    from neuropy.core.epoch import ensure_dataframe, ensure_Epoch
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphocorehelpers.plotting.media_output_helpers import save_array_as_image, ImagePostRenderFunctionSets
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, HeatmapExportKind
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.posterior2D_animated_grid import AnimatedLoopingPosteriorGraphicsGridViewer, AnimationExportMode
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ensure_nwb_wmaze_pbe_and_replay_epochs, build_contextual_pf2D_decoder, _resolve_maze_epoch_names_for_multi_context_eval, DecodeSpecificEpochsResultWithDecodingInfo
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from pyqtgraph.Qt import QtWidgets
+
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    os.environ.setdefault('QT_OPENGL', 'software')
+
+    def _subfn_build_contextual_pf2D_posterior_image_data(p_x_given_n: np.ndarray) -> np.ndarray:
+        """Marginalize contextual 2D posteriors to (n_contexts, n_time_bins) for heatmap export."""
+        p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
+        if p_x.ndim == 4:
+            img_data: np.ndarray = np.nansum(p_x, axis=(0, 1))
+        elif p_x.ndim == 3:
+            img_data = np.nansum(p_x, axis=(0, 1), keepdims=True)
+        elif p_x.ndim == 2:
+            img_data = p_x
+        else:
+            raise ValueError(f'_subfn_build_contextual_pf2D_posterior_image_data expected 2-4D p_x_given_n, got shape {p_x.shape}')
+        denom: np.ndarray = np.nansum(img_data, axis=0, keepdims=True)
+        return np.divide(img_data, denom, out=np.zeros_like(img_data), where=denom > 0)
+
+
+    def _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', desired_height: int = 1200, custom_export_formats: Optional[Dict] = None) -> dict:
+        """Export per-epoch contextual 2D posterior heatmap images (context x time marginals; mirrors generalized decode export formats)."""
+        parent_output_folder.mkdir(parents=True, exist_ok=True)
+        posterior_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name).resolve()
+        posterior_out_folder.mkdir(parents=True, exist_ok=True)
+        if custom_export_formats is None:
+            custom_export_formats = {'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict)}
+
+        out_custom_formats_dict: dict = {f'{epochs_name}.{decoder_name}': {}}
+        flat_save_out_paths: list = []
+        num_filter_epochs: int = decoded_epochs_result.num_filter_epochs
+        num_required_zero_padding: int = len(str(num_filter_epochs))
+
+        for export_format_name, export_format_config in custom_export_formats.items():
+            export_format_folder: Path = posterior_out_folder.joinpath(export_format_name).resolve()
+            export_format_folder.mkdir(parents=True, exist_ok=True)
+            export_format_config_list: list = []
+            for epoch_idx in np.arange(num_filter_epochs):
+                active_epoch_result = decoded_epochs_result.get_result_for_epoch(active_epoch_idx=epoch_idx)
+                img_data: np.ndarray = _subfn_build_contextual_pf2D_posterior_image_data(active_epoch_result.p_x_given_n)
+                curr_epoch_info_dict = active_epoch_result.epoch_info_tuple._asdict()
+                active_epoch_id = curr_epoch_info_dict.get('label', epoch_idx)
+                complete_epoch_identifier_str: str = f"p_x_given_n[{int(active_epoch_id):0{num_required_zero_padding}d}]"
+                out_path: Path = export_format_folder.joinpath(f'{complete_epoch_identifier_str}.png').resolve()
+                export_grayscale: bool = export_format_name.startswith('greyscale')
+                colormap: str = getattr(export_format_config, 'colormap', 'viridis')
+                vmin = getattr(export_format_config, 'vmin', None)
+                vmax = getattr(export_format_config, 'vmax', None)
+                posterior_image, posterior_save_path = save_array_as_image(img_data, desired_height=getattr(export_format_config, 'desired_height', desired_height), export_kind=getattr(export_format_config, 'export_kind', None), out_path=out_path, colormap=colormap, skip_img_normalization=True, export_grayscale=export_grayscale, vmin=vmin, vmax=vmax, allow_override_aspect_ratio=True)
+                export_format_config.posterior_saved_image = posterior_image
+                export_format_config.posterior_saved_path = posterior_save_path
+                export_format_config_list.append(deepcopy(export_format_config))
+                flat_save_out_paths.append(posterior_save_path)
+            out_custom_formats_dict[f'{epochs_name}.{decoder_name}'][export_format_name] = export_format_config_list
+
+        return {'parent_output_folder': parent_output_folder, 'epochs_name': epochs_name, 'decoder_name': decoder_name, 'posterior_out_folder': posterior_out_folder, 'out_custom_formats_dict': out_custom_formats_dict, 'flat_save_out_paths': flat_save_out_paths}
+
+
+    def _subfn_build_spatial_3D_p_x_given_n(p_x_given_n: np.ndarray, context_reduction: str = 'sum_contexts') -> np.ndarray:
+        """Reduce contextual 4D posteriors to spatial 3D (nx, ny, n_time_bins) for animated GIF export."""
+        p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
+        if p_x.ndim == 4:
+            if context_reduction == 'sum_contexts':
+                return np.nansum(p_x, axis=2)
+            if context_reduction == 'most_likely_context':
+                marginal_z: np.ndarray = np.nansum(p_x, axis=(0, 1))
+                denom: np.ndarray = np.nansum(marginal_z, axis=0, keepdims=True)
+                marginal_z = np.divide(marginal_z, denom, out=np.zeros_like(marginal_z), where=denom > 0)
+                most_likely_context_idx: np.ndarray = np.argmax(marginal_z, axis=0)
+                n_x_bins, n_y_bins, _n_contexts, n_t_bins = p_x.shape
+                p_x_spatial: np.ndarray = np.empty((n_x_bins, n_y_bins, n_t_bins), dtype=float)
+                for t_bin_idx, ctxt_idx in enumerate(most_likely_context_idx):
+                    p_x_spatial[:, :, t_bin_idx] = p_x[:, :, int(ctxt_idx), t_bin_idx]
+                return p_x_spatial
+            raise ValueError(f'_subfn_build_spatial_3D_p_x_given_n unsupported context_reduction={context_reduction!r}; expected sum_contexts or most_likely_context')
+        if p_x.ndim == 3:
+            return p_x
+        raise ValueError(f'_subfn_build_spatial_3D_p_x_given_n expected 3-4D p_x_given_n, got shape {p_x.shape}')
+
+
+    def _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result: DecodedFilterEpochsResult, context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None) -> DecodedFilterEpochsResult:
+        """Build a DecodedFilterEpochsResult with spatial 3D p_x_given_n_list suitable for AnimatedLoopingPosteriorGraphicsGridViewer."""
+        n_epochs: int = int(decoded_epochs_result.num_filter_epochs)
+        if max_epochs is not None:
+            n_epochs = min(int(max_epochs), n_epochs)
+        decoded_for_gif: DecodedFilterEpochsResult = deepcopy(decoded_epochs_result)
+        decoded_for_gif.p_x_given_n_list = [_subfn_build_spatial_3D_p_x_given_n(decoded_epochs_result.p_x_given_n_list[epoch_idx], context_reduction=context_reduction) for epoch_idx in np.arange(n_epochs)]
+        if n_epochs < decoded_epochs_result.num_filter_epochs:
+            per_epoch_field_names: list[str] = ['most_likely_positions_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'spkcount', 'time_bin_containers', 'time_bin_edges']
+            for field_name in per_epoch_field_names:
+                field_value = getattr(decoded_for_gif, field_name, None)
+                if field_value is not None:
+                    setattr(decoded_for_gif, field_name, field_value[:n_epochs])
+            decoded_for_gif.nbins = decoded_epochs_result.nbins[:n_epochs]
+            decoded_for_gif.filter_epochs = ensure_dataframe(decoded_epochs_result.filter_epochs).iloc[:n_epochs].copy()
+            decoded_for_gif.num_filter_epochs = n_epochs
+            if decoded_for_gif.epoch_description_list:
+                decoded_for_gif.epoch_description_list = decoded_for_gif.epoch_description_list[:n_epochs]
+        return decoded_for_gif
+
+
+    def _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result: DecodedFilterEpochsResult, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None, n_columns: int = 10, viewer_width: int = 1000, viewer_height: int = 1098, frame_duration_ms: int = 50, render_passes: int = 5, normalize_global: bool = True, export_single_grid: bool = True, export_per_epoch: bool = True) -> dict:
+        """Export spatial (nx, ny) animated GIFs for contextual 2D decoded epochs."""
+        parent_output_folder.mkdir(parents=True, exist_ok=True)
+        spatial_gif_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name, 'spatial_gifs').resolve()
+        spatial_gif_out_folder.mkdir(parents=True, exist_ok=True)
+        decoded_for_gif: DecodedFilterEpochsResult = _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result=decoded_epochs_result, context_reduction=context_reduction, max_epochs=max_epochs)
+        pg.mkQApp(f'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function - {epochs_name} spatial gifs')
+        viewer: AnimatedLoopingPosteriorGraphicsGridViewer = AnimatedLoopingPosteriorGraphicsGridViewer(decoded_for_gif, n_columns=n_columns)
+        viewer.resize(viewer_width, viewer_height)
+        viewer.show()
+        QtWidgets.QApplication.processEvents()
+        export_summary: dict = {'parent_output_folder': parent_output_folder, 'epochs_name': epochs_name, 'decoder_name': decoder_name, 'spatial_gif_out_folder': spatial_gif_out_folder, 'context_reduction': context_reduction, 'n_epochs_exported': decoded_for_gif.num_filter_epochs, 'single_grid_gif_path': None, 'per_epoch_gif_folder': None, 'per_epoch_gif_paths': []}
+        if export_single_grid:
+            single_grid_gif_path: Path = spatial_gif_out_folder.joinpath(f'{epochs_name}_spatial_single_grid.gif').resolve()
+            viewer.export_grid_as_gif(output_path=single_grid_gif_path, frame_duration_ms=frame_duration_ms, render_passes=render_passes, mode=AnimationExportMode.single_image, normalize_global=normalize_global)
+            export_summary['single_grid_gif_path'] = single_grid_gif_path
+        if export_per_epoch:
+            per_epoch_gif_folder: Path = spatial_gif_out_folder.joinpath('per_epoch').resolve()
+            per_epoch_gif_folder.mkdir(parents=True, exist_ok=True)
+            per_epoch_gif_paths: list = viewer.export_grid_as_gif(output_path=per_epoch_gif_folder, frame_duration_ms=frame_duration_ms, render_passes=render_passes, mode=AnimationExportMode.separate_images, normalize_global=normalize_global)
+            export_summary['per_epoch_gif_folder'] = per_epoch_gif_folder
+            export_summary['per_epoch_gif_paths'] = list(per_epoch_gif_paths)
+        return export_summary
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name != 'dandi_nwb':
+        print(f'WARN: figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    prior_recompute_outputs: dict = across_session_results_extended_dict.get('recompute_nwb_wmaze_pipeline_computations_completion_function', {})
+    pbe_pkl_path: Optional[Path] = prior_recompute_outputs.get('pbe_pkl_path', None)
+    replay_pkl_path: Optional[Path] = prior_recompute_outputs.get('replay_pkl_path', None)
+    if pbe_pkl_path is None:
+        pbe_pkl_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_pbe_2d_decoded_result.pkl').resolve()
+    if replay_pkl_path is None:
+        replay_pkl_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_replay_2d_decoded_result.pkl').resolve()
+
+    callback_outputs: dict[str, Any] = {'pbe_pkl_path': pbe_pkl_path, 'replay_pkl_path': replay_pkl_path, 'pbe_posterior_images_parent_folder': None, 'pbe_posterior_images_export_summary': None, 'replay_posterior_images_export_summary': None, 'pbe_spatial_gifs_export_summary': None, 'replay_spatial_gifs_export_summary': None, 'posterior_images_error': None}
+
+    try:
+        pbe_full_result: Optional[DecodeSpecificEpochsResultWithDecodingInfo] = None
+        replay_full_result: Optional[DecodeSpecificEpochsResultWithDecodingInfo] = None
+        needs_pbe_decode: bool = export_pbe_posterior_images or export_pbe_spatial_gifs
+        needs_replay_decode: bool = export_replay_posterior_images or export_replay_spatial_gifs
+        if (not force_redecode) and needs_pbe_decode and pbe_pkl_path.exists():
+            with open(pbe_pkl_path, 'rb') as f:
+                pbe_full_result = pickle.load(f)
+            print(f'\tloaded pbe_full_result PKL: "{pbe_pkl_path}"')
+        if (not force_redecode) and needs_replay_decode and replay_pkl_path.exists():
+            with open(replay_pkl_path, 'rb') as f:
+                replay_full_result = pickle.load(f)
+            print(f'\tloaded replay_full_result PKL: "{replay_pkl_path}"')
+
+        if force_redecode or ((needs_pbe_decode and pbe_full_result is None) or (needs_replay_decode and replay_full_result is None)):
+            ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline=curr_active_pipeline, overwrite_extant=overwrite_pbe_replay_epochs)
+            resolved_maze_epoch_names: list = _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline=curr_active_pipeline, maze_epoch_names=None, debug_print=debug_print)
+            _pf2D_Decoder_dict, _contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=resolved_maze_epoch_names)
+            global_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+            if needs_pbe_decode and pbe_full_result is None:
+                pbe_full_result = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='pbe'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(deepcopy(curr_active_pipeline.sess.pbe)), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+            if needs_replay_decode and replay_full_result is None:
+                replay_full_result = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='replay'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay)), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+
+        pbe_posterior_images_parent_folder: Path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_pbe_replay_posterior_images').resolve()
+        callback_outputs['pbe_posterior_images_parent_folder'] = pbe_posterior_images_parent_folder
+
+        if export_pbe_posterior_images:
+            assert pbe_full_result is not None, f'PBE decode result missing (pbe_pkl_path exists={pbe_pkl_path.exists()}, force_redecode={force_redecode})'
+            pbe_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', desired_height=posterior_images_desired_height)
+            callback_outputs['pbe_posterior_images_export_summary'] = deepcopy(pbe_posterior_images_export_summary)
+            print(f'\tsaved pbe posterior images: "{pbe_posterior_images_export_summary["posterior_out_folder"]}"')
+
+        if export_replay_posterior_images:
+            assert replay_full_result is not None, f'replay decode result missing (replay_pkl_path exists={replay_pkl_path.exists()}, force_redecode={force_redecode})'
+            replay_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', desired_height=posterior_images_desired_height)
+            callback_outputs['replay_posterior_images_export_summary'] = deepcopy(replay_posterior_images_export_summary)
+            print(f'\tsaved replay posterior images: "{replay_posterior_images_export_summary["posterior_out_folder"]}"')
+
+        if export_pbe_spatial_gifs:
+            assert pbe_full_result is not None, f'PBE decode result missing for spatial GIF export (pbe_pkl_path exists={pbe_pkl_path.exists()}, force_redecode={force_redecode})'
+            pbe_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch)
+            callback_outputs['pbe_spatial_gifs_export_summary'] = deepcopy(pbe_spatial_gifs_export_summary)
+            print(f'\tsaved pbe spatial GIFs: "{pbe_spatial_gifs_export_summary["spatial_gif_out_folder"]}"')
+
+        if export_replay_spatial_gifs:
+            assert replay_full_result is not None, f'replay decode result missing for spatial GIF export (replay_pkl_path exists={replay_pkl_path.exists()}, force_redecode={force_redecode})'
+            replay_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch)
+            callback_outputs['replay_spatial_gifs_export_summary'] = deepcopy(replay_spatial_gifs_export_summary)
+            print(f'\tsaved replay spatial GIFs: "{replay_spatial_gifs_export_summary["spatial_gif_out_folder"]}"')
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        posterior_images_err = CapturedException(e, exception_info)
+        callback_outputs['posterior_images_error'] = posterior_images_err
+        print(f"WARN: figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function failed: {posterior_images_err}")
+        if self.fail_on_exception:
+            raise posterior_images_err.exc
+
+    across_session_results_extended_dict['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+# ==================================================================================================================== #
+# NWB W-maze Display/Figures Export                                                                                    #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['dandi_nwb', 'nwb', 'wmaze', 'figure', 'batch', 'timeline'], input_requires=['DirectionalDecodersDecoded'], output_provides=[], uses=['programmatic_render_to_file', 'Spike3DRasterWindowWidget', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand', 'build_proper_epoch_intervals'], used_by=[], creation_date='2026-06-30 12:00', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function'])
+def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = True, laps_decoding_time_bin_size: float = 0.250, included_track_dock_identifiers: Optional[List[str]] = None, debug_print: bool = False, fail_on_exception_for_debugging: bool = False, skip_widget_required_plots: bool=False) -> dict:
+    """Exports NWB W-maze placefield figures and spike-raster timeline PDF (with context-decoder marginal track)."""
+    import os
+    from typing import Optional, List
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    os.environ.setdefault('QT_OPENGL', 'software')
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, programmatic_render_to_file, FigureToImageHelpers
+    from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
+    from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+    from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_proper_epoch_intervals
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDecodedEpochMarginal_MatplotlibPlotCommand, decoding_continuous_cache_key
+    from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete, configure_pyqtgraph_for_unattended_rendering
+    import io
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib import gridspec
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+
+
+    def _subfn_render_display_fn_to_image(curr_active_pipeline, display_fn_name: str, a_filtered_context, capture_dpi: float = 200.0, debug_print: bool = False, **display_kwargs):
+        rendered_image = None
+        with plt.ioff():
+            out_display_var = curr_active_pipeline.display(display_fn_name, a_filtered_context, **display_kwargs)
+            out_figures = getattr(out_display_var, 'figures', None)
+            if out_figures is not None and len(out_figures) > 0:
+                active_fig = out_figures[0]
+            else:
+                active_fig = plt.gcf()
+
+            if active_fig is None:
+                if debug_print:
+                    print(f'WARN: no figure found for display_fn `{display_fn_name}` in context `{a_filtered_context}`.')
+                return None
+
+            buffer = io.BytesIO()
+            active_fig.savefig(buffer, format='png', dpi=capture_dpi, bbox_inches='tight')
+            buffer.seek(0)
+            rendered_image = np.asarray(plt.imread(buffer))
+            buffer.close()
+            plt.close(active_fig)
+            plt.close('all')
+
+        return rendered_image
+
+
+    def _subfn_build_composite_maze_occupancy_placefields_figure(curr_active_pipeline, subset_includelist, occupancy_display_kwargs: dict, ratemaps_display_kwargs: dict, fig_man, write_png: bool, write_vector_format: bool, debug_print: bool = False):
+        candidate_filtered_items = list(curr_active_pipeline.filtered_contexts.items())
+        if subset_includelist is not None:
+            subset_names = set(subset_includelist)
+            selected_filtered_items = [(filter_name, a_filtered_context) for filter_name, a_filtered_context in candidate_filtered_items if filter_name in subset_names]
+        else:
+            selected_filtered_items = list(candidate_filtered_items)
+
+        selected_filtered_items = [(filter_name, a_filtered_context) for filter_name, a_filtered_context in selected_filtered_items if (filter_name != 'maze_GLOBAL')]
+        if len(selected_filtered_items) == 0:
+            if len(candidate_filtered_items) == 0:
+                print(f'WARN: _subfn_build_composite_maze_occupancy_placefields_figure found no filtered contexts.')
+                return []
+            selected_filtered_items = list(candidate_filtered_items)
+            print(f'WARN: composite figure fallback using all filtered contexts: {[k for k, _ in selected_filtered_items]}')
+
+        occupancy_images = []
+        placefield_images = []
+        column_labels = []
+        for filter_name, a_filtered_context in selected_filtered_items:
+            try:
+                occupancy_img = _subfn_render_display_fn_to_image(curr_active_pipeline, '_display_2d_placefield_occupancy', a_filtered_context, debug_print=debug_print, **occupancy_display_kwargs)
+                placefield_img = _subfn_render_display_fn_to_image(curr_active_pipeline, '_display_2d_placefield_result_plot_ratemaps_2D', a_filtered_context, debug_print=debug_print, **ratemaps_display_kwargs)
+            except Exception as e:
+                print(f'WARN: composite figure render failed for context `{filter_name}`: {e}')
+                continue
+
+            if placefield_img is None:
+                print(f'WARN: skipping composite column `{filter_name}` due to missing placefield image.')
+                continue
+            if occupancy_img is None:
+                print(f'WARN: occupancy image missing for `{filter_name}`, using placefield image as placeholder.')
+                occupancy_img = placefield_img
+
+            occupancy_images.append(occupancy_img)
+            placefield_images.append(placefield_img)
+            column_labels.append(str(filter_name))
+
+        n_columns = len(column_labels)
+        if n_columns == 0:
+            print(f'WARN: no columns rendered for composite occupancy/placefield figure.')
+            return []
+
+        composite_fig = plt.figure(figsize=(max(4.0 * float(n_columns), 8.0), 8.0), constrained_layout=True)
+        composite_grid = gridspec.GridSpec(2, n_columns, figure=composite_fig, hspace=0.02, wspace=0.02)
+        for col_idx in range(n_columns):
+            ax_occ = composite_fig.add_subplot(composite_grid[0, col_idx])
+            ax_occ.imshow(occupancy_images[col_idx])
+            ax_occ.axis('off')
+            ax_occ.set_title(column_labels[col_idx], fontsize=10)
+            if col_idx == 0:
+                ax_occ.set_ylabel('Occupancy', fontsize=10)
+
+            ax_pf = composite_fig.add_subplot(composite_grid[1, col_idx])
+            ax_pf.imshow(placefield_images[col_idx])
+            ax_pf.axis('off')
+            ax_pf.set_anchor('N')  # top-align the placefield image within its grid cell
+            if col_idx == 0:
+                ax_pf.set_ylabel('2D Placefields', fontsize=10)
+
+        try:
+            final_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='composite_occupancy_placefields_2D')
+        except Exception:
+            final_context = curr_active_pipeline.get_session_context().adding_context('display_fn', display_fn_name='composite_occupancy_placefields_2D')
+        composite_out_paths, _ = curr_active_pipeline.output_figure(final_context, composite_fig, write_vector_format=write_vector_format, write_png=write_png, override_fig_man=fig_man, debug_print=debug_print)
+        plt.close(composite_fig)
+        return composite_out_paths
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    if getattr(curr_session_context, 'format_name', None) != 'dandi_nwb':
+        print(f'WARN: figures_export_nwb_wmaze_display_completion_function skipped for non-dandi_nwb session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_export_nwb_wmaze_display_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+    CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
+    print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    _batch_figure_kwargs = dict(override_fig_man=custom_fig_man)
+
+    callback_outputs = {'figure_output_paths': [], 'timeline_pdf_path': None, 'export_all_tracks_result': None, 'subset_includelist': None, 'included_track_dock_identifiers': None}
+
+    hardcoded_params = NWBDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    subset_includelist = hardcoded_params.decoder_building_session_names
+    callback_outputs['subset_includelist'] = list(subset_includelist)
+    print(f'\tsubset_includelist: {subset_includelist}')
+
+    display_fn_kwargs = dict(subplots=(None, 9), fig_column_width=None, fig_row_height=1.0, resolution_multiplier=1.0)
+
+    try:
+        curr_active_pipeline.reload_default_display_functions()
+        curr_active_pipeline.prepare_for_display()
+    except Exception as e:
+        print(f'WARN: figures_export_nwb_wmaze_display_completion_function display setup failed: {e}')
+        if self.fail_on_exception:
+            raise
+
+    resolution_multiplier = 4.0
+    param_text_box_kwargs = dict(should_disable=True, text_args={'fontsize': 7})
+
+    for curr_display_function_name, extra_kwargs in [
+        ('_display_2d_placefield_result_plot_ratemaps_2D', display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE,  # aclu only, no shank/cluster/qclu
+                # fig_column_width=32.0, fig_row_height=4.0,
+                resolution_multiplier=resolution_multiplier, 
+                # param_text_box_kwargs=dict(text_args={'should_disable': True, 'fontsize': 7}),
+                param_text_box_kwargs=deepcopy(param_text_box_kwargs),
+
+            ),
+        ),
+        # ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}),
+        ('_display_2d_placefield_occupancy', dict(param_text_box_kwargs=deepcopy(param_text_box_kwargs))),
+        # ('_display_1d_placefields', display_fn_kwargs),
+    ]:
+        try:
+            out_paths = programmatic_render_to_file(curr_active_pipeline=curr_active_pipeline, curr_display_function_name=curr_display_function_name, subset_includelist=subset_includelist, write_vector_format=write_vector_format, write_png=write_png, debug_print=debug_print, **deepcopy(_batch_figure_kwargs), **deepcopy(extra_kwargs))
+            callback_outputs['figure_output_paths'].extend(out_paths or [])
+            print(f'\t{curr_display_function_name} figure_output_paths: {out_paths}')
+            plt.close('all')
+        except Exception as e:
+            print(f'WARN: programmatic_render_to_file `{curr_display_function_name}` failed: {e}')
+            if self.fail_on_exception:
+                raise
+            plt.close('all')
+
+        finally:
+            plt.close('all')
+
+    ## END for curr_display_function_name, extra_kwargs in...
+
+    composite_occupancy_display_kwargs = dict(param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}))
+    composite_ratemap_display_kwargs = display_fn_kwargs | dict(brev_mode=PlotStringBrevityModeEnum.NONE, resolution_multiplier=4.0, param_text_box_kwargs=dict(should_disable=True, text_args={'fontsize': 7}))
+    try:
+        composite_out_paths = _subfn_build_composite_maze_occupancy_placefields_figure(curr_active_pipeline, subset_includelist, occupancy_display_kwargs=composite_occupancy_display_kwargs, ratemaps_display_kwargs=composite_ratemap_display_kwargs, fig_man=custom_fig_man, write_png=write_png, write_vector_format=write_vector_format, debug_print=debug_print)
+        callback_outputs['figure_output_paths'].extend(composite_out_paths or [])
+        print(f'\tcomposite_occupancy_placefields_2D figure_output_paths: {composite_out_paths}')
+    except Exception as e:
+        print(f'WARN: composite occupancy/placefields export failed: {e}')
+        if self.fail_on_exception:
+            raise
+    finally:
+        plt.close('all')
+
+
+    if not skip_widget_required_plots:
+        cache_key = decoding_continuous_cache_key(laps_decoding_time_bin_size, None)
+        directional_decoders_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+        continuously_decoded_cache = getattr(directional_decoders_decode_result, 'continuously_decoded_result_cache_dict', None) if directional_decoders_decode_result is not None else None
+        if continuously_decoded_cache is None or cache_key not in continuously_decoded_cache:
+            print(f'WARN: DirectionalDecodersDecoded missing cache_key {cache_key}; skipping spike-raster timeline export.')
+            across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
+            print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            return across_session_results_extended_dict
+
+        spike_raster_window = None
+        try:
+            configure_pyqtgraph_for_unattended_rendering('figures_export_nwb_wmaze_display_completion_function')
+
+            global_context = curr_active_pipeline.filtered_contexts['maze_GLOBAL']
+            spike_raster_window, (active_2d_plot, *_rest) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=True, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context=global_context)
+
+            try:
+                main_graphics_layout_widget = active_2d_plot.ui.get('main_graphics_layout_widget', None) if hasattr(active_2d_plot, 'ui') else None
+                if main_graphics_layout_widget is not None and hasattr(main_graphics_layout_widget, 'useOpenGL'):
+                    main_graphics_layout_widget.useOpenGL(False)
+            except Exception as opengl_err:
+                print(f'WARN: could not disable Spike2DRaster OpenGL for unattended export: {opengl_err}')
+
+            build_proper_epoch_intervals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, height=1.5)
+
+            active_2d_plot.params.enable_non_marginalized_raw_result = False
+            active_2d_plot.params.enable_marginal_over_direction = False
+            active_2d_plot.params.enable_marginal_over_track_ID = True
+
+            cmd = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_time_bin_sizes_whitelist=[cache_key])
+            cmd.execute()
+
+            try:
+                identifier_name = f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}'
+                a_dock = active_2d_plot.find_display_dock(identifier_name)
+                if a_dock is not None:
+                    a_dock.setFixedHeight(130)
+            except Exception as dock_err:
+                print(f'WARN: could not set marginal dock fixed height: {dock_err}')
+
+            block_until_render_complete(qapp_name='figures_export_nwb_wmaze_display_completion_function', max_wait_time_sec=180)
+
+            default_included_track_dock_identifiers = ['intervals', 'rasters[raster_window]', 'new_curves_separate_plot', f'marginal_over_track_ID_ContinuousDecode - t_bin_size: {cache_key}']
+            resolved_included_track_dock_identifiers = list(reversed(included_track_dock_identifiers or default_included_track_dock_identifiers))
+            callback_outputs['included_track_dock_identifiers'] = resolved_included_track_dock_identifiers
+
+            display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+            timeline_output_pdf_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=False).with_suffix('.pdf')
+            saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(active_2d_plot, output_pdf_path=timeline_output_pdf_path, included_track_dock_identifiers=resolved_included_track_dock_identifiers, debug_max_num_pages=25)
+            export_result = {'fig_save_path': saved_output_pdf_path}
+            callback_outputs['export_all_tracks_result'] = export_result
+            callback_outputs['timeline_pdf_path'] = export_result.get('fig_save_path', None)
+            print(f'\ttimeline_pdf_path: {callback_outputs["timeline_pdf_path"]}')
+
+        except Exception as e:
+            print(f'WARN: figures_export_nwb_wmaze_display_completion_function spike-raster timeline export failed: {e}')
+            if fail_on_exception_for_debugging or self.fail_on_exception:
+                raise
+
+        finally:
+            if spike_raster_window is not None:
+                try:
+                    spike_raster_window.close()
+                    pg.mkQApp('figures_export_nwb_wmaze_display_completion_function').processEvents()
+                except Exception as close_err:
+                    print(f'WARN: could not close spike raster window after timeline export: {close_err}')
+
+    else:
+        ## skip_widget_required_plots == True
+        print(f'WARN: skip_widget_required_plots == True so skipping SpikeRaster2D/window plot')
+
+    across_session_results_extended_dict['figures_export_nwb_wmaze_display_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
 
 @function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
@@ -3789,11 +4642,8 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 else:
                     raise NotImplementedError(f'needs displayman!')
 
-                relative_data_output_parent_folder = Path('data').resolve()
-                Assert.path_exists(relative_data_output_parent_folder)
-
                 ## INPUTS: im_posterior_x_stack, track_labels, 
-                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf') # relative_data_output_parent_folder.joinpath('all_timeline_tracks_exported_stack.pdf')
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf')
                 print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
                 ## Export the wrapped tracks:
                 included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
@@ -3907,7 +4757,7 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
     """
     if override_custom_user_completion_functions_dict is None:
-        # If a literall None is provided, provide ALL
+        # If None is provided, use batch-default completion set (not KDIBA-specific). For KDIBA `_session_post_fixup`, pass explicit `override_custom_user_completion_functions_dict` that includes kdiba_session_post_fixup_completion_function.
         custom_user_completion_functions_dict = {
                                     "export_rank_order_results_completion_function": export_rank_order_results_completion_function,
                                     "figures_rank_order_results_completion_function": figures_rank_order_results_completion_function,
@@ -3915,8 +4765,6 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-                                    # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
-                                    'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
                                     'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
@@ -3930,6 +4778,15 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function,
                                     'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
                                     # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function,
+                                    'compute_and_export_bapun_train_test_decoder_error_distance_completion_function': compute_and_export_bapun_train_test_decoder_error_distance_completion_function,
+                                    'figures_plot_bapun_train_test_decoder_error_distance_completion_function': figures_plot_bapun_train_test_decoder_error_distance_completion_function,
+                                    'recompute_nwb_wmaze_pipeline_computations_completion_function': recompute_nwb_wmaze_pipeline_computations_completion_function,
+                                    'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function': figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function,
+                                    'figures_export_nwb_wmaze_display_completion_function': figures_export_nwb_wmaze_display_completion_function,
+                                    'compute_and_pickle_clusterless_decoder_completion_function': compute_and_pickle_clusterless_decoder_completion_function,
+                                    'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function,
+                                    'compute_and_pickle_spyglass_clusterless_decoder_completion_function': compute_and_pickle_spyglass_clusterless_decoder_completion_function,
+                                    'figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function,
                                     }
     else:
         # use the user one:
@@ -3955,5 +4812,310 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# Clusterless and Alternative Decoders                                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
 
 # %%
+
+
+# ==================================================================================================================== #
+# Bapun Clusterless Decoder Pickle Export                                                                              #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-06-30 12:00', related_items=[])
+def compute_and_pickle_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        pickle_clusterless_decoder: bool = True, debug_print: bool = False) -> dict:
+    """Computes and exports Bapun pf2D_ClusterlessDecoder to a pickle file for redundancy."""
+    import sys
+    import pickle
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+
+    if getattr(curr_session_context, 'format_name', None) != 'bapun':
+        if debug_print:
+            print(f'WARN: compute_and_pickle_clusterless_decoder_completion_function skipped for non-bapun session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_pickle_clusterless_decoder_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'exported_clusterless_decoder_paths': []}
+
+    try:
+        if curr_active_pipeline.computation_results is not None:
+            for filter_name, comp_result in curr_active_pipeline.computation_results.items():
+                if comp_result.computed_data is not None and 'pf2D_ClusterlessDecoder' in comp_result.computed_data:
+                    decoder: ClusterlessRTCPositionDecoder = comp_result.computed_data.get('pf2D_ClusterlessDecoder', None)
+                    if decoder is not None:
+                        # Ensure compute_all has been run
+                        if getattr(decoder, 'rtc_results', None) is None:
+                            decoder.compute_all()
+
+                        if pickle_clusterless_decoder:
+                            output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_ClusterlessDecoder.pkl").resolve()
+                            with open(output_path, 'wb') as f:
+                                pickle.dump(decoder, f)
+
+                            print(f'\texported clusterless decoder for {filter_name} to: {output_path}')
+                            callback_outputs['exported_clusterless_decoder_paths'].append(output_path)
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f'ERROR: Exception during compute_and_pickle_clusterless_decoder_completion_function: {err}')
+        if self.fail_on_exception:
+            raise err.exc
+
+    across_session_results_extended_dict['compute_and_pickle_clusterless_decoder_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+# ==================================================================================================================== #
+# Bapun Clusterless Plotting                                                                                           #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-06-30 12:00', related_items=['compute_and_export_bapun_train_test_decoder_error_distance_completion_function'])
+def figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun clusterless train/test decoder squared-error scatter figure."""
+    import pandas as pd
+    from typing import Optional, List
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+
+    use_clusterless_decoders = True # force True
+
+    if getattr(curr_session_context, 'format_name', None) != 'bapun':
+        print(f'WARN: figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function skipped for non-bapun session: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'figure_output_paths': [], 'use_clusterless_decoders': use_clusterless_decoders}
+
+    test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{curr_session_name}_bapun_clusterless_train_test_decoder_error.csv').resolve()
+
+    if test_err_df_csv_path.exists() and not force_recompute:
+        test_err_df = pd.read_csv(test_err_df_csv_path)
+        print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
+    else:
+        print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_clusterless_decoders=use_clusterless_decoders, debug_print=debug_print)
+
+    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos (Clusterless)')
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    display_context = curr_active_pipeline.build_display_context_for_session(f'test_decoded_measured_{y_col_name}_clusterless')
+    figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+    callback_outputs['figure_output_paths'].extend(figure_output_paths)
+    print(f'\tfigure_output_paths: {figure_output_paths}')
+
+    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error (Clusterless)')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D_clusterless')
+        figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
+        print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
+
+    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error (Clusterless)')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D_clusterless')
+        figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
+        print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
+
+    across_session_results_extended_dict['figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+# ==================================================================================================================== #
+# Bapun Spyglass Clusterless Decoder Pickle Export                                                                     #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'clusterless', 'decoder', 'pickle', 'batch', 'spyglass'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-07 15:00', related_items=[])
+def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        pickle_spyglass_clusterless_decoder: bool = True, debug_print: bool = False, force_recompute: bool = True) -> dict:
+    """Computes and exports Bapun pf2D_SpyglassClusterlessDecoder to a pickle file for redundancy."""
+    import sys
+    import pickle
+    from pyphocorehelpers.exception_helpers import CapturedException
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult, TrainTestLapsSplitting, CustomDecodeEpochsResult, decoder_name, epoch_split_key, get_proper_global_spikes_df, DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.Analysis.Decoder.context_dependent import GenericDecoderDictDecodedEpochsDictResult #, KnownNamedDecoderTrainedComputeEpochsType, KnownNamedDecodingEpochsType, MaskedTimeBinFillType, DataTimeGrain, GenericResultTupleIndexType
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters
+    
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
+        if debug_print:
+            print(f'WARN: compute_and_pickle_spyglass_clusterless_decoder_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'compute_and_pickle_spyglass_clusterless_decoder_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'exported_spyglass_clusterless_decoder_paths': []}
+
+    try:
+        if curr_active_pipeline.computation_results is not None:
+            for filter_name, comp_result in curr_active_pipeline.computation_results.items():
+                if comp_result.computed_data is not None and 'pf2D_SpyglassClusterlessDecoder' in comp_result.computed_data:
+                    decoder: SpyglassClusterlessDecoder = comp_result.computed_data.get('pf2D_SpyglassClusterlessDecoder', None)
+                    if decoder is not None:
+                        if getattr(decoder, 'nld_results', None) is None:
+                            decoder.compute_all()
+
+                        if pickle_spyglass_clusterless_decoder:
+                            output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_SpyglassClusterlessDecoder.pkl").resolve()
+                            with open(output_path, 'wb') as f:
+                                pickle.dump(decoder, f)
+
+                            print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
+                            callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
+                else:
+                    ## Attempt to recompute the missing pf2D_SpyglassClusterlessDecoder result by calling 'position_decoding_spyglass_clusterless'
+                    try:
+                        curr_active_pipeline.reload_default_computation_functions()
+
+                        ## Next wave of computations
+                        extended_computations_include_includelist = ['position_decoding_spyglass_clusterless',] # do only specified
+
+                        spyglass_computation_params: SpyglassClusterlessDecodingParameters = SpyglassClusterlessDecodingParameters()
+                        computation_kwargs_dict = {'position_decoding_spyglass_clusterless': dict(spyglass_params=spyglass_computation_params, should_defer_compute_all_decoded_times=True), }
+
+                        # force_recompute_override_computations_includelist = deepcopy(extended_computations_include_includelist)
+                        force_recompute_override_computations_includelist = []
+                        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist,  included_computation_filter_names = [filter_name], ## only pass this epoch
+                                                                                                                                                                    include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                                                                                                                    force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+
+                        if debug_print:
+                            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+
+                        # Post-hoc verification that the computations worked and that the validators reflect that. The list should be empty now.
+                        newly_computed_values = batch_extended_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                            force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, 
+                                                                            computation_kwargs_dict=computation_kwargs_dict,
+                                                                            debug_print=False)
+
+                        needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(curr_active_pipeline, include_includelist=extended_computations_include_includelist, included_computation_filter_names = [filter_name], ## only pass this epoch
+                                                                                                                                                                    include_global_functions=True, fail_on_exception=False, progress_print=True,
+                                                                                                                                                                    force_recompute=force_recompute, force_recompute_override_computations_includelist=force_recompute_override_computations_includelist, debug_print=False)
+                        if debug_print:
+                            print(f'\tPost-load global computations: needs_computation_output_dict: {[k for k,v in needs_computation_output_dict.items() if (v is not None)]}')
+                        print(f'\t...recomputation done.')
+                        decoder: SpyglassClusterlessDecoder = comp_result.computed_data.get('pf2D_SpyglassClusterlessDecoder', None)
+                        assert decoder is not None, f"decoder is still None ever after attempted recomputation!!"        
+                        if decoder is not None:
+                            if getattr(decoder, 'nld_results', None) is None:
+                                decoder.compute_all()
+
+                            if pickle_spyglass_clusterless_decoder:
+                                output_path = curr_active_pipeline.get_output_path().resolve().joinpath(f"{curr_session_name}_{filter_name}_pf2D_SpyglassClusterlessDecoder.pkl").resolve()
+                                with open(output_path, 'wb') as f:
+                                    pickle.dump(decoder, f)
+
+                                print(f'\texported spyglass clusterless decoder for {filter_name} to: {output_path}')
+                                callback_outputs['exported_spyglass_clusterless_decoder_paths'].append(output_path)
+                        else:
+                            print(f"WARN: pf2D_SpyglassClusterlessDecoder recompute unsuccessful for filter: {filter_name} on {curr_session_name}")
+
+                    except Exception as recompute_e:
+                        print(f"ERROR: Exception during recomputation of pf2D_SpyglassClusterlessDecoder for filter: {filter_name}: {recompute_e}")
+            ## END for filter_name, comp_result in curr_active_pipeline.computation_results.items()....
+
+    except Exception as e:
+        exception_info = sys.exc_info()
+        err = CapturedException(e, exception_info)
+        print(f'ERROR: Exception during compute_and_pickle_spyglass_clusterless_decoder_completion_function: {err}')
+        if self.fail_on_exception:
+            raise err.exc
+
+    across_session_results_extended_dict['compute_and_pickle_spyglass_clusterless_decoder_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict
+
+
+
+# ==================================================================================================================== #
+# Bapun Spyglass Clusterless Plotting                                                                                  #
+# ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['bapun', 'train-test', 'decoder', 'figure', 'batch', 'clusterless', 'spyglass'], input_requires=[], output_provides=[], uses=['BapunPositionDecodingPerformance', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-07 15:00', related_items=['compute_and_pickle_spyglass_clusterless_decoder_completion_function'])
+def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, write_png: bool = True, write_vector_format: bool = False, force_recompute: bool = False,
+        training_data_portion: float = 9.0/10.0, laps_decoding_time_bin_size: float = 0.250, maze_epoch_names: Optional[List[str]] = None, use_spyglass_clusterless_decoders: Optional[bool] = True, y_col_name: str='err_cm', debug_print: bool = False) -> dict:
+    """Plots and exports Bapun Spyglass clusterless train/test decoder squared-error scatter figure."""
+    import pandas as pd
+    from typing import Optional, List
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
+
+    use_spyglass_clusterless_decoders = True
+
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
+    if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
+        print(f'WARN: figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
+        return across_session_results_extended_dict
+
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    print(f'figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+
+    assert self.collected_outputs_path.exists()
+    curr_session_name: str = curr_active_pipeline.session_name
+
+    callback_outputs = {'figure_output_paths': [], 'use_spyglass_clusterless_decoders': use_spyglass_clusterless_decoders}
+
+    test_err_df_csv_path = self.collected_outputs_path.joinpath(f'{curr_session_name}_bapun_spyglass_clusterless_train_test_decoder_error.csv').resolve()
+
+    if test_err_df_csv_path.exists() and not force_recompute:
+        test_err_df = pd.read_csv(test_err_df_csv_path)
+        print(f'\tloaded test_err_df from CSV: "{test_err_df_csv_path}"')
+    else:
+        print(f'\tCSV not found or force_recompute=True, recomputing test_err_df...')
+        _test_err_agg_df, test_err_df, _test_decode_results = BapunPositionDecodingPerformance.compute_bapun_train_test_decoder_error_distance(curr_active_pipeline=curr_active_pipeline, training_data_portion=training_data_portion, laps_decoding_time_bin_size=laps_decoding_time_bin_size, maze_epoch_names=maze_epoch_names, use_spyglass_clusterless_decoders=use_spyglass_clusterless_decoders, debug_print=debug_print)
+
+    assert y_col_name in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D'], f"y_col_name: {y_col_name} is not in ['sq_err', 'err_cm', 'sq_err_1D', 'err_cm_1D', 'sq_err_2D', 'err_cm_2D']"
+    fig, ax = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name = y_col_name, title_string = 'Test Lap Decoded vs Measured Pos (Spyglass Clusterless)')
+    custom_figure_output_path = self.collected_outputs_path
+    custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+    display_context = curr_active_pipeline.build_display_context_for_session(f'test_decoded_measured_{y_col_name}_spyglass_clusterless')
+    figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+    callback_outputs['figure_output_paths'].extend(figure_output_paths)
+    print(f'\tfigure_output_paths: {figure_output_paths}')
+
+    if ('err_cm_1D' in test_err_df.columns) and (y_col_name != 'err_cm_1D'):
+        fig_lin_pos, ax_lin_pos = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_1D', title_string='Test Lap Decoded vs Measured lin_pos Error (Spyglass Clusterless)')
+        display_context_lin_pos = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_1D_spyglass_clusterless')
+        figure_output_paths_lin_pos = build_and_write_to_file(fig_lin_pos, display_context_lin_pos, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_lin_pos)
+        print(f'\tlin_pos figure_output_paths: {figure_output_paths_lin_pos}')
+
+    if ('err_cm_2D' in test_err_df.columns) and (y_col_name != 'err_cm_2D'):
+        fig_2d, ax_2d = BapunPositionDecodingPerformance.perform_plot_test_decoder_performance_error_distance(curr_active_pipeline=curr_active_pipeline, test_err_df=test_err_df, y_col_name='err_cm_2D', title_string='Test Lap Decoded vs Measured 2D Euclidean Error (Spyglass Clusterless)')
+        display_context_2d = curr_active_pipeline.build_display_context_for_session('test_decoded_measured_err_cm_2D_spyglass_clusterless')
+        figure_output_paths_2d = build_and_write_to_file(fig_2d, display_context_2d, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+        callback_outputs['figure_output_paths'].extend(figure_output_paths_2d)
+        print(f'\t2D figure_output_paths: {figure_output_paths_2d}')
+
+    across_session_results_extended_dict['figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function'] = callback_outputs
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    return across_session_results_extended_dict

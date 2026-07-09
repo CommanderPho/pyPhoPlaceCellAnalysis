@@ -1515,7 +1515,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
             a_p_x_given_n = self.p_x_given_n_dict[an_epoch_name]
 
             ## compute the locality:
-            num_timestamps: int = np.shape(self.gaussian_volume)[-1]
+            num_timestamps: int = self.gaussian_volume.shape[-1]
             
             
             # self.decoding_meas_pos_locality_measure_dict[an_epoch_name] = np.array([_subfn_calculate_spatial_emd(self.gaussian_volume[:, :, a_timestamp_idx], a_p_x_given_n[:, :, a_timestamp_idx]) for a_timestamp_idx in np.arange(num_timestamps)])
@@ -1556,7 +1556,11 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
                 raise e
 
 
-            self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int) ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import SparseGaussianVolume
+            if isinstance(self.gaussian_volume, SparseGaussianVolume):
+                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = self.gaussian_volume.multiply_mask_threshold_to_int(an_alpha_epoch_masks, min_val_epsilon)
+            else:
+                self.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name] = ((self.gaussian_volume * an_alpha_epoch_masks) > min_val_epsilon).astype(int)
             # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/self.n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
             self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
             # self.locality_measures_dict_dict[an_epoch_name][f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(self.n_total_pos_bins))

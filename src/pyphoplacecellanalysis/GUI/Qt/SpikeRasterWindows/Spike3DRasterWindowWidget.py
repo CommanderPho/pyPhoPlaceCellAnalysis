@@ -383,8 +383,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.perform_jump_specific_timestamp_only))
             self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time_window.connect(lambda start_t, end_t: self.perform_jump_specific_timestamp(start_t, (end_t - start_t))))
-            
-
+            self.ui.bottom_bar_connections.append(self.ui.spike_raster_plt_2d.spikes_window.timeWindow.window_changed_signal.connect(self._on_drive_spikes_window_time_changed))
 
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect(self.update_animation)
             # self.ui.bottom_bar_connections.append(self.ui.bottomPlaybackControlBarWidget.jump_specific_time.connect((lambda new_time: self.update_animation(new_time))))
@@ -574,6 +573,13 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     ##################################
     
 
+    @pyqtExceptionPrintingSlot(float, float)
+    def _on_drive_spikes_window_time_changed(self, start_t: float, end_t: float):
+        """Refresh bottom and left playback controls when the 2D driver spikes_window TimeWindow changes (region drag, wheel via window_scrolled, jumps, duration edits)."""
+        self.SpikeRasterBottomFrameControlsMixin_on_window_update(start_t, end_t)
+        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(start_t, end_t)
+
+
     @pyqtExceptionPrintingSlot(float)
     def update_animation(self, next_start_timestamp: float):
         """ Actually updates the animation given the next_start_timestep
@@ -588,12 +594,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.spike_raster_plt_2d.update_scroll_window_region(next_start_timestamp, next_end_timestamp, block_signals=True) # self.spike_raster_plt_2d.window_scrolled should be emitted        
         # signal emit:
         self.spike_raster_plt_2d.window_scrolled.emit(next_start_timestamp, next_end_timestamp)
-        # update_scroll_window_region
-        # self.ui.spike_raster_plt_3d.spikes_window.update_window_start_end(self.ui.spike_raster_plt_2d.spikes_window.active_time_window[0], self.ui.spike_raster_plt_2d.spikes_window.active_time_window[1])
-        # self.bottom_playback_control_bar_widget.on_window_changed(next_start_timestamp, next_end_timestamp) ## direct
-        self.SpikeRasterBottomFrameControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp) ## indirect 
-        self.SpikeRasterLeftSidebarControlsMixin_on_window_update(next_start_timestamp, next_end_timestamp)
-        
+        # Bottom/left bars: refreshed via spikes_window.timeWindow.window_changed_signal -> _on_drive_spikes_window_time_changed
+
 
     @pyqtExceptionPrintingSlot(int)
     def shift_animation_frame_val(self, shift_frames: int):
@@ -1154,6 +1156,15 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # _out_args = []
         # _out_args = {}
         _all_outputs_dict = {}
+
+        ## unless other context is provided, default to using the global context
+        active_session_configuration_context = kwargs.get('active_session_configuration_context', None)
+        if (active_session_configuration_context is None):
+            ## get default global context:
+            global_epoch_name: str = curr_active_pipeline.find_Global_epoch_name()
+            global_epoch_context = curr_active_pipeline.filtered_contexts[global_epoch_name]
+            active_session_configuration_context = deepcopy(global_epoch_context) # e.g. IdentifyingContext(format_name='bapun',animal='RatJ',session_name='Day3TwoNovel',filter_name='maze_GLOBAL')
+            kwargs['active_session_configuration_context'] = active_session_configuration_context
         
         if len(found_spike_raster_windows) < 1:
             # no existing spike_raster_windows. Make a new one
@@ -1559,11 +1570,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
             assert active_raster_plot is not None
 
-
-        ## Backup Existing Colors:
-        # _plot_backup_colors = ColorData.backup_raster_colors(active_raster_plot) # note that they are all 0.0-1.0 format. RGBA
-        # deepcopy(active_raster_plot.params.neuron_qcolors) #, active_raster_plot.params.neuron_qcolors_map
-
+        ## get the widgets:
         rightSideContainerWidget = self.ui.rightSideContainerWidget # pyphoplacecellanalysis.GUI.Qt.ZoomAndNavigationSidebarControls.Spike3DRasterRightSidebarWidget.Spike3DRasterRightSidebarWidget
         right_sidebar_contents_container_dockarea = rightSideContainerWidget.right_sidebar_contents_container_dockarea
 
@@ -1642,6 +1649,8 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             ## Build Connections to signals:
             _connections_list = []
             def _on_update_rendered_intervals(active_2d_plot):
+                """ I believe used to update the epoch items after updating them in UI
+                """
                 print(f'_on_update_rendered_intervals(...)')
                 _legends_dict = active_2d_plot.build_or_update_all_epoch_interval_rect_legends()
                 epoch_display_configs = active_2d_plot.extract_interval_display_config_lists()
@@ -1672,21 +1681,6 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
 
         # Display the sidebar:
         self.set_right_sidebar_visibility(True)
-
-
-    # @property
-    # def dock_tree_sidebar_widget(self) -> Optional[DockAreaDocksTree]:
-    #     """The dock_tree_sidebar_widget property."""
-    #     ## Get 2D or 3D Raster from spike_raster_window
-    #     active_raster_plot = self.spike_raster_plt_2d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-    #     if active_raster_plot is None:
-    #         active_raster_plot = self.spike_raster_plt_3d # <pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster.Spike2DRaster at 0x196c7244280>
-    #         if active_raster_plot is None:
-    #             ## no available raster plots
-    #             return None
-
-    #     return active_raster_plot.ui.dockarea_dock_managing_tree_widget
-    
 
 
     @function_attributes(short_name=None, tags=['widget', 'dock_area_managing_tree', 'interactive', 'right-sidebar'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-01-28 07:22', related_items=['DockAreaDocksTree'])

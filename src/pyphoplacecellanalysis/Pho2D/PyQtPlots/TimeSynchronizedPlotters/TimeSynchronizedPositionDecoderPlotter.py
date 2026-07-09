@@ -1,5 +1,7 @@
-from neuropy.core.user_annotations import function_attributes
+# from neuropy.core.user_annotations import function_attributes
 import numpy as np
+import signal
+import threading
 import pandas as pd
 from qtpy import QtCore, QtWidgets
 from copy import deepcopy
@@ -7,6 +9,8 @@ from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
+import imageio
+
 # from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 from pyphocorehelpers.assertion_helpers import Assert
 from neuropy.utils.mixins.dict_representable import overriding_dict_with
@@ -26,6 +30,47 @@ from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.Mixins.UserEditableROIMixin import UserEditableROIMixin, Rois
 
 from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedGenericPlotterLayer import TimeSynchronizedGenericPlotterLayer, LayerDisplayConfig
+
+
+def _decoder_bin_left_right_edges(active_one_step_decoder, centers: NDArray) -> Tuple[NDArray, NDArray]:
+    """Per-bin (left, right) edges aligned with decoded frames. Uses time_bin_container when present, else midpoint inference from centers."""
+    centers = np.asarray(centers, dtype=float)
+    n: int = len(centers)
+    if n == 0:
+        return np.array([]), np.array([])
+    if hasattr(active_one_step_decoder, 'time_bin_container') and active_one_step_decoder.time_bin_container is not None:
+        tbc = active_one_step_decoder.time_bin_container
+        left = np.asarray(tbc.left_edges, dtype=float)
+        right = np.asarray(tbc.right_edges, dtype=float)
+        if len(left) >= n and len(right) >= n:
+            return left[:n], right[:n]
+    if n == 1:
+        d = 1.0
+    else:
+        d = float(np.median(np.diff(centers)))
+    mid = (centers[:-1] + centers[1:]) / 2.0
+    left = np.empty(n, dtype=float)
+    left[0] = centers[0] - (mid[0] - centers[0]) if n > 1 else centers[0] - d / 2.0
+    left[1:] = mid
+    right = np.empty(n, dtype=float)
+    right[-1] = centers[-1] + (centers[-1] - mid[-1]) if n > 1 else centers[-1] + d / 2.0
+    right[:-1] = mid
+    return left, right
+
+
+def _included_posterior_bin_indices_for_viewport(active_one_step_decoder, centers: NDArray, viewport_start: float, viewport_end: float) -> NDArray:
+    """Decoded bin indices with [left,right] strictly inside [viewport_start, viewport_end]; if none, single bin from clamped searchsorted(viewport_start). Used for viewport aggregation when TimeSynchronizedPositionDecoderPlotter.use_all_active_viewport_timebins is True."""
+    centers = np.asarray(centers, dtype=float)
+    n = len(centers)
+    if n == 0:
+        return np.array([], dtype=np.intp)
+    left, right = _decoder_bin_left_right_edges(active_one_step_decoder, centers)
+    strict = [i for i in range(n) if left[i] >= viewport_start and right[i] <= viewport_end]
+    if strict:
+        return np.asarray(strict, dtype=np.intp)
+    i0 = int(np.searchsorted(centers, viewport_start, side='left'))
+    i0 = max(0, min(i0, n - 1))
+    return np.array([i0], dtype=np.intp)
 
 
 class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTrajectoryPlottingMixin, TimeSynchronizedPlotterBase):
@@ -94,6 +139,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
     
         self.last_window_index = None
         self.last_window_time = None
+        self.last_included_posterior_bin_indices: Optional[NDArray] = None
         self.active_one_step_decoder = active_one_step_decoder
         self.active_two_step_decoder = active_two_step_decoder
         
@@ -102,6 +148,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.params.needs_background_image = param_kwargs.pop('needs_background_image', False) # creates `self.ui.bg_imv` IFF this is true. Useful for creating the track shapes.
         self.params.show_posteriors = param_kwargs.pop('show_posteriors', True)
         self.params.decoded_time_bins_info_df = param_kwargs.pop('decoded_time_bins_info_df', None) ## 
+        self.use_all_active_viewport_timebins = param_kwargs.pop('use_all_active_viewport_timebins', False)
 
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter: params.debug_print is True, so debugging info will be printed!')
@@ -251,7 +298,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         self.enable_user_editable_rois(parent_plot_item=self.ui.root_plot)
 
     
-    @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
+    # @function_attributes(short_name=None, tags=['track_shapes'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-17 11:31', related_items=[])
     def add_track_shapes(self, loaded_track_limits=None, override_ax=None, debug_print:bool=True, defer_draw:bool=False):
         """ Adds the Long and Short track shapes to the plotter:
     
@@ -372,11 +419,27 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         # called when the window is updated
         if self.params.debug_print:
             print(f'TimeSynchronizedPositionDecoderPlotter.on_window_changed(start_t: {start_t}, end_t: {end_t})')
-        # if self.enable_debug_print:
-        #     profiler = pg.debug.Profiler(disabled=True, delayed=True)
-
-        # self.update(end_t, defer_render=False)
-        self.update(start_t, defer_render=False)
+        centers = np.asarray(self.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self.last_included_posterior_bin_indices = np.array([], dtype=np.intp)
+            self.last_window_index = None
+            self.last_window_time = None
+        elif self.use_all_active_viewport_timebins:
+            self.last_included_posterior_bin_indices = _included_posterior_bin_indices_for_viewport(self.active_one_step_decoder, centers, float(start_t), float(end_t))
+            if len(self.last_included_posterior_bin_indices) == 0:
+                self.last_window_index = None
+                self.last_window_time = None
+            else:
+                fi = int(self.last_included_posterior_bin_indices[0])
+                self.last_window_index = fi
+                self.last_window_time = centers[fi]
+        else:
+            idx = int(np.searchsorted(centers, float(start_t), side='left'))
+            idx = max(0, min(idx, n - 1))
+            self.last_included_posterior_bin_indices = np.array([idx], dtype=np.intp)
+            self.last_window_index = idx
+            self.last_window_time = centers[idx]
 
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
@@ -395,15 +458,26 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except Exception as e:
                 ## Unexpected exception!
                 raise e
-            
+
+        self._update_plots()
         if self.params.debug_print:
             print('\tFinished calling _update_plots()')
 
 
     def update(self, t, defer_render=False):
         # Finds the nearest previous decoded position for the time t:
-        self.last_window_index = np.searchsorted(self.time_window_centers, t, side='left') # side='left' ensures that no future values (later than 't') are ever returned
-        self.last_window_time = self.time_window_centers[self.last_window_index] # If there is no suitable index, return either 0 or N (where N is the length of `a`).
+        centers = np.asarray(self.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self.last_window_index = None
+            self.last_window_time = None
+            self.last_included_posterior_bin_indices = np.array([], dtype=np.intp)
+        else:
+            idx = int(np.searchsorted(centers, t, side='left')) # side='left' ensures that no future values (later than 't') are ever returned
+            idx = max(0, min(idx, n - 1))
+            self.last_window_index = idx
+            self.last_window_time = centers[idx]
+            self.last_included_posterior_bin_indices = np.array([idx], dtype=np.intp)
         
         ## update any additional image layers in the stack
         for z_idx, (a_stack_item_key, a_stack_item) in enumerate(self.ui.plot_stack.items()):
@@ -525,13 +599,54 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             
         if (self.last_window_time is not None):
             curr_window_title_str = f"{curr_window_title_str} | t: {self.last_window_time}"
+        if self.use_all_active_viewport_timebins and (self.last_included_posterior_bin_indices is not None):
+            curr_window_title_str = f"{curr_window_title_str} | n_bins: {len(self.last_included_posterior_bin_indices)}"
 
         # self.ui.root_plot.setTitle(f'PositionDecoder -  t = {self.last_window_time}')
         self.ui.root_plot.setTitle(curr_window_title_str)
         
 
 
-    @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
+    def _export_video_spike_raster_duration_seconds(self, spike_raster_plt_2d: Any) -> float:
+        """Visible window duration for sliding the spike raster during export (seconds)."""
+        rd = getattr(spike_raster_plt_2d, 'render_window_duration', None)
+        if rd is not None:
+            d = float(rd)
+            if d > 0:
+                return d
+        pd = getattr(spike_raster_plt_2d, 'plot_data', None)
+        if pd is not None:
+            try:
+                te = float(pd.time_window_end)
+                ts = float(pd.time_window_start)
+                if te > ts:
+                    return te - ts
+            except (TypeError, ValueError, AttributeError):
+                pass
+        return 15.0
+
+
+
+    def _export_video_apply_frame_time(self, t: float, spike_raster_plt_2d: Any, additional_decoder_plotters: Optional[List[Any]]) -> None:
+        """Advance time for export one frame: either scroll+emit the driver raster (updates connected decoders) or update() on each plotter.
+        
+        Never called?!?
+        
+        """
+        if spike_raster_plt_2d is not None:
+            duration = self._export_video_spike_raster_duration_seconds(spike_raster_plt_2d)
+            win_start = float(t)
+            win_end = win_start + duration
+            spike_raster_plt_2d.update_scroll_window_region(win_start, win_end, block_signals=True)
+            spike_raster_plt_2d.window_scrolled.emit(win_start, win_end)
+        else:
+            self.update(t, defer_render=False)
+            if additional_decoder_plotters:
+                for p in additional_decoder_plotters:
+                    p.update(t, defer_render=False)
+
+
+    # @function_attributes(short_name=None, tags=['video', 'export', 'mp4', 'avi', 'gif', 'output'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-24 23:09', related_items=[])
     def export_video(self, output_path: str, start_t: Optional[float] = None, end_t: Optional[float] = None, fps: float = 30.0, width: Optional[int] = None, height: Optional[int] = None, progress_print: bool = True, debug_print: bool = False):
         """Efficiently export a video or animated GIF from the TimeSynchronizedPositionDecoderPlotter instance (faster than real-time playback)
         
@@ -560,7 +675,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             plotter.export_video('output/videos/decoder.gif', start_t=100.0, end_t=200.0, fps=10.0)
         """
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.ImageExporter import ImageExporter
-        from pyphoplacecellanalysis.External.pyqtgraph import functions as fn
+        from pyphoplacecellanalysis.External.pyqtgraph_extensions.export_helpers import ExportHelpers
         from pathlib import Path
         import sys
         
@@ -583,11 +698,10 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             except (KeyError, AttributeError) as e:
                 print(f'\t encountered error "{e}" while trying to update item. Skipping.')
             except Exception as e:
-                ## Unexpected exception!
                 raise
+        ## END for (a_stack_item_key, a_stack_item) in self.ui.plot_stack.items()...
 
-        
-        video_filepath = Path(output_path).resolve()
+        video_filepath: Path = Path(output_path).resolve()
         suffix = video_filepath.suffix.lower()
         VIDEO_EXTENSIONS = {'.avi', '.mp4', '.mov'}
         GIF_EXTENSIONS = {'.gif'}
@@ -621,14 +735,14 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
         
         # Subsample frame indices based on fps to reduce processing
         # Calculate desired time step between frames (in seconds)
-        desired_time_step = 1.0 / fps if fps > 0 else float('inf')
+        desired_time_step: float = 1.0 / fps if fps > 0 else float('inf')
         
         # Get all candidate frame indices
         all_frame_indices = np.arange(start_idx, end_idx)
         all_frame_times = time_window_centers[all_frame_indices]
         
         # Subsample frames based on desired time step
-        if desired_time_step < float('inf') and len(all_frame_indices) > 1:
+        if (desired_time_step < float('inf')) and (len(all_frame_indices) > 1):
             # Start with the first frame
             subsampled_indices = [all_frame_indices[0]]
             last_selected_time = all_frame_times[0]
@@ -652,7 +766,7 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             raise ValueError(f"No frames to export after subsampling at {fps} fps")
         
         if progress_print:
-            total_available_frames = len(all_frame_indices)
+            total_available_frames: int = len(all_frame_indices)
             kind = 'animated GIF' if export_format == 'gif' else 'video'
             print(f'Exporting {kind}: {n_frames} frames (from {total_available_frames} available) from t={time_window_centers[start_idx]:.2f} to t={time_window_centers[end_idx-1]:.2f} at {fps} fps')
         
@@ -665,33 +779,11 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 height = widget_size.height()
         
 
-        # Helper to convert QImage to BGR array for OpenCV (contiguous uint8 for compatibility)
-        def qimage_to_bgr(qimage):
-            img_array = fn.ndarray_from_qimage(qimage)
-            # Handle ARGB32 format conversion based on byte order
-            if img_array.shape[2] == 4:
-                # ARGB32 format - extract RGB channels based on byte order
-                if sys.byteorder == 'little':
-                    # Little-endian: channels are [B, G, R, A] in memory
-                    bgr = img_array[:, :, :3]  # B, G, R (first 3 channels)
-                else:
-                    # Big-endian: channels are [A, R, G, B] in memory
-                    bgr = img_array[:, :, [3, 2, 1]]  # B, G, R from indices 3,2,1
-            elif img_array.shape[2] == 3:
-                # Already RGB format, convert to BGR for OpenCV
-                bgr = img_array[:, :, ::-1]
-            else:
-                raise ValueError(f"Unexpected image format with {img_array.shape[2]} channels")
-            # Ensure contiguous uint8 array for OpenCV compatibility
-            return np.ascontiguousarray(bgr, dtype=np.uint8)
-        
-        def qimage_to_rgb(qimage):
-            return np.ascontiguousarray(qimage_to_bgr(qimage)[:, :, ::-1], dtype=np.uint8)
-        
+
         out = None  # Initialize to None for proper cleanup
         try:
             # Create ImageExporter for the root plot
-            exporter = ImageExporter(self.ui.root_plot)
+            exporter: ImageExporter = ImageExporter(self.ui.root_plot)
             exporter.parameters()['width'] = width
             exporter.parameters()['height'] = height
             exporter.parameters()['antialias'] = True
@@ -700,29 +792,31 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
             QtWidgets.QApplication.processEvents()
             
             # Capture first frame to get actual output dimensions (may differ from requested)
-            first_frame_idx = frame_indices[0]
+            first_frame_idx: int = frame_indices[0]
             self.update(time_window_centers[first_frame_idx], defer_render=False)
             QtWidgets.QApplication.processEvents()
             first_qimage = exporter.export(toBytes=True)
             if export_format == 'gif':
-                first_frame = qimage_to_rgb(first_qimage)
+                first_frame = ExportHelpers.qimage_to_rgb(first_qimage)
             else:
-                first_bgr = qimage_to_bgr(first_qimage)
+                first_bgr = ExportHelpers.qimage_to_bgr(first_qimage)
                 first_frame = first_bgr
             actual_height, actual_width = first_frame.shape[:2]
             del first_qimage  # Free memory
             
             # Set up output path and directory
-            video_parent_path = video_filepath.parent
+            video_parent_path: Path = video_filepath.parent
             if not video_parent_path.exists():
                 if progress_print:
                     print(f'Creating output directory: {video_parent_path}')
                 video_parent_path.mkdir(parents=True, exist_ok=True)
             
             if export_format == 'gif':
-                import imageio
+                
                 frames_list = [first_frame]
                 progress_print_every_n_frames = max(1, n_frames // 20)
+                
+                # Main export loop ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 for i, frame_idx in enumerate(frame_indices):
                     if i == 0:
                         if progress_print:
@@ -731,10 +825,13 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                         print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
                     t = time_window_centers[frame_idx]
-                    self.update(t, defer_render=False)
+                    self.update(t, defer_render=False) ## Update call
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
-                    frames_list.append(qimage_to_rgb(qimage))
+                    frames_list.append(ExportHelpers.qimage_to_rgb(qimage))
+                ## END: for i, frame_idx in enumerate(frame_indices)
+
+
                 duration_sec = 1.0 / fps if fps > 0 else 0.1
                 imageio.mimsave(str(video_filepath), frames_list, format='GIF', duration=duration_sec, loop=0)
             else:
@@ -746,6 +843,8 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                 out.write(first_bgr)
                 del first_bgr  # Free memory
                 progress_print_every_n_frames = max(1, n_frames // 20)
+                
+                # Main export loop ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
                 for i, frame_idx in enumerate(frame_indices):
                     if i == 0:
                         if progress_print:
@@ -754,11 +853,15 @@ class TimeSynchronizedPositionDecoderPlotter(UserEditableROIMixin, AnimalTraject
                     if progress_print and (i % progress_print_every_n_frames == 0 or i == n_frames - 1):
                         print(f'Processing frame {i+1}/{n_frames} (t={time_window_centers[frame_idx]:.2f})')
                     t = time_window_centers[frame_idx]
-                    self.update(t, defer_render=False)
+                    self.update(t, defer_render=False) ## Update call
+                    
                     QtWidgets.QApplication.processEvents()
                     qimage = exporter.export(toBytes=True)
-                    bgr_array = qimage_to_bgr(qimage)
+                    bgr_array = ExportHelpers.qimage_to_bgr(qimage)
                     out.write(bgr_array)
+                ## END: for i, frame_idx in enumerate(frame_indices)
+
+
         finally:
             # Always close video writer (if opened) and restore debug print setting
             if out is not None:

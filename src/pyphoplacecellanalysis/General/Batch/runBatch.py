@@ -2,7 +2,7 @@ import sys
 import logging
 import pathlib
 from pathlib import Path
-from typing import List, Dict, Optional, Union, Callable
+from typing import List, Dict, Optional, Union, Callable, Tuple
 # import datetime
 from datetime import datetime
 import numpy as np
@@ -16,7 +16,7 @@ import builtins
 from enum import Enum, unique  # SessionBatchProgress
 
 ## Pho's Custom Libraries:
-from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path
+from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path, set_posix_windows, convert_filelist_to_new_parent, find_matching_parent_path, build_cross_root_copydict, save_copydict_to_text_file, sync_file_copydict_with_verification
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import get_now_time_precise_str
 from pyphocorehelpers.print_helpers import build_run_log_task_identifier, build_logger
@@ -30,7 +30,7 @@ from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionForma
 
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_SerializationMixin, HDF_Converter
-from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, PipelineCompletionResultTable, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
+from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.BatchCompletionHandler import PipelineCompletionResult, KDibaPipelineCompletionResult, PipelineCompletionResultTable, KDibaPipelineCompletionResultTable, fill_pipeline_completion_result_table_common_row_fields, fill_kdiba_pipeline_completion_result_table_row_from_result, BatchSessionCompletionHandler, SavingOptions, BatchComputationProcessOptions
 
 from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_load_session
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme
@@ -239,6 +239,76 @@ class ConcreteSessionFolder:
         return copy_dict
 
 
+    def _get_session_stem_from_xml(self) -> Optional[str]:
+        xml_files = list(self.path.glob('*.xml'))
+        if len(xml_files) == 0:
+            return None
+        return xml_files[0].stem
+
+
+    def discover_syncable_result_files(self, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None) -> List[Path]:
+        """Return extant paths for core pipeline outputs and optional session-preprocessing .npy files in the session folder.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+            syncable_files = a_session_folder.discover_syncable_result_files()
+        """
+        syncable_files: List[Path] = []
+        core_pipeline_files = [self.session_pickle, self.global_computation_result_pickle, self.pipeline_results_h5]
+        for a_file in core_pipeline_files:
+            if a_file.is_file():
+                syncable_files.append(a_file.resolve())
+        if include_preprocessing_npy:
+            session_stem = self._get_session_stem_from_xml()
+            if session_stem is not None:
+                for a_npy_file in self.path.glob(f'{session_stem}*.npy'):
+                    if a_npy_file.is_file():
+                        syncable_files.append(a_npy_file.resolve())
+        if extra_globs is not None:
+            for a_glob_pattern in extra_globs:
+                for a_matched_file in self.path.glob(a_glob_pattern):
+                    if a_matched_file.is_file():
+                        syncable_files.append(a_matched_file.resolve())
+        return list(dict.fromkeys(syncable_files))
+
+
+    @classmethod
+    def build_cross_root_results_sync_copydict(cls, fast_session_folders: List["ConcreteSessionFolder"], session_fast_roots: Dict[IdentifyingContext, Path], archive_data_root: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, skip_if_dest_newer_or_equal: bool = True, debug_print: bool = False) -> Dict[Path, Path]:
+        """Build a fast->archive hierarchical copydict for computed session results, skipping sessions already on archive root or missing archive folders.
+
+        Usage:
+            from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
+            copy_dict = ConcreteSessionFolder.build_cross_root_results_sync_copydict(good_session_concrete_folders, session_global_data_root_parent_paths, archive_data_root)
+        """
+        archive_data_root = Path(archive_data_root).resolve()
+        sync_copydict: Dict[Path, Path] = {}
+        for a_session_folder in fast_session_folders:
+            fast_data_root = session_fast_roots.get(a_session_folder.context)
+            if fast_data_root is None:
+                if debug_print:
+                    print(f'WARN: skipping {a_session_folder.context}: no fast data root in session_fast_roots')
+                continue
+            fast_data_root = Path(fast_data_root).resolve()
+            if fast_data_root == archive_data_root:
+                if debug_print:
+                    print(f'skipping {a_session_folder.context}: fast root equals archive root ({fast_data_root})')
+                continue
+            archive_session_basedir = convert_filelist_to_new_parent([a_session_folder.path.resolve()], original_parent_path=fast_data_root, dest_parent_path=archive_data_root)[0].resolve()
+            if not archive_session_basedir.is_dir():
+                print(f'WARN: skipping {a_session_folder.context}: archive session folder missing: {archive_session_basedir}')
+                continue
+            source_files = a_session_folder.discover_syncable_result_files(include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs)
+            if len(source_files) == 0:
+                if debug_print:
+                    print(f'skipping {a_session_folder.context}: no syncable source files found under {a_session_folder.path}')
+                continue
+            session_copydict = build_cross_root_copydict(source_files, source_data_root=fast_data_root, dest_data_root=archive_data_root, skip_if_dest_newer_or_equal=skip_if_dest_newer_or_equal)
+            if debug_print:
+                print(f'{a_session_folder.context}: {len(session_copydict)} file(s) to sync from {fast_data_root} -> {archive_data_root}')
+            sync_copydict.update(session_copydict)
+        return sync_copydict
+
+
     @classmethod
     def build_concrete_session_folders(cls, global_data_root_parent_path: Path, included_session_contexts: list, debug_print=False) -> List["ConcreteSessionFolder"]:
         """ 
@@ -265,6 +335,48 @@ class ConcreteSessionFolder:
         
         good_session_concrete_folders = [ConcreteSessionFolder(a_context, a_basedir) for a_context, a_basedir in included_output_session_basedir_dict.items()]
         return good_session_concrete_folders
+
+
+def sync_computed_session_results_to_archive_root(fast_session_folders: List[ConcreteSessionFolder], session_fast_roots: Dict[IdentifyingContext, Path], archive_data_root: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, skip_if_dest_newer_or_equal: bool = True, dry_run: bool = False, print_progress: bool = True, debug_print: bool = False, save_copydict_path: Optional[Path] = None) -> Tuple[Dict[Path, Path], Optional[Dict[Path, Path]]]:
+    """Sync computed session results from fast storage to the corresponding archive session folders.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.runBatch import sync_computed_session_results_to_archive_root
+        planned_copydict, moved_files_dict = sync_computed_session_results_to_archive_root(good_session_concrete_folders, session_global_data_root_parent_paths, archive_data_root, dry_run=True)
+    """
+    archive_data_root = Path(archive_data_root).resolve()
+    assert archive_data_root.exists(), f"archive_data_root: {archive_data_root} does not exist!"
+    planned_copydict = ConcreteSessionFolder.build_cross_root_results_sync_copydict(fast_session_folders, session_fast_roots, archive_data_root, include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs, skip_if_dest_newer_or_equal=skip_if_dest_newer_or_equal, debug_print=debug_print)
+    print(f'sync_computed_session_results_to_archive_root: {len(planned_copydict)} file(s) planned for sync to archive root {archive_data_root}')
+    if save_copydict_path is not None:
+        save_copydict_to_text_file(planned_copydict, filelist_path=Path(save_copydict_path).resolve(), debug_print=debug_print)
+    if dry_run or len(planned_copydict) == 0:
+        return planned_copydict, None
+    moved_files_dict = copy_movedict(planned_copydict, print_progress=print_progress)
+    return planned_copydict, moved_files_dict
+
+
+def sync_staged_session_results_with_verification(shm_session_folder: "ConcreteSessionFolder", source_data_root: Path, shm_data_root: Path, manifest_path: Path, include_preprocessing_npy: bool = True, extra_globs: Optional[List[str]] = None, max_attempts: int = 5, per_file_retries: int = 3, verify_checksum: bool = False, print_progress: bool = True, fail_on_empty_copydict: bool = True) -> bool:
+    """Copy computed session artifacts from shm staging back to source_data_root with verified atomic writes and retries.
+
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.runBatch import sync_staged_session_results_with_verification
+        ok = sync_staged_session_results_with_verification(shm_session_folder, source_data_root, shm_data_root, manifest_path)
+    """
+    source_data_root = Path(source_data_root).resolve()
+    shm_data_root = Path(shm_data_root).resolve()
+    manifest_path = Path(manifest_path).resolve()
+    source_files = shm_session_folder.discover_syncable_result_files(include_preprocessing_npy=include_preprocessing_npy, extra_globs=extra_globs)
+    if len(source_files) == 0:
+        msg = f'sync_staged_session_results_with_verification: no syncable source files under {shm_session_folder.path}'
+        print(msg)
+        return not fail_on_empty_copydict
+    file_copydict = build_cross_root_copydict(source_files, source_data_root=shm_data_root, dest_data_root=source_data_root, skip_if_dest_newer_or_equal=False)
+    if len(file_copydict) == 0:
+        msg = f'sync_staged_session_results_with_verification: empty copydict for {shm_session_folder.context}'
+        print(msg)
+        return not fail_on_empty_copydict
+    return sync_file_copydict_with_verification(file_copydict, manifest_path=manifest_path, max_attempts=max_attempts, per_file_retries=per_file_retries, verify_checksum=verify_checksum, print_progress=print_progress)
 
 
 @unique
@@ -336,6 +448,8 @@ class BatchRun(HDF_SerializationMixin):
 
         # BEGIN FUNCTION BODY
         global_batch_run = _try_load_global_batch_result()
+        if global_batch_run is not None:
+            global_batch_run.session_batch_outputs = {a_session_context: PipelineCompletionResult.migrate_session_batch_output(a_result) for a_session_context, a_result in global_batch_run.session_batch_outputs.items()}
         if (global_batch_run is not None) and (not skip_root_path_conversion):
             # One was loaded from file, meaning it has the potential to have the wrong paths. Check.
             global_batch_run.change_global_root_path(global_data_root_parent_path) # Convert the paths to work on the new system:
@@ -725,8 +839,9 @@ class BatchRun(HDF_SerializationMixin):
             # Create a new group at the specified key
             root_group = h5file.create_group("/", name='batch_run', title="Pipeline Completion Results")
 
-            # Create a new table for each PipelineCompletionResult object
-            files_table = h5file.create_table(root_group, f"batch_run_table", PipelineCompletionResultTable) # the table is actually at the top level yeah? Each session only has one of these?
+            has_kdiba_results = any(isinstance(a_result, KDibaPipelineCompletionResult) for a_result in session_batch_outputs if a_result is not None)
+            table_class = KDibaPipelineCompletionResultTable if has_kdiba_results else PipelineCompletionResultTable
+            files_table = h5file.create_table(root_group, f"batch_run_table", table_class) # the table is actually at the top level yeah? Each session only has one of these?
             
             # table.
             # Iterate through the PipelineCompletionResult objects and store them in the HDF5 file
@@ -737,25 +852,10 @@ class BatchRun(HDF_SerializationMixin):
                     
                     row = files_table.row
 
-                    # Fill in the fields of the table with data from the PipelineCompletionResult object
-                    row['long_epoch_name'] = a_result.long_epoch_name
-                    row['long_n_laps'] = a_result.long_laps.n_epochs
-                    row['long_n_replays'] = a_result.long_replays.n_epochs
-                    
-                    row['short_epoch_name'] = a_result.short_epoch_name
-                    row['short_n_laps'] = a_result.short_laps.n_epochs
-                    row['short_n_replays'] = a_result.short_replays.n_epochs
-                    
-
-
-
-                    # Convert timedelta to seconds and then to nanoseconds
-                    time_in_seconds = a_result.delta_since_last_compute.total_seconds()
-                    time_in_nanoseconds = int(time_in_seconds * 1e9)
-                    # Convert to np.int64 (64-bit integer) for tb.Time64Col()
-                    time_as_np_int64 = np.int64(time_in_nanoseconds)
-
-                    row['delta_since_last_compute'] = time_as_np_int64
+                    if has_kdiba_results:
+                        fill_kdiba_pipeline_completion_result_table_row_from_result(row, a_result)
+                    else:
+                        fill_pipeline_completion_result_table_common_row_fields(row, a_result)
 
                     # Handle outputs_local and outputs_global dictionaries
                     # if result.outputs_local is not None:
@@ -870,7 +970,7 @@ class BatchResultDataframeAccessor():
         out_counts = []
         out_new_column_names = ['n_long_laps', 'n_long_replays', 'n_short_laps', 'n_short_replays']
         for ctx, output_v in global_batch_run.session_batch_outputs.items():
-            if output_v is not None:
+            if output_v is not None and isinstance(output_v, KDibaPipelineCompletionResult):
                 # {long_epoch_name:(long_laps, long_replays), short_epoch_name:(short_laps, short_replays)}
                 # Extracting (long_laps, long_replays) tuple
                 long_laps = output_v.long_laps
@@ -1153,6 +1253,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     epoch_name_includelist = kwargs.pop('epoch_name_includelist', None)
     active_computation_functions_name_includelist = kwargs.pop('computation_functions_name_includelist', None) or ['_perform_baseline_placefield_computation',
                                             '_perform_position_decoding_computation', 
+                                            '_perform_clusterless_position_decoding_computation',
                                             '_perform_firing_rate_trends_computation',
                                         ]
     
@@ -1164,6 +1265,7 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     
     fail_on_exception = kwargs.pop('fail_on_exception', True)
     debug_print = kwargs.pop('debug_print', False)
+    preflight_bapun_batch_helpers_run_all = bool(kwargs.pop('preflight_bapun_batch_helpers_run_all', False))
     _out_error = None
 
     try:
@@ -1176,15 +1278,23 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         ## can fail here before callback function is even called.
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, None)
-        new_print(f'exception occured: {an_error}')
+        new_print(f'exception occured: {an_error!r}\n{an_error.get_full_traceback()}')
         if fail_on_exception:
             raise # Re-raises the original exception with its traceback
         new_print(f'"{_line_sweep} END BATCH {_line_sweep}\n\n')
-        _out_error = f"{an_error}"
+        _out_error = f"{an_error!r}\n{an_error.get_full_traceback()}"
         
         return (SessionBatchProgress.FAILED, _out_error, None) # return the Failed status and the exception that occured.
     # finally:
     #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
+
+    if preflight_bapun_batch_helpers_run_all:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunBatchHelpers
+        new_print(f'{_line_sweep} runBatch Bapun preflight: BapunBatchHelpers.run_all {_line_sweep}')
+        curr_active_pipeline, _preflight_out_dict = BapunBatchHelpers.run_all(curr_active_pipeline=curr_active_pipeline)
+        new_print(f'Bapun preflight complete;')
+        if _preflight_out_dict is not None:
+            new_print(f'\t_preflight_out_dict keys: {list(_preflight_out_dict.keys()) if isinstance(_preflight_out_dict, dict) else type(_preflight_out_dict)!r}')
 
     if post_run_callback_fn is not None:
         if fail_on_exception:
@@ -1197,12 +1307,12 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
             except Exception as e:
                 exception_info = sys.exc_info()
                 an_error = CapturedException(e, exception_info, curr_active_pipeline)
-                new_print(f'error occured in post_run_callback_fn: {an_error}. Suppressing.')
+                new_print(f'error occured in post_run_callback_fn: {an_error!r}\n{an_error.get_full_traceback()}. Suppressing.')
                 # if fail_on_exception:
                     # raise e.exc
                 post_run_callback_fn_output = None
                 if return_post_run_callback_fn_errors:
-                    _out_error = f"{an_error}"
+                    _out_error = f"{an_error!r}\n{an_error.get_full_traceback()}"
 
     #         finally:
     #             print = _backup_print # restore default print, I think it's okay because it's only used in this context.
@@ -1285,6 +1395,7 @@ def main(active_result_suffix:str='CHANGEME_TEST', included_session_contexts: Op
                                             # '_perform_time_dependent_placefield_computation',
                                             '_perform_extended_statistics_computation',
                                             '_perform_position_decoding_computation', 
+                                            '_perform_clusterless_position_decoding_computation',
                                             '_perform_firing_rate_trends_computation',
                                             '_perform_pf_find_ratemap_peaks_computation',
                                             # '_perform_time_dependent_pf_sequential_surprise_computation'

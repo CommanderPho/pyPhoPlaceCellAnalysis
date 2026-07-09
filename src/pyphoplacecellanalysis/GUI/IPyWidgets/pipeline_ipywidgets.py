@@ -1181,7 +1181,7 @@ class PipelinePickleFileSelectorWidget:
         return corresponding_global_file_name, corresponding_global_section_index
     
     @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
-    def try_select_first_valid_files(self) -> bool:
+    def try_select_first_valid_files(self, require_global_file: bool=False) -> bool:
         """
         try selecting the first
         """
@@ -1199,7 +1199,10 @@ class PipelinePickleFileSelectorWidget:
         if corresponding_global_section_index is None:
             # failed to find
             self.global_file_browser_widget.selection = [] ## clear global selection
-            return False # failed
+            if require_global_file:
+                return False # failed
+            else:
+                return True # success without global file
         else:
             corresponding_global_section_indicies = [corresponding_global_section_index] # single list
 

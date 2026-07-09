@@ -36,8 +36,8 @@ from pyphoplacecellanalysis.General.Mixins.DataSeriesColorHelpers import DataSer
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtGui # for QColor build_neurons_color_data
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
 
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
-from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
+# from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster import Spike3DRaster
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike3DRaster_Vedo import Spike3DRaster_Vedo
 from pyphoplacecellanalysis.GUI.Qt.SpikeRasterWindows.Spike3DRasterWindowWidget import Spike3DRasterWindowWidget
@@ -907,7 +907,7 @@ def build_scatter_plot_kwargs(scatter_plot_kwargs=None, tick_width: float = 1.0,
         # Merge the default kwargs with the user-provided kwargs
         merged_kwargs = {**default_scatter_plot_kwargs, **scatter_plot_kwargs}
 
-    print(f'merged_kwargs: {merged_kwargs}')
+    # print(f'merged_kwargs: {merged_kwargs}')
     return merged_kwargs
 
 def _build_units_y_grid(plot_item) -> pg.GridItem:

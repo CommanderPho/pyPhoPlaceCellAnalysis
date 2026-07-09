@@ -139,6 +139,7 @@ class IntervalsDatasource(BaseDatasource):
         ## Validate that it has all required columns:
         assert np.isin(IntervalsDatasource._required_interval_time_columns, df.columns).all(), f"dataframe is missing required columns:\n Required: {IntervalsDatasource._required_interval_time_columns}, current: {df.columns} "
         self._df = df
+        self.is_named_multi_epoch_series: Optional[bool] = None
 
 
         

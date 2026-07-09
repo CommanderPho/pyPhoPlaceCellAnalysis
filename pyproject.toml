@@ -1,6 +1,6 @@
 [project]
 name = "pyphoplacecellanalysis"
-version = "0.3.7"
+version = "0.3.9"
 description = ""
 authors = [{ name = "Pho Hale", email = "halechr@umich.edu" }]
 requires-python = ">=3.9,<3.12"
@@ -29,7 +29,7 @@ dependencies = [
     "napari[pyqt5]>=0.4.18,<0.5",
     "napari-animated-gif-io>=0.1.2,<0.2",
     "napari-animation>=0.0.8,<0.0.9",
-    "panel>=1.2.3,<2",
+    "panel>=1.4,<2",
     "params>=0.9.0,<0.10",
     "jupyter-bokeh>=3.0.7,<4",
     "pyqt-builder>=1.15.3,<2",
@@ -45,10 +45,15 @@ dependencies = [
     "numpy>=1.23.5",
     "pyclustering>=0.10.1.2",
     "silx>=2.2.0,<3",
+    "numba>=0.57,<0.62",
+    "replay-trajectory-classification>=1.4.1",
+    "spyglass-neuro",
+    "non-local-detector>=0.6.9",
 ]
 
 [dependency-groups]
 dev = [
+    "lxml-html-clean>=0.4.0,<1",
     "pytest>=7.2.1,<8",
     "ipython>=8.9.0,<9",
     "viztracer>=0.15.6,<0.16",
@@ -71,6 +76,7 @@ gui = [
     "mpl-multitab",
     "patchworklib>=0.5.2,<0.6",
     "pyqt-responsive-label>=0.0.3,<0.0.4",
+    "vedo",
 ]
 testing = [
     "bcubed>=1.5",
@@ -91,6 +97,8 @@ mpl-multitab = { git = "https://github.com/CommanderPho/mpl-multitab.git", rev =
 neuropy = { path = "../NeuroPy", editable = true }
 pybursts = { git = "https://github.com/CommanderPho/pybursts.git", rev = "master" }
 pyphocorehelpers = { path = "../pyPhoCoreHelpers", editable = true }
+vedo = { git = "https://github.com/CommanderPho/vedo.git", rev = "feature/merge-upstream" }
+spyglass-neuro = { path = "../spyglass", editable = true }
 
 [build-system]
 requires = ["hatchling"]

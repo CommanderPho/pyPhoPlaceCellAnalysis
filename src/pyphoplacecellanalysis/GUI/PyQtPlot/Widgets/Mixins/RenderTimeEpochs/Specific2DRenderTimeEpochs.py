@@ -73,9 +73,17 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
             else:
                 # Scalar value assignment:
                 active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
-        
+
+        text_label = kwargs.get('label', kwargs.get('name', None))
+        if text_label is not None and 'label' in active_df.columns:
+            if isinstance(text_label, (list, tuple)):
+                active_df['label'] = list(text_label)
+            else:
+                active_df['label'] = text_label
+
         return active_df #, kwargs
     
+
     @classmethod
     def build_epochs_dataframe_formatter(cls, **kwargs):
         def _add_interval_dataframe_visualization_columns_general_epoch(active_df):
@@ -95,6 +103,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
             return active_df
 
         return _add_interval_dataframe_visualization_columns_general_epoch
+
 
     @classmethod
     def build_render_time_epochs_datasource(cls, active_epochs_obj, **kwargs):
@@ -131,6 +140,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
             raise NotImplementedError
         return general_epochs_interval_datasource
 
+
     @classmethod
     def is_render_time_epochs_enabled(cls, curr_sess, **kwargs) -> bool:
         """ takes the exact same arguments as `add_render_time_epochs(...) but returns True if the call would be valid and False otherwise. """
@@ -163,7 +173,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         elif isinstance(curr_sess, (Epoch, pd.DataFrame, tuple)):
             active_Epochs = curr_sess  # <Epoch> object passed directly
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'.add_render_time_epochs(...): unexpected type for curr_sess: {type(curr_sess)}, curr_sess: {curr_sess}.')
         interval_datasource = cls.build_render_time_epochs_datasource(active_epochs_obj=active_Epochs, **kwargs)
         out_rects = destination_plot.add_rendered_intervals(interval_datasource, name=kwargs.setdefault('name', cls.default_datasource_name), debug_print=True)
         
@@ -243,7 +253,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
     def add_render_time_epochs(cls, curr_sess, destination_plot, **kwargs):
         """Override to handle Bapun-type sessions with proper epoch intervals.
         
-        For Bapun sessions, uses the correct epoch intervals from build_bapun_proper_epoch_intervals.
+        For Bapun sessions, uses the correct epoch intervals from build_proper_epoch_intervals.
         For other sessions, falls back to the default behavior.
         """
         # Check if this is a Bapun session
@@ -260,7 +270,7 @@ class SessionEpochs2DRenderTimeEpochs(General2DRenderTimeEpochs):
             # Build the Bapun epochs dataframe
             curr_paradigm_df = cls._build_bapun_epochs_dataframe_from_session(sess)
             
-            # Add color columns (adapted from build_bapun_proper_epoch_intervals)
+            # Add color columns (adapted from build_proper_epoch_intervals)
             curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
             curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
             

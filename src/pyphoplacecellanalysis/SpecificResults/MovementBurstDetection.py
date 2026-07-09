@@ -1028,6 +1028,25 @@ def compute_movement_trajectories_from_bursts(curr_active_pipeline, epoch_names 
     
         _lap_burst_detection_results, _out_laps = compute_movement_trajectories_from_bursts(curr_active_pipeline)
         
+        
+
+    Real usage:    
+        from pyphoplacecellanalysis.SpecificResults.MovementBurstDetection import compute_movement_trajectories_from_bursts
+    
+        burst_detector_kwargs = dict(
+                    min_burst_duration=1.5,      # Minimum burst duration in seconds
+                    min_rest_duration=0.1,       # Minimum rest period between bursts
+                    velocity_smoothing=0.15,     # Smoothing for velocity calculation
+                    bocd_hazard=120,             # Sensitivity of changepoint detection
+                    # clustering_method='hdbscan',  # Clustering algorithm
+                    # clustering_method='dbscan',  # Clustering algorithm
+                    clustering_method='dip',  # Use DipExt from clustpy
+                    use_gpu=False,             # Set to True if you have CUDA
+        )
+        _lap_burst_detection_results, _out_laps = compute_movement_trajectories_from_bursts(curr_active_pipeline, **burst_detector_kwargs)
+
+
+
     """
     # import clustpy
     # import bayesian_changepoint_detection

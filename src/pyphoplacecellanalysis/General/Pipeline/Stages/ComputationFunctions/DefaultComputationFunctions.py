@@ -1,11 +1,13 @@
 from copy import deepcopy
 import sys
-from typing import List, Optional
+from pathlib import Path
+from typing import Any, List, Optional
 from nptyping import NDArray
 import numpy as np
 import pandas as pd
 
 # NeuroPy (Diba Lab Python Repo) Loading
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 from neuropy.utils.dynamic_container import DynamicContainer # for _perform_two_step_position_decoding_computation
 from neuropy.utils.efficient_interval_search import get_non_overlapping_epochs # used in _subfn_compute_decoded_epochs to get only the valid (non-overlapping) epochs
 
@@ -14,6 +16,10 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
+from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters, build_is_training_mask, clusterless_events_to_spyglass_spike_lists, epochs_from_pfnd, pfnd_to_spyglass_position_info
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -64,9 +70,13 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             print(f'\tdid_change: {did_change}')
             
         ## filtered_spikes_df version:
-        computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
-        assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
-        computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
+        if (computation_result.computed_data['pf1D'].ratemap.n_neurons > 0):
+            computation_result.computed_data['pf1D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=computation_result.computed_data['pf1D'], spikes_df=computation_result.computed_data['pf1D'].filtered_spikes_df.copy(), debug_print=False)
+            assert (len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin) == computation_result.computed_data['pf1D_Decoder'].num_time_windows), f"len(self.is_non_firing_time_bin): {len(computation_result.computed_data['pf1D_Decoder'].is_non_firing_time_bin)}, self.num_time_windows: {computation_result.computed_data['pf1D_Decoder'].num_time_windows}"
+            computation_result.computed_data['pf1D_Decoder'].compute_all() # this is what breaks it
+        else:
+            print(f"WARN: _perform_position_decoding_computation(...): 1D decoding is not possible because the computation_result.computed_data['pf1D'] has ZERO neurons. Skipping and continuing.")
+
 
         if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
             pf = computation_result.computed_data['pf2D']
@@ -79,6 +89,185 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         return computation_result
     
 
+    @function_attributes(short_name='position_decoding_clusterless', tags=['decoding', 'position', 'clusterless'],
+                          input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_ClusterlessDecoder']", "computation_result.computed_data['pf2D_ClusterlessDecoder']"], uses=['ClusterlessRTCPositionDecoder', 'ClusterlessClassifier'], used_by=[], creation_date='2026-06-30 00:00', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
+    def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None,
+                                                        #    multiunits: Optional[np.ndarray] = None, rtc_time: Optional[np.ndarray] = None,
+                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[ClusterlessDecodingParameters] = None,
+                                                           should_defer_compute_all_decoded_times: bool = True,  
+                                                             **kwargs):
+        """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        from neuropy.core.clusterless_spike_events import default_clusterless_spike_events_path
+        from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
+
+        sess = computation_result.sess
+        assert sess is not None
+        pos_sampling_rate_Hz: float = float((getattr(sess.position, 'metadata', None) or {}).get('sampling_rate', sess.position_sampling_rate))  ## Hz ##
+        
+        # ... after sess = computation_result.sess ...
+
+        if clusterless_spike_events is None:
+            clusterless_spike_events = getattr(sess, 'clusterless_spike_events', None)
+        if clusterless_spike_events is None:
+            session_basedir = Path(getattr(sess, 'basepath', None) or Path(sess.filePrefix).parent)
+            session_name = getattr(getattr(sess, 'config', None), 'session_name', None) or getattr(sess, 'name', None) or Path(sess.filePrefix).stem
+            clusterless_events_path = default_clusterless_spike_events_path(session_basedir, session_name)
+            if clusterless_events_path.is_file():
+                clusterless_spike_events = load_clusterless_spike_events(clusterless_events_path)
+                sess.clusterless_spike_events = clusterless_spike_events  # cache for reuse
+
+        assert clusterless_spike_events is not None, f'2026-06-30 - requires clusterless_spike_events, but clusterless_spike_events is None'
+        active_events: ClusterlessSpikeEvents = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
+
+
+        if time_bin_size is None:
+            time_bin_size = getattr(getattr(computation_result.computation_config, 'pf_params', None), 'time_bin_size', None)
+    
+
+        if time_bin_size is not None:
+            print(f'WARN: time_bin_size (time_bin_size: {time_bin_size}) is not currently used in `_perform_clusterless_position_decoding_computation`... ')
+
+        if clusterless_params is None:
+            if sampling_frequency_hz is None:
+                sampling_frequency_hz = 1000.0 # 1000Hz
+                # sampling_frequency_hz = 1000.0 if time_bin_size is None else (1.0 / float(time_bin_size))
+            clusterless_params = ClusterlessDecodingParameters(clusterless_sampling_frequency_hz=float(sampling_frequency_hz), position_sampling_frequency_Hz=float(pos_sampling_rate_Hz))
+        else:
+            clusterless_params = deepcopy(clusterless_params)
+            if sampling_frequency_hz is not None:
+                clusterless_params.clusterless_sampling_frequency_hz = float(sampling_frequency_hz)
+            if pos_sampling_rate_Hz is not None:
+                clusterless_params.position_sampling_frequency_Hz = float(pos_sampling_rate_Hz)
+
+        # movement_var = estimate_movement_var(source_pos_df[['x', 'y']].to_numpy(), sampling_frequency=clusterless_params.position_sampling_frequency_Hz)        
+        ## pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
+        
+
+        def _build_decoder_for_pf(pf):
+            """ captures: active_events, clusterless_params """
+            assert active_events is not None, f'2026-06-30 - \t in _build_decoder_for_pf()\t requires active_events, but active_events is None'
+            assert clusterless_params is not None, f'2026-06-30 - \t in _build_decoder_for_pf()\t requires clusterless_params, but clusterless_params is None'
+
+            pos_df = pf.filtered_pos_df
+            # pos_sampling_rate_Hz: float = pos_df.metadata.metadata.get('sampling_rate', 120.0) ## Hz
+            # pos_sampling_rate_Hz
+            if 'y' not in pos_df:
+                # 1D
+                active_pos_arr = pos_df['x'].to_numpy()
+            else:
+                ## 2D
+                active_pos_arr = pos_df[['x', 'y']].to_numpy()
+
+            # movement_var = estimate_movement_var(active_pos_arr, sampling_frequency=clusterless_params.position_sampling_frequency_Hz)
+            # # If your marks are integers, use this algorithm because it is much faster
+            # clusterless_algorithm = 'multiunit_likelihood'
+            # clusterless_algorithm_params = {
+            #     'mark_std': 1.0,
+            #     'position_std': 12.5,
+            # }
+            # environment = Environment(place_bin_size=np.sqrt(movement_var))
+            # continuous_transition_types = [[RandomWalk(movement_var=movement_var * 120),  Uniform(), Identity()],
+            #                                 [Uniform(),                                   Uniform(), Uniform()],
+            #                                 [RandomWalk(movement_var=movement_var * 120), Uniform(), Identity()],
+            #                             ]
+            # classifier: ClusterlessClassifier = ClusterlessClassifier(environments=environment,
+            #                                         continuous_transition_types=continuous_transition_types,
+            #                                         clusterless_algorithm=clusterless_algorithm,
+            #                                         clusterless_algorithm_params=clusterless_algorithm_params,
+            #                                     )
+            # classifier.fit(active_pos_arr, multiunits)
+
+            source_times = pos_df['t'].to_numpy(dtype=float) if 't' in pos_df.columns else pos_df['t_seconds'].to_numpy(dtype=float)
+            t_start = float(source_times.min())
+            t_end = float(source_times.max())
+            
+
+            pf_multiunits, pf_rtc_time = build_multiunits_from_spike_events(active_events, t_start=t_start, t_end=t_end, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz)
+
+            # elif (multiunits is not None):
+            #     raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events` - clusterless_spike_events is None and multiunits is not None')
+            #     pf_multiunits, pf_rtc_time = build_multiunits_from_array(multiunits, rtc_time)
+            # else:
+            #     raise NotImplementedError(f'2026-06-30 - bad method now that I have `clusterless_spike_events` - clusterless_spike_events is None and multiunits is None')
+            #     pf_multiunits, pf_rtc_time = build_multiunits_from_session(sess, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz,
+            #                                                                 t_start=t_start, t_end=t_end, spikes_df=pf.filtered_spikes_df.copy())
+
+            decoder = ClusterlessRTCPositionDecoder(pf=pf, sampling_frequency_hz=clusterless_params.clusterless_sampling_frequency_hz, multiunits=pf_multiunits, rtc_time=pf_rtc_time, clusterless_params=clusterless_params, setup_on_init=True, post_load_on_init=False, debug_print=False)
+            if not should_defer_compute_all_decoded_times:
+                decoder.compute_all() ## #TODO 2026-07-01 19:02: - [ ] is this full compute really needed? The BasePositionDecoder doesn't compute like this all (doesn't store results).
+            else:
+                print(f'\tWARN: should_defer_compute_all_decoded_times == True, so not running `decoder.compute_all()`.')
+            return decoder
+        ## END def _build_decoder_for_pf(...
+
+
+        computation_result.computed_data['pf1D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf1D'])
+        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
+            computation_result.computed_data['pf2D_ClusterlessDecoder'] = _build_decoder_for_pf(computation_result.computed_data['pf2D'])
+        else:
+            computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
+
+        return computation_result
+    
+
+    @function_attributes(short_name='position_decoding_spyglass_clusterless', tags=['decoding', 'position', 'clusterless', 'spyglass'],
+                          input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_SpyglassClusterlessDecoder']", "computation_result.computed_data['pf2D_SpyglassClusterlessDecoder']"], uses=['SpyglassClusterlessDecoder', 'ClusterlessDetector'], used_by=[], creation_date='2026-07-07 00:00', related_items=[],
+        validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_SpyglassClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_SpyglassClusterlessDecoder', None)), is_global=False)
+    def _perform_spyglass_clusterless_position_decoding_computation(computation_result: ComputationResult, clusterless_spike_events: Optional[Any] = None, spyglass_params: Optional[SpyglassClusterlessDecodingParameters] = None, should_defer_compute_all_decoded_times: bool = True, **kwargs):
+        """ Builds Spyglass/non_local_detector clusterless 2D position decoders on PfND spatial grids. """
+        from neuropy.core.clusterless_spike_events import ClusterlessSpikeEvents, default_clusterless_spike_events_path
+
+        sess = computation_result.sess
+        assert sess is not None
+
+        if clusterless_spike_events is None:
+            clusterless_spike_events = getattr(sess, 'clusterless_spike_events', None)
+        if clusterless_spike_events is None:
+            session_basedir = Path(getattr(sess, 'basepath', None) or Path(sess.filePrefix).parent)
+            session_name = getattr(getattr(sess, 'config', None), 'session_name', None) or getattr(sess, 'name', None) or Path(sess.filePrefix).stem
+            clusterless_events_path = default_clusterless_spike_events_path(session_basedir, session_name)
+            if clusterless_events_path.is_file():
+                clusterless_spike_events = load_clusterless_spike_events(clusterless_events_path)
+                sess.clusterless_spike_events = clusterless_spike_events
+
+        assert clusterless_spike_events is not None, 'requires clusterless_spike_events, but clusterless_spike_events is None'
+        active_events: ClusterlessSpikeEvents = load_clusterless_spike_events(clusterless_spike_events) if isinstance(clusterless_spike_events, (str, Path)) else clusterless_spike_events
+        spike_times, spike_waveform_features = clusterless_events_to_spyglass_spike_lists(active_events)
+
+        if spyglass_params is None:
+            spyglass_params = SpyglassClusterlessDecodingParameters()
+        else:
+            spyglass_params = deepcopy(spyglass_params)
+
+        def _build_spyglass_decoder_for_pf(pf):
+            if pf is None:
+                return None
+            if getattr(pf, 'ndim', 1) < 2:
+                print('WARN: SpyglassClusterlessDecoder (ContFragClusterlessClassifier) supports 2D placefields only; skipping pf1D.')
+                return None
+            position_info = pfnd_to_spyglass_position_info(pf, upsample_hz=spyglass_params.position_upsample_hz, position_variable_names=spyglass_params.resolved_position_variable_names(pf))
+            encoding_interval, decoding_interval = epochs_from_pfnd(pf)
+            position_variable_names = spyglass_params.resolved_position_variable_names(pf)
+            is_training_mask = build_is_training_mask(position_info, encoding_interval, position_variable_names)
+            decoder = SpyglassClusterlessDecoder(pf=pf, position_upsample_hz=spyglass_params.position_upsample_hz, position_info=position_info, spike_times=spike_times, spike_waveform_features=spike_waveform_features, encoding_interval=encoding_interval, decoding_interval=decoding_interval, position_variable_names=position_variable_names, spyglass_params=spyglass_params, is_training_mask=is_training_mask, setup_on_init=True, post_load_on_init=False, debug_print=False)
+            if not should_defer_compute_all_decoded_times:
+                decoder.compute_all()
+            else:
+                print('\tWARN: should_defer_compute_all_decoded_times == True, so not running `decoder.compute_all()`.')
+            return decoder
+        ## END def _build_spyglass_decoder_for_pf(...)
+
+
+        computation_result.computed_data['pf1D_SpyglassClusterlessDecoder'] = _build_spyglass_decoder_for_pf(computation_result.computed_data.get('pf1D', None))
+        if ('pf2D' in computation_result.computed_data) and (computation_result.computed_data.get('pf2D', None) is not None):
+            computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = _build_spyglass_decoder_for_pf(computation_result.computed_data['pf2D'])
+        else:
+            computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = None
+
+        return computation_result
+    
+
     @function_attributes(short_name='position_decoding_two_step', tags=['decoding', 'position', 'two-step'],
                           input_requires=["computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['pf1D_TwoStepDecoder']", "computation_result.computed_data['pf2D_TwoStepDecoder']"],
                           uses=['_compute_avg_speed_at_each_position_bin'], used_by=[], creation_date='2023-09-12 17:32', related_items=[],
@@ -86,7 +275,6 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
-        from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
 
         def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
             """ captures debug_print 
@@ -358,7 +546,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                           input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
                           uses=[], used_by=[], creation_date='2023-04-07 02:16',
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
-    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
+    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, force_recompute: bool = False, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
         Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
 
@@ -378,9 +566,16 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
         found_result = curr_result.get(computation_tuple_key, None)
         if found_result is not None:
-            # Unwrap and reuse the result:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-            needs_compute = False # we don't need to recompute
+            if not force_recompute:
+                # Unwrap and reuse the result:
+                filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+                needs_compute = False # we don't need to recompute
+            else:
+                ## remove the extant result first
+                print(f'WARN: result found for key {computation_tuple_key} but force_recompute == True so removing the result and recomputing...')
+                found_result = curr_result.pop(computation_tuple_key, None)
+                found_result = None # null out the result
+                needs_compute = True ## force set it just to be safe
 
         if needs_compute:
             ## Do the computation:

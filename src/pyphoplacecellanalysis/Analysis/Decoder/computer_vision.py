@@ -63,6 +63,8 @@ class ComputerVisionComputations:
     
     out = TransitionMatrixComputations.plot_transition_matricies(decoders_dict=decoders_dict, binned_x_transition_matrix_higher_order_list_dict=binned_x_transition_matrix_higher_order_list_dict)
     out
+    
+    
 
     """
 
@@ -97,6 +99,11 @@ class ComputerVisionComputations:
 
     @classmethod
     def run_interactive(cls, input_img):
+        """ 
+        Usage:
+        
+            ComputerVisionComputations.run_interactive(an_img)
+        """
         from ipywidgets import interact, FloatSlider, IntSlider, fixed
         
         interact(cls.interactive_image_preview, 
@@ -370,7 +377,10 @@ class ComputerVisionComputations:
 
     @classmethod
     def imshow(cls, img: NDArray, xbin_edges=None, ybin_edges=None):
-        """ visualizes the image using matplotlib's imshow """
+        """ visualizes the image using matplotlib's imshow 
+        Usage:
+            fig, imv = ComputerVisionComputations.imshow(img, xbin_edges=a_decoder.xbin, ybin_edges=a_decoder.ybin)
+        """
         
         img_shape = np.shape(img)
         

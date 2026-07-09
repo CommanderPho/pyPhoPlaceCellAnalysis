@@ -42,6 +42,7 @@ from pyphocorehelpers.gui.Qt.color_helpers import build_adjusted_color # require
 
 from pyphoplacecellanalysis.General.DataSeriesToSpatial import DataSeriesToSpatial
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.SpikeRasterBase import SpikeRasterBase
+from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.TimeSynchronizedPositionDecoderPlotter import _decoder_bin_left_right_edges
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DScrollWindowPlot import Render2DScrollWindowPlotMixin
 from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.Render2DNeuronIdentityLinesMixin import Render2DNeuronIdentityLinesMixin
 
@@ -790,8 +791,6 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
     def _update_plots(self):
         """
         Seems to be called every time the timeline is scrolled at least.
-
-        
         """
         self.logger.debug(f'Spike2DRaster._update_plots()')
         if self.enable_debug_print:
@@ -813,37 +812,142 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         min_t, max_t = evt ## using signal proxy turns original arguments into a tuple
         self.update_zoomed_plot(min_t, max_t)
 
+    @pyqtExceptionPrintingSlot(float)
+    def update_window_start(self, new_value):
+        # self.timeWindow.update_window_start(new_value)
+        self.perform_update_zoomed_plot(min_t=new_value, max_t=None)
+
+    @pyqtExceptionPrintingSlot(float, float)
+    def update_window_start_end(self, new_start, new_end):
+        # self.timeWindow.update_window_start_end(new_start, new_end)
+        self.perform_update_zoomed_plot(min_t=new_start, max_t=new_end)
+
+
+    ############### Rate-Limited SLots ###############:
+    ##################################################
+    ## For use with pg.SignalProxy
+    # using signal proxy turns original arguments into a tuple
+    @pyqtExceptionPrintingSlot(object)
+    def update_window_start_rate_limited(self, evt):
+        if len(evt) == 1:
+            self.update_window_start(*evt)
+        elif len(evt) == 2:
+            ## truncate to just the first, as expected output is start_t, end_t = evt
+            start_t = evt[0]
+            self.update_window_start(start_t)
+        else:
+            raise NotImlementedError(f'update_window_start_rate_limited(evt): len(evt): {len(evt)}, evt: {evt}')
+
+
+
+
+    def _hide_decoded_posterior_active_bin_highlight(self) -> None:
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is not None:
+            reg.hide()
+
+
+
+    def _apply_decoded_posterior_x_grid(self, min_t: float, max_t: float) -> None:
+        """Decoded time-bin vertical grid for BapunDecodingWindowRaster only (see PendingNotebookCode). When decoded_posterior_x_grid_highlight_decoder_plotter is set and use_all_active_viewport_timebins is False, shades the decoded bin whose posterior is shown (left-edge index, same as viewport start_t)."""
+        if self.applicationName != 'BapunDecodingWindowRaster':
+            return
+        dec = self.params.get('decoded_posterior_x_grid_one_step_decoder', None)
+        plot_w = self.plots.main_plot_widget
+        hl_plotter = self.params.get('decoded_posterior_x_grid_highlight_decoder_plotter', None)
+        if dec is None or plot_w is None:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        centers = np.asarray(dec.time_window_centers, dtype=float)
+        n = len(centers)
+        if n == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        left, right = _decoder_bin_left_right_edges(dec, centers)
+        edge_list: List[float] = []
+        for i in range(n):
+            if right[i] < min_t or left[i] > max_t:
+                continue
+            edge_list.append(float(left[i]))
+            edge_list.append(float(right[i]))
+        if len(edge_list) == 0:
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        edges = np.unique(np.asarray(edge_list, dtype=float))
+        show_labels = self.params.get('decoded_posterior_x_grid_show_labels', None)
+        if show_labels is None:
+            show_labels = len(edges) <= 25
+        alpha = float(self.params.get('decoded_posterior_x_grid_alpha', 0.35))
+        bottom = plot_w.getAxis('bottom')
+        ticks = [(float(e), f'{e:g}') for e in edges] if show_labels else [(float(e), '') for e in edges]
+        bottom.setTicks([ticks])
+        plot_w.showGrid(x=True, y=False, alpha=alpha)
+        if hl_plotter is None or getattr(hl_plotter, 'use_all_active_viewport_timebins', False):
+            self._hide_decoded_posterior_active_bin_highlight()
+            return
+        idx = int(np.searchsorted(centers, float(min_t), side='left'))
+        idx = max(0, min(idx, n - 1))
+        reg = getattr(self, '_decoded_posterior_active_bin_region', None)
+        if reg is None:
+            reg = pg.LinearRegionItem(values=[float(left[idx]), float(right[idx])], orientation='vertical', movable=False, brush=(255, 200, 60, 85))
+            reg.setZValue(-20)
+            plot_w.addItem(reg)
+            self._decoded_posterior_active_bin_region = reg
+        else:
+            reg.setRegion([float(left[idx]), float(right[idx])])
+        reg.show()
+
+
+    @function_attributes(short_name=None, tags=['update'], input_requires=[], output_provides=[], uses=[], used_by=['update_zoomed_plot', 'update_window_start', 'update_window_start_end'], creation_date='2026-04-01 06:03', related_items=[])
+    def perform_update_zoomed_plot(self, min_t: float, max_t: Optional[float]=None):
+        """ common internal function to perform the update of the window, with an optional max_t
+        """
+        needs_update_duration: bool = (max_t is not None)
+        
+        if max_t is None:
+            ## update window start only:
+            max_t = min_t + self.spikes_window.window_duration
+        
+
+        # Update the main_plot_widget:
+        if self.Includes2DActiveWindowScatter:
+            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+
+
+        if needs_update_duration:
+            # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
+            scroll_window_width = max_t - min_t
+            # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
+
+            # Update GUI if we have one:
+            if self.WantsRenderWindowControls:
+                self.ui.spinTemporalZoomFactor.setValue(1.0)
+                self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
+                            
+            # Here is the main problem: The duration and window end-time aren't being updated
+            self.spikes_window.update_window_start_end(min_t, max_t)
+                        
+        else:
+            ## update window start only:            
+            self.spikes_window.update_window_start(min_t)
+
+
+        # Update 3D Curves if we have them: TODO: figure out where this goes!
+        self.TimeCurvesViewMixin_on_window_update()
+        self._apply_decoded_posterior_x_grid(min_t, max_t)
+
+
+
 
     @pyqtExceptionPrintingSlot(float, float)
     def update_zoomed_plot(self, min_t, max_t):
         """ update the zoomed plot, the spikes_window, and update the dependent curves
         
         """
-        # Update the main_plot_widget:
-        if self.Includes2DActiveWindowScatter:
-            self.plots.main_plot_widget.setXRange(min_t, max_t, padding=0)
+        self.perform_update_zoomed_plot(min_t=min_t, max_t=max_t)
 
-        # self.render_window_duration = (max_x - min_x) # update the render_window_duration from the slider width
-        scroll_window_width = max_t - min_t
-        # print(f'min_x: {min_x}, max_x: {max_x}, scroll_window_width: {scroll_window_width}') # min_x: 59.62061245756003, max_x: 76.83228787177144, scroll_window_width: 17.211675414211413
 
-        # Update GUI if we have one:
-        if self.WantsRenderWindowControls:
-            self.ui.spinTemporalZoomFactor.setValue(1.0)
-            self.ui.spinRenderWindowDuration.setValue(scroll_window_width)
-            
-        # Finally, update the actual spikes_window. This is the part that updates the 3D Raster plot because we bind to this window's signal
-        # self.spikes_window.update_window_start(min_t)
-        
-        # Here is the main problem: The duration and window end-time aren't being updated
-        self.spikes_window.update_window_start_end(min_t, max_t)
-        
-        
-        # Update 3D Curves if we have them: TODO: figure out where this goes!
-        self.TimeCurvesViewMixin_on_window_update()
-        
-        
-        
+
     @pyqtExceptionPrintingSlot(float, float)
     def update_scroll_window_region(self, new_start, new_end, block_signals: bool=True):
         """ called to update the interactive scrolling window control
@@ -1189,6 +1293,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         ## This part might be 3D only, but we do have a working 2D version so maybe just bring that in?
         self.remove_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
         
+
     def update_3D_time_curves(self):
         """ initialize the graphics objects if needed, or update them if they already exist. """
         if self.params.time_curves_datasource is None:
@@ -1242,6 +1347,7 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 # end for curr_data_series_index in np.arange(num_data_series)
 
             self.add_3D_time_curves_baseline_grid_mesh() # from Render3DTimeCurvesBaseGridMixin
+
 
     def _build_or_update_time_curves_legend(self, parent_item):
         """ Build a legend for each of the curves 
@@ -1514,6 +1620,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
 
+        if dDisplayItem is not None and getattr(dDisplayItem.config, 'showTimelineSyncModeButton', True):
+            self._connect_dock_timeline_sync_mode_button(dDisplayItem, name)
+
         return self.ui.matplotlib_view_widgets[name], fig, ax, dDisplayItem
     
 
@@ -1574,6 +1683,9 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         if sync_mode is not None:
             ## sync up the widgets
             self.sync_matplotlib_render_plot_widget(identifier=name, sync_mode=sync_mode)
+
+        if dDisplayItem is not None and getattr(dDisplayItem.config, 'showTimelineSyncModeButton', True):
+            self._connect_dock_timeline_sync_mode_button(dDisplayItem, name)
             
         return self.ui.matplotlib_view_widgets[name], root_graphics_layout_widget, plot_item, dDisplayItem
     
@@ -1724,6 +1836,13 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
                 return None
 
             elif sync_mode.name == SynchronizedPlotMode.TO_WINDOW.name:
+                # disable any existing sync connection before re-linking
+                sync_connection = self.ui.connections.get(identifier, None)
+                if sync_connection is not None:
+                    print(f'\tdisconnecting window_scrolled for "{identifier}"')
+                    self.window_scrolled.disconnect(sync_connection)
+                    self.ui.connections[identifier] = None
+                    del self.ui.connections[identifier]
                 # Perform Initial (one-time) update from source -> controlled:
                 active_matplotlib_view_widget.on_window_changed(self.spikes_window.active_window_start_time, self.spikes_window.active_window_end_time)
                 sync_connection = self.window_scrolled.connect(active_matplotlib_view_widget.on_window_changed)
@@ -2050,7 +2169,137 @@ class Spike2DRaster(SpecificDockWidgetManipulatingMixin, DynamicDockDisplayAreaO
         return saved_output_pdf_path
 
 
+    @function_attributes(short_name=None, tags=['MAIN', 'export', 'all-tracks', 'track', 'pdf', 'image', 'file'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-03-12 11:20', related_items=[])
+    def export_all_tracks_to_image(self, custom_figure_output_path=None, curr_active_pipeline=None, fail_on_exception_for_debugging=False, **additional_marginal_overlaying_measured_position_kwargs):
+        """Export all timeline tracks from this widget to a paged PDF.
 
+        Renders the current docked tracks (after blocking until render is complete), then calls
+        `FigureToImageHelpers.export_wrapped_tracks_to_paged_df` to write a PDF under the path
+        derived from the pipeline's display context and the given output folder.
+
+        Args:
+            custom_figure_output_path: Parent directory for the output PDF. Required.
+            curr_active_pipeline: Pipeline used for session name and display context. Defaults to `self.owning_pipeline`.
+            fail_on_exception_for_debugging: If True, re-raise on exception; otherwise catch and continue.
+            **additional_marginal_overlaying_measured_position_kwargs: Forwarded to the export helper. May include
+                `included_track_dock_identifiers` (list of dock names to include) and `track_labels` (list of labels).
+
+        Raises:
+            ValueError: If `curr_active_pipeline` (or `owning_pipeline`) is None, or if `custom_figure_output_path`
+                is None or does not exist.
+
+        Usage:
+
+            from pathlib import Path
+            from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.SpikeRasterWidgets.Spike2DRaster import Spike2DRaster
+
+            # In a notebook, with an existing Spike2DRaster widget and pipeline:
+            out_path = Path('outputs/figures').resolve()
+            active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=out_path, curr_active_pipeline=curr_active_pipeline)
+
+            
+            out_path = None
+            _render_export_all_time_tracks = active_2d_plot.export_all_tracks_to_image(custom_figure_output_path=out_path, curr_active_pipeline=curr_active_pipeline)
+            _render_export_all_time_tracks
+
+        """
+        # ==================================================================================================================================================================================================================================================================================== #
+        # `_render_export_all_time_tracks`                                                                                                                                                                                                                             #
+        # ==================================================================================================================================================================================================================================================================================== #
+        from pathlib import Path
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode
+
+        _render_export_all_time_tracks = {}
+
+        curr_active_pipeline = curr_active_pipeline or getattr(self, 'owning_pipeline', None)
+        if curr_active_pipeline is None:
+            raise ValueError("export_all_tracks_to_image requires curr_active_pipeline (or self.owning_pipeline). Pass pipeline or set widget.owning_pipeline.")
+
+        curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
+        BATCH_DATE_TO_USE = getattr(self, 'BATCH_DATE_TO_USE', '')
+        CURR_BATCH_OUTPUT_PREFIX: str = f"{BATCH_DATE_TO_USE}-{curr_session_name}" if BATCH_DATE_TO_USE else curr_session_name
+        print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+
+        print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+        print(f'export_all_tracks_to_image(session: {curr_session_name}, ...)')
+        if custom_figure_output_path is None:
+            # figure_output_location = FigureOutputLocation.SESSION_OUTPUT_FOLDER
+            figure_output_location = FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER
+            make_folder_if_needed = True
+        else:
+            figure_output_location = FigureOutputLocation.CUSTOM
+            make_folder_if_needed = False
+        #     raise ValueError("export_all_tracks_to_image requires custom_figure_output_path.")
+
+        # assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
+
+        custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=figure_output_location, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=custom_figure_output_path)
+
+        display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='export_all_time_tracks')
+        test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=make_folder_if_needed)
+        print(f'\ttest_display_output_path: "{test_display_output_path}"')
+
+        print(f'\t trying "_render_export_all_time_tracks"')
+        try:
+            import pyphoplacecellanalysis.External.pyqtgraph as pg
+            from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
+            # from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
+            from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FigureToImageHelpers
+            from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
+
+            # For PlotWidget
+            pg.setConfigOptions(useOpenGL=True)
+            pg.setConfigOption('antialias', False)
+
+            def _perform_output_figure_delayed():
+                ## #TODO 2025-08-22 10:25: - [ ] Output to correct path (see above):
+                print(f'\t_perform_output_figure_delayed() running inside timer!')     
+                if custom_fig_man is not None:
+                    print(f'custom_fig_man is not None! Custom output path will be used!')
+                    test_display_output_path = custom_fig_man.get_figure_save_file_path(display_context, make_folder_if_needed=make_folder_if_needed)
+                    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+                else:
+                    raise NotImplementedError(f'needs displayman!')
+
+                ## INPUTS: im_posterior_x_stack, track_labels, 
+                output_pdf_path: Path = test_display_output_path.with_suffix('.pdf')
+                print(f'\t\t_render_export_all_time_tracks: output_pdf_path: "{output_pdf_path}"')
+                ## Export the wrapped tracks:
+                included_track_dock_identifiers: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('included_track_dock_identifiers', None)
+                track_labels: Optional[List[str]] = additional_marginal_overlaying_measured_position_kwargs.pop('track_labels', None)
+                saved_output_pdf_path = FigureToImageHelpers.export_wrapped_tracks_to_paged_df(self, output_pdf_path=output_pdf_path, included_track_dock_identifiers=included_track_dock_identifiers, track_labels=track_labels, debug_max_num_pages=25)
+                print(f'\t\t_render_export_all_time_tracks: saved_output_pdf_path: "{saved_output_pdf_path}"')
+                _render_export_all_time_tracks.update({'fig_save_path': saved_output_pdf_path})
+                print(f'\t_render_export_all_time_tracks: _perform_output_figure_delayed() inside timer -- DONE.')     
+
+
+
+            # Run after a 0.5 second delay
+            _render_export_all_time_tracks.update({'fig_save_path': None})
+            
+            print(f'_render_export_all_time_tracks: WAITING to call `_perform_output_figure_delayed`...')
+
+            print(f'waiting until complete....')
+            block_until_render_complete()
+            print(f'\tblock_until_render_complete is done. Continuing execution.')
+
+            _perform_output_figure_delayed()
+            print(f'\t\t_render_export_all_time_tracks: done.')
+            ## INPUT: `_out` -- _a_trial_by_trial_window
+
+            # export_all_time_tracks_save_path = Path('data').joinpath('export_all_time_tracks.svg').resolve()
+            # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
+            return _render_export_all_time_tracks
+        
+
+        except Exception as e:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
+            if fail_on_exception_for_debugging:
+                raise
+            else:
+                pass
+                return _render_export_all_time_tracks
+            
 
     
 # Start Qt event loop unless running in interactive mode.
