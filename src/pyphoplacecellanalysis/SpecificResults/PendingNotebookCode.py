@@ -5245,7 +5245,39 @@ def build_DANDI001754_all_epochs_df(curr_active_pipeline):
     return curr_paradigm_df
 
 
-@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df', 'build_NWB_all_epochs_df', 'build_DANDI001754_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
+@function_attributes(tags=['NWB', 'DANDI', '001695', 'epochs', 'paradigm', 'sleep_states'], input_requires=[], output_provides=[], uses=[], used_by=['build_proper_epoch_intervals'], creation_date='2026-07-09 09:30', related_items=['build_DANDI001754_all_epochs_df'])
+def build_DANDI001695_all_epochs_df(curr_active_pipeline):
+    """Builds all epochs for DANDI 001695 HighDensityCrossBrain sessions (WAKE, NREM, REM, Ripple)."""
+    import matplotlib.pyplot as plt
+    from neuropy.core.epoch import ensure_dataframe
+
+    def ascending_color_hexes(n_colors: int, cmap_name: str, vmin: float = 0.35, vmax: float = 0.95) -> List[str]:
+        if n_colors <= 0:
+            return []
+        cmap = plt.get_cmap(cmap_name)
+        positions = [vmax] if n_colors == 1 else np.linspace(vmin, vmax, n_colors).tolist()
+        return [plt.matplotlib.colors.rgb2hex(cmap(p)[:3]) for p in positions]
+
+    def assign_ascending_group_colors(df: pd.DataFrame, prefix: str, color_fn) -> None:
+        mask = df['label'].astype(str).str.startswith(prefix)
+        group_df = df.loc[mask].copy()
+        group_df['_sort_key'] = group_df['label'].astype(str).str.extract(r'(\d+)$', expand=False).astype(float).fillna(0)
+        sorted_indices = group_df.sort_values('_sort_key').index
+        df.loc[sorted_indices, 'lap_color'] = color_fn(len(sorted_indices))
+
+    sess = curr_active_pipeline.sess
+    curr_paradigm_df = ensure_dataframe(sess.paradigm)
+    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['activity_GLOBAL']))]
+    curr_paradigm_df['lap_color'] = '#808080'
+    assign_ascending_group_colors(curr_paradigm_df, 'WAKE', lambda n: ascending_color_hexes(n, 'Greens'))
+    assign_ascending_group_colors(curr_paradigm_df, 'NREM', lambda n: ascending_color_hexes(n, 'Blues'))
+    assign_ascending_group_colors(curr_paradigm_df, 'REM', lambda n: ascending_color_hexes(n, 'Purples'))
+    assign_ascending_group_colors(curr_paradigm_df, 'Ripple', lambda n: ascending_color_hexes(n, 'Oranges'))
+    curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+    return curr_paradigm_df
+
+
+@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df', 'build_NWB_all_epochs_df', 'build_DANDI001754_all_epochs_df', 'build_DANDI001695_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
 def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
     """ adds the proper session epochs to the timeline
     
@@ -5262,6 +5294,8 @@ def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_locatio
         curr_paradigm_df = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
     elif session_format_name == 'dandi_nwb_001754':
         curr_paradigm_df = build_DANDI001754_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+    elif session_format_name == 'dandi_nwb_001695':
+        curr_paradigm_df = build_DANDI001695_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
     else:
         curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
 
@@ -5628,6 +5662,12 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
     else:
         session_epochs: Epoch = deepcopy(curr_active_pipeline.sess.epochs)
     session_epochs
+    if hasattr(active_data_mode_registered_class, '_get_activity_epoch_labels'):
+        resolved_activity_epoch_labels = active_data_mode_registered_class._get_activity_epoch_labels(curr_active_pipeline.sess)
+        if len(resolved_activity_epoch_labels) > 0:
+            hardcoded_params.non_global_activity_session_names = list(resolved_activity_epoch_labels)
+            if hasattr(active_data_mode_registered_class, '_get_decoder_building_epoch_labels'):
+                hardcoded_params.decoder_building_session_names = active_data_mode_registered_class._get_decoder_building_epoch_labels(curr_active_pipeline.sess)
 
     if linearization_kwargs.get('method') == 'shapely' and linearization_kwargs.get('all_session_mazes') is not None:
 
@@ -5661,6 +5701,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
                 NWBDataSessionFormatRegisteredClass._compute_linear_position_if_possible(curr_active_pipeline.sess)
             elif linearization_method == 'track_graph' and active_data_mode_name == 'dandi_nwb_001754':
                 raise ValueError('DANDI 001754 sessions do not support track_graph linearization; use method="umap".')
+            elif linearization_method == 'track_graph' and active_data_mode_name == 'dandi_nwb_001695':
+                raise ValueError('DANDI 001695 sessions do not support track_graph linearization; use method="umap".')
             else:
                 sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
             print(f'estimating the laps from the linear position...')

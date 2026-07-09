@@ -16,6 +16,7 @@ from matplotlib.backends import backend_pdf
 from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder # for batch_load_session
 # from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass  # noqa: F401 - registers format_name='dandi_nwb'
 # from neuropy.core.session.Formats.Specific.DANDI001754NWBDataSessionFormat import DANDI001754NWBDataSessionFormatRegisteredClass  # noqa: F401 - registers format_name='dandi_nwb_001754'
+# from neuropy.core.session.Formats.Specific.DANDI001695NWBDataSessionFormat import DANDI001695NWBDataSessionFormatRegisteredClass  # noqa: F401 - registers format_name='dandi_nwb_001695'
 from neuropy.utils.misc import compute_paginated_grid_config # for paginating shared aclus
 from neuropy.utils.result_context import IdentifyingContext
 

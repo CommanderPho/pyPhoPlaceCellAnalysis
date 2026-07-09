@@ -433,6 +433,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             if active_data_mode_name == 'dandi_nwb_001754':
                 from neuropy.core.session.Formats.Specific.DANDI001754NWBDataSessionFormat import DANDI001754NWBDataSessionFormatRegisteredClass
                 did_add_property = DANDI001754NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(curr_active_pipeline.sess) or did_add_property
+            if active_data_mode_name == 'dandi_nwb_001695':
+                from neuropy.core.session.Formats.Specific.DANDI001695NWBDataSessionFormat import DANDI001695NWBDataSessionFormatRegisteredClass
+                did_add_property = DANDI001695NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(curr_active_pipeline.sess) or did_add_property
             ## Apply to all of the pipeline's filtered sessions:
             if hasattr(curr_active_pipeline, 'filtered_sessions'):
                 for a_sess in curr_active_pipeline.filtered_sessions.values():
@@ -441,6 +444,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                         did_add_property = NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(a_sess) or did_add_property
                     if active_data_mode_name == 'dandi_nwb_001754':
                         did_add_property = DANDI001754NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(a_sess) or did_add_property
+                    if active_data_mode_name == 'dandi_nwb_001695':
+                        did_add_property = DANDI001695NWBDataSessionFormatRegisteredClass.ensure_preprocessing_epoch_estimation_parameters(a_sess) or did_add_property
             return did_add_property
 
         ## BEGIN FUNCTION BODY
@@ -516,7 +521,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=pipeline_compare_dict)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
-                if (not skip_save_on_initial_load) or (type_name in {'dandi_nwb', 'dandi_nwb_001754'}):
+                if (not skip_save_on_initial_load) or (type_name in {'dandi_nwb', 'dandi_nwb_001754', 'dandi_nwb_001695'}):
                     curr_active_pipeline.save_pipeline(active_pickle_filename=active_pickle_filename)
                 else:
                     if progress_print:
