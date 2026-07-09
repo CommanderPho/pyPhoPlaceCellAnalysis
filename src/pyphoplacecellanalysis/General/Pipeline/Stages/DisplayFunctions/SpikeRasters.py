@@ -165,10 +165,7 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         # Set Window Title Options:
         a_file_prefix = str(computation_result.sess.filePrefix.resolve())
         spike_raster_window.setWindowFilePath(a_file_prefix)
-        if hasattr(spike_raster_window, 'set_dynamic_window_title_suffix'):
-            spike_raster_window.set_dynamic_window_title_suffix(f'{active_config_name} - {a_file_prefix}')
-        else:
-            spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
+        spike_raster_window.setWindowTitle(f'Spike Raster Window - {active_config_name} - {a_file_prefix}')
         
         ## Build the additional menus:
         output_references = _build_additional_window_menus(spike_raster_window, owning_pipeline_reference, computation_result, active_display_fn_identifying_ctx) ## the menus on the other hand take the entire pipeline, because they might need that valuable DATA
