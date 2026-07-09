@@ -4270,6 +4270,260 @@ class PositionLikePosteriorScoring:
         return a_masked_filtered_decoded_local_epochs_result, scoring_results_df
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2026-07-09 - W-Maze Session Decoded PBEs Scoring                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @classmethod
+    def _reduce_posterior_to_spatial_3d(cls, p_x_given_n: NDArray, context_reduction: str = 'max_contexts') -> NDArray:
+        """Reduce 3D/4D posterior to spatial 3D (nx, ny, n_t). For 4D, take max or sum over context axis."""
+        p_x: NDArray = np.asarray(p_x_given_n, dtype=float)
+        if p_x.ndim == 3:
+            return p_x
+        if p_x.ndim == 4:
+            if context_reduction == 'max_contexts':
+                return np.nanmax(p_x, axis=2)
+            if context_reduction == 'sum_contexts':
+                return np.nansum(p_x, axis=2)
+            raise ValueError(f'_reduce_posterior_to_spatial_3d unsupported context_reduction={context_reduction!r}')
+        raise ValueError(f'_reduce_posterior_to_spatial_3d expected 3-4D p_x_given_n, got shape {p_x.shape}')
+
+
+    @classmethod
+    def _compute_temporal_sequentiality_from_prominence_masks(cls, alpha_epoch_masks: NDArray, epoch_promenence_tuples: list, xbin_centers: NDArray, ybin_centers: NDArray) -> Dict[str, float]:
+        """Compute epoch-level sequentiality aggregates from prominence masks and peak locations (memory-safe, no self mutation)."""
+        from scipy import ndimage
+
+        num_t_bins: int = int(alpha_epoch_masks.shape[2])
+        sequentiality_mask_overlap = np.full(num_t_bins, np.nan, dtype=np.float64)
+        peak_change_vector_magnitudes = np.full(num_t_bins, np.nan, dtype=np.float64)
+        direction_change_angles_degrees = np.full(num_t_bins, np.nan, dtype=np.float64)
+
+        if num_t_bins > 1:
+            dilation_kernel = np.ones((3, 3), dtype=bool)
+            for t_idx in range(num_t_bins - 1):
+                current_mask = alpha_epoch_masks[:, :, t_idx].astype(bool)
+                next_mask = alpha_epoch_masks[:, :, t_idx + 1].astype(bool)
+                if (not np.any(current_mask)) or (not np.any(next_mask)):
+                    sequentiality_mask_overlap[t_idx] = 0.0
+                    continue
+                dilated_current_mask = ndimage.binary_dilation(current_mask, structure=dilation_kernel)
+                overlap_count = np.sum(dilated_current_mask & next_mask)
+                union_count = np.sum(dilated_current_mask | next_mask)
+                sequentiality_mask_overlap[t_idx] = (overlap_count / union_count) if union_count > 0 else 0.0
+            ## END for t_idx in range(num_t_bins - 1)....
+
+            top_peak_locations_cm_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+            for t_idx, (peak_coords, prominences, peak_heights) in enumerate(epoch_promenence_tuples):
+                if peak_coords.size > 0 and peak_heights.size > 0:
+                    top_peak_idx = np.argmax(peak_heights)
+                    top_peak_bin_coords = peak_coords[top_peak_idx]
+                    x_idx = int(np.clip(top_peak_bin_coords[0], 0, len(xbin_centers) - 1))
+                    y_idx = int(np.clip(top_peak_bin_coords[1], 0, len(ybin_centers) - 1))
+                    top_peak_locations_cm_space[t_idx, 0] = xbin_centers[x_idx]
+                    top_peak_locations_cm_space[t_idx, 1] = ybin_centers[y_idx]
+            ## END for t_idx, (peak_coords, prominences, peak_heights) in enumerate(epoch_promenence_tuples)....
+
+            peak_change_vectors_cm_space = np.full((num_t_bins, 2), np.nan, dtype=np.float64)
+            for t_idx in range(num_t_bins - 1):
+                current_cm = top_peak_locations_cm_space[t_idx]
+                next_cm = top_peak_locations_cm_space[t_idx + 1]
+                if np.any(np.isnan(current_cm)) or np.any(np.isnan(next_cm)):
+                    continue
+                peak_change_vectors_cm_space[t_idx] = next_cm - current_cm
+                peak_change_vector_magnitudes[t_idx] = np.linalg.norm(peak_change_vectors_cm_space[t_idx])
+            ## END for t_idx in range(num_t_bins - 1)....
+
+            if num_t_bins > 2:
+                for t_idx in range(num_t_bins - 2):
+                    vec1 = peak_change_vectors_cm_space[t_idx]
+                    vec2 = peak_change_vectors_cm_space[t_idx + 1]
+                    if np.any(np.isnan(vec1)) or np.any(np.isnan(vec2)):
+                        continue
+                    vec1_mag = np.linalg.norm(vec1)
+                    vec2_mag = np.linalg.norm(vec2)
+                    if vec1_mag < 1e-9 or vec2_mag < 1e-9:
+                        continue
+                    cos_angle = np.clip(np.dot(vec1, vec2) / (vec1_mag * vec2_mag), -1.0, 1.0)
+                    direction_change_angles_degrees[t_idx] = np.degrees(np.arccos(cos_angle))
+                ## END for t_idx in range(num_t_bins - 2)....
+
+        return {
+            'mean_seq_mask_overlap': float(np.nanmean(sequentiality_mask_overlap)) if np.any(np.isfinite(sequentiality_mask_overlap)) else np.nan,
+            'total_path_cm': float(np.nansum(peak_change_vector_magnitudes)) if np.any(np.isfinite(peak_change_vector_magnitudes)) else np.nan,
+            'max_direction_change_deg': float(np.nanmax(direction_change_angles_degrees)) if np.any(np.isfinite(direction_change_angles_degrees)) else np.nan,
+        }
+
+
+    @function_attributes(short_name=None, tags=['WORKING', 'quality', 'filter', 'position-like', 'locality', 'sequentiality', '2D', 'posterior', 'batch'], input_requires=[], output_provides=[], uses=['cls.calculate_pli_score', 'DecodingLocalityMeasures.compute_locality_measures_for_posterior', 'cls._compute_temporal_sequentiality_from_prominence_masks'], used_by=['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function'], creation_date='2026-07-09 16:30', related_items=[])
+    @classmethod
+    def compute_decoded_epochs_quality_metrics(cls, decoded_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray,
+            min_duration_sec: Optional[float] = None, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: int = 3,
+            enable_locality_filter: bool = True, max_median_focality: float = 0.15, min_median_peakiness: float = 0.5, min_unimodal_fraction: float = 0.7,
+            enable_sequentiality_filter: bool = False, min_mean_seq_mask_overlap: float = 0.15, min_total_path_cm: float = 5.0, max_direction_change_deg: float = 120.0,
+            context_reduction: str = 'max_contexts', debug_print: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
+        """Per-epoch PLI / locality / sequentiality quality metrics (memory-safe; does not mutate decoded_epochs_result).
+
+        Returns:
+            epoch_quality_df, time_bin_quality_df, filter_config_dict
+        """
+        from neuropy.core.epoch import ensure_dataframe
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures
+
+        filter_epochs_df: pd.DataFrame = ensure_dataframe(decoded_epochs_result.filter_epochs).copy()
+        if 'original_epoch_idx' not in filter_epochs_df.columns:
+            filter_epochs_df['original_epoch_idx'] = filter_epochs_df.index.to_numpy().astype(int)
+        if 'duration' not in filter_epochs_df.columns:
+            filter_epochs_df['duration'] = (filter_epochs_df['stop'] - filter_epochs_df['start']).to_numpy()
+
+        xbin_centers: NDArray = 0.5 * (np.asarray(xbin)[:-1] + np.asarray(xbin)[1:])
+        ybin_centers: NDArray = 0.5 * (np.asarray(ybin)[:-1] + np.asarray(ybin)[1:])
+
+        filter_config_dict: Dict[str, Any] = {
+            'min_duration_sec': min_duration_sec, 'position_like_score_cutoff': position_like_score_cutoff, 'num_min_position_like_t_bins': num_min_position_like_t_bins,
+            'enable_locality_filter': enable_locality_filter, 'max_median_focality': max_median_focality, 'min_median_peakiness': min_median_peakiness, 'min_unimodal_fraction': min_unimodal_fraction,
+            'enable_sequentiality_filter': enable_sequentiality_filter, 'min_mean_seq_mask_overlap': min_mean_seq_mask_overlap, 'min_total_path_cm': min_total_path_cm, 'max_direction_change_deg': max_direction_change_deg,
+            'context_reduction': context_reduction,
+        }
+
+        epoch_records: list = []
+        time_bin_records: list = []
+        n_epochs: int = int(decoded_epochs_result.num_filter_epochs)
+
+        for epoch_idx in np.arange(n_epochs):
+            p_x_spatial: NDArray = cls._reduce_posterior_to_spatial_3d(decoded_epochs_result.p_x_given_n_list[epoch_idx], context_reduction=context_reduction)
+            n_t_bins: int = int(p_x_spatial.shape[2])
+            duration: float = float(filter_epochs_df.iloc[epoch_idx]['duration'])
+            original_epoch_idx: int = int(filter_epochs_df.iloc[epoch_idx]['original_epoch_idx'])
+            passes_duration: bool = True if min_duration_sec is None else (duration > float(min_duration_sec))
+
+            pli_scores = np.full(n_t_bins, np.nan, dtype=np.float64)
+            is_position_like = np.zeros(n_t_bins, dtype=bool)
+            for t_idx in range(n_t_bins):
+                score, _comps = cls.calculate_pli_score(p_x_spatial[:, :, t_idx], x_edges=xbin, y_edges=ybin)
+                pli_scores[t_idx] = score
+                is_position_like[t_idx] = (score >= position_like_score_cutoff)
+                time_bin_records.append({'epoch_idx': epoch_idx, 'original_epoch_idx': original_epoch_idx, 't_bin_idx': t_idx, 'pli_score': score, 'is_position_like': bool(is_position_like[t_idx])})
+            ## END for t_idx in range(n_t_bins)....
+
+            n_position_like_bins: int = int(np.nansum(is_position_like))
+            mean_pli_score: float = float(np.nanmean(pli_scores)) if n_t_bins > 0 else np.nan
+            passes_pli: bool = (n_position_like_bins >= int(num_min_position_like_t_bins))
+
+            median_focality: float = np.nan
+            median_peakiness: float = np.nan
+            unimodal_fraction: float = np.nan
+            mean_seq_mask_overlap: float = np.nan
+            total_path_cm: float = np.nan
+            max_direction_change_deg_val: float = np.nan
+            passes_locality: bool = True
+            passes_sequentiality: bool = True
+
+            pli_bin_idxs = np.where(is_position_like)[0]
+            if len(pli_bin_idxs) > 0 and (enable_locality_filter or enable_sequentiality_filter):
+                p_x_pli: NDArray = p_x_spatial[:, :, pli_bin_idxs]
+                locality_result = DecodingLocalityMeasures.compute_locality_measures_for_posterior(
+                    a_p_x_given_n=p_x_pli, xbin_centers=xbin_centers, ybin_centers=ybin_centers, gaussian_volume=None,
+                    min_val_epsilon=1e-6, alpha_list=[0.8], enable_debug_outputs=True, earthmovers_fn=None, debug_print=False,
+                )
+                focality = locality_result.get('peak_prom_Focality', np.full(len(pli_bin_idxs), np.nan))
+                peakiness = locality_result.get('peak_prom_Peakiness', np.full(len(pli_bin_idxs), np.nan))
+                num_peaks = locality_result.get('peak_prom_num_peaks', np.full(len(pli_bin_idxs), np.nan))
+                median_focality = float(np.nanmedian(focality)) if np.any(np.isfinite(focality)) else np.nan
+                median_peakiness = float(np.nanmedian(peakiness)) if np.any(np.isfinite(peakiness)) else np.nan
+                unimodal_fraction = float(np.nanmean(np.asarray(num_peaks) == 1)) if np.any(np.isfinite(num_peaks)) else np.nan
+
+                if enable_locality_filter:
+                    passes_locality = (
+                        (np.isnan(median_focality) or (median_focality < max_median_focality)) and
+                        (np.isnan(median_peakiness) or (median_peakiness > min_median_peakiness)) and
+                        (np.isnan(unimodal_fraction) or (unimodal_fraction >= min_unimodal_fraction))
+                    )
+
+                if enable_sequentiality_filter:
+                    debug_dict = locality_result.get('debug', {}) or {}
+                    epoch_masks_dict = debug_dict.get('peak_prom_masks_dict', {})
+                    epoch_promenence_tuples = debug_dict.get('peak_prom_promenence_tuples', [])
+                    alpha_epoch_masks = epoch_masks_dict.get(0.8, None)
+                    if alpha_epoch_masks is not None and len(epoch_promenence_tuples) > 0:
+                        seq_agg = cls._compute_temporal_sequentiality_from_prominence_masks(alpha_epoch_masks=alpha_epoch_masks, epoch_promenence_tuples=epoch_promenence_tuples, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
+                        mean_seq_mask_overlap = seq_agg['mean_seq_mask_overlap']
+                        total_path_cm = seq_agg['total_path_cm']
+                        max_direction_change_deg_val = seq_agg['max_direction_change_deg']
+                        passes_sequentiality = (
+                            (np.isnan(mean_seq_mask_overlap) or (mean_seq_mask_overlap > min_mean_seq_mask_overlap)) and
+                            (np.isnan(total_path_cm) or (total_path_cm > min_total_path_cm)) and
+                            (np.isnan(max_direction_change_deg_val) or (max_direction_change_deg_val < max_direction_change_deg))
+                        )
+                    else:
+                        passes_sequentiality = False
+
+            passes_all: bool = bool(passes_duration and passes_pli and passes_locality and passes_sequentiality)
+            epoch_records.append({
+                'epoch_idx': epoch_idx, 'original_epoch_idx': original_epoch_idx, 'duration': duration, 'n_t_bins': n_t_bins,
+                'n_position_like_bins': n_position_like_bins, 'mean_pli_score': mean_pli_score,
+                'median_focality': median_focality, 'median_peakiness': median_peakiness, 'unimodal_fraction': unimodal_fraction,
+                'mean_seq_mask_overlap': mean_seq_mask_overlap, 'total_path_cm': total_path_cm, 'max_direction_change_deg': max_direction_change_deg_val,
+                'passes_duration': passes_duration, 'passes_pli': passes_pli, 'passes_locality': passes_locality, 'passes_sequentiality': passes_sequentiality, 'passes_all': passes_all,
+            })
+            if debug_print and ((epoch_idx % 50) == 0):
+                print(f'\tepoch_idx={epoch_idx}/{n_epochs}: passes_all={passes_all}, n_position_like_bins={n_position_like_bins}, mean_pli={mean_pli_score:.3f}')
+        ## END for epoch_idx in np.arange(n_epochs)....
+
+        epoch_quality_df: pd.DataFrame = pd.DataFrame.from_records(epoch_records)
+        time_bin_quality_df: pd.DataFrame = pd.DataFrame.from_records(time_bin_records)
+        return epoch_quality_df, time_bin_quality_df, filter_config_dict
+
+
+    @function_attributes(short_name=None, tags=['WORKING', 'quality', 'filter', '2D', 'posterior', 'batch'], input_requires=[], output_provides=[], uses=['DecodedFilterEpochsResult.filtered_by_epochs'], used_by=['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function'], creation_date='2026-07-09 16:30', related_items=[])
+    @classmethod
+    def filter_decoded_epochs_by_quality_metrics(cls, decoded_epochs_result: DecodedFilterEpochsResult, epoch_quality_df: pd.DataFrame, max_epochs: Optional[int] = None, ranking_columns: Optional[List[str]] = None) -> Tuple[DecodedFilterEpochsResult, NDArray, Dict[str, Any]]:
+        """Non-destructively filter decoded epochs by `passes_all`, optionally capping to top-N by ranking columns.
+
+        Returns:
+            filtered_deepcopy, included_original_epoch_idxs, filter_summary_dict
+        """
+        from neuropy.core.epoch import ensure_dataframe
+
+        n_epochs_before: int = int(decoded_epochs_result.num_filter_epochs)
+        if ranking_columns is None:
+            ranking_columns = ['n_position_like_bins', 'mean_pli_score', 'mean_seq_mask_overlap']
+
+        n_passes_all: int = int(epoch_quality_df['passes_all'].astype(bool).sum()) if len(epoch_quality_df) > 0 else 0
+        passing_df: pd.DataFrame = epoch_quality_df[epoch_quality_df['passes_all'].astype(bool)].copy() if len(epoch_quality_df) > 0 else pd.DataFrame()
+        if len(passing_df) == 0:
+            filter_summary_dict = {'n_epochs_before': n_epochs_before, 'n_epochs_after': 0, 'n_epochs_exported': 0, 'included_original_epoch_idxs': np.array([], dtype=int), 'included_epoch_idxs': np.array([], dtype=int)}
+            ## Avoid filtered_by_epochs([]) edge cases: return a deepcopy with zero epochs via an empty index list only when the source already has epochs to slice from a no-op path.
+            empty_result = deepcopy(decoded_epochs_result)
+            if n_epochs_before > 0:
+                ## Use a single-element slice then clear is awkward; prefer filtered_by_epochs with empty list when supported:
+                try:
+                    empty_result = empty_result.filtered_by_epochs(included_epoch_indicies=[])
+                except Exception:
+                    empty_result.num_filter_epochs = 0
+                    empty_result.p_x_given_n_list = []
+                    empty_result.nbins = np.array([], dtype=int)
+                    empty_result.filter_epochs = ensure_dataframe(empty_result.filter_epochs).iloc[0:0].copy()
+            return empty_result, np.array([], dtype=int), filter_summary_dict
+
+        available_rank_cols = [c for c in ranking_columns if c in passing_df.columns]
+        if available_rank_cols:
+            passing_df = passing_df.sort_values(available_rank_cols, ascending=False, na_position='last')
+
+        if max_epochs is not None:
+            passing_df = passing_df.head(int(max_epochs))
+
+        included_epoch_idxs: NDArray = passing_df['epoch_idx'].to_numpy().astype(int)
+        included_original_epoch_idxs: NDArray = passing_df['original_epoch_idx'].to_numpy().astype(int) if 'original_epoch_idx' in passing_df.columns else included_epoch_idxs.copy()
+        filtered_result: DecodedFilterEpochsResult = deepcopy(decoded_epochs_result).filtered_by_epochs(included_epoch_indicies=included_epoch_idxs)
+        n_epochs_exported: int = int(filtered_result.num_filter_epochs)
+        filter_summary_dict = {
+            'n_epochs_before': n_epochs_before, 'n_epochs_after': n_passes_all,
+            'n_epochs_exported': n_epochs_exported, 'included_original_epoch_idxs': included_original_epoch_idxs, 'included_epoch_idxs': included_epoch_idxs,
+        }
+        return filtered_result, included_original_epoch_idxs, filter_summary_dict
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-01-01 - Prev                                                                                                                                                                                                                                                                    #
 # ==================================================================================================================================================================================================================================================================================== #
