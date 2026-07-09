@@ -3645,16 +3645,40 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     def get_by_id(self, ids, defer_compute_all:bool=False):
         """Return a copy restricted to neuron_ids equal to ids.
 
-        Always runs setup on the sliced decoder (builds F, P_x, neuron_IDs).
+        Filters existing model state (pf/F/P_x/IDs) instead of full setup rebuild.
         Does not run post_load (no serialized posterior to restore).
         If defer_compute_all is False, also runs compute_all() for full-session decode caches.
         """
+        ids = np.asarray(ids)
+        source_ids = np.asarray(self.neuron_IDs)
+        assert np.all(np.isin(ids, source_ids))
+        keep = np.isin(source_ids, ids)  # original neuron order
+
         neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
         spikes_df = deepcopy(self.spikes_df)
         if (spikes_df is not None) and ('aclu' in spikes_df.columns):
             spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids)].copy()
 
-        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, setup_on_init=True, post_load_on_init=False, debug_print=self.debug_print)
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, setup_on_init=False, post_load_on_init=False, debug_print=self.debug_print)
+
+        neuron_sliced_decoder.neuron_IDs = source_ids[keep]
+        neuron_sliced_decoder.neuron_IDXs = np.arange(int(np.sum(keep)))
+        neuron_sliced_decoder.F = self.F[:, keep]
+        neuron_sliced_decoder.P_x = deepcopy(self.P_x)
+
+        if self.unit_specific_time_binned_spike_counts is not None:
+            neuron_sliced_decoder.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[keep, :]
+            neuron_sliced_decoder.total_spike_counts_per_window = np.sum(neuron_sliced_decoder.unit_specific_time_binned_spike_counts, axis=0)
+            neuron_sliced_decoder.time_binning_container = deepcopy(self.time_binning_container)
+
+        # Invalidate decode caches (cannot neuron-slice a posterior)
+        neuron_sliced_decoder.flat_p_x_given_n = None
+        neuron_sliced_decoder.p_x_given_n = None
+        neuron_sliced_decoder.most_likely_positions = None
+        neuron_sliced_decoder.most_likely_position_indicies = None
+        neuron_sliced_decoder.most_likely_position_flat_indicies = None
+        neuron_sliced_decoder.marginal = None
+        neuron_sliced_decoder.revised_most_likely_positions = None
 
         if not defer_compute_all:
             neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now.
@@ -3807,6 +3831,19 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
             ## 2022-09-23 - Epochs-style encoding (that works):
             self.time_binning_container, self.p_x_given_n, self.most_likely_positions, curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z, flat_outputs_container = self.hyper_perform_decode(self.spikes_df, decoding_time_bin_size=self.time_bin_size, output_flat_versions=True, debug_print=(debug_print or self.debug_print)) ## this is where it's getting messed up
+            n_decode_time_bins: int = int(self.most_likely_positions.shape[0])
+            # Keep spike-count windows aligned with decode bins (hyper_perform_decode may drop a trailing partial bin).
+            if (self.total_spike_counts_per_window is not None) and (len(self.total_spike_counts_per_window) != n_decode_time_bins):
+                if len(self.total_spike_counts_per_window) == (n_decode_time_bins + 1):
+                    self.total_spike_counts_per_window = self.total_spike_counts_per_window[:n_decode_time_bins]
+                    if self.unit_specific_time_binned_spike_counts is not None:
+                        self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :n_decode_time_bins]
+                else:
+                    self._setup_time_bin_spike_counts_N_i(debug_print=False)
+                    if (self.total_spike_counts_per_window is not None) and (len(self.total_spike_counts_per_window) > n_decode_time_bins):
+                        self.total_spike_counts_per_window = self.total_spike_counts_per_window[:n_decode_time_bins]
+                        if self.unit_specific_time_binned_spike_counts is not None:
+                            self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :n_decode_time_bins]
             if should_use_safe_time_binning:
                 num_extra_bins_in_old: int = original_time_bin_container.num_bins - self.time_binning_container.num_bins
                 # np.isin(original_time_bin_container.centers, self.time_binning_container.centers)
@@ -3875,19 +3912,27 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # is_non_firing_bin = self.is_non_firing_time_bin
         # assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct
         
-        should_use_safe_time_binning: bool = False
-        if should_use_safe_time_binning:
-            if (len(self.is_non_firing_time_bin) != self.num_time_windows):
-                ## time windows aren't correct after computing for some reason, call `self._setup_time_bin_spike_counts_N_i()` to recompute them
-                print(f'WARN: f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}", trying to recompute them....')
-                self._setup_time_bin_spike_counts_N_i(debug_print=False) # updates: self.time_binning_container, self.unit_specific_time_binned_spike_counts, self.total_spike_counts_per_window        
+        # hyper_perform_decode often yields one fewer time bin than setup binning (drops a partial trailing bin).
+        # Align non-firing masks to most_likely_positions so indexing cannot go out of bounds.
+        n_decode_time_bins: int = int(self.most_likely_positions.shape[0])
+        if self.total_spike_counts_per_window is None:
+            self._setup_time_bin_spike_counts_N_i(debug_print=False)
+        is_non_firing = np.asarray(self.is_non_firing_time_bin).reshape(-1)
+        if len(is_non_firing) != n_decode_time_bins:
+            if abs(len(is_non_firing) - n_decode_time_bins) > 1:
+                self._setup_time_bin_spike_counts_N_i(debug_print=False)
+                is_non_firing = np.asarray(self.is_non_firing_time_bin).reshape(-1)
+            if len(is_non_firing) > n_decode_time_bins:
+                is_non_firing = is_non_firing[:n_decode_time_bins]
+                if self.unit_specific_time_binned_spike_counts is not None and self.unit_specific_time_binned_spike_counts.shape[1] > n_decode_time_bins:
+                    self.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[:, :n_decode_time_bins]
+                if self.total_spike_counts_per_window is not None and len(self.total_spike_counts_per_window) > n_decode_time_bins:
+                    self.total_spike_counts_per_window = self.total_spike_counts_per_window[:n_decode_time_bins]
+            elif len(is_non_firing) < n_decode_time_bins:
+                is_non_firing = np.pad(is_non_firing, (0, n_decode_time_bins - len(is_non_firing)), constant_values=True)
 
-            assert (len(self.is_non_firing_time_bin) == self.num_time_windows), f"len(self.is_non_firing_time_bin): {len(self.is_non_firing_time_bin)}, self.num_time_windows: {self.num_time_windows}" # 2025-01-13 17:43 Added constraint because this is supposed to be correct        
-        else:
-            print(f'WARN: not using safe time binning!')
-
-
-        is_non_firing_bin = np.where(self.is_non_firing_time_bin)[0] # TEMP: do this to get around the indexing issue. TODO: IndexError: boolean index did not match indexed array along dimension 0; dimension is 11880 but corresponding boolean dimension is 11881
+        is_non_firing_bin = np.flatnonzero(is_non_firing)
+        is_non_firing_bin = is_non_firing_bin[is_non_firing_bin < n_decode_time_bins]
         self.revised_most_likely_positions = self.perform_compute_forward_filled_positions(self.most_likely_positions, is_non_firing_bin=is_non_firing_bin)
         
         if self.marginal is not None:
