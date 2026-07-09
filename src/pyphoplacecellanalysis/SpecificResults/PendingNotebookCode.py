@@ -5214,7 +5214,38 @@ def build_NWB_all_epochs_df(curr_active_pipeline):
     return curr_paradigm_df
 
 
-@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df', 'build_NWB_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
+@function_attributes(tags=['NWB', 'DANDI', '001754', 'epochs', 'paradigm'], input_requires=[], output_provides=[], uses=[], used_by=['build_proper_epoch_intervals'], creation_date='2026-07-09 08:00', related_items=['build_NWB_all_epochs_df'])
+def build_DANDI001754_all_epochs_df(curr_active_pipeline):
+    """Builds all epochs for DANDI 001754 Neurolab ThreeDimSpatial sessions (ES, MC, BL)."""
+    import matplotlib.pyplot as plt
+    from neuropy.core.epoch import ensure_dataframe
+
+    def ascending_color_hexes(n_colors: int, cmap_name: str, vmin: float = 0.35, vmax: float = 0.95) -> List[str]:
+        if n_colors <= 0:
+            return []
+        cmap = plt.get_cmap(cmap_name)
+        positions = [vmax] if n_colors == 1 else np.linspace(vmin, vmax, n_colors).tolist()
+        return [plt.matplotlib.colors.rgb2hex(cmap(p)[:3]) for p in positions]
+
+    def assign_ascending_group_colors(df: pd.DataFrame, prefix: str, color_fn) -> None:
+        mask = df['label'].astype(str).str.startswith(prefix)
+        group_df = df.loc[mask].copy()
+        group_df['_sort_key'] = group_df['label'].astype(str).str.extract(r'(\d+)$', expand=False).astype(float).fillna(0)
+        sorted_indices = group_df.sort_values('_sort_key').index
+        df.loc[sorted_indices, 'lap_color'] = color_fn(len(sorted_indices))
+
+    sess = curr_active_pipeline.sess
+    curr_paradigm_df = ensure_dataframe(sess.paradigm)
+    curr_paradigm_df = curr_paradigm_df[np.logical_not(np.isin(curr_paradigm_df['label'], ['task_GLOBAL']))]
+    curr_paradigm_df['lap_color'] = '#808080'
+    assign_ascending_group_colors(curr_paradigm_df, 'ES', lambda n: ascending_color_hexes(n, 'Reds'))
+    assign_ascending_group_colors(curr_paradigm_df, 'MC', lambda n: ascending_color_hexes(n, 'Blues'))
+    assign_ascending_group_colors(curr_paradigm_df, 'BL', lambda n: ascending_color_hexes(n, 'Greys', vmin=0.25, vmax=0.75))
+    curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+    return curr_paradigm_df
+
+
+@function_attributes(short_name=None, tags=['intervals', 'epochs', 'SpikeRaster2D', 'rendering', 'bapun'], uses=['build_bapun_all_epochs_df', 'build_NWB_all_epochs_df', 'build_DANDI001754_all_epochs_df'], used_by=[], creation_date='2025-12-10 09:43', related_items=[])
 def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_location: float=-1.0, height: float = 0.9):
     """ adds the proper session epochs to the timeline
     
@@ -5229,6 +5260,8 @@ def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_locatio
     session_format_name = str(getattr(curr_active_pipeline.active_sess_config, 'format_name', getattr(getattr(curr_active_pipeline.sess, 'config', None), 'format_name', ''))).lower()
     if session_format_name == 'dandi_nwb':
         curr_paradigm_df = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
+    elif session_format_name == 'dandi_nwb_001754':
+        curr_paradigm_df = build_DANDI001754_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
     else:
         curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
 
@@ -5626,6 +5659,8 @@ def final_process_non_kdiba_all_comps(curr_active_pipeline, active_data_mode_nam
             if linearization_method == 'track_graph' and active_data_mode_name == 'dandi_nwb':
                 from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
                 NWBDataSessionFormatRegisteredClass._compute_linear_position_if_possible(curr_active_pipeline.sess)
+            elif linearization_method == 'track_graph' and active_data_mode_name == 'dandi_nwb_001754':
+                raise ValueError('DANDI 001754 sessions do not support track_graph linearization; use method="umap".')
             else:
                 sess = curr_active_pipeline.sess.position.compute_linearized_position(**linearization_kwargs)
             print(f'estimating the laps from the linear position...')

@@ -3461,7 +3461,7 @@ def compute_and_export_bapun_train_test_decoder_error_distance_completion_functi
     from pyphocorehelpers.exception_helpers import CapturedException
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance, evaluate_bapun_context_decoder_performance, _resolve_maze_epoch_names_for_multi_context_eval
 
-    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb', 'dandi_nwb_001754'})
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
         print(f'WARN: compute_and_export_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
@@ -3570,7 +3570,7 @@ def figures_plot_bapun_train_test_decoder_error_distance_completion_function(sel
     from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import BapunPositionDecodingPerformance
 
-    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb', 'dandi_nwb_001754'})
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name not in _MULTI_CONTEXT_DECODER_SUPPORTED_FORMATS:
         print(f'WARN: figures_plot_bapun_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
@@ -4959,7 +4959,7 @@ def compute_and_pickle_spyglass_clusterless_decoder_completion_function(self, gl
     from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations, batch_extended_computations
     from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters
     
-    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb', 'dandi_nwb_001754'})
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
         if debug_print:
@@ -5070,7 +5070,7 @@ def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_co
 
     use_spyglass_clusterless_decoders = True
 
-    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb'})
+    _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS = frozenset({'bapun', 'dandi_nwb', 'dandi_nwb_001754'})
     session_format_name: Optional[str] = getattr(curr_session_context, 'format_name', None)
     if session_format_name not in _SPYGLASS_CLUSTERLESS_SUPPORTED_FORMATS:
         print(f'WARN: figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function skipped for unsupported session format: {curr_session_context}')
