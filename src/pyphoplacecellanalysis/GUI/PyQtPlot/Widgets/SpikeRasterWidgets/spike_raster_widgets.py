@@ -412,7 +412,7 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
 
 
     print(f'waiting until complete....')
-    block_until_render_complete()
+    block_until_render_complete(max_wait_time_sec=10)  # or 10 sec max wait time
     print(f'\tblock_until_render_complete is done. Continuing execution.')
 
 

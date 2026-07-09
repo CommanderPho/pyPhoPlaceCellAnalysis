@@ -546,7 +546,7 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                           input_requires=[ "computation_result.computed_data['pf1D_Decoder']", "computation_result.computed_data['pf2D_Decoder']"], output_provides=["computation_result.computed_data['specific_epochs_decoding']"],
                           uses=[], used_by=[], creation_date='2023-04-07 02:16',
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data['specific_epochs_decoding']), is_global=False)
-    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, **kwargs):
+    def _perform_specific_epochs_decoding(computation_result: ComputationResult, active_config, decoder_ndim:int=2, filter_epochs='ripple', decoding_time_bin_size=0.02, force_recompute: bool = False, **kwargs):
         """ TODO: meant to be used by `_display_plot_decoded_epoch_slices` but needs a smarter way to cache the computations and etc. 
         Eventually to replace `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError._compute_specific_decoded_epochs`
 
@@ -566,9 +566,16 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         curr_result = computation_result.computed_data.get('specific_epochs_decoding', {})
         found_result = curr_result.get(computation_tuple_key, None)
         if found_result is not None:
-            # Unwrap and reuse the result:
-            filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
-            needs_compute = False # we don't need to recompute
+            if not force_recompute:
+                # Unwrap and reuse the result:
+                filter_epochs_decoder_result, active_filter_epochs, default_figure_name = found_result # computation_result.computed_data['specific_epochs_decoding'][('Laps', decoding_time_bin_size)]
+                needs_compute = False # we don't need to recompute
+            else:
+                ## remove the extant result first
+                print(f'WARN: result found for key {computation_tuple_key} but force_recompute == True so removing the result and recomputing...')
+                found_result = curr_result.pop(computation_tuple_key, None)
+                found_result = None # null out the result
+                needs_compute = True ## force set it just to be safe
 
         if needs_compute:
             ## Do the computation:

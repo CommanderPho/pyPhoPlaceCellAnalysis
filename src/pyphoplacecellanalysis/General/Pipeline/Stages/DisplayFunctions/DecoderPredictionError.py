@@ -206,9 +206,15 @@ class DefaultDecoderDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Disp
         Inputs:
             most_likely_positions_mode: 'standard'|'corrected'
         
+
+        Usage:
         
-        ax = destination_plot.ui.matplotlib_view_widget.ax,
-        variable_name = 'x',
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DefaultDecoderDisplayFunctions
+
+            DefaultDecoderDisplayFunctions._display_plot_decoded_epoch_slices(
+            ax = destination_plot.ui.matplotlib_view_widget.ax,
+            variable_name = 'x',
+
         
         """
         from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
