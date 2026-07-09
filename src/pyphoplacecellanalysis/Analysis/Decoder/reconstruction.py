@@ -2788,7 +2788,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         """ 
         """ NOTE 2025-02-20 09:40: even when ``enable_slow_debugging_time_bin_validation==False`, this function takes forever because it prints a ton of statements. 
         ERROR: epochs_spkcount(...): epoch[559], nbins[559]: 1 - TODO 2024-08-07 19:11: Building BinningContainer for epoch with fewer than 2 edges (occurs when epoch duration is shorter than the bin size). Using the epoch.start, epoch.stop as the two edges (giving a single bin) but this might be off and cause problems, as they are the edges of the epoch but maybe not "real" edges?
-	    ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
+        ERROR (cont.): even after this hack `slide_view` is not updated, so the returned spkcount is not valid and has the old (wrong, way too many) number of bins. This results in decoded posteriors/postitions/etc with way too many bins downstream. see `SOLUTION 2024-08-07 20:08: - [ ] Recompute the Invalid Quantities with the known correct number of time bins` for info.
         
         
         Occurs with epochs_decoding_time_bin_size = 1.0, frame_divide_bin_size = 1.0
@@ -3648,22 +3648,10 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
             defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
         """
-        # neuron_sliced_decoder = super().get_by_id(ids, defer_compute_all=defer_compute_all)
-
         # call .get_by_id(ids) on the placefield (pf):
-        # neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
-        ## apply the neuron_sliced_pf to the decoder:
-        # neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
-        val_dict = deepcopy(self.to_dict())
-        neuron_sliced_pf: PfND = val_dict['pf'].get_by_id(ids)
-        val_dict['pf'] = neuron_sliced_pf
-
-
         neuron_sliced_decoder = BayesianPlacemapPositionDecoder(
-                                    # time_bin_size=val_dict.get('time_bin_size', 0.25), pf=neuron_sliced_pf, spikes_df=val_dict.get('spikes_df', None),
-                                    # setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False),
-                                    **val_dict,
-        )
+                time_bin_size=self.time_bin_size, pf=self.pf.get_by_id(ids), spikes_df=self.spikes_df,
+                setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
 
         ## Recompute:
         if not defer_compute_all:
