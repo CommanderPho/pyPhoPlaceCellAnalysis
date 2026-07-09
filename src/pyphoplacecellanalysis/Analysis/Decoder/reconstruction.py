@@ -3587,6 +3587,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             self.compute_most_likely_positions()
 
+
     def setup(self):
         # This version should override the base class version to finish the more extended setup of the new properties
         self.neuron_IDXs = None
@@ -3609,7 +3610,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         self.most_likely_position_flat_indicies = None
         self.most_likely_position_indicies = None
         self.marginal = None 
-        
+
+
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """
         variable_names_dict = dict(summary = ['ndim', 'num_neurons', 'num_time_windows'],
@@ -3646,11 +3648,29 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
             defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
         """
-        neuron_sliced_decoder = super().get_by_id(ids, defer_compute_all=defer_compute_all)
+        # neuron_sliced_decoder = super().get_by_id(ids, defer_compute_all=defer_compute_all)
+
+        # call .get_by_id(ids) on the placefield (pf):
+        # neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
+        ## apply the neuron_sliced_pf to the decoder:
+        # neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        val_dict = deepcopy(self.to_dict())
+        neuron_sliced_pf: PfND = val_dict['pf'].get_by_id(ids)
+        val_dict['pf'] = neuron_sliced_pf
+
+
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(
+                                    # time_bin_size=val_dict.get('time_bin_size', 0.25), pf=neuron_sliced_pf, spikes_df=val_dict.get('spikes_df', None),
+                                    # setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False),
+                                    **val_dict,
+        )
+
         ## Recompute:
         if not defer_compute_all:
             neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
+            
         return neuron_sliced_decoder
+
 
     def conform_to_position_bins(self, target_one_step_decoder, force_recompute=True):
         """ After the underlying placefield (self.pf)'s position bins are changed by calling pf.conform_to_position_bins(...) externally, the computations for the decoder will be messed up (and out of sync).
