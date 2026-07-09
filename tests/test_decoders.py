@@ -129,6 +129,17 @@ class TestDecodersMethods(unittest.TestCase):
             print(f'{neuron_sliced_1D_decoder_neuron_ids = }')
 
         self.assertTrue(np.all(neuron_sliced_1D_decoder_neuron_ids == subset_included_neuron_ids)) # ensure that the returned neuron ids actually equal the desired subset
+        self.assertTrue(np.all(neuron_sliced_1D_decoder.neuron_IDs == subset_included_neuron_ids))
+        self.assertEqual(neuron_sliced_1D_decoder.F.shape[1], len(subset_included_neuron_ids))
+        self.assertIsNotNone(neuron_sliced_1D_decoder.p_x_given_n)
+        self.assertIsNotNone(neuron_sliced_1D_decoder.most_likely_positions)
+
+        deferred_sliced_decoder = original_decoder.get_by_id(subset_included_neuron_ids, defer_compute_all=True)
+        self.assertTrue(np.all(np.array(deferred_sliced_decoder.pf.ratemap.neuron_ids) == subset_included_neuron_ids))
+        self.assertTrue(np.all(deferred_sliced_decoder.neuron_IDs == subset_included_neuron_ids))
+        self.assertEqual(deferred_sliced_decoder.F.shape[1], len(subset_included_neuron_ids))
+        self.assertIsNone(deferred_sliced_decoder.p_x_given_n)
+        self.assertIsNone(deferred_sliced_decoder.most_likely_positions)
         # self.assertTrue(np.all(np.array(neuron_sliced_pf.ratemap.neuron_ids) == subset_included_neuron_ids)) # ensure that the ratemap neuron ids actually equal the desired subset
         # self.assertTrue(len(neuron_sliced_pf.ratemap.tuning_curves) == len(subset_included_neuron_ids)) # ensure one output tuning curve for each neuron_id
         # self.assertTrue(np.all(np.isclose(neuron_sliced_pf.ratemap.tuning_curves, [original_pf.ratemap.tuning_curves[idx] for idx in subset_included_neuron_IDXs]))) # ensure that the tuning curves built for the neuron_slided_pf are the same as those subset as retrieved from the  original_pf
