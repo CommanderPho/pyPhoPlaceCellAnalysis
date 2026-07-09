@@ -3643,20 +3643,22 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
     # for NeuronUnitSlicableObjectProtocol:
     def get_by_id(self, ids, defer_compute_all:bool=False):
-        """Implementors return a copy of themselves with neuron_ids equal to ids
-            Needs to update: neuron_sliced_decoder.pf, ... (much more)
+        """Return a copy restricted to neuron_ids equal to ids.
 
-            defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
+        Always runs setup on the sliced decoder (builds F, P_x, neuron_IDs).
+        Does not run post_load (no serialized posterior to restore).
+        If defer_compute_all is False, also runs compute_all() for full-session decode caches.
         """
-        # call .get_by_id(ids) on the placefield (pf):
-        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(
-                time_bin_size=self.time_bin_size, pf=self.pf.get_by_id(ids), spikes_df=self.spikes_df,
-                setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
+        spikes_df = deepcopy(self.spikes_df)
+        if (spikes_df is not None) and ('aclu' in spikes_df.columns):
+            spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids)].copy()
 
-        ## Recompute:
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoder(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, setup_on_init=True, post_load_on_init=False, debug_print=self.debug_print)
+
         if not defer_compute_all:
-            neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now. 
-            
+            neuron_sliced_decoder.compute_all() # does recompute, updating internal variables. TODO EFFICIENCY 2023-03-02 - This is overkill and I could filter the tuning_curves and etc directly, but this is easier for now.
+
         return neuron_sliced_decoder
 
 
