@@ -248,6 +248,9 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False, **params_kwargs)
         self.params.type_of_3d_plotter = type_of_3d_plotter
         self.params._menu_action_history_list = []
+        self.params.base_context_window_title = None
+        self.params.dynamic_dock_window_title_suffix = None
+        self.params.window_title = self.applicationName
         # Helper Mixins: INIT:
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
@@ -411,7 +414,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # Set Window Title Options:
         if self.applicationName is not None:
             # self.setWindowFilePath(str(sess.filePrefix.resolve()))
-            self.setWindowTitle(f'{self.applicationName}') # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
+            self.set_base_context_window_title(f'{self.applicationName}', clear_dynamic_suffix=True) # f'Spike Raster Window - {secondary_active_config_name} - {str(sess.filePrefix.resolve())}'
 
         ## Scrolling Properties:
         self._scheduledAnimationSteps = 0
@@ -1229,7 +1232,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         complete_session_context_window_title_str: str = complete_session_context.get_description(separator='|', include_property_names=False) # 'kdiba|gor01|two|2006-6-07_16-40-19|normal_computed|[1, 2, 4, 6, 7, 8, 9]|5.0'
         spike_raster_window.params.window_title = f"Spike Raster Window - {complete_session_context_window_title_str}" # Updates `spike_raster_window.params.window_title`
         # spike_raster_window.window().setWindowTitle(spike_raster_window.params.window_title) ## sets the window title
-        spike_raster_window.setWindowTitle(spike_raster_window.params.window_title)
+        spike_raster_window.set_base_context_window_title(spike_raster_window.params.window_title, clear_dynamic_suffix=True)
         # return spike_raster_window, (active_2d_plot, active_3d_plot, main_graphics_layout_widget, main_plot_widget, background_static_scroll_plot_widget)
         
 
@@ -1968,8 +1971,43 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             
 
 
+    def _set_window_title_direct(self, desired_window_title: str):
+        """Direct window title setter that bypasses title policy composition."""
+        win = self.window()
+        if win is self:
+            super().setWindowTitle(desired_window_title)
+        else:
+            win.setWindowTitle(desired_window_title)
+
+    def compose_window_title(self, base_context_title: Optional[str], dynamic_dock_title: Optional[str] = None) -> str:
+        """Composes final title as `<base> - <suffix>` when suffix exists."""
+        active_base_context_title: str = (base_context_title or self.applicationName or "Spike Raster Window")
+        active_dynamic_dock_title = (dynamic_dock_title or "").strip()
+        if len(active_dynamic_dock_title) == 0:
+            return active_base_context_title
+        return f"{active_base_context_title} - {active_dynamic_dock_title}"
+
+    def _apply_composed_window_title(self):
+        """Rebuilds the window title from immutable base + optional dynamic suffix."""
+        active_composed_window_title: str = self.compose_window_title(self.params.base_context_window_title, self.params.dynamic_dock_window_title_suffix)
+        self.params.window_title = active_composed_window_title
+        self._set_window_title_direct(active_composed_window_title)
+        return active_composed_window_title
+
+    def set_base_context_window_title(self, base_context_title: str, clear_dynamic_suffix: bool = False):
+        """Sets immutable base context title and reapplies composed title."""
+        self.params.base_context_window_title = base_context_title
+        if clear_dynamic_suffix:
+            self.params.dynamic_dock_window_title_suffix = None
+        return self._apply_composed_window_title()
+
+    def set_dynamic_window_title_suffix(self, dynamic_dock_title: Optional[str]):
+        """Sets dock/operation suffix while preserving base session context."""
+        self.params.dynamic_dock_window_title_suffix = dynamic_dock_title
+        return self._apply_composed_window_title()
+
     def setWindowTitle(self, desired_window_title: str):
-        """ passthrough support for setting the window title
+        """Policy-aware window title setter.
         
         Prevents having to use `spike_raster_window.window().setWindowTitle(desired_window_title)`.
         
@@ -1978,13 +2016,21 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             desired_window_title: str = curr_active_pipeline.get_complete_session_identifier_string() # 'kdiba_gor01_two_2006-6-07_16-40-19__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_5.0'
             spike_raster_window.setWindowTitle(desired_window_title)
             
+        Any caller-provided title becomes the dynamic suffix once base context exists.
         """
-        # self.window().setWindowTitle(desired_window_title) ## causes kernel crashes
-        win = self.window()        
-        if win is self:
-            super().setWindowTitle(desired_window_title) 
-        else:
-            win.setWindowTitle(desired_window_title)
+        existing_base_context_title = self.params.base_context_window_title
+        if existing_base_context_title is None:
+            return self.set_base_context_window_title(desired_window_title, clear_dynamic_suffix=True)
+
+        desired_window_title = (desired_window_title or "").strip()
+        if (len(desired_window_title) == 0) or (desired_window_title == existing_base_context_title):
+            return self.set_dynamic_window_title_suffix(None)
+
+        base_title_prefix = f"{existing_base_context_title} - "
+        if desired_window_title.startswith(base_title_prefix):
+            desired_window_title = desired_window_title[len(base_title_prefix):]
+
+        return self.set_dynamic_window_title_suffix(desired_window_title)
 
 
 
