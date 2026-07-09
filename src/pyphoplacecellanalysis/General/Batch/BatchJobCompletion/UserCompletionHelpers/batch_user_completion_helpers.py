@@ -3808,7 +3808,7 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
     os.environ.setdefault('QT_OPENGL', 'software')
 
     if replay_min_duration_sec is None:
-        replay_min_duration_sec = 2.0 * float(pbe_replay_decoding_time_bin_size)
+        replay_min_duration_sec = 4.0 * float(pbe_replay_decoding_time_bin_size)
 
     def _subfn_apply_drop_below_mask(arr: np.ndarray, active_drop_below_value: Optional[float]) -> np.ndarray:
         if (active_drop_below_value is None) or (active_drop_below_value <= 0):
