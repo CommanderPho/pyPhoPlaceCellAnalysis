@@ -3768,7 +3768,10 @@ def recompute_nwb_wmaze_pipeline_computations_completion_function(self, global_d
 
 
 @function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'pbe', 'replay', 'posterior-images', '2D-decode', 'gif', 'spatial-animation'], input_requires=[], output_provides=[], uses=['DecodeSpecificEpochsResultWithDecodingInfo', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_contextual_pf2D_decoder', 'HeatmapExportConfig', 'save_array_as_image', 'AnimatedLoopingPosteriorGraphicsGridViewer', 'AnimationExportMode'], used_by=[], creation_date='2026-07-08 14:30', related_items=['recompute_nwb_wmaze_pipeline_computations_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_pbe_posterior_images: bool = True, export_replay_posterior_images: bool = False, export_pbe_spatial_gifs: bool = False, export_replay_spatial_gifs: bool = False, posterior_images_desired_height: int = 1200, spatial_gif_context_reduction: str = 'sum_contexts', spatial_gif_max_epochs: Optional[int] = None, spatial_gif_n_columns: int = 10, spatial_gif_viewer_width: int = 1000, spatial_gif_viewer_height: int = 1098, spatial_gif_frame_duration_ms: int = 50, spatial_gif_render_passes: int = 5, spatial_gif_normalize_global: bool = True, spatial_gif_export_single_grid: bool = True, spatial_gif_export_per_epoch: bool = True, force_redecode: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, debug_print: bool = False) -> dict:
+def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, 
+    export_pbe_posterior_images: bool = True, export_replay_posterior_images: bool = False, export_pbe_spatial_gifs: bool = False, export_replay_spatial_gifs: bool = True, posterior_images_desired_height: int = 1200, spatial_gif_context_reduction: str = 'sum_contexts', spatial_gif_max_epochs: Optional[int] = None,
+    spatial_gif_n_columns: int = 10, spatial_gif_viewer_width: int = 1000, spatial_gif_viewer_height: int = 1098, spatial_gif_frame_duration_ms: int = 50, spatial_gif_render_passes: int = 5, spatial_gif_normalize_global: bool = True, spatial_gif_export_single_grid: bool = False, spatial_gif_export_per_epoch: bool = True, drop_below_value: float = 1e-7,
+    force_redecode: bool = False, pbe_replay_decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, debug_print: bool = False) -> dict:
     """Export W-Maze contextual 2D PBE/replay posterior images and optional spatial animated GIFs.
 
     PNG exports: per-epoch context x time marginal heatmaps (greyscale_shared_norm + viridis_shared_norm).
@@ -3800,7 +3803,15 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     os.environ.setdefault('QT_OPENGL', 'software')
 
-    def _subfn_build_contextual_pf2D_posterior_image_data(p_x_given_n: np.ndarray) -> np.ndarray:
+    def _subfn_apply_drop_below_mask(arr: np.ndarray, active_drop_below_value: Optional[float]) -> np.ndarray:
+        if (active_drop_below_value is None) or (active_drop_below_value <= 0):
+            return arr
+        masked_arr: np.ndarray = np.array(arr, copy=True, dtype=float)
+        masked_arr[np.where(masked_arr < active_drop_below_value)] = np.nan
+        return masked_arr
+
+
+    def _subfn_build_contextual_pf2D_posterior_image_data(p_x_given_n: np.ndarray, active_drop_below_value: Optional[float] = None) -> np.ndarray:
         """Marginalize contextual 2D posteriors to (n_contexts, n_time_bins) for heatmap export."""
         p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
         if p_x.ndim == 4:
@@ -3812,10 +3823,11 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
         else:
             raise ValueError(f'_subfn_build_contextual_pf2D_posterior_image_data expected 2-4D p_x_given_n, got shape {p_x.shape}')
         denom: np.ndarray = np.nansum(img_data, axis=0, keepdims=True)
-        return np.divide(img_data, denom, out=np.zeros_like(img_data), where=denom > 0)
+        img_data = np.divide(img_data, denom, out=np.zeros_like(img_data), where=denom > 0)
+        return _subfn_apply_drop_below_mask(img_data, active_drop_below_value)
 
 
-    def _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', desired_height: int = 1200, custom_export_formats: Optional[Dict] = None) -> dict:
+    def _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', desired_height: int = 1200, custom_export_formats: Optional[Dict] = None, active_drop_below_value: Optional[float] = None) -> dict:
         """Export per-epoch contextual 2D posterior heatmap images (context x time marginals; mirrors generalized decode export formats)."""
         parent_output_folder.mkdir(parents=True, exist_ok=True)
         posterior_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name).resolve()
@@ -3834,7 +3846,7 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
             export_format_config_list: list = []
             for epoch_idx in np.arange(num_filter_epochs):
                 active_epoch_result = decoded_epochs_result.get_result_for_epoch(active_epoch_idx=epoch_idx)
-                img_data: np.ndarray = _subfn_build_contextual_pf2D_posterior_image_data(active_epoch_result.p_x_given_n)
+                img_data: np.ndarray = _subfn_build_contextual_pf2D_posterior_image_data(active_epoch_result.p_x_given_n, active_drop_below_value=active_drop_below_value)
                 curr_epoch_info_dict = active_epoch_result.epoch_info_tuple._asdict()
                 active_epoch_id = curr_epoch_info_dict.get('label', epoch_idx)
                 complete_epoch_identifier_str: str = f"p_x_given_n[{int(active_epoch_id):0{num_required_zero_padding}d}]"
@@ -3853,12 +3865,12 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
         return {'parent_output_folder': parent_output_folder, 'epochs_name': epochs_name, 'decoder_name': decoder_name, 'posterior_out_folder': posterior_out_folder, 'out_custom_formats_dict': out_custom_formats_dict, 'flat_save_out_paths': flat_save_out_paths}
 
 
-    def _subfn_build_spatial_3D_p_x_given_n(p_x_given_n: np.ndarray, context_reduction: str = 'sum_contexts') -> np.ndarray:
+    def _subfn_build_spatial_3D_p_x_given_n(p_x_given_n: np.ndarray, context_reduction: str = 'sum_contexts', active_drop_below_value: Optional[float] = None) -> np.ndarray:
         """Reduce contextual 4D posteriors to spatial 3D (nx, ny, n_time_bins) for animated GIF export."""
         p_x: np.ndarray = np.asarray(p_x_given_n, dtype=float)
         if p_x.ndim == 4:
             if context_reduction == 'sum_contexts':
-                return np.nansum(p_x, axis=2)
+                return _subfn_apply_drop_below_mask(np.nansum(p_x, axis=2), active_drop_below_value)
             if context_reduction == 'most_likely_context':
                 marginal_z: np.ndarray = np.nansum(p_x, axis=(0, 1))
                 denom: np.ndarray = np.nansum(marginal_z, axis=0, keepdims=True)
@@ -3868,20 +3880,20 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
                 p_x_spatial: np.ndarray = np.empty((n_x_bins, n_y_bins, n_t_bins), dtype=float)
                 for t_bin_idx, ctxt_idx in enumerate(most_likely_context_idx):
                     p_x_spatial[:, :, t_bin_idx] = p_x[:, :, int(ctxt_idx), t_bin_idx]
-                return p_x_spatial
+                return _subfn_apply_drop_below_mask(p_x_spatial, active_drop_below_value)
             raise ValueError(f'_subfn_build_spatial_3D_p_x_given_n unsupported context_reduction={context_reduction!r}; expected sum_contexts or most_likely_context')
         if p_x.ndim == 3:
-            return p_x
+            return _subfn_apply_drop_below_mask(p_x, active_drop_below_value)
         raise ValueError(f'_subfn_build_spatial_3D_p_x_given_n expected 3-4D p_x_given_n, got shape {p_x.shape}')
 
 
-    def _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result: DecodedFilterEpochsResult, context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None) -> DecodedFilterEpochsResult:
+    def _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result: DecodedFilterEpochsResult, context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None, active_drop_below_value: Optional[float] = None) -> DecodedFilterEpochsResult:
         """Build a DecodedFilterEpochsResult with spatial 3D p_x_given_n_list suitable for AnimatedLoopingPosteriorGraphicsGridViewer."""
         n_epochs: int = int(decoded_epochs_result.num_filter_epochs)
         if max_epochs is not None:
             n_epochs = min(int(max_epochs), n_epochs)
         decoded_for_gif: DecodedFilterEpochsResult = deepcopy(decoded_epochs_result)
-        decoded_for_gif.p_x_given_n_list = [_subfn_build_spatial_3D_p_x_given_n(decoded_epochs_result.p_x_given_n_list[epoch_idx], context_reduction=context_reduction) for epoch_idx in np.arange(n_epochs)]
+        decoded_for_gif.p_x_given_n_list = [_subfn_build_spatial_3D_p_x_given_n(decoded_epochs_result.p_x_given_n_list[epoch_idx], context_reduction=context_reduction, active_drop_below_value=active_drop_below_value) for epoch_idx in np.arange(n_epochs)]
         if n_epochs < decoded_epochs_result.num_filter_epochs:
             per_epoch_field_names: list[str] = ['most_likely_positions_list', 'marginal_x_list', 'marginal_y_list', 'marginal_z_list', 'most_likely_position_indicies_list', 'spkcount', 'time_bin_containers', 'time_bin_edges']
             for field_name in per_epoch_field_names:
@@ -3896,12 +3908,12 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
         return decoded_for_gif
 
 
-    def _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result: DecodedFilterEpochsResult, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None, n_columns: int = 10, viewer_width: int = 1000, viewer_height: int = 1098, frame_duration_ms: int = 50, render_passes: int = 5, normalize_global: bool = True, export_single_grid: bool = True, export_per_epoch: bool = True) -> dict:
+    def _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result: DecodedFilterEpochsResult, parent_output_folder: Path, epochs_name: str = 'pbe', decoder_name: str = 'contextual_pf2D', context_reduction: str = 'sum_contexts', max_epochs: Optional[int] = None, n_columns: int = 10, viewer_width: int = 1000, viewer_height: int = 1098, frame_duration_ms: int = 50, render_passes: int = 5, normalize_global: bool = True, export_single_grid: bool = True, export_per_epoch: bool = True, active_drop_below_value: Optional[float] = None) -> dict:
         """Export spatial (nx, ny) animated GIFs for contextual 2D decoded epochs."""
         parent_output_folder.mkdir(parents=True, exist_ok=True)
         spatial_gif_out_folder: Path = parent_output_folder.joinpath(epochs_name, decoder_name, 'spatial_gifs').resolve()
         spatial_gif_out_folder.mkdir(parents=True, exist_ok=True)
-        decoded_for_gif: DecodedFilterEpochsResult = _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result=decoded_epochs_result, context_reduction=context_reduction, max_epochs=max_epochs)
+        decoded_for_gif: DecodedFilterEpochsResult = _subfn_build_spatial_decoded_epochs_result_for_gif(decoded_epochs_result=decoded_epochs_result, context_reduction=context_reduction, max_epochs=max_epochs, active_drop_below_value=active_drop_below_value)
         pg.mkQApp(f'figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function - {epochs_name} spatial gifs')
         viewer: AnimatedLoopingPosteriorGraphicsGridViewer = AnimatedLoopingPosteriorGraphicsGridViewer(decoded_for_gif, n_columns=n_columns)
         viewer.resize(viewer_width, viewer_height)
@@ -3919,6 +3931,36 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
             export_summary['per_epoch_gif_folder'] = per_epoch_gif_folder
             export_summary['per_epoch_gif_paths'] = list(per_epoch_gif_paths)
         return export_summary
+
+
+    # def _subfn_do_recompute_epochs():
+    #     ## Test _perform_specific_epochs_decoding
+    #     from neuropy.core.epoch import ensure_Epoch, ensure_dataframe, Epoch
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import KnownFilterEpochs
+    #     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.DefaultComputationFunctions import DefaultComputationFunctions
+    #     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import DecodeSpecificEpochsResultWithDecodingInfo
+
+    #     pbe_replay_decoding_time_bin_size: float = 0.06
+    #     replay_full_result: DecodeSpecificEpochsResultWithDecodingInfo = DecodeSpecificEpochsResultWithDecodingInfo.init_by_decoding(decoding_context=IdentifyingContext(epoch_name='replay'), decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, filter_epochs=ensure_Epoch(curr_active_pipeline.sess.replay), decoding_time_bin_size=pbe_replay_decoding_time_bin_size, debug_print=debug_print)
+
+    #     maze_epoch_name: str = 'maze_GLOBAL'
+    #     # filter_epochs = 'pbe'
+    #     filter_epochs = 'replay'
+    #     # filter_epochs = ensure_Epoch(curr_active_pipeline.filtered_sessions[maze_epoch_name].replay)
+
+    #     if curr_active_pipeline.filtered_sessions[maze_epoch_name].get('replay', None) is None:
+    #         curr_active_pipeline.filtered_sessions[maze_epoch_name].replay = ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay))
+
+    #     decoder_ndim: int = 2
+    #     # decoding_time_bin_size = 0.02
+    #     decoding_time_bin_size = 0.06
+    #     # decoding_time_bin_size = 0.5
+
+    #     computation_result = curr_active_pipeline.computation_results[maze_epoch_name]
+    #     computation_result = DefaultComputationFunctions._perform_specific_epochs_decoding(computation_result, curr_active_pipeline.active_configs[maze_epoch_name],
+    #                                     filter_epochs=filter_epochs, decoding_time_bin_size=decoding_time_bin_size, decoder_ndim=decoder_ndim, force_recompute=True)
+
+
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -3945,6 +3987,7 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
         replay_pkl_path = self.collected_outputs_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_replay_2d_decoded_result.pkl').resolve()
 
     callback_outputs: dict[str, Any] = {'pbe_pkl_path': pbe_pkl_path, 'replay_pkl_path': replay_pkl_path, 'pbe_posterior_images_parent_folder': None, 'pbe_posterior_images_export_summary': None, 'replay_posterior_images_export_summary': None, 'pbe_spatial_gifs_export_summary': None, 'replay_spatial_gifs_export_summary': None, 'posterior_images_error': None}
+
 
     try:
         pbe_full_result: Optional[DecodeSpecificEpochsResultWithDecodingInfo] = None
@@ -3975,25 +4018,25 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
 
         if export_pbe_posterior_images:
             assert pbe_full_result is not None, f'PBE decode result missing (pbe_pkl_path exists={pbe_pkl_path.exists()}, force_redecode={force_redecode})'
-            pbe_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', desired_height=posterior_images_desired_height)
+            pbe_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', desired_height=posterior_images_desired_height, active_drop_below_value=drop_below_value)
             callback_outputs['pbe_posterior_images_export_summary'] = deepcopy(pbe_posterior_images_export_summary)
             print(f'\tsaved pbe posterior images: "{pbe_posterior_images_export_summary["posterior_out_folder"]}"')
 
         if export_replay_posterior_images:
             assert replay_full_result is not None, f'replay decode result missing (replay_pkl_path exists={replay_pkl_path.exists()}, force_redecode={force_redecode})'
-            replay_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', desired_height=posterior_images_desired_height)
+            replay_posterior_images_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_posterior_images(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', desired_height=posterior_images_desired_height, active_drop_below_value=drop_below_value)
             callback_outputs['replay_posterior_images_export_summary'] = deepcopy(replay_posterior_images_export_summary)
             print(f'\tsaved replay posterior images: "{replay_posterior_images_export_summary["posterior_out_folder"]}"')
 
         if export_pbe_spatial_gifs:
             assert pbe_full_result is not None, f'PBE decode result missing for spatial GIF export (pbe_pkl_path exists={pbe_pkl_path.exists()}, force_redecode={force_redecode})'
-            pbe_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch)
+            pbe_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=pbe_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='pbe', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch, active_drop_below_value=drop_below_value)
             callback_outputs['pbe_spatial_gifs_export_summary'] = deepcopy(pbe_spatial_gifs_export_summary)
             print(f'\tsaved pbe spatial GIFs: "{pbe_spatial_gifs_export_summary["spatial_gif_out_folder"]}"')
 
         if export_replay_spatial_gifs:
             assert replay_full_result is not None, f'replay decode result missing for spatial GIF export (replay_pkl_path exists={replay_pkl_path.exists()}, force_redecode={force_redecode})'
-            replay_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch)
+            replay_spatial_gifs_export_summary: dict = _subfn_export_wmaze_contextual_pf2D_spatial_gifs(decoded_epochs_result=replay_full_result.decoder_result, parent_output_folder=pbe_posterior_images_parent_folder, epochs_name='replay', context_reduction=spatial_gif_context_reduction, max_epochs=spatial_gif_max_epochs, n_columns=spatial_gif_n_columns, viewer_width=spatial_gif_viewer_width, viewer_height=spatial_gif_viewer_height, frame_duration_ms=spatial_gif_frame_duration_ms, render_passes=spatial_gif_render_passes, normalize_global=spatial_gif_normalize_global, export_single_grid=spatial_gif_export_single_grid, export_per_epoch=spatial_gif_export_per_epoch, active_drop_below_value=drop_below_value)
             callback_outputs['replay_spatial_gifs_export_summary'] = deepcopy(replay_spatial_gifs_export_summary)
             print(f'\tsaved replay spatial GIFs: "{replay_spatial_gifs_export_summary["spatial_gif_out_folder"]}"')
 
