@@ -129,6 +129,208 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+# ==================================================================================================================== #
+# 2026-07-09 - Placefield Decoding when Disjoint Exploration                                                           #
+# ==================================================================================================================== #
+from copy import deepcopy
+from neuropy.core.epoch import ensure_dataframe
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+from neuropy.core.ratemap import Ratemap
+from neuropy.analyses.placefields import PfND
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, BasePositionDecoder
+
+class DisjointPlacefieldsExploration:
+    """
+    Usage:
+        # --- pick maze context (decoder is per filtered session) ---
+        maze_name = 'maze'  # or 'maze2', etc.
+        computed_data = curr_active_pipeline.computation_results[maze_name].computed_data
+        decoder: BayesianPlacemapPositionDecoder = computed_data['pf2D_Decoder']
+        # pf: PfND = deepcopy(decoder.pf)
+        # ratemap: Ratemap = deepcopy(decoder.ratemap)
+        ratemap: Ratemap = decoder.ratemap
+
+        pairs = compute_unit_pair_least_overlapping(ratemap=ratemap)
+        pairs
+        good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, graphics_outputs_dict = compute_and_plot_for_disjoint_cell_pairs(decoder=decoder, pairs=pairs)
+
+
+    """
+    @function_attributes(short_name=None, tags=['overlap', 'similarity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-09 07:02', related_items=[])
+    def compute_unit_pair_least_overlapping(ratemap: Ratemap):
+        """ 
+            from copy import deepcopy
+            from neuropy.core.epoch import ensure_dataframe
+            from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+            from neuropy.core.ratemap import Ratemap
+            from neuropy.analyses.placefields import PfND
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, BasePositionDecoder
+
+            # --- pick maze context (decoder is per filtered session) ---
+            maze_name = 'maze'  # or 'maze2', etc.
+            computed_data = curr_active_pipeline.computation_results[maze_name].computed_data
+            decoder: BayesianPlacemapPositionDecoder = computed_data['pf2D_Decoder']
+            # pf: PfND = deepcopy(decoder.pf)
+            # ratemap: Ratemap = deepcopy(decoder.ratemap)
+            ratemap: Ratemap = decoder.ratemap
+            pairs = compute_unit_pair_least_overlapping(ratemap=ratemap)
+            pairs
+            
+        """
+        # PDF-normalized maps: (n_neurons, n_bins...) → (n_neurons, n_flat)
+        X = np.nan_to_num(ratemap.pdf_normalized_tuning_curves, nan=0.0)
+        X = X.reshape(X.shape[0], -1)
+
+        # Pairwise soft overlap O_ij = sum_x p_i(x) p_j(x)
+        O = X @ X.T  # (n_neurons, n_neurons)
+
+        # Ignore self-pairs
+        np.fill_diagonal(O, np.inf)
+
+        # Smallest overlaps first
+        flat = np.argsort(O, axis=None)
+        ii, jj = np.unravel_index(flat, O.shape)
+        # unique unordered pairs (i < j)
+        keep = ii < jj
+        pairs = list(zip(np.asarray(ratemap.neuron_ids)[ii[keep]],
+                        np.asarray(ratemap.neuron_ids)[jj[keep]],
+                        O[ii[keep], jj[keep]]))
+        # pairs[0] = most disjoint
+        return pairs
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'overlap', 'similarity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-09 06:59', related_items=[])
+    def compute_unit_pair_least_overlapping_exclusive(ratemap: Ratemap, frac = 0.2):  # keep bins ≥ 20% of each cell's peak
+        """ 
+        array([[inf, 0.179803, 0.146148, 0.105105, 0.0443623, 0, 0, 0, 0.515528, 0, 0, 0.0371353, 0.347826, 0.10274],
+        [0.179803, inf, 0.164013, 0.131934, 0.0774908, 0.16622, 0.199324, 0, 0.233577, 0, 0.0106667, 0, 0, 0.195238],
+        [0.146148, 0.164013, inf, 0.393031, 0.23741, 0.060652, 0.0493238, 0.148523, 0.180578, 0.128956, 0.0883306, 0.0569231, 0.0435835, 0.146208],
+        [0.105105, 0.131934, 0.393031, inf, 0.253353, 0, 0, 0.186441, 0.115328, 0.144674, 0.162706, 0.0183206, 0, 0.0675105],
+        [0.0443623, 0.0774908, 0.23741, 0.253353, inf, 0, 0, 0.21501, 0.0821168, 0.153361, 0.0287611, 0.135011, 0, 0.00684932],
+        ...
+        ])
+        
+        Usage:
+            J = compute_unit_pair_least_overlapping_exclusive(ratemap=ratemap)
+        
+        """
+        U = ratemap.unit_max_tuning_curves.reshape(ratemap.n_neurons, -1)
+        M = (U >= frac)  # boolean support
+
+        # Jaccard: |A∩B| / |A∪B|  (0 = disjoint supports)
+        inter = M.astype(float) @ M.T
+        sizes = M.sum(axis=1, keepdims=True)
+        union = sizes + sizes.T - inter
+        J = inter / np.maximum(union, 1)
+        np.fill_diagonal(J, np.inf)
+        # then argsort J the same way
+        return J
+
+
+    @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
+    def plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True):
+        """
+        Usage:
+        
+            ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
+            tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
+            fig, axes = plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0)
+
+        """
+        # fig, axes = plt.subplots(1, 3)
+        n_columns: int = 2
+        if include_occupancy:
+            n_columns = n_columns + 1
+        fig, axes = plt.subplots(1, n_columns, num=f'plot_pfs_and_decoded_posterior[{tuple_key}] - t[{t_idx}]')
+
+        p_x_given_n = co_firing_posteriors[:, :, t_idx]
+        if nan_less_than_value is not None:
+            p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
+        axes[0].imshow(p_x_given_n) ## plot the decoded posterior
+
+        ## plot the two placefields used to decode for reference
+        n_neurons, n_x_bins, n_y_bins = np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps)
+        stack_img = np.zeros((n_x_bins, n_y_bins, 4), dtype=float)
+        if nan_less_than_value is not None:
+            stack_img[stack_img < nan_less_than_value] = np.nan
+
+        # stack_img[:, :, -1] = 1.0
+        stack_img[:, :, -1] = 0.0 ## set alpha to zero
+        
+
+        # np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps) # (2, 60, 60)
+        for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids):
+            print(f'neuron_idx: {neuron_idx}, alcu: {aclu}')
+            pf_cell = neuron_sliced_decoder.ratemap.tuning_curves[neuron_idx, :, :]
+            if nan_less_than_value is not None:
+                pf_cell[pf_cell < nan_less_than_value] = np.nan
+            stack_img[np.logical_not(np.isnan(pf_cell)), -1] = 0.5
+            stack_img[:, :, neuron_idx] = pf_cell
+            # axes[1+neuron_idx].imshow(pf_cell)
+
+        axes[1].imshow(stack_img)
+        if include_occupancy:
+            # neuron_sliced_decoder.pf.plot_occupancy(ax=axes[2])
+            axes[2].imshow(neuron_sliced_decoder.pf.nan_never_visited_occupancy)
+        return fig, axes
+
+
+    @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=['plot_pfs_and_decoded_posterior'], used_by=[], creation_date='2026-07-09 06:57', related_items=[])
+    def compute_and_plot_for_disjoint_cell_pairs(decoder, pairs, nan_less_than_value: float = 1e-7, debug_print = False):
+        # good_pairs = []
+        good_pairs_co_firing_bins_dict = {}
+        good_pairs_co_firing_posteriors_dict = {}
+        good_pairs_co_firing_marginals_dict = {}
+        graphics_outputs_dict = {}
+        
+
+        for i, a_pair in enumerate(pairs):
+            cell_a_aclu, cell_b_aclu, overlap_value = a_pair
+            disjoint_cell_ids = [cell_a_aclu, cell_b_aclu]
+            if debug_print:
+                print(f'testing: {disjoint_cell_ids}')
+            neuron_sliced_decoder: BayesianPlacemapPositionDecoder = decoder.get_by_id(disjoint_cell_ids, defer_compute_all=True)
+            co_firing_bin_unit_specific_time_binned_spike_counts_indicies = np.where(np.all((neuron_sliced_decoder.unit_specific_time_binned_spike_counts > 0), axis=0))[0] # array([ 45410,  56871, 137093, 188634, 247313, 261047, 368414])
+            if len(co_firing_bin_unit_specific_time_binned_spike_counts_indicies) > 0:
+                # good_pairs.append(disjoint_cell_ids)
+                tuple_key = tuple(disjoint_cell_ids)
+                good_pairs_co_firing_bins_dict[tuple_key] = co_firing_bin_unit_specific_time_binned_spike_counts_indicies
+                if debug_print:
+                    print(f'\tfound good pair: {disjoint_cell_ids}')
+                spkcount = neuron_sliced_decoder.unit_specific_time_binned_spike_counts[:, co_firing_bin_unit_specific_time_binned_spike_counts_indicies] # (n_cells, n_epoch_time_bins)
+                # np.shape(spkcount)
+                
+                # decoder.
+                ## TODO: need to decode first since .compute is not done?
+                ## INPUTS: decoder
+                most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container = neuron_sliced_decoder.decode(spkcount, time_bin_size=neuron_sliced_decoder.time_bin_size, output_flat_versions=False, debug_print=neuron_sliced_decoder.debug_print)
+                # np.shape(neuron_sliced_decoder.p_x_given_n) # (60, 60, 384252)
+                # co_firing_posteriors = neuron_sliced_decoder.p_x_given_n[:, :, co_firing_bin_unit_specific_time_binned_spike_counts_indicies]
+                # good_pairs_co_firing_posteriors_dict[tuple_key] = co_firing_posteriors
+
+                # if nan_less_than_value is not None:
+                # 	p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
+
+                good_pairs_co_firing_posteriors_dict[tuple_key] = p_x_given_n
+
+                ## compute marginals:
+                curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = neuron_sliced_decoder.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=neuron_sliced_decoder.debug_print)
+                good_pairs_co_firing_marginals_dict[tuple_key] = (curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z)
+
+                if i < 3:
+                    ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
+                    # tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
+                    fig, axes = plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0,
+                                nan_less_than_value = nan_less_than_value)
+                    graphics_outputs_dict[tuple_key] = (fig, axes)
+                else:
+                    continue
+
+        return good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, graphics_outputs_dict
+
+
+
 
 # ============================================================================================================================ #
 # Multi-Context (N-Maze) Context Decoder Performance Evaluation
