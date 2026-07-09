@@ -26,6 +26,7 @@ import attrs
 import matplotlib as mpl
 import napari
 from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch
+from neuropy.core.ratemap import Ratemap
 from neuropy.analyses.placefields import HDF_SerializationMixin, PfND
 import numpy as np
 import pandas as pd
@@ -35,7 +36,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.programming_helpers import metadata_attributes
 
 from functools import wraps, partial
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing import NewType
@@ -132,12 +133,6 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # ==================================================================================================================== #
 # 2026-07-09 - Placefield Decoding when Disjoint Exploration                                                           #
 # ==================================================================================================================== #
-from copy import deepcopy
-from neuropy.core.epoch import ensure_dataframe
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-from neuropy.core.ratemap import Ratemap
-from neuropy.analyses.placefields import PfND
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder, BasePositionDecoder
 
 class DisjointPlacefieldsExploration:
     """
@@ -150,14 +145,15 @@ class DisjointPlacefieldsExploration:
         # ratemap: Ratemap = deepcopy(decoder.ratemap)
         ratemap: Ratemap = decoder.ratemap
 
-        pairs = compute_unit_pair_least_overlapping(ratemap=ratemap)
+        pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=ratemap)
         pairs
-        good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, graphics_outputs_dict = compute_and_plot_for_disjoint_cell_pairs(decoder=decoder, pairs=pairs)
+        good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, good_pairs_co_firing_bins_dict, graphics_outputs_dict = DisjointPlacefieldsExploration.compute_and_plot_for_disjoint_cell_pairs(decoder=decoder, pairs=pairs)
 
 
     """
     @function_attributes(short_name=None, tags=['overlap', 'similarity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-09 07:02', related_items=[])
-    def compute_unit_pair_least_overlapping(ratemap: Ratemap):
+    @classmethod
+    def compute_unit_pair_least_overlapping(cls, ratemap: Ratemap):
         """ 
             from copy import deepcopy
             from neuropy.core.epoch import ensure_dataframe
@@ -174,7 +170,7 @@ class DisjointPlacefieldsExploration:
             # pf: PfND = deepcopy(decoder.pf)
             # ratemap: Ratemap = deepcopy(decoder.ratemap)
             ratemap: Ratemap = decoder.ratemap
-            pairs = compute_unit_pair_least_overlapping(ratemap=ratemap)
+            pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=ratemap)
             pairs
             
         """
@@ -201,7 +197,8 @@ class DisjointPlacefieldsExploration:
 
 
     @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'overlap', 'similarity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-09 06:59', related_items=[])
-    def compute_unit_pair_least_overlapping_exclusive(ratemap: Ratemap, frac = 0.2):  # keep bins ≥ 20% of each cell's peak
+    @classmethod
+    def compute_unit_pair_least_overlapping_exclusive(cls, ratemap: Ratemap, frac = 0.2):  # keep bins ≥ 20% of each cell's peak
         """ 
         array([[inf, 0.179803, 0.146148, 0.105105, 0.0443623, 0, 0, 0, 0.515528, 0, 0, 0.0371353, 0.347826, 0.10274],
         [0.179803, inf, 0.164013, 0.131934, 0.0774908, 0.16622, 0.199324, 0, 0.233577, 0, 0.0106667, 0, 0, 0.195238],
@@ -212,7 +209,7 @@ class DisjointPlacefieldsExploration:
         ])
         
         Usage:
-            J = compute_unit_pair_least_overlapping_exclusive(ratemap=ratemap)
+            J = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping_exclusive(ratemap=ratemap)
         
         """
         U = ratemap.unit_max_tuning_curves.reshape(ratemap.n_neurons, -1)
@@ -229,13 +226,14 @@ class DisjointPlacefieldsExploration:
 
 
     @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
-    def plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True):
+    @classmethod
+    def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True):
         """
         Usage:
         
             ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
             tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
-            fig, axes = plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0)
+            fig, axes = DisjointPlacefieldsExploration.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0)
 
         """
         # fig, axes = plt.subplots(1, 3)
@@ -277,7 +275,8 @@ class DisjointPlacefieldsExploration:
 
 
     @function_attributes(short_name=None, tags=['compute', 'MAIN'], input_requires=[], output_provides=[], uses=['plot_pfs_and_decoded_posterior'], used_by=[], creation_date='2026-07-09 06:57', related_items=[])
-    def compute_and_plot_for_disjoint_cell_pairs(decoder, pairs, nan_less_than_value: float = 1e-7, debug_print = False):
+    @classmethod
+    def compute_and_plot_for_disjoint_cell_pairs(cls, decoder, pairs, nan_less_than_value: float = 1e-7, debug_print = False):
         # good_pairs = []
         good_pairs_co_firing_bins_dict = {}
         good_pairs_co_firing_posteriors_dict = {}
@@ -321,8 +320,7 @@ class DisjointPlacefieldsExploration:
                 if i < 3:
                     ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
                     # tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
-                    fig, axes = plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0,
-                                nan_less_than_value = nan_less_than_value)
+                    fig, axes = cls.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0, nan_less_than_value = nan_less_than_value)
                     graphics_outputs_dict[tuple_key] = (fig, axes)
                 else:
                     continue
