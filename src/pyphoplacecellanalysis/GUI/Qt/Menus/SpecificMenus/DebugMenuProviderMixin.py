@@ -86,19 +86,52 @@ class DebugMenuProviderMixin(BaseMenuProviderMixin):
         curr_drivers_items = list(connection_man.registered_available_drivers.keys())
         for a_driver_key in curr_drivers_items:
             self.activeMenuReference.active_drivers_menu.addAction(a_driver_key)
-        self.activeMenuReference.active_drivers_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}')))
+
+        def _on_active_drivers_menu_triggered(action):
+            try:
+                print(connection_man.registered_available_drivers.get(action.text(), f'Driver KeyNotFound: {action.text()}'))
+            except Exception as exc:
+                PhoMenuHelper.report_menu_error(
+                    exc,
+                    error_context=f'Debug.ActiveDrivers.{action.text()}',
+                    spike_raster_window=self._render_widget,
+                )
+
+        self.activeMenuReference.active_drivers_menu.triggered.connect(_on_active_drivers_menu_triggered)
 
         ## Update Drivable Menu:
         curr_drivable_items = list(connection_man.registered_available_drivables.keys())
         for a_driveable_key in curr_drivable_items:
             self.activeMenuReference.active_drivables_menu.addAction(a_driveable_key)
-        self.activeMenuReference.active_drivables_menu.triggered.connect(lambda action: print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}')))
+
+        def _on_active_drivables_menu_triggered(action):
+            try:
+                print(connection_man.registered_available_drivables.get(action.text(), f'Drivable KeyNotFound: {action.text()}'))
+            except Exception as exc:
+                PhoMenuHelper.report_menu_error(
+                    exc,
+                    error_context=f'Debug.ActiveDrivables.{action.text()}',
+                    spike_raster_window=self._render_widget,
+                )
+
+        self.activeMenuReference.active_drivables_menu.triggered.connect(_on_active_drivables_menu_triggered)
   
         ## Update Connections Menu:
         curr_connections_descriptions = list([a_conn_ref.description for a_conn_ref in connection_man.active_connections.values()])
         for a_connection_key in curr_connections_descriptions:
             self.activeMenuReference.active_connections_menu.addAction(a_connection_key)
-        self.activeMenuReference.active_connections_menu.triggered.connect(lambda action: print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}')))
+
+        def _on_active_connections_menu_triggered(action):
+            try:
+                print((connection_man.find_active_connection(action.text()) or f'Connection KeyNotFound: {action.text()}'))
+            except Exception as exc:
+                PhoMenuHelper.report_menu_error(
+                    exc,
+                    error_context=f'Debug.ActiveConnections.{action.text()}',
+                    spike_raster_window=self._render_widget,
+                )
+
+        self.activeMenuReference.active_connections_menu.triggered.connect(_on_active_connections_menu_triggered)
         
         
     # build QMenus _______________________________________________________________________________________________________ #

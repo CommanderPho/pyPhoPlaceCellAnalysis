@@ -842,22 +842,32 @@ class Spike3DRasterBottomPlaybackControlBar(ComboBoxCtrlOwningMixin, QWidget):
     def toggle_log_window(self):
         """ shows/hides the multi-line log window widget 
         """
-        is_external_window_opened: bool = self.ui.btnToggleExternalLogWindow
+        is_external_window_opened: bool = self.ui.btnToggleExternalLogWindow.isChecked()
         if self.params.debug_print:
             print(f'is_external_window_opened: {is_external_window_opened}')
-        if (self.ui._attached_log_window is None) and (is_external_window_opened):
-            ## open a new one
-            self.ui._attached_log_window = LoggingOutputWidget()
-            self._logger.sigLogUpdated.connect(self.ui._attached_log_window.on_log_updated)
-            self.ui.connections['_attached_log_window'] = {'_logger_sigLogUpdated': self._logger.sigLogUpdated.connect(self.ui._attached_log_window.on_log_updated),
-                                                           '_logger_sigLogUpdateFinished': self._logger.sigLogUpdateFinished.connect(self.ui._attached_log_window.on_log_update_finished),
-            }
-            self.ui._attached_log_window.on_log_updated(self.logger)
-            self.ui._attached_log_window.show()
-        else:
+
+        attached_log_window = self.ui._attached_log_window
+
+        try:
+            if is_external_window_opened:
+                if attached_log_window is None:
+                    attached_log_window = LoggingOutputWidget()
+                    self.ui._attached_log_window = attached_log_window
+                    self.ui.connections['_attached_log_window'] = {
+                        '_logger_sigLogUpdated': self._logger.sigLogUpdated.connect(attached_log_window.on_log_updated),
+                        '_logger_sigLogUpdateFinished': self._logger.sigLogUpdateFinished.connect(attached_log_window.on_log_update_finished),
+                    }
+                attached_log_window.on_log_updated(self.logger)
+                attached_log_window.show()
+                attached_log_window.raise_()
+            elif attached_log_window is not None:
+                if self.params.debug_print:
+                    print(f'hide.')
+                attached_log_window.hide()
+        except (AttributeError, RuntimeError) as e:
             if self.params.debug_print:
-                print(f'hide.')
-            self.ui._attached_log_window.hide()
+                print(f'WARN: toggle_log_window failed: {e}')
+            self.ui._attached_log_window = None
 
         self._format_button_toggle_log_window()
         

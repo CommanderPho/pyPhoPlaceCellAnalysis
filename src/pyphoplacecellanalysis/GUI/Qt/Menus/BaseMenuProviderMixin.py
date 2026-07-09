@@ -73,7 +73,15 @@ class BaseMenuCommand:
 
 
     def __call__(self, *args, **kwds):
-        return self.execute(*args, **kwds)
+        try:
+            return self.execute(*args, **kwds)
+        except Exception as exc:
+            PhoMenuHelper.report_menu_error(
+                exc,
+                error_context=self.command_identifier,
+                spike_raster_window=getattr(self, '_spike_raster_window', None),
+            )
+            return None
     
 
 

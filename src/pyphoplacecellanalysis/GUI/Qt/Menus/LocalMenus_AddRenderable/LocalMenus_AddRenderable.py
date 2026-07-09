@@ -115,10 +115,16 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
         
         submenu_addTimeIntervals_Connections = []
         for an_action, a_callback in zip(submenu_addTimeIntervals, submenu_addTimeIntervalCallbacks):
-            _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addTimeIntervals_Connections.append(_curr_conn)
             extracted_menu_path: List[str] = PhoMenuHelper.parse_QAction_for_menu_path(an_action) # extracted_menu_path: ['AddTimeIntervals', 'Laps']
-            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            error_context = '.'.join(extracted_menu_path)
+            _curr_conn = PhoMenuHelper.connect_action_safe(
+                an_action,
+                a_callback,
+                error_context=error_context,
+                spike_raster_window=destination_plot,
+            )
+            submenu_addTimeIntervals_Connections.append(_curr_conn)
+            widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
 
         # Set enabled state
         # widget.ui.actionAddTimeIntervals_PBEs.setEnabled(sess.pbe is not None)
@@ -149,10 +155,16 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
             ]
         submenu_addTimeCurves_Connections = []
         for an_action, a_callback in zip(submenu_addTimeCurves, submenu_addTimeCurvesCallbacks):
-            _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addTimeCurves_Connections.append(_curr_conn)
             extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
-            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            error_context = '.'.join(extracted_menu_path)
+            _curr_conn = PhoMenuHelper.connect_action_safe(
+                an_action,
+                a_callback,
+                error_context=error_context,
+                spike_raster_window=destination_plot,
+            )
+            submenu_addTimeCurves_Connections.append(_curr_conn)
+            widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
         # Matplotlib Plots: __________________________________________________________________________________________________ #
         # self.ui.menuAddRenderable_Matplotlib_Plot        
@@ -161,24 +173,50 @@ class LocalMenus_AddRenderable(QtWidgets.QMainWindow):
                                             lambda evt=None: print(f'actionaddMatplotlibPlot_Custom not yet supported')]
         submenu_addMatplotlibPlot_Connections = []
         for an_action, a_callback in zip(submenu_addMatplotlibPlot, submenu_addMatplotlibPlotCallbacks):
-            _curr_conn = an_action.triggered.connect(a_callback)
-            submenu_addMatplotlibPlot_Connections.append(_curr_conn)
             extracted_menu_path = PhoMenuHelper.parse_QAction_for_menu_path(an_action)
-            widget.programmatic_actions_dict['.'.join(extracted_menu_path)] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
+            error_context = '.'.join(extracted_menu_path)
+            _curr_conn = PhoMenuHelper.connect_action_safe(
+                an_action,
+                a_callback,
+                error_context=error_context,
+                spike_raster_window=destination_plot,
+            )
+            submenu_addMatplotlibPlot_Connections.append(_curr_conn)
+            widget.programmatic_actions_dict[error_context] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed
         
         # Connect Clear actions:
         clear_actions = [widget.ui.actionClear_all_Time_Curves, widget.ui.actionClear_all_Time_Intervals, widget.ui.actionClear_all_Matplotlib_Plots, widget.ui.actionClear_all_Renderables]
 
-        widget.ui.actionClear_all_Time_Curves.triggered.connect(destination_plot.clear_all_3D_time_curves)
-        widget.ui.actionClear_all_Time_Intervals.triggered.connect(destination_plot.clear_all_rendered_intervals)
-        widget.ui.actionClear_all_Matplotlib_Plots.triggered.connect(destination_plot.clear_all_matplotlib_plots)
+        PhoMenuHelper.connect_action_safe(
+            widget.ui.actionClear_all_Time_Curves,
+            destination_plot.clear_all_3D_time_curves,
+            error_context='Clear_all_Time_Curves',
+            spike_raster_window=destination_plot,
+        )
+        PhoMenuHelper.connect_action_safe(
+            widget.ui.actionClear_all_Time_Intervals,
+            destination_plot.clear_all_rendered_intervals,
+            error_context='Clear_all_Time_Intervals',
+            spike_raster_window=destination_plot,
+        )
+        PhoMenuHelper.connect_action_safe(
+            widget.ui.actionClear_all_Matplotlib_Plots,
+            destination_plot.clear_all_matplotlib_plots,
+            error_context='Clear_all_Matplotlib_Plots',
+            spike_raster_window=destination_plot,
+        )
         
         def _clear_all_both():
             destination_plot.clear_all_3D_time_curves()
             destination_plot.clear_all_rendered_intervals()
             destination_plot.clear_all_matplotlib_plots()
             
-        widget.ui.actionClear_all_Renderables.triggered.connect(_clear_all_both)
+        PhoMenuHelper.connect_action_safe(
+            widget.ui.actionClear_all_Renderables,
+            _clear_all_both,
+            error_context='Clear_all_Renderables',
+            spike_raster_window=destination_plot,
+        )
 
         for an_action in clear_actions:
             widget.programmatic_actions_dict['.'.join(PhoMenuHelper.parse_QAction_for_menu_path(an_action))] = an_action # have to use a string keypath because `out_command_dict[*extracted_menu_path]` is not allowed

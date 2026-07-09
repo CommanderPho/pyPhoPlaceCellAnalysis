@@ -1,4 +1,5 @@
 import re # regular expression for PhoMenuHelper
+import traceback
 from benedict import benedict
 from qtpy import QtCore, QtGui, QtWidgets
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters # for initialize_global_menu_ui_variables_if_needed
@@ -52,7 +53,68 @@ class PhoMenuHelper(object):
         """
         curr_window = cls.try_get_menu_window(a_content_widget)
         menubar = curr_window.menuBar()
-        return menubar    
+        return menubar
+
+    @classmethod
+    def _try_resolve_menu_error_logger(cls, spike_raster_window=None):
+        """Best-effort lookup of LoggingBaseClass for menu error reporting."""
+        if spike_raster_window is None:
+            return None
+
+        logger = getattr(spike_raster_window, 'bottom_playback_control_bar_logger', None)
+        if logger is not None:
+            return logger
+
+        playback_bar = getattr(spike_raster_window, 'bottom_playback_control_bar_widget', None)
+        if playback_bar is not None:
+            logger = getattr(playback_bar, 'logger', None)
+            if logger is not None:
+                return logger
+
+        try:
+            parent_window = spike_raster_window.window()
+        except (AttributeError, RuntimeError):
+            parent_window = None
+
+        if parent_window is not None and parent_window is not spike_raster_window:
+            return cls._try_resolve_menu_error_logger(parent_window)
+
+        return None
+
+    @classmethod
+    def report_menu_error(cls, exc: Exception, *, error_context: Optional[str] = None, spike_raster_window=None) -> None:
+        """Print and optionally append menu failures to the spike-raster log UI."""
+        traceback.print_exc()
+
+        try:
+            command_id = error_context or 'unknown'
+            summary_line = f'ERROR [menu:{command_id}]: {exc}'
+            traceback_text = ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+
+            logger = cls._try_resolve_menu_error_logger(spike_raster_window)
+            if logger is not None:
+                logger.add_log_line(summary_line, allow_split_newlines=True)
+                logger.add_log_line(traceback_text, allow_split_newlines=True)
+            else:
+                print(summary_line)
+                print(traceback_text)
+        except Exception:
+            pass
+
+    @classmethod
+    def connect_action_safe(cls, action, callback, *, error_context: Optional[str] = None, spike_raster_window=None):
+        """Connect QAction.triggered with best-effort exception reporting."""
+        def _safe_callback(*args, **kwargs):
+            try:
+                return callback(*args, **kwargs)
+            except Exception as exc:
+                cls.report_menu_error(
+                    exc,
+                    error_context=error_context,
+                    spike_raster_window=spike_raster_window,
+                )
+
+        return action.triggered.connect(_safe_callback)
     
     @classmethod
     def set_menu_default_stylesheet(cls, root_menu_bar):
