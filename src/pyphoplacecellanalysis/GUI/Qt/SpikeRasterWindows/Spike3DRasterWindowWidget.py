@@ -225,6 +225,18 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
             parent (_type_, optional): _description_. Defaults to None.
         """
         QtWidgets.QWidget.__init__(self, parent=parent) # note kwargs (`self=self`), as in `QtWidgets.QWidget.__init__(self=self, parent=parent)` results in `TypeError: descriptor '__init__' of 'sip.simplewrapper' object needs an argument`
+
+        if params_kwargs is None:
+            params_kwargs = {}
+
+        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False, **params_kwargs)
+        self.params.type_of_3d_plotter = type_of_3d_plotter
+        self.params._menu_action_history_list = []
+        self.params.base_context_window_title = None
+        self.params.dynamic_dock_window_title_suffix = None
+        self.params.window_title = self.applicationName
+
+        ## .params is needed before `self.ui.setupUi(self)` to allow titles to work
         self.ui = Ui_RootWidget()
         self.ui.setupUi(self) # builds the design from the .ui onto this widget.
         
@@ -242,15 +254,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         # self.ui.splitter.setStretchFactor(0, 5) # have the top widget by 3x the height as the bottom widget
         # self.ui.splitter.setStretchFactor(1, 1) # have the top widget by 3x the height as the bottom widget        
         
-        if params_kwargs is None:
-            params_kwargs = {}
 
-        self.params = VisualizationParameters(self.applicationName, _menu_action_history_list=[], type_of_3d_plotter=type_of_3d_plotter, is_crosshair_trace_enabled=False, debug_print=False, **params_kwargs)
-        self.params.type_of_3d_plotter = type_of_3d_plotter
-        self.params._menu_action_history_list = []
-        self.params.base_context_window_title = None
-        self.params.dynamic_dock_window_title_suffix = None
-        self.params.window_title = self.applicationName
         # Helper Mixins: INIT:
         
         self.SpikeRasterBottomFrameControlsMixin_on_init()
