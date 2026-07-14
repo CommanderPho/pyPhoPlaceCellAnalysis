@@ -3462,6 +3462,9 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                 if debug_print:
                     print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
+
+        ## END for a_p_x_given_n in p_x_given_n_list...
+
         return custom_curr_unit_marginal_list
 
 
