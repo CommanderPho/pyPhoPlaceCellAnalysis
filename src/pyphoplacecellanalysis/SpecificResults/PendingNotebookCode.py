@@ -361,6 +361,202 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 )
 
 
+@function_attributes(short_name=None, tags=['compute', 'MAIN', 'performance', 'context', 'pending'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 23:18', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
+def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_decoding_result):
+    """ 
+    Computes the context marginals for each maze in a manner ready to plot in plot_maze_probability_stacked_bar, plot_maze_probability_histograms
+
+    #TODO 2026-07-13 23:21: - [ ] Need to convert from taking only a SingleEpochDecodedResult to a general `DecodedFilterEpochsResult` or w/e.
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _compute_all_maze_by_maze_context_marginals
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar, plot_maze_probability_histograms
+
+        context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=laps_decoding_result)
+        # context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=laps_decoding_result)
+        context_probability_performance_df
+
+
+    """
+    from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
+    from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
+    from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
+
+    ## INPUTS: curr_active_pipeline
+    hardcoded_params: HardcodedProcessingParameters = NWBDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+    ## INPUTS: hardcoded_params
+    maze_names: List[str] = hardcoded_params.non_global_activity_session_names # ['maze0', 'maze1', 'maze2', 'maze3', 'maze4', 'maze5', 'maze6', 'maze7']
+    ## OUTPUTS: maze_names
+
+    ## INPUTS: pseudo2D
+    p_x_given_n = pseudo2D_decoding_result.marginal_z['p_x_given_n']
+    time_bin_centers = deepcopy(pseudo2D_decoding_result.time_bin_container.centers)
+    n_mazes, n_t_bins = np.shape(p_x_given_n) # (8, 72556)
+    assert len(maze_names) == n_mazes, f"len(maze_names): {len(maze_names)} != n_mazes: {n_mazes}"
+    marginal_prob_mazes_dict = {f'P(m_{i})': np.squeeze(p_x_given_n[i, :]) for i in np.arange(n_mazes)}
+
+    ## build output dataframe for each time bins
+    context_probability_df: pd.DataFrame = pd.DataFrame({'t': time_bin_centers, **marginal_prob_mazes_dict})
+    # context_probability_df
+    maze_prob_col_names: List[str] = [v for v in list(context_probability_df.columns) if v.startswith('P(')] # ['P(m_0)', 'P(m_1)', 'P(m_2)', 'P(m_3)', 'P(m_4)', 'P(m_5)', 'P(m_6)', 'P(m_7)']
+
+    ## OUTPUTS: context_probability_df, maze_prob_col_names
+
+    ## need to add the groundtruth maze_id to the decoded epochs using `add_epochs_id_identity`
+    ## INPUTS: curr_active_pipeline, maze_names
+    active_epochs: pd.DataFrame = ensure_dataframe(curr_active_pipeline.sess.epochs) ## get all epochs
+    maze_only_epochs_df: pd.DataFrame = active_epochs[np.isin(active_epochs['label'], maze_names)]
+    maze_only_epochs_df['original_epochs_id'] = deepcopy(maze_only_epochs_df.index.astype(int))
+    maze_only_epochs_df = maze_only_epochs_df.reset_index(drop=True, inplace=False)
+    maze_only_epochs_df['maze_id'] = deepcopy(maze_only_epochs_df.index.astype(int)) ## this is the one that matches the 'label' field and should be matched against
+    # maze_only_epochs_df
+
+    ## INPUTS: context_probability_df, maze_only_epochs_df
+    context_probability_df = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
+    # context_probability_df: pd.DataFrame = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
+    context_probability_df = context_probability_df[context_probability_df['Probe_Epoch_id'] >= 0] ## drop non-maze epochs
+    # context_probability_df
+
+    ## find most probable decoder index
+    context_probability_arr = context_probability_df[maze_prob_col_names].to_numpy()
+    # np.shape(context_probability_arr) # (30521, 8) - (n_relevant_t_bins, n_maze_epochs)
+    max_maze_prob_idxs = np.argmax(context_probability_arr, axis=1) ## get the max over the possible maze epochs for each time bin
+    # max_maze_prob_idxs # array([2, 0, 0, ..., 2, 2, 2], dtype=int64)
+    # np.shape(max_maze_prob_idxs) # (n_relevant_t_bins, )
+    context_probability_df['most_likely_maze_idx'] = max_maze_prob_idxs
+    ## add prediction correctness metric column
+    context_probability_df['is_ctx_prediction_correct'] = (context_probability_df['Probe_Epoch_id'] == context_probability_df['most_likely_maze_idx'])
+    # context_probability_df
+
+    ## OUTPUTS: context_probability_df
+    # Build `context_probability_performance_df` over column: 'Probe_Epoch_id':
+    context_probability_performance_df: pd.DataFrame = context_probability_df.groupby(['Probe_Epoch_id']).agg(is_ctx_prediction_correct_count=('is_ctx_prediction_correct', 'count'),
+        # is_ctx_prediction_correct_mode=('is_ctx_prediction_correct', lambda s: s.value_counts().index[0]),
+        is_ctx_prediction_correct_sum=('is_ctx_prediction_correct', lambda s: s.sum()),
+    ).reset_index()
+    context_probability_performance_df['pct_ctx_prediction_correct'] = context_probability_performance_df['is_ctx_prediction_correct_sum'] / context_probability_performance_df['is_ctx_prediction_correct_count']
+    context_probability_performance_df
+
+    ## OUTPUTS: context_probability_df, context_probability_performance_df
+    return context_probability_df, context_probability_performance_df, maze_prob_col_names
+
+
+@function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 18:10', related_items=['plot_maze_probability_histograms'])
+def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str]) -> tuple[plt.Figure, np.ndarray, dict]:
+    """
+    Plots one subplot column for each maze -- each subplot contains a vertically stacked bar graph showing the relative maze probabilities across different probe epochs (maze epochs).
+        - Each color represents a specific decoded maze context, consistent across all subplot columns.
+        - A solid black outline is drawn around the edge of the probability corresponding to the actual current maze.
+
+        - The most-likely decoded context produced by the context decoder for each epoch (computed by summing the relative proportion of time bins occuring on that track) agrees with the actual experienced (as expected).
+        - The introduction of the 3rd track (m_2) most strongly reduces the certainty of the context decoder, after which it remains relatively stable.
+        - The decoder shows two minor biases:
+            1) Biases toward conflation with the immedately preceeding or subsequently following maze
+            2) Precency/Recency effects -- tendency for conflation with the first two or last ewo epochs
+        - This suggests that temporal adjacency, independent of context, plays a role in decoding -- TODO: substantiate
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar
+
+        fig, axes, artist_objects = plot_maze_probability_stacked_bar(context_probability_df=context_probability_df, maze_prob_col_names=maze_prob_col_names)
+
+    """
+    import matplotlib.patches as mpatches ## for legend
+
+    n_mazes: int = len(maze_prob_col_names)
+    maze_ids = np.arange(n_mazes)
+
+    # Generate consistent colors for each maze
+    cmap = plt.get_cmap("tab10")
+    colors = [cmap(j) for j in range(n_mazes)]
+
+    # Apply 'constrained' layout here to automatically make room for the figure legend
+    fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True) # , layout='constrained'
+
+    artist_objects = {'bars': [], 'legend': None}
+
+    for i in maze_ids:
+        a_maze_col_name: str = maze_prob_col_names[i] 
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        ax = axes[i]
+        
+        # Calculate the mean probability of each maze for this specific probe epoch
+        mean_probs = curr_maze_df[maze_prob_col_names].mean()
+        
+        a_maze_bar_artists = []
+        bottom = 0.0
+        for j, maze_col in enumerate(maze_prob_col_names):
+            val = mean_probs[maze_col]
+            
+            # Only add legend labels on the first iteration to prevent duplicates
+            label = maze_col if i == 0 else None
+            
+            # Highlight the current axes' track with a thicker border
+            is_current_track = (j == i)
+            edge_color = 'black' if is_current_track else None
+            line_width = 2.5 if is_current_track else 0
+            
+            a_bar_container = ax.bar(
+                x=0, height=val, bottom=bottom, color=colors[j], label=label,
+                edgecolor=edge_color, linewidth=line_width
+            )
+
+
+            a_maze_bar_artists.append(a_bar_container)
+            bottom += val
+        ## END for j, maze_col in enumerate(maze_prob_col_names)...
+
+        ax.set_title(a_maze_col_name)
+        ax.set_xticks([]) 
+        artist_objects['bars'].append(a_maze_bar_artists)
+
+    ## END for i in maze_ids...
+
+    # Add the legend to the figure (tight_layout is no longer needed at the end)
+    # Explicitly create a list of Patch objects for the legend handles
+    legend_handles = [
+        mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) 
+        for j in range(len(maze_prob_col_names))
+    ]
+    # Pass the explicit handles to the legend
+    artist_objects['legend'] = axes[-1].legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Probabilities")
+    return fig, axes, artist_objects
+
+
+@function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 18:24', related_items=['plot_maze_probability_stacked_bar'])
+def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str]) -> tuple[plt.Figure, np.ndarray]:
+    """
+    Plots horizontal histograms of maze probabilities across different probe epochs.
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_histograms
+
+        # INPUTS: context_probability_df, maze_prob_col_names
+        fig, axes = plot_maze_probability_histograms(context_probability_df=context_probability_df, maze_prob_col_names=maze_prob_col_names)
+
+    """
+    n_mazes: int = len(maze_prob_col_names)
+    maze_ids = np.arange(n_mazes)
+    fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True)
+    _common_hist_kwargs = dict(bins=25, orientation='horizontal')
+
+    for i in maze_ids:
+        a_maze_col_name: str = maze_prob_col_names[i] 
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        ax = axes[i]
+        
+        ax.hist(curr_maze_df[a_maze_col_name].to_numpy(), **_common_hist_kwargs)
+        ax.set_title(a_maze_col_name)
+        
+    return fig, axes
+
+
+
+@function_attributes(short_name=None, tags=['performance', 'decode', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 00:00', related_items=[])
 def _resolve_maze_epoch_names_for_multi_context_eval(curr_active_pipeline, maze_epoch_names: Optional[List[str]] = None, minimum_contexts: int = 2, debug_print: bool = False) -> List[str]:
     """Resolve maze epoch names for multi-context decoder evaluation.
 
