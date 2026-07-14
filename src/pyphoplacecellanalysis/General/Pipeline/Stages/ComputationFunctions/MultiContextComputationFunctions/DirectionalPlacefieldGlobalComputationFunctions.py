@@ -76,6 +76,8 @@ DecodedMarginalResultTuple: TypeAlias = Tuple[
     NDArray[ND.Shape["*"], ND.Bool]
 ] 
 
+Pseudo2DContextLayout: TypeAlias = namedtuple('Pseudo2DContextLayout', ['p_x_given_n_list', 'p_x_given_n_ndim', 'context_dim_idx', 'n_contexts', 'spatial_sum_axes', 'context_names', 'direction_group_indices', 'track_identity_group_indices'])
+
 DecodingContinuousCacheKey: TypeAlias = Tuple[float, float]
 
 
@@ -2966,6 +2968,98 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
     @classmethod
+    def _resolve_context_names(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], n_contexts: int, context_names: Optional[List[str]]=None) -> List[str]:
+        if context_names is not None:
+            assert len(context_names) == n_contexts, f"context_names: {context_names} must have len {n_contexts}, got len(context_names): {len(context_names)}"
+            return list(context_names)
+        for attr_name in ('pseudo2D_decoder_names_list', 'context_names', 'decoder_names'):
+            candidate_context_names = getattr(filter_epochs_decoder_result, attr_name, None) if (not isinstance(filter_epochs_decoder_result, (List, NDArray))) else None
+            if candidate_context_names is not None:
+                candidate_context_names = list(candidate_context_names)
+                if len(candidate_context_names) >= n_contexts:
+                    return candidate_context_names[:n_contexts]
+        if n_contexts == 4:
+            return ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        if n_contexts == 2:
+            return ['long', 'short']
+        return [f'context_{i}' for i in range(n_contexts)]
+
+
+    @classmethod
+    def _infer_direction_group_indices(cls, context_names: List[str], n_contexts: int) -> Optional[Tuple[List[int], List[int]]]:
+        lr_context_indices = [i for i, a_name in enumerate(context_names) if a_name.endswith('_LR')]
+        rl_context_indices = [i for i, a_name in enumerate(context_names) if a_name.endswith('_RL')]
+        if len(lr_context_indices) > 0 and len(rl_context_indices) > 0:
+            return lr_context_indices, rl_context_indices
+        if n_contexts == 4:
+            return [0, 2], [1, 3]
+        return None
+
+
+    @classmethod
+    def _infer_track_identity_group_indices(cls, context_names: List[str], n_contexts: int) -> Optional[Tuple[List[int], List[int]]]:
+        long_context_indices = [i for i, a_name in enumerate(context_names) if (a_name.startswith('long') or a_name.split('_', maxsplit=1)[0] == 'long')]
+        short_context_indices = [i for i, a_name in enumerate(context_names) if (a_name.startswith('short') or a_name.split('_', maxsplit=1)[0] == 'short')]
+        if len(long_context_indices) > 0 and len(short_context_indices) > 0:
+            return long_context_indices, short_context_indices
+        if n_contexts == 4:
+            return [0, 1], [2, 3]
+        if n_contexts == 2:
+            return [0], [1]
+        return None
+
+
+    @classmethod
+    def _resolve_pseudo2D_context_layout(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> Pseudo2DContextLayout:
+        """Resolve pseudo2D/context decoder posterior layout from array shapes.
+
+        Supports 3D `(n_pos_bins, n_contexts, n_time_bins)` and 4D `(n_xbins, n_ybins, n_contexts, n_time_bins)` posteriors.
+        """
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        p_x_given_n_list_ndim_sizes = np.array([np.ndim(a_p_x_given_n) for a_p_x_given_n in p_x_given_n_list])
+        p_x_given_n_ndim: int = int(p_x_given_n_list_ndim_sizes[0])
+        assert np.all([v == p_x_given_n_ndim for v in p_x_given_n_list_ndim_sizes]), f"the first ndim must equal all the others, but p_x_given_n_ndim: {p_x_given_n_ndim}, p_x_given_n_list_ndim_sizes: {p_x_given_n_list_ndim_sizes}"
+        if p_x_given_n_ndim == 4:
+            context_dim_idx: int = 2
+            spatial_sum_axes: Tuple[int, ...] = (0, 1)
+        elif p_x_given_n_ndim == 3:
+            context_dim_idx: int = 1
+            spatial_sum_axes = (0,)
+        else:
+            raise ValueError(f"Unsupported pseudo2D posterior ndim: {p_x_given_n_ndim}. Expected 3D or 4D posteriors.")
+        p_x_given_n_list_context_dim_sizes = np.array([np.shape(a_p_x_given_n)[context_dim_idx] for a_p_x_given_n in p_x_given_n_list])
+        n_contexts: int = int(p_x_given_n_list_context_dim_sizes[0])
+        assert np.all([v == n_contexts for v in p_x_given_n_list_context_dim_sizes]), f"the first n_contexts must equal all the others, but n_contexts: {n_contexts}, p_x_given_n_list_context_dim_sizes: {p_x_given_n_list_context_dim_sizes}"
+        resolved_context_names: List[str] = cls._resolve_context_names(filter_epochs_decoder_result, n_contexts, context_names=context_names)
+        direction_group_indices = cls._infer_direction_group_indices(resolved_context_names, n_contexts)
+        track_identity_group_indices = cls._infer_track_identity_group_indices(resolved_context_names, n_contexts)
+        return Pseudo2DContextLayout(p_x_given_n_list, p_x_given_n_ndim, context_dim_idx, n_contexts, spatial_sum_axes, tuple(resolved_context_names), direction_group_indices, track_identity_group_indices)
+
+
+    @classmethod
+    def _normalize_per_timebin_context_marginal(cls, marginal_p_x_given_n: NDArray) -> NDArray:
+        normalized_marginal_p_x_given_n = np.squeeze(marginal_p_x_given_n)
+        if normalized_marginal_p_x_given_n.ndim == 0:
+            normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n.reshape(1, 1)
+        elif normalized_marginal_p_x_given_n.ndim == 1:
+            normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n[:, np.newaxis]
+        normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n / np.sum(normalized_marginal_p_x_given_n, axis=0, keepdims=True)
+        return normalized_marginal_p_x_given_n
+
+
+    @classmethod
+    def _marginalize_p_x_given_n_to_context_probs(cls, a_p_x_given_n: NDArray, spatial_sum_axes: Tuple[int, ...]) -> NDArray:
+        context_marginal_p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=spatial_sum_axes))
+        return cls._normalize_per_timebin_context_marginal(context_marginal_p_x_given_n)
+
+
+    @classmethod
+    def _group_context_marginal(cls, context_marginal_p_x_given_n: NDArray, group_indices_list: List[List[int]]) -> NDArray:
+        grouped_context_marginal_p_x_given_n = np.stack([np.sum(context_marginal_p_x_given_n[group_indices, :], axis=0) for group_indices in group_indices_list], axis=0)
+        return cls._normalize_per_timebin_context_marginal(grouped_context_marginal_p_x_given_n)
+
+
+    @classmethod
     def _resolve_pseudo2D_continuous_result(cls, pseudo2D_result) -> Tuple[Any, NDArray, str]:
         """Normalize pseudo2D cache entries to SingleEpochDecodedResult + time centers and detect decoder format."""
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
@@ -3334,133 +3428,46 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['cls.determine_non_marginalized_decoder_likelihoods', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals', '_display_directional_merged_pf_decoded_epochs'], creation_date='2025-05-02 17:29', related_items=[])
     @classmethod
-    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
-        """ only works for the all-directional coder with the four items
-        
-        Requires: filter_epochs_decoder_result.p_x_given_n_list
-        
-        Usage:
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
+        """Build per-epoch non-marginalized context posteriors summed over spatial dimensions.
 
-            active_decoder = all_directional_pf1D_Decoder
-            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
-                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
-                                                        )
-                                    
-                                                        
-        0: LR
-        1: RL
-        
+        Works for pseudo2D/context decoders with arbitrary `n_contexts` in 3D or 4D posteriors.
         """
-        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
-        
+        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
         custom_curr_unit_marginal_list = []
-        
-        for a_p_x_given_n in p_x_given_n_list:
-            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
-            curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
+        for a_p_x_given_n in context_layout.p_x_given_n_list:
+            curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-
-            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
-
-            if debug_print:
-                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
-                
+            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
-            
-            if debug_print:
-                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
-            
-            # y-axis marginal:
-            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (4, n_epoch_t_bins[i])
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all four decoders for each time_bin (so there's a normalized distribution at each timestep)
-
-            ## Ensures that the marginal posterior is at least 2D:
-            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
-            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
-                if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+            curr_unit_marginal_x.p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
         return custom_curr_unit_marginal_list
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_directional_likelihoods'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
-    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
-        """ only works for the all-directional coder with the four items
-        
-        Requires: filter_epochs_decoder_result.p_x_given_n_list
+    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
+        """Marginalize pseudo2D/context posteriors over direction groups inferred from context names.
 
-        
-        Usage:
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
-
-            active_decoder = all_directional_pf1D_Decoder
-            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
-                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
-                                                        )
-                                    
-                                                        
-        0: LR
-        1: RL
-        
+        For KDiba linear-track 4-context decoders this yields [LR, RL]. Requires resolvable direction groups.
         """
-        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
-        
+        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
+        if context_layout.direction_group_indices is None:
+            raise ValueError(f"Cannot infer direction groups for context_names: {context_layout.context_names} (n_contexts={context_layout.n_contexts}).")
+        lr_context_indices, rl_context_indices = context_layout.direction_group_indices
         custom_curr_unit_marginal_list = []
-        
-        ## Make sure it is the Pseudo2D (all-directional) decoder by checking shape:
-        p_x_given_n_list_second_dim_sizes = np.array([np.shape(a_p_x_given_n)[1] for a_p_x_given_n in p_x_given_n_list])
-        is_pseudo2D_decoder = np.all((p_x_given_n_list_second_dim_sizes == 4)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        if not is_pseudo2D_decoder:
-            raise ValueError(f"this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] but p_x_given_n_list_second_dim_sizes: {p_x_given_n_list_second_dim_sizes} ")
-        
-        for a_p_x_given_n in p_x_given_n_list:
-            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+        for a_p_x_given_n in context_layout.p_x_given_n_list:
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-
-            assert curr_array_shape[1] == 4, f"curr_array_shape: {curr_array_shape} but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
-
-            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
-            ## I don't want to use np.nansum(...) here because I DO want to propgate NaNs if one of the elements are NaN:
-            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
-            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
-
-            normalized_out_p_x_given_n = out_p_x_given_n
-
-            input_array = normalized_out_p_x_given_n
-
-            if debug_print:
-                print(f'np.shape(input_array): {np.shape(input_array)}')
-            # custom marginal over long/short, leaving only LR/RL:
-            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            curr_unit_marginal_y.p_x_given_n = input_array
-            
-            # y-axis marginal:
-            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
-
-            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
-
+            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
+            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
+            directional_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [lr_context_indices, rl_context_indices])
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=directional_marginal_p_x_given_n, most_likely_positions_1D=None)
             if debug_print:
                 print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
-            
-            ## Ensures that the marginal posterior is at least 2D:
-            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
-            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
-            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
-                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
-            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
-                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
-                if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
 
         ## END for a_p_x_given_n in p_x_given_n_list...
@@ -3470,166 +3477,64 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_long_short_likelihoods', 'prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
-    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
-        """ only works for the all-directional coder with the four items
-        
-        Usage:
-            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
+        """Marginalize pseudo2D/context posteriors over track-identity groups inferred from context names.
 
-            active_decoder = all_directional_pf1D_Decoder
-            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
-                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
-                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
-                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_long_short(filter_epochs_decoder_result),
-                                                        )
-                                    
-                                                        
-        0: LR
-        1: RL
-        
+        For KDiba linear-track 4-context decoders this yields [Long, Short]. Requires resolvable track-identity groups.
         """
-        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
-        
+        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
+        if context_layout.track_identity_group_indices is None:
+            raise ValueError(f"Cannot infer track-identity groups for context_names: {context_layout.context_names} (n_contexts={context_layout.n_contexts}).")
+        long_context_indices, short_context_indices = context_layout.track_identity_group_indices
         custom_curr_unit_marginal_list = []
-        
-        for a_p_x_given_n in p_x_given_n_list:
-            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+        for a_p_x_given_n in context_layout.p_x_given_n_list:
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-            # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-            # (['long', 'long', 'short', 'short'])
-            # (n_neurons, is_long, is_LR, pos_bins)
-            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
-
-            # out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
-            # out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
-            # out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
-
-            # Extract the Long/Short items
-            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
-            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 1, :]) # Long_marginal = long_LR + long_RL 
-            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 2, :] + a_p_x_given_n[:, 3, :]) # Short_marginal = short_LR + short_RL
-            # normalized_out_p_x_given_n = out_p_x_given_n / np.sum(out_p_x_given_n, axis=1) # , keepdims=True
-            normalized_out_p_x_given_n = out_p_x_given_n
-            # reshaped_p_x_given_n = np.reshape(a_p_x_given_n, (curr_array_shape[0], 2, 2, curr_array_shape[-1]))
-            # assert np.array_equiv(reshaped_p_x_given_n[:,0,0,:], a_p_x_given_n[:, 0, :]) # long_LR
-            # assert np.array_equiv(reshaped_p_x_given_n[:,1,0,:], a_p_x_given_n[:, 2, :]) # short_LR
-
-            # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
-
-            # input_array = a_p_x_given_n
-            # input_array = normalized_reshaped_p_x_given_n
-            input_array = normalized_out_p_x_given_n
-
+            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
+            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
+            track_identity_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [long_context_indices, short_context_indices])
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=track_identity_marginal_p_x_given_n, most_likely_positions_1D=None)
             if debug_print:
-                print(f'np.shape(input_array): {np.shape(input_array)}')
-            # custom marginal over long/short, leaving only LR/RL:
-            curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
-            curr_unit_marginal_x.p_x_given_n = input_array
-            
-            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
-            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, 1)) # sum over all y. Result should be [x_bins x time_bins]
-            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-        
-            # y-axis marginal:
-            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
-            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-
-            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
-
-            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=1)) # sum over all x. Result should be [y_bins x time_bins]
-            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
-            if debug_print:
-                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
-            
-            ## Ensures that the marginal posterior is at least 2D:
-            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
-            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
-            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
-            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
-                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
-                if debug_print:
-                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+                print(f'np.shape(curr_unit_marginal_x.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
         return custom_curr_unit_marginal_list
         
     # Higher-level likelihood access functions ___________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
-        """ 
-
-        determine_directional_likelihoods
-
-        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dir = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
-
-        0: LR
-        1: RL
-        
-        """
-        directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
+    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> DecodedMarginalResultTuple:
+        """Compute per-epoch direction marginals (e.g. [LR, RL]) from pseudo2D/context posteriors."""
+        directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
         if len(directional_marginals) == 0:
             raise ValueError(f'No values!')
-        
-        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
-        
-        # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
-        # directional_all_epoch_bins_marginal = np.stack([
-        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
-        #     for v in directional_marginals
-        # ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
-
-        # Find the indicies via this method:
-        most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
-        is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
+        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0)
+        most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1)
+        is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder)
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
-        """ 
-        
-        laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
-        track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
-        
-        0: Long
-        1: Short
-        
-        """
-        track_identity_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result)
-        
-        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
-
-        # Find the indicies via this method:
-        most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
-        is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
+    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> DecodedMarginalResultTuple:
+        """Compute per-epoch track-identity marginals (e.g. [Long, Short]) from pseudo2D/context posteriors."""
+        track_identity_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
+        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0)
+        most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1)
+        is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder)
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
 
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
-        """ 
-        
-        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
-        
-        
-        [(4, 47), (4, 31), (4, 33), ]
-        
-        """
-        non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
-        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
-        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
-
-        # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
-        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time | most_likely_decoder_idxs will always contain valid indices, not NaN.
-        # build the dataframe:
-        assert (np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == 4), f"shape of non_marginalized_decoder_all_epoch_bins_marginal must be 4 (corresponding to the 4 decoders) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
-        non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=['long_LR', 'long_RL', 'short_LR', 'short_RL'])
+    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
+        """Compute per-epoch likelihoods for each context/decoder without marginalizing over context."""
+        context_layout = cls._resolve_pseudo2D_context_layout(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
+        non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, context_names=list(context_layout.context_names), debug_print=debug_print)
+        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0)
+        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1)
+        assert np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == context_layout.n_contexts, f"shape of non_marginalized_decoder_all_epoch_bins_marginal must match n_contexts ({context_layout.n_contexts}) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
+        non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=list(context_layout.context_names))
         return non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df
 
 

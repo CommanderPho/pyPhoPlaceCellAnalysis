@@ -1544,39 +1544,53 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
-        
 
-        ## Make sure it is the Pseudo2D (all-directional) decoder by checking shape:
-        p_x_given_n_list = DirectionalPseudo2DDecodersResult.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
-        p_x_given_n_list_second_dim_sizes = np.array([np.shape(a_p_x_given_n)[1] for a_p_x_given_n in p_x_given_n_list])
-        is_pseudo2D_decoder = np.all((p_x_given_n_list_second_dim_sizes == 4)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        
+        context_layout = DirectionalPseudo2DDecodersResult._resolve_pseudo2D_context_layout(filter_epochs_decoder_result)
+        n_contexts: int = context_layout.n_contexts
+        context_names: List[str] = list(context_layout.context_names)
+        has_direction_marginalization: bool = context_layout.direction_group_indices is not None
+        has_track_identity_marginalization: bool = context_layout.track_identity_group_indices is not None
+        is_pseudo2D_decoder: bool = (n_contexts >= 4) or has_direction_marginalization
 
         epochs_df: pd.DataFrame = ensure_dataframe(deepcopy(filter_epochs))
         
-
         if is_pseudo2D_decoder:
-            epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(filter_epochs_decoder_result)
-            epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
-            epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result)
-            epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
-            epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, debug_print=False)
+            epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, context_names=context_names, debug_print=False)
             non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+            if has_direction_marginalization:
+                epochs_directional_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(filter_epochs_decoder_result, context_names=context_names)
+                epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir = epochs_directional_marginals_tuple
+            else:
+                epochs_directional_marginals_tuple = (None, None, None, None)
+                epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir = epochs_directional_marginals_tuple
+            if has_track_identity_marginalization:
+                epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result, context_names=context_names)
+                epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+            else:
+                epochs_track_identity_marginals_tuple = (None, None, None, None)
+                epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+
         else:
-            is_track_identity_only_pseudo2D_decoder: bool = np.all((p_x_given_n_list_second_dim_sizes == 2)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-            assert is_track_identity_only_pseudo2D_decoder
-            raise NotImplementedError(f'2025-03-26 14:06 Not finished, do the other method instead (see git commit)')
-            # epochs_directional_marginals_tuple = (None, None)
-            # epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir  = epochs_directional_marginals_tuple
-            # epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result)
-            # epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
-            # epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, debug_print=False)
-            # non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
+            is_track_identity_only_pseudo2D_decoder: bool = (n_contexts == 2) and has_track_identity_marginalization
+            assert is_track_identity_only_pseudo2D_decoder, f"Unsupported pseudo2D/context decoder layout: n_contexts={n_contexts}, context_names={context_names}"
+            epochs_directional_marginals_tuple = (None, None, None, None)
+            epochs_directional_marginals, epochs_directional_all_epoch_bins_marginal, epochs_most_likely_direction_from_decoder, epochs_is_most_likely_direction_LR_dir = epochs_directional_marginals_tuple
+            epochs_track_identity_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(filter_epochs_decoder_result, context_names=context_names)
+            epochs_track_identity_marginals, epochs_track_identity_all_epoch_bins_marginal, epochs_most_likely_track_identity_from_decoder, epochs_is_most_likely_track_identity_Long = epochs_track_identity_marginals_tuple
+            epochs_non_marginalized_decoder_marginals_tuple = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(filter_epochs_decoder_result, context_names=context_names, debug_print=False)
+            non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = epochs_non_marginalized_decoder_marginals_tuple
             
 
         ## Build combined marginals df:
-        # epochs_marginals_df = pd.DataFrame(np.hstack((epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
+        epochs_marginal_parts: List[NDArray] = [non_marginalized_decoder_all_epoch_bins_marginal]
+        epochs_marginal_column_names: List[str] = list(context_names)
+        if epochs_directional_all_epoch_bins_marginal is not None:
+            epochs_marginal_parts.append(epochs_directional_all_epoch_bins_marginal)
+            epochs_marginal_column_names.extend(['P_LR', 'P_RL'])
+        if epochs_track_identity_all_epoch_bins_marginal is not None:
+            epochs_marginal_parts.append(epochs_track_identity_all_epoch_bins_marginal)
+            epochs_marginal_column_names.extend(['P_Long', 'P_Short'])
+        epochs_marginals_df = pd.DataFrame(np.hstack(epochs_marginal_parts), columns=epochs_marginal_column_names)
         epochs_marginals_df[epoch_idx_col_name] = epochs_marginals_df.index.to_numpy()
         epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
         
