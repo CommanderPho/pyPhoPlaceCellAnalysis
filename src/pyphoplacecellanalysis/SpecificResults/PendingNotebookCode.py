@@ -349,10 +349,7 @@ from neuropy.core.laps import Laps
 from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
 from neuropy.utils.result_context import IdentifyingContext
 
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import (
-    BasePositionDecoder,
-    DecodedFilterEpochsResult,
-)
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, SingleEpochDecodedResult
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import (
     CompleteDecodedContextCorrectness,
     DecodedContextCorrectnessArraysTuple,
@@ -361,8 +358,191 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 )
 
 
-@function_attributes(short_name=None, tags=['compute', 'MAIN', 'performance', 'context', 'pending'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 23:18', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
-def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_decoding_result):
+@function_attributes(short_name=None, tags=['MAIN', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-14 19:08', related_items=[])
+def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline, **kwargs):
+    """
+    runs all required computations for the three epochs (laps, pbes, replays), exports them, then builds figures for them if possible
+    """
+    from datetime import date
+    from copy import deepcopy
+    import pandas as pd
+    from neuropy.core.epoch import ensure_Epoch, ensure_dataframe, Epoch
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import safeSaveData, safeSaveSplitData, loadSplitData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalPseudo2DDecodersResult
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _compute_all_epochs_all_maze_by_maze_context_marginals, _compute_all_maze_by_maze_context_marginals
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar
+    from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, decoding_continuous_cache_key
+
+
+    today_str = date.today().isoformat()
+    output_dict = {}
+
+    directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersDecoded', None)
+    if directional_decoders_decode_result is None:
+        hardcoded_params = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
+        epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names  # e.g. ['maze1', 'maze2'] or ['roam', 'sprinkle']
+
+        active_laps_decoding_time_bin_size = 0.25
+        active_laps_decoding_slideby = None
+
+        contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
+        all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size, slideby=active_laps_decoding_slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
+
+        global_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+        cache_key = decoding_continuous_cache_key(active_laps_decoding_time_bin_size, active_laps_decoding_slideby)  # e.g. (0.25, 0.25)
+        directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={cache_key: {'pseudo2D': all_context_filter_epochs_decoder_result}})
+        curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
+
+
+    ## OUTPUTS: directional_decoders_decode_result
+
+
+    # from concurrent.futures import ThreadPoolExecutor
+
+    ## Parallel decode: laps (~17.5m), replay (~3.5m), pbe (~3.5m) -- wall time ~max of the three
+    _decoder = directional_decoders_decode_result.pseudo2D_decoder
+    _epoch_inputs = {
+        'lap': ensure_Epoch(deepcopy(curr_active_pipeline.sess.laps.to_dataframe())),
+        'replay': ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay)),
+        'pbe': ensure_Epoch(deepcopy(curr_active_pipeline.sess.pbe)),
+    }
+
+    # with ThreadPoolExecutor(max_workers=3) as _executor:
+    #     _futures = {name: _executor.submit(_decoder.decode_specific_epochs, spikes_df=deepcopy(computation_result.sess.spikes_df), filter_epochs=epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False) for name, epochs in _epoch_inputs.items()}
+    #     laps_decoding_result = _futures['laps'].result()
+    #     replay_decoding_result = _futures['replay'].result()
+    #     pbe_decoding_result = _futures['pbe'].result()
+
+    decoded_results_dict = {}
+    for name, epochs in _epoch_inputs.items():
+        decoded_results_dict[name] = _decoder.decode_specific_epoch(spikes_df=deepcopy(computation_result.sess.spikes_df), filter_epochs=epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+        decoded_results_dict[name].marginal_z_list = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(decoded_results_dict[name]) ## compute correct marginals
+
+    output_dict['decoded_results_dict'] = decoded_results_dict
+
+    # laps_decoding_result = directional_decoders_decode_result.pseudo2D_decoder.decode_specific_epochs(spikes_df=computation_result.sess.spikes_df, filter_epochs=ensure_Epoch(deepcopy(curr_active_pipeline.sess.laps.to_dataframe())), decoding_time_bin_size=decoding_time_bin_size, debug_print=False) # 17.5m
+    # replay_decoding_result = directional_decoders_decode_result.pseudo2D_decoder.decode_specific_epochs(spikes_df=computation_result.sess.spikes_df, filter_epochs=ensure_Epoch(deepcopy(curr_active_pipeline.sess.replay)), decoding_time_bin_size=decoding_time_bin_size, debug_print=False)  ## 3.5m
+    # pbe_decoding_result = directional_decoders_decode_result.pseudo2D_decoder.decode_specific_epochs(spikes_df=computation_result.sess.spikes_df, filter_epochs=ensure_Epoch(deepcopy(curr_active_pipeline.sess.pbe)), decoding_time_bin_size=decoding_time_bin_size, debug_print=False) ## 3.5m
+
+    ## compute correct marginals
+    # laps_decoding_result.marginal_z_list = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(laps_decoding_result)
+    # replay_decoding_result.marginal_z_list = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(replay_decoding_result)
+    # pbe_decoding_result.marginal_z_list = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pbe_decoding_result)
+
+    ## Pickle the result using the current computation day date for the file name:
+    
+
+    pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath(f'{today_str}_decoded_results.pkl')
+    pkl_output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, {
+            'laps_decoding_result': laps_decoding_result,
+            'replay_decoding_result': replay_decoding_result,
+            'pbe_decoding_result': pbe_decoding_result,
+            'decoding_time_bin_size': decoding_time_bin_size
+        }, debug_print=True)
+        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+        output_dict['split_save_folder'] = pkl_output_path
+
+    except Exception as e:
+        print(f"[WARN] Failed to save decoded results to {pkl_output_path}: {e}")
+        
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Compute                                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+    # decoded_results_dict = {
+    #     'lap': laps_decoding_result, 
+    #     'replay': replay_decoding_result,
+    #     'pbe': pbe_decoding_result,
+    # }
+    decoded_results_context_probability_performance_df_dict = {}
+    context_probability_df_dict = {}
+    for k, a_decoded_result in decoded_results_dict.items():
+        context_probability_df, context_probability_performance_df, maze_prob_col_names, (context_probability_performance_df_list, context_probability_df_list) = _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, all_epochs_decoding_result=a_decoded_result)
+        decoded_results_context_probability_performance_df_dict[k] = context_probability_performance_df
+        context_probability_df_dict[k] = context_probability_df
+
+    output_dict['context_probability_df_dict'] = context_probability_df_dict
+    output_dict['decoded_results_context_probability_performance_df_dict'] = decoded_results_context_probability_performance_df_dict
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plots                                                                                                                                                                                                                                                                                #
+    # ==================================================================================================================================================================================================================================================================================== #
+    figs_plot_maze_probability_stacked_bar_dict = {}
+    for k, a_context_probability_df in context_probability_df_dict.items():
+        title_string = f'Maze Context Decoded Probabilities' #  ({k})
+        subtitle_string: Optional[str] = f'{k.title()}s'
+
+        active_context = curr_active_pipeline.build_display_context_for_session(f'maze_context_decoded_probabilities[{k}]')
+        figs_plot_maze_probability_stacked_bar_dict[k] = plot_maze_probability_stacked_bar(context_probability_df=a_context_probability_df, maze_prob_col_names=maze_prob_col_names,
+                                                                                            active_context=active_context, title_string=title_string, subtitle_string=subtitle_string)
+        # fig, axes, artist_objects = figs_plot_maze_probability_stacked_bar_dict[k]
+
+    output_dict['figs_plot_maze_probability_stacked_bar_dict'] = figs_plot_maze_probability_stacked_bar_dict
+
+    return output_dict
+
+
+
+
+
+@function_attributes(short_name=None, tags=['MAIN', 'epoch', 'decoder', 'performance'], input_requires=[], output_provides=[], uses=['_compute_all_maze_by_maze_context_marginals'], used_by=[], creation_date='2026-07-14 18:47', related_items=[])
+def _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline, all_epochs_decoding_result: DecodedFilterEpochsResult, debug_print: bool=False, compute_flattened_bins: bool=False):
+    """ 
+    Computes the context marginals for ALL DECODED EPOCHS for each maze in a manner ready to plot in plot_maze_probability_stacked_bar, plot_maze_probability_histograms
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _compute_all_epochs_all_maze_by_maze_context_marginals, _compute_all_maze_by_maze_context_marginals
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar, plot_maze_probability_histograms
+
+        context_probability_df, context_probability_performance_df, maze_prob_col_names, (context_probability_performance_df_list, context_probability_df_list) = _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, all_epochs_decoding_result = laps_decoding_result)
+        context_probability_performance_df
+
+
+    """
+    context_probability_performance_df_list = []
+    context_probability_df_list = []
+    maze_prob_col_names = None
+    n_epochs: int = all_epochs_decoding_result.n_epochs
+
+    if not compute_flattened_bins:
+        for i in np.arange(n_epochs):
+            if debug_print:
+                print(f'computing {i}/{n_epochs}...')
+            an_epoch_result = all_epochs_decoding_result.get_result_for_epoch(i) # `DecodedFilterEpochsResult` -> `SingleEpochDecodedResult`
+            context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=an_epoch_result)
+            context_probability_df_list.append(context_probability_df)
+            context_probability_performance_df_list.append(context_probability_performance_df)
+            # if maze_prob_col_names is None:
+            #     maze_prob_col_names = maze_prob_col_names
+        ## END for i in np.arange(n_epochs)...
+
+        ## integrate over all epochs to determine final cross-epoch stats...
+
+        context_probability_df: pd.DataFrame = pd.concat(context_probability_df_list, ignore_index=True)
+        context_probability_performance_df: pd.DataFrame = (
+            context_probability_df.groupby('Probe_Epoch_id')
+            .agg(is_ctx_prediction_correct_count=('is_ctx_prediction_correct', 'count'),
+                is_ctx_prediction_correct_sum=('is_ctx_prediction_correct', 'sum'))
+            .reset_index()
+        )
+        context_probability_performance_df['pct_ctx_prediction_correct'] = context_probability_performance_df['is_ctx_prediction_correct_sum'] / context_probability_performance_df['is_ctx_prediction_correct_count']
+
+    else:
+        p_x_given_n = np.hstack([mz.p_x_given_n for mz in all_epochs_decoding_result.marginal_z_list])
+        time_bin_centers = np.hstack([tc.centers for tc in all_epochs_decoding_result.time_bin_containers])
+        # then attach Probe_Epoch_id / correctness the same way the helper does
+
+    return context_probability_df, context_probability_performance_df, maze_prob_col_names, (context_probability_performance_df_list, context_probability_df_list)
+
+
+@function_attributes(short_name=None, tags=['compute', 'MAIN', 'performance', 'context', 'pending'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_all_epochs_all_maze_by_maze_context_marginals'], creation_date='2026-07-13 23:18', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
+def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_decoding_result: SingleEpochDecodedResult):
     """ 
     Computes the context marginals for each maze in a manner ready to plot in plot_maze_probability_stacked_bar, plot_maze_probability_histograms
 
@@ -532,9 +712,9 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
 
         if title_string is not None:
             if subtitle_string is not None:
-                header_flexitext = f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>'
+                header_flexitext = f'<size:16>{title_string}</>\n<size:14><weight:bold>{subtitle_string}</></>'
             else:
-                header_flexitext = f'<size:20><weight:bold>{title_string}</></>'
+                header_flexitext = f'<size:16>{title_string}</>'
             artist_objects['title_text_obj'] = flexitext(0.01, 0.85, header_flexitext, va="bottom", xycoords="figure fraction")
             if fig.canvas.manager is not None:
                 fig.canvas.manager.set_window_title(f'{title_string} - {active_context.get_description(separator=" | ")}')
