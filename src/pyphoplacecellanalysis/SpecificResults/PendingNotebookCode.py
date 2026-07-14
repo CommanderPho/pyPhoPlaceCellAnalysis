@@ -390,6 +390,7 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
     ## OUTPUTS: maze_names
 
     ## INPUTS: pseudo2D
+    # pseudo2D_decoding_result.compute_marginals() ## TODO: compute marginals when they are missing
     p_x_given_n = pseudo2D_decoding_result.marginal_z['p_x_given_n']
     time_bin_centers = deepcopy(pseudo2D_decoding_result.time_bin_container.centers)
     n_mazes, n_t_bins = np.shape(p_x_given_n) # (8, 72556)
@@ -443,7 +444,7 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
 
 
 @function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 18:10', related_items=['plot_maze_probability_histograms'])
-def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str]) -> tuple[plt.Figure, np.ndarray, dict]:
+def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None) -> tuple[plt.Figure, np.ndarray, dict]:
     """
     Plots one subplot column for each maze -- each subplot contains a vertically stacked bar graph showing the relative maze probabilities across different probe epochs (maze epochs).
         - Each color represents a specific decoded maze context, consistent across all subplot columns.
@@ -456,15 +457,19 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
             2) Precency/Recency effects -- tendency for conflation with the first two or last ewo epochs
         - This suggests that temporal adjacency, independent of context, plays a role in decoding -- TODO: substantiate
 
+    When `active_context` is provided, adds publication flexitext title/subtitle header and session-context footer.
 
     Usage:
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar
 
-        fig, axes, artist_objects = plot_maze_probability_stacked_bar(context_probability_df=context_probability_df, maze_prob_col_names=maze_prob_col_names)
+        active_context = curr_active_pipeline.build_display_context_for_session('maze_context_decoded_probabilities')
+        fig, axes, artist_objects = plot_maze_probability_stacked_bar(context_probability_df=context_probability_df, maze_prob_col_names=maze_prob_col_names, active_context=active_context)
 
     """
     import matplotlib.patches as mpatches ## for legend
+    from flexitext import flexitext
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
     n_mazes: int = len(maze_prob_col_names)
     maze_ids = np.arange(n_mazes)
@@ -476,7 +481,7 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
     # Apply 'constrained' layout here to automatically make room for the figure legend
     fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True) # , layout='constrained'
 
-    artist_objects = {'bars': [], 'legend': None}
+    artist_objects = {'bars': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None}
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i] 
@@ -499,10 +504,7 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
             edge_color = 'black' if is_current_track else None
             line_width = 2.5 if is_current_track else 0
             
-            a_bar_container = ax.bar(
-                x=0, height=val, bottom=bottom, color=colors[j], label=label,
-                edgecolor=edge_color, linewidth=line_width
-            )
+            a_bar_container = ax.bar(x=0, height=val, bottom=bottom, color=colors[j], label=label, edgecolor=edge_color, linewidth=line_width)
 
 
             a_maze_bar_artists.append(a_bar_container)
@@ -517,12 +519,28 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
 
     # Add the legend to the figure (tight_layout is no longer needed at the end)
     # Explicitly create a list of Patch objects for the legend handles
-    legend_handles = [
-        mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) 
-        for j in range(len(maze_prob_col_names))
-    ]
+    legend_handles = [mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) for j in range(len(maze_prob_col_names))]
     # Pass the explicit handles to the legend
     artist_objects['legend'] = axes[-1].legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Probabilities")
+
+    ## Publication title / footer (flexitext) — only when session context is provided
+    if active_context is not None:
+        fig.suptitle('')
+        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.72, left_margin=0.08, right_margin=0.82, bottom_margin=0.15)
+        text_formatter.setup_margins(fig)
+        artist_objects['text_formatter'] = text_formatter
+
+        if title_string is not None:
+            if subtitle_string is not None:
+                header_flexitext = f'<size:20><weight:bold>{title_string}</></>\n<size:9>{subtitle_string}</>'
+            else:
+                header_flexitext = f'<size:20><weight:bold>{title_string}</></>'
+            artist_objects['title_text_obj'] = flexitext(0.01, 0.85, header_flexitext, va="bottom", xycoords="figure fraction")
+            if fig.canvas.manager is not None:
+                fig.canvas.manager.set_window_title(f'{title_string} - {active_context.get_description(separator=" | ")}')
+
+        artist_objects['footer_text_obj'] = text_formatter.add_flexitext_context_footer(active_context=active_context)
+
     return fig, axes, artist_objects
 
 
