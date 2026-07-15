@@ -349,7 +349,7 @@ class ComputeGlobalEpochBase(ComputedResult):
             # INPUTS: global_frame_divided_epochs_obj, original_pos_dfs_dict
             # global_frame_divided_epochs_obj
             
-            global_frame_divided_epochs_df = global_frame_divided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+            global_frame_divided_epochs_df = ensure_dataframe(global_frame_divided_epochs_obj) #.rename(columns={'t_rel_seconds':'t'})
             global_frame_divided_epochs_df['label'] = deepcopy(global_frame_divided_epochs_df.index.to_numpy())
             # global_pos_df: pd.DataFrame = deepcopy(global_session.position.to_dataframe()) #.rename(columns={'t':'t_rel_seconds'})
 
@@ -370,7 +370,7 @@ class ComputeGlobalEpochBase(ComputedResult):
             frame_divided_df: pd.DataFrame = deepcopy(df)
             frame_divided_df['label'] = deepcopy(frame_divided_df.index.to_numpy())
             global_frame_divided_epochs_obj = ensure_Epoch(frame_divided_df)
-            global_frame_divided_epochs_df = global_frame_divided_epochs_obj.epochs.to_dataframe() #.rename(columns={'t_rel_seconds':'t'})
+            global_frame_divided_epochs_df = ensure_dataframe(global_frame_divided_epochs_obj) #.rename(columns={'t_rel_seconds':'t'})
             global_frame_divided_epochs_df['label'] = deepcopy(global_frame_divided_epochs_df.index.to_numpy())
             
         ## END if
@@ -990,8 +990,8 @@ class Compute_NonPBE_Epochs(ComputedResult):
         sess.non_pbe_endcaps = DataSession.compute_non_PBE_EndcapsOnly_epochs(sess, save_on_compute=save_on_compute)
         
         # Check if main session changed - compare the dataframes directly
-        did_change = did_change or (original_non_pbe is None) or (not original_non_pbe.to_dataframe().equals(sess.non_pbe.to_dataframe()))
-        did_change = did_change or (original_non_pbe_endcaps is None) or (not original_non_pbe_endcaps.to_dataframe().equals(sess.non_pbe_endcaps.to_dataframe()))
+        did_change = did_change or (original_non_pbe is None) or (not ensure_dataframe(original_non_pbe).equals(ensure_dataframe(sess.non_pbe)))
+        did_change = did_change or (original_non_pbe_endcaps is None) or (not ensure_dataframe(original_non_pbe_endcaps).equals(ensure_dataframe(sess.non_pbe_endcaps)))
         
         # Update filtered sessions if provided
         if filtered_sessions is not None:
@@ -1003,9 +1003,9 @@ class Compute_NonPBE_Epochs(ComputedResult):
                 filtered_session.non_pbe_endcaps = sess.non_pbe_endcaps.time_slice(t_start=filtered_session.t_start, t_stop=filtered_session.t_stop)                
 
                 # Check if filtered session changed
-                did_change = did_change or (original_filtered_non_pbe is None) or (not original_filtered_non_pbe.to_dataframe().equals(filtered_session.non_pbe.to_dataframe()))
+                did_change = did_change or (original_filtered_non_pbe is None) or (not ensure_dataframe(original_filtered_non_pbe).equals(ensure_dataframe(filtered_session.non_pbe)))
                 # Check if filtered session changed for non_pbe_endcaps
-                did_change = did_change or (original_filtered_non_pbe_endcaps is None) or (not original_filtered_non_pbe_endcaps.to_dataframe().equals(filtered_session.non_pbe_endcaps.to_dataframe()))
+                did_change = did_change or (original_filtered_non_pbe_endcaps is None) or (not ensure_dataframe(original_filtered_non_pbe_endcaps).equals(ensure_dataframe(filtered_session.non_pbe_endcaps)))
                     
         return did_change, sess, filtered_sessions
 
@@ -1174,7 +1174,7 @@ class GeneralDecoderDictDecodedEpochsDictResult(ComputedResult):
             for epoch_type, epoch_obj in self.filter_epochs_to_decode_dict.items():
                 # Convert Epoch to DataFrame and save it
                 epoch_key = f"{key}/filter_epochs_to_decode_dict/{epoch_type}"
-                epoch_df = epoch_obj.to_dataframe()
+                epoch_df = ensure_dataframe(epoch_obj)
                 epoch_df.to_hdf(file_path, key=epoch_key)
         
         # 2. Handle filter_epochs_pseudo2D_continuous_specific_decoded_result
@@ -3426,7 +3426,7 @@ class KnownFilterEpochs(ExtendedEnum):
             # Use it raw, hope it's right
             active_filter_epochs = ensure_dataframe(filter_epochs)
             default_figure_name = f'{default_figure_name}_CUSTOM'
-            epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in active_filter_epochs.to_dataframe()[['label']].itertuples()]
+            epoch_description_list = [f'{default_figure_name} {epoch_tuple.label}' for epoch_tuple in ensure_dataframe(active_filter_epochs)[['label']].itertuples()]
 
         return active_filter_epochs, default_figure_name, epoch_description_list
 
