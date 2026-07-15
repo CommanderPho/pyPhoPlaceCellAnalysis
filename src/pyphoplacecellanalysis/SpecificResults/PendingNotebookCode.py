@@ -822,13 +822,15 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
 
 
 @function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla', 'per-epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-15 16:00', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
-def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None) -> tuple[plt.Figure, np.ndarray, dict]:
+def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None, group_width_proportional_to_num_bars: bool = True) -> tuple[plt.Figure, np.ndarray, dict]:
     """
     Plots one subplot column for each maze -- each subplot contains vertically stacked bars, one per decoded epoch
     (lap/PBE/replay) that occurred during that maze, showing mean maze-context probabilities for that epoch.
 
         - Each color represents a specific decoded maze context, consistent across all subplot columns.
-        - A solid black outline is drawn around the stack segment corresponding to the actual current maze.
+        - A thin black outline is drawn around the stack segment corresponding to the actual current maze.
+        - Figure width is 4x the matplotlib default so per-epoch bars remain readable.
+        - When ``group_width_proportional_to_num_bars`` is True (default), each maze subplot width scales with its epoch count.
 
     Requires `decoded_epoch_idx` on `context_probability_df` (stamped by `_compute_all_epochs_all_maze_by_maze_context_marginals`).
 
@@ -851,23 +853,41 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
 
     n_mazes: int = len(maze_prob_col_names)
     maze_ids = np.arange(n_mazes)
+    correct_track_linewidth: float = 0.05  # ~0.3125 — thin outline so thin bars stay readable
 
     # Generate consistent colors for each maze
     cmap = plt.get_cmap("tab10")
     colors = [cmap(j) for j in range(n_mazes)]
 
-    fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True)
+    # Precompute per-maze epoch counts for proportional panel widths
+    epoch_means_by_maze: Dict[int, pd.DataFrame] = {}
+    n_epochs_by_maze: List[int] = []
+    for i in maze_ids:
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        epoch_means: pd.DataFrame = curr_maze_df.groupby('decoded_epoch_idx')[maze_prob_col_names].mean().sort_index()
+        epoch_means_by_maze[i] = epoch_means
+        n_epochs_by_maze.append(max(len(epoch_means), 1))  # avoid zero-width panels for empty mazes
+
+    ## END for i in maze_ids...
+
+    if group_width_proportional_to_num_bars:
+        width_ratios = n_epochs_by_maze
+    else:
+        width_ratios = [1] * n_mazes
+
+    # 4x default figure width so thin per-epoch bars are visible across many mazes
+    default_fig_w, default_fig_h = plt.rcParams['figure.figsize']
+    fig_width: float = float(default_fig_w) * 4.0
+    fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True, figsize=(fig_width, default_fig_h), gridspec_kw={'width_ratios': width_ratios})
     if n_mazes == 1:
         axes = np.array([axes])
 
-    artist_objects = {'bars': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None}
+    artist_objects = {'bars': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None, 'group_width_proportional_to_num_bars': group_width_proportional_to_num_bars, 'width_ratios': list(width_ratios)}
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i]
-        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
         ax = axes[i]
-
-        epoch_means: pd.DataFrame = curr_maze_df.groupby('decoded_epoch_idx')[maze_prob_col_names].mean().sort_index()
+        epoch_means = epoch_means_by_maze[i]
         epoch_idxs = epoch_means.index.to_numpy()
         n_epochs_in_maze: int = len(epoch_idxs)
 
@@ -881,7 +901,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
                 label = maze_col if ((i == 0) and (k == 0)) else None
                 is_current_track = (j == i)
                 edge_color = 'black' if is_current_track else None
-                line_width = 2.5 if is_current_track else 0
+                line_width = correct_track_linewidth if is_current_track else 0
                 a_bar_container = ax.bar(x=k, height=val, bottom=bottom, color=colors[j], label=label, edgecolor=edge_color, linewidth=line_width)
                 a_epoch_bar_artists.append(a_bar_container)
                 bottom += val
@@ -903,6 +923,8 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
             ax.set_xticklabels(tick_labels, fontsize=7, rotation=45, ha='right')
         else:
             ax.set_xticks([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         artist_objects['bars'].append(a_maze_bar_artists)
 
     ## END for i in maze_ids...

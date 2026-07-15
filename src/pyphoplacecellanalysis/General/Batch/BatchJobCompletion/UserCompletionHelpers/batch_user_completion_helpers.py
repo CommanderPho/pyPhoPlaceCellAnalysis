@@ -4205,6 +4205,11 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
         callback_outputs['resolved_maze_epoch_names'] = list(output_dict.get('resolved_maze_epoch_names') or [])
         callback_outputs['pipeline_output_pkl_path'] = output_dict.get('pkl_output_path')
         callback_outputs['epoch_names'] = list((output_dict.get('decoded_results_dict') or {}).keys())
+
+        transfer_keys_list = ['context_probability_df_dict']
+        for k in transfer_keys_list:
+            callback_outputs[k] = output_dict.get(k, None)
+
         figs_dict = output_dict.get('figs_plot_maze_probability_stacked_bar_dict') or {}
 
         if save_csv:
