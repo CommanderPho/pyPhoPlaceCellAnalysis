@@ -568,7 +568,17 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
 
     ## END for k, a_context_probability_df in context_probability_df_dict.items()...
 
+    figs_plot_maze_probability_stacked_bar_by_epoch_dict = {}
+    for k, a_context_probability_df in context_probability_df_dict.items():
+        title_string = f'Maze Context Decoded Probabilities'
+        subtitle_string: Optional[str] = f'{k.title()}s (per-epoch)'
+        active_context = curr_active_pipeline.build_display_context_for_session(f'maze_context_decoded_probabilities_by_epoch[{k}]')
+        figs_plot_maze_probability_stacked_bar_by_epoch_dict[k] = plot_maze_probability_stacked_bar_by_epoch(context_probability_df=a_context_probability_df, maze_prob_col_names=maze_prob_col_names, active_context=active_context, title_string=title_string, subtitle_string=subtitle_string)
+
+    ## END for k, a_context_probability_df in context_probability_df_dict.items()...
+
     output_dict['figs_plot_maze_probability_stacked_bar_dict'] = figs_plot_maze_probability_stacked_bar_dict
+    output_dict['figs_plot_maze_probability_stacked_bar_by_epoch_dict'] = figs_plot_maze_probability_stacked_bar_by_epoch_dict
     output_dict['decoding_time_bin_size'] = decoding_time_bin_size
     return output_dict
 
@@ -601,6 +611,7 @@ def _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline,
                 print(f'computing {i}/{n_epochs}...')
             an_epoch_result = all_epochs_decoding_result.get_result_for_epoch(i) # `DecodedFilterEpochsResult` -> `SingleEpochDecodedResult`
             context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=an_epoch_result, **kwargs)
+            context_probability_df['decoded_epoch_idx'] = i
             context_probability_df_list.append(context_probability_df)
             context_probability_performance_df_list.append(context_probability_performance_df)
             # if maze_prob_col_names is None:
@@ -787,6 +798,116 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
     # Explicitly create a list of Patch objects for the legend handles
     legend_handles = [mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) for j in range(len(maze_prob_col_names))]
     # Pass the explicit handles to the legend
+    artist_objects['legend'] = axes[-1].legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Probabilities")
+
+    ## Publication title / footer (flexitext) — only when session context is provided
+    if active_context is not None:
+        fig.suptitle('')
+        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.72, left_margin=0.08, right_margin=0.82, bottom_margin=0.15)
+        text_formatter.setup_margins(fig)
+        artist_objects['text_formatter'] = text_formatter
+
+        if title_string is not None:
+            if subtitle_string is not None:
+                header_flexitext = f'<size:16>{title_string}</>\n<size:14><weight:bold>{subtitle_string}</></>'
+            else:
+                header_flexitext = f'<size:16>{title_string}</>'
+            artist_objects['title_text_obj'] = flexitext(0.01, 0.85, header_flexitext, va="bottom", xycoords="figure fraction")
+            if fig.canvas.manager is not None:
+                fig.canvas.manager.set_window_title(f'{title_string} - {active_context.get_description(separator=" | ")}')
+
+        artist_objects['footer_text_obj'] = text_formatter.add_flexitext_context_footer(active_context=active_context)
+
+    return fig, axes, artist_objects
+
+
+@function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla', 'per-epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-15 16:00', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
+def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None) -> tuple[plt.Figure, np.ndarray, dict]:
+    """
+    Plots one subplot column for each maze -- each subplot contains vertically stacked bars, one per decoded epoch
+    (lap/PBE/replay) that occurred during that maze, showing mean maze-context probabilities for that epoch.
+
+        - Each color represents a specific decoded maze context, consistent across all subplot columns.
+        - A solid black outline is drawn around the stack segment corresponding to the actual current maze.
+
+    Requires `decoded_epoch_idx` on `context_probability_df` (stamped by `_compute_all_epochs_all_maze_by_maze_context_marginals`).
+
+    When `active_context` is provided, adds publication flexitext title/subtitle header and session-context footer.
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar_by_epoch
+
+        active_context = curr_active_pipeline.build_display_context_for_session('maze_context_decoded_probabilities_by_epoch')
+        fig, axes, artist_objects = plot_maze_probability_stacked_bar_by_epoch(context_probability_df=context_probability_df, maze_prob_col_names=maze_prob_col_names, active_context=active_context)
+
+    """
+    import matplotlib.patches as mpatches ## for legend
+    from flexitext import flexitext
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+
+    if 'decoded_epoch_idx' not in context_probability_df.columns:
+        raise KeyError("context_probability_df is missing required column 'decoded_epoch_idx'. Ensure it was produced by `_compute_all_epochs_all_maze_by_maze_context_marginals` with per-epoch stamping.")
+
+    n_mazes: int = len(maze_prob_col_names)
+    maze_ids = np.arange(n_mazes)
+
+    # Generate consistent colors for each maze
+    cmap = plt.get_cmap("tab10")
+    colors = [cmap(j) for j in range(n_mazes)]
+
+    fig, axes = plt.subplots(nrows=1, ncols=n_mazes, sharex=False, sharey=True)
+    if n_mazes == 1:
+        axes = np.array([axes])
+
+    artist_objects = {'bars': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None}
+
+    for i in maze_ids:
+        a_maze_col_name: str = maze_prob_col_names[i]
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        ax = axes[i]
+
+        epoch_means: pd.DataFrame = curr_maze_df.groupby('decoded_epoch_idx')[maze_prob_col_names].mean().sort_index()
+        epoch_idxs = epoch_means.index.to_numpy()
+        n_epochs_in_maze: int = len(epoch_idxs)
+
+        a_maze_bar_artists = []
+        for k, epoch_idx in enumerate(epoch_idxs):
+            mean_probs = epoch_means.loc[epoch_idx]
+            a_epoch_bar_artists = []
+            bottom = 0.0
+            for j, maze_col in enumerate(maze_prob_col_names):
+                val = mean_probs[maze_col]
+                label = maze_col if ((i == 0) and (k == 0)) else None
+                is_current_track = (j == i)
+                edge_color = 'black' if is_current_track else None
+                line_width = 2.5 if is_current_track else 0
+                a_bar_container = ax.bar(x=k, height=val, bottom=bottom, color=colors[j], label=label, edgecolor=edge_color, linewidth=line_width)
+                a_epoch_bar_artists.append(a_bar_container)
+                bottom += val
+            ## END for j, maze_col in enumerate(maze_prob_col_names)...
+
+            a_maze_bar_artists.append(a_epoch_bar_artists)
+        ## END for k, epoch_idx in enumerate(epoch_idxs)...
+
+        ax.set_title(a_maze_col_name)
+        if n_epochs_in_maze > 0:
+            # Sparse x ticks when many epochs; show all when few
+            if n_epochs_in_maze <= 8:
+                tick_positions = np.arange(n_epochs_in_maze)
+                tick_labels = [str(int(e)) for e in epoch_idxs]
+            else:
+                tick_positions = np.linspace(0, n_epochs_in_maze - 1, num=min(6, n_epochs_in_maze), dtype=int)
+                tick_labels = [str(int(epoch_idxs[p])) for p in tick_positions]
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels(tick_labels, fontsize=7, rotation=45, ha='right')
+        else:
+            ax.set_xticks([])
+        artist_objects['bars'].append(a_maze_bar_artists)
+
+    ## END for i in maze_ids...
+
+    legend_handles = [mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) for j in range(len(maze_prob_col_names))]
     artist_objects['legend'] = axes[-1].legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Probabilities")
 
     ## Publication title / footer (flexitext) — only when session context is provided
