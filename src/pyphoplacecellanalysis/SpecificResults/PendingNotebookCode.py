@@ -847,6 +847,8 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
 
     """
     import matplotlib.patches as mpatches ## for legend
+    from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea, HPacker, TextArea
+    from matplotlib.patches import FancyBboxPatch
     from flexitext import flexitext
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
 
@@ -892,7 +894,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
     if n_mazes == 1:
         axes = np.array([axes])
 
-    artist_objects = {'bars': [], 'aggregate_bars': [], 'aggregate_separators': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None, 'group_width_proportional_to_num_bars': group_width_proportional_to_num_bars, 'include_summary_aggregate_bars': include_summary_aggregate_bars, 'width_ratios': list(width_ratios)}
+    artist_objects = {'bars': [], 'aggregate_bars': [], 'aggregate_separators': [], 'title_swatches': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None, 'group_width_proportional_to_num_bars': group_width_proportional_to_num_bars, 'include_summary_aggregate_bars': include_summary_aggregate_bars, 'width_ratios': list(width_ratios)}
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i]
@@ -943,7 +945,16 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
                 bottom += val
             ## END for j, maze_col in enumerate(maze_prob_col_names)...
 
-        ax.set_title(a_maze_col_name)
+        # Title: legend-style rounded color swatch to the left of the maze name
+        ax.set_title('')
+        swatch_area = DrawingArea(width=14, height=10, xdescent=0, ydescent=0)
+        swatch_patch = FancyBboxPatch((1.0, 1.0), width=12.0, height=8.0, boxstyle="round,pad=0.15,rounding_size=2.0", facecolor=colors[i], edgecolor='none', mutation_aspect=1.0)
+        swatch_area.add_artist(swatch_patch)
+        title_text_area = TextArea(a_maze_col_name, textprops=dict(color='black', size=10))
+        title_packer = HPacker(children=[swatch_area, title_text_area], align="center", pad=0, sep=4)
+        title_box = AnchoredOffsetbox(loc='lower center', child=title_packer, pad=0.0, borderpad=0.0, frameon=False, bbox_to_anchor=(0.5, 1.0), bbox_transform=ax.transAxes)
+        ax.add_artist(title_box)
+
         if n_epochs_in_maze > 0:
             # Sparse x ticks when many epochs; show all when few
             if n_epochs_in_maze <= 8:
@@ -967,6 +978,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
         artist_objects['bars'].append(a_maze_bar_artists)
         artist_objects['aggregate_bars'].append(a_aggregate_bar_artists)
         artist_objects['aggregate_separators'].append(a_separator_artist)
+        artist_objects['title_swatches'].append(title_box)
 
     ## END for i in maze_ids...
 
