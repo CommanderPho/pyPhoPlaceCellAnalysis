@@ -425,6 +425,30 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
         active_laps_decoding_time_bin_size = 0.25
         active_laps_decoding_slideby = None
 
+        ## Ensure per-maze pf2D / pf2D_Decoder exist before contextual merge
+        missing_filter_contexts: List[str] = []
+        needs_pf_recompute: List[str] = []
+        filtered_sessions = getattr(curr_active_pipeline, 'filtered_sessions', {}) or {}
+        for n in epochs_to_create_global_from_names:
+            if (n not in curr_active_pipeline.computation_results) and (n not in filtered_sessions):
+                missing_filter_contexts.append(n)
+                continue
+            if n not in curr_active_pipeline.computation_results:
+                needs_pf_recompute.append(n)
+                continue
+            computed_data = curr_active_pipeline.computation_results[n].computed_data
+            if (computed_data.get('pf2D', None) is None) or (computed_data.get('pf2D_Decoder', None) is None):
+                needs_pf_recompute.append(n)
+
+        ## END for n in epochs_to_create_global_from_names....
+
+        if len(missing_filter_contexts) > 0:
+            raise ValueError(f'Cannot recompute pf2D/pf2D_Decoder — maze context(s) missing filtered sessions: {missing_filter_contexts} (need all of {list(epochs_to_create_global_from_names)})')
+        if len(needs_pf_recompute) > 0:
+            print(f'Recomputing pf2D/pf2D_Decoder for missing maze contexts: {needs_pf_recompute}')
+            curr_active_pipeline.reload_default_computation_functions()
+            curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['pf_computation', 'position_decoding'], enabled_filter_names=needs_pf_recompute, fail_on_exception=True, debug_print=debug_print)
+
         contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(curr_active_pipeline, epochs_to_create_global_from_names=epochs_to_create_global_from_names)
         all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(curr_active_pipeline, contextual_pf2D_Decoder=contextual_pf2D_Decoder, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size, slideby=active_laps_decoding_slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
 
