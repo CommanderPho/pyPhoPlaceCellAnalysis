@@ -4127,7 +4127,7 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
 
 @function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'maze-context', 'context-decoding', 'CSV', 'png'], input_requires=[], output_provides=[], uses=['_run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-14 19:50', related_items=['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function', 'recompute_nwb_wmaze_pipeline_computations_completion_function'])
 def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, save_csv: bool = True, save_pkls: bool = True, write_png: bool = True, write_vector_format: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Path] = None, debug_print: bool = False) -> dict:
+        decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, save_csv: bool = True, save_pkls: bool = False, write_png: bool = True, write_vector_format: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Path] = None, debug_print: bool = False) -> dict:
     """Decode lap/replay/PBE with contextual multi-maze pf2D decoder; export context-probability CSVs and stacked-bar figures.
 
     Wraps ``_run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context`` for batch. Does not mutate
