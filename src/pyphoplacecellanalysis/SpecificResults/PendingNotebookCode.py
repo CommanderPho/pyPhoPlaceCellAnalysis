@@ -14479,7 +14479,8 @@ def _computed_data_get(computed_data, key: str):
     return computed_data.get(key, None) if hasattr(computed_data, 'get') else getattr(computed_data, key, None)
 
 
-def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_clusterless_decoders: Optional[bool], context_name: Optional[str] = None, use_spyglass_clusterless_decoders: Optional[bool] = None) -> BasePositionDecoder:
+def _resolve_bapun_position_decoder(computed_data, decoder_dim: str, use_clusterless_decoders: Optional[bool], context_name: Optional[str] = None, 
+                                                    use_spyglass_clusterless_decoders: Optional[bool] = None) -> BasePositionDecoder:
     """Resolve Bapun position decoder keys while preserving standard-decoder defaults."""
     if use_clusterless_decoders is True and use_spyglass_clusterless_decoders is True:
         raise ValueError("use_clusterless_decoders and use_spyglass_clusterless_decoders cannot both be True.")
