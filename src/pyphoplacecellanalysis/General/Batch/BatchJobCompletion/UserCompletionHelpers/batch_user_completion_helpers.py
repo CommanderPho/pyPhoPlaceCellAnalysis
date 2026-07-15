@@ -4127,14 +4127,15 @@ def figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function(self
 
 @function_attributes(short_name=None, tags=['dandi_nwb', 'wmaze', 'nwb', 'figure', 'batch', 'maze-context', 'context-decoding', 'CSV', 'png'], input_requires=[], output_provides=[], uses=['_run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context', 'ensure_nwb_wmaze_pbe_and_replay_epochs', 'build_and_write_to_file'], used_by=[], creation_date='2026-07-14 19:50', related_items=['figures_plot_nwb_wmaze_pbe_replay_decode_posteriors_completion_function', 'recompute_nwb_wmaze_pipeline_computations_completion_function'])
 def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, save_csv: bool = True, write_png: bool = True, write_vector_format: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Path] = None, debug_print: bool = False) -> dict:
+        decoding_time_bin_size: float = 0.060, overwrite_pbe_replay_epochs: bool = False, save_csv: bool = True, save_pkls: bool = True, write_png: bool = True, write_vector_format: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Path] = None, debug_print: bool = False) -> dict:
     """Decode lap/replay/PBE with contextual multi-maze pf2D decoder; export context-probability CSVs and stacked-bar figures.
 
     Wraps ``_run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context`` for batch. Does not mutate
     ``DirectionalDecodersDecoded`` or the posterior PNG/GIF exporter.
 
-    ``override_output_parent_path``: when set, PKLs/CSVs from the helper (normally under session ``.output``) and this
-    function's batch CSV/figure exports (normally under ``self.collected_outputs_path``) all write under that root.
+    ``override_output_parent_path``: helper PKL/CSV root (defaults to ``self.collected_outputs_path``). Session identity is
+    included in helper filenames when writing under a shared parent. ``save_csv`` / ``save_pkls`` are forwarded to the helper;
+    this wrapper only records helper CSV paths and writes figure exports.
 
     Usage:
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function, SimpleBatchComputationDummy
@@ -4183,7 +4184,6 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
     active_output_parent_path.mkdir(parents=True, exist_ok=True)
     curr_session_name: str = curr_active_pipeline.session_name
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-    decoding_time_bin_size_ms = int(round(float(decoding_time_bin_size) * 1000))
     print(f'\tCURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
     print(f'\tactive_output_parent_path: "{active_output_parent_path.as_posix()}"')
 
@@ -4197,40 +4197,18 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
         pbe_replay_epochs_summary: dict = ensure_nwb_wmaze_pbe_and_replay_epochs(curr_active_pipeline=curr_active_pipeline, overwrite_extant=overwrite_pbe_replay_epochs)
         callback_outputs['pbe_replay_epochs_summary'] = deepcopy(pbe_replay_epochs_summary)
 
-        # Pass override through to helper so pkls/csvs leave session .output when provided; None keeps helper default (session output).
-        output_dict: dict = _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, ensure_pbe_replay_epochs=False, overwrite_pbe_replay_epochs=False, maze_epoch_names=maze_epoch_names, override_output_parent_path=override_output_parent_path, debug_print=debug_print)
+        # Always pass the effective batch output root so helper CSVs/PKLs use session-qualified names under that shared parent.
+        output_dict: dict = _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, ensure_pbe_replay_epochs=False, overwrite_pbe_replay_epochs=False, maze_epoch_names=maze_epoch_names, override_output_parent_path=active_output_parent_path, save_pkls=save_pkls, save_csvs=save_csv, debug_print=debug_print)
 
         callback_outputs['resolved_maze_epoch_names'] = list(output_dict.get('resolved_maze_epoch_names') or [])
         callback_outputs['pipeline_output_pkl_path'] = output_dict.get('pkl_output_path')
         callback_outputs['epoch_names'] = list((output_dict.get('decoded_results_dict') or {}).keys())
-
-        context_probability_df_dict = output_dict.get('context_probability_df_dict') or {}
-        performance_df_dict = output_dict.get('decoded_results_context_probability_performance_df_dict') or {}
         figs_dict = output_dict.get('figs_plot_maze_probability_stacked_bar_dict') or {}
 
         if save_csv:
-            helper_csv_paths = output_dict.get('context_probability_csv_paths') or {}
-            helper_perf_csv_paths = output_dict.get('context_probability_performance_csv_paths') or {}
-            # Helper already wrote collision-safe CSVs into the same override parent — reuse them instead of writing a second set.
-            if (override_output_parent_path is not None) and helper_csv_paths:
-                callback_outputs['context_probability_csv_paths'] = dict(helper_csv_paths)
-                callback_outputs['context_probability_performance_csv_paths'] = dict(helper_perf_csv_paths)
-                print(f'\treusing helper maze-context CSVs under override_output_parent_path ({len(helper_csv_paths)} epoch(s))')
-            else:
-                for epoch_name, context_probability_df in context_probability_df_dict.items():
-                    csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_{decoding_time_bin_size_ms}ms.csv').resolve()
-                    context_probability_df.to_csv(csv_path, index=False)
-                    callback_outputs['context_probability_csv_paths'][epoch_name] = csv_path
-                    print(f'\tsaved maze context probability CSV: "{csv_path}"')
-
-                    performance_df = performance_df_dict.get(epoch_name)
-                    if performance_df is not None:
-                        perf_csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_performance_{decoding_time_bin_size_ms}ms.csv').resolve()
-                        performance_df.to_csv(perf_csv_path, index=False)
-                        callback_outputs['context_probability_performance_csv_paths'][epoch_name] = perf_csv_path
-                        print(f'\tsaved maze context performance CSV: "{perf_csv_path}"')
-
-                ## END for epoch_name, context_probability_df in context_probability_df_dict.items()...
+            callback_outputs['context_probability_csv_paths'] = dict(output_dict.get('context_probability_csv_paths') or {})
+            callback_outputs['context_probability_performance_csv_paths'] = dict(output_dict.get('context_probability_performance_csv_paths') or {})
+            print(f'\thelper maze-context CSV paths: {len(callback_outputs["context_probability_csv_paths"])} epoch(s)')
 
         if write_png or write_vector_format:
             custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_output_parent_path)
