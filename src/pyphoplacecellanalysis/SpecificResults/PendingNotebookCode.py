@@ -359,7 +359,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'batch'], input_requires=[], output_provides=[], uses=['_compute_all_epochs_all_maze_by_maze_context_marginals', 'plot_maze_probability_stacked_bar', 'build_contextual_pf2D_decoder', '_resolve_maze_epoch_names_for_multi_context_eval', 'ensure_nwb_wmaze_pbe_and_replay_epochs'], used_by=['compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function'], creation_date='2026-07-14 19:08', related_items=[])
-def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline, decoding_time_bin_size: float = 0.050, ensure_pbe_replay_epochs: bool = False, overwrite_pbe_replay_epochs: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Union[str, Path]] = None, debug_print: bool = False, **kwargs):
+def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline, decoding_time_bin_size: float = 0.050, ensure_pbe_replay_epochs: bool = False, overwrite_pbe_replay_epochs: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Union[str, Path]] = None, save_pkls: bool = True, save_csvs: bool = True, debug_print: bool = False, **kwargs):
     """
     runs all required computations for the three epochs (laps, pbes, replays), exports them, then builds figures for them if possible.
 
@@ -433,12 +433,13 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
         directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=global_spikes_df, continuously_decoded_result_cache_dict={cache_key: {'pseudo2D': all_context_filter_epochs_decoder_result}})
         curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
 
-        directional_decoders_decode_result_pkl_output_path: Path = _subfn_build_maze_context_output_path('directional_decoders_decode_result', '.pkl')
-        try:
-            directional_decoders_decode_result.save(pkl_output_path=directional_decoders_decode_result_pkl_output_path)
-            print(f'directional_decoders_decode_result_pkl_output_path: "{directional_decoders_decode_result_pkl_output_path.as_posix()}"')
-        except Exception as e:
-            print(f"[WARN] Failed to save directional_decoders_decode_result to {directional_decoders_decode_result_pkl_output_path}: {e}")
+        if save_pkls:
+            directional_decoders_decode_result_pkl_output_path: Path = _subfn_build_maze_context_output_path('directional_decoders_decode_result', '.pkl')
+            try:
+                directional_decoders_decode_result.save(pkl_output_path=directional_decoders_decode_result_pkl_output_path)
+                print(f'directional_decoders_decode_result_pkl_output_path: "{directional_decoders_decode_result_pkl_output_path.as_posix()}"')
+            except Exception as e:
+                print(f"[WARN] Failed to save directional_decoders_decode_result to {directional_decoders_decode_result_pkl_output_path}: {e}")
 
 
     output_dict: Dict[str, Any] = {}
@@ -471,23 +472,24 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
     replay_decoding_result = decoded_results_dict['replay']
     pbe_decoding_result = decoded_results_dict['pbe']
 
-    pkl_output_path: Path = _subfn_build_maze_context_output_path(f'decoded_results_{decoding_time_bin_size_ms}ms', '.pkl')
-    pkl_output_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, {
-            'laps_decoding_result': laps_decoding_result,
-            'replay_decoding_result': replay_decoding_result,
-            'pbe_decoding_result': pbe_decoding_result,
-            'decoding_time_bin_size': decoding_time_bin_size,
-            'resolved_maze_epoch_names': resolved_maze_epoch_names,
-        }, debug_print=debug_print)
-        print(f'split_save_folder: "{split_save_folder.as_posix()}"')
-        output_dict['split_save_folder'] = split_save_folder
-        output_dict['pkl_output_path'] = pkl_output_path
-        output_dict['split_save_paths'] = split_save_paths
-        output_dict['failed_keys'] = failed_keys
-    except Exception as e:
-        print(f"[WARN] Failed to save decoded results to {pkl_output_path}: {e}")
+    if save_pkls:
+        pkl_output_path: Path = _subfn_build_maze_context_output_path(f'decoded_results_{decoding_time_bin_size_ms}ms', '.pkl')
+        pkl_output_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            split_save_folder, split_save_paths, split_save_output_types, failed_keys = safeSaveSplitData(pkl_output_path, {
+                'laps_decoding_result': laps_decoding_result,
+                'replay_decoding_result': replay_decoding_result,
+                'pbe_decoding_result': pbe_decoding_result,
+                'decoding_time_bin_size': decoding_time_bin_size,
+                'resolved_maze_epoch_names': resolved_maze_epoch_names,
+            }, debug_print=debug_print)
+            print(f'split_save_folder: "{split_save_folder.as_posix()}"')
+            output_dict['split_save_folder'] = split_save_folder
+            output_dict['pkl_output_path'] = pkl_output_path
+            output_dict['split_save_paths'] = split_save_paths
+            output_dict['failed_keys'] = failed_keys
+        except Exception as e:
+            print(f"[WARN] Failed to save decoded results to {pkl_output_path}: {e}")
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Compute                                                                                                                                                                                                                                                                              #
@@ -503,21 +505,22 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
         decoded_results_context_probability_performance_df_dict[k] = context_probability_performance_df
         context_probability_df_dict[k] = context_probability_df
 
-        try:
-            context_probability_csv_path: Path = _subfn_build_maze_context_output_path(f'context_probability_df_{k}_{decoding_time_bin_size_ms}ms', '.csv')
-            context_probability_df.to_csv(context_probability_csv_path, index=False)
-            context_probability_csv_paths[k] = context_probability_csv_path
-            print(f'context_probability_csv_path: "{context_probability_csv_path.as_posix()}"')
-        except Exception as e:
-            print(f"[WARN] Failed to save context_probability_df[{k}] to csv: {e}")
+        if save_csvs:
+            try:
+                context_probability_csv_path: Path = _subfn_build_maze_context_output_path(f'context_probability_df_{k}_{decoding_time_bin_size_ms}ms', '.csv')
+                context_probability_df.to_csv(context_probability_csv_path, index=False)
+                context_probability_csv_paths[k] = context_probability_csv_path
+                print(f'context_probability_csv_path: "{context_probability_csv_path.as_posix()}"')
+            except Exception as e:
+                print(f"[WARN] Failed to save context_probability_df[{k}] to csv: {e}")
 
-        try:
-            context_probability_performance_csv_path: Path = _subfn_build_maze_context_output_path(f'context_probability_performance_df_{k}_{decoding_time_bin_size_ms}ms', '.csv')
-            context_probability_performance_df.to_csv(context_probability_performance_csv_path, index=False)
-            context_probability_performance_csv_paths[k] = context_probability_performance_csv_path
-            print(f'context_probability_performance_csv_path: "{context_probability_performance_csv_path.as_posix()}"')
-        except Exception as e:
-            print(f"[WARN] Failed to save context_probability_performance_df[{k}] to csv: {e}")
+            try:
+                context_probability_performance_csv_path: Path = _subfn_build_maze_context_output_path(f'context_probability_performance_df_{k}_{decoding_time_bin_size_ms}ms', '.csv')
+                context_probability_performance_df.to_csv(context_probability_performance_csv_path, index=False)
+                context_probability_performance_csv_paths[k] = context_probability_performance_csv_path
+                print(f'context_probability_performance_csv_path: "{context_probability_performance_csv_path.as_posix()}"')
+            except Exception as e:
+                print(f"[WARN] Failed to save context_probability_performance_df[{k}] to csv: {e}")
 
     ## END for k, a_decoded_result in decoded_results_dict.items()...
 

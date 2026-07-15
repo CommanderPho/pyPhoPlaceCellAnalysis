@@ -4209,20 +4209,28 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
         figs_dict = output_dict.get('figs_plot_maze_probability_stacked_bar_dict') or {}
 
         if save_csv:
-            for epoch_name, context_probability_df in context_probability_df_dict.items():
-                csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_{decoding_time_bin_size_ms}ms.csv').resolve()
-                context_probability_df.to_csv(csv_path, index=False)
-                callback_outputs['context_probability_csv_paths'][epoch_name] = csv_path
-                print(f'\tsaved maze context probability CSV: "{csv_path}"')
+            helper_csv_paths = output_dict.get('context_probability_csv_paths') or {}
+            helper_perf_csv_paths = output_dict.get('context_probability_performance_csv_paths') or {}
+            # Helper already wrote collision-safe CSVs into the same override parent — reuse them instead of writing a second set.
+            if (override_output_parent_path is not None) and helper_csv_paths:
+                callback_outputs['context_probability_csv_paths'] = dict(helper_csv_paths)
+                callback_outputs['context_probability_performance_csv_paths'] = dict(helper_perf_csv_paths)
+                print(f'\treusing helper maze-context CSVs under override_output_parent_path ({len(helper_csv_paths)} epoch(s))')
+            else:
+                for epoch_name, context_probability_df in context_probability_df_dict.items():
+                    csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_{decoding_time_bin_size_ms}ms.csv').resolve()
+                    context_probability_df.to_csv(csv_path, index=False)
+                    callback_outputs['context_probability_csv_paths'][epoch_name] = csv_path
+                    print(f'\tsaved maze context probability CSV: "{csv_path}"')
 
-                performance_df = performance_df_dict.get(epoch_name)
-                if performance_df is not None:
-                    perf_csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_performance_{decoding_time_bin_size_ms}ms.csv').resolve()
-                    performance_df.to_csv(perf_csv_path, index=False)
-                    callback_outputs['context_probability_performance_csv_paths'][epoch_name] = perf_csv_path
-                    print(f'\tsaved maze context performance CSV: "{perf_csv_path}"')
+                    performance_df = performance_df_dict.get(epoch_name)
+                    if performance_df is not None:
+                        perf_csv_path = active_output_parent_path.joinpath(f'{CURR_BATCH_OUTPUT_PREFIX}_maze_context_{epoch_name}_context_probability_performance_{decoding_time_bin_size_ms}ms.csv').resolve()
+                        performance_df.to_csv(perf_csv_path, index=False)
+                        callback_outputs['context_probability_performance_csv_paths'][epoch_name] = perf_csv_path
+                        print(f'\tsaved maze context performance CSV: "{perf_csv_path}"')
 
-            ## END for epoch_name, context_probability_df in context_probability_df_dict.items()...
+                ## END for epoch_name, context_probability_df in context_probability_df_dict.items()...
 
         if write_png or write_vector_format:
             custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_output_parent_path)
