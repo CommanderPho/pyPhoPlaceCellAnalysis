@@ -441,6 +441,10 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
 
     ## END for name, epochs in _epoch_inputs.items()...
 
+    output_dict['decoded_results_dict'] = decoded_results_dict
+    laps_decoding_result = decoded_results_dict['lap']
+    replay_decoding_result = decoded_results_dict['replay']
+    pbe_decoding_result = decoded_results_dict['pbe']
 
     pkl_output_path: Path = curr_active_pipeline.get_output_path().joinpath(f'{today_str}_decoded_results_{decoding_time_bin_size_ms}ms.pkl')
     pkl_output_path.parent.mkdir(parents=True, exist_ok=True)
