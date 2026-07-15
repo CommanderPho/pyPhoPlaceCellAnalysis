@@ -4133,11 +4133,32 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
     Wraps ``_run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context`` for batch. Does not mutate
     ``DirectionalDecodersDecoded`` or the posterior PNG/GIF exporter.
 
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
+    Usage:
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function, SimpleBatchComputationDummy
 
-    callback_outputs = across_session_results_extended_dict['compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function']
-    figure_output_paths = callback_outputs['figure_output_paths']
-    context_probability_csv_paths = callback_outputs['context_probability_csv_paths']
+        a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
+
+        _across_session_results_extended_dict = {}
+        _across_session_results_extended_dict = _across_session_results_extended_dict | compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function (a_dummy, None,
+                                                        curr_session_context=curr_active_pipeline.get_session_context(), curr_session_basedir=curr_active_pipeline.sess.basepath.resolve(), curr_active_pipeline=curr_active_pipeline,
+                                                        across_session_results_extended_dict=_across_session_results_extended_dict,
+                                                        # time_bin_size = 0.500,
+                                                        )
+
+
+        ## get outputs:
+        callback_outputs = _across_session_results_extended_dict.get('compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function', None)
+        if callback_outputs is not None:
+            figure_output_paths = callback_outputs['figure_output_paths']
+            context_probability_performance_csv_paths = callback_outputs['context_probability_performance_csv_paths']
+            context_probability_csv_paths = callback_outputs['context_probability_csv_paths'] # resolved_maze_epoch_names: list  = [] - (0,)
+
+            figure_output_paths
+            context_probability_performance_csv_paths
+            context_probability_csv_paths
+
+
+
     """
     import sys
     from typing import Optional, List, Dict, Any

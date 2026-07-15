@@ -415,7 +415,8 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
             print(f'directional_decoders_decode_result_pkl_output_path: "{directional_decoders_decode_result_pkl_output_path.as_posix()}"')
         except Exception as e:
             print(f"[WARN] Failed to save directional_decoders_decode_result to {directional_decoders_decode_result_pkl_output_path}: {e}")
-   
+
+
     output_dict: Dict[str, Any] = {}
     decoding_time_bin_size_ms = int(round(float(decoding_time_bin_size) * 1000))
 
