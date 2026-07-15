@@ -13,7 +13,7 @@ import matplotlib.patches as mpatches # used for plot_epoch_track_assignments
 from flexitext import flexitext ## flexitext version
 
 from neuropy.utils.mixins.enum_helpers import ExtendedEnum # used in TrackAssignmentState
-from neuropy.core.epoch import Epoch
+from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
 
 from pyphocorehelpers.mixins.key_value_hashable import KeyValueHashableObject
@@ -457,13 +457,13 @@ def PAPER_FIGURE_figure_1_add_replay_epoch_rasters(curr_active_pipeline, allow_i
     jonathan_firing_rate_analysis_result: JonathanFiringRateAnalysisResult = curr_active_pipeline.global_computation_results.computed_data.jonathan_firing_rate_analysis
     neuron_replay_stats_df, short_exclusive, long_exclusive, BOTH_subset, EITHER_subset, XOR_subset, NEITHER_subset = jonathan_firing_rate_analysis_result.get_cell_track_partitions(frs_index_inclusion_magnitude=0.5)
 
-    assigning_epochs_obj = AssigningEpochs(filter_epochs_df=deepcopy(long_results_obj.active_filter_epochs.to_dataframe()))
+    assigning_epochs_obj = AssigningEpochs(filter_epochs_df=ensure_dataframe(deepcopy(long_results_obj.active_filter_epochs)))
 
     # included_neuron_ids = deepcopy(exclusive_aclus)
     # included_neuron_ids = None
     included_neuron_ids = EITHER_subset.track_exclusive_aclus
     spikes_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.spikes_df).spikes.sliced_by_neuron_type('pyr')
-    # filter_epochs_df = deepcopy(long_results_obj.active_filter_epochs.to_dataframe())
+    # filter_epochs_df = ensure_dataframe(deepcopy(long_results_obj.active_filter_epochs))
 
 
     ## TODO: need to usee the actual LxC/SxCs (hand-picked) instead of the ones based on placefields.

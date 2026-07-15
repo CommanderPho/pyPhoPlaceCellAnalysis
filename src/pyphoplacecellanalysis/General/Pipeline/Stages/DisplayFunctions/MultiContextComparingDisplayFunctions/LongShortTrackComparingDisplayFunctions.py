@@ -14,6 +14,7 @@ import nptyping as ND
 from nptyping import NDArray
 import neuropy.utils.type_aliases as types
 
+from neuropy.core.epoch import ensure_dataframe
 from neuropy.core.neuron_identities import PlotStringBrevityModeEnum, NeuronType  # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
 from neuropy.plotting.figure import Fig # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
 from neuropy.plotting.ratemaps import plot_ratemap_1D # for plot_short_v_long_pf1D_comparison (_display_long_short_pf1D_comparison)
@@ -740,7 +741,7 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
         ## long_short_decoding_analyses:
         curr_long_short_decoding_analyses = global_computation_results.computed_data['long_short_leave_one_out_decoding_analysis']
         ## Extract variables from results object:
-        replay_result_df = deepcopy(curr_long_short_decoding_analyses.long_results_obj.active_filter_epochs.to_dataframe())
+        replay_result_df = ensure_dataframe(deepcopy(curr_long_short_decoding_analyses.long_results_obj.active_filter_epochs))
         maze_epochs = owning_pipeline_reference.sess.epochs
             
         fig, (ax1, ax2), plot_data_dict = _subfn_perform_plot(running_pos_df, replay_result_df, maze_epochs=maze_epochs)

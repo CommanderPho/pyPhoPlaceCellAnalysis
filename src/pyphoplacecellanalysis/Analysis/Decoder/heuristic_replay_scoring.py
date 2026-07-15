@@ -3249,13 +3249,14 @@ class HeuristicReplayScoring:
         """ Ensures the laps df passed has the required track and directional information ('maze_id', 'lap_dir'], and from this info builds a new 'truth_decoder_name' column containing the name of the decoder built from the corresponding lap
         
         Usage:    
+            from neuropy.core.epoch import ensure_dataframe
             from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _add_lap_extended_info_columns
 
             ## INPUTS: all_directional_laps_filter_epochs_decoder_result_value, labels_column_name
             # Creates Columns: 'maze_id', 'truth_decoder_name':
             labels_column_name='label'
             # labels_column_name='lap_id'
-            filter_epochs = all_directional_laps_filter_epochs_decoder_result_value.filter_epochs.to_dataframe()
+            filter_epochs = ensure_dataframe(all_directional_laps_filter_epochs_decoder_result_value.filter_epochs)
             filter_epochs, all_epochs_position_derivatives_df = _add_lap_extended_info_columns(filter_epochs, labels_column_name=labels_column_name)
             filter_epochs
 

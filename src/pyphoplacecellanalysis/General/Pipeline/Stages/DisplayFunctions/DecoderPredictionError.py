@@ -1557,7 +1557,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         Usage:
             from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import _build_radon_transform_plotting_data
             
-            radon_transform_data = _build_radon_transform_plotting_data(active_filter_epochs_df = curr_results_obj.active_filter_epochs.to_dataframe().copy(),
+            radon_transform_data = _build_radon_transform_plotting_data(active_filter_epochs_df = ensure_dataframe(curr_results_obj.active_filter_epochs).copy(),
                 num_filter_epochs = ,
                 time_bin_containers = curr_results_obj.all_included_filter_epochs_decoder_result.time_bin_containers)
 

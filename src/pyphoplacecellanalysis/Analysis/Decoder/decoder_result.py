@@ -618,7 +618,7 @@ class LeaveOneOutDecodingAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         """ Subsets the passed epochs_df and epochs_decoder_result by the included_epoch_indicies
         
         Usage:
-            subset_filter_epochs, subset = LeaveOneOutDecodingAnalysisResult.get_results_subset(epochs_df=curr_results_obj.active_filter_epochs.to_dataframe(),
+            subset_filter_epochs, subset = LeaveOneOutDecodingAnalysisResult.get_results_subset(epochs_df=ensure_dataframe(curr_results_obj.active_filter_epochs),
                                             epochs_decoder_result=curr_results_obj.all_included_filter_epochs_decoder_result,
                                             included_epoch_indicies=good_epoch_indicies_L)
 
