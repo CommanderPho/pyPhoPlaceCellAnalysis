@@ -822,7 +822,7 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
 
 
 @function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla', 'per-epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-15 16:00', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
-def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None, group_width_proportional_to_num_bars: bool = True) -> tuple[plt.Figure, np.ndarray, dict]:
+def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None, group_width_proportional_to_num_bars: bool = True, include_summary_aggregate_bars: bool = True) -> tuple[plt.Figure, np.ndarray, dict]:
     """
     Plots one subplot column for each maze -- each subplot contains vertically stacked bars, one per decoded epoch
     (lap/PBE/replay) that occurred during that maze, showing mean maze-context probabilities for that epoch.
@@ -831,6 +831,8 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
         - A thin black outline is drawn around the stack segment corresponding to the actual current maze.
         - Figure width is 4x the matplotlib default so per-epoch bars remain readable.
         - When ``group_width_proportional_to_num_bars`` is True (default), each maze subplot width scales with its epoch count.
+        - When ``include_summary_aggregate_bars`` is True (default), a maze-mean aggregate bar (same as ``plot_maze_probability_stacked_bar``)
+          is placed to the right of the per-epoch bars (~8x as thick), separated by a solid black vertical line.
 
     Requires `decoded_epoch_idx` on `context_probability_df` (stamped by `_compute_all_epochs_all_maze_by_maze_context_marginals`).
 
@@ -853,25 +855,33 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
 
     n_mazes: int = len(maze_prob_col_names)
     maze_ids = np.arange(n_mazes)
-    correct_track_linewidth: float = 0.05  # ~0.3125 — thin outline so thin bars stay readable
+    correct_track_linewidth: float = 0.05  # thin outline so thin bars stay readable
+    epoch_bar_width: float = 0.8  # matplotlib default bar width
+    aggregate_bar_width: float = epoch_bar_width * 8.0  # ~8x as thick as individual epoch bars (4x * 2x)
+    aggregate_separator_gap: float = 0.55  # room for a vertical separator between last epoch and aggregate bar
+    aggregate_separator_linewidth: float = 1.5
 
     # Generate consistent colors for each maze
     cmap = plt.get_cmap("tab10")
     colors = [cmap(j) for j in range(n_mazes)]
 
-    # Precompute per-maze epoch counts for proportional panel widths
+    # Precompute per-maze epoch means / counts for proportional panel widths
     epoch_means_by_maze: Dict[int, pd.DataFrame] = {}
+    maze_mean_probs_by_maze: Dict[int, pd.Series] = {}
     n_epochs_by_maze: List[int] = []
     for i in maze_ids:
         curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
         epoch_means: pd.DataFrame = curr_maze_df.groupby('decoded_epoch_idx')[maze_prob_col_names].mean().sort_index()
         epoch_means_by_maze[i] = epoch_means
+        maze_mean_probs_by_maze[i] = curr_maze_df[maze_prob_col_names].mean()  # same aggregate as plot_maze_probability_stacked_bar
         n_epochs_by_maze.append(max(len(epoch_means), 1))  # avoid zero-width panels for empty mazes
 
     ## END for i in maze_ids...
 
+    # Extra x-span for separator gap + thick aggregate bar, expressed in epoch-center units (~1.0)
+    aggregate_x_span: float = (aggregate_separator_gap + aggregate_bar_width) if include_summary_aggregate_bars else 0.0
     if group_width_proportional_to_num_bars:
-        width_ratios = n_epochs_by_maze
+        width_ratios = [n + aggregate_x_span for n in n_epochs_by_maze]
     else:
         width_ratios = [1] * n_mazes
 
@@ -882,7 +892,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
     if n_mazes == 1:
         axes = np.array([axes])
 
-    artist_objects = {'bars': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None, 'group_width_proportional_to_num_bars': group_width_proportional_to_num_bars, 'width_ratios': list(width_ratios)}
+    artist_objects = {'bars': [], 'aggregate_bars': [], 'aggregate_separators': [], 'legend': None, 'title_text_obj': None, 'footer_text_obj': None, 'text_formatter': None, 'group_width_proportional_to_num_bars': group_width_proportional_to_num_bars, 'include_summary_aggregate_bars': include_summary_aggregate_bars, 'width_ratios': list(width_ratios)}
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i]
@@ -902,7 +912,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
                 is_current_track = (j == i)
                 edge_color = 'black' if is_current_track else None
                 line_width = correct_track_linewidth if is_current_track else 0
-                a_bar_container = ax.bar(x=k, height=val, bottom=bottom, color=colors[j], label=label, edgecolor=edge_color, linewidth=line_width)
+                a_bar_container = ax.bar(x=k, height=val, width=epoch_bar_width, bottom=bottom, color=colors[j], label=label, edgecolor=edge_color, linewidth=line_width)
                 a_epoch_bar_artists.append(a_bar_container)
                 bottom += val
             ## END for j, maze_col in enumerate(maze_prob_col_names)...
@@ -910,33 +920,69 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
             a_maze_bar_artists.append(a_epoch_bar_artists)
         ## END for k, epoch_idx in enumerate(epoch_idxs)...
 
+        a_aggregate_bar_artists = []
+        a_separator_artist = None
+        if include_summary_aggregate_bars:
+            # Place aggregate to the right of the last epoch bar; draw a solid black vertical separator in the gap
+            if n_epochs_in_maze > 0:
+                last_epoch_right: float = float(n_epochs_in_maze - 1) + (epoch_bar_width / 2.0)
+                separator_x: float = last_epoch_right + (aggregate_separator_gap / 2.0)
+                aggregate_x: float = last_epoch_right + aggregate_separator_gap + (aggregate_bar_width / 2.0)
+                a_separator_artist = ax.axvline(x=separator_x, color='black', linewidth=aggregate_separator_linewidth, ymin=0.0, ymax=1.0, zorder=5, clip_on=False)
+            else:
+                aggregate_x = 0.0
+            maze_mean_probs = maze_mean_probs_by_maze[i]
+            bottom = 0.0
+            for j, maze_col in enumerate(maze_prob_col_names):
+                val = maze_mean_probs[maze_col]
+                is_current_track = (j == i)
+                edge_color = 'black' if is_current_track else None
+                line_width = correct_track_linewidth if is_current_track else 0
+                a_bar_container = ax.bar(x=aggregate_x, height=val, width=aggregate_bar_width, bottom=bottom, color=colors[j], edgecolor=edge_color, linewidth=line_width)
+                a_aggregate_bar_artists.append(a_bar_container)
+                bottom += val
+            ## END for j, maze_col in enumerate(maze_prob_col_names)...
+
         ax.set_title(a_maze_col_name)
         if n_epochs_in_maze > 0:
             # Sparse x ticks when many epochs; show all when few
             if n_epochs_in_maze <= 8:
-                tick_positions = np.arange(n_epochs_in_maze)
+                tick_positions = list(np.arange(n_epochs_in_maze))
                 tick_labels = [str(int(e)) for e in epoch_idxs]
             else:
-                tick_positions = np.linspace(0, n_epochs_in_maze - 1, num=min(6, n_epochs_in_maze), dtype=int)
+                tick_positions = list(np.linspace(0, n_epochs_in_maze - 1, num=min(6, n_epochs_in_maze), dtype=int))
                 tick_labels = [str(int(epoch_idxs[p])) for p in tick_positions]
+            if include_summary_aggregate_bars:
+                tick_positions.append(aggregate_x)
+                tick_labels.append('μ')
             ax.set_xticks(tick_positions)
             ax.set_xticklabels(tick_labels, fontsize=7, rotation=45, ha='right')
+        elif include_summary_aggregate_bars:
+            ax.set_xticks([aggregate_x])
+            ax.set_xticklabels(['μ'], fontsize=7, rotation=45, ha='right')
         else:
             ax.set_xticks([])
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         artist_objects['bars'].append(a_maze_bar_artists)
+        artist_objects['aggregate_bars'].append(a_aggregate_bar_artists)
+        artist_objects['aggregate_separators'].append(a_separator_artist)
 
     ## END for i in maze_ids...
 
     legend_handles = [mpatches.Patch(color=colors[j], label=maze_prob_col_names[j]) for j in range(len(maze_prob_col_names))]
     artist_objects['legend'] = axes[-1].legend(handles=legend_handles, loc='center left', bbox_to_anchor=(1.05, 0.5), title="Probabilities")
 
+    # Use most of the figure window width for subplot contents
+    _subplots_adjust_kwargs = dict(top=0.72, bottom=0.15, left=0.025, right=0.935, hspace=0.2, wspace=0.2)
+    fig.subplots_adjust(**_subplots_adjust_kwargs)
+
     ## Publication title / footer (flexitext) — only when session context is provided
     if active_context is not None:
         fig.suptitle('')
-        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.72, left_margin=0.08, right_margin=0.82, bottom_margin=0.15)
+        text_formatter = FormattedFigureText.init_from_margins(top_margin=_subplots_adjust_kwargs['top'], left_margin=_subplots_adjust_kwargs['left'], right_margin=_subplots_adjust_kwargs['right'], bottom_margin=_subplots_adjust_kwargs['bottom'])
         text_formatter.setup_margins(fig)
+        fig.subplots_adjust(hspace=_subplots_adjust_kwargs['hspace'], wspace=_subplots_adjust_kwargs['wspace'])  # setup_margins does not set spacing
         artist_objects['text_formatter'] = text_formatter
 
         if title_string is not None:
