@@ -4198,7 +4198,9 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
         callback_outputs['pbe_replay_epochs_summary'] = deepcopy(pbe_replay_epochs_summary)
 
         # Always pass the effective batch output root so helper CSVs/PKLs use session-qualified names under that shared parent.
-        output_dict: dict = _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, ensure_pbe_replay_epochs=False, overwrite_pbe_replay_epochs=False, maze_epoch_names=maze_epoch_names, override_output_parent_path=active_output_parent_path, save_pkls=save_pkls, save_csvs=save_csv, debug_print=debug_print)
+        output_dict: dict = _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline=curr_active_pipeline, decoding_time_bin_size=decoding_time_bin_size, ensure_pbe_replay_epochs=False, overwrite_pbe_replay_epochs=False, maze_epoch_names=maze_epoch_names, 
+                                                                                                    override_output_parent_path=active_output_parent_path, save_pkls=save_pkls, save_csvs=save_csv, debug_print=debug_print,
+                                                                                                )
 
         callback_outputs['resolved_maze_epoch_names'] = list(output_dict.get('resolved_maze_epoch_names') or [])
         callback_outputs['pipeline_output_pkl_path'] = output_dict.get('pkl_output_path')

@@ -358,7 +358,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 )
 
 
-@function_attributes(short_name=None, tags=['MAIN', 'batch'], input_requires=[], output_provides=[], uses=['_compute_all_epochs_all_maze_by_maze_context_marginals', 'plot_maze_probability_stacked_bar', 'build_contextual_pf2D_decoder', '_resolve_maze_epoch_names_for_multi_context_eval', 'ensure_nwb_wmaze_pbe_and_replay_epochs'], used_by=['compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function'], creation_date='2026-07-14 19:08', related_items=[])
+@function_attributes(short_name=None, tags=['MAIN', 'batch'], input_requires=[], output_provides=[], uses=['plot_maze_probability_stacked_bar_by_epoch', '_compute_all_epochs_all_maze_by_maze_context_marginals', 'plot_maze_probability_stacked_bar', 'build_contextual_pf2D_decoder', '_resolve_maze_epoch_names_for_multi_context_eval', 'ensure_nwb_wmaze_pbe_and_replay_epochs'], used_by=['compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function'], creation_date='2026-07-14 19:08', related_items=[])
 def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_active_pipeline, decoding_time_bin_size: float = 0.050, ensure_pbe_replay_epochs: bool = False, overwrite_pbe_replay_epochs: bool = False, maze_epoch_names: Optional[List[str]] = None, override_output_parent_path: Optional[Union[str, Path]] = None, save_pkls: bool = True, save_csvs: bool = True, debug_print: bool = False, **kwargs):
     """
     runs all required computations for the three epochs (laps, pbes, replays), exports them, then builds figures for them if possible.
