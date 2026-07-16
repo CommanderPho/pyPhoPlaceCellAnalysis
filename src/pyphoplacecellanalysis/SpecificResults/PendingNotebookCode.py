@@ -769,6 +769,19 @@ def plot_dominant_context_bias_occupancy_masked(p_x_given_n_by_context, occupanc
     fig, ax = plt.subplots(figsize=(10, 8))
     image_to_plot = np.transpose(dominant_image, (1, 0, 2))
     cax = ax.imshow(image_to_plot, origin='lower', aspect='auto', interpolation='nearest')
+    # Thin lines at each x/y bin edge (imshow pixels are centered on integers)
+    ax.set_xticks(np.arange(-0.5, n_x_bins, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, n_y_bins, 1), minor=True)
+    ax.grid(which='minor', color='k', linewidth=0.25, alpha=0.35)
+    ax.tick_params(which='minor', bottom=False, left=False)
+    # Percent bias over uniform: ((dominant_ratio - chance) / chance) * 100
+    percent_bias_over_uniform = ((dominant_ratios - chance_level) / chance_level) * 100.0
+    has_nonzero_bias = is_occupancy_visited & (dominant_ratios > (chance_level + 1e-9)) & (np.squeeze(bin_sums, axis=-1) > 0)
+    for ix, iy in np.argwhere(has_nonzero_bias):
+        ax.text(ix, iy, f'{percent_bias_over_uniform[ix, iy]:.0f}', ha='center', va='center', fontsize=10, color='k', clip_on=True)
+
+    ## END for ix, iy in np.argwhere(has_nonzero_bias)...
+
     ax.set_title(title, fontsize=14, pad=15)
     ax.set_xlabel("X Bins", fontsize=12)
     ax.set_ylabel("Y Bins", fontsize=12)
@@ -6166,11 +6179,13 @@ def build_NWB_all_epochs_df(curr_active_pipeline):
     from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers, ColorFormatConverter
     from neuropy.core.epoch import Epoch, EpochsAccessor, ensure_dataframe, ensure_Epoch
 
-    def ascending_red_hex_colors(n_colors: int) -> List[str]:
+    def tab10_hex_colors(n_colors: int) -> List[str]:
         if n_colors <= 0:
             return []
-        times = [1.0] if n_colors == 1 else [float(i) / float(n_colors - 1) for i in range(n_colors)]
-        return [plt.matplotlib.colors.rgb2hex(ColormapHelpers.make_saturating_red_cmap(t, min_alpha=1.0, max_alpha=1.0)(1.0)[:3]) for t in times]
+        # times = [1.0] if n_colors == 1 else [float(i) / float(n_colors - 1) for i in range(n_colors)]
+        # return [plt.matplotlib.colors.rgb2hex(ColormapHelpers.make_saturating_red_cmap(t, min_alpha=1.0, max_alpha=1.0)(1.0)[:3]) for t in times]
+        cmap = plt.get_cmap('tab10')
+        return [plt.matplotlib.colors.rgb2hex(cmap(i)[:3]) for i in range(n_colors)]
 
     def ascending_dark_purple_hex_colors(n_colors: int, vmin: float = 0.45, vmax: float = 0.95) -> List[str]:
         if n_colors <= 0:
@@ -6206,9 +6221,12 @@ def build_NWB_all_epochs_df(curr_active_pipeline):
 
     n_epochs: int = len(curr_paradigm_df)
     curr_paradigm_df['lap_color'] = '#808080'  # fallback for unexpected labels
-    assign_ascending_group_colors(curr_paradigm_df, 'maze', ascending_red_hex_colors)
+    # assign_ascending_group_colors(curr_paradigm_df, 'maze', ascending_red_hex_colors)
+    assign_ascending_group_colors(curr_paradigm_df, 'maze', tab10_hex_colors)
     assign_ascending_group_colors(curr_paradigm_df, 'sleep', ascending_dark_purple_hex_colors)
     curr_paradigm_df['lap_accent_color'] = '#FFFFFF'
+    maze_mask = curr_paradigm_df['label'].astype(str).str.startswith('maze')
+    curr_paradigm_df.loc[maze_mask, 'lap_accent_color'] = '#FF0000'  # bright red stroke marks maze epochs; fill remains tab10
     return curr_paradigm_df
 
 
@@ -7572,6 +7590,7 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     from PyQt5.QtGui import QPainter
     from qtpy import QtWidgets, QtGui
     import pyphoplacecellanalysis.External.pyqtgraph as pg
+    import matplotlib.pyplot as plt
     from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.Mixins.RenderTimeEpochs.Specific2DRenderTimeEpochs import General2DRenderTimeEpochs
     from pyphoplacecellanalysis.External.pyqtgraph.dockarea.Dock import Dock
 
@@ -7587,11 +7606,23 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
     if included_filter_names is None:
         included_filter_names = ['sprinkle', 'roam']
         
+    ## get specific dock colors for each context (pastel gist_rainbow red→violet; cap below 1.0 so last is violet, not magenta wrap):
+    cmap = plt.get_cmap("gist_rainbow")
+    _n_mazes = max(1, len(included_filter_names))
+    _cmap_vmax = 0.82  # gist_rainbow@1.0 is magenta/pink; ~0.82 is violet
+    _pastel_mix = 0.55  # blend toward white (0=full chroma, 1=pure white)
+    def _pastel_hex_at(frac: float) -> str:
+        rgb = np.asarray(cmap(frac)[:3], dtype=float)
+        rgb = rgb + (1.0 - rgb) * _pastel_mix
+        return '#%02x%02x%02x' % tuple(int(255 * x) for x in rgb)
+    maze_hex_colors_dict = {name: _pastel_hex_at(0.0 if _n_mazes == 1 else (_cmap_vmax * j / (_n_mazes - 1))) for j, name in enumerate(included_filter_names)}
     
     def _subfn_merge_plotters(a_controlling_widget, is_controlling_widget_external=False, window_sync_raster_widget=None, debug_print=False, **_out_sync_plotters) -> GenericPyQtGraphContainer:
         """ Merges the provided list of `_out_sync_plotters` into a single horizontally stacked widget, all controlled by `a_controlling_widget`
         
             implicitly captures title from the outer function
+            Captures: maze_hex_colors_dict,
+
         """
         if len(_out_sync_plotters) > 0:
             # out_Width_Height_Tuple = list(_out_sync_plotters.values())[0].desired_widget_size(desired_page_height = 600.0, debug_print=True)
@@ -7612,9 +7643,12 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
         _display_sync_connections = {}
         
         for a_name, a_sync_plotter in _out_sync_plotters.items():
-            _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False)
+            a_color = maze_hex_colors_dict.get(a_name, '#44aa44')
+
+            _display_configs[a_name] = CustomDockDisplayConfig(showCloseButton=False, custom_get_colors_callback_fn=CustomDockDisplayConfig.build_custom_get_colors_fn(bg_color=a_color, border_color=a_color, fg_color='#111111'))
             _, _display_dock_items[a_name] = root_dockAreaWindow.add_display_dock(f"{a_name}", dockSize=(final_desired_width, final_desired_height), widget=a_sync_plotter, dockAddLocationOpts=['right'], display_config=_display_configs[a_name])
-        # END for a_name, a_sync_plotter in _out_sync_plotter...
+
+        ## END for a_name, a_sync_plotter in _out_sync_plotters.items()....
 
         if window_sync_raster_widget is not None:
             decoding_window_raster_id: str = 'decoding_window_spikes'
@@ -7737,6 +7771,9 @@ def build_combined_time_synchronized_Bapun_decoders_window(curr_active_pipeline,
             QtWidgets.QApplication.processEvents()
             # win.repaint()
             
+
+        ## END for a_plotter_name, a_plotter in sync_plotters.items()....
+
 
     def _subfn_add_session_epoch_intervals(active_2d_plot, curr_active_pipeline, **kwargs):
         """ 
