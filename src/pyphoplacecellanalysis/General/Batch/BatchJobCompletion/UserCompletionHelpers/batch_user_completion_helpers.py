@@ -4210,8 +4210,6 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
         for k in transfer_keys_list:
             callback_outputs[k] = output_dict.get(k, None)
 
-        figs_dict = output_dict.get('figs_plot_maze_probability_stacked_bar_dict') or {}
-
         if save_csv:
             callback_outputs['context_probability_csv_paths'] = dict(output_dict.get('context_probability_csv_paths') or {})
             callback_outputs['context_probability_performance_csv_paths'] = dict(output_dict.get('context_probability_performance_csv_paths') or {})
@@ -4219,14 +4217,22 @@ def compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function
 
         if write_png or write_vector_format:
             custom_fig_man: FileOutputManager = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=active_output_parent_path)
-            for epoch_name, fig_tuple in figs_dict.items():
-                fig = fig_tuple[0] if isinstance(fig_tuple, (tuple, list)) else fig_tuple
-                display_context = curr_active_pipeline.build_display_context_for_session(f'maze_context_decoded_probabilities[{epoch_name}]')
-                figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
-                callback_outputs['figure_output_paths'].extend(list(figure_output_paths))
-                print(f'\tfigure_output_paths[{epoch_name}]: {figure_output_paths}')
+            figure_export_sources = [
+                ('figs_plot_maze_probability_stacked_bar_dict', 'maze_context_decoded_probabilities[{epoch_name}]'),
+                ('figs_plot_maze_probability_stacked_bar_by_epoch_dict', 'maze_context_decoded_probabilities_by_epoch[{epoch_name}]'),
+            ]
+            for figs_dict_key, display_context_template in figure_export_sources:
+                figs_dict = output_dict.get(figs_dict_key) or {}
+                for epoch_name, fig_tuple in figs_dict.items():
+                    fig = fig_tuple[0] if isinstance(fig_tuple, (tuple, list)) else fig_tuple
+                    display_context = curr_active_pipeline.build_display_context_for_session(display_context_template.format(epoch_name=epoch_name))
+                    figure_output_paths = build_and_write_to_file(fig, display_context, fig_man=custom_fig_man, write_vector_format=write_vector_format, write_png=write_png)
+                    callback_outputs['figure_output_paths'].extend(list(figure_output_paths))
+                    print(f'\tfigure_output_paths[{figs_dict_key}][{epoch_name}]: {figure_output_paths}')
 
-            ## END for epoch_name, fig_tuple in figs_dict.items()...
+                ## END for epoch_name, fig_tuple in figs_dict.items()...
+
+            ## END for figs_dict_key, display_context_template in figure_export_sources...
 
     except Exception as e:
         exception_info = sys.exc_info()
