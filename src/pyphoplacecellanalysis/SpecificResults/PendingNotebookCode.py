@@ -720,6 +720,66 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
     return context_probability_df, context_probability_performance_df, maze_prob_col_names
 
 
+@function_attributes(short_name=None, tags=['bias', 'decoder', 'maze', 'multi-maze'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-16 12:39', related_items=[])
+def plot_dominant_context_bias_occupancy_masked(p_x_given_n_by_context, occupancy, min_visited_value: float = 1e-6, title: str = "Dominant Context Bias (Occupancy Masked)"):
+    """ plots the bias towards each decoder in each bin 
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_dominant_context_bias_occupancy_masked
+
+        plot_dominant_context_bias_occupancy_masked(p_x_given_n_by_context, occupancy=directional_decoders_decode_result.pseudo2D_decoder.pf.ratemap.occupancy)
+
+    """
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+    from copy import deepcopy
+
+    # --- 1. Generate the Occupancy Mask ---
+    occupancy = deepcopy(occupancy)
+    is_occupancy_visited = np.asarray(occupancy >= min_visited_value)
+    if is_occupancy_visited.ndim == 3:
+        is_occupancy_visited = np.any(is_occupancy_visited, axis=-1)
+
+    # --- 2. Setup Colors and Base Ratios ---
+    n_x_bins, n_y_bins, n_contexts = np.shape(p_x_given_n_by_context)
+    cmap = plt.get_cmap("tab10")
+    colors_rgba = np.array([cmap(j) for j in range(n_contexts)])
+    bin_sums = np.sum(p_x_given_n_by_context, axis=-1, keepdims=True)
+    safe_bin_sums = np.where(bin_sums == 0, 1, bin_sums)
+    ratios = p_x_given_n_by_context / safe_bin_sums 
+
+    # --- 3. Vectorized Dominant Context and Empirical Opacity ---
+    dominant_indices = np.argmax(ratios, axis=-1)
+    dominant_ratios = np.max(ratios, axis=-1)
+    chance_level = 1.0 / n_contexts
+    actual_max_ratio = np.max(dominant_ratios[is_occupancy_visited])
+    denominator = max((actual_max_ratio - chance_level), 1e-6)
+    scaled_alphas = (dominant_ratios - chance_level) / denominator
+    scaled_alphas = np.clip(scaled_alphas + 0.2, 0.0, 1.0) 
+    dominant_image = colors_rgba[dominant_indices]
+    dominant_image[..., 3] = scaled_alphas
+
+    # --- 4. Apply the Occupancy Mask ---
+    dominant_image[~is_occupancy_visited] = 0.0
+
+    # --- 5. Visualization ---
+    fig, ax = plt.subplots(figsize=(10, 8))
+    image_to_plot = np.transpose(dominant_image, (1, 0, 2))
+    cax = ax.imshow(image_to_plot, origin='lower', aspect='auto', interpolation='nearest')
+    ax.set_title(title, fontsize=14, pad=15)
+    ax.set_xlabel("X Bins", fontsize=12)
+    ax.set_ylabel("Y Bins", fontsize=12)
+    legend_elements = [Patch(facecolor=colors_rgba[i], edgecolor='k', label=f'Context {i}') for i in range(n_contexts)]
+    ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1.02, 1), title="Contexts")
+    plt.tight_layout()
+    plt.show()
+
+    return (fig, ax)
+
+
 @function_attributes(short_name=None, tags=['figure', 'context', 'matplotlib', 'performance', 'decoder', 'kayla'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-13 18:10', related_items=['plot_maze_probability_histograms'])
 def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze_prob_col_names: list[str], active_context: Optional[IdentifyingContext] = None, title_string: Optional[str] = 'Maze Context Decoded Probabilities', subtitle_string: Optional[str] = None) -> tuple[plt.Figure, np.ndarray, dict]:
     """
