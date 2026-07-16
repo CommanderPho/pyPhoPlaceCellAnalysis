@@ -584,8 +584,6 @@ def _run_all_compute_and_figures_for_all_epochs_all_maze_by_maze_context(curr_ac
 
 
 
-
-
 @function_attributes(short_name=None, tags=['MAIN', 'epoch', 'decoder', 'performance'], input_requires=[], output_provides=[], uses=['_compute_all_maze_by_maze_context_marginals'], used_by=[], creation_date='2026-07-14 18:47', related_items=[])
 def _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline, all_epochs_decoding_result: DecodedFilterEpochsResult, debug_print: bool=False, compute_flattened_bins: bool=False, **kwargs):
     """ 
@@ -622,7 +620,7 @@ def _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline,
 
         context_probability_df: pd.DataFrame = pd.concat(context_probability_df_list, ignore_index=True)
         context_probability_performance_df: pd.DataFrame = (
-            context_probability_df.groupby('Probe_Epoch_id')
+            context_probability_df.groupby('maze_id')
             .agg(is_ctx_prediction_correct_count=('is_ctx_prediction_correct', 'count'),
                 is_ctx_prediction_correct_sum=('is_ctx_prediction_correct', 'sum'))
             .reset_index()
@@ -632,16 +630,27 @@ def _compute_all_epochs_all_maze_by_maze_context_marginals(curr_active_pipeline,
     else:
         p_x_given_n = np.hstack([mz.p_x_given_n for mz in all_epochs_decoding_result.marginal_z_list])
         time_bin_centers = np.hstack([tc.centers for tc in all_epochs_decoding_result.time_bin_containers])
-        # then attach Probe_Epoch_id / correctness the same way the helper does
+        # then attach maze_id / correctness the same way the helper does
         raise NotImplementedError(f'2026-07-14 - This path is not yet implemented.')
 
     return context_probability_df, context_probability_performance_df, maze_prob_col_names, (context_probability_performance_df_list, context_probability_df_list)
 
 
 @function_attributes(short_name=None, tags=['compute', 'MAIN', 'performance', 'context', 'pending'], input_requires=[], output_provides=[], uses=[], used_by=['_compute_all_epochs_all_maze_by_maze_context_marginals'], creation_date='2026-07-13 23:18', related_items=['plot_maze_probability_stacked_bar', 'plot_maze_probability_histograms'])
-def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_decoding_result: SingleEpochDecodedResult, **kwargs):
+def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_decoding_result: SingleEpochDecodedResult, 
+    include_continuous_measured_positions: bool = False,
+        **kwargs,
+    ):
     """ 
     Computes the context marginals for each maze in a manner ready to plot in plot_maze_probability_stacked_bar, plot_maze_probability_histograms
+
+    Per-time-bin `context_probability_df` columns include:
+        t, P(m_*), maze_id, most_likely_maze_idx, is_ctx_prediction_correct,
+        x, y (interpolated from sess.position), t_rel_maze, binned_x, binned_y
+
+    ## adds columns: 
+    # when `include_continuous_measured_positions == True`: ['x_meas', 'y_meas']
+    #  when xbin and ybin are provided as kwargs: ['binned_x_meas', 'binned_y_meas']
 
     #TODO 2026-07-13 23:21: - [ ] Need to convert from taking only a SingleEpochDecodedResult to a general `DecodedFilterEpochsResult` or w/e.
 
@@ -650,15 +659,22 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import _compute_all_maze_by_maze_context_marginals
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_maze_probability_stacked_bar, plot_maze_probability_histograms
 
+
+
         context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=laps_decoding_result)
-        # context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=laps_decoding_result)
+        # context_probability_df, context_probability_performance_df, maze_prob_col_names = _compute_all_maze_by_maze_context_marginals(curr_active_pipeline=curr_active_pipeline, pseudo2D_decoding_result=laps_decoding_result,
+                                                                                                    xbin = directional_decoders_decode_result.pseudo2D_decoder.xbin, ybin=directional_decoders_decode_result.pseudo2D_decoder.ybin,
+                                                                                                )
         context_probability_performance_df
 
 
     """
+    from neuropy.core.position import PositionAccessor
     from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
     from neuropy.core.session.Formats.Specific.NWBDataSessionFormat import NWBDataSessionFormatRegisteredClass
     from neuropy.utils.mixins.time_slicing import add_epochs_id_identity
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestLapsSplitting ## used for interpolating positions
+    # NOTE: Interpolation of positions inspired by `pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions._helper_add_interpolated_position_columns_to_decoded_result_df`
 
     ## INPUTS: curr_active_pipeline
     hardcoded_params: HardcodedProcessingParameters = NWBDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=curr_active_pipeline.get_session_context())
@@ -691,9 +707,9 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
     # maze_only_epochs_df
 
     ## INPUTS: context_probability_df, maze_only_epochs_df
-    context_probability_df = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name=None, override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
-    # context_probability_df: pd.DataFrame = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='Probe_Epoch_id', epoch_label_column_name='label', override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
-    context_probability_df = context_probability_df[context_probability_df['Probe_Epoch_id'] >= 0] ## drop non-maze epochs
+    context_probability_df = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='maze_id', epoch_label_column_name=None, override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
+    # context_probability_df: pd.DataFrame = add_epochs_id_identity(context_probability_df, epochs_df=ensure_dataframe(maze_only_epochs_df), epoch_id_key_name='maze_id', epoch_label_column_name='label', override_time_variable_name='t', no_interval_fill_value=-1) # uses new add_epochs_id_identity
+    context_probability_df = context_probability_df[context_probability_df['maze_id'] >= 0] ## drop non-maze epochs
     # context_probability_df
 
     ## find most probable decoder index
@@ -704,15 +720,42 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
     # np.shape(max_maze_prob_idxs) # (n_relevant_t_bins, )
     context_probability_df['most_likely_maze_idx'] = max_maze_prob_idxs
     ## add prediction correctness metric column
-    context_probability_df['is_ctx_prediction_correct'] = (context_probability_df['Probe_Epoch_id'] == context_probability_df['most_likely_maze_idx'])
+    context_probability_df['is_ctx_prediction_correct'] = (context_probability_df['maze_id'] == context_probability_df['most_likely_maze_idx'])
     # context_probability_df
 
+    ## attach measured (x, y) at each decode time bin, then add binned_x / binned_y for spatial error maps
+    
+
+    ## INPUTS: curr_active_pipeline, context_probability_df, 
+    ## interpolate positions to the decoding time bins and add the actual positions to the `context_probability_df`
+    # adds: x_meas, y_meas, binned_x_meas, (+ decoded most-likely cols) onto the per-bin decoded df
+    meas_df: pd.DataFrame = TrainTestLapsSplitting.interpolate_positions(deepcopy(curr_active_pipeline.sess.position.to_dataframe()), context_probability_df['t'].to_numpy())
+
+    xbin = kwargs.pop('xbin', None)
+    ybin = kwargs.pop('ybin', None)
+
+    if (xbin is not None) and (ybin is not None):
+        meas_df = meas_df.position.adding_binned_position_columns(xbin, ybin)
+        context_probability_df['binned_x_meas'] = meas_df['binned_x'].to_numpy()
+        context_probability_df['binned_y_meas'] = meas_df['binned_y'].to_numpy()
+
+    else:
+        if not include_continuous_measured_positions:
+            print(f'WARN: include_continuous_measured_positions == False so no continuous "x"/"y" position columns will be added AND ALSO (xbin is not None) and (ybin is not None), "Need xbin/ybin via kwargs or DirectionalDecodersDecoded.pseudo2D_decoder / pf2D_Decoder to bin positions"')
+
+    if include_continuous_measured_positions:
+        ## add continuous columns:
+        context_probability_df['x_meas'] = meas_df['x'].to_numpy()
+        context_probability_df['y_meas'] = meas_df['y'].to_numpy()
+
+
     ## OUTPUTS: context_probability_df
-    # Build `context_probability_performance_df` over column: 'Probe_Epoch_id':
-    context_probability_performance_df: pd.DataFrame = context_probability_df.groupby(['Probe_Epoch_id']).agg(is_ctx_prediction_correct_count=('is_ctx_prediction_correct', 'count'),
+    # Build `context_probability_performance_df` over column: 'maze_id':
+    context_probability_performance_df: pd.DataFrame = context_probability_df.groupby(['maze_id']).agg(is_ctx_prediction_correct_count=('is_ctx_prediction_correct', 'count'),
         # is_ctx_prediction_correct_mode=('is_ctx_prediction_correct', lambda s: s.value_counts().index[0]),
         is_ctx_prediction_correct_sum=('is_ctx_prediction_correct', lambda s: s.sum()),
     ).reset_index()
+
     context_probability_performance_df['pct_ctx_prediction_correct'] = context_probability_performance_df['is_ctx_prediction_correct_sum'] / context_probability_performance_df['is_ctx_prediction_correct_count']
     context_probability_performance_df
 
@@ -835,7 +878,7 @@ def plot_maze_probability_stacked_bar(context_probability_df: pd.DataFrame, maze
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i] 
-        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['maze_id'] == i]
         ax = axes[i]
         
         # Calculate the mean probability of each maze for this specific probe epoch
@@ -945,7 +988,7 @@ def plot_maze_probability_stacked_bar_by_epoch(context_probability_df: pd.DataFr
     maze_mean_probs_by_maze: Dict[int, pd.Series] = {}
     n_epochs_by_maze: List[int] = []
     for i in maze_ids:
-        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['maze_id'] == i]
         epoch_means: pd.DataFrame = curr_maze_df.groupby('decoded_epoch_idx')[maze_prob_col_names].mean().sort_index()
         epoch_means_by_maze[i] = epoch_means
         maze_mean_probs_by_maze[i] = curr_maze_df[maze_prob_col_names].mean()  # same aggregate as plot_maze_probability_stacked_bar
@@ -1104,7 +1147,7 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
 
     for i in maze_ids:
         a_maze_col_name: str = maze_prob_col_names[i] 
-        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['Probe_Epoch_id'] == i]
+        curr_maze_df: pd.DataFrame = context_probability_df[context_probability_df['maze_id'] == i]
         ax = axes[i]
         
         ax.hist(curr_maze_df[a_maze_col_name].to_numpy(), **_common_hist_kwargs)
