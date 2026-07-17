@@ -360,7 +360,12 @@ class DisjointPlacefieldsExploration:
                 bg_im = None
             
             im = ax.imshow(curr_pfmap, **main_plot_kwargs, label='main_image')
-            ax.axis("off")
+            ax.set_xticks(xbin, minor=True)
+            ax.set_yticks(ybin, minor=True)
+            ax.grid(which='minor', color='0.65', linewidth=0.2, alpha=0.5)
+            ax.tick_params(which='both', left=False, bottom=False, labelleft=False, labelbottom=False)
+            for spine in ax.spines.values():
+                spine.set_visible(False)
                 
             ## Labeling:
             if final_title_str is None:
@@ -428,12 +433,14 @@ class DisjointPlacefieldsExploration:
 
         _set_figure_titles(t_idx)
 
+        pf_occupancy = neuron_sliced_decoder.pf.occupancy
+        never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
         p_x_given_n = co_firing_posteriors[:, :, t_idx]
         if nan_less_than_value is not None:
             p_x_given_n = np.array(p_x_given_n, copy=True)
             p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
         # im0 = axes[0].imshow(p_x_given_n) ## plot the decoded posterior
-        _subfn_plot_single_2D_matrix(p_x_given_n, ax=axes[0])
+        _subfn_plot_single_2D_matrix(p_x_given_n, occupancy=pf_occupancy, ax=axes[0])
         posterior_im = next((im for im in axes[0].images if im.get_label() == 'main_image'), axes[0].images[-1] if len(axes[0].images) > 0 else None)
 
         axes[0].set_title('Decoded Posterior $p(x|n)$', fontsize=10)
@@ -462,8 +469,7 @@ class DisjointPlacefieldsExploration:
             # axes[1+neuron_idx].imshow(pf_cell)
         ## END for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids)...
 
-        pf_occupancy = neuron_sliced_decoder.pf.occupancy
-        never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
+
         for neuron_idx in range(n_neurons):
             pf_channel_max = np.nanmax(stack_img[:, :, neuron_idx])
             if np.isfinite(pf_channel_max) and pf_channel_max > 0:
@@ -524,9 +530,14 @@ class DisjointPlacefieldsExploration:
             active_t_idx = int(np.clip(active_t_idx, 0, max(n_posterior_time_bins - 1, 0)))
             if posterior_im is not None:
                 posterior_im.set_data(_prepare_display_map(co_firing_posteriors[:, :, active_t_idx]))
+
+            
             _set_figure_titles(active_t_idx)
             _draw_spike_row_for_t_idx(active_t_idx)
             fig.canvas.draw_idle()
+
+        def _format_t_idx_slider_label(active_t_idx: int) -> str:
+            return f'{active_t_idx + 1}/{n_posterior_time_bins}'
 
         _draw_spike_row_for_t_idx(t_idx)
 
@@ -535,7 +546,14 @@ class DisjointPlacefieldsExploration:
             from matplotlib.widgets import Slider
             ax_t_idx_slider = fig.add_axes([0.15, 0.03, 0.7, 0.025])
             t_idx_slider = Slider(ax_t_idx_slider, 't_idx', 0, n_posterior_time_bins - 1, valinit=t_idx, valfmt='%0.0f', valstep=1)
-            t_idx_slider.on_changed(lambda val: _update_for_t_idx(int(val)))
+
+            def _on_t_idx_slider_change(val):
+                active_t_idx = int(val)
+                _update_for_t_idx(active_t_idx)
+                t_idx_slider.valtext.set_text(_format_t_idx_slider_label(active_t_idx))
+
+            t_idx_slider.on_changed(_on_t_idx_slider_change)
+            t_idx_slider.valtext.set_text(_format_t_idx_slider_label(t_idx))
             fig._pfs_decoded_posterior_t_idx_slider = t_idx_slider
 
         return fig, axes
