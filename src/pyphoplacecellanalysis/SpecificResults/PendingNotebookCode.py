@@ -231,7 +231,7 @@ class DisjointPlacefieldsExploration:
 
     @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
     @classmethod
-    def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True):
+    def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True, co_firing_time_bin_indices: Optional[NDArray] = None):
         """
         Usage:
         
@@ -392,9 +392,10 @@ class DisjointPlacefieldsExploration:
         n_columns: int = 2
         if include_occupancy:
             n_columns = n_columns + 1
-        fig, axes = plt.subplots(1, n_columns, num=f'plot_pfs_and_decoded_posterior[{tuple_key}] - t[{t_idx}]',
-                            # sharex=True, sharey=True,
-                        )
+        fig = plt.figure(num=f'plot_pfs_and_decoded_posterior[{tuple_key}] - t[{t_idx}]', figsize=(4.5 * n_columns, 5.5))
+        gs = GridSpec(2, n_columns, figure=fig, height_ratios=[5, 1.2], hspace=0.35)
+        axes = np.array([fig.add_subplot(gs[0, col_i]) for col_i in range(n_columns)])
+        ax_spike_row = fig.add_subplot(gs[1, :])
 
         # Add descriptive suptitle to the figure
         pf_descr = f"Cells: {tuple_key}" if isinstance(tuple_key, (list, tuple)) else str(tuple_key)
@@ -460,6 +461,36 @@ class DisjointPlacefieldsExploration:
             # axes[2].imshow(neuron_sliced_decoder.pf.nan_never_visited_occupancy)
             _subfn_plot_single_2D_matrix(neuron_sliced_decoder.pf.nan_never_visited_occupancy, ax=axes[2])
             axes[2].set_title("Occupancy", fontsize=10)
+
+        unit_spike_counts = neuron_sliced_decoder.unit_specific_time_binned_spike_counts
+        if co_firing_time_bin_indices is None and unit_spike_counts is not None:
+            co_firing_time_bin_indices = np.where(np.all(unit_spike_counts > 0, axis=0))[0]
+        n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
+        global_time_bin_idx = None
+        curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
+        if unit_spike_counts is not None and co_firing_time_bin_indices is not None and t_idx < n_posterior_time_bins and t_idx < len(co_firing_time_bin_indices):
+            global_time_bin_idx = int(co_firing_time_bin_indices[t_idx])
+            curr_bin_spike_counts = np.asarray(unit_spike_counts[:, global_time_bin_idx], dtype=int).reshape(-1)
+        pf_cell_colors = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e']
+        max_spikes_in_bin = int(np.max(curr_bin_spike_counts)) if curr_bin_spike_counts.size > 0 else 0
+        for neuron_idx, aclu in enumerate(pf_titles):
+            n_spikes = int(curr_bin_spike_counts[neuron_idx]) if neuron_idx < len(curr_bin_spike_counts) else 0
+            if n_spikes > 0:
+                ax_spike_row.vlines(np.arange(n_spikes), neuron_idx - 0.35, neuron_idx + 0.35, colors=pf_cell_colors[neuron_idx % len(pf_cell_colors)], linewidth=2.5)
+            ax_spike_row.text(max(max_spikes_in_bin, 1) + 0.15, neuron_idx, f'{aclu}: {n_spikes} spike{"s" if n_spikes != 1 else ""}', va='center', ha='left', fontsize=9)
+        ## END for neuron_idx, aclu in enumerate(pf_titles)...
+
+        ax_spike_row.set_yticks(np.arange(n_neurons))
+        ax_spike_row.set_yticklabels([f'Cell {title}' for title in pf_titles], fontsize=9)
+        ax_spike_row.set_xlim(-0.5, max(max_spikes_in_bin, 1) + 2.5)
+        ax_spike_row.set_ylim(-0.5, n_neurons - 0.5)
+        ax_spike_row.set_xlabel('Spike index in bin', fontsize=9)
+        ax_spike_row.invert_yaxis()
+        spike_row_title = f'Spikes in time bin t_idx={t_idx}'
+        if global_time_bin_idx is not None:
+            spike_row_title += f' (global bin {global_time_bin_idx}, dt={neuron_sliced_decoder.time_bin_size}s)'
+        ax_spike_row.set_title(spike_row_title, fontsize=9)
+        ax_spike_row.grid(axis='x', alpha=0.25, linestyle=':')
 
         return fig, axes
 
@@ -534,7 +565,7 @@ class DisjointPlacefieldsExploration:
                     if i < plot_first_n_pairs:
                         ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
                         # tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
-                        fig, axes = cls.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0, nan_less_than_value = nan_less_than_value)
+                        fig, axes = cls.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx=0, nan_less_than_value=nan_less_than_value, co_firing_time_bin_indices=co_firing_bin_unit_specific_time_binned_spike_counts_indicies)
                         graphics_outputs_dict[tuple_key] = (fig, axes)
                     else:
                         continue
