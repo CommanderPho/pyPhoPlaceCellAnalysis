@@ -649,6 +649,7 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
         x, y (interpolated from sess.position), t_rel_maze, binned_x, binned_y
 
     ## adds columns: 
+    # always: ['t_rel_maze']
     # when `include_continuous_measured_positions == True`: ['x_meas', 'y_meas']
     #  when xbin and ybin are provided as kwargs: ['binned_x_meas', 'binned_y_meas']
 
@@ -721,6 +722,7 @@ def _compute_all_maze_by_maze_context_marginals(curr_active_pipeline, pseudo2D_d
     context_probability_df['most_likely_maze_idx'] = max_maze_prob_idxs
     ## add prediction correctness metric column
     context_probability_df['is_ctx_prediction_correct'] = (context_probability_df['maze_id'] == context_probability_df['most_likely_maze_idx'])
+    context_probability_df['t_rel_maze'] = context_probability_df['t'] - context_probability_df.groupby('maze_id')['t'].transform('min')
     # context_probability_df
 
     ## attach measured (x, y) at each decode time bin, then add binned_x / binned_y for spatial error maps
