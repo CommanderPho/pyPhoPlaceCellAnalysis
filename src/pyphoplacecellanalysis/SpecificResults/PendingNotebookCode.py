@@ -288,7 +288,6 @@ class DisjointPlacefieldsExploration:
                 #         # curr_pfmap[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
                 #         curr_pfmap[np.where(occupancy < drop_below_threshold), -1] = 0.0 # set the alpha of bins below occupancy to 0.0
 
-            print(curr_pfmap)
             ## Seems to work:
             curr_pfmap = np.rot90(curr_pfmap, k=-1)
             curr_pfmap = np.fliplr(curr_pfmap)
@@ -347,6 +346,14 @@ class DisjointPlacefieldsExploration:
                 # We'll also create a black background into which the pixels will fade
                 background_black = np.full((*curr_pfmap.shape[:2], 3), 0, dtype=np.uint8)
                 bg_im = ax.imshow(background_black, **imshow_shared_kwargs, label='background_image')
+            elif background_rendering_mode_name == 'OCCUPANCY_BLACK_WHITE':
+                assert occupancy is not None, "occupancy is required for OCCUPANCY_BLACK_WHITE background rendering"
+                visited_mask = np.asarray(occupancy) > 0.0
+                visited_mask = np.rot90(visited_mask, k=-1)
+                visited_mask = np.fliplr(visited_mask)
+                background_rgb = np.ones((*visited_mask.shape, 3), dtype=float)
+                background_rgb[visited_mask, :] = 0.0
+                bg_im = ax.imshow(background_rgb, interpolation='nearest', **imshow_shared_kwargs, label='background_image')
             else:
                 # No added background image
                 bg_im = None
@@ -425,15 +432,22 @@ class DisjointPlacefieldsExploration:
             # axes[1+neuron_idx].imshow(pf_cell)
         ## END for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids)...
 
+        pf_occupancy = neuron_sliced_decoder.pf.occupancy
+        never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
+        for neuron_idx in range(n_neurons):
+            pf_channel_max = np.nanmax(stack_img[:, :, neuron_idx])
+            if np.isfinite(pf_channel_max) and pf_channel_max > 0:
+                stack_img[:, :, neuron_idx] = stack_img[:, :, neuron_idx] / pf_channel_max
+        ## END for neuron_idx in range(n_neurons)...
+
+        has_pf_signal = np.nanmax(stack_img[:, :, :n_neurons], axis=2) > 0.01
+        stack_img[:, :, -1] = 0.0
+        stack_img[has_pf_signal, -1] = 1.0
+        stack_img[never_visited_mask, -1] = 0.0
+
         # axes[1].imshow(stack_img)
         # _subfn_plot_single_2D_matrix(stack_img, occupancy=neuron_sliced_decoder.pf.nan_never_visited_occupancy,  bg_rendering_mode=BackgroundRenderingOptions.SOLID_COLOR, ax=axes[1])
-        _subfn_plot_single_2D_matrix(stack_img,
-                occupancy=neuron_sliced_decoder.pf.occupancy,
-                pfmap_as_image = True,
-                bg_rendering_mode=BackgroundRenderingOptions.EMPTY,
-                # drop_below_threshold=None,
-                ax=axes[1],
-            )
+        _subfn_plot_single_2D_matrix(stack_img, occupancy=pf_occupancy, pfmap_as_image=True, bg_rendering_mode='OCCUPANCY_BLACK_WHITE', ax=axes[1])
 
 
         if n_neurons == 2:
