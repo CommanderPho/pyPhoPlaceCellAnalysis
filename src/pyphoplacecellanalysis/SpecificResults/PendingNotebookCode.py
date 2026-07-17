@@ -394,15 +394,6 @@ class DisjointPlacefieldsExploration:
         
         _subfn_plot_single_2D_matrix = lambda *args, **kwargs: _plot_single_tuning_map_2D(neuron_sliced_decoder.xbin, neuron_sliced_decoder.ybin, *args, **kwargs)
 
-        def _prepare_display_map(pfmap_2d):
-            display_map = np.array(pfmap_2d, copy=True)
-            if nan_less_than_value is not None:
-                display_map[display_map < nan_less_than_value] = np.nan
-            display_map = _scale_current_placefield_to_acceptable_range(display_map, occupancy=None, drop_below_threshold=None)
-            display_map = np.rot90(display_map, k=-1)
-            display_map = np.fliplr(display_map)
-            return display_map
-
         n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
         if t_idx is None:
             enable_t_idx_slider = True
@@ -418,7 +409,11 @@ class DisjointPlacefieldsExploration:
         n_columns: int = 2
         if include_occupancy:
             n_columns = n_columns + 1
-        fig = plt.figure(num=f'plot_pfs_and_decoded_posterior[{tuple_key}]', figsize=(4.5 * n_columns, 5.8))
+
+        fig_title: str = f'plot_pfs_and_decoded_posterior[{tuple_key}]'
+        if (not enable_t_idx_slider):
+            fig_title = f'{fig_title}[t_idx={t_idx}]'
+        fig = plt.figure(num=fig_title, figsize=(4.5 * n_columns, 5.8))
         gs = GridSpec(2, n_columns, figure=fig, height_ratios=[5, 1.2], hspace=0.35, top=0.90, bottom=0.16 if enable_t_idx_slider and n_posterior_time_bins > 1 else 0.08)
         axes = np.array([fig.add_subplot(gs[0, col_i]) for col_i in range(n_columns)])
         ax_spike_row = fig.add_subplot(gs[1, :])
@@ -435,16 +430,19 @@ class DisjointPlacefieldsExploration:
 
         pf_occupancy = neuron_sliced_decoder.pf.occupancy
         never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
+
+
+        # Axes[0]: Draw Decoded Posterior for t_idx __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         p_x_given_n = co_firing_posteriors[:, :, t_idx]
         if nan_less_than_value is not None:
             p_x_given_n = np.array(p_x_given_n, copy=True)
             p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
         # im0 = axes[0].imshow(p_x_given_n) ## plot the decoded posterior
         _subfn_plot_single_2D_matrix(p_x_given_n, occupancy=pf_occupancy, ax=axes[0])
-        posterior_im = next((im for im in axes[0].images if im.get_label() == 'main_image'), axes[0].images[-1] if len(axes[0].images) > 0 else None)
-
         axes[0].set_title('Decoded Posterior $p(x|n)$', fontsize=10)
 
+
+        # Axes[1]: Draw Both Placefields _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         ## plot the two placefields used to decode for reference
         n_neurons, n_x_bins, n_y_bins = np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps)
         stack_img = np.zeros((n_x_bins, n_y_bins, 4), dtype=float)
@@ -491,6 +489,7 @@ class DisjointPlacefieldsExploration:
         else:
             axes[1].set_title('Placefields Overlay', fontsize=10)
 
+        # Axes[2]: Draw Occupancy ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         if include_occupancy:
             # neuron_sliced_decoder.pf.plot_occupancy(ax=axes[2])
             # axes[2].imshow(neuron_sliced_decoder.pf.nan_never_visited_occupancy)
@@ -500,6 +499,7 @@ class DisjointPlacefieldsExploration:
         pf_cell_colors = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e']
 
         def _draw_spike_row_for_t_idx(active_t_idx: int):
+            """ draws raster below 3 axes """
             global_time_bin_idx = None
             curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
             if unit_spike_counts is not None and co_firing_time_bin_indices is not None and active_t_idx < n_posterior_time_bins and active_t_idx < len(co_firing_time_bin_indices):
@@ -528,19 +528,22 @@ class DisjointPlacefieldsExploration:
 
         def _update_for_t_idx(active_t_idx: int):
             active_t_idx = int(np.clip(active_t_idx, 0, max(n_posterior_time_bins - 1, 0)))
-            if posterior_im is not None:
-                posterior_im.set_data(_prepare_display_map(co_firing_posteriors[:, :, active_t_idx]))
-
-            
+            axes[0].cla()
+            curr_p_x_given_n = np.array(co_firing_posteriors[:, :, active_t_idx], copy=True)
+            if nan_less_than_value is not None:
+                curr_p_x_given_n[curr_p_x_given_n < nan_less_than_value] = np.nan
+            _subfn_plot_single_2D_matrix(curr_p_x_given_n, occupancy=pf_occupancy, ax=axes[0])
+            axes[0].set_title('Decoded Posterior $p(x|n)$', fontsize=10)
             _set_figure_titles(active_t_idx)
             _draw_spike_row_for_t_idx(active_t_idx)
-            fig.canvas.draw_idle()
+            fig.canvas.draw()
 
         def _format_t_idx_slider_label(active_t_idx: int) -> str:
             return f'{active_t_idx + 1}/{n_posterior_time_bins}'
 
         _draw_spike_row_for_t_idx(t_idx)
 
+        # Enable Interactive Slider Functionality ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         t_idx_slider = None
         if enable_t_idx_slider and n_posterior_time_bins > 1:
             from matplotlib.widgets import Slider
@@ -595,13 +598,15 @@ class DisjointPlacefieldsExploration:
             if debug_print:
                 print(f'testing: {disjoint_cell_ids}')
             neuron_sliced_decoder: BayesianPlacemapPositionDecoder = decoder.get_by_id(disjoint_cell_ids, defer_compute_all=True)
-            if return_decoders_dict:
-                good_pairs_co_firing_sliced_decoders_dict[tuple_key] = neuron_sliced_decoder
 
             co_firing_bin_unit_specific_time_binned_spike_counts_indicies = np.where(np.all((neuron_sliced_decoder.unit_specific_time_binned_spike_counts > 0), axis=0))[0] # array([ 45410,  56871, 137093, 188634, 247313, 261047, 368414])
             if len(co_firing_bin_unit_specific_time_binned_spike_counts_indicies) > 0:
                 # good_pairs.append(disjoint_cell_ids)
                 tuple_key = tuple(disjoint_cell_ids)
+
+                if return_decoders_dict:
+                    good_pairs_co_firing_sliced_decoders_dict[tuple_key] = neuron_sliced_decoder
+
                 good_pairs_co_firing_bins_dict[tuple_key] = co_firing_bin_unit_specific_time_binned_spike_counts_indicies
                 if debug_print:
                     print(f'\tfound good pair: {disjoint_cell_ids}')
