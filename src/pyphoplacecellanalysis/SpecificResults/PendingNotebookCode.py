@@ -231,13 +231,14 @@ class DisjointPlacefieldsExploration:
 
     @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
     @classmethod
-    def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx = 0, nan_less_than_value: float = 1e-7, include_occupancy: bool = True, co_firing_time_bin_indices: Optional[NDArray] = None):
+    def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx: Optional[int] = None, nan_less_than_value: float = 1e-7, include_occupancy: bool = True, co_firing_time_bin_indices: Optional[NDArray] = None, enable_t_idx_slider: bool = False):
         """
         Usage:
         
             ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
             tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[0]
-            fig, axes = DisjointPlacefieldsExploration.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx = 0)
+            fig, axes = DisjointPlacefieldsExploration.plot_pfs_and_decoded_posterior(neuron_sliced_decoder, co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key], tuple_key=tuple_key, t_idx=None)
+            ## t_idx=None enables the bottom t_idx slider (requires `%matplotlib widget` or Qt backend in notebooks).
 
         """
         # from pyphocorehelpers.plotting.image_plotting_helpers import IMShowHelpers
@@ -388,24 +389,52 @@ class DisjointPlacefieldsExploration:
         
         _subfn_plot_single_2D_matrix = lambda *args, **kwargs: _plot_single_tuning_map_2D(neuron_sliced_decoder.xbin, neuron_sliced_decoder.ybin, *args, **kwargs)
 
+        def _prepare_display_map(pfmap_2d):
+            display_map = np.array(pfmap_2d, copy=True)
+            if nan_less_than_value is not None:
+                display_map[display_map < nan_less_than_value] = np.nan
+            display_map = _scale_current_placefield_to_acceptable_range(display_map, occupancy=None, drop_below_threshold=None)
+            display_map = np.rot90(display_map, k=-1)
+            display_map = np.fliplr(display_map)
+            return display_map
+
+        n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
+        if t_idx is None:
+            enable_t_idx_slider = True
+            t_idx = 0
+        else:
+            t_idx = int(t_idx)
+        t_idx = int(np.clip(t_idx, 0, max(n_posterior_time_bins - 1, 0)))
+        unit_spike_counts = neuron_sliced_decoder.unit_specific_time_binned_spike_counts
+        if co_firing_time_bin_indices is None and unit_spike_counts is not None:
+            co_firing_time_bin_indices = np.where(np.all(unit_spike_counts > 0, axis=0))[0]
+
         # fig, axes = plt.subplots(1, 3)
         n_columns: int = 2
         if include_occupancy:
             n_columns = n_columns + 1
-        fig = plt.figure(num=f'plot_pfs_and_decoded_posterior[{tuple_key}] - t[{t_idx}]', figsize=(4.5 * n_columns, 5.5))
-        gs = GridSpec(2, n_columns, figure=fig, height_ratios=[5, 1.2], hspace=0.35)
+        fig = plt.figure(num=f'plot_pfs_and_decoded_posterior[{tuple_key}]', figsize=(4.5 * n_columns, 5.8))
+        gs = GridSpec(2, n_columns, figure=fig, height_ratios=[5, 1.2], hspace=0.35, top=0.90, bottom=0.16 if enable_t_idx_slider and n_posterior_time_bins > 1 else 0.08)
         axes = np.array([fig.add_subplot(gs[0, col_i]) for col_i in range(n_columns)])
         ax_spike_row = fig.add_subplot(gs[1, :])
 
         # Add descriptive suptitle to the figure
         pf_descr = f"Cells: {tuple_key}" if isinstance(tuple_key, (list, tuple)) else str(tuple_key)
-        fig.suptitle(f'Decoded Posterior and Placefields Visualization\n{pf_descr} at time idx={t_idx}', fontsize=12)
+
+        def _set_figure_titles(active_t_idx: int):
+            fig.suptitle(f'Decoded Posterior and Placefields Visualization\n{pf_descr} at time idx={active_t_idx}', fontsize=12)
+            if fig.canvas.manager is not None:
+                fig.canvas.manager.set_window_title(f'plot_pfs_and_decoded_posterior[{tuple_key}] - t[{active_t_idx}]')
+
+        _set_figure_titles(t_idx)
 
         p_x_given_n = co_firing_posteriors[:, :, t_idx]
         if nan_less_than_value is not None:
+            p_x_given_n = np.array(p_x_given_n, copy=True)
             p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
         # im0 = axes[0].imshow(p_x_given_n) ## plot the decoded posterior
         _subfn_plot_single_2D_matrix(p_x_given_n, ax=axes[0])
+        posterior_im = next((im for im in axes[0].images if im.get_label() == 'main_image'), axes[0].images[-1] if len(axes[0].images) > 0 else None)
 
         axes[0].set_title('Decoded Posterior $p(x|n)$', fontsize=10)
 
@@ -462,35 +491,52 @@ class DisjointPlacefieldsExploration:
             _subfn_plot_single_2D_matrix(neuron_sliced_decoder.pf.nan_never_visited_occupancy, ax=axes[2])
             axes[2].set_title("Occupancy", fontsize=10)
 
-        unit_spike_counts = neuron_sliced_decoder.unit_specific_time_binned_spike_counts
-        if co_firing_time_bin_indices is None and unit_spike_counts is not None:
-            co_firing_time_bin_indices = np.where(np.all(unit_spike_counts > 0, axis=0))[0]
-        n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
-        global_time_bin_idx = None
-        curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
-        if unit_spike_counts is not None and co_firing_time_bin_indices is not None and t_idx < n_posterior_time_bins and t_idx < len(co_firing_time_bin_indices):
-            global_time_bin_idx = int(co_firing_time_bin_indices[t_idx])
-            curr_bin_spike_counts = np.asarray(unit_spike_counts[:, global_time_bin_idx], dtype=int).reshape(-1)
         pf_cell_colors = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e']
-        max_spikes_in_bin = int(np.max(curr_bin_spike_counts)) if curr_bin_spike_counts.size > 0 else 0
-        for neuron_idx, aclu in enumerate(pf_titles):
-            n_spikes = int(curr_bin_spike_counts[neuron_idx]) if neuron_idx < len(curr_bin_spike_counts) else 0
-            if n_spikes > 0:
-                ax_spike_row.vlines(np.arange(n_spikes), neuron_idx - 0.35, neuron_idx + 0.35, colors=pf_cell_colors[neuron_idx % len(pf_cell_colors)], linewidth=2.5)
-            ax_spike_row.text(max(max_spikes_in_bin, 1) + 0.15, neuron_idx, f'{aclu}: {n_spikes} spike{"s" if n_spikes != 1 else ""}', va='center', ha='left', fontsize=9)
-        ## END for neuron_idx, aclu in enumerate(pf_titles)...
 
-        ax_spike_row.set_yticks(np.arange(n_neurons))
-        ax_spike_row.set_yticklabels([f'Cell {title}' for title in pf_titles], fontsize=9)
-        ax_spike_row.set_xlim(-0.5, max(max_spikes_in_bin, 1) + 2.5)
-        ax_spike_row.set_ylim(-0.5, n_neurons - 0.5)
-        ax_spike_row.set_xlabel('Spike index in bin', fontsize=9)
-        ax_spike_row.invert_yaxis()
-        spike_row_title = f'Spikes in time bin t_idx={t_idx}'
-        if global_time_bin_idx is not None:
-            spike_row_title += f' (global bin {global_time_bin_idx}, dt={neuron_sliced_decoder.time_bin_size}s)'
-        ax_spike_row.set_title(spike_row_title, fontsize=9)
-        ax_spike_row.grid(axis='x', alpha=0.25, linestyle=':')
+        def _draw_spike_row_for_t_idx(active_t_idx: int):
+            global_time_bin_idx = None
+            curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
+            if unit_spike_counts is not None and co_firing_time_bin_indices is not None and active_t_idx < n_posterior_time_bins and active_t_idx < len(co_firing_time_bin_indices):
+                global_time_bin_idx = int(co_firing_time_bin_indices[active_t_idx])
+                curr_bin_spike_counts = np.asarray(unit_spike_counts[:, global_time_bin_idx], dtype=int).reshape(-1)
+            ax_spike_row.cla()
+            max_spikes_in_bin = int(np.max(curr_bin_spike_counts)) if curr_bin_spike_counts.size > 0 else 0
+            for neuron_idx, aclu in enumerate(pf_titles):
+                n_spikes = int(curr_bin_spike_counts[neuron_idx]) if neuron_idx < len(curr_bin_spike_counts) else 0
+                if n_spikes > 0:
+                    ax_spike_row.vlines(np.arange(n_spikes), neuron_idx - 0.35, neuron_idx + 0.35, colors=pf_cell_colors[neuron_idx % len(pf_cell_colors)], linewidth=2.5)
+                ax_spike_row.text(max(max_spikes_in_bin, 1) + 0.15, neuron_idx, f'{aclu}: {n_spikes} spike{"s" if n_spikes != 1 else ""}', va='center', ha='left', fontsize=9)
+            ## END for neuron_idx, aclu in enumerate(pf_titles)...
+
+            ax_spike_row.set_yticks(np.arange(n_neurons))
+            ax_spike_row.set_yticklabels([f'Cell {title}' for title in pf_titles], fontsize=9)
+            ax_spike_row.set_xlim(-0.5, max(max_spikes_in_bin, 1) + 2.5)
+            ax_spike_row.set_ylim(-0.5, n_neurons - 0.5)
+            ax_spike_row.set_xlabel('Spike index in bin', fontsize=9)
+            ax_spike_row.invert_yaxis()
+            spike_row_title = f'Spikes in time bin t_idx={active_t_idx}'
+            if global_time_bin_idx is not None:
+                spike_row_title += f' (global bin {global_time_bin_idx}, dt={neuron_sliced_decoder.time_bin_size}s)'
+            ax_spike_row.set_title(spike_row_title, fontsize=9)
+            ax_spike_row.grid(axis='x', alpha=0.25, linestyle=':')
+
+        def _update_for_t_idx(active_t_idx: int):
+            active_t_idx = int(np.clip(active_t_idx, 0, max(n_posterior_time_bins - 1, 0)))
+            if posterior_im is not None:
+                posterior_im.set_data(_prepare_display_map(co_firing_posteriors[:, :, active_t_idx]))
+            _set_figure_titles(active_t_idx)
+            _draw_spike_row_for_t_idx(active_t_idx)
+            fig.canvas.draw_idle()
+
+        _draw_spike_row_for_t_idx(t_idx)
+
+        t_idx_slider = None
+        if enable_t_idx_slider and n_posterior_time_bins > 1:
+            from matplotlib.widgets import Slider
+            ax_t_idx_slider = fig.add_axes([0.15, 0.03, 0.7, 0.025])
+            t_idx_slider = Slider(ax_t_idx_slider, 't_idx', 0, n_posterior_time_bins - 1, valinit=t_idx, valfmt='%0.0f', valstep=1)
+            t_idx_slider.on_changed(lambda val: _update_for_t_idx(int(val)))
+            fig._pfs_decoded_posterior_t_idx_slider = t_idx_slider
 
         return fig, axes
 
