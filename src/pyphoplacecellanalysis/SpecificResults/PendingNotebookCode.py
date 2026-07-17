@@ -229,6 +229,185 @@ class DisjointPlacefieldsExploration:
         return J
 
 
+    _PF_CELL_COLORS = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e']
+
+
+    @classmethod
+    def _plot_single_tuning_map_2D(cls, xbin, ybin, pfmap, occupancy=None, final_title_str=None, drop_below_threshold: float = 0.0000001, pfmap_as_image: bool = False, plot_mode=None, ax=None, brev_mode=None, max_value_formatter=None, use_special_overlayed_title: bool = False, bg_rendering_mode=None):
+        """Plots a single tuning curve Heatmap using matplotlib. Shared by slider and all-t_idx plot methods."""
+        from matplotlib.colors import Normalize
+        from neuropy.core.neuron_identities import PlotStringBrevityModeEnum
+        from neuropy.utils.matplotlib_helpers import add_inner_title, enumTuningMap2DPlotMode, _build_square_checkerboard_image, _scale_current_placefield_to_acceptable_range
+        from neuropy.plotting.ratemaps import BackgroundRenderingOptions
+
+        if plot_mode is None:
+            plot_mode = enumTuningMap2DPlotMode.IMSHOW
+        assert plot_mode is enumTuningMap2DPlotMode.IMSHOW, f"Plot mode should not be specified to anything other than None or enumTuningMap2DPlotMode.IMSHOW as of 2022-08-15 but value was: {plot_mode}"
+        if brev_mode is None:
+            brev_mode = PlotStringBrevityModeEnum.NONE
+        if bg_rendering_mode is None:
+            bg_rendering_mode = BackgroundRenderingOptions.PATTERN_CHECKERBOARD
+
+        use_alpha_by_occupancy = False # Only supported in IMSHOW mode
+
+        if ax is None:
+            ax = plt.gca()
+
+        if (not pfmap_as_image):
+            curr_pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=occupancy, drop_below_threshold=drop_below_threshold)
+        else:
+            curr_pfmap = pfmap.copy()
+
+        ## Seems to work:
+        curr_pfmap = np.rot90(curr_pfmap, k=-1)
+        curr_pfmap = np.fliplr(curr_pfmap)
+
+        """ https://matplotlib.org/stable/tutorials/intermediate/imshow_extent.html """
+        xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+        extent = (xmin, xmax, ymin, ymax)
+
+        imshow_shared_kwargs = {
+            'origin': 'lower',
+            'extent': extent,
+        }
+
+        main_plot_kwargs = imshow_shared_kwargs
+
+        if (not pfmap_as_image):
+            main_plot_kwargs = main_plot_kwargs | {
+                'vmin': 0,
+            }
+
+        if use_alpha_by_occupancy:
+            alphas = Normalize(clip=True)(np.abs(occupancy))
+            main_plot_kwargs['alpha'] = alphas
+        else:
+            main_plot_kwargs['alpha'] = None
+
+        ## Determine which background graphics to use:
+        if isinstance(bg_rendering_mode, str):
+            background_rendering_mode_name = bg_rendering_mode # Already a string.
+        else:
+            background_rendering_mode_name = bg_rendering_mode.name
+
+        if background_rendering_mode_name == BackgroundRenderingOptions.PATTERN_CHECKERBOARD.name:
+            background_chessboard = _build_square_checkerboard_image(extent, num_checkerboard_squares_short_axis=8)
+            bg_im = ax.imshow(background_chessboard, cmap=plt.cm.gray, alpha=0.25, interpolation='nearest', **imshow_shared_kwargs, label='background_image')
+        elif background_rendering_mode_name == BackgroundRenderingOptions.SOLID_COLOR.name:
+            background_black = np.full((*curr_pfmap.shape[:2], 3), 0, dtype=np.uint8)
+            bg_im = ax.imshow(background_black, **imshow_shared_kwargs, label='background_image')
+        elif background_rendering_mode_name == 'OCCUPANCY_BLACK_WHITE':
+            assert occupancy is not None, "occupancy is required for OCCUPANCY_BLACK_WHITE background rendering"
+            visited_mask = np.asarray(occupancy) > 0.0
+            visited_mask = np.rot90(visited_mask, k=-1)
+            visited_mask = np.fliplr(visited_mask)
+            background_rgb = np.ones((*visited_mask.shape, 3), dtype=float)
+            background_rgb[visited_mask, :] = 0.0
+            bg_im = ax.imshow(background_rgb, interpolation='nearest', **imshow_shared_kwargs, label='background_image')
+        else:
+            bg_im = None
+
+        im = ax.imshow(curr_pfmap, **main_plot_kwargs, label='main_image')
+        ax.set_xticks(xbin, minor=True)
+        ax.set_yticks(ybin, minor=True)
+        ax.grid(which='minor', color='0.65', linewidth=0.2, alpha=0.5)
+        ax.tick_params(which='both', left=False, bottom=False, labelleft=False, labelbottom=False)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ## END for spine in ax.spines.values()....
+
+        ## Labeling:
+        if final_title_str is None:
+            final_title_str = 'ERR'
+
+        if use_special_overlayed_title:
+            title_anchored_text = add_inner_title(ax, final_title_str, loc='upper center', strokewidth=2, stroke_foreground='k', text_foreground='w')
+            title_anchored_text.patch.set_ec("none")
+        else:
+            ax.set_title(final_title_str)
+            title_anchored_text = None
+        ax.set_label(final_title_str)
+        return im, title_anchored_text
+
+
+    @classmethod
+    def _apply_nan_less_than_threshold(cls, arr, nan_less_than_value: Optional[float] = 1e-7):
+        """Return a copy of arr with values below threshold set to NaN (or arr unchanged if threshold is None)."""
+        if nan_less_than_value is None:
+            return arr
+        out = np.array(arr, copy=True)
+        out[out < nan_less_than_value] = np.nan
+        return out
+
+
+    @classmethod
+    def _build_placefield_stack_image(cls, neuron_sliced_decoder, nan_less_than_value: Optional[float] = 1e-7):
+        """Build RGBA placefield overlay image and cell title strings for a neuron-sliced decoder."""
+        never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
+        n_neurons, n_x_bins, n_y_bins = np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps)
+        stack_img = np.zeros((n_x_bins, n_y_bins, 4), dtype=float)
+        if nan_less_than_value is not None:
+            stack_img[stack_img < nan_less_than_value] = np.nan
+        stack_img[:, :, -1] = 0.0 ## set alpha to zero
+
+        pf_titles = []
+        for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids):
+            print(f'neuron_idx: {neuron_idx}, alcu: {aclu}')
+            pf_cell = neuron_sliced_decoder.ratemap.tuning_curves[neuron_idx, :, :]
+            if nan_less_than_value is not None:
+                pf_cell[pf_cell < nan_less_than_value] = np.nan
+            stack_img[np.logical_not(np.isnan(pf_cell)), -1] = 1.0 ## set alpha corresponding to the non-nan bins
+            stack_img[:, :, neuron_idx] = pf_cell ## set the color channel of the image to the map of the neuron
+            pf_titles.append(str(aclu))
+        ## END for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids)....
+
+        for neuron_idx in range(n_neurons):
+            pf_channel_max = np.nanmax(stack_img[:, :, neuron_idx])
+            if np.isfinite(pf_channel_max) and pf_channel_max > 0:
+                stack_img[:, :, neuron_idx] = stack_img[:, :, neuron_idx] / pf_channel_max
+        ## END for neuron_idx in range(n_neurons)....
+
+        has_pf_signal = np.nanmax(stack_img[:, :, :n_neurons], axis=2) > 0.01
+        stack_img[:, :, -1] = 0.0
+        stack_img[has_pf_signal, -1] = 1.0
+        stack_img[never_visited_mask, -1] = 0.0
+        return stack_img, pf_titles, n_neurons
+
+
+    @classmethod
+    def _draw_spike_row_for_t_idx(cls, ax_spike_row, active_t_idx: int, n_neurons: int, pf_titles: List[str], unit_spike_counts, co_firing_time_bin_indices, n_posterior_time_bins: int, time_bin_size, pf_cell_colors: Optional[List[str]] = None, clear_axes: bool = True):
+        """Draw spike raster for one co-firing time bin onto ax_spike_row."""
+        if pf_cell_colors is None:
+            pf_cell_colors = cls._PF_CELL_COLORS
+        global_time_bin_idx = None
+        curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
+        if unit_spike_counts is not None and co_firing_time_bin_indices is not None and active_t_idx < n_posterior_time_bins and active_t_idx < len(co_firing_time_bin_indices):
+            global_time_bin_idx = int(co_firing_time_bin_indices[active_t_idx])
+            curr_bin_spike_counts = np.asarray(unit_spike_counts[:, global_time_bin_idx], dtype=int).reshape(-1)
+        if clear_axes:
+            ax_spike_row.cla()
+        max_spikes_in_bin = int(np.max(curr_bin_spike_counts)) if curr_bin_spike_counts.size > 0 else 0
+        for neuron_idx, aclu in enumerate(pf_titles):
+            n_spikes = int(curr_bin_spike_counts[neuron_idx]) if neuron_idx < len(curr_bin_spike_counts) else 0
+            if n_spikes > 0:
+                ax_spike_row.vlines(np.arange(n_spikes), neuron_idx - 0.35, neuron_idx + 0.35, colors=pf_cell_colors[neuron_idx % len(pf_cell_colors)], linewidth=2.5)
+            ax_spike_row.text(max(max_spikes_in_bin, 1) + 0.15, neuron_idx, f'{aclu}: {n_spikes} spike{"s" if n_spikes != 1 else ""}', va='center', ha='left', fontsize=9)
+        ## END for neuron_idx, aclu in enumerate(pf_titles)....
+
+        ax_spike_row.set_yticks(np.arange(n_neurons))
+        ax_spike_row.set_yticklabels([f'Cell {title}' for title in pf_titles], fontsize=9)
+        ax_spike_row.set_xlim(-0.5, max(max_spikes_in_bin, 1) + 2.5)
+        ax_spike_row.set_ylim(-0.5, n_neurons - 0.5)
+        ax_spike_row.set_xlabel('Spike index in bin', fontsize=9)
+        ax_spike_row.invert_yaxis()
+        spike_row_title = f'Spikes in time bin t_idx={active_t_idx}'
+        if global_time_bin_idx is not None:
+            spike_row_title += f' (global bin {global_time_bin_idx}, dt={time_bin_size}s)'
+        ax_spike_row.set_title(spike_row_title, fontsize=9)
+        ax_spike_row.grid(axis='x', alpha=0.25, linestyle=':')
+        return global_time_bin_idx
+
+
     @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
     @classmethod
     def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx: Optional[int] = None, nan_less_than_value: float = 1e-7, include_occupancy: bool = True, co_firing_time_bin_indices: Optional[NDArray] = None, enable_t_idx_slider: bool = False):
@@ -241,158 +420,7 @@ class DisjointPlacefieldsExploration:
             ## t_idx=None enables the bottom t_idx slider (requires `%matplotlib widget` or Qt backend in notebooks).
 
         """
-        # from pyphocorehelpers.plotting.image_plotting_helpers import IMShowHelpers
-
-        from neuropy.core.neuron_identities import PlotStringBrevityModeEnum            
-        from neuropy.utils import mathutil
-        from neuropy.utils.misc import RowColTuple, safe_item
-        from neuropy.utils.matplotlib_helpers import build_or_reuse_figure, perform_update_title_subtitle, _build_variable_max_value_label, add_inner_title, enumTuningMap2DPlotMode, _build_square_checkerboard_image, enumTuningMap2DPlotVariables, _determine_best_placefield_2D_layout, _scale_current_placefield_to_acceptable_range, _build_neuron_identity_label 
-        from neuropy.plotting.ratemaps import BackgroundRenderingOptions
-
-        # from neuropy.plotting.ratemaps import _plot_single_tuning_map_2D # as _subfn_plot_single_2D_matrix
-
-
-        def _plot_single_tuning_map_2D(xbin, ybin, pfmap, occupancy=None, final_title_str=None, drop_below_threshold: float=0.0000001, pfmap_as_image: bool = False,
-                                    plot_mode: enumTuningMap2DPlotMode=None, ax=None, brev_mode=PlotStringBrevityModeEnum.NONE, max_value_formatter=None, use_special_overlayed_title:bool=False, bg_rendering_mode=BackgroundRenderingOptions.PATTERN_CHECKERBOARD):
-            """Plots a single tuning curve Heatmap using matplotlib
-
-            Args:
-                xbin ([type]): [description]
-                ybin ([type]): [description]
-                pfmap ([type]): [description]
-                occupancy ([type]): [description]
-                drop_below_threshold (float, optional): [description]. Defaults to 0.0000001.
-                ax ([type], optional): [description]. Defaults to None.
-
-            Returns:
-                [type]: [description]
-            """
-            if plot_mode is None:
-                plot_mode = enumTuningMap2DPlotMode.IMSHOW
-            assert plot_mode is enumTuningMap2DPlotMode.IMSHOW, f"Plot mode should not be specified to anything other than None or enumTuningMap2DPlotMode.IMSHOW as of 2022-08-15 but value was: {plot_mode}"
-            
-            # use_special_overlayed_title = True
-            
-            # use_alpha_by_occupancy = False # Only supported in IMSHOW mode
-            use_alpha_by_occupancy = False # Only supported in IMSHOW mode
-
-            if ax is None:
-                ax = plt.gca()
-                    
-            if (not pfmap_as_image):
-                curr_pfmap = _scale_current_placefield_to_acceptable_range(pfmap, occupancy=occupancy, drop_below_threshold=drop_below_threshold)     
-            else:
-                curr_pfmap = pfmap.copy()
-                # with np.errstate(divide='ignore', invalid='ignore'):
-                #     # image = np.array(image.copy()) / np.nanmax(image) # note scaling by maximum here!
-                #     if (drop_below_threshold is not None) and (occupancy is not None):
-                #         # curr_pfmap[np.where(occupancy < drop_below_threshold)] = np.nan # null out the occupancy
-                #         curr_pfmap[np.where(occupancy < drop_below_threshold), -1] = 0.0 # set the alpha of bins below occupancy to 0.0
-
-            ## Seems to work:
-            curr_pfmap = np.rot90(curr_pfmap, k=-1)
-            curr_pfmap = np.fliplr(curr_pfmap)
-                
-            # # curr_pfmap = curr_pfmap / np.nanmax(curr_pfmap) # for when the pfmap already had its transpose taken
-
-            """ https://matplotlib.org/stable/tutorials/intermediate/imshow_extent.html """
-            """ TODO: Use the brightness to reflect the confidence in the outcome. Could also use opacity. """
-            # mesh_X, mesh_Y = np.meshgrid(xbin, ybin)
-            xmin, xmax, ymin, ymax = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-            # The extent keyword arguments controls the bounding box in data coordinates that the image will fill specified as (left, right, bottom, top) in data coordinates, the origin keyword argument controls how the image fills that bounding box, and the orientation in the final rendered image is also affected by the axes limits.
-            extent = (xmin, xmax, ymin, ymax)
-            # vmax = np.abs(curr_pfmap).max()
-                    
-            imshow_shared_kwargs = {
-                'origin': 'lower',
-                'extent': extent,
-            }
-            
-            main_plot_kwargs = imshow_shared_kwargs
-
-            if (not pfmap_as_image):
-                main_plot_kwargs = main_plot_kwargs | {
-                    # 'vmax': vmax,
-                    'vmin': 0,
-                    # 'cmap': 'jet',
-                }
-            
-            if use_alpha_by_occupancy:
-                # alphas = np.ones(curr_pfmap.shape)
-                # alphas[:, :] = np.linspace(1, 0, curr_pfmap.shape[1]) # Test, blend transparency linearly
-                # Normalize:
-                # Create an alpha channel based on weight values
-                # Any value whose absolute value is > .0001 will have zero transparency
-                alphas = Normalize(clip=True)(np.abs(occupancy))
-                # alphas = Normalize(0, .3, clip=True)(np.abs(occupancy))
-                # alphas = np.clip(alphas, .4, 1)  # alpha value clipped at the bottom at .4
-                main_plot_kwargs['alpha'] = alphas
-                pass
-            else:
-                main_plot_kwargs['alpha'] = None
-            
-            ## Determine which background graphics to use:    
-            if isinstance(bg_rendering_mode, str):
-                background_rendering_mode_name = bg_rendering_mode # Already a string.
-            else:
-                # Otherwise assume it's the enum type and get its .name property
-                background_rendering_mode_name = bg_rendering_mode.name
-
-            if background_rendering_mode_name == BackgroundRenderingOptions.PATTERN_CHECKERBOARD.name:
-                # Grey checkerboard background:
-                # background_chessboard = np.add.outer(range(8), range(8)) % 2  # chessboard
-                background_chessboard = _build_square_checkerboard_image(extent, num_checkerboard_squares_short_axis=8)
-                bg_im = ax.imshow(background_chessboard, cmap=plt.cm.gray, alpha=0.25, interpolation='nearest', **imshow_shared_kwargs, label='background_image')
-            elif background_rendering_mode_name == BackgroundRenderingOptions.SOLID_COLOR.name:
-                # We'll also create a black background into which the pixels will fade
-                background_black = np.full((*curr_pfmap.shape[:2], 3), 0, dtype=np.uint8)
-                bg_im = ax.imshow(background_black, **imshow_shared_kwargs, label='background_image')
-            elif background_rendering_mode_name == 'OCCUPANCY_BLACK_WHITE':
-                assert occupancy is not None, "occupancy is required for OCCUPANCY_BLACK_WHITE background rendering"
-                visited_mask = np.asarray(occupancy) > 0.0
-                visited_mask = np.rot90(visited_mask, k=-1)
-                visited_mask = np.fliplr(visited_mask)
-                background_rgb = np.ones((*visited_mask.shape, 3), dtype=float)
-                background_rgb[visited_mask, :] = 0.0
-                bg_im = ax.imshow(background_rgb, interpolation='nearest', **imshow_shared_kwargs, label='background_image')
-            else:
-                # No added background image
-                bg_im = None
-            
-            im = ax.imshow(curr_pfmap, **main_plot_kwargs, label='main_image')
-            ax.set_xticks(xbin, minor=True)
-            ax.set_yticks(ybin, minor=True)
-            ax.grid(which='minor', color='0.65', linewidth=0.2, alpha=0.5)
-            ax.tick_params(which='both', left=False, bottom=False, labelleft=False, labelbottom=False)
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-                
-            ## Labeling:
-            if final_title_str is None:
-                final_title_str = 'ERR'
-
-            if use_special_overlayed_title:
-                title_anchored_text = add_inner_title(ax, final_title_str, loc='upper center', strokewidth=2, stroke_foreground='k', text_foreground='w') # loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-                title_anchored_text.patch.set_ec("none")
-                # t.patch.set_alpha(0.5)
-            else:
-                # conventional way:
-                ax.set_title(final_title_str) # f"Cell {ratemap.neuron_ids[cell]} - {ratemap.get_extended_neuron_id_string(neuron_i=cell)} \n{round(np.nanmax(pfmap),2)} Hz"
-                title_anchored_text = None
-            # always
-            ax.set_label(final_title_str)
-            return im, title_anchored_text
-
-
-
-        # ==================================================================================================================================================================================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-        # ==================================================================================================================================================================================================================================================================================== #
-        # plot_fn_kwargs = dict(xbin=neuron_sliced_decoder.xbin, ybin=neuron_sliced_decoder.ybin)
-
-        # plot_fn_kwargs = dict(xbin_edges=neuron_sliced_decoder.xbin, ybin_edges=neuron_sliced_decoder.ybin)
-        
-        _subfn_plot_single_2D_matrix = lambda *args, **kwargs: _plot_single_tuning_map_2D(neuron_sliced_decoder.xbin, neuron_sliced_decoder.ybin, *args, **kwargs)
+        _subfn_plot_single_2D_matrix = lambda *args, **kwargs: cls._plot_single_tuning_map_2D(neuron_sliced_decoder.xbin, neuron_sliced_decoder.ybin, *args, **kwargs)
 
         n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
         if t_idx is None:
@@ -405,7 +433,6 @@ class DisjointPlacefieldsExploration:
         if co_firing_time_bin_indices is None and unit_spike_counts is not None:
             co_firing_time_bin_indices = np.where(np.all(unit_spike_counts > 0, axis=0))[0]
 
-        # fig, axes = plt.subplots(1, 3)
         n_columns: int = 2
         if include_occupancy:
             n_columns = n_columns + 1
@@ -418,7 +445,6 @@ class DisjointPlacefieldsExploration:
         axes = np.array([fig.add_subplot(gs[0, col_i]) for col_i in range(n_columns)])
         ax_spike_row = fig.add_subplot(gs[1, :])
 
-        # Add descriptive suptitle to the figure
         pf_descr = f"Cells: {tuple_key}" if isinstance(tuple_key, (list, tuple)) else str(tuple_key)
 
         def _set_figure_titles(active_t_idx: int):
@@ -429,102 +455,27 @@ class DisjointPlacefieldsExploration:
         _set_figure_titles(t_idx)
 
         pf_occupancy = neuron_sliced_decoder.pf.occupancy
-        never_visited_mask = neuron_sliced_decoder.pf.never_visited_occupancy_mask
 
-
-        # Axes[0]: Draw Decoded Posterior for t_idx __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        p_x_given_n = co_firing_posteriors[:, :, t_idx]
-        if nan_less_than_value is not None:
-            p_x_given_n = np.array(p_x_given_n, copy=True)
-            p_x_given_n[p_x_given_n < nan_less_than_value] = np.nan
-        # im0 = axes[0].imshow(p_x_given_n) ## plot the decoded posterior
+        # Axes[0]: Draw Decoded Posterior for t_idx
+        p_x_given_n = cls._apply_nan_less_than_threshold(co_firing_posteriors[:, :, t_idx], nan_less_than_value=nan_less_than_value)
         _subfn_plot_single_2D_matrix(p_x_given_n, occupancy=pf_occupancy, ax=axes[0])
         axes[0].set_title('Decoded Posterior $p(x|n)$', fontsize=10)
 
-
-        # Axes[1]: Draw Both Placefields _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        ## plot the two placefields used to decode for reference
-        n_neurons, n_x_bins, n_y_bins = np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps)
-        stack_img = np.zeros((n_x_bins, n_y_bins, 4), dtype=float)
-        if nan_less_than_value is not None:
-            stack_img[stack_img < nan_less_than_value] = np.nan
-
-        # stack_img[:, :, -1] = 1.0
-        stack_img[:, :, -1] = 0.0 ## set alpha to zero
-        
-        # np.shape(neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps) # (2, 60, 60)
-        pf_titles = []
-        for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids):
-            print(f'neuron_idx: {neuron_idx}, alcu: {aclu}')
-            pf_cell = neuron_sliced_decoder.ratemap.tuning_curves[neuron_idx, :, :]
-            # pf_cell = neuron_sliced_decoder.ratemap.unsmoothed_tuning_maps[neuron_idx, :, :] ## very interesting
-            if nan_less_than_value is not None:
-                pf_cell[pf_cell < nan_less_than_value] = np.nan
-            # stack_img[np.logical_not(np.isnan(pf_cell)), -1] = 0.5 ## set alpha corresponding to the non-nan bins
-            stack_img[np.logical_not(np.isnan(pf_cell)), -1] = 1.0 ## set alpha corresponding to the non-nan bins
-            stack_img[:, :, neuron_idx] = pf_cell ## set the color channel of the image to the map of the neuron
-            pf_titles.append(str(aclu))
-            # axes[1+neuron_idx].imshow(pf_cell)
-        ## END for neuron_idx, aclu in enumerate(neuron_sliced_decoder.ratemap.neuron_ids)...
-
-
-        for neuron_idx in range(n_neurons):
-            pf_channel_max = np.nanmax(stack_img[:, :, neuron_idx])
-            if np.isfinite(pf_channel_max) and pf_channel_max > 0:
-                stack_img[:, :, neuron_idx] = stack_img[:, :, neuron_idx] / pf_channel_max
-        ## END for neuron_idx in range(n_neurons)...
-
-        has_pf_signal = np.nanmax(stack_img[:, :, :n_neurons], axis=2) > 0.01
-        stack_img[:, :, -1] = 0.0
-        stack_img[has_pf_signal, -1] = 1.0
-        stack_img[never_visited_mask, -1] = 0.0
-
-        # axes[1].imshow(stack_img)
-        # _subfn_plot_single_2D_matrix(stack_img, occupancy=neuron_sliced_decoder.pf.nan_never_visited_occupancy,  bg_rendering_mode=BackgroundRenderingOptions.SOLID_COLOR, ax=axes[1])
+        # Axes[1]: Draw Both Placefields
+        stack_img, pf_titles, n_neurons = cls._build_placefield_stack_image(neuron_sliced_decoder, nan_less_than_value=nan_less_than_value)
         _subfn_plot_single_2D_matrix(stack_img, occupancy=pf_occupancy, pfmap_as_image=True, bg_rendering_mode='OCCUPANCY_BLACK_WHITE', ax=axes[1])
-
-
         if n_neurons == 2:
             axes[1].set_title(f'Placefields (A: {pf_titles[0]}, B: {pf_titles[1]})', fontsize=10)
         else:
             axes[1].set_title('Placefields Overlay', fontsize=10)
 
-        # Axes[2]: Draw Occupancy ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # Axes[2]: Draw Occupancy
         if include_occupancy:
-            # neuron_sliced_decoder.pf.plot_occupancy(ax=axes[2])
-            # axes[2].imshow(neuron_sliced_decoder.pf.nan_never_visited_occupancy)
             _subfn_plot_single_2D_matrix(neuron_sliced_decoder.pf.nan_never_visited_occupancy, ax=axes[2])
             axes[2].set_title("Occupancy", fontsize=10)
 
-        pf_cell_colors = ['#d62728', '#2ca02c', '#1f77b4', '#ff7f0e']
-
         def _draw_spike_row_for_t_idx(active_t_idx: int):
-            """ draws raster below 3 axes """
-            global_time_bin_idx = None
-            curr_bin_spike_counts = np.zeros(n_neurons, dtype=int)
-            if unit_spike_counts is not None and co_firing_time_bin_indices is not None and active_t_idx < n_posterior_time_bins and active_t_idx < len(co_firing_time_bin_indices):
-                global_time_bin_idx = int(co_firing_time_bin_indices[active_t_idx])
-                curr_bin_spike_counts = np.asarray(unit_spike_counts[:, global_time_bin_idx], dtype=int).reshape(-1)
-            ax_spike_row.cla()
-            max_spikes_in_bin = int(np.max(curr_bin_spike_counts)) if curr_bin_spike_counts.size > 0 else 0
-            for neuron_idx, aclu in enumerate(pf_titles):
-                n_spikes = int(curr_bin_spike_counts[neuron_idx]) if neuron_idx < len(curr_bin_spike_counts) else 0
-                if n_spikes > 0:
-                    ax_spike_row.vlines(np.arange(n_spikes), neuron_idx - 0.35, neuron_idx + 0.35, colors=pf_cell_colors[neuron_idx % len(pf_cell_colors)], linewidth=2.5)
-                ax_spike_row.text(max(max_spikes_in_bin, 1) + 0.15, neuron_idx, f'{aclu}: {n_spikes} spike{"s" if n_spikes != 1 else ""}', va='center', ha='left', fontsize=9)
-            ## END for neuron_idx, aclu in enumerate(pf_titles)...
-
-            ax_spike_row.set_yticks(np.arange(n_neurons))
-            ax_spike_row.set_yticklabels([f'Cell {title}' for title in pf_titles], fontsize=9)
-            ax_spike_row.set_xlim(-0.5, max(max_spikes_in_bin, 1) + 2.5)
-            ax_spike_row.set_ylim(-0.5, n_neurons - 0.5)
-            ax_spike_row.set_xlabel('Spike index in bin', fontsize=9)
-            ax_spike_row.invert_yaxis()
-            spike_row_title = f'Spikes in time bin t_idx={active_t_idx}'
-            if global_time_bin_idx is not None:
-                spike_row_title += f' (global bin {global_time_bin_idx}, dt={neuron_sliced_decoder.time_bin_size}s)'
-            ax_spike_row.set_title(spike_row_title, fontsize=9)
-            ax_spike_row.grid(axis='x', alpha=0.25, linestyle=':')
+            cls._draw_spike_row_for_t_idx(ax_spike_row, active_t_idx, n_neurons=n_neurons, pf_titles=pf_titles, unit_spike_counts=unit_spike_counts, co_firing_time_bin_indices=co_firing_time_bin_indices, n_posterior_time_bins=n_posterior_time_bins, time_bin_size=neuron_sliced_decoder.time_bin_size, pf_cell_colors=cls._PF_CELL_COLORS)
 
         def _update_for_t_idx(active_t_idx: int):
             active_t_idx = int(np.clip(active_t_idx, 0, max(n_posterior_time_bins - 1, 0)))
@@ -559,6 +510,89 @@ class DisjointPlacefieldsExploration:
             t_idx_slider.valtext.set_text(_format_t_idx_slider_label(t_idx))
             fig._pfs_decoded_posterior_t_idx_slider = t_idx_slider
 
+        return fig, axes
+
+
+    @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual', 'all_t'], input_requires=[], output_provides=[], uses=['cls._plot_single_tuning_map_2D', 'cls._build_placefield_stack_image', 'cls._draw_spike_row_for_t_idx'], used_by=[], creation_date='2026-07-17 08:00', related_items=['plot_pfs_and_decoded_posterior'])
+    @classmethod
+    def plot_pfs_and_decoded_posteriors_all_t(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, nan_less_than_value: float = 1e-7, co_firing_time_bin_indices: Optional[NDArray] = None):
+        """Static multi-column figure: left column = placefields + occupancy; remaining columns = one posterior + spike raster per co-firing t_idx.
+
+        Layout::
+
+            [ Placefields ] [ p(x|n) t=0 ] ... [ p(x|n) t=N-1 ]
+            [ Occupancy   ] [ spikes t=0 ] ... [ spikes t=N-1 ]
+
+        Usage:
+            tuple_key = list(good_pairs_co_firing_posteriors_dict.keys())[2]
+            fig, axes = DisjointPlacefieldsExploration.plot_pfs_and_decoded_posteriors_all_t(
+                neuron_sliced_decoder=good_pairs_co_firing_sliced_decoders_dict[tuple_key],
+                co_firing_posteriors=good_pairs_co_firing_posteriors_dict[tuple_key],
+                tuple_key=tuple_key,
+                co_firing_time_bin_indices=good_pairs_co_firing_bins_dict[tuple_key],
+            )
+
+        Returns:
+            (fig, axes) where axes is a dict with keys:
+                'ax_placefields', 'ax_occupancy', 'ax_posteriors' (list), 'ax_spike_rows' (list)
+        """
+        _subfn_plot_single_2D_matrix = lambda *args, **kwargs: cls._plot_single_tuning_map_2D(neuron_sliced_decoder.xbin, neuron_sliced_decoder.ybin, *args, **kwargs)
+
+        n_posterior_time_bins = int(np.shape(co_firing_posteriors)[2])
+        unit_spike_counts = neuron_sliced_decoder.unit_specific_time_binned_spike_counts
+        if co_firing_time_bin_indices is None and unit_spike_counts is not None:
+            co_firing_time_bin_indices = np.where(np.all(unit_spike_counts > 0, axis=0))[0]
+
+        n_columns: int = 1 + max(n_posterior_time_bins, 1)
+        fig_title: str = f'plot_pfs_and_decoded_posteriors_all_t[{tuple_key}]'
+        fig = plt.figure(num=fig_title, figsize=(4.5 * n_columns, 8.0))
+        # Outer columns: left (PF+occ, equal height) vs one column per t_idx (posterior tall, spikes short)
+        gs = GridSpec(1, n_columns, figure=fig, wspace=0.25, top=0.90, bottom=0.06)
+        gs_left = gs[0, 0].subgridspec(2, 1, height_ratios=[1, 1], hspace=0.30)
+        ax_placefields = fig.add_subplot(gs_left[0, 0])
+        ax_occupancy = fig.add_subplot(gs_left[1, 0])
+        ax_posteriors = []
+        ax_spike_rows = []
+        for t_col in range(max(n_posterior_time_bins, 1)):
+            gs_t = gs[0, 1 + t_col].subgridspec(2, 1, height_ratios=[5, 1.2], hspace=0.35)
+            ax_posteriors.append(fig.add_subplot(gs_t[0, 0]))
+            ax_spike_rows.append(fig.add_subplot(gs_t[1, 0]))
+        ## END for t_col in range(max(n_posterior_time_bins, 1))....
+
+        pf_descr = f"Cells: {tuple_key}" if isinstance(tuple_key, (list, tuple)) else str(tuple_key)
+        fig.suptitle(f'Decoded Posteriors (all t_idx) and Placefields\n{pf_descr}', fontsize=12)
+        if fig.canvas.manager is not None:
+            fig.canvas.manager.set_window_title(fig_title)
+
+        pf_occupancy = neuron_sliced_decoder.pf.occupancy
+        stack_img, pf_titles, n_neurons = cls._build_placefield_stack_image(neuron_sliced_decoder, nan_less_than_value=nan_less_than_value)
+        _subfn_plot_single_2D_matrix(stack_img, occupancy=pf_occupancy, pfmap_as_image=True, bg_rendering_mode='OCCUPANCY_BLACK_WHITE', ax=ax_placefields)
+        if n_neurons == 2:
+            ax_placefields.set_title(f'Placefields (A: {pf_titles[0]}, B: {pf_titles[1]})', fontsize=10)
+        else:
+            ax_placefields.set_title('Placefields Overlay', fontsize=10)
+
+        _subfn_plot_single_2D_matrix(neuron_sliced_decoder.pf.nan_never_visited_occupancy, ax=ax_occupancy)
+        ax_occupancy.set_title("Occupancy", fontsize=10)
+
+        for t_idx in range(n_posterior_time_bins):
+            ax_post = ax_posteriors[t_idx]
+            p_x_given_n = cls._apply_nan_less_than_threshold(co_firing_posteriors[:, :, t_idx], nan_less_than_value=nan_less_than_value)
+            _subfn_plot_single_2D_matrix(p_x_given_n, occupancy=pf_occupancy, ax=ax_post)
+            posterior_title = f'Decoded Posterior $p(x|n)$\nt_idx={t_idx}'
+            if co_firing_time_bin_indices is not None and t_idx < len(co_firing_time_bin_indices):
+                posterior_title += f' (global bin {int(co_firing_time_bin_indices[t_idx])})'
+            ax_post.set_title(posterior_title, fontsize=9)
+
+            cls._draw_spike_row_for_t_idx(ax_spike_rows[t_idx], t_idx, n_neurons=n_neurons, pf_titles=pf_titles, unit_spike_counts=unit_spike_counts, co_firing_time_bin_indices=co_firing_time_bin_indices, n_posterior_time_bins=n_posterior_time_bins, time_bin_size=neuron_sliced_decoder.time_bin_size, pf_cell_colors=cls._PF_CELL_COLORS, clear_axes=False)
+        ## END for t_idx in range(n_posterior_time_bins)....
+
+        axes = {
+            'ax_placefields': ax_placefields,
+            'ax_occupancy': ax_occupancy,
+            'ax_posteriors': ax_posteriors,
+            'ax_spike_rows': ax_spike_rows,
+        }
         return fig, axes
 
 
@@ -675,6 +709,9 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
     PercentDecodedContextCorrectnessTuple,
     DirectionalPseudo2DDecodersResult,
 )
+
+
+
 
 
 @function_attributes(short_name=None, tags=['MAIN', 'batch'], input_requires=[], output_provides=[], uses=['plot_maze_probability_stacked_bar_by_epoch', '_compute_all_epochs_all_maze_by_maze_context_marginals', 'plot_maze_probability_stacked_bar', 'build_contextual_pf2D_decoder', '_resolve_maze_epoch_names_for_multi_context_eval', 'ensure_nwb_wmaze_pbe_and_replay_epochs'], used_by=['compute_and_figures_nwb_wmaze_maze_context_probabilities_completion_function'], creation_date='2026-07-14 19:08', related_items=[])
@@ -1476,6 +1513,7 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
         
     return fig, axes
 
+## insert the `build_interactive_bayesian_2d_eqn_viewer` here a self contained function similar to those around it
 
 
 @function_attributes(short_name=None, tags=['performance', 'decode', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 00:00', related_items=[])
