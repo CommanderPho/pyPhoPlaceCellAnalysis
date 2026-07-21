@@ -34,6 +34,17 @@ from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDe
 
 """-------------- Specific Computation Functions to be registered --------------"""
 
+def _session_uses_3d_placefields_only(sess) -> bool:
+    from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
+    format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(getattr(getattr(sess, 'config', None), 'format_name', None))
+    if format_cls is None:
+        return False
+    try:
+        return format_cls.get_spatial_dimensionality(sess) == 3
+    except Exception:
+        return False
+
+
 class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=ComputationFunctionRegistryHolder):
     _computationPrecidence = 1 # must be done after PlacefieldComputations
     _is_global = False
@@ -68,6 +79,18 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             did_change: bool = (override_decoding_time_bin_size != old_time_bin_size)
             computation_result.computation_config.pf_params.time_bin_size = override_decoding_time_bin_size
             print(f'\tdid_change: {did_change}')
+
+        if _session_uses_3d_placefields_only(computation_result.sess):
+            pf3D = computation_result.computed_data.get('pf3D', None)
+            if (pf3D is not None) and (pf3D.ratemap.n_neurons > 0):
+                computation_result.computed_data['pf3D_Decoder'] = BayesianPlacemapPositionDecoder(time_bin_size=placefield_computation_config.time_bin_size, pf=pf3D, spikes_df=pf3D.filtered_spikes_df.copy(), debug_print=False)
+                computation_result.computed_data['pf3D_Decoder'].compute_all()
+            else:
+                computation_result.computed_data['pf3D_Decoder'] = None
+                print(f"WARN: _perform_position_decoding_computation(...): 3D decoding skipped because pf3D is missing or has zero neurons.")
+            computation_result.computed_data['pf1D_Decoder'] = None
+            computation_result.computed_data['pf2D_Decoder'] = None
+            return computation_result
             
         ## filtered_spikes_df version:
         if (computation_result.computed_data['pf1D'].ratemap.n_neurons > 0):
@@ -98,6 +121,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
                                                            should_defer_compute_all_decoded_times: bool = True,  
                                                              **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        if _session_uses_3d_placefields_only(computation_result.sess):
+            computation_result.computed_data['pf1D_ClusterlessDecoder'] = None
+            computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
+            return computation_result
         from neuropy.core.clusterless_spike_events import default_clusterless_spike_events_path
         from replay_trajectory_classification import ClusterlessClassifier, Environment, RandomWalk, Uniform, Identity, estimate_movement_var
 
@@ -216,6 +243,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_SpyglassClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_SpyglassClusterlessDecoder', None)), is_global=False)
     def _perform_spyglass_clusterless_position_decoding_computation(computation_result: ComputationResult, clusterless_spike_events: Optional[Any] = None, spyglass_params: Optional[SpyglassClusterlessDecodingParameters] = None, should_defer_compute_all_decoded_times: bool = True, **kwargs):
         """ Builds Spyglass/non_local_detector clusterless 2D position decoders on PfND spatial grids. """
+        if _session_uses_3d_placefields_only(computation_result.sess):
+            computation_result.computed_data['pf1D_SpyglassClusterlessDecoder'] = None
+            computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = None
+            return computation_result
         from neuropy.core.clusterless_spike_events import ClusterlessSpikeEvents, default_clusterless_spike_events_path
 
         sess = computation_result.sess
@@ -275,6 +306,10 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     def _perform_two_step_position_decoding_computation(computation_result: ComputationResult, debug_print=False, ndim: int=2, **kwargs):
         """ Builds the Zhang Velocity/Position For 2-step Bayesian Decoder for 2D Placefields
         """
+        if _session_uses_3d_placefields_only(computation_result.sess):
+            computation_result.computed_data['pf1D_TwoStepDecoder'] = None
+            computation_result.computed_data['pf2D_TwoStepDecoder'] = None
+            return computation_result
 
         def _subfn_compute_two_step_decoder(active_xbins, active_ybins, prev_one_step_bayesian_decoder, pos_df, computation_config, debug_print=False):
             """ captures debug_print 

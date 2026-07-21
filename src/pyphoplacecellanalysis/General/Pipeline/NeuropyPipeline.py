@@ -1062,8 +1062,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
             a_results = self.computation_results[an_epoch_name]
             a_computed_data = a_results['computed_data']
-            a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D") # damn this will be called with the `tb` still having the thingy open
-            a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
+            if a_computed_data.get('pf3D', None) is not None:
+                a_computed_data.pf3D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf3D")
+            else:
+                a_computed_data.pf1D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf1D") # damn this will be called with the `tb` still having the thingy open
+                a_computed_data.pf2D.to_hdf(file_path=file_path, key=f"{filter_context_key}/pf2D")
             ## TODO: encode the rest of the computed_data
 
             try:
