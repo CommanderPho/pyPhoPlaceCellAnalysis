@@ -600,7 +600,7 @@ class BatchPlotting:
         """
         from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
 
-        known_collected_outputs_paths = [Path(v).resolve() for v in ['/Users/pho/data/collected_outputs',
+        known_collected_outputs_paths = [Path(v) for v in ['/Users/pho/data/collected_outputs',
                                                                     '/Volumes/SwapSSD/Data/collected_outputs', r"K:/scratch/collected_outputs", '/Users/pho/Dropbox (University of Michigan)/MED-DibaLabDropbox/Data/Pho/Outputs/output/collected_outputs', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs',
                                                                     '/home/halechr/cloud/turbo/Data/Output/collected_outputs',
                                                                     '/home/halechr/cloud/turbo/Pho/Output/collected_outputs',
@@ -616,7 +616,7 @@ class BatchPlotting:
         # display(_active_folder_widget)
 
         # Create a 'figures' subfolder if it doesn't exist
-        collected_figures_folder: Path = collected_outputs_directory.parent.joinpath('collected_figures').resolve()
+        collected_figures_folder: Path = collected_outputs_directory.parent.joinpath('collected_figures')
         collected_figures_folder.mkdir(parents=False, exist_ok=True)
         assert collected_figures_folder.exists()
         print(f'\tcollected_figures_folder: "{collected_figures_folder}"')
