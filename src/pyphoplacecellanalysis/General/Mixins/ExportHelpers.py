@@ -946,6 +946,8 @@ class FigureToImageHelpers:
         from matplotlib.axes import Axes
         from matplotlib.artist import Artist
         import matplotlib.pyplot as plt
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
         import io
         from qtpy import QtWidgets
         from pyphoplacecellanalysis.Pho2D.PyQtPlots.TimeSynchronizedPlotters.PyqtgraphTimeSynchronizedWidget import PyqtgraphTimeSynchronizedWidget
@@ -1124,79 +1126,84 @@ class FigureToImageHelpers:
         ui_connections = getattr(getattr(active_2d_plot, 'ui', None), 'connections', {}) or {}
         max_export_width_px = int(figsize[0] * dpi)
 
-        with backend_pdf.PdfPages(output_pdf_path) as pdf:
-            for page_chunks in pages:
-                fig, axes = plt.subplots(nrows=len(page_chunks), figsize=figsize, dpi=dpi, constrained_layout=True)
-                if len(page_chunks) == 1:
-                    axes = [axes]
+        with plt.ioff():
+            ## Disables showing the figure by default; Agg canvas avoids Qt GUI windows under QtAgg backends.
+            with backend_pdf.PdfPages(output_pdf_path) as pdf:
+                for page_chunks in pages:
+                    fig = Figure(figsize=figsize, dpi=dpi, layout='constrained')
+                    FigureCanvasAgg(fig)
+                    axes = fig.subplots(nrows=len(page_chunks))
+                    if len(page_chunks) == 1:
+                        axes = [axes]
 
-                first_chunk = True
-                for ax, (start, end) in zip(axes, page_chunks):
-                    ## one temp axes to draw into:
-                    # active_2d_plot.Render2DScrollWindowPlot_on_window_update(start, end)
-                    # active_2d_plot.TimeCurvesViewMixin_on_window_update(new_start=start, new_end=end) ## the passed times don't actually do anything, but it does trigger the curve updates
-                    _subfn_sync_export_chunk_window(start, end, included_track_dock_identifiers, found_track_widgets, debug_print=debug_print)
+                    first_chunk = True
+                    for ax, (start, end) in zip(axes, page_chunks):
+                        ## one temp axes to draw into:
+                        # active_2d_plot.Render2DScrollWindowPlot_on_window_update(start, end)
+                        # active_2d_plot.TimeCurvesViewMixin_on_window_update(new_start=start, new_end=end) ## the passed times don't actually do anything, but it does trigger the curve updates
+                        _subfn_sync_export_chunk_window(start, end, included_track_dock_identifiers, found_track_widgets, debug_print=debug_print)
 
-                    # render each track
-                    for track_IDX, (a_widget, info) in enumerate(zip(found_track_widgets, export_infos)):
-                        dock_id = included_track_dock_identifiers[track_IDX]
-                        if debug_print:
-                            print(f'track_IDX: {track_IDX} dock_id: "{dock_id}" info["extent"]: {info["extent"]}')
+                        # render each track
+                        for track_IDX, (a_widget, info) in enumerate(zip(found_track_widgets, export_infos)):
+                            dock_id = included_track_dock_identifiers[track_IDX]
+                            if debug_print:
+                                print(f'track_IDX: {track_IDX} dock_id: "{dock_id}" info["extent"]: {info["extent"]}')
 
-                        apply_chunk_xlim = (dock_id in ui_connections and dock_id != 'tracks')
-                        arr = a_widget.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print, max_export_width_px=max_export_width_px, force_render_interval_labels=True)
-                        if arr is None or arr.size == 0:
-                            print(f'WARN: empty export for track "{dock_id}" (track_IDX={track_IDX}) chunk ({start}, {end}); skipping imshow.')
-                            continue
-                        if debug_print:
-                            print(f'\ttrack "{dock_id}" arr.shape: {arr.shape}')
-                        if arr.shape[0] < 2 or arr.shape[1] < 2:
-                            print(f'WARN: export for track "{dock_id}" is very small ({arr.shape}); content may be blank.')
-                        ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
-                        ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
-                    ## END for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos))...
+                            apply_chunk_xlim = (dock_id in ui_connections and dock_id != 'tracks')
+                            arr = a_widget.export_as_img_arr(start=start, end=end, dpi=dpi, info=info, apply_chunk_xlim=apply_chunk_xlim, debug_print=debug_print, max_export_width_px=max_export_width_px, force_render_interval_labels=True)
+                            if arr is None or arr.size == 0:
+                                print(f'WARN: empty export for track "{dock_id}" (track_IDX={track_IDX}) chunk ({start}, {end}); skipping imshow.')
+                                continue
+                            if debug_print:
+                                print(f'\ttrack "{dock_id}" arr.shape: {arr.shape}')
+                            if arr.shape[0] < 2 or arr.shape[1] < 2:
+                                print(f'WARN: export for track "{dock_id}" is very small ({arr.shape}); content may be blank.')
+                            ## render the image into the temporary matplotlib ax using `ax.imshow(...)`
+                            ax.imshow(arr, extent=[start, end, info['extent'][2], info['extent'][3]], aspect='auto', origin='upper') 
+                        ## END for track_IDX, (t, info) in enumerate(zip(found_track_widgets, export_infos))...
 
-                    # separators between tracks (drawn in reserved gap above each track's content extent)
-                    if len(export_infos) > 1 and separator_height_inches > 0:
-                        for info in export_infos[:-1]:
-                            sep_y = info['extent'][3] + separator_height_inches / 2.0
-                            ax.axhline(y=sep_y, **track_separator_line_kwargs)
-                        ## END for i, info in enumerate(export_infos[:-1])...
+                        # separators between tracks (drawn in reserved gap above each track's content extent)
+                        if len(export_infos) > 1 and separator_height_inches > 0:
+                            for info in export_infos[:-1]:
+                                sep_y = info['extent'][3] + separator_height_inches / 2.0
+                                ax.axhline(y=sep_y, **track_separator_line_kwargs)
+                            ## END for i, info in enumerate(export_infos[:-1])...
 
-                    ax.set_xlim(start, end)
-                    ax.set_ylim(total_y_min, total_y_max)
+                        ax.set_xlim(start, end)
+                        ax.set_ylim(total_y_min, total_y_max)
 
-                    # labels (only first chunk per page)
-                    if first_chunk and has_labels:
-                        for info, lbl in zip(export_infos, track_labels):
-                            yc = (info['extent'][2]+info['extent'][3])/2
-                            ynorm = (yc-total_y_min)/(total_y_max-total_y_min)
-                            ax.text(-0.01, ynorm, lbl, rotation=90, va='center', ha='center', transform=ax.transAxes, **multi_track_label_formatting_kwargs)
-                        ## END for info, lbl in zip(export_infos, track_labels)...
-                    ## END if first_chunk and has_labels...
+                        # labels (only first chunk per page)
+                        if first_chunk and has_labels:
+                            for info, lbl in zip(export_infos, track_labels):
+                                yc = (info['extent'][2]+info['extent'][3])/2
+                                ynorm = (yc-total_y_min)/(total_y_max-total_y_min)
+                                ax.text(-0.01, ynorm, lbl, rotation=90, va='center', ha='center', transform=ax.transAxes, **multi_track_label_formatting_kwargs)
+                            ## END for info, lbl in zip(export_infos, track_labels)...
+                        ## END if first_chunk and has_labels...
 
 
-                    # start/end time outside edges
-                    ax.text(-0.02 if has_labels else -0.01, 0.5, f"{start:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
-                    ax.text(1.02, 0.5, f"{end:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+                        # start/end time outside edges
+                        ax.text(-0.02 if has_labels else -0.01, 0.5, f"{start:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
+                        ax.text(1.02, 0.5, f"{end:.0f}", rotation=90, va='center', ha='center', transform=ax.transAxes, **time_label_formatting_kwargs)
 
-                    ax.set_xticks([]); ax.set_yticks([])
-                    first_chunk = False
+                        ax.set_xticks([]); ax.set_yticks([])
+                        first_chunk = False
 
-                ## END for ax, (start, end) in zip(axes, page_chunks)...
+                    ## END for ax, (start, end) in zip(axes, page_chunks)...
 
-                pdf.savefig(fig)
-                try:
-                    plt.close(fig)
-                except ValueError as e:
-                    print(f'failed to close temp figure with error e: {e}.')
-                    pass
-                except Exception as e:
-                    print(f'ERROR: unhandled exception {e} while trying to close temp fig.')
-                    raise
-                
-            ## END for page_chunks in pages...
-        ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
+                    pdf.savefig(fig)
+                    try:
+                        plt.close(fig)
+                    except ValueError as e:
+                        print(f'failed to close temp figure with error e: {e}.')
+                        pass
+                    except Exception as e:
+                        print(f'ERROR: unhandled exception {e} while trying to close temp fig.')
+                        raise
+                    
+                ## END for page_chunks in pages...
+            ## END with backend_pdf.PdfPages(output_pdf_path) as pdf:...
+        ## END with plt.ioff():...
         
         print(f"PDF saved to {output_pdf_path}")
         return output_pdf_path
