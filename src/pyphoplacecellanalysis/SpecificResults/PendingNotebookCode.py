@@ -1620,15 +1620,24 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
         neuron_ids = (int(pairs[0][0]), int(pairs[0][1]))
         print(f'Using most-disjoint pair: {neuron_ids} (overlap={pairs[0][2]:.4g})')
+
+    elif isinstance(neuron_ids, int):
+        pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
+        pair_idx: int = neuron_ids
+        neuron_ids = (int(pairs[pair_idx][0]), int(pairs[pair_idx][1]))
+        print(f'Using pair_idx {pair_idx}: neuron_ids: {neuron_ids} (overlap={pairs[pair_idx][2]:.4g})')
+
     neuron_ids = tuple(int(x) for x in neuron_ids)
 
     sliced: BayesianPlacemapPositionDecoder = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
-    tau = float(sliced.time_bin_size)
+    tau: float = float(sliced.time_bin_size)
     tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
     n_cells, nx, ny = tc.shape
     aclu_list = list(map(int, sliced.ratemap.neuron_ids))
     xbin, ybin = sliced.xbin, sliced.ybin
     peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
+    E_n = tau * peak_rates ## expected number of spikes
+
 
     # Seed spike counts
     if all_epochs_decoding_result is not None:
@@ -1647,17 +1656,46 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
 
     # Figure layout: row0 = posterior + factors; row1 = per-cell PF + per-cell L; sliders below
     n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
-    n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
+    # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
+    n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
+
     fig = plt.figure(figsize=(3.2 * n_grid_cols, 7.2), constrained_layout=False)
-    gs = fig.add_gridspec(3, n_grid_cols, height_ratios=[3.2, 2.4, 1.0], hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98)
 
-    ax_post = fig.add_subplot(gs[0, 0])
-    ax_pow = fig.add_subplot(gs[0, 1])
-    ax_exp = fig.add_subplot(gs[0, 2])
-    ax_L = fig.add_subplot(gs[0, 3])
+    # ## INPUTS: fig
+    # gs = fig.add_gridspec(3, n_grid_cols, height_ratios=[3.2, 2.4, 1.0], hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98)
 
-    ax_cell_pf = [fig.add_subplot(gs[1, i]) for i in range(n_cells)]
-    ax_cell_L = [fig.add_subplot(gs[1, n_cells + i]) for i in range(n_cells)]
+    # ax_post = fig.add_subplot(gs[0, 0])
+    # ax_pow = fig.add_subplot(gs[0, 1])
+    # ax_exp = fig.add_subplot(gs[0, 2])
+    # ax_L = fig.add_subplot(gs[0, 3])
+
+    # ax_cell_pf = [fig.add_subplot(gs[1, i]) for i in range(n_cells)]
+    # ax_cell_L = [fig.add_subplot(gs[1, n_cells + i]) for i in range(n_cells)]
+
+    ## INPUTS: fig
+    mosaic_layout = [
+        [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * max(n_factor_cols - n_cells, 0),
+        [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * max(n_factor_cols - n_cells, 0),   
+        ["decoded_posterior", "term0", "term1", "joint_likelihood"],
+    ]
+
+    ax_dict = fig.subplot_mosaic(
+        mosaic_layout,
+        height_ratios=[3.0, 3.0, 3.2],
+        width_ratios=[1, 1, 1, 1],
+        gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98),
+    )
+
+
+    ax_post = ax_dict['decoded_posterior']
+    ax_pow = ax_dict['term0']
+    ax_exp = ax_dict['term1']
+    ax_L = ax_dict['joint_likelihood']
+
+    # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
+    ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
+    ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
+
 
     state = {'n': n0.copy(), 'ims': {}}
 
@@ -1681,14 +1719,30 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         else:
             _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$L(x)$ (unnormalized)', cmap='plasma')
 
+        ## Use a real, repeatable colormap list for n_cells
+        import matplotlib.cm as cm
+        import matplotlib.colors as mcolors
+
+        # Generate a list of distinct colormaps for each cell
+        # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
+        # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
+        base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
+        # If n_cells > len(base_cmaps), cycle
+        cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
+
+        ## Place Cells
         for i, ax in enumerate(ax_cell_pf):
-            _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap='Greens' if i == 0 else 'Reds')
-            E_n = tau * peak_rates[i]
-            ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={E_n:.2f}$', fontsize=8)
+            cmap = cell_cmaps[i]
+            _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap=cmap)
+            an_E_n = E_n[i] # tau * peak_rates[i]
+            # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
+            ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
+
         ## END for i, ax in enumerate(ax_cell_pf)...
 
         for i, ax in enumerate(ax_cell_L):
-            _subfn_imshow_map(ax, parts['per_cell_L'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $(\tau f)^{n}/n!\,e^{{-\tau f}}$', cmap='viridis')
+            cmap = cell_cmaps[i]
+            _subfn_imshow_map(ax, parts['per_cell_L'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
         ## END for i, ax in enumerate(ax_cell_L)...
 
         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(aclu_list, n)])
