@@ -1544,7 +1544,11 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         (fig, sliced_decoder, neuron_ids): figure with live UI refs on ``fig._bayes_eqn_ui``, neuron-sliced decoder, resolved cell ids.
     """
     from math import factorial
+    import matplotlib.cm as cm
+    import matplotlib.colors as mcolors
     from matplotlib.widgets import Slider, Button
+    from neuropy.utils.matplotlib_helpers import FormattedFigureText
+    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 
     def _subfn_orient_2d_for_imshow(M: NDArray) -> NDArray:
         """Match placefield / posterior display orientation used elsewhere."""
@@ -1638,6 +1642,13 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
     E_n = tau * peak_rates ## expected number of spikes
 
+    ## Use a real, repeatable colormap list for n_cells
+    # Generate a list of distinct colormaps for each cell
+    # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
+    # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
+    base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
+    # If n_cells > len(base_cmaps), cycle
+    cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
 
     # Seed spike counts
     if all_epochs_decoding_result is not None:
@@ -1659,7 +1670,17 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
     n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
 
-    fig = plt.figure(figsize=(3.2 * n_grid_cols, 7.2), constrained_layout=False)
+    # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
+    slider_h: float = 0.022
+    slider_gap: float = 0.018  # vertical gap between slider axes (thumbs extend past ax height)
+    slider_pitch: float = slider_h + slider_gap
+    controls_bottom: float = 0.018
+    controls_top_pad: float = 0.018
+    controls_band_h: float = n_cells * slider_pitch + controls_top_pad
+    mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
+    fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
+
+    fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
 
     # ## INPUTS: fig
     # gs = fig.add_gridspec(3, n_grid_cols, height_ratios=[3.2, 2.4, 1.0], hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98)
@@ -1683,8 +1704,27 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         mosaic_layout,
         height_ratios=[3.0, 3.0, 3.2],
         width_ratios=[1, 1, 1, 1],
-        gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98),
+        gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
     )
+
+
+    title_string = f"Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
+    subtitle_string = None # "Place fields, expected spike counts, and likelihood terms across spatial bins"
+
+    perform_update_title_subtitle(fig=fig, ax=ax_dict, title_string=title_string, subtitle_string=subtitle_string)
+
+    # `flexitext` version:
+    text_formatter = FormattedFigureText(fig=fig)
+    plt.title('')
+    plt.suptitle('')
+    text_formatter.setup_margins(fig)
+    text_formatter.set_title(title=title_string)
+
+    # ## Need to extract the track name ('maze1') for the title in this plot. 
+    # track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
+    # # TODO: do we want to convert this into "long" or "short"?
+    # header_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> replay|laps <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
+    # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
 
 
     ax_post = ax_dict['decoded_posterior']
@@ -1719,16 +1759,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         else:
             _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$L(x)$ (unnormalized)', cmap='plasma')
 
-        ## Use a real, repeatable colormap list for n_cells
-        import matplotlib.cm as cm
-        import matplotlib.colors as mcolors
 
-        # Generate a list of distinct colormaps for each cell
-        # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
-        # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
-        base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
-        # If n_cells > len(base_cmaps), cycle
-        cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
 
         ## Place Cells
         for i, ax in enumerate(ax_cell_pf):
@@ -1752,12 +1783,22 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         fig.canvas.draw_idle()
 
 
-    # Sliders
+    # Sliders — y from bottom of stack upward; pitch clears thumb overlap
     slider_axes = []
     sliders = []
     for i, aclu in enumerate(aclu_list):
-        ax_s = fig.add_axes([0.12, 0.06 - 0.00 + 0.035 * (n_cells - 1 - i), 0.55, 0.025])
-        s = Slider(ax_s, f'n[{aclu}]', 0, max_spikes_per_cell, valinit=int(state['n'][i]), valstep=1, valfmt='%0.0f')
+        y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
+        ax_s = fig.add_axes([0.12, y_s, 0.55, slider_h])
+        cell_cmap = cm.get_cmap(cell_cmaps[i])
+        marker_color = cell_cmap(0.75)
+        track_color = cell_cmap(0.22)
+        s = Slider(ax_s, f'n[{aclu}]', 0, max_spikes_per_cell, valinit=int(state['n'][i]), valstep=1, valfmt='%0.0f',
+                   color=marker_color, track_color=track_color, initcolor='none',
+                   handle_style=dict(facecolor=marker_color, edgecolor=marker_color, size=8))
+        s.vline.set_visible(False)
+        s.label.set_color(marker_color)
+        s.valtext.set_color(marker_color)
+        ax_s.axvline(np.clip(float(E_n[i]), 0, max_spikes_per_cell), color=marker_color, linewidth=1.0, alpha=0.85, zorder=5)
         slider_axes.append(ax_s)
         sliders.append(s)
     ## END for i, aclu in enumerate(aclu_list)...
@@ -1772,10 +1813,12 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         s.on_changed(_subfn_on_slider)
     ## END for s in sliders...
 
-    # Quick-set buttons
-    ax_btn_zero = fig.add_axes([0.72, 0.055, 0.08, 0.04])
-    ax_btn_one = fig.add_axes([0.81, 0.055, 0.08, 0.04])
-    ax_btn_exp = fig.add_axes([0.90, 0.055, 0.08, 0.04])
+    # Quick-set buttons — vertically centered on the slider stack
+    btn_h: float = 0.04
+    btn_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - btn_h) * 0.5)
+    ax_btn_zero = fig.add_axes([0.72, btn_y, 0.08, btn_h])
+    ax_btn_one = fig.add_axes([0.81, btn_y, 0.08, btn_h])
+    ax_btn_exp = fig.add_axes([0.90, btn_y, 0.08, btn_h])
     b_zero = Button(ax_btn_zero, 'n=0')
     b_one = Button(ax_btn_one, 'n=1')
     b_exp = Button(ax_btn_exp, 'n≈E')
