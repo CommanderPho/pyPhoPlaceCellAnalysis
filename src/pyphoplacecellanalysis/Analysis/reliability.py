@@ -847,6 +847,7 @@ class CellIndividualReliabilityMatrix:
             in_field_masks=in_field_masks,
             neuron_ids=neuron_ids,
             time_bin_size_seconds=0.050,
+            max_t_idx = 1000,
         )
         t_bin_aclus_reliability_df
 
@@ -990,92 +991,113 @@ class CellIndividualReliabilityMatrix:
             .join(in_field_lut, on=["aclu", "binned_x", "binned_y"], how="left")
             .with_columns(pl.col("is_in_field").fill_null(False))
         )
-        spikes_tagged
+        # spikes_tagged
         per_tbin = (
             spikes_tagged
             .group_by(["aclu", "t_bin_idx"])
             .agg([
                 pl.len().alias("n_spikes"),
-                pl.col("is_in_field").sum().alias("n_spikes_in_field"),
-                (~pl.col("is_in_field")).sum().alias("n_spikes_out_field"),
+                # pl.col("is_in_field").sum().alias("n_spikes_in_field"),
+                # (~pl.col("is_in_field")).sum().alias("n_spikes_out_field"),
             ])
-            .with_columns([
-                (pl.col("n_spikes_in_field") > 0).alias("tbin_has_in_field_spike"),
-                (pl.col("n_spikes_out_field") > 0).alias("tbin_has_out_field_spike"),
-                (pl.col("n_spikes_out_field") == 0).alias("tbin_all_in_field"),
-                (pl.col("n_spikes_in_field") == 0).alias("tbin_all_out_field"),
-            ])
-        )
-        per_tbin = per_tbin.to_pandas()
-        per_tbin
-        tbin_counts = per_tbin.groupby(['aclu']).agg(n_spikes_sum=('n_spikes', 'sum'), t_bin_idx_nunique=('t_bin_idx', 'nunique'), n_spikes_in_field_sum=('n_spikes_in_field', 'sum'), n_spikes_out_field_sum=('n_spikes_out_field', 'sum')).reset_index()
-        tbin_counts
+            # .with_columns([
+            #     (pl.col("n_spikes_in_field") > 0).alias("tbin_has_in_field_spike"),
+            #     (pl.col("n_spikes_out_field") > 0).alias("tbin_has_out_field_spike"),
+            #     (pl.col("n_spikes_out_field") == 0).alias("tbin_all_in_field"),
+            #     (pl.col("n_spikes_in_field") == 0).alias("tbin_all_out_field"),
+            # ])
+        ).to_pandas()
+        # per_tbin = per_tbin.to_pandas()
+        # per_tbin
+        # tbin_counts = per_tbin.groupby(['aclu']).agg(n_spikes_sum=('n_spikes', 'sum'), t_bin_idx_nunique=('t_bin_idx', 'nunique'), n_spikes_in_field_sum=('n_spikes_in_field', 'sum'), n_spikes_out_field_sum=('n_spikes_out_field', 'sum')).reset_index()
+        # tbin_counts
 
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute Reliability Matrix                                                                                                                                                                                                                                                           #
         # ==================================================================================================================================================================================================================================================================================== #
-        # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
-        ## INPUTS: per_tbin, (binned_xy_idxs_to_field_aclus_dict, binned_xy_idxs_to_outoffield_aclus_dict), time_bin_edges_binning_info, time_bin_info_df, neuron_ids
-        n_t_bins: int = len(time_bin_edges_binning_info.bin_indicies)
+        t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids,
+            binned_xy_idxs_to_field_aclus_dict=binned_xy_idxs_to_field_aclus_dict, binned_xy_idxs_to_outoffield_aclus_dict=binned_xy_idxs_to_outoffield_aclus_dict, **kwargs)
+
+        ## OUTPUTS: t_bin_aclus_reliability_df
+        return t_bin_aclus_reliability_df
+
+
+    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
+    @classmethod
+    def perform_compute_confusion_matrix(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, neuron_ids,
+                                         binned_xy_idxs_to_field_aclus_dict: Dict[Tuple[int, int], NDArray], binned_xy_idxs_to_outoffield_aclus_dict: Dict[Tuple[int, int], NDArray],
+                                         max_t_idx: Optional[int] = None, **kwargs) -> pd.DataFrame:
+        """Accumulate per-aclu TP/FP/TN/FN from animal position per t-bin vs which cells' fields cover that bin.
+
+        Parameters
+        ----------
+        per_tbin : DataFrame with columns ['aclu', 't_bin_idx', 'n_spikes'] (optionally pre-mapped 'neuron_IDX').
+        time_bin_info_df : per-time-bin animal position with ['binned_x', 'binned_y'] (1-based labels).
+        neuron_ids : ordered neuron ids (row order of output).
+        binned_xy_idxs_to_field_aclus_dict / binned_xy_idxs_to_outoffield_aclus_dict : (bx, by) -> aclus.
+        max_t_idx : if set, only process valid iloc positions with t_idx < max_t_idx (debug/partial runs).
+
+        Returns
+        -------
+        t_bin_aclus_reliability_df : indexed by aclu with true_pos/true_neg/false_pos/false_neg.
+            Note: TP/FP are spike counts; TN/FN are silent time-bin counts (mixed units).
+        """
+        neuron_ids = np.asarray(neuron_ids)
         aclu_to_neuron_idx_map = dict(zip(neuron_ids, np.arange(len(neuron_ids))))
         ## do once:
         if 'neuron_IDX' not in per_tbin.columns:
+            per_tbin = per_tbin.copy()
             per_tbin['neuron_IDX'] = per_tbin['aclu'].map(aclu_to_neuron_idx_map).astype(int)
 
-        # t_bin_aclus_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
-        t_bin_aclus_true_positive_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
-        t_bin_aclus_true_negative_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
-        t_bin_aclus_false_positive_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
-        t_bin_aclus_false_negative_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
-        # t_bin_aclus_spike_counts_dict = dict(zip(neuron_ids, t_bin_aclus_spike_counts_arr))
+        t_bin_aclus_true_positive_spike_counts_arr = np.zeros((len(neuron_ids),))
+        t_bin_aclus_true_negative_spike_counts_arr = np.zeros((len(neuron_ids),))
+        t_bin_aclus_false_positive_spike_counts_arr = np.zeros((len(neuron_ids),))
+        t_bin_aclus_false_negative_spike_counts_arr = np.zeros((len(neuron_ids),))
 
-        ## check for invalid t_bins (containing NaN binned_x/y columns
+        ## check for invalid t_bins (containing NaN binned_x/y columns)
         valid_tbin_mask = time_bin_info_df[['binned_x', 'binned_y']].notna().all(axis=1)
-        valid_t_idxs = time_bin_info_df.index[valid_tbin_mask].to_numpy()
-        # if you iterate 0-based iloc positions instead:
         valid_iloc = np.flatnonzero(valid_tbin_mask.to_numpy())
         print(f"n_tbins={len(time_bin_info_df)}, n_valid={valid_tbin_mask.sum()}, n_nan={(~valid_tbin_mask).sum()}")
-        time_bin_info_df.loc[~valid_tbin_mask]  # inspect NaN rows
 
-        # for t_idx in time_bin_edges_binning_info.bin_indicies:
-        for t_idx in valid_iloc:  # or valid_t_idxs if matching index/t_bin_idx
-            if t_idx < 5000:
+        for t_idx in valid_iloc:
+            if (max_t_idx is not None) and (t_idx >= max_t_idx):
+                continue
 
-                a_row = time_bin_info_df.iloc[t_idx]
-                target_idxs_tuple = (int(a_row['binned_x']), int(a_row['binned_y']))
-                a_pos_infield_aclus_list = binned_xy_idxs_to_field_aclus_dict.get(target_idxs_tuple, np.array([]))
-                a_pos_outoffield_aclus_list = binned_xy_idxs_to_outoffield_aclus_dict.get(target_idxs_tuple, np.array([]))
+            a_row = time_bin_info_df.iloc[t_idx]
+            target_idxs_tuple = (int(a_row['binned_x']), int(a_row['binned_y']))
+            a_pos_infield_aclus_list = binned_xy_idxs_to_field_aclus_dict.get(target_idxs_tuple, np.array([]))
+            a_pos_outoffield_aclus_list = binned_xy_idxs_to_outoffield_aclus_dict.get(target_idxs_tuple, np.array([]))
 
-                curr_t_spikes_df = per_tbin[(per_tbin['t_bin_idx'] == t_idx)][['aclu', 'neuron_IDX', 'n_spikes']]
+            curr_t_spikes_df = per_tbin[(per_tbin['t_bin_idx'] == t_idx)][['aclu', 'neuron_IDX', 'n_spikes']]
 
-                true_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list)] ## spikes observed but not expected from cells' fields
-                # t_bin_aclus_true_positive_spike_counts_arr[true_positive_spikes_df['aclu'].map(aclu_to_neuron_idx_map)] += true_positive_spikes_df['n_spikes']
-                t_bin_aclus_true_positive_spike_counts_arr[true_positive_spikes_df['neuron_IDX']] += true_positive_spikes_df['n_spikes']
+            true_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list)] ## spikes observed but not expected from cells' fields
+            tp_neuron_idxs = true_positive_spikes_df['neuron_IDX'].to_numpy()
+            tp_n_spikes = true_positive_spikes_df['n_spikes'].to_numpy()
+            if len(tp_neuron_idxs) > 0:
+                t_bin_aclus_true_positive_spike_counts_arr[tp_neuron_idxs] += tp_n_spikes
 
-                ## true-negative: out-of-field and no-spikes (cells not expected to fire that didn't)
-                true_negative_aclus = a_pos_outoffield_aclus_list[np.isin(a_pos_outoffield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
+            ## true-negative: out-of-field and no-spikes (cells not expected to fire that didn't)
+            true_negative_aclus = a_pos_outoffield_aclus_list[np.isin(a_pos_outoffield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
+            if len(true_negative_aclus) > 0:
                 t_bin_aclus_true_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in true_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
 
-                ## false-negative: spikes expected but that did not appear in this bin
-                false_negative_aclus = a_pos_infield_aclus_list[np.isin(a_pos_infield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
-                # t_bin_aclus_false_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in false_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
+            ## false-negative: spikes expected but that did not appear in this bin
+            false_negative_aclus = a_pos_infield_aclus_list[np.isin(a_pos_infield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
+            if len(false_negative_aclus) > 0:
                 t_bin_aclus_false_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in false_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
 
-                # false_positive_spikes_idxs = np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list, invert=True) ## spikes observed but not expected from cells' fields
-                # false_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list, invert=True)] ## spikes observed but not expected from cells' fields
-                false_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_outoffield_aclus_list)] ## spikes observed but not expected from cells' fields
-
-                # t_bin_aclus_false_positive_spike_counts_arr[false_positive_spikes_df['aclu'].map(aclu_to_neuron_idx_map)] += false_positive_spikes_df['n_spikes']
-                t_bin_aclus_false_positive_spike_counts_arr[false_positive_spikes_df['neuron_IDX']] += false_positive_spikes_df['n_spikes']
-
-        # ## END for t_idx in time_bin_edges_binning_info.bin_indicies...
+            false_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_outoffield_aclus_list)]
+            fp_neuron_idxs = false_positive_spikes_df['neuron_IDX'].to_numpy()
+            fp_n_spikes = false_positive_spikes_df['n_spikes'].to_numpy()
+            if len(fp_neuron_idxs) > 0:
+                t_bin_aclus_false_positive_spike_counts_arr[fp_neuron_idxs] += fp_n_spikes
+        ## END for t_idx in valid_iloc....
 
         t_bin_aclus_reliability_df: pd.DataFrame = pd.DataFrame(
             dict(aclu=neuron_ids, neuron_IDX=np.arange(len(neuron_ids)),
                 true_pos=t_bin_aclus_true_positive_spike_counts_arr, true_neg=t_bin_aclus_true_negative_spike_counts_arr, false_pos=t_bin_aclus_false_positive_spike_counts_arr, false_neg=t_bin_aclus_false_negative_spike_counts_arr,
             ),
         ).set_index('aclu', drop=True, inplace=False)
-        t_bin_aclus_reliability_df
 
         ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
