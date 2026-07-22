@@ -1,3 +1,6 @@
+ 
+from __future__ import annotations # prevents having to specify types for typehinting as strings
+from typing import TYPE_CHECKING
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -17,7 +20,13 @@ from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from scipy.ndimage import gaussian_filter1d
 
 # plotting:
+
 import matplotlib.pyplot as plt
+
+if TYPE_CHECKING:
+    ## typehinting only imports here
+    from matplotlib.figure import Figure
+    from matplotlib.axes import Axes
 
 
 
@@ -802,4 +811,570 @@ def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_e
     return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
 
 
+from typing import Dict, List, Optional, Sequence, Tuple
+import numpy as np
+import polars as pl
+from neuropy.utils.mixins.binning_helpers import compute_spanning_bins
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo # for epochs_spkcount getting the correct time bins
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+from neuropy.core.flattened_spiketrains import SpikesAccessor
+
+
+class CellIndividualReliabilityMatrix:
+    """
+        from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
+
+        pfs = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D']
+        ratemaps = pfs.ratemap
+        neuron_ids = deepcopy(pfs.ratemap.neuron_ids)
+        n_neuron_ids: int = len(neuron_ids)
+        spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
+
+        reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
+            spikes_df=spikes_df,
+            active_peak_prominence_2d_results=active_peak_prominence_2d_results,
+            ratemaps=ratemaps,
+            n_top_peaks=3,
+            # slice_level_multiplier=0.9,
+            slice_level_multiplier=0.2,
+            fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
+        )
+        reliability_df
+
+        ## OUTPUTS: reliability_df, in_field_masks
+
+
+    """
+    @classmethod
+    def compute_reliability_matrix(cls, **kwargs):
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Main Compute Block                                                                                                                                                                                                                                                                   #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        # ratemaps = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D'].ratemap
+        # spikes_df = deepcopy(curr_active_pipeline.computation_results[maze_name].computed_data['pf2D'].filtered_spikes_df)
+        spikes_df = spikes_df.drop(columns=['t_bin_idx'], inplace=False)
+
+        ## INPUTS: spikes_df, ratemaps
+        # spikes_df should already have 'x' and 'y' (e.g. active_pf_2D.filtered_spikes_df)
+
+        # spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(spikes_df, bin_values=(ratemaps.xbin, ratemaps.ybin), position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=False)
+        spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+
+        if spikes_df.spikes.time_variable_name not in spikes_df.columns:
+            if 't_seconds' in spikes_df.columns:
+                spikes_df.spikes.set_time_variable_name('t_seconds')
+
+        # time_bin_size_seconds: float = 0.250
+        time_bin_size_seconds: float = 0.050 # 50ms bins
+        time_bin_edges, time_bin_edges_binning_info = compute_spanning_bins(spikes_df.spikes.times, bin_size=time_bin_size_seconds)
+        bin_container = BinningContainer.init_from_edges(edges=time_bin_edges, edge_info=time_bin_edges_binning_info)
+        n_t_bins: int = len(bin_container.centers) # 1427041
+
+        spikes_df = spikes_df.spikes.add_binned_time_column(time_bin_edges, time_bin_edges_binning_info)
+        spikes_df.rename(columns={'binned_time': 't_bin_idx'}, inplace=True)
+        spikes_df['t_bin_idx'] = spikes_df['t_bin_idx'].astype(int)
+
+        ## Positions:
+        active_pos_df: pd.DataFrame = deepcopy(pfs.filtered_pos_df)
+        # active_pos_df
+        active_pos_df = active_pos_df.position.add_binned_time_column(time_bin_edges, time_bin_edges_binning_info)
+        active_pos_df.rename(columns={'binned_time': 't_bin_idx'}, inplace=True)
+        active_pos_df['t_bin_idx'] = spikes_df['t_bin_idx'].astype(int)
+        active_pos_df = active_pos_df.dropna(subset=['binned_x', 'binned_y', 't_bin_idx']) # Drop rows with missing data in columns: 'binned_x', 'binned_y', 't_bin_idx'
+        active_pos_df
+
+        # pos_df = pfs.filtered_pos_df  # or sess.position.to_dataframe()
+
+        time_bin_info_df: pd.DataFrame = pd.DataFrame({'t': bin_container.centers, 't_bin_idx': np.arange(bin_container.num_bins),
+            'x': np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['x']),
+            'y': np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['y']),
+        })
+
+        # time_bin_info_df.position.add
+        time_bin_info_df = time_bin_info_df.position.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+        time_bin_info_df
+
+        ## OUTPUTS: spikes_df, active_pos_df, time_bin_info_df
+        # spikes_df, active_pos_df, time_bin_info_df
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Build binned-x/y indicies to infield/outfield aclus for efficient computation later                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
+        binned_xy_idxs_to_field_aclus_dict: Dict[Tuple[int, int], List] = {}
+        binned_xy_idxs_to_outoffield_aclus_dict: Dict[Tuple[int, int], List] = {} ## complement of aclus in `binned_xy_idxs_to_field_aclus_dict`
+
+        for aclu, mask in in_field_masks.items():
+            ix, iy = np.nonzero(mask)  # 0-based
+            for bx, by in zip(ix + 1, iy + 1):  # match spikes_df binned_x/y labels
+                target_idxs_tuple = (int(bx), int(by))
+                if target_idxs_tuple not in binned_xy_idxs_to_field_aclus_dict:
+                    binned_xy_idxs_to_field_aclus_dict[target_idxs_tuple] = [] ## make new arr
+
+                ## already exists, append
+                binned_xy_idxs_to_field_aclus_dict[target_idxs_tuple].append(int(aclu))
+                
+
+            ## END for bx, by in zip(ix + 1, iy + 1)...
+        ## END for aclu, mask in in_field_masks.items()...
+
+        binned_xy_idxs_to_field_aclus_dict = {k: np.unique(v) for k, v in binned_xy_idxs_to_field_aclus_dict.items()} ## convert to sorted np.arrays
+        binned_xy_idxs_to_field_aclus_dict
+
+        binned_xy_idxs_to_outoffield_aclus_dict = {k: np.unique(list(set(neuron_ids) - set(aclus))) for k, aclus in binned_xy_idxs_to_field_aclus_dict.items()}
+        # binned_xy_idxs_to_outoffield_aclus_dict
+        ## OUTPUTS: binned_xy_idxs_to_field_aclus_dict, binned_xy_idxs_to_outoffield_aclus_dict
+
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute in_field masks for efficient computation                                                                                                                                                                                                                                     #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
+        rows = []
+        for aclu, mask in in_field_masks.items():
+            ix, iy = np.nonzero(mask)  # 0-based
+            for bx, by in zip(ix + 1, iy + 1):  # match spikes_df binned_x/y labels
+                rows.append({"aclu": int(aclu), "binned_x": int(bx), "binned_y": int(by), "is_in_field": True})
+            ## END for bx, by in zip(ix + 1, iy + 1)...
+        ## END for aclu, mask in in_field_masks.items()...
+
+        in_field_lut = pl.DataFrame(rows)  # only True cells; absent = out-of-field / invalid
+        in_field_lut
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Polars Acceleration                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        ## INPUTS: spikes_df, in_field_lut
+        spikes_pl = pl.from_pandas(spikes_df[["t_bin_idx", "aclu", "binned_x", "binned_y"]]).with_columns([
+        # spikes_pl = pl.from_pandas(spikes_df.drop(columns=['neuron_type'], inplace=False, errors="ignore")).with_columns([
+            pl.col("binned_x").cast(pl.Int64),
+            pl.col("binned_y").cast(pl.Int64),
+            pl.col("aclu").cast(pl.Int64),
+            pl.col("t_bin_idx").cast(pl.Int64),
+        ])
+
+        spikes_tagged = (
+            spikes_pl
+            .join(in_field_lut, on=["aclu", "binned_x", "binned_y"], how="left")
+            .with_columns(pl.col("is_in_field").fill_null(False))
+        )
+        spikes_tagged
+        per_tbin = (
+            spikes_tagged
+            .group_by(["aclu", "t_bin_idx"])
+            .agg([
+                pl.len().alias("n_spikes"),
+                pl.col("is_in_field").sum().alias("n_spikes_in_field"),
+                (~pl.col("is_in_field")).sum().alias("n_spikes_out_field"),
+            ])
+            .with_columns([
+                (pl.col("n_spikes_in_field") > 0).alias("tbin_has_in_field_spike"),
+                (pl.col("n_spikes_out_field") > 0).alias("tbin_has_out_field_spike"),
+                (pl.col("n_spikes_out_field") == 0).alias("tbin_all_in_field"),
+                (pl.col("n_spikes_in_field") == 0).alias("tbin_all_out_field"),
+            ])
+        )
+        per_tbin = per_tbin.to_pandas()
+        per_tbin
+        tbin_counts = per_tbin.groupby(['aclu']).agg(n_spikes_sum=('n_spikes', 'sum'), t_bin_idx_nunique=('t_bin_idx', 'nunique'), n_spikes_in_field_sum=('n_spikes_in_field', 'sum'), n_spikes_out_field_sum=('n_spikes_out_field', 'sum')).reset_index()
+        tbin_counts
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Compute Reliability Matrix                                                                                                                                                                                                                                                           #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
+        ## INPUTS: per_tbin, (binned_xy_idxs_to_field_aclus_dict, binned_xy_idxs_to_outoffield_aclus_dict), time_bin_edges_binning_info, time_bin_info_df, neuron_ids
+        n_t_bins: int = len(time_bin_edges_binning_info.bin_indicies)
+        aclu_to_neuron_idx_map = dict(zip(neuron_ids, np.arange(len(neuron_ids))))
+        ## do once:
+        if 'neuron_IDX' not in per_tbin.columns:
+            per_tbin['neuron_IDX'] = per_tbin['aclu'].map(aclu_to_neuron_idx_map).astype(int)
+
+        # t_bin_aclus_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
+        t_bin_aclus_true_positive_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
+        t_bin_aclus_true_negative_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
+        t_bin_aclus_false_positive_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
+        t_bin_aclus_false_negative_spike_counts_arr = np.zeros((len(neuron_ids),)) # (n_neurons, )
+        # t_bin_aclus_spike_counts_dict = dict(zip(neuron_ids, t_bin_aclus_spike_counts_arr))
+
+        ## check for invalid t_bins (containing NaN binned_x/y columns
+        valid_tbin_mask = time_bin_info_df[['binned_x', 'binned_y']].notna().all(axis=1)
+        valid_t_idxs = time_bin_info_df.index[valid_tbin_mask].to_numpy()
+        # if you iterate 0-based iloc positions instead:
+        valid_iloc = np.flatnonzero(valid_tbin_mask.to_numpy())
+        print(f"n_tbins={len(time_bin_info_df)}, n_valid={valid_tbin_mask.sum()}, n_nan={(~valid_tbin_mask).sum()}")
+        time_bin_info_df.loc[~valid_tbin_mask]  # inspect NaN rows
+
+        # for t_idx in time_bin_edges_binning_info.bin_indicies:
+        for t_idx in valid_iloc:  # or valid_t_idxs if matching index/t_bin_idx
+            if t_idx < 5000:
+
+                a_row = time_bin_info_df.iloc[t_idx]
+                target_idxs_tuple = (int(a_row['binned_x']), int(a_row['binned_y']))
+                a_pos_infield_aclus_list = binned_xy_idxs_to_field_aclus_dict.get(target_idxs_tuple, np.array([]))
+                a_pos_outoffield_aclus_list = binned_xy_idxs_to_outoffield_aclus_dict.get(target_idxs_tuple, np.array([]))
+
+                curr_t_spikes_df = per_tbin[(per_tbin['t_bin_idx'] == t_idx)][['aclu', 'neuron_IDX', 'n_spikes']]
+
+                true_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list)] ## spikes observed but not expected from cells' fields
+                # t_bin_aclus_true_positive_spike_counts_arr[true_positive_spikes_df['aclu'].map(aclu_to_neuron_idx_map)] += true_positive_spikes_df['n_spikes']
+                t_bin_aclus_true_positive_spike_counts_arr[true_positive_spikes_df['neuron_IDX']] += true_positive_spikes_df['n_spikes']
+
+                ## true-negative: out-of-field and no-spikes (cells not expected to fire that didn't)
+                true_negative_aclus = a_pos_outoffield_aclus_list[np.isin(a_pos_outoffield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
+                t_bin_aclus_true_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in true_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
+
+                ## false-negative: spikes expected but that did not appear in this bin
+                false_negative_aclus = a_pos_infield_aclus_list[np.isin(a_pos_infield_aclus_list, curr_t_spikes_df['aclu'], invert=True)] ## aclus that fired less spikes than expected. Assume 0 spikes for these cells
+                # t_bin_aclus_false_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in false_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
+                t_bin_aclus_false_negative_spike_counts_arr[np.array([aclu_to_neuron_idx_map[v] for v in false_negative_aclus])] += 1 ## TODO: currently in terms of t_bins, we need to convert to expected number of spikes within this time bin size when done
+
+                # false_positive_spikes_idxs = np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list, invert=True) ## spikes observed but not expected from cells' fields
+                # false_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_infield_aclus_list, invert=True)] ## spikes observed but not expected from cells' fields
+                false_positive_spikes_df = curr_t_spikes_df[np.isin(curr_t_spikes_df['aclu'], a_pos_outoffield_aclus_list)] ## spikes observed but not expected from cells' fields
+
+                # t_bin_aclus_false_positive_spike_counts_arr[false_positive_spikes_df['aclu'].map(aclu_to_neuron_idx_map)] += false_positive_spikes_df['n_spikes']
+                t_bin_aclus_false_positive_spike_counts_arr[false_positive_spikes_df['neuron_IDX']] += false_positive_spikes_df['n_spikes']
+
+        # ## END for t_idx in time_bin_edges_binning_info.bin_indicies...
+
+        t_bin_aclus_reliability_df: pd.DataFrame = pd.DataFrame(
+            dict(aclu=neuron_ids, neuron_IDX=np.arange(len(neuron_ids)),
+                true_pos=t_bin_aclus_true_positive_spike_counts_arr, true_neg=t_bin_aclus_true_negative_spike_counts_arr, false_pos=t_bin_aclus_false_positive_spike_counts_arr, false_neg=t_bin_aclus_false_negative_spike_counts_arr,
+            ),
+        ).set_index('aclu', drop=True, inplace=False)
+        t_bin_aclus_reliability_df
+
+        ## OUTPUTS: t_bin_aclus_reliability_df
+        return t_bin_aclus_reliability_df
+
+
+    @function_attributes(short_name=None, tags=['promence'], input_requires=[], output_provides=[], uses=[], used_by=['_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
+    @classmethod
+    def _build_top_peak_90pct_masks(cls, active_peak_prominence_2d_results, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9) -> Dict[int, np.ndarray]:
+        """Build per-neuron boolean masks (ny, nx) = union of top-N peak contours at `slice_level_multiplier` * peak height.
+
+        Uses precomputed `level_slices` when present; otherwise recomputes the contour from the stored `slab`.
+        """
+        from matplotlib.path import Path
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+        xx = np.asarray(active_peak_prominence_2d_results.xx)
+        yy = np.asarray(active_peak_prominence_2d_results.yy)
+        XX, YY = np.meshgrid(xx, yy, indexing='xy')  # (ny, nx) — matches prominence `slab` (.T of tuning curve)
+        points = np.column_stack([XX.ravel(), YY.ravel()])
+
+        def _contour_to_path(contour):
+            if contour is None:
+                return None
+            if isinstance(contour, tuple):
+                contour = contour[0]
+            if isinstance(contour, np.ndarray):
+                return Path(contour)
+            return contour  # already a Path
+
+        def _lookup_precomputed_slice(a_peak, lvl: float):
+            level_slices = a_peak.get('level_slices', {}) or {}
+            # exact / float-key match
+            slice_info = level_slices.get(lvl)
+            if slice_info is not None:
+                return slice_info
+            for k, v in level_slices.items():
+                if np.isclose(float(k), lvl, rtol=1e-5, atol=1e-8):
+                    return v
+            ## END for k, v in level_slices.items()...
+            # closest precomputed probe level (by multiplier), if any
+            probe_levels = np.asarray(a_peak.get('probe_levels', []), dtype=float)
+            if len(probe_levels) == 0 or float(a_peak.get('height', 0.0)) <= 0:
+                return None
+            mults = probe_levels / float(a_peak['height'])
+            lvl_idx = int(np.argmin(np.abs(mults - slice_level_multiplier)))
+            if np.isclose(mults[lvl_idx], slice_level_multiplier, atol=1e-3):
+                nearest_lvl = float(probe_levels[lvl_idx])
+                for k, v in level_slices.items():
+                    if np.isclose(float(k), nearest_lvl, rtol=1e-5, atol=1e-8):
+                        return v
+                    ## END for k, v in level_slices.items()...
+            return None
+
+        def _recompute_contour(a_peak, slab, lvl: float):
+            if slab is None:
+                return None
+            peak_center = np.asarray(a_peak['center'], dtype=float)
+            included = PeakPromenence._find_contours_at_levels(xx, yy, slab, peak_center, np.asarray([lvl], dtype=float))
+            # keys are the probe level floats used; match with isclose
+            for k, contour in included.items():
+                if np.isclose(float(k), lvl, rtol=1e-5, atol=1e-8):
+                    return contour
+                ## END for k, contour in included.items()...
+            # single-level call → at most one entry
+            if len(included) == 1:
+                return next(iter(included.values()))
+            return None
+
+        masks_by_neuron: Dict[int, np.ndarray] = {}
+        for neuron_id, a_result in active_peak_prominence_2d_results.results.items():
+            peaks = a_result['peaks']
+            slab = a_result.get('slab', None)
+            top_peaks = sorted(peaks.items(), key=lambda kv: kv[1]['prominence'], reverse=True)[:n_top_peaks]
+            union_mask = np.zeros(XX.shape, dtype=bool)
+
+            for _peak_id, a_peak in top_peaks:
+                lvl = float(a_peak['height'] * slice_level_multiplier)
+                slice_info = _lookup_precomputed_slice(a_peak, lvl)
+                contour = None
+                if slice_info is not None:
+                    contour = _contour_to_path(slice_info.get('contour'))
+                if contour is None:
+                    contour = _contour_to_path(_recompute_contour(a_peak, slab, lvl))
+                if contour is None:
+                    continue
+                union_mask |= contour.contains_points(points).reshape(XX.shape)
+            ## END for _peak_id, a_peak in top_peaks...
+
+            masks_by_neuron[int(neuron_id)] = union_mask
+        ## END for neuron_id, a_result in active_peak_prominence_2d_results.results.items()...
+
+        return masks_by_neuron
+
+    @function_attributes(short_name=None, tags=['INCOMPLETE'], input_requires=[], output_provides=[], uses=['_build_top_peak_90pct_masks'], used_by=[], creation_date='2026-07-22 19:22', related_items=[])
+    @classmethod
+    def _partial_compute_reliability_matrix(cls, spikes_df: pd.DataFrame, active_peak_prominence_2d_results, ratemaps, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9, fn_tn_mode: str = 'occupancy_seconds') -> Tuple[pd.DataFrame, Dict[int, np.ndarray]]:
+        """Per-cell placefield reliability confusion counts using 90% prominence field masks.
+
+        Definitions (condition = in-field; detection = spike):
+        TP: # spikes inside field
+        FP: # spikes outside field (visited maze only)
+        FN: in-field occupancy with no spikes (bins or occupancy-seconds)
+        TN: out-of-field occupancy with no spikes (bins or occupancy-seconds)
+
+        Parameters
+        ----------
+        spikes_df : must include ['aclu','x','y'] (or ['binned_x','binned_y']).
+        active_peak_prominence_2d_results : PeakProminence2D DynamicParameters.
+        ratemaps : neuropy Ratemap (2D) with occupancy, spikes_maps, xbin/ybin, neuron_ids.
+        fn_tn_mode : 'occupancy_seconds' | 'occupied_bins'
+
+        Returns
+        -------
+        reliability_df : one row per neuron with TP/FP/FN/TN (+ rates)
+        in_field_masks_xy : neuron_id -> bool mask shaped like ratemap occupancy (nx, ny)
+        """
+        assert fn_tn_mode in ('occupancy_seconds', 'occupied_bins')
+        occupancy = np.asarray(ratemaps.occupancy)  # (nx, ny)
+        visited = occupancy > 0
+        neuron_ids = np.asarray(ratemaps.neuron_ids)
+        xbin, ybin = np.asarray(ratemaps.xbin), np.asarray(ratemaps.ybin)
+        nx, ny = occupancy.shape
+
+        # Contour masks are (ny, nx); ratemap maps are (nx, ny)
+        masks_ny_nx = cls._build_top_peak_90pct_masks(active_peak_prominence_2d_results, n_top_peaks=n_top_peaks, slice_level_multiplier=slice_level_multiplier)
+        in_field_masks_xy: Dict[int, np.ndarray] = {nid: m.T for nid, m in masks_ny_nx.items() if m.shape == (ny, nx)}
+
+        # Prefer unsmoothed spike maps when available; else histogram from spikes_df
+        spikes_maps = getattr(ratemaps, 'spikes_maps', None)
+        if spikes_maps is not None:
+            spikes_maps = np.asarray(spikes_maps)
+
+        rows = []
+        for neuron_idx, neuron_id in enumerate(neuron_ids):
+            neuron_id = int(neuron_id)
+            in_field = in_field_masks_xy.get(neuron_id)
+            if in_field is None:
+                in_field = np.zeros((nx, ny), dtype=bool)
+                in_field_masks_xy[neuron_id] = in_field
+            in_field = in_field & visited
+            out_field = (~in_field) & visited
+
+            # --- TP / FP from spikes ---
+            if (spikes_maps is not None) and (spikes_maps.ndim >= 3):
+                spikes_map = np.asarray(spikes_maps[neuron_idx])
+                assert spikes_map.shape == (nx, ny), f"spikes_map shape {spikes_map.shape} != occupancy {(nx, ny)}"
+                TP = float(np.nansum(spikes_map[in_field]))
+                FP = float(np.nansum(spikes_map[out_field]))
+
+            else:
+                ## have to compute spikes_maps mangually from spikes_df:
+                cell_spikes = spikes_df[spikes_df['aclu'] == neuron_id]
+                if {'binned_x', 'binned_y'}.issubset(cell_spikes.columns):
+                    bx = cell_spikes['binned_x'].to_numpy().astype(int) - 1  # labels are often 1-indexed
+                    by = cell_spikes['binned_y'].to_numpy().astype(int) - 1
+                    valid = (bx >= 0) & (bx < nx) & (by >= 0) & (by < ny)
+                    bx, by = bx[valid], by[valid]
+                else:
+                    assert {'x', 'y'}.issubset(cell_spikes.columns), "spikes_df needs ['x','y'] or ['binned_x','binned_y']"
+                    spikes_map, _, _ = np.histogram2d(cell_spikes['x'].to_numpy(), cell_spikes['y'].to_numpy(), bins=(xbin, ybin))
+                    TP = float(np.nansum(spikes_map[in_field])) ## total spikes in the field (over all positions)
+                    FP = float(np.nansum(spikes_map[out_field])) ## total spikes outside the field (over all positions)
+                    bx = by = None
+
+                if bx is not None:
+                    is_in = in_field[bx, by]
+                    TP = float(np.sum(is_in))
+                    FP = float(np.sum(~is_in))
+                    spikes_map = np.histogram2d(cell_spikes['x'].to_numpy(), cell_spikes['y'].to_numpy(), bins=(xbin, ybin))[0] if {'x','y'}.issubset(cell_spikes.columns) else None
+
+            if spikes_maps is not None and spikes_maps.ndim >= 3:
+                spikes_map = np.asarray(spikes_maps[neuron_idx])
+            elif 'spikes_map' not in locals() or spikes_map is None:
+                cell_spikes = spikes_df[spikes_df['aclu'] == neuron_id]
+                spikes_map = np.histogram2d(cell_spikes['x'].to_numpy(), cell_spikes['y'].to_numpy(), bins=(xbin, ybin))[0]
+
+            no_spike = (spikes_map == 0) & visited
+            fn_mask = in_field & no_spike
+            tn_mask = out_field & no_spike
+
+            if fn_tn_mode == 'occupancy_seconds':
+                FN = float(np.nansum(occupancy[fn_mask]))
+                TN = float(np.nansum(occupancy[tn_mask]))
+            else:
+                FN = float(np.count_nonzero(fn_mask))
+                TN = float(np.count_nonzero(tn_mask))
+
+            denom_pos = TP + FN
+            denom_neg = TN + FP
+            denom_all = TP + FP + FN + TN
+            rows.append({
+                'neuron_id': neuron_id,
+                'n_field_bins': int(np.count_nonzero(in_field)),
+                'TP': TP, 'FP': FP, 'FN': FN, 'TN': TN,
+                'precision': TP / (TP + FP) if (TP + FP) > 0 else np.nan,
+                'recall_sensitivity': TP / denom_pos if denom_pos > 0 else np.nan,  # in-field spike capture
+                'specificity': TN / denom_neg if denom_neg > 0 else np.nan,
+                'false_positive_rate': FP / denom_neg if denom_neg > 0 else np.nan,
+                'accuracy': (TP + TN) / denom_all if denom_all > 0 else np.nan,
+                'in_field_spike_fraction': TP / (TP + FP) if (TP + FP) > 0 else np.nan,
+            })
+        ## END for neuron_idx, neuron_id in enumerate(neuron_ids)...
+
+        return pd.DataFrame(rows).set_index('neuron_id'), in_field_masks_xy
+
+
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-22 19:20', related_items=[])
+    @classmethod
+    def plot_in_field_masks_with_spikes(cls, pfs, in_field_masks: Dict[int, np.ndarray],
+                                        included_neuron_ids: Optional[Sequence[int]] = None,
+                                        color_by_in_field: bool = True, max_n_cells: Optional[int] = None,
+                                        subplots: Optional[Tuple[int, int]] = None, figsize_per_cell: float = 2.5,
+                                        mask_cmap: str = "Greens", mask_alpha: float = 0.55,
+                                        heatmap_cmap: str = "jet", heatmap_alpha: float = 0.7,
+                                        spike_s: float = 2.0, spike_alpha: float = 0.3,
+                                        use_pcolormesh: bool = True, show_trajectory: bool = False,
+                                        trajectory_alpha: float = 0.15) -> Tuple[Figure, np.ndarray]:
+        """Plot per-cell placefield heatmap (background) + in-field mask + spike positions.
+
+        Layer order (bottom → top): trajectory (optional) → tuning-curve heatmap → in-field mask → spikes.
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
+
+            ## Usage:
+            fig, axes = CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes(pfs, in_field_masks)
+
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+
+        assert getattr(pfs, "ndim", 2) >= 2, "plot_in_field_masks_with_spikes requires 2D PfND"
+        xbin = np.asarray(pfs.xbin)
+        ybin = np.asarray(pfs.ybin)
+        spikes_df = pfs.filtered_spikes_df
+        ratemap = pfs.ratemap
+        neuron_ids_rm = np.asarray(ratemap.neuron_ids)
+        tuning_curves = np.asarray(ratemap.tuning_curves)  # (n_neurons, nx, ny)
+        nx, ny = len(xbin) - 1, len(ybin) - 1
+        extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+
+        neuron_ids = list(included_neuron_ids) if included_neuron_ids is not None else sorted(in_field_masks.keys())
+        if max_n_cells is not None:
+            neuron_ids = neuron_ids[:int(max_n_cells)]
+        ## END if max_n_cells is not None...
+
+        n = len(neuron_ids)
+        assert n > 0, "No neuron_ids to plot"
+
+        if subplots is None:
+            n_cols = int(np.ceil(np.sqrt(n)))
+            n_rows = int(np.ceil(n / n_cols))
+        else:
+            n_rows, n_cols = subplots
+        ## END if subplots is None...
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(figsize_per_cell * n_cols, figsize_per_cell * n_rows), squeeze=False)
+        flat_axes: List[Axes] = list(axes.ravel())
+
+        for ax_i, aclu in enumerate(neuron_ids):
+            ax = flat_axes[ax_i]
+            aclu = int(aclu)
+            mask = np.asarray(in_field_masks.get(aclu, np.zeros((nx, ny), dtype=bool)), dtype=bool)
+            if mask.shape != (nx, ny):
+                if mask.shape == (ny, nx):
+                    mask = mask.T
+                else:
+                    raise ValueError(f"aclu {aclu}: mask shape {mask.shape} != expected {(nx, ny)}")
+                ## END if mask.shape == (ny, nx)...
+            ## END if mask.shape != (nx, ny)...
+
+            if show_trajectory and hasattr(pfs, "x") and hasattr(pfs, "y"):
+                ax.plot(pfs.x, pfs.y, color="#d3c5c5", alpha=trajectory_alpha, linewidth=0.5, zorder=0)
+            ## END if show_trajectory...
+
+            # --- background heatmap (tuning curve) ---
+            rm_idx = np.flatnonzero(neuron_ids_rm == aclu)
+            if len(rm_idx) > 0:
+                pfmap = np.asarray(tuning_curves[int(rm_idx[0])], dtype=float)
+                if use_pcolormesh:
+                    ax.pcolormesh(xbin, ybin, pfmap.T, cmap=heatmap_cmap, alpha=heatmap_alpha, shading="flat", zorder=1)
+                else:
+                    plot_pf = np.fliplr(np.rot90(pfmap, k=-1))
+                    ax.imshow(plot_pf, origin="lower", extent=extent, cmap=heatmap_cmap, alpha=heatmap_alpha, zorder=1, aspect="auto")
+                ## END if use_pcolormesh...
+            ## END if len(rm_idx) > 0...
+
+            # --- in-field mask ---
+            if use_pcolormesh:
+                ax.pcolormesh(xbin, ybin, mask.T.astype(float), cmap=mask_cmap, alpha=mask_alpha, shading="flat", vmin=0, vmax=1, zorder=2)
+            else:
+                plot_mask = np.fliplr(np.rot90(mask.astype(float), k=-1))
+                ax.imshow(plot_mask, origin="lower", extent=extent, cmap=mask_cmap, alpha=mask_alpha, vmin=0, vmax=1, zorder=2, aspect="auto")
+            ## END if use_pcolormesh...
+
+            # --- spikes ---
+            cell_spk = spikes_df[spikes_df["aclu"] == aclu]
+            if len(cell_spk) > 0:
+                if color_by_in_field and {"binned_x", "binned_y"}.issubset(cell_spk.columns):
+                    bx = cell_spk["binned_x"].to_numpy().astype(int) - 1
+                    by = cell_spk["binned_y"].to_numpy().astype(int) - 1
+                    valid = (bx >= 0) & (by >= 0) & (bx < mask.shape[0]) & (by < mask.shape[1])
+                    in_field = np.zeros(len(cell_spk), dtype=bool)
+                    in_field[valid] = mask[bx[valid], by[valid]]
+                    ax.scatter(cell_spk.loc[~in_field, "x"], cell_spk.loc[~in_field, "y"], s=spike_s, c="0.45", alpha=spike_alpha * 0.7, marker=".", linewidths=0, zorder=3)
+                    ax.scatter(cell_spk.loc[in_field, "x"], cell_spk.loc[in_field, "y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=4)
+                else:
+                    ax.scatter(cell_spk["x"], cell_spk["y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=3)
+                ## END if color_by_in_field...
+            ## END if len(cell_spk) > 0...
+
+            ax.set_aspect("equal")
+            ax.set_xlim(xbin[0], xbin[-1])
+            ax.set_ylim(ybin[0], ybin[-1])
+            ax.set_title(f"aclu {aclu}", fontsize=9)
+            ax.axis("off")
+        ## END for ax_i, aclu in enumerate(neuron_ids)...
+
+        for ax in flat_axes[n:]:
+            ax.axis("off")
+        ## END for ax in flat_axes[n:]...
+
+        fig.suptitle("PF heatmap + in-field masks + spikes", fontsize=12)
+        fig.tight_layout()
+        return fig, axes
 
