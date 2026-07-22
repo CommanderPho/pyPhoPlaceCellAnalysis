@@ -830,7 +830,7 @@ class CellIndividualReliabilityMatrix:
         n_neuron_ids: int = len(neuron_ids)
         spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
 
-        reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
+        _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
             spikes_df=spikes_df,
             active_peak_prominence_2d_results=active_peak_prominence_2d_results,
             ratemaps=ratemaps,
@@ -839,22 +839,51 @@ class CellIndividualReliabilityMatrix:
             slice_level_multiplier=0.2,
             fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
         )
-        reliability_df
 
-        ## OUTPUTS: reliability_df, in_field_masks
+        t_bin_aclus_reliability_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+            spikes_df=spikes_df,
+            ratemaps=ratemaps,
+            pfs=pfs,
+            in_field_masks=in_field_masks,
+            neuron_ids=neuron_ids,
+            time_bin_size_seconds=0.050,
+        )
+        t_bin_aclus_reliability_df
+
+        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df
 
 
     """
     @classmethod
-    def compute_reliability_matrix(cls, **kwargs):
+    def compute_reliability_matrix(cls, spikes_df: pd.DataFrame, ratemaps, pfs, in_field_masks: Dict[int, np.ndarray], neuron_ids=None, time_bin_size_seconds: float = 0.050, **kwargs):
+        """Compute per-aclu TP/FP/TN/FN reliability counts from time-binned spikes vs in-field masks.
 
+        Parameters
+        ----------
+        spikes_df : filtered spikes with at least ['aclu','x','y'] (and a spikes time column).
+        ratemaps : 2D Ratemap (provides xbin/ybin; neuron_ids used if `neuron_ids` is None).
+        pfs : PfND / pf2D object (provides `filtered_pos_df` for interpolating animal position per t-bin).
+        in_field_masks : Dict[aclu, np.ndarray[bool]] shaped like ratemap occupancy (nx, ny), 0-based.
+        neuron_ids : optional explicit neuron id order; defaults to `ratemaps.neuron_ids`.
+        time_bin_size_seconds : temporal bin width used for t_bin_idx / position alignment.
+
+        Returns
+        -------
+        t_bin_aclus_reliability_df : DataFrame indexed by aclu with true_pos/true_neg/false_pos/false_neg.
+        """
         # ==================================================================================================================================================================================================================================================================================== #
         # Main Compute Block                                                                                                                                                                                                                                                                   #
         # ==================================================================================================================================================================================================================================================================================== #
 
+        if neuron_ids is None:
+            neuron_ids = np.asarray(ratemaps.neuron_ids)
+        else:
+            neuron_ids = np.asarray(neuron_ids)
+
         # ratemaps = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D'].ratemap
         # spikes_df = deepcopy(curr_active_pipeline.computation_results[maze_name].computed_data['pf2D'].filtered_spikes_df)
-        spikes_df = spikes_df.drop(columns=['t_bin_idx'], inplace=False)
+        if 't_bin_idx' in spikes_df.columns:
+            spikes_df = spikes_df.drop(columns=['t_bin_idx'], inplace=False)
 
         ## INPUTS: spikes_df, ratemaps
         # spikes_df should already have 'x' and 'y' (e.g. active_pf_2D.filtered_spikes_df)
@@ -866,8 +895,6 @@ class CellIndividualReliabilityMatrix:
             if 't_seconds' in spikes_df.columns:
                 spikes_df.spikes.set_time_variable_name('t_seconds')
 
-        # time_bin_size_seconds: float = 0.250
-        time_bin_size_seconds: float = 0.050 # 50ms bins
         time_bin_edges, time_bin_edges_binning_info = compute_spanning_bins(spikes_df.spikes.times, bin_size=time_bin_size_seconds)
         bin_container = BinningContainer.init_from_edges(edges=time_bin_edges, edge_info=time_bin_edges_binning_info)
         n_t_bins: int = len(bin_container.centers) # 1427041
