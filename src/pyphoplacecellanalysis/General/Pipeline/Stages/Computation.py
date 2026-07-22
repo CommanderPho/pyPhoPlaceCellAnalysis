@@ -1660,7 +1660,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         assert len(force_recompute_override_computations_includelist) <= len(include_includelist), f"READ THE NOTE ABOUT force_recompute_override_computations_includelist being a subset of include_includelist in the code above!! include_includelist: {include_includelist}\nforce_recompute_override_computations_includelist: {force_recompute_override_computations_includelist}"
 
         ## Get computed relative entropy measures:
-        _, _, global_epoch_name = self.find_LongShortGlobal_epoch_names()
+        global_epoch_name = curr_active_pipeline.find_Global_epoch_name()
         # global_epoch_name = curr_active_pipeline.active_completed_computation_result_names[-1] # 'maze'
 
         if included_computation_filter_names is None:
