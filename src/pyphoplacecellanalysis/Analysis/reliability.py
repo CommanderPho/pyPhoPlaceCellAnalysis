@@ -20,6 +20,15 @@ from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from scipy.ndimage import gaussian_filter1d
 from scipy.sparse import csr_matrix
 
+from typing import Dict, List, Optional, Sequence, Tuple
+import warnings
+import numpy as np
+import polars as pl
+from neuropy.utils.mixins.binning_helpers import compute_spanning_bins
+from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo # for epochs_spkcount getting the correct time bins
+from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+from neuropy.core.flattened_spiketrains import SpikesAccessor
+
 # plotting:
 
 import matplotlib.pyplot as plt
@@ -816,15 +825,9 @@ def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_e
     return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
 
 
-from typing import Dict, List, Optional, Sequence, Tuple
-import numpy as np
-import polars as pl
-from neuropy.utils.mixins.binning_helpers import compute_spanning_bins
-from neuropy.utils.mixins.binning_helpers import BinningContainer, BinningInfo # for epochs_spkcount getting the correct time bins
-from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
-from neuropy.core.flattened_spiketrains import SpikesAccessor
 
 
+@metadata_attributes(short_name=None, tags=['reliability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-23 05:13', related_items=[])
 class CellIndividualReliabilityMatrix:
     """
         from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
@@ -1375,6 +1378,185 @@ class CellIndividualReliabilityMatrix:
 
     #     return pd.DataFrame(rows).set_index('neuron_id'), in_field_masks_xy
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Cell Reliability Metrics                                                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @classmethod
+    def _extract_pf_data(cls, pf) -> Tuple[np.ndarray, np.ndarray, int]:
+        """
+        Safely extracts, flattens, and normalizes occupancy and tuning curves from a PfND object.
+        
+        Args:
+            pf: A Neuropy PfND object containing ratemap data.
+            
+        Returns:
+            P_v: (V,) numpy array of normalized spatial occupancy probabilities for valid bins.
+            lambda_i: (N, V) numpy array of tuning curves for N neurons over V valid spatial bins.
+            N: Integer representing the number of neurons.
+        """
+        try:
+            # Access the ratemap properties native to Neuropy's PfND object
+            occupancy = pf.ratemap.occupancy
+            tuning_curves = pf.ratemap.tuning_curves
+        except AttributeError:
+            raise ValueError(
+                "Provided object does not have the expected PfND structure. "
+                "Ensure it contains `pf.ratemap.occupancy` and `pf.ratemap.tuning_curves`."
+            )
+
+        # Flatten the spatial dimensions to generalize across 1D and 2D placefields
+        N = tuning_curves.shape[0]
+        lambda_i = tuning_curves.reshape(N, -1)
+        occupancy = occupancy.reshape(-1)
+
+        # Filter out unvisited bins (occupancy is 0 or NaN)
+        valid_bins = (occupancy > 0) & ~np.isnan(occupancy)
+        occ_valid = occupancy[valid_bins]
+        lambda_i_valid = lambda_i[:, valid_bins]
+
+        # Normalize occupancy to be a strict probability distribution P(v) where sum(P(v)) == 1
+        P_v = occ_valid / np.nansum(occ_valid)
+
+        return P_v, lambda_i_valid, N
+
+
+    @classmethod
+    def compute_skaggs_alpha(cls, pf, k: float = 1.0) -> np.ndarray:
+        """
+        Computes the reliability factor (alpha) based on Skaggs Spatial Information.
+        
+        Formula:
+            I_i = sum_v [ P(v) * (lambda_i(v) / lambda_bar_i) * log2(lambda_i(v) / lambda_bar_i) ]
+            alpha_i = 1 - e^(-k * I_i)
+            
+        Args:
+            pf: The PfND placefield object.
+            k: Exponential decay threshold mapping bits/spike to a [0, 1) range.
+            
+        Returns:
+            alpha: (N,) array of reliability factors for each neuron.
+        """
+        P_v, lambda_i, N = cls._extract_pf_data(pf)
+
+        # Calculate overall mean firing rate for each cell (lambda_bar)
+        # Shape: (N, 1) for broadcasting
+        lambda_bar = np.nansum(lambda_i * P_v, axis=1, keepdims=True)
+
+        # Initialize the ratio lambda_i(v) / lambda_bar_i
+        ratio = np.zeros_like(lambda_i)
+        
+        # Mask to prevent division by zero or log2 of zero
+        valid_mask = (lambda_bar > 0) & (lambda_i > 0)
+        
+        # Temporarily suppress numpy warnings for the valid indexing block
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Compute the ratio only where valid
+            lambda_bar_bc = np.broadcast_to(lambda_bar, lambda_i.shape)
+            np.place(ratio, valid_mask, lambda_i[valid_mask] / lambda_bar_bc[valid_mask])
+
+        # Calculate Skaggs Information (I_i) in bits/spike
+        log2_ratio = np.zeros_like(ratio)
+        np.log2(ratio, out=log2_ratio, where=(ratio > 0))
+        I_i = np.nansum(P_v * ratio * log2_ratio, axis=1)
+
+        # Map to Dempster-Shafer mass via exponential decay
+        alpha = 1.0 - np.exp(-k * I_i)
+        
+        return alpha
+
+
+    @classmethod
+    def compute_sparsity_alpha(cls, pf) -> np.ndarray:
+        """
+        Computes the reliability factor (alpha) based on Spatial Sparsity.
+        A highly tuned cell has sparsity approaching 0. A uniform firer approaches 1.
+        
+        Formula:
+            S_i = (sum_v [ P(v) * lambda_i(v) ])^2 / sum_v [ P(v) * lambda_i(v)^2 ]
+            alpha_i = 1 - S_i
+            
+        Args:
+            pf: The PfND placefield object.
+            
+        Returns:
+            alpha: (N,) array of reliability factors for each neuron.
+        """
+        P_v, lambda_i, N = cls._extract_pf_data(pf)
+
+        # Numerator: Square of the expected firing rate across the environment
+        num = np.nansum(P_v * lambda_i, axis=1)**2
+        
+        # Denominator: Expected squared firing rate
+        den = np.nansum(P_v * (lambda_i**2), axis=1)
+
+        # Initialize Sparsity array
+        S_i = np.ones(N)  # Default to 1 (pure ignorance) if cell doesn't fire
+        
+        # Compute sparsity only for cells with a non-zero denominator
+        valid_den = den > 0
+        S_i[valid_den] = num[valid_den] / den[valid_den]
+
+        # Map to Dempster-Shafer mass by inverting the sparsity
+        alpha = 1.0 - S_i
+        
+        return alpha
+
+
+    @classmethod
+    def compute_dsnr_alpha(cls, pf, n_i: Union[np.ndarray, list], tau: float, lambda_bg: Optional[np.ndarray] = None) -> np.ndarray:
+        """
+        Computes the temporally dynamic reliability factor (alpha_i(t)) based on 
+        instantaneous Signal-to-Noise ratio.
+        
+        Formula:
+            alpha_i(t) = n_i(t) / (n_i(t) + (lambda_bg * tau))
+            
+        Args:
+            pf: The PfND placefield object (used to estimate lambda_bg if not provided).
+            n_i: Array of spike counts. Can be shape (N,) for a single time bin, 
+                or (N, T) for multiple time bins.
+            tau: Time window duration in seconds (e.g., 0.02 for 20ms bins).
+            lambda_bg: Optional array of shape (N,) defining the baseline out-of-field 
+                    firing rate. If None, it is estimated as the 5th percentile of 
+                    the ratemap activity.
+                    
+        Returns:
+            alpha: Array of dynamic reliability factors. Matches shape of n_i.
+        """
+        n_i = np.asarray(n_i, dtype=float)
+        _, lambda_i, N = cls._extract_pf_data(pf)
+        
+        if lambda_bg is None:
+            # Estimate the out-of-field baseline firing rate as the 5th percentile 
+            # of the valid spatial bins. This is a standard proxy for "noise".
+            lambda_bg = np.nanpercentile(lambda_i, 5, axis=1)
+        else:
+            lambda_bg = np.asarray(lambda_bg)
+            if lambda_bg.shape[0] != N:
+                raise ValueError(f"lambda_bg must have shape ({N},) to match neuron count.")
+
+        # Align shapes for broadcasting if n_i is a 2D array (N, T)
+        if n_i.ndim == 2:
+            lambda_bg = lambda_bg.reshape(-1, 1)
+
+        # Compute expected baseline spike count in this time window
+        expected_bg_spikes = lambda_bg * tau
+        
+        # Add a tiny epsilon to prevent division by zero in intervals with zero spikes 
+        # and zero estimated background rate.
+        eps = 1e-12 
+        
+        alpha = n_i / (n_i + expected_bg_spikes + eps)
+        
+        return alpha
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plotting Display                                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
 
 
     @function_attributes(short_name=None, tags=['matplotlib', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-22 19:20', related_items=[])
