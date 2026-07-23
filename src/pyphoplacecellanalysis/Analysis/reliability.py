@@ -18,6 +18,7 @@ from neuropy.analyses.time_dependent_placefields import PfND_TimeDependent
 
 from pyphocorehelpers.indexing_helpers import build_pairwise_indicies
 from scipy.ndimage import gaussian_filter1d
+from scipy.sparse import csr_matrix
 
 # plotting:
 
@@ -840,7 +841,7 @@ class CellIndividualReliabilityMatrix:
             fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
         )
 
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df,
             ratemaps=ratemaps,
             pfs=pfs,
@@ -851,7 +852,7 @@ class CellIndividualReliabilityMatrix:
         )
         t_bin_aclus_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df
+        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
 
 
     """
@@ -872,6 +873,11 @@ class CellIndividualReliabilityMatrix:
         Returns
         -------
         t_bin_aclus_reliability_df : DataFrame indexed by aclu with true_pos/true_neg/false_pos/false_neg.
+        per_tbin_aclu_spike_counts_df : long DataFrame with columns ['aclu', 't_bin_idx', 'n_spikes'] (nonzero bins only; spike t_bin_idx is 1-based).
+        time_bin_info_df : per-time-bin animal position with 0-based t_bin_idx.
+        per_tbin_aclu_spike_counts_sparse : csr_matrix shape (n_aclus, n_t_bins), dtype int32.
+            Rows follow `neuron_ids` order; columns are 0-based time bins aligned with `time_bin_info_df['t_bin_idx']`.
+            Zero entries mean no spikes in that (aclu, t_bin).
         """
         # ==================================================================================================================================================================================================================================================================================== #
         # Main Compute Block                                                                                                                                                                                                                                                                   #
@@ -963,14 +969,24 @@ class CellIndividualReliabilityMatrix:
             .agg([pl.len().alias("n_spikes")])
         ).to_pandas()
 
+        # Sparse (n_aclus, n_t_bins) spike counts from COO nonzero entries (no dense allocate).
+        # Spike t_bin_idx labels are 1-based; matrix columns / time_bin_info_df use 0-based indices.
+        n_aclus: int = len(neuron_ids)
+        aclu_arr = per_tbin_aclu_spike_counts_df['aclu'].to_numpy()
+        t_bin_arr = per_tbin_aclu_spike_counts_df['t_bin_idx'].to_numpy().astype(np.int64)
+        n_spikes_arr = per_tbin_aclu_spike_counts_df['n_spikes'].to_numpy().astype(np.int32)
+        row_i = pd.Categorical(aclu_arr, categories=list(neuron_ids)).codes.astype(np.int64)
+        col_j = t_bin_arr - 1
+        valid = (row_i >= 0) & (col_j >= 0) & (col_j < n_t_bins)
+        per_tbin_aclu_spike_counts_sparse = csr_matrix((n_spikes_arr[valid], (row_i[valid], col_j[valid])), shape=(n_aclus, n_t_bins), dtype=np.int32)
+
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute Reliability Matrix                                                                                                                                                                                                                                                           #
         # ==================================================================================================================================================================================================================================================================================== #
-        t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin_aclu_spike_counts_df, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids,
-            in_field_lut=in_field_lut, **kwargs)
+        t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin_aclu_spike_counts_df, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, **kwargs)
 
-        ## OUTPUTS: t_bin_aclus_reliability_df
-        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df
+        ## OUTPUTS: t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
+        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
 
 
     @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
