@@ -155,6 +155,64 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         self.in_field_masks = None
 
 
+    def get_by_id(self, ids, defer_compute_all: bool = False):
+        """Return a DST copy restricted to ``ids``, preserving DST config and sliced reliability when present.
+
+        Mirrors ``BayesianPlacemapPositionDecoder.get_by_id`` but constructs ``BayesianPlacemapPositionDecoderDST``.
+        Time-bin reliability tables / sparse spike counts are left None on the slice.
+        """
+        ids = np.asarray(ids)
+        source_ids = np.asarray(self.neuron_IDs)
+        assert np.all(np.isin(ids, source_ids))
+        keep = np.isin(source_ids, ids)  # original neuron order
+
+        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
+        spikes_df = deepcopy(self.spikes_df)
+        if (spikes_df is not None) and ('aclu' in spikes_df.columns):
+            spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids)].copy()
+
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoderDST(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, field_threshold_frac=self.field_threshold_frac, discount_silence=self.discount_silence, n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode, setup_on_init=False, post_load_on_init=False, debug_print=self.debug_print)
+
+        neuron_sliced_decoder.neuron_IDs = source_ids[keep]
+        neuron_sliced_decoder.neuron_IDXs = np.arange(int(np.sum(keep)))
+        neuron_sliced_decoder.F = self.F[:, keep]
+        neuron_sliced_decoder.P_x = deepcopy(self.P_x)
+
+        if self.unit_specific_time_binned_spike_counts is not None:
+            neuron_sliced_decoder.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[keep, :]
+            neuron_sliced_decoder.total_spike_counts_per_window = np.sum(neuron_sliced_decoder.unit_specific_time_binned_spike_counts, axis=0)
+            neuron_sliced_decoder.time_binning_container = deepcopy(self.time_binning_container)
+
+        # Reuse per-cell reliability / masks when already computed on the full decoder
+        if self.reliability_active is not None:
+            neuron_sliced_decoder.reliability_active = np.asarray(self.reliability_active)[keep]
+        if self.reliability_silent is not None:
+            neuron_sliced_decoder.reliability_silent = np.asarray(self.reliability_silent)[keep]
+        if self.in_field_masks is not None:
+            id_set = set(int(x) for x in ids)
+            neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
+
+        # Leave time-bin reliability tables / sparse counts unset on the slice
+        neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
+        neuron_sliced_decoder.time_bin_info_df = None
+        neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
+
+        # Invalidate decode caches (cannot neuron-slice a posterior)
+        neuron_sliced_decoder.flat_p_x_given_n = None
+        neuron_sliced_decoder.p_x_given_n = None
+        neuron_sliced_decoder.most_likely_positions = None
+        neuron_sliced_decoder.most_likely_position_indicies = None
+        neuron_sliced_decoder.most_likely_position_flat_indicies = None
+        neuron_sliced_decoder.marginal = None
+        neuron_sliced_decoder.revised_most_likely_positions = None
+
+        if not defer_compute_all:
+            neuron_sliced_decoder.compute_all()
+
+        return neuron_sliced_decoder
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # Main Methods                                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
