@@ -41,6 +41,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         Fraction of peak firing rate defining in-field vs out-of-field masks (default: 0.20).
     discount_silence : bool
         If True, applies Shafer Discounting when the cell did NOT fire (n_i = 0). (default: False).
+    n_top_peaks : int
+        Number of top prominence peaks used when building in-field masks (default: 3).
+    slice_level_multiplier : float
+        Prominence contour level multiplier for in-field masks (default: 0.20).
+    fn_tn_mode : str
+        FN/TN accumulation mode: ``'occupancy_seconds'`` or ``'occupied_bins'`` (default: ``'occupancy_seconds'``).
 
     Usage:
         from copy import deepcopy
@@ -59,6 +65,9 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     field_threshold_frac: float = serialized_field(default=0.20)
     discount_silence: bool = non_serialized_field(default=False)
+    n_top_peaks: int = serialized_field(default=3)
+    slice_level_multiplier: float = serialized_field(default=0.20)
+    fn_tn_mode: str = serialized_field(default='occupancy_seconds')
     reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
 
@@ -80,12 +89,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # ==================================================================================================================== #
     @classmethod
     def serialized_key_allowlist(cls):
-        return BayesianPlacemapPositionDecoder.serialized_key_allowlist() + ['field_threshold_frac']
+        return BayesianPlacemapPositionDecoder.serialized_key_allowlist() + ['field_threshold_frac', 'n_top_peaks', 'slice_level_multiplier', 'fn_tn_mode']
 
 
     @classmethod
     def from_dict(cls, val_dict):
-        return cls(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), field_threshold_frac=val_dict.get('field_threshold_frac', 0.20), discount_silence=val_dict.get('discount_silence', False), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
+        return cls(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), field_threshold_frac=val_dict.get('field_threshold_frac', 0.20), discount_silence=val_dict.get('discount_silence', False), n_top_peaks=val_dict.get('n_top_peaks', 3), slice_level_multiplier=val_dict.get('slice_level_multiplier', 0.20), fn_tn_mode=val_dict.get('fn_tn_mode', 'occupancy_seconds'), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
 
 
     @classmethod
@@ -120,52 +129,48 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # ==================================================================================================================================================================================================================================================================================== #
     # Main Methods                                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
-    def compute_reliability_new(self, **kwargs):
+    def compute_reliability_new(self, active_peak_prominence_2d_results, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
+        """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
+
+        Parameters
+        ----------
+        active_peak_prominence_2d_results : PeakProminence2D results (required for in-field masks).
+        spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
+        time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
+        max_t_idx : optional cap on number of time bins (None = all).
+
+        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, and ``fn_tn_mode``.
+
+        Returns
+        -------
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
         """
-            Computes new reliability
-        """
-        maze_name: str = 'maze_GLOBAL'
-        active_peak_prominence_2d_results = curr_active_pipeline.computation_results[maze_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
-        # active_peak_prominence_2d_results
-        pfs = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D']
-        ratemaps = pfs.ratemap
-        neuron_ids = deepcopy(pfs.ratemap.neuron_ids)
-        n_neuron_ids: int = len(neuron_ids)
-        spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
+        pfs = self.pf
+        ratemaps = self.ratemap
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
+        if spikes_df is None:
+            spikes_df = deepcopy(self.spikes_df)
+        spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
+        if time_bin_size_seconds is None:
+            time_bin_size_seconds = self.time_bin_size
+
+        if self.spikes_df is None:
+            self.spikes_df = spikes_df
+
+        if self.time_bin_size is None:
+            self.time_bin_size = time_bin_size_seconds
 
         _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
-            spikes_df=spikes_df,
-            active_peak_prominence_2d_results=active_peak_prominence_2d_results,
-            ratemaps=ratemaps,
-            n_top_peaks=3,
-            # slice_level_multiplier=0.9,
-            slice_level_multiplier=0.2,
-            fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
+            spikes_df=spikes_df, active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode,
         )
-        _fake_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks
-
-        # max_t_idx = 4096
-        # max_t_idx = 19200
-        max_t_idx = None
-
-        time_bin_size_seconds: float = 0.050
-
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
-            spikes_df=spikes_df,
-            ratemaps=ratemaps,
-            pfs=pfs,
-            in_field_masks=in_field_masks,
-            neuron_ids=neuron_ids,
-            time_bin_size_seconds=time_bin_size_seconds,
-            max_t_idx = max_t_idx,
+        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+            spikes_df=spikes_df, ratemaps=ratemaps, pfs=pfs, in_field_masks=in_field_masks, neuron_ids=neuron_ids,
+            time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
         )
-        t_bin_aclus_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, (max_t_idx, time_bin_size_seconds)
-
-        ## 1m 8s - 19200
+        return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
 
 
 
