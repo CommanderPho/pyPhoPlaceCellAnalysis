@@ -1720,13 +1720,6 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     text_formatter.setup_margins(fig)
     text_formatter.set_title(title=title_string)
 
-    # ## Need to extract the track name ('maze1') for the title in this plot. 
-    # track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
-    # # TODO: do we want to convert this into "long" or "short"?
-    # header_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> replay|laps <weight:bold>firing rate</></>', va="bottom", xycoords="figure fraction")
-    # footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-
-
     ax_post = ax_dict['decoded_posterior']
     ax_pow = ax_dict['term0']
     ax_exp = ax_dict['term1']
