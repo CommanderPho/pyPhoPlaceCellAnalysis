@@ -213,7 +213,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     def _compute_reliability_metrics(self, **kwargs):
         """
-        Builds static per-cell reliability (alpha_i) from Skaggs SI × spatial sparsity.
+        Builds static per-cell reliability (alpha_i) from Skaggs spatial information.
         Requires only ``self.pf`` so first ``decode()`` / ``compute_all()`` works without
         a prior ``compute_reliability_new`` call.
         """
@@ -222,14 +222,15 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         an_active_pf = deepcopy(self.pf)
         ## INPUTS: an_active_pf
         alpha_skaggs = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
-        alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)
+        # alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)  # correlated with Skaggs; do not multiply into alpha
 
         # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
         # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
 
         # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
         # Ensuring the result is properly bounded [0, 1]
-        R_base = np.clip(alpha_skaggs * alpha_sparsity, 0.0, 1.0)
+        # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
+        R_base = np.clip(alpha_skaggs, 0.0, 1.0)
 
         self.reliability_active = R_base
         
@@ -301,9 +302,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             if time_bin_size is None:
                 print(f'time_bin_size is None, using internal self.time_bin_size.')
                 time_bin_size = self.time_bin_size
+            else:
+                if (self.time_bin_size is None) or (time_bin_size != self.time_bin_size):
+                    self.time_bin_size = time_bin_size
 
             try:
-                self.time_bin_size = time_bin_size
+                
                 p_x_given_n = self.compute_posterior(unit_specific_time_binned_spike_counts)
                 curr_flat_p_x_given_n = np.reshape(p_x_given_n, (-1, num_time_windows))
                 if debug_print:
