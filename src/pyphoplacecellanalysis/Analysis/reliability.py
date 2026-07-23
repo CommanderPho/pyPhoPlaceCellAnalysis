@@ -1041,7 +1041,9 @@ class CellIndividualReliabilityMatrix:
         Returns
         -------
         t_bin_aclus_reliability_df : indexed by aclu with true_pos/true_neg/false_pos/false_neg.
-            Note: TP/FP are spike counts; TN/FN are silent time-bin counts (mixed units).
+            TP/FP are spike counts normalized by each cell's total spikes (TP+FP).
+            TN/FN are silent time-bin counts normalized by each cell's opportunity counts:
+            true_neg = TN / n_out_of_field_tbins, false_neg = FN / n_in_field_tbins.
         """
         neuron_ids = np.asarray(neuron_ids)
         n_computed_bins: int = 0
@@ -1055,6 +1057,8 @@ class CellIndividualReliabilityMatrix:
         t_bin_aclus_true_negative_spike_counts_arr = np.zeros((len(neuron_ids),))
         t_bin_aclus_false_positive_spike_counts_arr = np.zeros((len(neuron_ids),))
         t_bin_aclus_false_negative_spike_counts_arr = np.zeros((len(neuron_ids),))
+        t_bin_aclus_n_in_field_tbins_arr = np.zeros((len(neuron_ids),))
+        t_bin_aclus_n_out_of_field_tbins_arr = np.zeros((len(neuron_ids),))
 
         ## check for invalid t_bins (containing NaN binned_x/y columns)
         valid_tbin_mask = time_bin_info_df[['binned_x', 'binned_y']].notna().all(axis=1)
@@ -1067,8 +1071,14 @@ class CellIndividualReliabilityMatrix:
 
             a_row = time_bin_info_df.iloc[t_idx]
             target_idxs_tuple = (int(a_row['binned_x']), int(a_row['binned_y']))
-            a_pos_infield_aclus_list = binned_xy_idxs_to_field_aclus_dict.get(target_idxs_tuple, np.array([]))
-            a_pos_outoffield_aclus_list = binned_xy_idxs_to_outoffield_aclus_dict.get(target_idxs_tuple, np.array([]))
+            a_pos_infield_aclus_list = np.asarray(binned_xy_idxs_to_field_aclus_dict.get(target_idxs_tuple, np.array([])))
+            a_pos_outoffield_aclus_list = np.asarray(binned_xy_idxs_to_outoffield_aclus_dict.get(target_idxs_tuple, np.array([])))
+
+            ## per-cell opportunity counts (every visit to in/out field, whether silent or not)
+            if len(a_pos_infield_aclus_list) > 0:
+                t_bin_aclus_n_in_field_tbins_arr[np.array([aclu_to_neuron_idx_map[v] for v in a_pos_infield_aclus_list])] += 1
+            if len(a_pos_outoffield_aclus_list) > 0:
+                t_bin_aclus_n_out_of_field_tbins_arr[np.array([aclu_to_neuron_idx_map[v] for v in a_pos_outoffield_aclus_list])] += 1
 
             curr_t_spikes_df = per_tbin[(per_tbin['t_bin_idx'] == t_idx)][['aclu', 'neuron_IDX', 'n_spikes']]
 
@@ -1095,7 +1105,6 @@ class CellIndividualReliabilityMatrix:
                 t_bin_aclus_false_positive_spike_counts_arr[fp_neuron_idxs] += fp_n_spikes
 
             n_computed_bins += 1 ## increment
-
         ## END for t_idx in valid_iloc....
 
         n_tbins_column_names = ['true_neg_n_tbins', 'false_neg_n_tbins']
@@ -1106,18 +1115,23 @@ class CellIndividualReliabilityMatrix:
                 true_neg_n_tbins=t_bin_aclus_true_negative_spike_counts_arr, false_neg_n_tbins=t_bin_aclus_false_negative_spike_counts_arr,
                 # true_pos=t_bin_aclus_true_positive_spike_counts_arr, true_neg=t_bin_aclus_true_negative_spike_counts_arr,
                 # false_pos=t_bin_aclus_false_positive_spike_counts_arr, false_neg=t_bin_aclus_false_negative_spike_counts_arr,
+                n_in_field_tbins=t_bin_aclus_n_in_field_tbins_arr, n_out_of_field_tbins=t_bin_aclus_n_out_of_field_tbins_arr,
+                n_computed_bins=n_computed_bins,
             ),
         ).set_index('aclu', drop=True, inplace=False)
 
 
+        ## Spike fractions (among spikes for that cell): true_pos + false_pos == 1 when the cell spiked at least once
         t_bin_aclus_reliability_df['n_total_spikes'] = t_bin_aclus_reliability_df['true_pos_n_spikes'] + t_bin_aclus_reliability_df['false_pos_n_spikes']
-        t_bin_aclus_reliability_df['true_pos'] = t_bin_aclus_reliability_df['true_pos_n_spikes'] / t_bin_aclus_reliability_df['n_total_spikes'].astype(float)
-        t_bin_aclus_reliability_df['false_pos'] = t_bin_aclus_reliability_df['false_pos_n_spikes'] / t_bin_aclus_reliability_df['n_total_spikes'].astype(float)
+        _spike_denom = t_bin_aclus_reliability_df['n_total_spikes'].replace(0, np.nan).astype(float)
+        t_bin_aclus_reliability_df['true_pos'] = t_bin_aclus_reliability_df['true_pos_n_spikes'] / _spike_denom
+        t_bin_aclus_reliability_df['false_pos'] = t_bin_aclus_reliability_df['false_pos_n_spikes'] / _spike_denom
 
-        t_bin_aclus_reliability_df['true_neg'] = t_bin_aclus_reliability_df['true_neg_n_tbins'] / float(n_computed_bins)
-        t_bin_aclus_reliability_df['false_neg'] = t_bin_aclus_reliability_df['false_neg_n_tbins'] / float(n_computed_bins)
-        
-
+        ## Silent-bin rates among each cell's opportunities (not global n_computed_bins)
+        _out_denom = t_bin_aclus_reliability_df['n_out_of_field_tbins'].replace(0, np.nan).astype(float)
+        _in_denom = t_bin_aclus_reliability_df['n_in_field_tbins'].replace(0, np.nan).astype(float)
+        t_bin_aclus_reliability_df['true_neg'] = t_bin_aclus_reliability_df['true_neg_n_tbins'] / _out_denom
+        t_bin_aclus_reliability_df['false_neg'] = t_bin_aclus_reliability_df['false_neg_n_tbins'] / _in_denom
 
         ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
