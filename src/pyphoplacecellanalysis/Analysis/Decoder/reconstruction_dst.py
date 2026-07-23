@@ -84,19 +84,26 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     """
     ## New `BayesianPlacemapPositionDecoderDST`-specific fields:
+    # Computed Cell Confusion Reliability Variables ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
     time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
     per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)}) # (n_aclus, n_t_bins) - (25, 1427042)
 
+
+    
     field_threshold_frac: float = serialized_field(default=0.20)
-    discount_silence: bool = non_serialized_field(default=False)
+    
     n_top_peaks: int = serialized_field(default=3)
     slice_level_multiplier: float = serialized_field(default=0.20)
     fn_tn_mode: str = serialized_field(default='occupancy_seconds')
+    in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
+
+
+    ## Cell reliability variables:
+    discount_silence: bool = non_serialized_field(default=False)
     reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
-    in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
 
 
     @property
@@ -125,15 +132,39 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
 
     @classmethod
-    def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", field_threshold_frac: float = 0.20, discount_silence: bool = False, **kwargs):
-        """Creates a new DST decoder instance from an existing stateful Bayesian decoder."""
-        return cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
+    def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, **kwargs):
+        """Creates a new DST decoder instance from an existing stateful Bayesian decoder.
+
+        If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``
+        (optional confusion-matrix / in-field-mask products; not required for DST decode).
+        Extra kwargs for that step: ``max_t_idx``, ``spikes_df``, ``time_bin_size_seconds``.
+        """
+        max_t_idx = kwargs.pop('max_t_idx', None)
+        confusion_spikes_df = kwargs.pop('spikes_df', None)
+        time_bin_size_seconds = kwargs.pop('time_bin_size_seconds', None)
+        _obj = cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
+        if active_peak_prominence_2d_results is not None:
+            _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=confusion_spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
+            self._compute_reliability_metrics() ## compute
+
+        return _obj
 
 
     @classmethod
-    def init_from_placefields(cls, pf: PfND, time_bin_size: float, spikes_df: pd.DataFrame, field_threshold_frac: float = 0.20, discount_silence: bool = False, debug_print: bool = False, **kwargs):
-        """Creates a new DST decoder instance from a placefields object plus required decoder inputs."""
-        return cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=debug_print, **kwargs)
+    def init_from_placefields(cls, pf: PfND, time_bin_size: float, spikes_df: pd.DataFrame, active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, debug_print: bool = False, **kwargs):
+        """Creates a new DST decoder instance from a placefields object plus required decoder inputs.
+
+        If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``.
+        Extra kwargs for that step: ``max_t_idx``, ``time_bin_size_seconds``.
+        """
+        max_t_idx = kwargs.pop('max_t_idx', None)
+        time_bin_size_seconds = kwargs.pop('time_bin_size_seconds', None)
+        _obj = cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=debug_print, **kwargs)
+        if active_peak_prominence_2d_results is not None:
+            _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
+            self._compute_reliability_metrics() ## compute
+
+        return _obj
 
 
     def post_load(self):
@@ -237,6 +268,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         Returns
         -------
         t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
+
+
+        UPDATES:
+            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
         """
         pfs = self.pf
         ratemaps = self.ratemap
