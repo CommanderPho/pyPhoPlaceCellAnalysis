@@ -183,49 +183,65 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
 
     def _compute_reliability_metrics(self, ratemaps_flat):
-        """
+        """ #TODO 2026-07-23 05:37: - [ ] NEEDS IMPLEMENTATION
         Calculates the in-field vs out-of-field Spatial SNR (R_i) for all cells.
         Expects ratemaps flattened to (nCells, nFlatPositionBins).
         """
-        nCells, nPositionBins = ratemaps_flat.shape
-        R_active = np.ones(nCells)
-        R_silent = np.ones(nCells)
+        assert (self.pf is not None)
+        assert (self.per_tbin_aclu_spike_counts_sparse is not None)
+        assert (self.time_bin_size is not None)
 
-        for i in range(nCells):
-            rm = ratemaps_flat[i, :]
-            max_rate = np.nanmax(rm)
+        an_active_pf = deepcopy(self.pf)
+        ## INPUTS: an_active_pf, time_bin_size_seconds, _decoder_per_tbin_aclu_spike_counts_sparse
+        alpha_skaggs = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
+        alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)
+        alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
 
-            # Handle cells that are silent everywhere or have invalid rates
-            if max_rate <= 0 or np.isnan(max_rate):
-                R_active[i] = 0.0 
-                R_silent[i] = 0.0
-                continue
+        alpha_skaggs
+        alpha_sparsity
+        alpha_dsnr
 
-            # Step A: Create Spatial Masks
-            theta = self.field_threshold_frac * max_rate
-            in_field_mask = (rm >= theta)
-            out_field_mask = ~in_field_mask
 
-            # Step B: Calculate Mean Regional Rates
-            mu_in = np.nanmean(rm[in_field_mask]) if np.any(in_field_mask) else 0.0
-            mu_out = np.nanmean(rm[out_field_mask]) if np.any(out_field_mask) else 0.0
+        # # Old Method _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        # nCells, nPositionBins = ratemaps_flat.shape
+        # R_active = np.ones(nCells)
+        # R_silent = np.ones(nCells)
 
-            # Step C: Define Spatial Precision (R_i)
-            if (mu_in + mu_out) > 0:
-                R_active[i] = mu_in / (mu_in + mu_out)
-            else:
-                R_active[i] = 0.0
+        # for i in range(nCells):
+        #     rm = ratemaps_flat[i, :]
+        #     max_rate = np.nanmax(rm)
+
+        #     # Handle cells that are silent everywhere or have invalid rates
+        #     if max_rate <= 0 or np.isnan(max_rate):
+        #         R_active[i] = 0.0 
+        #         R_silent[i] = 0.0
+        #         continue
+
+        #     # Step A: Create Spatial Masks
+        #     theta = self.field_threshold_frac * max_rate
+        #     in_field_mask = (rm >= theta)
+        #     out_field_mask = ~in_field_mask
+
+        #     # Step B: Calculate Mean Regional Rates
+        #     mu_in = np.nanmean(rm[in_field_mask]) if np.any(in_field_mask) else 0.0
+        #     mu_out = np.nanmean(rm[out_field_mask]) if np.any(out_field_mask) else 0.0
+
+        #     # Step C: Define Spatial Precision (R_i)
+        #     if (mu_in + mu_out) > 0:
+        #         R_active[i] = mu_in / (mu_in + mu_out)
+        #     else:
+        #         R_active[i] = 0.0
                 
-            # Map NPV for silence. Defaults to 1.0 (no discounting) if disabled.
-            if self.discount_silence:
-                R_silent[i] = R_active[i] 
+        #     # Map NPV for silence. Defaults to 1.0 (no discounting) if disabled.
+        #     if self.discount_silence:
+        #         R_silent[i] = R_active[i] 
 
-        self.reliability_active = R_active
-        self.reliability_silent = R_silent
+        # self.reliability_active = R_active
+        # self.reliability_silent = R_silent
 
 
     def compute_posterior(self, spkcount, ratemaps=None):
-        """
+        """ #TODO 2026-07-23 05:37: - [ ] NEEDS IMPLEMENTATION
         Overrides the standard likelihood combination to inject Shafer Discounting.
         Handles both 1D and 2D ratemaps natively.
         

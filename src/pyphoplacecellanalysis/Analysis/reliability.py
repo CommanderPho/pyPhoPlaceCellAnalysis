@@ -1382,6 +1382,7 @@ class CellIndividualReliabilityMatrix:
     # Cell Reliability Metrics                                                                                                                                                                                                                                                             #
     # ==================================================================================================================================================================================================================================================================================== #
 
+    @function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['compute_skaggs_alpha', 'compute_sparsity_alpha', 'compute_dsnr_alpha'], creation_date='2026-07-23 05:28', related_items=[])
     @classmethod
     def _extract_pf_data(cls, pf) -> Tuple[np.ndarray, np.ndarray, int]:
         """
@@ -1421,8 +1422,9 @@ class CellIndividualReliabilityMatrix:
         return P_v, lambda_i_valid, N
 
 
+    @function_attributes(short_name=None, tags=['metric', 'cell-reliability', 'dempster-shafer'], input_requires=[], output_provides=[], uses=['cls._extract_pf_data'], used_by=[], creation_date='2026-07-23 05:26', related_items=['compute_sparsity_alpha', 'compute_dsnr_alpha'])
     @classmethod
-    def compute_skaggs_alpha(cls, pf, k: float = 1.0) -> np.ndarray:
+    def compute_skaggs_alpha(cls, pf, k: float = 1.0) -> NDArray[ND.Shape["N_NEURONS"], Any]:
         """
         Computes the reliability factor (alpha) based on Skaggs Spatial Information.
         
@@ -1435,7 +1437,7 @@ class CellIndividualReliabilityMatrix:
             k: Exponential decay threshold mapping bits/spike to a [0, 1) range.
             
         Returns:
-            alpha: (N,) array of reliability factors for each neuron.
+            alpha: NDArray[ND.Shape["N_NEURONS"], Any] — per-neuron reliability factors in [0, 1).
         """
         P_v, lambda_i, N = cls._extract_pf_data(pf)
 
@@ -1462,13 +1464,14 @@ class CellIndividualReliabilityMatrix:
         I_i = np.nansum(P_v * ratio * log2_ratio, axis=1)
 
         # Map to Dempster-Shafer mass via exponential decay
-        alpha = 1.0 - np.exp(-k * I_i)
+        alpha: NDArray[ND.Shape["N_NEURONS"], Any] = 1.0 - np.exp(-k * I_i)
         
         return alpha
 
 
+    @function_attributes(short_name=None, tags=['metric', 'cell-reliability', 'dempster-shafer'], input_requires=[], output_provides=[], uses=['cls._extract_pf_data'], used_by=[], creation_date='2026-07-23 05:26', related_items=['compute_skaggs_alpha', 'compute_dsnr_alpha'])
     @classmethod
-    def compute_sparsity_alpha(cls, pf) -> np.ndarray:
+    def compute_sparsity_alpha(cls, pf) -> NDArray[ND.Shape["N_NEURONS"], Any]:
         """
         Computes the reliability factor (alpha) based on Spatial Sparsity.
         A highly tuned cell has sparsity approaching 0. A uniform firer approaches 1.
@@ -1481,7 +1484,7 @@ class CellIndividualReliabilityMatrix:
             pf: The PfND placefield object.
             
         Returns:
-            alpha: (N,) array of reliability factors for each neuron.
+            alpha: NDArray[ND.Shape["N_NEURONS"], Any] — per-neuron reliability factors in [0, 1).
         """
         P_v, lambda_i, N = cls._extract_pf_data(pf)
 
@@ -1499,13 +1502,14 @@ class CellIndividualReliabilityMatrix:
         S_i[valid_den] = num[valid_den] / den[valid_den]
 
         # Map to Dempster-Shafer mass by inverting the sparsity
-        alpha = 1.0 - S_i
+        alpha: NDArray[ND.Shape["N_NEURONS"], Any] = 1.0 - S_i
         
         return alpha
 
 
+    @function_attributes(short_name=None, tags=['metric', 'cell-reliability', 'dempster-shafer'], input_requires=[], output_provides=[], uses=['cls._extract_pf_data'], used_by=[], creation_date='2026-07-23 05:26', related_items=['compute_skaggs_alpha', 'compute_sparsity_alpha'])
     @classmethod
-    def compute_dsnr_alpha(cls, pf, n_i: Union[np.ndarray, list], tau: float, lambda_bg: Optional[np.ndarray] = None) -> np.ndarray:
+    def compute_dsnr_alpha(cls, pf, n_i: Union[NDArray[ND.Shape["N_NEURONS"], Any], NDArray[ND.Shape["N_NEURONS, N_TIME_BINS"], Any], list], tau: float, lambda_bg: Optional[NDArray[ND.Shape["N_NEURONS"], Any]] = None) -> Union[NDArray[ND.Shape["N_NEURONS"], Any], NDArray[ND.Shape["N_NEURONS, N_TIME_BINS"], Any]]:
         """
         Computes the temporally dynamic reliability factor (alpha_i(t)) based on 
         instantaneous Signal-to-Noise ratio.
@@ -1515,15 +1519,31 @@ class CellIndividualReliabilityMatrix:
             
         Args:
             pf: The PfND placefield object (used to estimate lambda_bg if not provided).
-            n_i: Array of spike counts. Can be shape (N,) for a single time bin, 
-                or (N, T) for multiple time bins.
+            n_i: Spike counts per neuron. NDArray[ND.Shape["N_NEURONS"], Any] for one time bin,
+                or NDArray[ND.Shape["N_NEURONS, N_TIME_BINS"], Any] for multiple time bins.
             tau: Time window duration in seconds (e.g., 0.02 for 20ms bins).
-            lambda_bg: Optional array of shape (N,) defining the baseline out-of-field 
-                    firing rate. If None, it is estimated as the 5th percentile of 
-                    the ratemap activity.
+            lambda_bg: Optional NDArray[ND.Shape["N_NEURONS"], Any] of baseline out-of-field
+                    firing rates (Hz). If None, estimated as the 5th percentile of ratemap activity.
                     
         Returns:
-            alpha: Array of dynamic reliability factors. Matches shape of n_i.
+            alpha: NDArray matching ``n_i`` shape — NDArray[ND.Shape["N_NEURONS"], Any] or
+                NDArray[ND.Shape["N_NEURONS, N_TIME_BINS"], Any] — dynamic reliability in [0, 1).
+
+
+
+        Usage:
+            pf2D = curr_active_pipeline.computation_results[global_epoch_name].computed_data['pf2D']
+            an_active_pf = deepcopy(pf2D)
+            ## INPUTS: an_active_pf, time_bin_size_seconds, _decoder_per_tbin_aclu_spike_counts_sparse
+            alpha_skaggs = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
+            alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)
+            alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = _decoder_per_tbin_aclu_spike_counts_sparse.toarray(), tau=time_bin_size_seconds)
+
+            alpha_skaggs
+            alpha_sparsity
+            alpha_dsnr
+
+
         """
         n_i = np.asarray(n_i, dtype=float)
         _, lambda_i, N = cls._extract_pf_data(pf)
@@ -1548,7 +1568,7 @@ class CellIndividualReliabilityMatrix:
         # and zero estimated background rate.
         eps = 1e-12 
         
-        alpha = n_i / (n_i + expected_bg_spikes + eps)
+        alpha: Union[NDArray[ND.Shape["N_NEURONS"], Any], NDArray[ND.Shape["N_NEURONS, N_TIME_BINS"], Any]] = n_i / (n_i + expected_bg_spikes + eps)
         
         return alpha
 
