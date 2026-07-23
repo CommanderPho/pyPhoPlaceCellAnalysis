@@ -153,6 +153,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         self.reliability_active = None
         self.reliability_silent = None
         self.in_field_masks = None
+        self._compute_reliability_metrics() ## compute
+
 
 
     def get_by_id(self, ids, defer_compute_all: bool = False):
@@ -216,8 +218,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # ==================================================================================================================================================================================================================================================================================== #
     # Main Methods                                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
-    def compute_reliability_new(self, active_peak_prominence_2d_results, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
+    
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
+    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
         """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
+
+        #TODO 2026-07-23 09:59: - [ ] this result is not currently used by any of the main computations because we use the skragg information reliability for each cell instead.
 
         Parameters
         ----------
@@ -336,57 +342,6 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         # self.reliability_active = R_active
         # self.reliability_silent = R_silent
-
-
-    @function_attributes(short_name='decode', tags=['MAIN', 'decode', 'DST', 'pure'], input_requires=[], output_provides=[], creation_date='2026-07-23 06:07',
-        uses=['self.compute_posterior', 'BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions'],
-        used_by=['BayesianPlacemapPositionDecoder.hyper_perform_decode', 'BayesianPlacemapPositionDecoder._perform_decoding_specific_epochs'])
-    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size: float, output_flat_versions=False, debug_print=True):
-        """DST decode: same contract as parent ``BayesianPlacemapPositionDecoder.decode``, but uses ``compute_posterior`` (Shafer discounting) instead of Zhang Bayesian.
-
-        Inputs:
-            unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins)
-
-        Returns:
-            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
-        """
-        num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]
-        num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
-        if debug_print:
-            print(f'num_cells: {num_cells}, num_time_windows: {num_time_windows}')
-
-        prev_time_bin_size = self.time_bin_size
-        with WrappingMessagePrinter(f'decode(...) [DST] called. Computing {num_time_windows} windows for final_p_x_given_n...', begin_line_ending='... ', finished_message='decode completed.', enable_print=(debug_print or self.debug_print)):
-            if time_bin_size is None:
-                print(f'time_bin_size is None, using internal self.time_bin_size.')
-                time_bin_size = self.time_bin_size
-            else:
-                if (self.time_bin_size is None) or (time_bin_size != self.time_bin_size):
-                    self.time_bin_size = time_bin_size
-
-            try:
-                
-                p_x_given_n = self.compute_posterior(unit_specific_time_binned_spike_counts)
-                curr_flat_p_x_given_n = np.reshape(p_x_given_n, (-1, num_time_windows))
-                if debug_print:
-                    print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
-
-                most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
-
-                if output_flat_versions:
-                    flat_outputs_container = DynamicContainer(flat_p_x_given_n=curr_flat_p_x_given_n, most_likely_position_flat_indicies=most_likely_position_flat_indicies)
-                else:
-                    flat_outputs_container = None
-
-                if self.ndim > 1:
-                    most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0, :]], self.ybin_centers[most_likely_position_indicies[1, :]])).T
-                else:
-                    most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0, :]])
-
-                return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
-
-            finally:
-                self.time_bin_size = prev_time_bin_size
 
 
     def compute_posterior(self, spkcount, ratemaps=None):
@@ -545,4 +500,56 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         # final_shape = (*spatial_shape, nTimeBins)
         
         # return posterior.reshape(final_shape)
+
+
+
+    @function_attributes(short_name='decode', tags=['MAIN', 'decode', 'DST', 'pure'], input_requires=[], output_provides=[], creation_date='2026-07-23 06:07',
+        uses=['self.compute_posterior', 'BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions'],
+        used_by=['BayesianPlacemapPositionDecoder.hyper_perform_decode', 'BayesianPlacemapPositionDecoder._perform_decoding_specific_epochs'])
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size: float, output_flat_versions=False, debug_print=True):
+        """DST decode: same contract as parent ``BayesianPlacemapPositionDecoder.decode``, but uses ``compute_posterior`` (Shafer discounting) instead of Zhang Bayesian.
+
+        Inputs:
+            unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins)
+
+        Returns:
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
+        """
+        num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]
+        num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
+        if debug_print:
+            print(f'num_cells: {num_cells}, num_time_windows: {num_time_windows}')
+
+        prev_time_bin_size = self.time_bin_size
+        with WrappingMessagePrinter(f'decode(...) [DST] called. Computing {num_time_windows} windows for final_p_x_given_n...', begin_line_ending='... ', finished_message='decode completed.', enable_print=(debug_print or self.debug_print)):
+            if time_bin_size is None:
+                print(f'time_bin_size is None, using internal self.time_bin_size.')
+                time_bin_size = self.time_bin_size
+            else:
+                if (self.time_bin_size is None) or (time_bin_size != self.time_bin_size):
+                    self.time_bin_size = time_bin_size
+
+            try:
+                
+                p_x_given_n = self.compute_posterior(unit_specific_time_binned_spike_counts)
+                curr_flat_p_x_given_n = np.reshape(p_x_given_n, (-1, num_time_windows))
+                if debug_print:
+                    print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
+
+                most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
+
+                if output_flat_versions:
+                    flat_outputs_container = DynamicContainer(flat_p_x_given_n=curr_flat_p_x_given_n, most_likely_position_flat_indicies=most_likely_position_flat_indicies)
+                else:
+                    flat_outputs_container = None
+
+                if self.ndim > 1:
+                    most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0, :]], self.ybin_centers[most_likely_position_indicies[1, :]])).T
+                else:
+                    most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0, :]])
+
+                return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
+
+            finally:
+                self.time_bin_size = prev_time_bin_size
 
