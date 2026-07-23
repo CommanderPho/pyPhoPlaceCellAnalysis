@@ -149,24 +149,32 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         ratemaps = self.ratemap
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
         if spikes_df is None:
+            if self.spikes_df is None:
+                self.spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
             spikes_df = deepcopy(self.spikes_df)
+
         spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
         if time_bin_size_seconds is None:
             time_bin_size_seconds = self.time_bin_size
 
-        if self.spikes_df is None:
+        if (self.spikes_df is None):
             self.spikes_df = spikes_df
 
-        if self.time_bin_size is None:
+        if (self.time_bin_size is None):
             self.time_bin_size = time_bin_size_seconds
 
-        _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
-            spikes_df=spikes_df, active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
-            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode,
+        # _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
+        #     spikes_df=spikes_df, active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+        #     n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode,
+        # )
+
+        in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
+            neuron_ids=neuron_ids,
         )
 
         self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
-            spikes_df=spikes_df, ratemaps=ratemaps, pfs=pfs, in_field_masks=in_field_masks, neuron_ids=neuron_ids,
+            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=in_field_masks, neuron_ids=neuron_ids,
             time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
         )
 
