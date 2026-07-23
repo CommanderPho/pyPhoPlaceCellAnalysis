@@ -180,10 +180,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
 
+        
 
-
-    def _compute_reliability_metrics(self, ratemaps_flat):
-        """ #TODO 2026-07-23 05:37: - [ ] NEEDS IMPLEMENTATION
+    def _compute_reliability_metrics(self, **kwargs):
+        """
         Calculates the in-field vs out-of-field Spatial SNR (R_i) for all cells.
         Expects ratemaps flattened to (nCells, nFlatPositionBins).
         """
@@ -195,11 +195,26 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         ## INPUTS: an_active_pf, time_bin_size_seconds, _decoder_per_tbin_aclu_spike_counts_sparse
         alpha_skaggs = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
         alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)
-        alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
 
-        alpha_skaggs
-        alpha_sparsity
-        alpha_dsnr
+        # ## time-dependent alpha
+        # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
+
+        # alpha_skaggs
+        # alpha_sparsity
+        # alpha_dsnr
+
+        # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
+        # Ensuring the result is properly bounded [0, 1]
+        R_base = np.clip(alpha_skaggs * alpha_sparsity, 0.0, 1.0)
+
+        self.reliability_active = R_base
+        
+        # Map reliability for silence (n_i = 0). 
+        # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
+        if self.discount_silence:
+            self.reliability_silent = R_base
+        else:
+            self.reliability_silent = np.ones_like(R_base)
 
 
         # # Old Method _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -241,7 +256,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
 
     def compute_posterior(self, spkcount, ratemaps=None):
-        """ #TODO 2026-07-23 05:37: - [ ] NEEDS IMPLEMENTATION
+        """ 
         Overrides the standard likelihood combination to inject Shafer Discounting.
         Handles both 1D and 2D ratemaps natively.
         
@@ -261,24 +276,45 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         
         # 2. Ensure spatial SNR metrics are prepared
         if self.reliability_active is None:
-            self._compute_reliability_metrics(ratemaps_flat)
-            
+            # self._compute_reliability_metrics(ratemaps_flat)
+            self._compute_reliability_metrics()
+
         tau = self.time_bin_size
         nTimeBins = spkcount.shape[1]
         
-        # We accumulate log-evidence to prevent float underflow and save RAM
+        # 3. Incorporate Occupancy Prior P(x, y) 
+        try:
+            # Extract historical animal occupancy in seconds
+            P_v = self.pf.occupancy # self.pf.ratemap.probability_normalized_occupancy
+            P_v = np.nan_to_num(P_v, nan=0.0)
+            P_v_flat = P_v.flatten()
+            
+            # Normalize to form the basic probability assignment prior (m_0)
+            sum_P_v = np.sum(P_v_flat)
+            if sum_P_v > 0:
+                P_v_flat = P_v_flat / sum_P_v
+            else:
+                P_v_flat = np.ones(nPositionBins) / nPositionBins
+
+        except Exception as err:
+            # Safe fallback if occupancy prior is unavailable
+            print(f'WARNING: fallback to uniform posterior because occupancy prior is unavailable or calculation failed with error {err}.')
+            P_v_flat = np.ones(nPositionBins) / nPositionBins
+
+        # Initialize log_posterior with the log of the prior P(v) to avoid float underflow
         log_posterior = np.zeros((nTimeBins, nPositionBins), dtype=np.float64)
+        log_posterior += np.log(P_v_flat + 1e-15)[np.newaxis, :]
         
-        # 3. Iterative Likelihood Evaluation (Memory Efficient)
+        # 4. Iterative Likelihood Evaluation (Memory Efficient Evidential Fusion)
         for cell in range(nCells):
             cell_spkcnt = spkcount[cell, :][:, np.newaxis]   # (nTimeBins, 1)
             cell_ratemap = ratemaps_flat[cell, :][np.newaxis, :]  # (1, nPositionBins)
 
-            # Poisson Likelihood Density (ignoring constant 1/n! term)
+            # Poisson Sensor Likelihood Density
             L_i = ( (tau * cell_ratemap) ** cell_spkcnt ) * np.exp(-tau * cell_ratemap)
             Z_i = np.sum(L_i, axis=1, keepdims=True)
             
-            # Convert raw likelihoods to specific probability density mappings (p_i)
+            # Convert raw likelihoods to specific evidential mass assignments
             with np.errstate(divide='ignore', invalid='ignore'):
                 p_i = L_i / Z_i
             p_i = np.where(Z_i == 0, 1.0 / nPositionBins, p_i)
@@ -287,26 +323,92 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             active_mask = (cell_spkcnt > 0)
             R_effective = np.where(active_mask, self.reliability_active[cell], self.reliability_silent[cell])
             
-            # Shafer Discounting Rule: E_i(x) = R_i * p_i(x|n_i) + (1 - R_i) * (1 / |Theta|)
-            E_i = (R_effective * p_i) + ((1.0 - R_effective) / nPositionBins)
+            # Dempster-Shafer Unnormalized Conjoint Mass formulation: 
+            # E_i(v) = [ alpha_i * ( L_i(v) / SUM_w L_i(w) ) ] + ( 1 - alpha_i )
+            # The uncommitted mass (1 - alpha_i) applies uniformly to all points in Omega.
+            E_i = (R_effective * p_i) + (1.0 - R_effective)
             
-            # Dempster's Rule of Combination (Summing Log Evidences)
+            # Dempster's Rule of Combination (Orthogonal sum via logarithms)
             log_posterior += np.log(E_i + 1e-15)
 
-        # 4. Convert back to linear probability space (Log-Sum-Exp Trick)
+        ## END for cell in range(nCells)...
+
+        # 5. Convert back to linear probability space (Log-Sum-Exp Trick)
         log_posterior_max = np.max(log_posterior, axis=1, keepdims=True)
         posterior = np.exp(log_posterior - log_posterior_max)
         
-        # Final Global Normalization
+        # Final Global Normalization to output strict evidential Belief: Bel({v})
         sum_post = np.sum(posterior, axis=1, keepdims=True)
         with np.errstate(divide='ignore', invalid='ignore'):
             posterior /= sum_post
             
         posterior = np.where(sum_post == 0, 1.0 / nPositionBins, posterior)
 
-        # 5. Reshape to match pyphoplacecellanalysis expectations: (*Spatial_Shape, nTimeBins)
+        # 6. Reshape to match pyphoplacecellanalysis expectations: (*Spatial_Shape, nTimeBins)
         posterior = posterior.T # (nPositionBins, nTimeBins)
         final_shape = (*spatial_shape, nTimeBins)
         
         return posterior.reshape(final_shape)
+
+
+        # OLD IMPLEMENTATION _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+        # # 1. Dynamically handle 1D vs 2D spatial layouts
+        # original_shape = ratemaps.shape
+        # nCells = original_shape[0]
+        # spatial_shape = original_shape[1:] 
+        # nPositionBins = np.prod(spatial_shape)
+        
+        # ratemaps_flat = ratemaps.reshape(nCells, nPositionBins)
+        
+        # # 2. Ensure spatial SNR metrics are prepared
+        # if self.reliability_active is None:
+        #     self._compute_reliability_metrics(ratemaps_flat)
+            
+        # tau = self.time_bin_size
+        # nTimeBins = spkcount.shape[1]
+        
+        # # We accumulate log-evidence to prevent float underflow and save RAM
+        # log_posterior = np.zeros((nTimeBins, nPositionBins), dtype=np.float64)
+        
+        # # 3. Iterative Likelihood Evaluation (Memory Efficient)
+        # for cell in range(nCells):
+        #     cell_spkcnt = spkcount[cell, :][:, np.newaxis]   # (nTimeBins, 1)
+        #     cell_ratemap = ratemaps_flat[cell, :][np.newaxis, :]  # (1, nPositionBins)
+
+        #     # Poisson Likelihood Density (ignoring constant 1/n! term)
+        #     L_i = ( (tau * cell_ratemap) ** cell_spkcnt ) * np.exp(-tau * cell_ratemap)
+        #     Z_i = np.sum(L_i, axis=1, keepdims=True)
+            
+        #     # Convert raw likelihoods to specific probability density mappings (p_i)
+        #     with np.errstate(divide='ignore', invalid='ignore'):
+        #         p_i = L_i / Z_i
+        #     p_i = np.where(Z_i == 0, 1.0 / nPositionBins, p_i)
+
+        #     # Apply Reliability Conditional on Firing State
+        #     active_mask = (cell_spkcnt > 0)
+        #     R_effective = np.where(active_mask, self.reliability_active[cell], self.reliability_silent[cell])
+            
+        #     # Shafer Discounting Rule: E_i(x) = R_i * p_i(x|n_i) + (1 - R_i) * (1 / |Theta|)
+        #     E_i = (R_effective * p_i) + ((1.0 - R_effective) / nPositionBins)
+            
+        #     # Dempster's Rule of Combination (Summing Log Evidences)
+        #     log_posterior += np.log(E_i + 1e-15)
+
+        # # 4. Convert back to linear probability space (Log-Sum-Exp Trick)
+        # log_posterior_max = np.max(log_posterior, axis=1, keepdims=True)
+        # posterior = np.exp(log_posterior - log_posterior_max)
+        
+        # # Final Global Normalization
+        # sum_post = np.sum(posterior, axis=1, keepdims=True)
+        # with np.errstate(divide='ignore', invalid='ignore'):
+        #     posterior /= sum_post
+            
+        # posterior = np.where(sum_post == 0, 1.0 / nPositionBins, posterior)
+
+        # # 5. Reshape to match pyphoplacecellanalysis expectations: (*Spatial_Shape, nTimeBins)
+        # posterior = posterior.T # (nPositionBins, nTimeBins)
+        # final_shape = (*spatial_shape, nTimeBins)
+        
+        # return posterior.reshape(final_shape)
 
