@@ -1,16 +1,25 @@
 import numpy as np
+import pandas as pd
+from scipy.sparse import csr_matrix
 import warnings
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from nptyping import NDArray
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
+from pyphocorehelpers.print_helpers import WrappingMessagePrinter
+from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
+from neuropy.utils.mixins.AttrsClassHelpers import custom_define, non_serialized_field, serialized_field
+from neuropy.analyses.placefields import PfND
+from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
 
 # Import the base decoder from your pyphoplacecellanalysis repo
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
 @metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-03 11:04', related_items=[])
+@custom_define(slots=False, eq=False)
 class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     """
     Dempster-Shafer Theory (DST) updated Position Decoder.
@@ -20,40 +29,144 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     Reliability (R_i) is calculated dynamically for each cell based on its 
     Spatial Signal-to-Noise Ratio (in-field vs. out-of-field expected firing rates).
 
+    Parameters
+    ----------
+    time_bin_size : float
+        The decoding time bin size.
+    pf : PfND
+        The underlying placefield object (ratemaps come from `pf.ratemap.tuning_curves`).
+    spikes_df : pd.DataFrame
+        Spikes used for time-binned decoding.
+    field_threshold_frac : float
+        Fraction of peak firing rate defining in-field vs out-of-field masks (default: 0.20).
+    discount_silence : bool
+        If True, applies Shafer Discounting when the cell did NOT fire (n_i = 0). (default: False).
 
-	Usage:
-		from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
+    Usage:
+        from copy import deepcopy
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 
-
-		a_dst_decoder2D: BayesianPlacemapPositionDecoderDST = BayesianPlacemapPositionDecoderDST(time_bin_size=pf2D_Decoder.time_bin_size, pf=pf2D_Decoder.pf, spikes_df=deepcopy(pf2D_Decoder.spikes_df)) # , ratemaps=None
-		a_dst_decoder2D
+        a_dst_decoder2D: BayesianPlacemapPositionDecoderDST = BayesianPlacemapPositionDecoderDST(
+            time_bin_size=pf2D_Decoder.time_bin_size, pf=pf2D_Decoder.pf, spikes_df=deepcopy(pf2D_Decoder.spikes_df),
+        )
+        a_dst_decoder2D
     """
-    
-    def __init__(self, time_bin_size, pf, field_threshold_frac=0.20, discount_silence=False, **kwargs):
-        """
-        Parameters
-        ----------
-        time_bin_size : float
-            The decoding time bin size.
-        pf : Placefield1D or Placefield2D
-            The underlying placefield object.
-        ratemaps : np.ndarray, optional
-            The ratemaps array. If None, derived from pf.
-        field_threshold_frac : float
-            The fraction of the peak firing rate used to define the boundary 
-            of the "in-field" vs "out-of-field" masks (default: 0.20).
-        discount_silence : bool
-            If True, applies Shafer Discounting to time bins where the cell 
-            did NOT fire (n_i = 0). (default: False).
-        """
-        super().__init__(time_bin_size=time_bin_size, pf=pf, **kwargs)
-        
-        self.field_threshold_frac = field_threshold_frac
-        self.discount_silence = discount_silence
-        
-        # Computed structural reliability metrics
+    ## New `BayesianPlacemapPositionDecoderDST`-specific fields:
+    t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
+    time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
+    per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)}) # (n_aclus, n_t_bins) - (25, 1427042)
+
+    field_threshold_frac: float = serialized_field(default=0.20)
+    discount_silence: bool = non_serialized_field(default=False)
+    reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+
+
+    @property
+    def expected_n_spikes(self):
+        """The expected_n_spikes property."""
+        return self.ratemap.tuning_curves * self.time_bin_size # shape: (n_aclus, n_xbins, n_ybins) for 2D — same as tuning_curves
+
+
+    @property
+    def ratemaps(self):
+        """Alias for `self.ratemap.tuning_curves` used by DST posterior computation."""
+        return self.ratemap.tuning_curves
+
+
+    # ==================================================================================================================== #
+    # Initialization                                                                                                       #
+    # ==================================================================================================================== #
+    @classmethod
+    def serialized_key_allowlist(cls):
+        return BayesianPlacemapPositionDecoder.serialized_key_allowlist() + ['field_threshold_frac']
+
+
+    @classmethod
+    def from_dict(cls, val_dict):
+        return cls(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), field_threshold_frac=val_dict.get('field_threshold_frac', 0.20), discount_silence=val_dict.get('discount_silence', False), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
+
+
+    @classmethod
+    def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", field_threshold_frac: float = 0.20, discount_silence: bool = False, **kwargs):
+        """Creates a new DST decoder instance from an existing stateful Bayesian decoder."""
+        return cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=stateful_decoder.debug_print, **kwargs)
+
+
+    @classmethod
+    def init_from_placefields(cls, pf: PfND, time_bin_size: float, spikes_df: pd.DataFrame, field_threshold_frac: float = 0.20, discount_silence: bool = False, debug_print: bool = False, **kwargs):
+        """Creates a new DST decoder instance from a placefields object plus required decoder inputs."""
+        return cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=debug_print, **kwargs)
+
+
+    def post_load(self):
+        """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
+        super().post_load()
         self.reliability_active = None
         self.reliability_silent = None
+
+
+    def setup(self):
+        super().setup()
+        self.t_bin_aclus_reliability_df = None
+        self.per_tbin_aclu_spike_counts_df = None
+        self.time_bin_info_df = None
+        self.per_tbin_aclu_spike_counts_sparse = None
+        self.reliability_active = None
+        self.reliability_silent = None
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Main Methods                                                                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+    def compute_reliability_new(self, **kwargs):
+        """
+            Computes new reliability
+        """
+        maze_name: str = 'maze_GLOBAL'
+        active_peak_prominence_2d_results = curr_active_pipeline.computation_results[maze_name].computed_data['RatemapPeaksAnalysis']['PeakProminence2D']
+        # active_peak_prominence_2d_results
+        pfs = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D']
+        ratemaps = pfs.ratemap
+        neuron_ids = deepcopy(pfs.ratemap.neuron_ids)
+        n_neuron_ids: int = len(neuron_ids)
+        spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
+
+        _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
+            spikes_df=spikes_df,
+            active_peak_prominence_2d_results=active_peak_prominence_2d_results,
+            ratemaps=ratemaps,
+            n_top_peaks=3,
+            # slice_level_multiplier=0.9,
+            slice_level_multiplier=0.2,
+            fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
+        )
+        _fake_reliability_df
+
+        ## OUTPUTS: _fake_reliability_df, in_field_masks
+
+        # max_t_idx = 4096
+        # max_t_idx = 19200
+        max_t_idx = None
+
+        time_bin_size_seconds: float = 0.050
+
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+            spikes_df=spikes_df,
+            ratemaps=ratemaps,
+            pfs=pfs,
+            in_field_masks=in_field_masks,
+            neuron_ids=neuron_ids,
+            time_bin_size_seconds=time_bin_size_seconds,
+            max_t_idx = max_t_idx,
+        )
+        t_bin_aclus_reliability_df
+
+        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, (max_t_idx, time_bin_size_seconds)
+
+        ## 1m 8s - 19200
+
 
 
     def _compute_reliability_metrics(self, ratemaps_flat):
