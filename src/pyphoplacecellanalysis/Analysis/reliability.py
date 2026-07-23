@@ -840,7 +840,7 @@ class CellIndividualReliabilityMatrix:
             fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
         )
 
-        t_bin_aclus_reliability_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df,
             ratemaps=ratemaps,
             pfs=pfs,
@@ -851,10 +851,11 @@ class CellIndividualReliabilityMatrix:
         )
         t_bin_aclus_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df
+        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df
 
 
     """
+    @function_attributes(short_name=None, tags=['MAIN', 'STAGE_2'], input_requires=[], output_provides=[], uses=['perform_compute_confusion_matrix'], used_by=[], creation_date='2026-07-22 19:47', related_items=[])
     @classmethod
     def compute_reliability_matrix(cls, spikes_df: pd.DataFrame, ratemaps, pfs, in_field_masks: Dict[int, np.ndarray], neuron_ids=None, time_bin_size_seconds: float = 0.050, **kwargs):
         """Compute per-aclu TP/FP/TN/FN reliability counts from time-binned spikes vs in-field masks.
@@ -992,7 +993,7 @@ class CellIndividualReliabilityMatrix:
             .with_columns(pl.col("is_in_field").fill_null(False))
         )
         # spikes_tagged
-        per_tbin = (
+        per_tbin_aclu_spike_counts_df = (
             spikes_tagged
             .group_by(["aclu", "t_bin_idx"])
             .agg([
@@ -1015,11 +1016,11 @@ class CellIndividualReliabilityMatrix:
         # ==================================================================================================================================================================================================================================================================================== #
         # Compute Reliability Matrix                                                                                                                                                                                                                                                           #
         # ==================================================================================================================================================================================================================================================================================== #
-        t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids,
+        t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin_aclu_spike_counts_df, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids,
             binned_xy_idxs_to_field_aclus_dict=binned_xy_idxs_to_field_aclus_dict, binned_xy_idxs_to_outoffield_aclus_dict=binned_xy_idxs_to_outoffield_aclus_dict, **kwargs)
 
         ## OUTPUTS: t_bin_aclus_reliability_df
-        return t_bin_aclus_reliability_df
+        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df
 
 
     @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
@@ -1043,6 +1044,7 @@ class CellIndividualReliabilityMatrix:
             Note: TP/FP are spike counts; TN/FN are silent time-bin counts (mixed units).
         """
         neuron_ids = np.asarray(neuron_ids)
+        n_computed_bins: int = 0
         aclu_to_neuron_idx_map = dict(zip(neuron_ids, np.arange(len(neuron_ids))))
         ## do once:
         if 'neuron_IDX' not in per_tbin.columns:
@@ -1091,19 +1093,37 @@ class CellIndividualReliabilityMatrix:
             fp_n_spikes = false_positive_spikes_df['n_spikes'].to_numpy()
             if len(fp_neuron_idxs) > 0:
                 t_bin_aclus_false_positive_spike_counts_arr[fp_neuron_idxs] += fp_n_spikes
+
+            n_computed_bins += 1 ## increment
+
         ## END for t_idx in valid_iloc....
 
+        n_tbins_column_names = ['true_neg_n_tbins', 'false_neg_n_tbins']
+        final_column_names = ['true_neg', 'false_neg']
         t_bin_aclus_reliability_df: pd.DataFrame = pd.DataFrame(
             dict(aclu=neuron_ids, neuron_IDX=np.arange(len(neuron_ids)),
-                true_pos=t_bin_aclus_true_positive_spike_counts_arr, true_neg=t_bin_aclus_true_negative_spike_counts_arr, false_pos=t_bin_aclus_false_positive_spike_counts_arr, false_neg=t_bin_aclus_false_negative_spike_counts_arr,
+                true_pos_n_spikes=t_bin_aclus_true_positive_spike_counts_arr, false_pos_n_spikes=t_bin_aclus_false_positive_spike_counts_arr,
+                true_neg_n_tbins=t_bin_aclus_true_negative_spike_counts_arr, false_neg_n_tbins=t_bin_aclus_false_negative_spike_counts_arr,
+                # true_pos=t_bin_aclus_true_positive_spike_counts_arr, true_neg=t_bin_aclus_true_negative_spike_counts_arr,
+                # false_pos=t_bin_aclus_false_positive_spike_counts_arr, false_neg=t_bin_aclus_false_negative_spike_counts_arr,
             ),
         ).set_index('aclu', drop=True, inplace=False)
+
+
+        t_bin_aclus_reliability_df['n_total_spikes'] = t_bin_aclus_reliability_df['true_pos_n_spikes'] + t_bin_aclus_reliability_df['false_pos_n_spikes']
+        t_bin_aclus_reliability_df['true_pos'] = t_bin_aclus_reliability_df['true_pos_n_spikes'] / t_bin_aclus_reliability_df['n_total_spikes'].astype(float)
+        t_bin_aclus_reliability_df['false_pos'] = t_bin_aclus_reliability_df['false_pos_n_spikes'] / t_bin_aclus_reliability_df['n_total_spikes'].astype(float)
+
+        t_bin_aclus_reliability_df['true_neg'] = t_bin_aclus_reliability_df['true_neg_n_tbins'] / float(n_computed_bins)
+        t_bin_aclus_reliability_df['false_neg'] = t_bin_aclus_reliability_df['false_neg_n_tbins'] / float(n_computed_bins)
+        
+
 
         ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
 
 
-    @function_attributes(short_name=None, tags=['promence'], input_requires=[], output_provides=[], uses=[], used_by=['_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
+    @function_attributes(short_name=None, tags=['promence', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
     @classmethod
     def _build_top_peak_90pct_masks(cls, active_peak_prominence_2d_results, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9) -> Dict[int, np.ndarray]:
         """Build per-neuron boolean masks (ny, nx) = union of top-N peak contours at `slice_level_multiplier` * peak height.
@@ -1190,6 +1210,7 @@ class CellIndividualReliabilityMatrix:
         ## END for neuron_id, a_result in active_peak_prominence_2d_results.results.items()...
 
         return masks_by_neuron
+
 
     @function_attributes(short_name=None, tags=['INCOMPLETE'], input_requires=[], output_provides=[], uses=['_build_top_peak_90pct_masks'], used_by=[], creation_date='2026-07-22 19:22', related_items=[])
     @classmethod
