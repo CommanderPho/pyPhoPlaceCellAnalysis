@@ -59,11 +59,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         )
         # Or: a_dst_decoder2D = BayesianPlacemapPositionDecoderDST.init_from_stateful_decoder(pf2D_Decoder)
 
-        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; Skaggs×sparsity is computed lazily):
-        # _rel = a_dst_decoder2D.compute_reliability_new(
-        #     active_peak_prominence_2d_results=active_peak_prominence_2d_results,
-        #     spikes_df=spikes_df, time_bin_size_seconds=a_dst_decoder2D.time_bin_size,
-        # )
+        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; Skaggs is computed lazily):
+        # a_dst_decoder2D.compute_unit_confusion_reliability_variables(spikes_df=spikes_df, time_bin_size_seconds=a_dst_decoder2D.time_bin_size)
+        # # Or pass pipeline PeakProminence2D if already computed:
+        # # a_dst_decoder2D.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=..., spikes_df=spikes_df, ...)
 
         ## Decode all time bins (DST Bel({v}) via overridden decode → compute_posterior):
         a_dst_decoder2D.compute_all(debug_print=False)
@@ -138,6 +137,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``
         (optional confusion-matrix / in-field-mask products; not required for DST decode).
         Extra kwargs for that step: ``max_t_idx``, ``spikes_df``, ``time_bin_size_seconds``.
+
+        To build confusion masks without a pipeline PeakProminence2D cache, construct the decoder then call
+        ``compute_unit_confusion_reliability_variables(...)`` with ``active_peak_prominence_2d_results`` omitted
+        (recomputes from ``self.pf``).
         """
         max_t_idx = kwargs.pop('max_t_idx', None)
         confusion_spikes_df = kwargs.pop('spikes_df', None)
@@ -156,6 +159,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``.
         Extra kwargs for that step: ``max_t_idx``, ``time_bin_size_seconds``.
+
+        To build confusion masks without a pipeline PeakProminence2D cache, construct the decoder then call
+        ``compute_unit_confusion_reliability_variables(...)`` with ``active_peak_prominence_2d_results`` omitted
+        (recomputes from ``self.pf``).
         """
         max_t_idx = kwargs.pop('max_t_idx', None)
         time_bin_size_seconds = kwargs.pop('time_bin_size_seconds', None)
@@ -250,15 +257,17 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # Main Methods                                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
     
-    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
-    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
+    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
         """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
 
         #TODO 2026-07-23 09:59: - [ ] this result is not currently used by any of the main computations because we use the skragg information reliability for each cell instead.
 
         Parameters
         ----------
-        active_peak_prominence_2d_results : PeakProminence2D results (required for in-field masks).
+        active_peak_prominence_2d_results : optional PeakProminence2D results for in-field masks.
+            If None, recomputes a minimal PeakProminence2D from ``self.pf`` via
+            ``CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf`` (no pipeline cache required).
         spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
         time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
         max_t_idx : optional cap on number of time bins (None = all).
@@ -291,10 +300,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         if (self.time_bin_size is None):
             self.time_bin_size = time_bin_size_seconds
 
-        # _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
-        #     spikes_df=spikes_df, active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
-        #     n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode,
-        # )
+        if active_peak_prominence_2d_results is None:
+            active_peak_prominence_2d_results = CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf(pfs, neuron_ids=neuron_ids)
 
         self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
             n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 

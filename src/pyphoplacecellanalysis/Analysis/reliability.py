@@ -1233,6 +1233,65 @@ class CellIndividualReliabilityMatrix:
         return masks_by_neuron
 
 
+    @function_attributes(short_name=None, tags=['prominence', 'PeakProminence2D', 'pf'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_prominence_contours'], used_by=['build_in_field_masks_xy_from_pf', 'BayesianPlacemapPositionDecoderDST.compute_unit_confusion_reliability_variables'], creation_date='2026-07-23 16:00', related_items=['_perform_pf_find_ratemap_peaks_peak_prominence2d_computation'])
+    @classmethod
+    def compute_peak_prominence_2d_from_pf(cls, pf: PfND, step: float = 0.01, min_considered_promenence: float = 0.2, neuron_ids=None):
+        """Build a minimal PeakProminence2D DynamicParameters from a 2D PfND (no pipeline cache required).
+
+        Mirrors the core of ``ratemap_peaks_prominence2d`` (unit-max tuning curves → prominence contours),
+        but only stores what ``_build_top_peak_90pct_masks`` / ``build_in_field_masks_xy`` need:
+        ``xx``, ``yy``, and per-neuron ``results[nid] = {peaks, slab, id_map, prominence_map, parent_map}``.
+
+        Parameters
+        ----------
+        pf : PfND
+            2D placefield object (``pf.ndim >= 2``).
+        step, min_considered_promenence : forwarded to ``PeakPromenence.compute_prominence_contours``.
+        neuron_ids : optional subset of neuron ids to include; defaults to all ``pf.ratemap.neuron_ids``.
+
+        Returns
+        -------
+        DynamicParameters with ``xx``, ``yy``, ``results`` (compatible with ``build_in_field_masks_xy``).
+        """
+        import matplotlib
+        from neuropy.utils.dynamic_container import DynamicParameters
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+        assert getattr(pf, 'ndim', 2) >= 2, "compute_peak_prominence_2d_from_pf requires 2D PfND"
+        matplotlib.use('Agg')  # avoid interactive figures from contour helpers
+
+        ratemap = pf.ratemap
+        all_neuron_ids = np.asarray(ratemap.neuron_ids)
+        active_tuning_curves = ratemap.unit_max_tuning_curves  # (n_neurons, nx, ny)
+        if neuron_ids is None:
+            included_set = None
+        else:
+            included_set = {int(nid) for nid in np.asarray(neuron_ids)}
+
+        out_results = {}
+        for neuron_idx, neuron_id in enumerate(all_neuron_ids):
+            neuron_id = int(neuron_id)
+            if (included_set is not None) and (neuron_id not in included_set):
+                continue
+            slab = np.asarray(active_tuning_curves[neuron_idx]).T
+            _, _, slab, cell_peaks_dict, id_map, prominence_map, parent_map = PeakPromenence.compute_prominence_contours(xbin_centers=pf.xbin_centers, ybin_centers=pf.ybin_centers, slab=slab, step=step, min_area=None, min_considered_promenence=min_considered_promenence, include_edge=True, verbose=False)
+            out_results[neuron_id] = {'peaks': cell_peaks_dict, 'slab': slab, 'id_map': id_map, 'prominence_map': prominence_map, 'parent_map': parent_map}
+        ## END for neuron_idx, neuron_id in enumerate(all_neuron_ids)...
+
+        return DynamicParameters(xx=pf.xbin_centers, yy=pf.ybin_centers, results=out_results)
+
+
+    @function_attributes(short_name=None, tags=['prominence', 'in_field', 'mask', 'pf'], input_requires=[], output_provides=[], uses=['compute_peak_prominence_2d_from_pf', 'build_in_field_masks_xy'], used_by=['BayesianPlacemapPositionDecoderDST.compute_unit_confusion_reliability_variables'], creation_date='2026-07-23 16:00', related_items=[])
+    @classmethod
+    def build_in_field_masks_xy_from_pf(cls, pf: PfND, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9, neuron_ids=None, step: float = 0.01, min_considered_promenence: float = 0.2) -> Dict[int, np.ndarray]:
+        """Build per-neuron in-field masks (nx, ny) from a 2D PfND by recomputing PeakProminence2D.
+
+        Convenience wrapper: ``compute_peak_prominence_2d_from_pf`` → ``build_in_field_masks_xy``.
+        """
+        active_peak_prominence_2d_results = cls.compute_peak_prominence_2d_from_pf(pf, step=step, min_considered_promenence=min_considered_promenence, neuron_ids=neuron_ids)
+        return cls.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=pf.ratemap, n_top_peaks=n_top_peaks, slice_level_multiplier=slice_level_multiplier, neuron_ids=neuron_ids)
+
+
     @function_attributes(short_name=None, tags=['prominence', 'in_field', 'mask'], input_requires=[], output_provides=[], uses=['_build_top_peak_90pct_masks'], used_by=['_partial_compute_reliability_matrix'], creation_date='2026-07-23 04:06', related_items=[])
     @classmethod
     def build_in_field_masks_xy(cls, active_peak_prominence_2d_results, ratemaps, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9, neuron_ids=None) -> Dict[int, np.ndarray]:
