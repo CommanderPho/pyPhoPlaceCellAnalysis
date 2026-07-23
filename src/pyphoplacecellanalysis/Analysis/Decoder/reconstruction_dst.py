@@ -10,6 +10,7 @@ from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.print_helpers import WrappingMessagePrinter
 from pyphocorehelpers.mixins.serialized import SerializedAttributesAllowBlockSpecifyingClass
 from neuropy.utils.mixins.AttrsClassHelpers import custom_define, non_serialized_field, serialized_field
+from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.analyses.placefields import PfND
 from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
 
@@ -18,7 +19,7 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BayesianPlacemapPositionDecoder
 
 
-@metadata_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-03 11:04', related_items=[])
+@metadata_attributes(short_name=None, tags=['Dempster-Shafer', 'decoder', 'position-decoder', 'probability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-03 11:04', related_items=[])
 @custom_define(slots=False, eq=False)
 class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     """
@@ -52,10 +53,35 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         from copy import deepcopy
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 
+        ## Build from an existing Bayesian 2D decoder (inherits parent setup / spike binning):
         a_dst_decoder2D: BayesianPlacemapPositionDecoderDST = BayesianPlacemapPositionDecoderDST(
             time_bin_size=pf2D_Decoder.time_bin_size, pf=pf2D_Decoder.pf, spikes_df=deepcopy(pf2D_Decoder.spikes_df),
         )
-        a_dst_decoder2D
+        # Or: a_dst_decoder2D = BayesianPlacemapPositionDecoderDST.init_from_stateful_decoder(pf2D_Decoder)
+
+        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; Skaggs×sparsity is computed lazily):
+        # _rel = a_dst_decoder2D.compute_reliability_new(
+        #     active_peak_prominence_2d_results=active_peak_prominence_2d_results,
+        #     spikes_df=spikes_df, time_bin_size_seconds=a_dst_decoder2D.time_bin_size,
+        # )
+
+        ## Decode all time bins (DST Bel({v}) via overridden decode → compute_posterior):
+        a_dst_decoder2D.compute_all(debug_print=False)
+        # → a_dst_decoder2D.p_x_given_n, a_dst_decoder2D.most_likely_positions, a_dst_decoder2D.reliability_active
+
+        ## Or decode an explicit spike-count matrix of shape (n_cells, n_time_bins):
+        spkcount = a_dst_decoder2D.unit_specific_time_binned_spike_counts  # or sparse.toarray() from compute_reliability_new
+        most_likely_positions, p_x_given_n, most_likely_position_indicies, _ = a_dst_decoder2D.decode(
+            spkcount, time_bin_size=a_dst_decoder2D.time_bin_size, debug_print=False,
+        )
+        # p_x_given_n.shape: (*spatial_bins, n_time_bins); most_likely_positions.shape: (n_time_bins, 2) for 2D
+
+        ## Epoch-restricted decoding (same API as parent; uses DST decode polymorphically):
+        # filter_epochs_decoder_result = a_dst_decoder2D.decode_specific_epochs(
+        #     spikes_df=spikes_df, filter_epochs=filter_epochs, decoding_time_bin_size=a_dst_decoder2D.time_bin_size,
+        # )
+
+
     """
     ## New `BayesianPlacemapPositionDecoderDST`-specific fields:
     t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
@@ -70,6 +96,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     fn_tn_mode: str = serialized_field(default='occupancy_seconds')
     reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
 
 
     @property
@@ -114,6 +141,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         super().post_load()
         self.reliability_active = None
         self.reliability_silent = None
+        self.in_field_masks = None
 
 
     def setup(self):
@@ -124,6 +152,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         self.per_tbin_aclu_spike_counts_sparse = None
         self.reliability_active = None
         self.reliability_silent = None
+        self.in_field_masks = None
 
 
     # ==================================================================================================================================================================================================================================================================================== #
@@ -168,13 +197,13 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         #     n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode,
         # )
 
-        in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+        self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
             n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
             neuron_ids=neuron_ids,
         )
 
         self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
-            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=in_field_masks, neuron_ids=neuron_ids,
+            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
             time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
         )
 
@@ -184,24 +213,19 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     def _compute_reliability_metrics(self, **kwargs):
         """
-        Calculates the in-field vs out-of-field Spatial SNR (R_i) for all cells.
-        Expects ratemaps flattened to (nCells, nFlatPositionBins).
+        Builds static per-cell reliability (alpha_i) from Skaggs SI × spatial sparsity.
+        Requires only ``self.pf`` so first ``decode()`` / ``compute_all()`` works without
+        a prior ``compute_reliability_new`` call.
         """
         assert (self.pf is not None)
-        assert (self.per_tbin_aclu_spike_counts_sparse is not None)
-        assert (self.time_bin_size is not None)
 
         an_active_pf = deepcopy(self.pf)
-        ## INPUTS: an_active_pf, time_bin_size_seconds, _decoder_per_tbin_aclu_spike_counts_sparse
+        ## INPUTS: an_active_pf
         alpha_skaggs = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
         alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)
 
-        # ## time-dependent alpha
+        # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
         # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
-
-        # alpha_skaggs
-        # alpha_sparsity
-        # alpha_dsnr
 
         # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
         # Ensuring the result is properly bounded [0, 1]
@@ -253,6 +277,54 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         # self.reliability_active = R_active
         # self.reliability_silent = R_silent
+
+
+    @function_attributes(short_name='decode', tags=['MAIN', 'decode', 'DST', 'pure'], input_requires=[], output_provides=[], creation_date='2026-07-23 06:07',
+        uses=['self.compute_posterior', 'BayesianPlacemapPositionDecoder.perform_compute_most_likely_positions'],
+        used_by=['BayesianPlacemapPositionDecoder.hyper_perform_decode', 'BayesianPlacemapPositionDecoder._perform_decoding_specific_epochs'])
+    def decode(self, unit_specific_time_binned_spike_counts, time_bin_size: float, output_flat_versions=False, debug_print=True):
+        """DST decode: same contract as parent ``BayesianPlacemapPositionDecoder.decode``, but uses ``compute_posterior`` (Shafer discounting) instead of Zhang Bayesian.
+
+        Inputs:
+            unit_specific_time_binned_spike_counts: np.array of shape (num_cells, num_time_bins)
+
+        Returns:
+            most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
+        """
+        num_cells = np.shape(unit_specific_time_binned_spike_counts)[0]
+        num_time_windows = np.shape(unit_specific_time_binned_spike_counts)[1]
+        if debug_print:
+            print(f'num_cells: {num_cells}, num_time_windows: {num_time_windows}')
+
+        prev_time_bin_size = self.time_bin_size
+        with WrappingMessagePrinter(f'decode(...) [DST] called. Computing {num_time_windows} windows for final_p_x_given_n...', begin_line_ending='... ', finished_message='decode completed.', enable_print=(debug_print or self.debug_print)):
+            if time_bin_size is None:
+                print(f'time_bin_size is None, using internal self.time_bin_size.')
+                time_bin_size = self.time_bin_size
+
+            try:
+                self.time_bin_size = time_bin_size
+                p_x_given_n = self.compute_posterior(unit_specific_time_binned_spike_counts)
+                curr_flat_p_x_given_n = np.reshape(p_x_given_n, (-1, num_time_windows))
+                if debug_print:
+                    print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
+
+                most_likely_position_flat_indicies, most_likely_position_indicies = self.perform_compute_most_likely_positions(curr_flat_p_x_given_n, self.original_position_data_shape)
+
+                if output_flat_versions:
+                    flat_outputs_container = DynamicContainer(flat_p_x_given_n=curr_flat_p_x_given_n, most_likely_position_flat_indicies=most_likely_position_flat_indicies)
+                else:
+                    flat_outputs_container = None
+
+                if self.ndim > 1:
+                    most_likely_positions = np.vstack((self.xbin_centers[most_likely_position_indicies[0, :]], self.ybin_centers[most_likely_position_indicies[1, :]])).T
+                else:
+                    most_likely_positions = np.squeeze(self.xbin_centers[most_likely_position_indicies[0, :]])
+
+                return most_likely_positions, p_x_given_n, most_likely_position_indicies, flat_outputs_container
+
+            finally:
+                self.time_bin_size = prev_time_bin_size
 
 
     def compute_posterior(self, spkcount, ratemaps=None):
