@@ -127,7 +127,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     @classmethod
     def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", field_threshold_frac: float = 0.20, discount_silence: bool = False, **kwargs):
         """Creates a new DST decoder instance from an existing stateful Bayesian decoder."""
-        return cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=stateful_decoder.debug_print, **kwargs)
+        return cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
 
 
     @classmethod
