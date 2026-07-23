@@ -1513,18 +1513,24 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
         
     return fig, axes
 
-@function_attributes(short_name=None, tags=['figure', 'interactive', 'decoder', 'bayesian', 'intuition', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping'], used_by=[], creation_date='2026-07-17 13:00', related_items=['DisjointPlacefieldsExploration'])
-def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDecoder, neuron_ids: Optional[Union[List[int], Tuple[int, ...]]] = None,
+@function_attributes(short_name=None, tags=['figure', 'interactive', 'decoder', 'bayesian', 'intuition', '2D', 'matplotlib', 'DST'], input_requires=[], output_provides=[], uses=['DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping'], used_by=[], creation_date='2026-07-17 13:00', related_items=['DisjointPlacefieldsExploration'])
+def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPositionDecoder, "BayesianPlacemapPositionDecoderDST"], neuron_ids: Optional[Union[List[int], Tuple[int, ...]]] = None,
         all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
         max_spikes_per_cell: int = 15, show_log_likelihood: bool = True):
-    """Interactive 2D Bayesian decode viewer: sliders set observed spike counts ``n_i``; panels show Poisson equation factors.
+    """Interactive 2D Bayesian / DST decode viewer: sliders set observed spike counts ``n_i``; panels show Poisson equation factors.
 
     Decomposes the independent-Poisson place-cell likelihood used by ``neuropy_bayesian_prob``:
 
         P(n|x) ∝ Π_i  (τ f_i(x))^{n_i} / n_i!  ·  exp(-τ f_i(x))
         P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
 
-    Top row: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
+    Factor panels (power, exp, per-cell L, joint L) always show this Bayesian Poisson decomposition.
+    When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, the decoded-posterior panel instead shows
+    Shafer-discounted ``Bel({v})`` from ``sliced.compute_posterior`` (reuses ``reliability_active`` /
+    ``reliability_silent`` when already computed; otherwise Skaggs α via ``_compute_reliability_metrics``).
+    Per-cell α is annotated on placefield titles.
+
+    Top row: posterior ``P(x|n)`` or DST ``Bel({v})``, product power term, product exp term, joint ``L`` (optionally log10).
     Bottom row: per-cell placefields (raw Hz) and per-cell likelihood terms.
     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
 
@@ -1534,6 +1540,8 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
 
         maze_name = 'maze0'
         decoder = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D_Decoder']
+        # Or DST: from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
+        # decoder = BayesianPlacemapPositionDecoderDST.init_from_stateful_decoder(pf2D_Decoder)
         # Optional: seed from a DecodedFilterEpochsResult
         # all_epochs_decoding_result = ...
         fig, sliced_decoder, used_ids = build_interactive_bayesian_2d_eqn_viewer(decoder=decoder, neuron_ids=None, # None → most-disjoint pair; or (38, 49)
@@ -1549,6 +1557,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     from matplotlib.widgets import Slider, Button
     from neuropy.utils.matplotlib_helpers import FormattedFigureText
     from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 
     def _subfn_orient_2d_for_imshow(M: NDArray) -> NDArray:
         """Match placefield / posterior display orientation used elsewhere."""
@@ -1633,7 +1642,11 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
 
     neuron_ids = tuple(int(x) for x in neuron_ids)
 
-    sliced: BayesianPlacemapPositionDecoder = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
+    sliced: Union[BayesianPlacemapPositionDecoder, BayesianPlacemapPositionDecoderDST] = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
+    is_dst: bool = isinstance(sliced, BayesianPlacemapPositionDecoderDST)
+    if is_dst and (sliced.reliability_active is None):
+        sliced._compute_reliability_metrics()  # populate α for titles; compute_posterior would do this lazily anyway
+
     tau: float = float(sliced.time_bin_size)
     tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
     n_cells, nx, ny = tc.shape
@@ -1708,7 +1721,8 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     )
 
 
-    title_string = f"Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
+    mode_label = 'DST' if is_dst else 'Bayesian'
+    title_string = f"{mode_label} Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
     subtitle_string = None # "Place fields, expected spike counts, and likelihood terms across spatial bins"
 
     perform_update_title_subtitle(fig=fig, ax=ax_dict, title_string=title_string, subtitle_string=subtitle_string)
@@ -1744,7 +1758,16 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
             ax.cla()
         ## END for ax in ax_cell_L...
 
-        _subfn_imshow_map(ax_post, parts['posterior'], xbin, ybin, r'Decoded $P(x\mid n)$')
+        if is_dst:
+            # DST Bel({v}): one time-bin spike-count column; squeeze trailing t-axis → (nx, ny)
+            p_dst = sliced.compute_posterior(np.asarray(n, dtype=float)[:, np.newaxis])
+            posterior_map = np.squeeze(p_dst, axis=-1)
+            post_title = r'DST $\mathrm{Bel}(\{v\})$'
+        else:
+            posterior_map = parts['posterior']
+            post_title = r'Decoded $P(x\mid n)$'
+
+        _subfn_imshow_map(ax_post, posterior_map, xbin, ybin, post_title)
         _subfn_imshow_map(ax_pow, parts['power_term'], xbin, ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
         _subfn_imshow_map(ax_exp, parts['exp_term'], xbin, ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
         if show_log_likelihood:
@@ -1757,7 +1780,14 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         ## Place Cells
         for i, ax in enumerate(ax_cell_pf):
             cmap = cell_cmaps[i]
-            _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap=cmap)
+            pf_title = f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}'
+            if is_dst and (sliced.reliability_active is not None):
+                alpha_i = float(sliced.reliability_active[i])
+                if getattr(sliced, 'discount_silence', False) and (sliced.reliability_silent is not None):
+                    pf_title += rf'  $\alpha$={alpha_i:.2f}  $\alpha_{{silent}}$={float(sliced.reliability_silent[i]):.2f}'
+                else:
+                    pf_title += rf'  $\alpha$={alpha_i:.2f}'
+            _subfn_imshow_map(ax, tc[i], xbin, ybin, pf_title, cmap=cmap)
             an_E_n = E_n[i] # tau * peak_rates[i]
             # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
@@ -1770,9 +1800,9 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         ## END for i, ax in enumerate(ax_cell_L)...
 
         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(aclu_list, n)])
-        ml_flat = np.nanargmax(parts['posterior'])
-        ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
-        fig.suptitle(rf'Bayesian 2D decode intuition  |  $\tau={tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
+        ml_flat = np.nanargmax(posterior_map)
+        ml_ij = np.unravel_index(ml_flat, posterior_map.shape)
+        fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
         fig.canvas.draw_idle()
 
 
@@ -1832,7 +1862,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     _subfn_redraw()
 
     # Keep refs alive
-    fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids)
+    fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids, is_dst=is_dst, reliability_active=getattr(sliced, 'reliability_active', None), reliability_silent=getattr(sliced, 'reliability_silent', None))
     return fig, sliced, neuron_ids
 
 
