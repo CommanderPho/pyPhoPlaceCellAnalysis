@@ -79,6 +79,7 @@ def _compute_single_lap_reliability(curr_lap_filtered_spikes_df, variable_extent
     # np.convolve(out[curr_digitized_variable], np.
     return out_indicies, out_digitized_position_bins, out_within_lap_spikes_overlap
 
+
 @function_attributes(short_name=None, tags=['original'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2022-01-01 00:00', related_items=[])
 def compute_lap_to_lap_reliability(active_pf, filtered_spikes_df, lap_ids, cellind, min_subdivision_resolution:float = 0.01, plot_results=False, plot_horizontal=True, debug_print=True):
     """ Computes the reliability of a placecell from lap-to-lap

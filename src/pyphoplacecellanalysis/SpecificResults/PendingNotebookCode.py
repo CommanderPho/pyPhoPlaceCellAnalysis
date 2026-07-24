@@ -1528,10 +1528,11 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, the decoded-posterior panel instead shows
     Shafer-discounted ``Bel({v})`` from ``sliced.compute_posterior`` (reuses ``reliability_active`` /
     ``reliability_silent`` when already computed; otherwise Skaggs α via ``_compute_reliability_metrics``).
-    Per-cell α is annotated on placefield titles.
+    Per-cell α is annotated on placefield titles. DST also inserts a row under each placefield showing
+    per-cell Shafer mass ``E_i(x) = α p_i(x) + (1-α)`` (α from active/silent reliability by ``n_i``).
 
-    Top row: posterior ``P(x|n)`` or DST ``Bel({v})``, product power term, product exp term, joint ``L`` (optionally log10).
-    Bottom row: per-cell placefields (raw Hz) and per-cell likelihood terms.
+    Layout: per-cell placefields (raw Hz); DST-only ``E_i`` row; per-cell likelihood terms; then posterior
+    ``P(x|n)`` or DST ``Bel({v})``, product power term, product exp term, joint ``L`` (optionally log10).
     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
 
     Usage:
@@ -1609,12 +1610,42 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
         }
 
 
-    def _subfn_imshow_map(ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False):
+    def _subfn_dst_Ei_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, reliability_active: NDArray, reliability_silent: NDArray) -> Dict[str, Any]:
+        """Per-cell Shafer mass maps matching ``BayesianPlacemapPositionDecoderDST.compute_posterior``.
+
+        E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i].
+        Factorial cancels under normalization of L_i → p_i.
+        """
+        n_cells = tuning_curves_xy.shape[0]
+        assert len(spike_counts) == n_cells
+        F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+        n_bins = int(np.prod(F.shape[1:]))
+        per_cell_E = []
+        alphas = np.zeros(n_cells, dtype=float)
+
+        for i in range(n_cells):
+            n_i = int(spike_counts[i])
+            tau_f = tau * F[i]
+            L_i = np.power(tau_f, n_i) * np.exp(-tau_f)
+            Z_i = np.nansum(L_i)
+            if Z_i > 0:
+                p_i = L_i / Z_i
+            else:
+                p_i = np.full_like(L_i, 1.0 / float(n_bins))
+            alpha_i = float(reliability_active[i]) if n_i > 0 else float(reliability_silent[i])
+            alphas[i] = alpha_i
+            per_cell_E.append((alpha_i * p_i) + (1.0 - alpha_i))
+        ## END for i in range(n_cells)...
+
+        return {'per_cell_E': per_cell_E, 'alphas': alphas}
+
+
+    def _subfn_imshow_map(ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False, vmin=None, vmax=None):
         A = _subfn_orient_2d_for_imshow(M)
         if log_scale:
             A = np.log10(np.clip(A, 1e-30, None))
         extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-        im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal')
+        im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
         ax.set_title(title, fontsize=10)
         ax.set_xticks([])
         ax.set_yticks([])
@@ -1678,10 +1709,11 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     else:
         n0 = np.ones(n_cells, dtype=int)
 
-    # Figure layout: row0 = posterior + factors; row1 = per-cell PF + per-cell L; sliders below
+    # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors; sliders below
     n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
     # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
     n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
+    pad: int = max(n_factor_cols - n_cells, 0)
 
     # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
     slider_h: float = 0.022
@@ -1692,6 +1724,8 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     controls_band_h: float = n_cells * slider_pitch + controls_top_pad
     mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
     fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
+    if is_dst:
+        fig_h += 0.9
 
     fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
 
@@ -1707,15 +1741,20 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     # ax_cell_L = [fig.add_subplot(gs[1, n_cells + i]) for i in range(n_cells)]
 
     ## INPUTS: fig
-    mosaic_layout = [
-        [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * max(n_factor_cols - n_cells, 0),
-        [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * max(n_factor_cols - n_cells, 0),   
-        ["decoded_posterior", "term0", "term1", "joint_likelihood"],
-    ]
+    pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
+    L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
+    factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
+    if is_dst:
+        E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad
+        mosaic_layout = [pf_row, E_row, L_row, factor_row]
+        height_ratios = [3.0, 2.8, 3.0, 3.2]
+    else:
+        mosaic_layout = [pf_row, L_row, factor_row]
+        height_ratios = [3.0, 3.0, 3.2]
 
     ax_dict = fig.subplot_mosaic(
         mosaic_layout,
-        height_ratios=[3.0, 3.0, 3.2],
+        height_ratios=height_ratios,
         width_ratios=[1, 1, 1, 1],
         gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
     )
@@ -1742,6 +1781,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
     ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
     ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
+    ax_cell_E = [ax_dict.get(f'cell_{chr(97 + i)}_E') for i in range(n_cells)] if is_dst else []
 
 
     state = {'n': n0.copy(), 'ims': {}}
@@ -1758,14 +1798,20 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
             ax.cla()
         ## END for ax in ax_cell_L...
 
+        for ax in ax_cell_E:
+            ax.cla()
+        ## END for ax in ax_cell_E...
+
         if is_dst:
             # DST Bel({v}): one time-bin spike-count column; squeeze trailing t-axis → (nx, ny)
             p_dst = sliced.compute_posterior(np.asarray(n, dtype=float)[:, np.newaxis])
             posterior_map = np.squeeze(p_dst, axis=-1)
             post_title = r'DST $\mathrm{Bel}(\{v\})$'
+            Ei_parts = _subfn_dst_Ei_maps(tc, n, tau, sliced.reliability_active, sliced.reliability_silent)
         else:
             posterior_map = parts['posterior']
             post_title = r'Decoded $P(x\mid n)$'
+            Ei_parts = None
 
         _subfn_imshow_map(ax_post, posterior_map, xbin, ybin, post_title)
         _subfn_imshow_map(ax_pow, parts['power_term'], xbin, ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
@@ -1793,6 +1839,16 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
 
         ## END for i, ax in enumerate(ax_cell_pf)...
+
+        if is_dst and (Ei_parts is not None):
+            # Fixed [0,1] clim: auto-scale hides the (1-α) floor (max p_i ≪ 1) so E_i looks like PF/p_i
+            for i, ax in enumerate(ax_cell_E):
+                cmap = cell_cmaps[i]
+                alpha_eff = float(Ei_parts['alphas'][i])
+                floor = 1.0 - alpha_eff
+                _subfn_imshow_map(ax, Ei_parts['per_cell_E'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $E_i=\alpha p_i+(1-\alpha)$  $\alpha$={alpha_eff:.2f}', cmap=cmap, vmin=0.0, vmax=1.0)
+                ax.set_xlabel(rf'floor $1-\alpha$={floor:.2f}  (clim $[0,1]$)', fontsize=8)
+            ## END for i, ax in enumerate(ax_cell_E)...
 
         for i, ax in enumerate(ax_cell_L):
             cmap = cell_cmaps[i]
@@ -1862,7 +1918,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: Union[BayesianPlacemapPosi
     _subfn_redraw()
 
     # Keep refs alive
-    fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids, is_dst=is_dst, reliability_active=getattr(sliced, 'reliability_active', None), reliability_silent=getattr(sliced, 'reliability_silent', None))
+    fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids, is_dst=is_dst, ax_cell_E=ax_cell_E, reliability_active=getattr(sliced, 'reliability_active', None), reliability_silent=getattr(sliced, 'reliability_silent', None))
     return fig, sliced, neuron_ids
 
 
