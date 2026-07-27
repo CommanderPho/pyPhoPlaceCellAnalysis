@@ -517,3 +517,40 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             finally:
                 self.time_bin_size = prev_time_bin_size
 
+
+    @classmethod
+    def iterative_intersection(cls, *args):
+        """ computes the iterative intersection of each of the arguments in *args """
+        if len(args) < 2:
+            return args
+        else:
+            out = np.zeros_like(args[0]) ## all must be same size, but this is the output
+            for i, an_arg in enumerate(args):
+                ## get the intersection of this arg with out
+                is_conflicting_mask = np.logical_and(np.logical_not((out > 0)), (an_arg > 0))
+                out[is_conflicting_mask] = an_arg[is_conflicting_mask]
+            ## END for i, an_arg in enumerate(args)...
+            return out
+
+
+    @classmethod
+    def conflict_K(cls, *args) -> float:
+        """ the degree of conflict between the sources presented in *args
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
+
+            tuning_curves = deepcopy(sliced.ratemap.tuning_curves)
+            # np.shape(tuning_curves) # (4, 30, 28) - (n_tuning_curves, n_x_bins_, n_y_bins)
+            n_tuning_curves, n_x_bins_, n_y_bins = np.shape(tuning_curves)
+            tuning_curves_list = [tuning_curves[i, :, :] for i in np.arange(n_tuning_curves)]
+
+            K: float = BayesianPlacemapPositionDecoderDST.conflict_K(tuning_curves_list)
+            K
+
+
+        """
+        return np.nansum(cls.iterative_intersection(*args))
+
+
