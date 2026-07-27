@@ -355,8 +355,6 @@ class ZhangReconstructionImplementation:
                 print(f'WARN: f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}", replacing with uniform!')
                 # raise ValueError(f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}")
 
-
-
             if use_flat_computation_mode:
                 # Single-cell flat Version:
 
@@ -4062,11 +4060,12 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             # Ensuring the result is properly bounded [0, 1]
             # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
 
-        R_base = np.clip(daweights, 0.0, 1.0)
-
+        R_base = daweights
+        # R_base = np.clip(daweights, 0.0, 1.0)
 
         ## 
-        R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
+        # R_base = np.clip(daweights, 0.0, 1.0) / np.nansum(daweights) ## normalized weights from each cell
+        # R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
 
         self.reliability_active = R_base
         

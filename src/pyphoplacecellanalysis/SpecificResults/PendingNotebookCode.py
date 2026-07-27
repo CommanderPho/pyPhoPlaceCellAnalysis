@@ -1521,6 +1521,7 @@ import matplotlib.colors as mcolors
 from matplotlib.widgets import Slider, Button
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 
 
@@ -1575,6 +1576,8 @@ class InteractiveBayesian2DEquationDebugger:
     max_spikes_per_cell: int = field(default=15)
     show_log_likelihood: bool = field(default=True)
     drop_negative_contributing_terms_mode: bool = field(default=True)
+    reliability_modifier_mode: ReliabilityDecoderModifierMode = field(default=ReliabilityDecoderModifierMode.IGNORE)
+
 
     # Derived / UI state (populated in setup / buildUI) _______________________________________________________________ #
     sliced: Optional[BayesianPlacemapPositionDecoder] = field(default=None)
@@ -1624,25 +1627,39 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     @classmethod
-    def _poisson_factor_maps(cls, tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, drop_negative_contributing_terms_mode: bool = True) -> Dict[str, Any]:
+    def _poisson_factor_maps(cls, tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, drop_negative_contributing_terms_mode: bool = True,
+                             reliability_modifier_mode: Optional[ReliabilityDecoderModifierMode] = None, reliability_active: Optional[NDArray] = None, reliability_silent: Optional[NDArray] = None) -> Dict[str, Any]:
         """Build per-factor 2D maps for the Poisson likelihood product.
 
         tuning_curves_xy: (n_cells, n_x, n_y) in Hz
         spike_counts:     (n_cells,)
 
-        Captures: drop_negative_contributing_terms_mode
+        Captures: drop_negative_contributing_terms_mode, reliability_modifier_mode
 
+        ``ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING`` (power-prior): raise each cell's
+        likelihood factors to reliability α_i (active if n_i>0 else silent), then re-normalise the joint.
         """
+        if reliability_modifier_mode is None:
+            reliability_modifier_mode = ReliabilityDecoderModifierMode.IGNORE
+
         n_cells = tuning_curves_xy.shape[0]
         assert len(spike_counts) == n_cells
 
         # Avoid exact zeros so log/pow stay finite; matches "tiny floor" reality after smoothing
         F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+        spatial_shape = F.shape[1:]
 
-        power_term = np.ones(F.shape[1:], dtype=float)  # Π (τ f_i)^{n_i}
-        exp_term = np.ones(F.shape[1:], dtype=float)  # Π exp(-τ f_i)
+        use_tempering: bool = (reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING)
+        if use_tempering:
+            assert (reliability_active is not None) and (reliability_silent is not None), f'LIKELIHOOD_TEMPERING requires reliability_active and reliability_silent.'
+            reliability_active = np.asarray(reliability_active, dtype=float)
+            reliability_silent = np.asarray(reliability_silent, dtype=float)
+
+        power_term = np.ones(spatial_shape, dtype=float)  # Π (τ f_i)^{n_i}
+        exp_term = np.ones(spatial_shape, dtype=float)  # Π exp(-τ f_i)
         factorial_term = 1.0
         per_cell_L = []
+        alphas = np.ones(n_cells, dtype=float)
 
         for i in range(n_cells):
             n_i = int(spike_counts[i])
@@ -1651,6 +1668,23 @@ class InteractiveBayesian2DEquationDebugger:
             cell_exp = np.exp(-tau_f)
             cell_fac = 1.0 / float(factorial(n_i))
             cell_L = cell_power * cell_exp * cell_fac
+
+            if use_tempering:
+                ## Power-prior: L_i(x) ← L_i(x)^{α_i}  (equivalently raise each Poisson factor)
+                R_eff = reliability_active if (n_i > 0) else reliability_silent
+                if R_eff.ndim == 1:
+                    alpha_i = float(R_eff[i])
+                    alphas[i] = alpha_i
+                elif R_eff.ndim == 2:
+                    alpha_i = R_eff[:, i].reshape(spatial_shape)
+                    alphas[i] = float(np.nanmean(alpha_i))
+                else:
+                    raise ValueError(f'Unsupported reliability ndim={R_eff.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+
+                cell_power = np.power(cell_power, alpha_i)
+                cell_exp = np.power(cell_exp, alpha_i)
+                cell_fac = np.power(cell_fac, alpha_i)
+                cell_L = cell_power * cell_exp * cell_fac
 
             if drop_negative_contributing_terms_mode and (n_i == 0):
                 ## ignore terms that arise from having no spikes from this cell in the time bin:
@@ -1674,10 +1708,11 @@ class InteractiveBayesian2DEquationDebugger:
             'per_cell_L': per_cell_L,  # list of (nx, ny)
             'power_term': power_term,  # Π (τf)^{n}
             'exp_term': exp_term,  # Π e^{-τf}
-            'factorial_term': factorial_term,  # scalar Π 1/n!
+            'factorial_term': factorial_term,  # scalar Π 1/n! (or tempered)
             'L': L,  # unnormalized joint
             'posterior': posterior,  # P(x|n)
             'F': F,
+            'alphas': alphas,
         }
 
 
@@ -1776,6 +1811,8 @@ class InteractiveBayesian2DEquationDebugger:
         if is_dst and (getattr(sliced, 'reliability_active', None) is None):
             sliced._compute_reliability_metrics()  # populate α for titles / E_i; compute_posterior would do this lazily anyway
 
+        if (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(sliced, 'reliability_active', None) is None):
+            sliced._compute_reliability_metrics()  # needed for power-prior tempering on Bayesian path
 
 
         tau: float = float(sliced.time_bin_size)
@@ -1970,7 +2007,8 @@ class InteractiveBayesian2DEquationDebugger:
 
         """
         n = self.n ## number of spikes
-        parts = self._poisson_factor_maps(self.tuning_curves, n, self.tau, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode) ## recompute
+        parts = self._poisson_factor_maps(self.tuning_curves, n, self.tau, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode,
+                                         reliability_modifier_mode=self.reliability_modifier_mode, reliability_active=getattr(self.sliced, 'reliability_active', None), reliability_silent=getattr(self.sliced, 'reliability_silent', None)) ## recompute
 
         axes_to_clear = [self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf]
         if self.ax_conflict_K is not None:
@@ -2065,6 +2103,7 @@ class InteractiveBayesian2DEquationDebugger:
 def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDecoder, neuron_ids: Optional[Union[List[int], Tuple[int, ...], int]] = None,
         all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
         max_spikes_per_cell: int = 15, show_log_likelihood: bool = True, drop_negative_contributing_terms_mode: bool = True,
+        reliability_modifier_mode: ReliabilityDecoderModifierMode = ReliabilityDecoderModifierMode.IGNORE,
     ):
     """Interactive 2D Bayesian decode viewer — thin wrapper around ``InteractiveBayesian2DEquationDebugger``.
 
@@ -2073,7 +2112,8 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     """
     dbgr = InteractiveBayesian2DEquationDebugger(decoder=decoder, neuron_ids=neuron_ids,
         all_epochs_decoding_result=all_epochs_decoding_result, seed_epoch_idx=seed_epoch_idx, seed_t_bin_idx=seed_t_bin_idx,
-        max_spikes_per_cell=max_spikes_per_cell, show_log_likelihood=show_log_likelihood, drop_negative_contributing_terms_mode=drop_negative_contributing_terms_mode)
+        max_spikes_per_cell=max_spikes_per_cell, show_log_likelihood=show_log_likelihood, drop_negative_contributing_terms_mode=drop_negative_contributing_terms_mode,
+        reliability_modifier_mode=reliability_modifier_mode)
     return dbgr.as_viewer_tuple()
 
 
