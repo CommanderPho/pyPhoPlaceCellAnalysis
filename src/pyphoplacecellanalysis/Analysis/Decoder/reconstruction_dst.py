@@ -105,6 +105,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
 
 
+    ## alternative functions:
+    drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
+
+
     @property
     def expected_n_spikes(self):
         """The expected_n_spikes property."""
@@ -337,11 +341,14 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
             # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
 
+            # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
+            # Ensuring the result is properly bounded [0, 1]
+            # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
+            R_base = np.clip(daweights, 0.0, 1.0)
 
-        # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
-        # Ensuring the result is properly bounded [0, 1]
-        # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
-        R_base = np.clip(daweights, 0.0, 1.0)
+
+        ## 
+        R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
 
         self.reliability_active = R_base
         
@@ -379,8 +386,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             # self._compute_reliability_metrics(ratemaps_flat)
             self._compute_reliability_metrics()
 
-        tau = self.time_bin_size
-        nTimeBins = spkcount.shape[1]
+        tau: float = self.time_bin_size
+        nTimeBins: int = spkcount.shape[1]
         
         # 3. Incorporate Occupancy Prior P(x, y) 
         try:
@@ -408,19 +415,27 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         # 4. Iterative Likelihood Evaluation (Memory Efficient Evidential Fusion)
         for cell in range(nCells):
             cell_spkcnt = spkcount[cell, :][:, np.newaxis]   # (nTimeBins, 1)
+            active_mask = (cell_spkcnt > 0)
+
             cell_ratemap = ratemaps_flat[cell, :][np.newaxis, :]  # (1, nPositionBins)
 
             # Poisson Sensor Likelihood Density
             L_i = ( (tau * cell_ratemap) ** cell_spkcnt ) * np.exp(-tau * cell_ratemap)
-            Z_i = np.sum(L_i, axis=1, keepdims=True)
+            Z_i = np.sum(L_i, axis=1, keepdims=True) ## normalization term I suppose?
             
             # Convert raw likelihoods to specific evidential mass assignments
             with np.errstate(divide='ignore', invalid='ignore'):
-                p_i = L_i / Z_i
-            p_i = np.where(Z_i == 0, 1.0 / nPositionBins, p_i)
+                p_i = L_i / Z_i ## apply normalization
+            ## prevent normalization by zero I suppose, instead set those bins to uniform
+            p_i = np.where(Z_i == 0, (1.0 / nPositionBins), p_i)
+
+
+            if self.drop_negative_contributing_terms_mode:
+                ## discard any negative terms (from non-spiking periods)
+                p_i = np.where(active_mask, p_i, 0.0) ## for this cell, zero out any terms for bins that have zero firing (are inactive)
+
 
             # Apply Reliability Conditional on Firing State
-            active_mask = (cell_spkcnt > 0)
             R_effective = np.where(active_mask, self.reliability_active[cell], self.reliability_silent[cell])
             
             # Dempster-Shafer Unnormalized Conjoint Mass formulation: 

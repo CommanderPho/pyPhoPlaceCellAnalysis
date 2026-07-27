@@ -3503,6 +3503,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     revised_most_likely_positions: np.ndarray = None
 
 
+
     # time_binning_container accessors ___________________________________________________________________________________ #
     @property
     def time_window_edges(self):

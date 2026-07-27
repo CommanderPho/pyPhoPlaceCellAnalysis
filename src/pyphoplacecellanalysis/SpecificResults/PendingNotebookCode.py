@@ -1513,376 +1513,747 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
         
     return fig, axes
 
-@function_attributes(short_name=None, tags=['figure', 'interactive', 'decoder', 'bayesian', 'intuition', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping'], used_by=[], creation_date='2026-07-17 13:00', related_items=['DisjointPlacefieldsExploration'])
-def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDecoder, neuron_ids: Optional[Union[List[int], Tuple[int, ...]]] = None,
-        all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
-        max_spikes_per_cell: int = 15, show_log_likelihood: bool = True):
-    """Interactive 2D Bayesian decode viewer: sliders set observed spike counts ``n_i``; panels show Poisson equation factors.
 
-    Decomposes the independent-Poisson place-cell likelihood used by ``neuropy_bayesian_prob``:
 
-        P(n|x) ∝ Π_i  (τ f_i(x))^{n_i} / n_i!  ·  exp(-τ f_i(x))
-        P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
+from math import factorial
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+from matplotlib.widgets import Slider, Button
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 
-    Top row: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
-    Bottom row: per-cell placefields (raw Hz) and per-cell likelihood terms.
-    When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
 
-    Usage:
+@define(slots=False)
+class InteractiveBayesian2DEquationDebugger:
+    """ Interactive decoding equation viewer
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_interactive_bayesian_2d_eqn_viewer
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import InteractiveBayesian2DEquationDebugger
 
-        maze_name = 'maze0'
-        decoder = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D_Decoder']
-        # Optional: seed from a DecodedFilterEpochsResult
-        # all_epochs_decoding_result = ...
-        fig, sliced_decoder, used_ids = build_interactive_bayesian_2d_eqn_viewer(decoder=decoder, neuron_ids=None, # None → most-disjoint pair; or (38, 49)
-            all_epochs_decoding_result=None, seed_epoch_idx=0, seed_t_bin_idx=0, max_spikes_per_cell=15, show_log_likelihood=True)
-        plt.show()
 
-    Returns:
-        (fig, sliced_decoder, neuron_ids): figure with live UI refs on ``fig._bayes_eqn_ui``, neuron-sliced decoder, resolved cell ids.
     """
-    from math import factorial
-    import matplotlib.cm as cm
-    import matplotlib.colors as mcolors
-    from matplotlib.widgets import Slider, Button
-    from neuropy.utils.matplotlib_helpers import FormattedFigureText
-    from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+    decoder: BayesianPlacemapPositionDecoder
+    neuron_ids: Optional[Union[List[int], Tuple[int, ...]]] = field(default=None)
+    
+    all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = field(default=None)
+    seed_epoch_idx: int = field(default=0)
+    seed_t_bin_idx: int = field(default=0)
+    max_spikes_per_cell: int = field(default=15)
+    show_log_likelihood: bool = field(default=True)
+    drop_negative_contributing_terms_mode: bool = field(default=True)
 
-    def _subfn_orient_2d_for_imshow(M: NDArray) -> NDArray:
-        """Match placefield / posterior display orientation used elsewhere."""
-        return np.fliplr(np.rot90(np.asarray(M, dtype=float), k=-1))
+    def __attrs_post_init__(self):
+        """Interactive 2D Bayesian decode viewer: sliders set observed spike counts ``n_i``; panels show Poisson equation factors.
 
+        Decomposes the independent-Poisson place-cell likelihood used by ``neuropy_bayesian_prob``:
 
-    def _subfn_poisson_factor_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float) -> Dict[str, Any]:
-        """Build per-factor 2D maps for the Poisson likelihood product.
+            P(n|x) ∝ Π_i  (τ f_i(x))^{n_i} / n_i!  ·  exp(-τ f_i(x))
+            P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
 
-        tuning_curves_xy: (n_cells, n_x, n_y) in Hz
-        spike_counts:     (n_cells,)
+        Top row: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
+        Bottom row: per-cell placefields (raw Hz) and per-cell likelihood terms.
+        When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
+
+        Usage:
+
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_interactive_bayesian_2d_eqn_viewer
+
+            maze_name = 'maze0'
+            decoder = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D_Decoder']
+            # Optional: seed from a DecodedFilterEpochsResult
+            # all_epochs_decoding_result = ...
+            fig, sliced_decoder, used_ids = build_interactive_bayesian_2d_eqn_viewer(decoder=decoder, neuron_ids=None, # None → most-disjoint pair; or (38, 49)
+                all_epochs_decoding_result=None, seed_epoch_idx=0, seed_t_bin_idx=0, max_spikes_per_cell=15, show_log_likelihood=True)
+            plt.show()
+
+        Returns:
+            (fig, sliced_decoder, neuron_ids): figure with live UI refs on ``fig._bayes_eqn_ui``, neuron-sliced decoder, resolved cell ids.
         """
-        n_cells = tuning_curves_xy.shape[0]
-        assert len(spike_counts) == n_cells
-
-        # Avoid exact zeros so log/pow stay finite; matches "tiny floor" reality after smoothing
-        F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
-
-        power_term = np.ones(F.shape[1:], dtype=float)  # Π (τ f_i)^{n_i}
-        exp_term = np.ones(F.shape[1:], dtype=float)  # Π exp(-τ f_i)
-        factorial_term = 1.0
-        per_cell_L = []
-
-        for i in range(n_cells):
-            n_i = int(spike_counts[i])
-            tau_f = tau * F[i]
-            cell_power = np.power(tau_f, n_i)
-            cell_exp = np.exp(-tau_f)
-            cell_fac = 1.0 / float(factorial(n_i))
-            cell_L = cell_power * cell_exp * cell_fac
-            per_cell_L.append(cell_L)
-            power_term *= cell_power
-            exp_term *= cell_exp
-            factorial_term *= cell_fac
-        ## END for i in range(n_cells)...
-
-        L = power_term * exp_term * factorial_term  # joint unnormalized likelihood
-        Z = np.nansum(L)
-        posterior = L / Z if Z > 0 else np.full_like(L, np.nan)
-
-        return {
-            'per_cell_L': per_cell_L,  # list of (nx, ny)
-            'power_term': power_term,  # Π (τf)^{n}
-            'exp_term': exp_term,  # Π e^{-τf}
-            'factorial_term': factorial_term,  # scalar Π 1/n!
-            'L': L,  # unnormalized joint
-            'posterior': posterior,  # P(x|n)
-            'F': F,
-        }
 
 
-    def _subfn_dst_Ei_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, reliability_active: NDArray, reliability_silent: NDArray) -> Dict[str, Any]:
-        """Per-cell Shafer mass maps matching ``BayesianPlacemapPositionDecoderDST.compute_posterior``.
-
-        E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i].
-        Factorial cancels under normalization of L_i → p_i.
-        """
-        n_cells = tuning_curves_xy.shape[0]
-        assert len(spike_counts) == n_cells
-        F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
-        n_bins = int(np.prod(F.shape[1:]))
-        per_cell_E = []
-        alphas = np.zeros(n_cells, dtype=float)
-
-        for i in range(n_cells):
-            n_i = int(spike_counts[i])
-            tau_f = tau * F[i]
-            L_i = np.power(tau_f, n_i) * np.exp(-tau_f)
-            Z_i = np.nansum(L_i)
-            if Z_i > 0:
-                p_i = L_i / Z_i
-            else:
-                p_i = np.full_like(L_i, 1.0 / float(n_bins))
-            alpha_i = float(reliability_active[i]) if n_i > 0 else float(reliability_silent[i])
-            alphas[i] = alpha_i
-            per_cell_E.append((alpha_i * p_i) + (1.0 - alpha_i))
-        ## END for i in range(n_cells)...
-
-        return {'per_cell_E': per_cell_E, 'alphas': alphas}
+        def _subfn_orient_2d_for_imshow(M: NDArray) -> NDArray:
+            """Match placefield / posterior display orientation used elsewhere."""
+            return np.fliplr(np.rot90(np.asarray(M, dtype=float), k=-1))
 
 
-    def _subfn_imshow_map(ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False, vmin=None, vmax=None):
-        A = _subfn_orient_2d_for_imshow(M)
-        if log_scale:
-            A = np.log10(np.clip(A, 1e-30, None))
-        extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
-        im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
-        ax.set_title(title, fontsize=10)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-        ## END for spine in ax.spines.values()...
+        def _subfn_poisson_factor_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float) -> Dict[str, Any]:
+            """Build per-factor 2D maps for the Poisson likelihood product.
 
-        return im
+            tuning_curves_xy: (n_cells, n_x, n_y) in Hz
+            spike_counts:     (n_cells,)
+
+            Captures: drop_negative_contributing_terms_mode
+
+            """
+            n_cells = tuning_curves_xy.shape[0]
+            assert len(spike_counts) == n_cells
+
+            # Avoid exact zeros so log/pow stay finite; matches "tiny floor" reality after smoothing
+            F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+
+            power_term = np.ones(F.shape[1:], dtype=float)  # Π (τ f_i)^{n_i}
+            exp_term = np.ones(F.shape[1:], dtype=float)  # Π exp(-τ f_i)
+            factorial_term = 1.0
+            per_cell_L = []
+
+            for i in range(n_cells):
+                n_i = int(spike_counts[i])
+                tau_f = tau * F[i]
+                cell_power = np.power(tau_f, n_i)
+                cell_exp = np.exp(-tau_f)
+                cell_fac = 1.0 / float(factorial(n_i))
+                cell_L = cell_power * cell_exp * cell_fac
+
+                if drop_negative_contributing_terms_mode and (n_i == 0):
+                    ## ignore terms that arise from having no spikes from this cell in the time bin:
+                    per_cell_L.append(cell_L)
+                    # power_term *= cell_power
+                    # exp_term *= cell_exp
+                    # factorial_term *= cell_fac
+
+                else:
+                    per_cell_L.append(cell_L)
+                    power_term *= cell_power
+                    exp_term *= cell_exp
+                    factorial_term *= cell_fac
+            ## END for i in range(n_cells)...
+
+            L = power_term * exp_term * factorial_term  # joint unnormalized likelihood
+            Z = np.nansum(L)
+            posterior = L / Z if Z > 0 else np.full_like(L, np.nan)
+
+            return {
+                'per_cell_L': per_cell_L,  # list of (nx, ny)
+                'power_term': power_term,  # Π (τf)^{n}
+                'exp_term': exp_term,  # Π e^{-τf}
+                'factorial_term': factorial_term,  # scalar Π 1/n!
+                'L': L,  # unnormalized joint
+                'posterior': posterior,  # P(x|n)
+                'F': F,
+            }
 
 
-    # ==================================================================================================================================================================================================================================================================================== #
-    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
-    # ==================================================================================================================================================================================================================================================================================== #
-    # Resolve cell pair
-    if neuron_ids is None:
-        pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
-        neuron_ids = (int(pairs[0][0]), int(pairs[0][1]))
-        print(f'Using most-disjoint pair: {neuron_ids} (overlap={pairs[0][2]:.4g})')
+        def _subfn_dst_Ei_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, reliability_active: NDArray, reliability_silent: NDArray) -> Dict[str, Any]:
+            """Per-cell Shafer mass maps matching ``BayesianPlacemapPositionDecoderDST.compute_posterior``.
 
-    elif isinstance(neuron_ids, int):
-        pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
-        pair_idx: int = neuron_ids
-        neuron_ids = (int(pairs[pair_idx][0]), int(pairs[pair_idx][1]))
-        print(f'Using pair_idx {pair_idx}: neuron_ids: {neuron_ids} (overlap={pairs[pair_idx][2]:.4g})')
+            E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i].
+            Factorial cancels under normalization of L_i → p_i.
+            """
+            n_cells = tuning_curves_xy.shape[0]
+            assert len(spike_counts) == n_cells
+            F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+            n_bins = int(np.prod(F.shape[1:]))
+            per_cell_E = []
+            alphas = np.zeros(n_cells, dtype=float)
 
-    neuron_ids = tuple(int(x) for x in neuron_ids)
+            for i in range(n_cells):
+                n_i = int(spike_counts[i])
+                tau_f = tau * F[i]
+                L_i = np.power(tau_f, n_i) * np.exp(-tau_f)
+                Z_i = np.nansum(L_i)
+                if Z_i > 0:
+                    p_i = L_i / Z_i
+                else:
+                    p_i = np.full_like(L_i, 1.0 / float(n_bins))
+                alpha_i = float(reliability_active[i]) if n_i > 0 else float(reliability_silent[i])
+                alphas[i] = alpha_i
+                per_cell_E.append((alpha_i * p_i) + (1.0 - alpha_i))
+            ## END for i in range(n_cells)...
 
-    sliced: BayesianPlacemapPositionDecoder = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
-    tau: float = float(sliced.time_bin_size)
-    tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
-    n_cells, nx, ny = tc.shape
-    aclu_list = list(map(int, sliced.ratemap.neuron_ids))
-    xbin, ybin = sliced.xbin, sliced.ybin
-    peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
-    E_n = tau * peak_rates ## expected number of spikes
+            return {'per_cell_E': per_cell_E, 'alphas': alphas}
 
-    ## Use a real, repeatable colormap list for n_cells
-    # Generate a list of distinct colormaps for each cell
-    # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
-    # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
-    base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
-    # If n_cells > len(base_cmaps), cycle
-    cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
 
-    # Seed spike counts
-    if all_epochs_decoding_result is not None:
-        spk = all_epochs_decoding_result.spkcount[seed_epoch_idx]  # (n_neurons_full, n_tbins) OR already sliced?
-        # Prefer matching by neuron id against the *full* decoder if shapes differ:
-        try:
-            full_ids = np.asarray(decoder.neuron_IDs)
-            row_idx = [int(np.where(full_ids == a)[0][0]) for a in aclu_list]
-            n0 = np.asarray(spk[row_idx, seed_t_bin_idx], dtype=int)
-            print(f'Seeded n from epoch={seed_epoch_idx}, t_bin={seed_t_bin_idx}: {dict(zip(aclu_list, n0))}')
-        except Exception as e:
-            print(f'Could not seed from decoding result ({e}); starting at n=1 for each cell.')
+        def _subfn_imshow_map(ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False, vmin=None, vmax=None):
+            A = _subfn_orient_2d_for_imshow(M)
+            if log_scale:
+                A = np.log10(np.clip(A, 1e-30, None))
+            extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+            im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
+            ax.set_title(title, fontsize=10)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            ## END for spine in ax.spines.values()...
+
+            return im
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+        # Resolve cell pair
+        if neuron_ids is None:
+            pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
+            neuron_ids = (int(pairs[0][0]), int(pairs[0][1]))
+            print(f'Using most-disjoint pair: {neuron_ids} (overlap={pairs[0][2]:.4g})')
+
+        elif isinstance(neuron_ids, int):
+            pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
+            pair_idx: int = neuron_ids
+            neuron_ids = (int(pairs[pair_idx][0]), int(pairs[pair_idx][1]))
+            print(f'Using pair_idx {pair_idx}: neuron_ids: {neuron_ids} (overlap={pairs[pair_idx][2]:.4g})')
+
+        neuron_ids = tuple(int(x) for x in neuron_ids)
+
+        sliced: BayesianPlacemapPositionDecoder = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
+        tau: float = float(sliced.time_bin_size)
+        tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
+        n_cells, nx, ny = tc.shape
+        aclu_list = list(map(int, sliced.ratemap.neuron_ids))
+        xbin, ybin = sliced.xbin, sliced.ybin
+        peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
+        E_n = tau * peak_rates ## expected number of spikes
+
+        ## Use a real, repeatable colormap list for n_cells
+        # Generate a list of distinct colormaps for each cell
+        # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
+        # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
+        base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
+        # If n_cells > len(base_cmaps), cycle
+        cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
+
+        # Seed spike counts
+        if all_epochs_decoding_result is not None:
+            spk = all_epochs_decoding_result.spkcount[seed_epoch_idx]  # (n_neurons_full, n_tbins) OR already sliced?
+            # Prefer matching by neuron id against the *full* decoder if shapes differ:
+            try:
+                full_ids = np.asarray(decoder.neuron_IDs)
+                row_idx = [int(np.where(full_ids == a)[0][0]) for a in aclu_list]
+                n0 = np.asarray(spk[row_idx, seed_t_bin_idx], dtype=int)
+                print(f'Seeded n from epoch={seed_epoch_idx}, t_bin={seed_t_bin_idx}: {dict(zip(aclu_list, n0))}')
+            except Exception as e:
+                print(f'Could not seed from decoding result ({e}); starting at n=1 for each cell.')
+                n0 = np.ones(n_cells, dtype=int)
+        else:
             n0 = np.ones(n_cells, dtype=int)
-    else:
-        n0 = np.ones(n_cells, dtype=int)
 
-    # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors; sliders below
-    n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
-    # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
-    n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
-    pad: int = max(n_factor_cols - n_cells, 0)
+        # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors; sliders below
+        n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
+        # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
+        n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
+        pad: int = max(n_factor_cols - n_cells, 0)
 
-    # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
-    slider_h: float = 0.022
-    slider_gap: float = 0.018  # vertical gap between slider axes (thumbs extend past ax height)
-    slider_pitch: float = slider_h + slider_gap
-    controls_bottom: float = 0.018
-    controls_top_pad: float = 0.018
-    controls_band_h: float = n_cells * slider_pitch + controls_top_pad
-    mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
-    fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
-    if is_dst:
-        fig_h += 0.9
+        # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
+        slider_h: float = 0.022
+        slider_gap: float = 0.018  # vertical gap between slider axes (thumbs extend past ax height)
+        slider_pitch: float = slider_h + slider_gap
+        controls_bottom: float = 0.018
+        controls_top_pad: float = 0.018
+        controls_band_h: float = n_cells * slider_pitch + controls_top_pad
+        mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
+        fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
 
-    fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
+        fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
 
-    # ## INPUTS: fig
-    # gs = fig.add_gridspec(3, n_grid_cols, height_ratios=[3.2, 2.4, 1.0], hspace=0.45, wspace=0.25, top=0.90, bottom=0.14, left=0.04, right=0.98)
+        ## INPUTS: fig
+        pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
+        L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
+        factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
 
-    # ax_post = fig.add_subplot(gs[0, 0])
-    # ax_pow = fig.add_subplot(gs[0, 1])
-    # ax_exp = fig.add_subplot(gs[0, 2])
-    # ax_L = fig.add_subplot(gs[0, 3])
-
-    # ax_cell_pf = [fig.add_subplot(gs[1, i]) for i in range(n_cells)]
-    # ax_cell_L = [fig.add_subplot(gs[1, n_cells + i]) for i in range(n_cells)]
-
-    ## INPUTS: fig
-    pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
-    L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
-    factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
-    if is_dst:
-        E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad
-        mosaic_layout = [pf_row, E_row, L_row, factor_row]
-        height_ratios = [3.0, 2.8, 3.0, 3.2]
-    else:
         mosaic_layout = [pf_row, L_row, factor_row]
         height_ratios = [3.0, 3.0, 3.2]
 
-    ax_dict = fig.subplot_mosaic(
-        mosaic_layout,
-        height_ratios=height_ratios,
-        width_ratios=[1, 1, 1, 1],
-        gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
-    )
+        ax_dict = fig.subplot_mosaic(
+            mosaic_layout,
+            height_ratios=height_ratios,
+            width_ratios=[1, 1, 1, 1],
+            gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
+        )
 
 
-    title_string = f"Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
-    subtitle_string = None # "Place fields, expected spike counts, and likelihood terms across spatial bins"
+        title_string = f"Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
+        subtitle_string = None # "Place fields, expected spike counts, and likelihood terms across spatial bins"
 
-    perform_update_title_subtitle(fig=fig, ax=ax_dict, title_string=title_string, subtitle_string=subtitle_string)
+        perform_update_title_subtitle(fig=fig, ax=ax_dict, title_string=title_string, subtitle_string=subtitle_string)
 
-    # `flexitext` version:
-    text_formatter = FormattedFigureText(fig=fig)
-    plt.title('')
-    plt.suptitle('')
-    text_formatter.setup_margins(fig)
-    text_formatter.set_title(title=title_string)
+        # `flexitext` version:
+        text_formatter = FormattedFigureText(fig=fig)
+        plt.title('')
+        plt.suptitle('')
+        text_formatter.setup_margins(fig)
+        text_formatter.set_title(title=title_string)
 
-    ax_post = ax_dict['decoded_posterior']
-    ax_pow = ax_dict['term0']
-    ax_exp = ax_dict['term1']
-    ax_L = ax_dict['joint_likelihood']
+        ax_post = ax_dict['decoded_posterior']
+        ax_pow = ax_dict['term0']
+        ax_exp = ax_dict['term1']
+        ax_L = ax_dict['joint_likelihood']
 
-    # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
-    ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
-    ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
-    ax_cell_E = [ax_dict.get(f'cell_{chr(97 + i)}_E') for i in range(n_cells)] if is_dst else []
-
-
-    state = {'n': n0.copy(), 'ims': {}}
-
-    def _subfn_redraw():
-        parts = _subfn_poisson_factor_maps(tc, state['n'], tau)
-        n = state['n']
-
-        for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf):
-            ax.cla()
-        ## END for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf)...
-
-        for ax in ax_cell_L:
-            ax.cla()
-        ## END for ax in ax_cell_L...
-
-        _subfn_imshow_map(ax_post, parts['posterior'], xbin, ybin, r'Decoded $P(x\mid n)$')
-        _subfn_imshow_map(ax_pow, parts['power_term'], xbin, ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
-        _subfn_imshow_map(ax_exp, parts['exp_term'], xbin, ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
-        if show_log_likelihood:
-            _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$\log_{10} L(x)$ (joint)', cmap='plasma', log_scale=True)
-        else:
-            _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$L(x)$ (unnormalized)', cmap='plasma')
+        # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
+        ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
+        ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
 
 
+        state = {'n': n0.copy(), 'ims': {}}
 
-        ## Place Cells
-        for i, ax in enumerate(ax_cell_pf):
-            cmap = cell_cmaps[i]
-            _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap=cmap)
-            an_E_n = E_n[i] # tau * peak_rates[i]
-            # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
-            ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
+        def _subfn_redraw():
+            """ called to recalculate and redraw everything when the number of spikes change 
 
-        ## END for i, ax in enumerate(ax_cell_pf)...
+            Uses: state['n'], 
 
-        if is_dst and (Ei_parts is not None):
-            # Fixed [0,1] clim: auto-scale hides the (1-α) floor (max p_i ≪ 1) so E_i looks like PF/p_i
-            for i, ax in enumerate(ax_cell_E):
+            """
+            n = state['n'] ## number of spikes
+            parts = _subfn_poisson_factor_maps(tc, n, tau) ## recompute
+
+            for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf):
+                ax.cla()
+            ## END for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf)...
+
+            for ax in ax_cell_L:
+                ax.cla()
+            ## END for ax in ax_cell_L...
+
+            _subfn_imshow_map(ax_post, parts['posterior'], xbin, ybin, r'Decoded $P(x\mid n)$')
+            _subfn_imshow_map(ax_pow, parts['power_term'], xbin, ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
+            _subfn_imshow_map(ax_exp, parts['exp_term'], xbin, ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
+            if show_log_likelihood:
+                _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$\log_{10} L(x)$ (joint)', cmap='plasma', log_scale=True)
+            else:
+                _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$L(x)$ (unnormalized)', cmap='plasma')
+
+
+
+            ## Place Cells
+            for i, ax in enumerate(ax_cell_pf):
                 cmap = cell_cmaps[i]
-                alpha_eff = float(Ei_parts['alphas'][i])
-                floor = 1.0 - alpha_eff
-                _subfn_imshow_map(ax, Ei_parts['per_cell_E'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $E_i=\alpha p_i+(1-\alpha)$  $\alpha$={alpha_eff:.2f}', cmap=cmap, vmin=0.0, vmax=1.0)
-                ax.set_xlabel(rf'floor $1-\alpha$={floor:.2f}  (clim $[0,1]$)', fontsize=8)
-            ## END for i, ax in enumerate(ax_cell_E)...
+                _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap=cmap)
+                an_E_n = E_n[i] # tau * peak_rates[i]
+                # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
+                ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
 
-        for i, ax in enumerate(ax_cell_L):
-            cmap = cell_cmaps[i]
-            _subfn_imshow_map(ax, parts['per_cell_L'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
-        ## END for i, ax in enumerate(ax_cell_L)...
+            ## END for i, ax in enumerate(ax_cell_pf)...
 
-        n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(aclu_list, n)])
-        ml_flat = np.nanargmax(parts['posterior'])
-        ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
-        fig.suptitle(rf'Bayesian 2D decode intuition  |  $\tau={tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
-        fig.canvas.draw_idle()
+            for i, ax in enumerate(ax_cell_L):
+                cmap = cell_cmaps[i]
+                _subfn_imshow_map(ax, parts['per_cell_L'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
+            ## END for i, ax in enumerate(ax_cell_L)...
 
-
-    # Sliders — y from bottom of stack upward; pitch clears thumb overlap
-    slider_axes = []
-    sliders = []
-    for i, aclu in enumerate(aclu_list):
-        y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
-        ax_s = fig.add_axes([0.12, y_s, 0.55, slider_h])
-        cell_cmap = cm.get_cmap(cell_cmaps[i])
-        marker_color = cell_cmap(0.75)
-        track_color = cell_cmap(0.22)
-        s = Slider(ax_s, f'n[{aclu}]', 0, max_spikes_per_cell, valinit=int(state['n'][i]), valstep=1, valfmt='%0.0f',
-                   color=marker_color, track_color=track_color, initcolor='none',
-                   handle_style=dict(facecolor=marker_color, edgecolor=marker_color, size=8))
-        s.vline.set_visible(False)
-        s.label.set_color(marker_color)
-        s.valtext.set_color(marker_color)
-        ax_s.axvline(np.clip(float(E_n[i]), 0, max_spikes_per_cell), color=marker_color, linewidth=1.0, alpha=0.85, zorder=5)
-        slider_axes.append(ax_s)
-        sliders.append(s)
-    ## END for i, aclu in enumerate(aclu_list)...
+            n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(aclu_list, n)])
+            ml_flat = np.nanargmax(parts['posterior'])
+            ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
+            fig.suptitle(rf'Bayesian 2D decode intuition  |  $\tau={tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
+            fig.canvas.draw_idle()
 
 
-    def _subfn_on_slider(_=None):
-        state['n'] = np.array([int(s.val) for s in sliders], dtype=int)
+        # Sliders — y from bottom of stack upward; pitch clears thumb overlap
+        slider_axes = []
+        sliders = []
+        for i, aclu in enumerate(aclu_list):
+            y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
+            ax_s = fig.add_axes([0.12, y_s, 0.55, slider_h])
+            cell_cmap = cm.get_cmap(cell_cmaps[i])
+            marker_color = cell_cmap(0.75)
+            track_color = cell_cmap(0.22)
+            s = Slider(ax_s, f'n[{aclu}]', 0, max_spikes_per_cell, valinit=int(state['n'][i]), valstep=1, valfmt='%0.0f',
+                    color=marker_color, track_color=track_color, initcolor='none',
+                    handle_style=dict(facecolor=marker_color, edgecolor=marker_color, size=8))
+            s.vline.set_visible(False)
+            s.label.set_color(marker_color)
+            s.valtext.set_color(marker_color)
+            ax_s.axvline(np.clip(float(E_n[i]), 0, max_spikes_per_cell), color=marker_color, linewidth=1.0, alpha=0.85, zorder=5)
+            slider_axes.append(ax_s)
+            sliders.append(s)
+        ## END for i, aclu in enumerate(aclu_list)...
+
+
+        def _subfn_on_slider(_=None):
+            state['n'] = np.array([int(s.val) for s in sliders], dtype=int)
+            _subfn_redraw()
+
+
+        for s in sliders:
+            s.on_changed(_subfn_on_slider)
+        ## END for s in sliders...
+
+        # Quick-set buttons — vertically centered on the slider stack
+        btn_h: float = 0.04
+        btn_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - btn_h) * 0.5)
+        ax_btn_zero = fig.add_axes([0.72, btn_y, 0.08, btn_h])
+        ax_btn_one = fig.add_axes([0.81, btn_y, 0.08, btn_h])
+        ax_btn_exp = fig.add_axes([0.90, btn_y, 0.08, btn_h])
+        b_zero = Button(ax_btn_zero, 'n=0')
+        b_one = Button(ax_btn_one, 'n=1')
+        b_exp = Button(ax_btn_exp, 'n≈E')
+
+
+        def _subfn_set_all(vals):
+            for s, v in zip(sliders, vals):
+                s.set_val(int(v))
+            ## END for s, v in zip(sliders, vals)...
+
+            _subfn_on_slider()
+
+
+        b_zero.on_clicked(lambda _e: _subfn_set_all(np.zeros(n_cells)))
+        b_one.on_clicked(lambda _e: _subfn_set_all(np.ones(n_cells)))
+        b_exp.on_clicked(lambda _e: _subfn_set_all(np.clip(np.rint(tau * peak_rates), 0, max_spikes_per_cell)))
+
         _subfn_redraw()
 
-
-    for s in sliders:
-        s.on_changed(_subfn_on_slider)
-    ## END for s in sliders...
-
-    # Quick-set buttons — vertically centered on the slider stack
-    btn_h: float = 0.04
-    btn_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - btn_h) * 0.5)
-    ax_btn_zero = fig.add_axes([0.72, btn_y, 0.08, btn_h])
-    ax_btn_one = fig.add_axes([0.81, btn_y, 0.08, btn_h])
-    ax_btn_exp = fig.add_axes([0.90, btn_y, 0.08, btn_h])
-    b_zero = Button(ax_btn_zero, 'n=0')
-    b_one = Button(ax_btn_one, 'n=1')
-    b_exp = Button(ax_btn_exp, 'n≈E')
+        # Keep refs alive
+        fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids)
+        return fig, sliced, neuron_ids
 
 
-    def _subfn_set_all(vals):
-        for s, v in zip(sliders, vals):
-            s.set_val(int(v))
-        ## END for s, v in zip(sliders, vals)...
+# @function_attributes(short_name=None, tags=['figure', 'interactive', 'decoder', 'bayesian', 'intuition', '2D', 'matplotlib'], input_requires=[], output_provides=[], uses=['DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping'], used_by=[], creation_date='2026-07-17 13:00', related_items=['DisjointPlacefieldsExploration'])
+# def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDecoder, neuron_ids: Optional[Union[List[int], Tuple[int, ...]]] = None,
+#         all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
+#         max_spikes_per_cell: int = 15, show_log_likelihood: bool = True, drop_negative_contributing_terms_mode: bool = True,
+#     ):
+#     """Interactive 2D Bayesian decode viewer: sliders set observed spike counts ``n_i``; panels show Poisson equation factors.
 
-        _subfn_on_slider()
+#     Decomposes the independent-Poisson place-cell likelihood used by ``neuropy_bayesian_prob``:
+
+#         P(n|x) ∝ Π_i  (τ f_i(x))^{n_i} / n_i!  ·  exp(-τ f_i(x))
+#         P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
+
+#     Top row: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
+#     Bottom row: per-cell placefields (raw Hz) and per-cell likelihood terms.
+#     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
+
+#     Usage:
+
+#         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_interactive_bayesian_2d_eqn_viewer
+
+#         maze_name = 'maze0'
+#         decoder = curr_active_pipeline.computation_results[maze_name].computed_data['pf2D_Decoder']
+#         # Optional: seed from a DecodedFilterEpochsResult
+#         # all_epochs_decoding_result = ...
+#         fig, sliced_decoder, used_ids = build_interactive_bayesian_2d_eqn_viewer(decoder=decoder, neuron_ids=None, # None → most-disjoint pair; or (38, 49)
+#             all_epochs_decoding_result=None, seed_epoch_idx=0, seed_t_bin_idx=0, max_spikes_per_cell=15, show_log_likelihood=True)
+#         plt.show()
+
+#     Returns:
+#         (fig, sliced_decoder, neuron_ids): figure with live UI refs on ``fig._bayes_eqn_ui``, neuron-sliced decoder, resolved cell ids.
+#     """
+#     from math import factorial
+#     import matplotlib.cm as cm
+#     import matplotlib.colors as mcolors
+#     from matplotlib.widgets import Slider, Button
+#     from neuropy.utils.matplotlib_helpers import FormattedFigureText
+#     from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
+
+#     def _subfn_orient_2d_for_imshow(M: NDArray) -> NDArray:
+#         """Match placefield / posterior display orientation used elsewhere."""
+#         return np.fliplr(np.rot90(np.asarray(M, dtype=float), k=-1))
 
 
-    b_zero.on_clicked(lambda _e: _subfn_set_all(np.zeros(n_cells)))
-    b_one.on_clicked(lambda _e: _subfn_set_all(np.ones(n_cells)))
-    b_exp.on_clicked(lambda _e: _subfn_set_all(np.clip(np.rint(tau * peak_rates), 0, max_spikes_per_cell)))
+#     def _subfn_poisson_factor_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float) -> Dict[str, Any]:
+#         """Build per-factor 2D maps for the Poisson likelihood product.
 
-    _subfn_redraw()
+#         tuning_curves_xy: (n_cells, n_x, n_y) in Hz
+#         spike_counts:     (n_cells,)
 
-    # Keep refs alive
-    fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids)
-    return fig, sliced, neuron_ids
+#         Captures: drop_negative_contributing_terms_mode
+
+#         """
+#         n_cells = tuning_curves_xy.shape[0]
+#         assert len(spike_counts) == n_cells
+
+#         # Avoid exact zeros so log/pow stay finite; matches "tiny floor" reality after smoothing
+#         F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+
+#         power_term = np.ones(F.shape[1:], dtype=float)  # Π (τ f_i)^{n_i}
+#         exp_term = np.ones(F.shape[1:], dtype=float)  # Π exp(-τ f_i)
+#         factorial_term = 1.0
+#         per_cell_L = []
+
+#         for i in range(n_cells):
+#             n_i = int(spike_counts[i])
+#             tau_f = tau * F[i]
+#             cell_power = np.power(tau_f, n_i)
+#             cell_exp = np.exp(-tau_f)
+#             cell_fac = 1.0 / float(factorial(n_i))
+#             cell_L = cell_power * cell_exp * cell_fac
+
+#             if drop_negative_contributing_terms_mode and (n_i == 0):
+#                 ## ignore terms that arise from having no spikes from this cell in the time bin:
+#                 per_cell_L.append(cell_L)
+#                 # power_term *= cell_power
+#                 # exp_term *= cell_exp
+#                 # factorial_term *= cell_fac
+
+#             else:
+#                 per_cell_L.append(cell_L)
+#                 power_term *= cell_power
+#                 exp_term *= cell_exp
+#                 factorial_term *= cell_fac
+#         ## END for i in range(n_cells)...
+
+#         L = power_term * exp_term * factorial_term  # joint unnormalized likelihood
+#         Z = np.nansum(L)
+#         posterior = L / Z if Z > 0 else np.full_like(L, np.nan)
+
+#         return {
+#             'per_cell_L': per_cell_L,  # list of (nx, ny)
+#             'power_term': power_term,  # Π (τf)^{n}
+#             'exp_term': exp_term,  # Π e^{-τf}
+#             'factorial_term': factorial_term,  # scalar Π 1/n!
+#             'L': L,  # unnormalized joint
+#             'posterior': posterior,  # P(x|n)
+#             'F': F,
+#         }
+
+
+#     def _subfn_dst_Ei_maps(tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, reliability_active: NDArray, reliability_silent: NDArray) -> Dict[str, Any]:
+#         """Per-cell Shafer mass maps matching ``BayesianPlacemapPositionDecoderDST.compute_posterior``.
+
+#         E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i].
+#         Factorial cancels under normalization of L_i → p_i.
+#         """
+#         n_cells = tuning_curves_xy.shape[0]
+#         assert len(spike_counts) == n_cells
+#         F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
+#         n_bins = int(np.prod(F.shape[1:]))
+#         per_cell_E = []
+#         alphas = np.zeros(n_cells, dtype=float)
+
+#         for i in range(n_cells):
+#             n_i = int(spike_counts[i])
+#             tau_f = tau * F[i]
+#             L_i = np.power(tau_f, n_i) * np.exp(-tau_f)
+#             Z_i = np.nansum(L_i)
+#             if Z_i > 0:
+#                 p_i = L_i / Z_i
+#             else:
+#                 p_i = np.full_like(L_i, 1.0 / float(n_bins))
+#             alpha_i = float(reliability_active[i]) if n_i > 0 else float(reliability_silent[i])
+#             alphas[i] = alpha_i
+#             per_cell_E.append((alpha_i * p_i) + (1.0 - alpha_i))
+#         ## END for i in range(n_cells)...
+
+#         return {'per_cell_E': per_cell_E, 'alphas': alphas}
+
+
+#     def _subfn_imshow_map(ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False, vmin=None, vmax=None):
+#         A = _subfn_orient_2d_for_imshow(M)
+#         if log_scale:
+#             A = np.log10(np.clip(A, 1e-30, None))
+#         extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+#         im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
+#         ax.set_title(title, fontsize=10)
+#         ax.set_xticks([])
+#         ax.set_yticks([])
+#         for spine in ax.spines.values():
+#             spine.set_visible(False)
+#         ## END for spine in ax.spines.values()...
+
+#         return im
+
+
+#     # ==================================================================================================================================================================================================================================================================================== #
+#     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+#     # ==================================================================================================================================================================================================================================================================================== #
+#     # Resolve cell pair
+#     if neuron_ids is None:
+#         pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
+#         neuron_ids = (int(pairs[0][0]), int(pairs[0][1]))
+#         print(f'Using most-disjoint pair: {neuron_ids} (overlap={pairs[0][2]:.4g})')
+
+#     elif isinstance(neuron_ids, int):
+#         pairs = DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping(ratemap=decoder.ratemap)
+#         pair_idx: int = neuron_ids
+#         neuron_ids = (int(pairs[pair_idx][0]), int(pairs[pair_idx][1]))
+#         print(f'Using pair_idx {pair_idx}: neuron_ids: {neuron_ids} (overlap={pairs[pair_idx][2]:.4g})')
+
+#     neuron_ids = tuple(int(x) for x in neuron_ids)
+
+#     sliced: BayesianPlacemapPositionDecoder = decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
+#     tau: float = float(sliced.time_bin_size)
+#     tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
+#     n_cells, nx, ny = tc.shape
+#     aclu_list = list(map(int, sliced.ratemap.neuron_ids))
+#     xbin, ybin = sliced.xbin, sliced.ybin
+#     peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
+#     E_n = tau * peak_rates ## expected number of spikes
+
+#     ## Use a real, repeatable colormap list for n_cells
+#     # Generate a list of distinct colormaps for each cell
+#     # Use a perceptually uniform colormap cycle (e.g., plasma, viridis, turbo, etc.)
+#     # Here we use tab10 colors applied as overlays to "Greens", "Reds", etc.
+#     base_cmaps = ['Greens', 'Reds', 'Blues', 'Purples', 'Oranges', 'PuRd', 'YlGn', 'BuGn', 'YlOrRd', 'PuBu']
+#     # If n_cells > len(base_cmaps), cycle
+#     cell_cmaps = [base_cmaps[i % len(base_cmaps)] for i in range(n_cells)]
+
+#     # Seed spike counts
+#     if all_epochs_decoding_result is not None:
+#         spk = all_epochs_decoding_result.spkcount[seed_epoch_idx]  # (n_neurons_full, n_tbins) OR already sliced?
+#         # Prefer matching by neuron id against the *full* decoder if shapes differ:
+#         try:
+#             full_ids = np.asarray(decoder.neuron_IDs)
+#             row_idx = [int(np.where(full_ids == a)[0][0]) for a in aclu_list]
+#             n0 = np.asarray(spk[row_idx, seed_t_bin_idx], dtype=int)
+#             print(f'Seeded n from epoch={seed_epoch_idx}, t_bin={seed_t_bin_idx}: {dict(zip(aclu_list, n0))}')
+#         except Exception as e:
+#             print(f'Could not seed from decoding result ({e}); starting at n=1 for each cell.')
+#             n0 = np.ones(n_cells, dtype=int)
+#     else:
+#         n0 = np.ones(n_cells, dtype=int)
+
+#     # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors; sliders below
+#     n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
+#     # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
+#     n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
+#     pad: int = max(n_factor_cols - n_cells, 0)
+
+#     # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
+#     slider_h: float = 0.022
+#     slider_gap: float = 0.018  # vertical gap between slider axes (thumbs extend past ax height)
+#     slider_pitch: float = slider_h + slider_gap
+#     controls_bottom: float = 0.018
+#     controls_top_pad: float = 0.018
+#     controls_band_h: float = n_cells * slider_pitch + controls_top_pad
+#     mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
+#     fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
+
+#     fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
+
+#     ## INPUTS: fig
+#     pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
+#     L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
+#     factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
+
+#     mosaic_layout = [pf_row, L_row, factor_row]
+#     height_ratios = [3.0, 3.0, 3.2]
+
+#     ax_dict = fig.subplot_mosaic(
+#         mosaic_layout,
+#         height_ratios=height_ratios,
+#         width_ratios=[1, 1, 1, 1],
+#         gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
+#     )
+
+
+#     title_string = f"Place Cell Decoding Debugger: Neuron(s) {neuron_ids}"
+#     subtitle_string = None # "Place fields, expected spike counts, and likelihood terms across spatial bins"
+
+#     perform_update_title_subtitle(fig=fig, ax=ax_dict, title_string=title_string, subtitle_string=subtitle_string)
+
+#     # `flexitext` version:
+#     text_formatter = FormattedFigureText(fig=fig)
+#     plt.title('')
+#     plt.suptitle('')
+#     text_formatter.setup_margins(fig)
+#     text_formatter.set_title(title=title_string)
+
+#     ax_post = ax_dict['decoded_posterior']
+#     ax_pow = ax_dict['term0']
+#     ax_exp = ax_dict['term1']
+#     ax_L = ax_dict['joint_likelihood']
+
+#     # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
+#     ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
+#     ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
+
+
+#     state = {'n': n0.copy(), 'ims': {}}
+
+#     def _subfn_redraw():
+#         """ called to recalculate and redraw everything when the number of spikes change 
+
+#         Uses: state['n'], 
+
+#         """
+#         n = state['n'] ## number of spikes
+#         parts = _subfn_poisson_factor_maps(tc, n, tau) ## recompute
+
+#         for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf):
+#             ax.cla()
+#         ## END for ax in (ax_post, ax_pow, ax_exp, ax_L, *ax_cell_pf)...
+
+#         for ax in ax_cell_L:
+#             ax.cla()
+#         ## END for ax in ax_cell_L...
+
+#         _subfn_imshow_map(ax_post, parts['posterior'], xbin, ybin, r'Decoded $P(x\mid n)$')
+#         _subfn_imshow_map(ax_pow, parts['power_term'], xbin, ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
+#         _subfn_imshow_map(ax_exp, parts['exp_term'], xbin, ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
+#         if show_log_likelihood:
+#             _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$\log_{10} L(x)$ (joint)', cmap='plasma', log_scale=True)
+#         else:
+#             _subfn_imshow_map(ax_L, parts['L'], xbin, ybin, r'$L(x)$ (unnormalized)', cmap='plasma')
+
+
+
+#         ## Place Cells
+#         for i, ax in enumerate(ax_cell_pf):
+#             cmap = cell_cmaps[i]
+#             _subfn_imshow_map(ax, tc[i], xbin, ybin, f'PF aclu={aclu_list[i]}  peak={peak_rates[i]:.1f}Hz  n={n[i]}', cmap=cmap)
+#             an_E_n = E_n[i] # tau * peak_rates[i]
+#             # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
+#             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
+
+#         ## END for i, ax in enumerate(ax_cell_pf)...
+
+#         for i, ax in enumerate(ax_cell_L):
+#             cmap = cell_cmaps[i]
+#             _subfn_imshow_map(ax, parts['per_cell_L'][i], xbin, ybin, rf'Cell {aclu_list[i]}: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
+#         ## END for i, ax in enumerate(ax_cell_L)...
+
+#         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(aclu_list, n)])
+#         ml_flat = np.nanargmax(parts['posterior'])
+#         ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
+#         fig.suptitle(rf'Bayesian 2D decode intuition  |  $\tau={tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
+#         fig.canvas.draw_idle()
+
+
+#     # Sliders — y from bottom of stack upward; pitch clears thumb overlap
+#     slider_axes = []
+#     sliders = []
+#     for i, aclu in enumerate(aclu_list):
+#         y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
+#         ax_s = fig.add_axes([0.12, y_s, 0.55, slider_h])
+#         cell_cmap = cm.get_cmap(cell_cmaps[i])
+#         marker_color = cell_cmap(0.75)
+#         track_color = cell_cmap(0.22)
+#         s = Slider(ax_s, f'n[{aclu}]', 0, max_spikes_per_cell, valinit=int(state['n'][i]), valstep=1, valfmt='%0.0f',
+#                    color=marker_color, track_color=track_color, initcolor='none',
+#                    handle_style=dict(facecolor=marker_color, edgecolor=marker_color, size=8))
+#         s.vline.set_visible(False)
+#         s.label.set_color(marker_color)
+#         s.valtext.set_color(marker_color)
+#         ax_s.axvline(np.clip(float(E_n[i]), 0, max_spikes_per_cell), color=marker_color, linewidth=1.0, alpha=0.85, zorder=5)
+#         slider_axes.append(ax_s)
+#         sliders.append(s)
+#     ## END for i, aclu in enumerate(aclu_list)...
+
+
+#     def _subfn_on_slider(_=None):
+#         state['n'] = np.array([int(s.val) for s in sliders], dtype=int)
+#         _subfn_redraw()
+
+
+#     for s in sliders:
+#         s.on_changed(_subfn_on_slider)
+#     ## END for s in sliders...
+
+#     # Quick-set buttons — vertically centered on the slider stack
+#     btn_h: float = 0.04
+#     btn_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - btn_h) * 0.5)
+#     ax_btn_zero = fig.add_axes([0.72, btn_y, 0.08, btn_h])
+#     ax_btn_one = fig.add_axes([0.81, btn_y, 0.08, btn_h])
+#     ax_btn_exp = fig.add_axes([0.90, btn_y, 0.08, btn_h])
+#     b_zero = Button(ax_btn_zero, 'n=0')
+#     b_one = Button(ax_btn_one, 'n=1')
+#     b_exp = Button(ax_btn_exp, 'n≈E')
+
+
+#     def _subfn_set_all(vals):
+#         for s, v in zip(sliders, vals):
+#             s.set_val(int(v))
+#         ## END for s, v in zip(sliders, vals)...
+
+#         _subfn_on_slider()
+
+
+#     b_zero.on_clicked(lambda _e: _subfn_set_all(np.zeros(n_cells)))
+#     b_one.on_clicked(lambda _e: _subfn_set_all(np.ones(n_cells)))
+#     b_exp.on_clicked(lambda _e: _subfn_set_all(np.clip(np.rint(tau * peak_rates), 0, max_spikes_per_cell)))
+
+#     _subfn_redraw()
+
+#     # Keep refs alive
+#     fig._bayes_eqn_ui = dict(sliders=sliders, buttons=(b_zero, b_one, b_exp), sliced=sliced, neuron_ids=neuron_ids)
+#     return fig, sliced, neuron_ids
 
 
 @function_attributes(short_name=None, tags=['performance', 'decode', 'computation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-01 00:00', related_items=[])
