@@ -292,7 +292,7 @@ class ZhangReconstructionImplementation:
 
     
     @staticmethod
-    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_intermediates_mode=False, debug_print=False):
+    def neuropy_bayesian_prob(tau, P_x, F, n, use_flat_computation_mode=True, debug_intermediates_mode=False, debug_print=False, reliability_modifier_mode=None, drop_negative_contributing_terms_mode=False):
         """ 
             n_i: the number of spikes fired by each cell during the time window of consideration
             use_flat_computation_mode: bool - if True, a more memory efficient accumulating computation is performed that avoids `MemoryError: Unable to allocate 65.4 GiB for an array with shape (3969, 21896, 101) and data type float64` caused by allocating the full `cell_prob` matrix
@@ -355,13 +355,19 @@ class ZhangReconstructionImplementation:
                 print(f'WARN: f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}", replacing with uniform!')
                 # raise ValueError(f"np.sum(cell_ratemap): {cell_ratemap} for cell: {cell}")
 
+
+
             if use_flat_computation_mode:
                 # Single-cell flat Version:
 
                 # _temp = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) 
                 # cell_prob = cell_prob * _temp
 
-                cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *= ## #TODO 2025-01-14 18:35: - [ ] numpy.core._exceptions._ArrayMemoryError: Unable to allocate 2.09 GiB for an array with shape (15124, 18557) and data type float64
+                if drop_negative_contributing_terms_mode:
+                    ## skip silence terms (n_i==0): multiply by product identity
+                    cell_prob *= np.where(cell_spkcnt > 0, (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)), 1.0)
+                else:
+                    cell_prob *= (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)) # product equal using *= ## #TODO 2025-01-14 18:35: - [ ] numpy.core._exceptions._ArrayMemoryError: Unable to allocate 2.09 GiB for an array with shape (15124, 18557) and data type float64
 
                 # cell_prob.shape (nFlatPositionBins, nTimeBins)
             else:
@@ -371,9 +377,20 @@ class ZhangReconstructionImplementation:
                     t0 = ((tau * cell_ratemap) ** cell_spkcnt)
                     t1 = coeff
                     t2 = (np.exp(-tau * cell_ratemap))
-                    cell_prob[:, :, cell] = (t0 * t1) * t2
+                    if drop_negative_contributing_terms_mode:
+                        ## skip silence terms (n_i==0): product identity (must be 1.0, not 0 — full mode starts from zeros)
+                        cell_prob[:, :, cell] = np.where(cell_spkcnt > 0, (t0 * t1) * t2, 1.0)
+                    else:
+                        cell_prob[:, :, cell] = (t0 * t1) * t2
                 else:
-                    cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap))
+                    if drop_negative_contributing_terms_mode:
+                        ## skip silence terms (n_i==0): product identity (must be 1.0, not 0 — full mode starts from zeros)
+                        cell_prob[:, :, cell] = np.where(cell_spkcnt > 0, (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap)), 1.0)
+                    else:
+                        cell_prob[:, :, cell] = (((tau * cell_ratemap) ** cell_spkcnt) * coeff) * (np.exp(-tau * cell_ratemap))
+
+        ## END for cell in range(nCells)...
+
 
         if use_flat_computation_mode:
             # Single-cell flat Version:
@@ -2261,6 +2278,28 @@ def is_clusterless_position_decoder(decoder) -> bool:
     return ClusterlessRTCPositionDecoder.is_clusterless_decoder(decoder) or SpyglassClusterlessDecoder.is_clusterless_decoder(decoder)
 
 
+from enum import Enum, auto
+
+class ReliabilityDecoderModifierMode(Enum):
+    """How the reliability information is integrated into the decoder (when reliability is available on the decoder) """
+    IGNORE = auto()
+    LIKELIHOOD_TEMPERING = auto() ## "Power-prior mode: Raise each cell’s likelihood to the power of the likelihood and re‑normalise."
+    # MIXTURE_MODEL = auto()
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 @custom_define(slots=False, eq=False)
 class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
@@ -2268,7 +2307,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     Usage:
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode
 
 
     """
@@ -2291,6 +2330,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     ## alternative functions:
     drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
+    reliability_modifier_mode: ReliabilityDecoderModifierMode = non_serialized_field(default=ReliabilityDecoderModifierMode.IGNORE)
 
 
     # Properties _________________________________________________________________________________________________________ #
@@ -2439,6 +2479,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         # Preserve config flags and shape-aware reliability slices when present
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
         if (self.neuron_IDs is not None) and ((self.reliability_active is not None) or (self.reliability_silent is not None)):
             source_ids = np.asarray(self.neuron_IDs)
             ids_arr = np.asarray(ids)
@@ -2646,7 +2687,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
                 time_bin_size = self.time_bin_size
             
             # Single sweep decoding:
-            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print))
+            curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print), reliability_modifier_mode=self.reliability_modifier_mode, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode)
             if debug_print:
                 print(f'curr_flat_p_x_given_n.shape: {curr_flat_p_x_given_n.shape}')
             # all computed
@@ -3784,6 +3825,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         # Reuse per-cell / position-dependent reliability and in-field masks when already computed
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
         neuron_sliced_decoder.n_top_peaks = self.n_top_peaks
         neuron_sliced_decoder.slice_level_multiplier = self.slice_level_multiplier
         neuron_sliced_decoder.fn_tn_mode = self.fn_tn_mode

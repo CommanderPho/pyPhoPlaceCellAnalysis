@@ -202,6 +202,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         # Reuse per-cell / position-dependent reliability / masks when already computed on the full decoder
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
         neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
         neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
         if self.in_field_masks is not None:
