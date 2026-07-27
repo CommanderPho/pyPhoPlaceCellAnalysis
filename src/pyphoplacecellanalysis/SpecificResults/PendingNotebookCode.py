@@ -1518,7 +1518,7 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
 from math import factorial
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from matplotlib.widgets import Slider, Button, RadioButtons
+from matplotlib.widgets import Slider, Button, RadioButtons, CheckButtons
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, BayesianPlacemapPositionDecoder
@@ -1538,11 +1538,12 @@ class InteractiveBayesian2DEquationDebugger:
         P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
 
     Factor panels (power, exp, per-cell L, joint L) always show this Bayesian Poisson decomposition.
-    When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, an extra mosaic row under each placefield
-    shows that cell's Shafer-discounted evidential mass map ``E_i(x) = α p_i(x) + (1 − α)``.
+    When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, an extra middle mosaic row under each placefield
+    shows that cell's *uncustomized* per-cell ``L_i`` (``reliability_modifier_mode=IGNORE``, ``drop_negative_contributing_terms_mode=False``)
+    so it can be compared against the bottom per-cell ``L`` row, which uses the viewer's active customization options.
 
     Layout:
-        Top: per-cell placefields (raw Hz); DST-only: per-cell ``E_i``; per-cell likelihood terms.
+        Top: per-cell placefields (raw Hz); DST-only: uncustomized per-cell ``L_0``; per-cell likelihood terms (customized).
         Bottom: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
 
@@ -1603,11 +1604,12 @@ class InteractiveBayesian2DEquationDebugger:
 
     ax_cell_pf: List[Any] = field(default=Factory(list))
     ax_cell_L: List[Any] = field(default=Factory(list))
-    ax_cell_E: List[Any] = field(default=Factory(list))  # DST-only E_i axes
+    ax_cell_E: List[Any] = field(default=Factory(list))  # DST-only middle row (baseline / uncustomized L_0)
     sliders: List[Any] = field(default=Factory(list))
     slider_axes: List[Any] = field(default=Factory(list))
     buttons: Optional[Tuple[Any, ...]] = field(default=None)
     reliability_mode_radio: Any = field(default=None)
+    drop_negative_terms_check: Any = field(default=None)
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
 
@@ -1650,16 +1652,29 @@ class InteractiveBayesian2DEquationDebugger:
         F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
         spatial_shape = F.shape[1:]
 
+        needs_raw_backup: bool = drop_negative_contributing_terms_mode
         use_tempering: bool = (reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING)
         if use_tempering:
             assert (reliability_active is not None) and (reliability_silent is not None), f'LIKELIHOOD_TEMPERING requires reliability_active and reliability_silent.'
             reliability_active = np.asarray(reliability_active, dtype=float)
             reliability_silent = np.asarray(reliability_silent, dtype=float)
+            needs_raw_backup = True
 
         power_term = np.ones(spatial_shape, dtype=float)  # Π (τ f_i)^{n_i}
         exp_term = np.ones(spatial_shape, dtype=float)  # Π exp(-τ f_i)
         factorial_term = 1.0
         per_cell_L = []
+
+        ## unmodified versions:
+        if needs_raw_backup:
+            power_term_raw = np.ones(spatial_shape, dtype=float)  # Π (τ f_i)^{n_i}
+            exp_term_raw = np.ones(spatial_shape, dtype=float)  # Π exp(-τ f_i)
+            factorial_term_raw = 1.0
+            per_cell_L_raw = []
+
+
+
+
         alphas = np.ones(n_cells, dtype=float)
 
         for i in range(n_cells):
@@ -1669,6 +1684,13 @@ class InteractiveBayesian2DEquationDebugger:
             cell_exp = np.exp(-tau_f)
             cell_fac = 1.0 / float(factorial(n_i))
             cell_L = cell_power * cell_exp * cell_fac
+
+            if needs_raw_backup:
+                cell_power_raw = deepcopy(cell_power)
+                cell_exp_raw = deepcopy(cell_exp)
+                cell_fac_raw = deepcopy(cell_fac)
+                cell_L_raw = cell_power_raw * cell_exp_raw * cell_fac_raw
+
 
             if use_tempering:
                 ## Power-prior: L_i(x) ← L_i(x)^{α_i}  (equivalently raise each Poisson factor)
@@ -1687,25 +1709,35 @@ class InteractiveBayesian2DEquationDebugger:
                 cell_fac = np.power(cell_fac, alpha_i)
                 cell_L = cell_power * cell_exp * cell_fac
 
+
+            per_cell_L.append(cell_L)
+            if needs_raw_backup:
+                per_cell_L_raw.append(cell_L_raw)
+
             if drop_negative_contributing_terms_mode and (n_i == 0):
                 ## ignore terms that arise from having no spikes from this cell in the time bin:
-                per_cell_L.append(cell_L)
                 # power_term *= cell_power
                 # exp_term *= cell_exp
                 # factorial_term *= cell_fac
+                pass
 
             else:
-                per_cell_L.append(cell_L)
                 power_term *= cell_power
                 exp_term *= cell_exp
                 factorial_term *= cell_fac
+
+                if needs_raw_backup:
+                    power_term_raw *= cell_power_raw
+                    exp_term_raw *= cell_exp_raw
+                    factorial_term_raw *= cell_fac_raw
+                    
         ## END for i in range(n_cells)...
 
         L = power_term * exp_term * factorial_term  # joint unnormalized likelihood
         Z = np.nansum(L)
         posterior = L / Z if Z > 0 else np.full_like(L, np.nan)
 
-        return {
+        out_dict = {
             'per_cell_L': per_cell_L,  # list of (nx, ny)
             'power_term': power_term,  # Π (τf)^{n}
             'exp_term': exp_term,  # Π e^{-τf}
@@ -1715,6 +1747,18 @@ class InteractiveBayesian2DEquationDebugger:
             'F': F,
             'alphas': alphas,
         }
+
+        if needs_raw_backup:
+            L_raw = power_term_raw * exp_term_raw * factorial_term_raw  # joint unnormalized likelihood
+            Z_raw = np.nansum(L_raw)
+            posterior_raw = L_raw / Z_raw if Z_raw > 0 else np.full_like(L_raw, np.nan)
+
+            out_dict.update({'per_cell_L_raw': per_cell_L_raw, 
+                'power_term_raw': power_term_raw, 'exp_term_raw': exp_term_raw, 'factorial_term_raw': factorial_term_raw,
+                'L_raw': L_raw, 'posterior_raw': posterior_raw,
+            })
+
+        return out_dict
 
 
     @classmethod
@@ -1892,11 +1936,11 @@ class InteractiveBayesian2DEquationDebugger:
 
         ## INPUTS: fig
         pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
-        E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only
+        E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only: baseline L_0 row
         L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
         factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]  # Bayesian default; DST overrides below
 
-        # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors (+ conflict for DST); sliders below
+        # Figure layout: PF (+ DST baseline L_0) + per-cell L (custom); then posterior + factors (+ conflict for DST); sliders below
         if self.is_dst:
             factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood", "conflict_K"]
             pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
@@ -1951,12 +1995,23 @@ class InteractiveBayesian2DEquationDebugger:
         self.ax_cell_E = ax_cell_E
         self.text_formatter = text_formatter
 
-        # Reliability modifier mode radio — left of slider stack
+        # Left column: reliability radio + drop-n=0 checkbox — left of slider stack
         mode_names = ReliabilityDecoderModifierMode.list_names()
         active_mode_idx = mode_names.index(self.reliability_modifier_mode.name)
+        check_h: float = 0.038
+        check_gap: float = 0.008
         radio_h: float = max(0.085, min(0.12, n_cells * slider_pitch))
-        radio_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - radio_h) * 0.5)
-        ax_radio = fig.add_axes([0.01, radio_y, 0.14, radio_h])
+        left_col_h: float = radio_h + check_gap + check_h
+        left_col_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - left_col_h) * 0.5)
+        ax_check = fig.add_axes([0.01, left_col_y, 0.14, check_h])
+        drop_negative_terms_check = CheckButtons(ax_check, ['drop n=0 terms'], [bool(self.drop_negative_contributing_terms_mode)])
+        for label in drop_negative_terms_check.labels:
+            label.set_fontsize(7)
+        ## END for label in drop_negative_terms_check.labels...
+        drop_negative_terms_check.on_clicked(self.on_drop_negative_terms)
+        self.drop_negative_terms_check = drop_negative_terms_check
+
+        ax_radio = fig.add_axes([0.01, left_col_y + check_h + check_gap, 0.14, radio_h])
         reliability_mode_radio = RadioButtons(ax_radio, mode_names, active=active_mode_idx)
         for label in reliability_mode_radio.labels:
             label.set_fontsize(7)
@@ -2013,6 +2068,7 @@ class InteractiveBayesian2DEquationDebugger:
         # Keep refs alive
         fig._bayes_eqn_ui = dict(
             sliders=sliders, buttons=self.buttons, reliability_mode_radio=self.reliability_mode_radio,
+            drop_negative_terms_check=self.drop_negative_terms_check,
             sliced=self.sliced, neuron_ids=self.neuron_ids,
             is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
@@ -2074,24 +2130,26 @@ class InteractiveBayesian2DEquationDebugger:
         ## END for i, ax in enumerate(self.ax_cell_pf)...
 
         if self.is_dst and (len(self.ax_cell_E) > 0):
-            reliability_active = np.asarray(self.sliced.reliability_active, dtype=float)
-            reliability_silent = np.asarray(getattr(self.sliced, 'reliability_silent', None), dtype=float) if getattr(self.sliced, 'reliability_silent', None) is not None else np.ones_like(reliability_active)
-            ei_parts = self._dst_Ei_maps(self.tuning_curves, n, self.tau, reliability_active=reliability_active, reliability_silent=reliability_silent)
+            # Middle row: uncustomized per-cell L (IGNORE reliability; keep silence / n=0 terms)
+            baseline_parts = self._poisson_factor_maps(self.tuning_curves, n, self.tau, drop_negative_contributing_terms_mode=False,
+                                                      reliability_modifier_mode=ReliabilityDecoderModifierMode.IGNORE)
             for i, ax in enumerate(self.ax_cell_E):
                 cmap = self.cell_cmaps[i]
-                alpha_i = float(ei_parts['alphas'][i])
-                self._imshow_map(ax, ei_parts['per_cell_E'][i], self.xbin, self.ybin, rf'$E[{self.aclu_list[i]}]=\alpha p_i+(1-\alpha)$  $\alpha$={alpha_i:.2f}', cmap=cmap)
+                self._imshow_map(ax, baseline_parts['per_cell_L'][i], self.xbin, self.ybin, rf'$L_0[{self.aclu_list[i]}]$ uncustomized', cmap=cmap)
             ## END for i, ax in enumerate(self.ax_cell_E)...
 
-            # Conflict K panel
+            # Conflict K panel still uses DST E_i mass maps
             if self.ax_conflict_K is not None:
+                reliability_active = np.asarray(self.sliced.reliability_active, dtype=float)
+                reliability_silent = np.asarray(getattr(self.sliced, 'reliability_silent', None), dtype=float) if getattr(self.sliced, 'reliability_silent', None) is not None else np.ones_like(reliability_active)
+                ei_parts = self._dst_Ei_maps(self.tuning_curves, n, self.tau, reliability_active=reliability_active, reliability_silent=reliability_silent)
                 self.ax_conflict_K.cla()
                 conflict_parts = self._compute_conflict_map(ei_parts['per_cell_E'])
                 self._imshow_map(self.ax_conflict_K, conflict_parts['conflict_map'], self.xbin, self.ybin, rf'Conflict $K={conflict_parts["K"]:.3f}$', cmap='hot') # , vmin=0.0, vmax=1.0
 
         for i, ax in enumerate(self.ax_cell_L):
             cmap = self.cell_cmaps[i]
-            self._imshow_map(ax, parts['per_cell_L'][i], self.xbin, self.ybin, rf'L[{self.aclu_list[i]}]: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
+            self._imshow_map(ax, parts['per_cell_L'][i], self.xbin, self.ybin, rf'L[{self.aclu_list[i]}] custom: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
         ## END for i, ax in enumerate(self.ax_cell_L)...
 
         mode_label = 'DST' if self.is_dst else 'Bayesian'
@@ -2118,6 +2176,15 @@ class InteractiveBayesian2DEquationDebugger:
         self.redraw()
 
 
+    def on_drop_negative_terms(self, _label: str):
+        """CheckButtons callback: update ``drop_negative_contributing_terms_mode`` and recompute if it changed."""
+        new_val: bool = bool(self.drop_negative_terms_check.get_status()[0])
+        if new_val == bool(self.drop_negative_contributing_terms_mode):
+            return
+        self.drop_negative_contributing_terms_mode = new_val
+        self.redraw()
+
+
     def set_all(self, vals):
         for s, v in zip(self.sliders, vals):
             s.set_val(int(v))
@@ -2140,7 +2207,7 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
     """Interactive 2D Bayesian decode viewer — thin wrapper around ``InteractiveBayesian2DEquationDebugger``.
 
     Implemented via ``InteractiveBayesian2DEquationDebugger(...)``; returns ``(fig, sliced_decoder, neuron_ids)`` for compatibility.
-    See that class docstring for equation decomposition, DST ``E_i`` row, and usage.
+    See that class docstring for equation decomposition, DST baseline ``L_0`` row, and usage.
     """
     dbgr = InteractiveBayesian2DEquationDebugger(decoder=decoder, neuron_ids=neuron_ids,
         all_epochs_decoding_result=all_epochs_decoding_result, seed_epoch_idx=seed_epoch_idx, seed_t_bin_idx=seed_t_bin_idx,
