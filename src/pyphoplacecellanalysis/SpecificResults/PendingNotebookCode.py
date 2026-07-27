@@ -1580,7 +1580,7 @@ class InteractiveBayesian2DEquationDebugger:
     sliced: Optional[BayesianPlacemapPositionDecoder] = field(default=None)
     is_dst: bool = field(default=False)
     tau: Optional[float] = field(default=None)
-    tc: Optional[NDArray] = field(default=None)  # (n_cells, nx, ny)
+    tuning_curves: Optional[NDArray] = field(default=None)  # (n_cells, nx, ny)
     n_cells: int = field(default=0)
     aclu_list: List[int] = field(default=Factory(list))
     xbin: Optional[NDArray] = field(default=None)
@@ -1596,7 +1596,7 @@ class InteractiveBayesian2DEquationDebugger:
     ax_pow: Any = field(default=None)
     ax_exp: Any = field(default=None)
     ax_L: Any = field(default=None)
-    ax_conflict_K: Any = field(default=None)
+    ax_conflict_K: Any = field(default=None)  # DST-only: spatial conflict map
 
     ax_cell_pf: List[Any] = field(default=Factory(list))
     ax_cell_L: List[Any] = field(default=Factory(list))
@@ -1713,6 +1713,25 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     @classmethod
+    def _compute_conflict_map(cls, per_cell_E: List[NDArray]) -> Dict[str, Any]:
+        """Compute per-bin Dempster conflict from the E_i mass maps.
+
+        K(x) = 1 − Π_i E_i(x)  at each spatial bin (conflict is the mass assigned to ∅ before normalization).
+        Scalar K = Σ_x K(x) / n_bins (average conflict across space).
+        """
+        conflict_map = BayesianPlacemapPositionDecoderDST.iterative_intersection(*per_cell_E)
+
+        # conflict_map = np.ones_like(per_cell_E[0], dtype=float)
+        # for E_i in per_cell_E:
+        #     conflict_map *= E_i
+        # ## END for E_i in per_cell_E...
+        # conflict_map = 1.0 - conflict_map  # mass on ∅ per bin
+
+        K_scalar = float(np.nanmean(conflict_map))
+        return {'conflict_map': conflict_map, 'K': K_scalar}
+
+
+    @classmethod
     def _imshow_map(cls, ax, M, xbin, ybin, title, cmap='viridis', log_scale: bool = False, vmin=None, vmax=None):
         A = cls._orient_2d_for_imshow(M)
         if log_scale:
@@ -1758,16 +1777,6 @@ class InteractiveBayesian2DEquationDebugger:
             sliced._compute_reliability_metrics()  # populate α for titles / E_i; compute_posterior would do this lazily anyway
 
 
-        if is_dst:
-            active_tuning_curves = deepcopy(sliced.ratemap.tuning_curves)
-            # np.shape(tuning_curves) # (4, 30, 28) - (n_tuning_curves, n_x_bins_, n_y_bins)
-            n_tuning_curves, n_x_bins_, n_y_bins = np.shape(active_tuning_curves)
-            tuning_curves_list = [active_tuning_curves[i, :, :] for i in np.arange(n_tuning_curves)]
-
-            K: float = BayesianPlacemapPositionDecoderDST.conflict_K(tuning_curves_list)
-            K
-
-
 
         tau: float = float(sliced.time_bin_size)
         tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
@@ -1803,7 +1812,7 @@ class InteractiveBayesian2DEquationDebugger:
         self.sliced = sliced
         self.is_dst = is_dst
         self.tau = tau
-        self.tc = tc
+        self.tuning_curves = tc
         self.n_cells = int(n_cells)
         self.aclu_list = aclu_list
         self.xbin = xbin
@@ -1819,10 +1828,10 @@ class InteractiveBayesian2DEquationDebugger:
         """Create figure, mosaic, sliders/buttons, connect callbacks, initial redraw."""
         n_cells = self.n_cells
         pad: int
-        n_factor_cols: int = 4  # posterior, power, exp, L (or logL)
+        n_factor_cols: int = 5 if self.is_dst else 4  # posterior, power, exp, L (or logL), [conflict_K for DST]
         # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
         n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
-        pad = max(n_factor_cols - n_cells, 0)
+        pad = max(n_grid_cols - n_cells, 0)
 
         # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
         slider_h: float = 0.022
@@ -1842,10 +1851,14 @@ class InteractiveBayesian2DEquationDebugger:
         pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
         E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only
         L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
-        factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
+        factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]  # Bayesian default; DST overrides below
 
-        # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors; sliders below
+        # Figure layout: PF (+ DST E_i) + per-cell L; then posterior + factors (+ conflict for DST); sliders below
         if self.is_dst:
+            factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood", "conflict_K"]
+            pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
+            E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
+            L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
             mosaic_layout = [pf_row, E_row, L_row, factor_row]
             height_ratios = [3.0, 2.8, 3.0, 3.2]
         else:
@@ -1855,7 +1868,7 @@ class InteractiveBayesian2DEquationDebugger:
         ax_dict = fig.subplot_mosaic(
             mosaic_layout,
             height_ratios=height_ratios,
-            width_ratios=[1, 1, 1, 1],
+            width_ratios=[1] * n_grid_cols,
             gridspec_kw=dict(hspace=0.45, wspace=0.25, top=0.90, bottom=mosaic_bottom, left=0.04, right=0.98),
         )
 
@@ -1881,6 +1894,7 @@ class InteractiveBayesian2DEquationDebugger:
         ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
         ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
         ax_cell_E = [ax_dict.get(f'cell_{chr(97 + i)}_E') for i in range(n_cells)] if self.is_dst else []
+        ax_conflict_K = ax_dict.get('conflict_K', None)
 
         self.fig = fig
         self.ax_dict = ax_dict
@@ -1888,6 +1902,7 @@ class InteractiveBayesian2DEquationDebugger:
         self.ax_pow = ax_pow
         self.ax_exp = ax_exp
         self.ax_L = ax_L
+        self.ax_conflict_K = ax_conflict_K
         self.ax_cell_pf = ax_cell_pf
         self.ax_cell_L = ax_cell_L
         self.ax_cell_E = ax_cell_E
@@ -1941,7 +1956,7 @@ class InteractiveBayesian2DEquationDebugger:
         # Keep refs alive
         fig._bayes_eqn_ui = dict(
             sliders=sliders, buttons=self.buttons, sliced=self.sliced, neuron_ids=self.neuron_ids,
-            is_dst=self.is_dst, ax_cell_E=ax_cell_E,
+            is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
             reliability_silent=getattr(self.sliced, 'reliability_silent', None),
             debugger=self,
@@ -1955,11 +1970,14 @@ class InteractiveBayesian2DEquationDebugger:
 
         """
         n = self.n ## number of spikes
-        parts = self._poisson_factor_maps(self.tc, n, self.tau, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode) ## recompute
+        parts = self._poisson_factor_maps(self.tuning_curves, n, self.tau, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode) ## recompute
 
-        for ax in (self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf):
+        axes_to_clear = [self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf]
+        if self.ax_conflict_K is not None:
+            axes_to_clear.append(self.ax_conflict_K)
+        for ax in axes_to_clear:
             ax.cla()
-        ## END for ax in (self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf)...
+        ## END for ax in axes_to_clear...
 
         for ax in self.ax_cell_L:
             ax.cla()
@@ -1989,7 +2007,7 @@ class InteractiveBayesian2DEquationDebugger:
                     pf_title += rf'  $\alpha$={alpha_i:.2f}  $\alpha_{{silent}}$={float(self.sliced.reliability_silent[i]):.2f}'
                 else:
                     pf_title += rf'  $\alpha$={alpha_i:.2f}'
-            self._imshow_map(ax, self.tc[i], self.xbin, self.ybin, pf_title, cmap=cmap)
+            self._imshow_map(ax, self.tuning_curves[i], self.xbin, self.ybin, pf_title, cmap=cmap)
             an_E_n = self.E_n[i] # tau * peak_rates[i]
             # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
@@ -1999,16 +2017,22 @@ class InteractiveBayesian2DEquationDebugger:
         if self.is_dst and (len(self.ax_cell_E) > 0):
             reliability_active = np.asarray(self.sliced.reliability_active, dtype=float)
             reliability_silent = np.asarray(getattr(self.sliced, 'reliability_silent', None), dtype=float) if getattr(self.sliced, 'reliability_silent', None) is not None else np.ones_like(reliability_active)
-            ei_parts = self._dst_Ei_maps(self.tc, n, self.tau, reliability_active=reliability_active, reliability_silent=reliability_silent)
+            ei_parts = self._dst_Ei_maps(self.tuning_curves, n, self.tau, reliability_active=reliability_active, reliability_silent=reliability_silent)
             for i, ax in enumerate(self.ax_cell_E):
                 cmap = self.cell_cmaps[i]
                 alpha_i = float(ei_parts['alphas'][i])
-                self._imshow_map(ax, ei_parts['per_cell_E'][i], self.xbin, self.ybin, rf'Cell {self.aclu_list[i]}: $E_i=\alpha p_i+(1-\alpha)$  $\alpha$={alpha_i:.2f}', cmap=cmap)
+                self._imshow_map(ax, ei_parts['per_cell_E'][i], self.xbin, self.ybin, rf'$E[{self.aclu_list[i]}]=\alpha p_i+(1-\alpha)$  $\alpha$={alpha_i:.2f}', cmap=cmap)
             ## END for i, ax in enumerate(self.ax_cell_E)...
+
+            # Conflict K panel
+            if self.ax_conflict_K is not None:
+                self.ax_conflict_K.cla()
+                conflict_parts = self._compute_conflict_map(ei_parts['per_cell_E'])
+                self._imshow_map(self.ax_conflict_K, conflict_parts['conflict_map'], self.xbin, self.ybin, rf'Conflict $K={conflict_parts["K"]:.3f}$', cmap='hot') # , vmin=0.0, vmax=1.0
 
         for i, ax in enumerate(self.ax_cell_L):
             cmap = self.cell_cmaps[i]
-            self._imshow_map(ax, parts['per_cell_L'][i], self.xbin, self.ybin, rf'Cell {self.aclu_list[i]}: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
+            self._imshow_map(ax, parts['per_cell_L'][i], self.xbin, self.ybin, rf'L[{self.aclu_list[i]}]: $((\tau f)^{n[i]}/{n[i]}!)\,e^{{-\tau f}}$', cmap=cmap)
         ## END for i, ax in enumerate(self.ax_cell_L)...
 
         mode_label = 'DST' if self.is_dst else 'Bayesian'
