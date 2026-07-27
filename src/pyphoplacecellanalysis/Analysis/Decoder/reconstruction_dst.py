@@ -90,23 +90,21 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)}) # (n_aclus, n_t_bins) - (25, 1427042)
 
 
-    
-    field_threshold_frac: float = serialized_field(default=0.20)
-    
+    field_threshold_frac: float = serialized_field(default=0.20)    
     n_top_peaks: int = serialized_field(default=3)
     slice_level_multiplier: float = serialized_field(default=0.20)
     fn_tn_mode: str = serialized_field(default='occupancy_seconds')
     in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
 
 
-    ## Cell reliability variables:
-    discount_silence: bool = non_serialized_field(default=False)
-    reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
-    reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    # ## Cell reliability variables:
+    # should_discount_silence: bool = non_serialized_field(default=False)
+    # reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    # reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
 
 
-    ## alternative functions:
-    drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
+    # ## alternative functions:
+    # drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
 
 
     @property
@@ -261,107 +259,6 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # Main Methods                                                                                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
     
-    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
-    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
-        """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
-
-        #TODO 2026-07-23 09:59: - [ ] this result is not currently used by any of the main computations because we use the skragg information reliability for each cell instead.
-
-        Parameters
-        ----------
-        active_peak_prominence_2d_results : optional PeakProminence2D results for in-field masks.
-            If None, recomputes a minimal PeakProminence2D from ``self.pf`` via
-            ``CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf`` (no pipeline cache required).
-        spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
-        time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
-        max_t_idx : optional cap on number of time bins (None = all).
-
-        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, and ``fn_tn_mode``.
-
-        Returns
-        -------
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
-
-
-        UPDATES:
-            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
-        """
-        pfs = self.pf
-        ratemaps = self.ratemap
-        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
-        if spikes_df is None:
-            if self.spikes_df is None:
-                self.spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
-            spikes_df = deepcopy(self.spikes_df)
-
-        spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
-        if time_bin_size_seconds is None:
-            time_bin_size_seconds = self.time_bin_size
-
-        if (self.spikes_df is None):
-            self.spikes_df = spikes_df
-
-        if (self.time_bin_size is None):
-            self.time_bin_size = time_bin_size_seconds
-
-        if active_peak_prominence_2d_results is None:
-            active_peak_prominence_2d_results = CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf(pfs, neuron_ids=neuron_ids)
-
-        self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
-            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
-            neuron_ids=neuron_ids,
-        )
-
-        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
-            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
-            time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
-        )
-
-        return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
-
-        
-
-    def _compute_reliability_metrics(self, **kwargs):
-        """
-        Builds static per-cell reliability (alpha_i) from Skaggs spatial information.
-        Requires only ``self.pf`` so first ``decode()`` / ``compute_all()`` works without
-        a prior ``compute_reliability_new`` call.
-        """
-        assert (self.pf is not None)
-
-        an_active_pf = deepcopy(self.pf)
-
-        if (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns):
-            daweights =  self.t_bin_aclus_reliability_df['true_pos'].to_numpy()
-        else:
-            ## INPUTS: an_active_pf
-            daweights = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
-            # alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)  # correlated with Skaggs; do not multiply into alpha
-
-            # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
-            # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
-
-            # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
-            # Ensuring the result is properly bounded [0, 1]
-            # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
-            R_base = np.clip(daweights, 0.0, 1.0)
-
-
-        ## 
-        R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
-
-        self.reliability_active = R_base
-        
-        # Map reliability for silence (n_i = 0). 
-        # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
-        if self.discount_silence:
-            self.reliability_silent = R_base
-        else:
-            self.reliability_silent = np.ones_like(R_base)
-
-
-
-
     def compute_posterior(self, spkcount, ratemaps=None):
         """ 
         Overrides the standard likelihood combination to inject Shafer Discounting.
