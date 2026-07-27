@@ -1518,7 +1518,7 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
 from math import factorial
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from matplotlib.widgets import Slider, Button
+from matplotlib.widgets import Slider, Button, RadioButtons
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, BayesianPlacemapPositionDecoder
@@ -1607,6 +1607,7 @@ class InteractiveBayesian2DEquationDebugger:
     sliders: List[Any] = field(default=Factory(list))
     slider_axes: List[Any] = field(default=Factory(list))
     buttons: Optional[Tuple[Any, ...]] = field(default=None)
+    reliability_mode_radio: Any = field(default=None)
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
 
@@ -1950,12 +1951,26 @@ class InteractiveBayesian2DEquationDebugger:
         self.ax_cell_E = ax_cell_E
         self.text_formatter = text_formatter
 
+        # Reliability modifier mode radio — left of slider stack
+        mode_names = ReliabilityDecoderModifierMode.list_names()
+        active_mode_idx = mode_names.index(self.reliability_modifier_mode.name)
+        radio_h: float = max(0.085, min(0.12, n_cells * slider_pitch))
+        radio_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - radio_h) * 0.5)
+        ax_radio = fig.add_axes([0.01, radio_y, 0.14, radio_h])
+        reliability_mode_radio = RadioButtons(ax_radio, mode_names, active=active_mode_idx)
+        for label in reliability_mode_radio.labels:
+            label.set_fontsize(7)
+        ## END for label in reliability_mode_radio.labels...
+        ax_radio.set_title('reliability', fontsize=7, pad=2)
+        reliability_mode_radio.on_clicked(self.on_reliability_mode)
+        self.reliability_mode_radio = reliability_mode_radio
+
         # Sliders — y from bottom of stack upward; pitch clears thumb overlap
         slider_axes = []
         sliders = []
         for i, aclu in enumerate(self.aclu_list):
             y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
-            ax_s = fig.add_axes([0.12, y_s, 0.55, slider_h])
+            ax_s = fig.add_axes([0.17, y_s, 0.50, slider_h])
             cell_cmap = cm.get_cmap(self.cell_cmaps[i])
             marker_color = cell_cmap(0.75)
             track_color = cell_cmap(0.22)
@@ -1997,7 +2012,8 @@ class InteractiveBayesian2DEquationDebugger:
 
         # Keep refs alive
         fig._bayes_eqn_ui = dict(
-            sliders=sliders, buttons=self.buttons, sliced=self.sliced, neuron_ids=self.neuron_ids,
+            sliders=sliders, buttons=self.buttons, reliability_mode_radio=self.reliability_mode_radio,
+            sliced=self.sliced, neuron_ids=self.neuron_ids,
             is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
             reliability_silent=getattr(self.sliced, 'reliability_silent', None),
@@ -2082,12 +2098,23 @@ class InteractiveBayesian2DEquationDebugger:
         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(self.aclu_list, n)])
         ml_flat = np.nanargmax(parts['posterior'])
         ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
-        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}', fontsize=11)
+        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}  |  rel={self.reliability_modifier_mode.name}', fontsize=11)
         self.fig.canvas.draw_idle()
 
 
     def on_slider(self, _=None):
         self.n = np.array([int(s.val) for s in self.sliders], dtype=int)
+        self.redraw()
+
+
+    def on_reliability_mode(self, label: str):
+        """RadioButtons callback: update ``reliability_modifier_mode`` and recompute if it changed."""
+        new_mode = ReliabilityDecoderModifierMode[label]
+        if new_mode == self.reliability_modifier_mode:
+            return
+        self.reliability_modifier_mode = new_mode
+        if (new_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(self.sliced, 'reliability_active', None) is None):
+            self.sliced._compute_reliability_metrics()
         self.redraw()
 
 
