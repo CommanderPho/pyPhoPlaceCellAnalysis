@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 # from scipy.stats import multivariate_normal
 from scipy.special import factorial, logsumexp
+from scipy.sparse import csr_matrix
 
 # import neuropy
 from neuropy.utils.dynamic_container import DynamicContainer # for decode_specific_epochs
@@ -2408,14 +2409,20 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         self.neuron_IDs = None
         self.F = None
         self.P_x = None
-        
+        self.reliability_active = None
+        self.reliability_silent = None
+
         self._setup_computation_variables()
+
 
     @post_deserialize
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
             self._setup_computation_variables()
+            self.reliability_active = None
+            self.reliability_silent = None
+
 
     # for NeuronUnitSlicableObjectProtocol:
     def get_by_id(self, ids, defer_compute_all:bool=False): # defer_compute_all:bool = False
@@ -2429,6 +2436,15 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
         ## apply the neuron_sliced_pf to the decoder:
         neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        # Preserve config flags and shape-aware reliability slices when present
+        neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
+        neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        if (self.neuron_IDs is not None) and ((self.reliability_active is not None) or (self.reliability_silent is not None)):
+            source_ids = np.asarray(self.neuron_IDs)
+            ids_arr = np.asarray(ids)
+            keep = np.isin(source_ids, ids_arr)
+            neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
+            neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
         return neuron_sliced_decoder
     
     @function_attributes(short_name=None, tags=['epoch', 'slice', 'restrict'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 19:08', related_items=[])
@@ -2503,105 +2519,45 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     # ==================================================================================================================================================================================================================================================================================== #
-    # Reliability                                                                                                                                                                                                                                                                          #
+    # Reliability (optional state + shape-aware resolve; estimation lives on BayesianPlacemapPositionDecoder)                                                                               #
     # ==================================================================================================================================================================================================================================================================================== #
-    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
-    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
-        """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
-
-        #TODO 2026-07-23 09:59: - [ ] this result is not currently used by any of the main computations because we use the skragg information reliability for each cell instead.
-
-        Parameters
-        ----------
-        active_peak_prominence_2d_results : optional PeakProminence2D results for in-field masks.
-            If None, recomputes a minimal PeakProminence2D from ``self.pf`` via
-            ``CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf`` (no pipeline cache required).
-        spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
-        time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
-        max_t_idx : optional cap on number of time bins (None = all).
-
-        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, and ``fn_tn_mode``.
-
-        Returns
-        -------
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
-
-
-        UPDATES:
-            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
-        """
-        pfs = self.pf
-        ratemaps = self.ratemap
-        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
-        if spikes_df is None:
-            if self.spikes_df is None:
-                self.spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
-            spikes_df = deepcopy(self.spikes_df)
-
-        spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
-        if time_bin_size_seconds is None:
-            time_bin_size_seconds = self.time_bin_size
-
-        if (self.spikes_df is None):
-            self.spikes_df = spikes_df
-
-        if (self.time_bin_size is None):
-            self.time_bin_size = time_bin_size_seconds
-
-        if active_peak_prominence_2d_results is None:
-            active_peak_prominence_2d_results = CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf(pfs, neuron_ids=neuron_ids)
-
-        self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
-            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
-            neuron_ids=neuron_ids,
-        )
-
-        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
-            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
-            time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
-        )
-
-        return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
-
-        
-
-    def _compute_reliability_metrics(self, **kwargs):
-        """
-        Builds static per-cell reliability (alpha_i) from Skaggs spatial information.
-        Requires only ``self.pf`` so first ``decode()`` / ``compute_all()`` works without
-        a prior ``compute_reliability_new`` call.
-        """
-        assert (self.pf is not None)
-
-        an_active_pf = deepcopy(self.pf)
-
-        if (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns):
-            daweights =  self.t_bin_aclus_reliability_df['true_pos'].to_numpy()
+    @classmethod
+    def _slice_reliability_array(cls, arr: Optional[np.ndarray], keep: np.ndarray) -> Optional[np.ndarray]:
+        """Neuron-slice reliability arrays for either per-cell ``(n_neurons,)`` or position-dependent ``(n_flat_position_bins, n_neurons)``."""
+        if arr is None:
+            return None
+        arr = np.asarray(arr)
+        if arr.ndim == 1:
+            return arr[keep]
+        elif arr.ndim == 2:
+            return arr[:, keep]
         else:
-            ## INPUTS: an_active_pf
-            daweights = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
-            # alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)  # correlated with Skaggs; do not multiply into alpha
-
-            # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
-            # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
-
-            # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
-            # Ensuring the result is properly bounded [0, 1]
-            # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
-            R_base = np.clip(daweights, 0.0, 1.0)
+            raise ValueError(f'Unsupported reliability array ndim={arr.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
 
 
-        ## 
-        R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
+    def _resolve_cell_reliability(self, cell_idx: int, active_mask: np.ndarray, n_position_bins: int) -> np.ndarray:
+        """Resolve effective reliability for one cell given active/silent firing mask.
 
-        self.reliability_active = R_base
-        
-        # Map reliability for silence (n_i = 0). 
-        # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
-        if self.should_discount_silence:
-            self.reliability_silent = R_base
+        Accepts:
+            - per-cell scalars: ``reliability_*`` shape ``(n_neurons,)``
+            - position-dependent: ``reliability_*`` shape ``(n_flat_position_bins, n_neurons)``
+
+        ``active_mask`` should be shape ``(nTimeBins, 1)``. Returns an array broadcastable to ``(nTimeBins, n_position_bins)``.
+        """
+        assert (self.reliability_active is not None) and (self.reliability_silent is not None), 'reliability_active and reliability_silent must both be set before resolve.'
+        R_active = np.asarray(self.reliability_active)
+        R_silent = np.asarray(self.reliability_silent)
+        assert R_active.shape == R_silent.shape, f'reliability_active shape {R_active.shape} != reliability_silent shape {R_silent.shape}'
+
+        if R_active.ndim == 1:
+            return np.where(active_mask, R_active[cell_idx], R_silent[cell_idx])
+        elif R_active.ndim == 2:
+            assert R_active.shape[0] == n_position_bins, f'Position-dependent reliability expects first dim == n_position_bins ({n_position_bins}), got {R_active.shape[0]}'
+            R_active_i = R_active[:, cell_idx][np.newaxis, :]
+            R_silent_i = R_silent[:, cell_idx][np.newaxis, :]
+            return np.where(active_mask, R_active_i, R_silent_i)
         else:
-            self.reliability_silent = np.ones_like(R_base)
+            raise ValueError(f'Unsupported reliability array ndim={R_active.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
 
 
 
@@ -3617,6 +3573,16 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     most_likely_positions: np.ndarray = None
     revised_most_likely_positions: np.ndarray = None
 
+    ## Cell confusion / reliability estimation (optional; Skaggs/confusion write per-cell reliability_* on Base):
+    n_top_peaks: int = serialized_field(default=3)
+    slice_level_multiplier: float = serialized_field(default=0.20)
+    fn_tn_mode: str = serialized_field(default='occupancy_seconds')
+    t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
+    per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
+    time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
+    per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)})
+    in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
+
 
 
     # time_binning_container accessors ___________________________________________________________________________________ #
@@ -3665,7 +3631,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
     @classmethod
     def serialized_key_allowlist(cls):
-        input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print']
+        input_keys = ['time_bin_size', 'pf', 'spikes_df', 'debug_print', 'n_top_peaks', 'slice_level_multiplier', 'fn_tn_mode']
         # intermediate_keys = ['unit_specific_time_binned_spike_counts', 'time_window_edges', 'time_window_edges_binning_info']
         saved_result_keys = ['flat_p_x_given_n']
         return input_keys + saved_result_keys
@@ -3716,6 +3682,13 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             # self._setup_time_window_centers()
             self.p_x_given_n = self._reshape_output(self.flat_p_x_given_n)
             self.compute_most_likely_positions()
+            self.reliability_active = None
+            self.reliability_silent = None
+            self.in_field_masks = None
+            self.t_bin_aclus_reliability_df = None
+            self.per_tbin_aclu_spike_counts_df = None
+            self.time_bin_info_df = None
+            self.per_tbin_aclu_spike_counts_sparse = None
 
 
     def setup(self):
@@ -3724,7 +3697,14 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         self.neuron_IDs = None
         self.F = None
         self.P_x = None
-        
+        self.reliability_active = None
+        self.reliability_silent = None
+        self.in_field_masks = None
+        self.t_bin_aclus_reliability_df = None
+        self.per_tbin_aclu_spike_counts_df = None
+        self.time_bin_info_df = None
+        self.per_tbin_aclu_spike_counts_sparse = None
+
         self._setup_computation_variables()
         # Could pre-filter the self.spikes_df by the 
         
@@ -3800,6 +3780,23 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             neuron_sliced_decoder.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[keep, :]
             neuron_sliced_decoder.total_spike_counts_per_window = np.sum(neuron_sliced_decoder.unit_specific_time_binned_spike_counts, axis=0)
             neuron_sliced_decoder.time_binning_container = deepcopy(self.time_binning_container)
+
+        # Reuse per-cell / position-dependent reliability and in-field masks when already computed
+        neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
+        neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        neuron_sliced_decoder.n_top_peaks = self.n_top_peaks
+        neuron_sliced_decoder.slice_level_multiplier = self.slice_level_multiplier
+        neuron_sliced_decoder.fn_tn_mode = self.fn_tn_mode
+        neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
+        neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
+        if self.in_field_masks is not None:
+            id_set = set(int(x) for x in ids)
+            neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
+        # Leave time-bin reliability tables / sparse counts unset on the slice
+        neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
+        neuron_sliced_decoder.time_bin_info_df = None
+        neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
 
         # Invalidate decode caches (cannot neuron-slice a posterior)
         neuron_sliced_decoder.flat_p_x_given_n = None
@@ -4022,7 +4019,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
             # Ensuring the result is properly bounded [0, 1]
             # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
-            R_base = np.clip(daweights, 0.0, 1.0)
+
+        R_base = np.clip(daweights, 0.0, 1.0)
 
 
         ## 

@@ -40,8 +40,9 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         Spikes used for time-binned decoding.
     field_threshold_frac : float
         Fraction of peak firing rate defining in-field vs out-of-field masks (default: 0.20).
-    discount_silence : bool
+    should_discount_silence : bool
         If True, applies Shafer Discounting when the cell did NOT fire (n_i = 0). (default: False).
+        Legacy kwarg ``discount_silence`` is accepted by factories and mapped to this field.
     n_top_peaks : int
         Number of top prominence peaks used when building in-field masks (default: 3).
     slice_level_multiplier : float
@@ -82,29 +83,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
 
     """
-    ## New `BayesianPlacemapPositionDecoderDST`-specific fields:
-    # Computed Cell Confusion Reliability Variables ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
-    per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
-    time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
-    per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)}) # (n_aclus, n_t_bins) - (25, 1427042)
-
-
-    field_threshold_frac: float = serialized_field(default=0.20)    
-    n_top_peaks: int = serialized_field(default=3)
-    slice_level_multiplier: float = serialized_field(default=0.20)
-    fn_tn_mode: str = serialized_field(default='occupancy_seconds')
-    in_field_masks: Optional[Dict[int, np.ndarray]] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons', 'n_xbins', 'n_ybins')})
-
-
-    # ## Cell reliability variables:
-    # should_discount_silence: bool = non_serialized_field(default=False)
-    # reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
-    # reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
-
-
-    # ## alternative functions:
-    # drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
+    ## DST-specific fields (confusion/reliability estimation fields live on BayesianPlacemapPositionDecoder):
+    field_threshold_frac: float = serialized_field(default=0.20)
 
 
     @property
@@ -124,16 +104,17 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     # ==================================================================================================================== #
     @classmethod
     def serialized_key_allowlist(cls):
-        return BayesianPlacemapPositionDecoder.serialized_key_allowlist() + ['field_threshold_frac', 'n_top_peaks', 'slice_level_multiplier', 'fn_tn_mode']
+        return BayesianPlacemapPositionDecoder.serialized_key_allowlist() + ['field_threshold_frac']
 
 
     @classmethod
     def from_dict(cls, val_dict):
-        return cls(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), field_threshold_frac=val_dict.get('field_threshold_frac', 0.20), discount_silence=val_dict.get('discount_silence', False), n_top_peaks=val_dict.get('n_top_peaks', 3), slice_level_multiplier=val_dict.get('slice_level_multiplier', 0.20), fn_tn_mode=val_dict.get('fn_tn_mode', 'occupancy_seconds'), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
+        should_discount_silence = val_dict.get('should_discount_silence', val_dict.get('discount_silence', False))
+        return cls(time_bin_size=val_dict.get('time_bin_size', 0.25), pf=val_dict.get('pf', None), spikes_df=val_dict.get('spikes_df', None), field_threshold_frac=val_dict.get('field_threshold_frac', 0.20), should_discount_silence=should_discount_silence, n_top_peaks=val_dict.get('n_top_peaks', 3), slice_level_multiplier=val_dict.get('slice_level_multiplier', 0.20), fn_tn_mode=val_dict.get('fn_tn_mode', 'occupancy_seconds'), setup_on_init=val_dict.get('setup_on_init', True), post_load_on_init=val_dict.get('post_load_on_init', False), debug_print=val_dict.get('debug_print', False))
 
 
     @classmethod
-    def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, **kwargs):
+    def init_from_stateful_decoder(cls, stateful_decoder: "BayesianPlacemapPositionDecoder", active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, should_discount_silence: Optional[bool] = None, **kwargs):
         """Creates a new DST decoder instance from an existing stateful Bayesian decoder.
 
         If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``
@@ -147,16 +128,18 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         max_t_idx = kwargs.pop('max_t_idx', None)
         confusion_spikes_df = kwargs.pop('spikes_df', None)
         time_bin_size_seconds = kwargs.pop('time_bin_size_seconds', None)
-        _obj = cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
+        if should_discount_silence is None:
+            should_discount_silence = discount_silence
+        _obj = cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, should_discount_silence=should_discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
         if active_peak_prominence_2d_results is not None:
             _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=confusion_spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
-            self._compute_reliability_metrics() ## compute
+            _obj._compute_reliability_metrics() ## compute
 
         return _obj
 
 
     @classmethod
-    def init_from_placefields(cls, pf: PfND, time_bin_size: float, spikes_df: pd.DataFrame, active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, debug_print: bool = False, **kwargs):
+    def init_from_placefields(cls, pf: PfND, time_bin_size: float, spikes_df: pd.DataFrame, active_peak_prominence_2d_results=None, field_threshold_frac: float = 0.20, discount_silence: bool = False, should_discount_silence: Optional[bool] = None, debug_print: bool = False, **kwargs):
         """Creates a new DST decoder instance from a placefields object plus required decoder inputs.
 
         If ``active_peak_prominence_2d_results`` is provided, also runs ``compute_unit_confusion_reliability_variables``.
@@ -168,10 +151,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         """
         max_t_idx = kwargs.pop('max_t_idx', None)
         time_bin_size_seconds = kwargs.pop('time_bin_size_seconds', None)
-        _obj = cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, discount_silence=discount_silence, debug_print=debug_print, **kwargs)
+        if should_discount_silence is None:
+            should_discount_silence = discount_silence
+        _obj = cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, should_discount_silence=should_discount_silence, debug_print=debug_print, **kwargs)
         if active_peak_prominence_2d_results is not None:
             _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
-            self._compute_reliability_metrics() ## compute
+            _obj._compute_reliability_metrics() ## compute
 
         return _obj
 
@@ -179,20 +164,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         super().post_load()
-        self.reliability_active = None
-        self.reliability_silent = None
-        self.in_field_masks = None
 
 
     def setup(self):
         super().setup()
-        self.t_bin_aclus_reliability_df = None
-        self.per_tbin_aclu_spike_counts_df = None
-        self.time_bin_info_df = None
-        self.per_tbin_aclu_spike_counts_sparse = None
-        self.reliability_active = None
-        self.reliability_silent = None
-        self.in_field_masks = None
         self._compute_reliability_metrics() ## compute
 
 
@@ -213,7 +188,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         if (spikes_df is not None) and ('aclu' in spikes_df.columns):
             spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids)].copy()
 
-        neuron_sliced_decoder = BayesianPlacemapPositionDecoderDST(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, field_threshold_frac=self.field_threshold_frac, discount_silence=self.discount_silence, n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode, setup_on_init=False, post_load_on_init=False, debug_print=self.debug_print)
+        neuron_sliced_decoder = BayesianPlacemapPositionDecoderDST(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, field_threshold_frac=self.field_threshold_frac, should_discount_silence=self.should_discount_silence, n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode, setup_on_init=False, post_load_on_init=False, debug_print=self.debug_print)
 
         neuron_sliced_decoder.neuron_IDs = source_ids[keep]
         neuron_sliced_decoder.neuron_IDXs = np.arange(int(np.sum(keep)))
@@ -225,11 +200,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             neuron_sliced_decoder.total_spike_counts_per_window = np.sum(neuron_sliced_decoder.unit_specific_time_binned_spike_counts, axis=0)
             neuron_sliced_decoder.time_binning_container = deepcopy(self.time_binning_container)
 
-        # Reuse per-cell reliability / masks when already computed on the full decoder
-        if self.reliability_active is not None:
-            neuron_sliced_decoder.reliability_active = np.asarray(self.reliability_active)[keep]
-        if self.reliability_silent is not None:
-            neuron_sliced_decoder.reliability_silent = np.asarray(self.reliability_silent)[keep]
+        # Reuse per-cell / position-dependent reliability / masks when already computed on the full decoder
+        neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
+        neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
+        neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
         if self.in_field_masks is not None:
             id_set = set(int(x) for x in ids)
             neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
@@ -332,8 +306,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
                 p_i = np.where(active_mask, p_i, 0.0) ## for this cell, zero out any terms for bins that have zero firing (are inactive)
 
 
-            # Apply Reliability Conditional on Firing State
-            R_effective = np.where(active_mask, self.reliability_active[cell], self.reliability_silent[cell])
+            # Apply Reliability Conditional on Firing State (per-cell or position-dependent)
+            R_effective = self._resolve_cell_reliability(cell, active_mask, nPositionBins)
             
             # Dempster-Shafer Unnormalized Conjoint Mass formulation: 
             # E_i(v) = [ alpha_i * ( L_i(v) / SUM_w L_i(w) ) ] + ( 1 - alpha_i )
@@ -449,5 +423,3 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
         """
         return np.nansum(cls.iterative_intersection(*args))
-
-
