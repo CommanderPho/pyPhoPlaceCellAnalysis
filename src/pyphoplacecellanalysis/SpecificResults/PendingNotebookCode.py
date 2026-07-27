@@ -1774,8 +1774,13 @@ class InteractiveBayesian2DEquationDebugger:
         extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
         im = ax.imshow(A, origin='lower', extent=extent, cmap=cmap, aspect='equal', vmin=vmin, vmax=vmax)
         ax.set_title(title, fontsize=10)
+        # Thin dark-grey grid at xbin/ybin edges (all heatmap axes share this)
+        ax.set_xticks(xbin, minor=True)
+        ax.set_yticks(ybin, minor=True)
         ax.set_xticks([])
         ax.set_yticks([])
+        ax.grid(which='minor', color='0.25', linewidth=0.3, alpha=0.2)
+        ax.tick_params(which='both', left=False, bottom=False, labelleft=False, labelbottom=False)
         for spine in ax.spines.values():
             spine.set_visible(False)
         ## END for spine in ax.spines.values()...
