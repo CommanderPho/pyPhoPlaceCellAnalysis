@@ -2,6 +2,7 @@
 from __future__ import annotations # prevents having to specify types for typehinting as strings
 from typing import TYPE_CHECKING
 from copy import deepcopy
+from enum import Enum, auto
 import numpy as np
 import pandas as pd
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -826,6 +827,43 @@ def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_e
     return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
 
 
+class ReliabilityDecoderModifierMode(Enum):
+    """How the reliability information is integrated into the decoder (when reliability is available on the decoder) """
+    IGNORE = auto()
+    LIKELIHOOD_TEMPERING = auto() ## "Power-prior mode: Raise each cell’s likelihood to the power of the likelihood and re‑normalise."
+    # MIXTURE_MODEL = auto()
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
+class ReliabilityEstimationMode(Enum):
+    """How per-cell reliability arrays are estimated from confusion-matrix products."""
+    PER_CELL = auto()              # (n_neurons,) from confusion rates
+    POSITION_DEPENDENT = auto()    # (n_flat_position_bins, n_neurons) from rates × in_field
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
 
 
 @metadata_attributes(short_name=None, tags=['reliability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-23 05:13', related_items=[])
@@ -849,7 +887,7 @@ class CellIndividualReliabilityMatrix:
             fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
         )
 
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df,
             ratemaps=ratemaps,
             pfs=pfs,
@@ -860,13 +898,15 @@ class CellIndividualReliabilityMatrix:
         )
         t_bin_aclus_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
+        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
 
 
     """
     @function_attributes(short_name=None, tags=['MAIN', 'STAGE_2'], input_requires=[], output_provides=[], uses=['perform_compute_confusion_matrix'], used_by=[], creation_date='2026-07-22 19:47', related_items=[])
     @classmethod
-    def compute_reliability_matrix(cls, spikes_df: pd.DataFrame, pfs: PfND, in_field_masks: Dict[int, np.ndarray], ratemaps=None, neuron_ids=None, time_bin_size_seconds: float = 0.050, **kwargs):
+    def compute_reliability_matrix(cls, spikes_df: pd.DataFrame, pfs: PfND, in_field_masks: Dict[int, np.ndarray], ratemaps=None, neuron_ids=None, time_bin_size_seconds: float = 0.050,
+                                        reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.POSITION_DEPENDENT,
+                                    **kwargs):
         """Compute per-aclu TP/FP/TN/FN reliability counts from time-binned spikes vs in-field masks.
 
         Parameters
@@ -877,6 +917,7 @@ class CellIndividualReliabilityMatrix:
         in_field_masks : Dict[aclu, np.ndarray[bool]] shaped like ratemap occupancy (nx, ny), 0-based.
         neuron_ids : optional explicit neuron id order; defaults to `ratemaps.neuron_ids`.
         time_bin_size_seconds : temporal bin width used for t_bin_idx / position alignment.
+        reliability_estimation_mode : reserved for callers; xy spike counts are always computed (needed for POSITION_DEPENDENT maps).
 
         Returns
         -------
@@ -886,6 +927,8 @@ class CellIndividualReliabilityMatrix:
         per_tbin_aclu_spike_counts_sparse : csr_matrix shape (n_aclus, n_t_bins), dtype int32.
             Rows follow `neuron_ids` order; columns are 0-based time bins aligned with `time_bin_info_df['t_bin_idx']`.
             Zero entries mean no spikes in that (aclu, t_bin).
+        per_tbin_aclu_xy_spike_counts_df : long DataFrame with columns ['aclu', 't_bin_idx', 'binned_x', 'binned_y', 'n_spikes']
+            (nonzero spike-location bins only; spike ``t_bin_idx`` is 1-based; ``binned_x``/``binned_y`` are spike positions).
         """
         # ==================================================================================================================================================================================================================================================================================== #
         # Main Compute Block                                                                                                                                                                                                                                                                   #
@@ -935,8 +978,14 @@ class CellIndividualReliabilityMatrix:
 
         time_bin_info_df: pd.DataFrame = pd.DataFrame({'t': bin_container.centers, 't_bin_idx': np.arange(bin_container.num_bins),
             'x': np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['x']),
-            'y': np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['y']),
         })
+
+        if 'y' in pfs.filtered_pos_df.columns:
+            time_bin_info_df['y'] = np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['y'])
+
+        if 'z' in pfs.filtered_pos_df.columns:
+            time_bin_info_df['z'] = np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['z'])
+
 
         # time_bin_info_df.position.add
         time_bin_info_df = time_bin_info_df.position.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
@@ -950,22 +999,10 @@ class CellIndividualReliabilityMatrix:
         # Build in_field LUT (aclu, binned_x, binned_y) for Polars joins                                                                                                                                                                                                                        #
         # ==================================================================================================================================================================================================================================================================================== #
         # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
-        rows = []
-        for aclu, mask in in_field_masks.items():
-            ix, iy = np.nonzero(mask)  # 0-based
-            for bx, by in zip(ix + 1, iy + 1):  # match spikes_df binned_x/y labels
-                rows.append({"aclu": int(aclu), "binned_x": int(bx), "binned_y": int(by), "is_in_field": True})
-            ## END for bx, by in zip(ix + 1, iy + 1)...
-        ## END for aclu, mask in in_field_masks.items()...
-
-        in_field_lut = pl.DataFrame(rows).with_columns([
-            pl.col("aclu").cast(pl.Int64),
-            pl.col("binned_x").cast(pl.Int64),
-            pl.col("binned_y").cast(pl.Int64),
-        ])  # only True cells; absent = out-of-field / unknown spatial bin
+        in_field_lut = cls.build_in_field_lut(in_field_masks)  # only True cells; absent = out-of-field / unknown spatial bin
 
         # ==================================================================================================================================================================================================================================================================================== #
-        # Polars: per-(aclu, t_bin) spike counts                                                                                                                                                                                                                                               #
+        # Polars: per-(aclu, t_bin, binned_x, binned_y) spike counts (spike locations)                                                                                                                                                                                                           #
         # ==================================================================================================================================================================================================================================================================================== #
         spikes_pl = pl.from_pandas(spikes_df[["t_bin_idx", "aclu", "binned_x", "binned_y"]]).with_columns([
             pl.col("binned_x").cast(pl.Int64),
@@ -974,11 +1011,18 @@ class CellIndividualReliabilityMatrix:
             pl.col("t_bin_idx").cast(pl.Int64),
         ])
 
-        per_tbin_aclu_spike_counts_df = (
+        per_tbin_aclu_xy_spike_counts_df = (
             spikes_pl
-            .group_by(["aclu", "t_bin_idx"])
+            .group_by(["aclu", "t_bin_idx", "binned_x", "binned_y"])
             .agg([pl.len().alias("n_spikes")])
         ).to_pandas()
+
+        # Coarse per-(aclu, t_bin) counts for PER_CELL confusion + sparse matrix (sum over spike locations)
+        per_tbin_aclu_spike_counts_df = (
+            per_tbin_aclu_xy_spike_counts_df
+            .groupby(["aclu", "t_bin_idx"], as_index=False)["n_spikes"]
+            .sum()
+        )
 
         # Sparse (n_aclus, n_t_bins) spike counts from COO nonzero entries (no dense allocate).
         # Spike t_bin_idx labels are 1-based; matrix columns / time_bin_info_df use 0-based indices.
@@ -996,8 +1040,8 @@ class CellIndividualReliabilityMatrix:
         # ==================================================================================================================================================================================================================================================================================== #
         t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin_aclu_spike_counts_df, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, **kwargs)
 
-        ## OUTPUTS: t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
-        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse
+        ## OUTPUTS: t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
 
 
     @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
@@ -1143,6 +1187,143 @@ class CellIndividualReliabilityMatrix:
 
         ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
+
+
+    @classmethod
+    def build_in_field_lut(cls, in_field_masks: Dict[int, np.ndarray]) -> pl.DataFrame:
+        """Convert Dict[aclu, (nx, ny) bool] masks to Polars LUT with 1-based ``binned_x``/``binned_y`` labels."""
+        rows = []
+        for aclu, mask in in_field_masks.items():
+            ix, iy = np.nonzero(mask)  # 0-based
+            for bx, by in zip(ix + 1, iy + 1):
+                rows.append({"aclu": int(aclu), "binned_x": int(bx), "binned_y": int(by), "is_in_field": True})
+            ## END for bx, by in zip(ix + 1, iy + 1)...
+        ## END for aclu, mask in in_field_masks.items()...
+        if len(rows) == 0:
+            return pl.DataFrame(schema={"aclu": pl.Int64, "binned_x": pl.Int64, "binned_y": pl.Int64, "is_in_field": pl.Boolean})
+        return pl.DataFrame(rows).with_columns([
+            pl.col("aclu").cast(pl.Int64),
+            pl.col("binned_x").cast(pl.Int64),
+            pl.col("binned_y").cast(pl.Int64),
+        ])
+
+
+    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability', 'position-dependent'], input_requires=[], output_provides=[], uses=[], used_by=['BayesianPlacemapPositionDecoder._compute_reliability_metrics'], creation_date='2026-07-28 17:00', related_items=['perform_compute_confusion_matrix'])
+    @classmethod
+    def perform_compute_position_dependent_reliability_maps(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, neuron_ids, in_field_lut: pl.DataFrame, occupancy_shape: Tuple[int, ...], max_t_idx: Optional[int] = None, **kwargs) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+        """Build visit-conditioned reliability maps ``(n_flat_position_bins, n_neurons)`` from animal position per t-bin.
+
+        For each (aclu, animal binned_x, binned_y):
+            p_fire = n_active_visits / n_visits
+            in-field:  R_active = p_fire, R_silent = p_fire   (= 1 - local FN)
+            out-field: R_active = 1 - p_fire, R_silent = 1 - p_fire  (= local TN)
+
+        Unvisited bins remain 0. ``binned_x``/``binned_y`` are 1-based labels matching ``time_bin_info_df``.
+        Uses unique visited spatial bins × aclus (not full n_tbins × n_neurons cross).
+
+        Parameters
+        ----------
+        per_tbin : DataFrame with columns ['aclu', 't_bin_idx', 'n_spikes'] (spike ``t_bin_idx`` 1-based).
+        time_bin_info_df : animal position per t-bin with 0-based ``t_bin_idx`` and 1-based ``binned_x``/``binned_y``.
+        neuron_ids : ordered neuron ids (column order of output maps).
+        in_field_lut : Polars DataFrame ['aclu', 'binned_x', 'binned_y'] (in-field bins only).
+        occupancy_shape : ``(nx, ny)`` used to flatten maps in C-order (same as ``F`` / occupancy).
+
+        Returns
+        -------
+        R_active, R_silent : ndarray shape ``(n_flat, n_neurons)``
+        position_aclus_reliability_df : long DataFrame with per-(aclu, binned_x, binned_y) rates
+        """
+        neuron_ids = np.asarray(neuron_ids)
+        neuron_ids_i64 = neuron_ids.astype(np.int64)
+        nx, ny = int(occupancy_shape[0]), int(occupancy_shape[1])
+        n_flat: int = nx * ny
+        n_neurons: int = len(neuron_ids)
+
+        pos_cols = ['t_bin_idx', 'binned_x', 'binned_y']
+        assert all(c in time_bin_info_df.columns for c in pos_cols), f"time_bin_info_df missing {pos_cols}"
+
+        pos = (
+            pl.from_pandas(time_bin_info_df[pos_cols])
+            .with_columns([
+                pl.col('t_bin_idx').cast(pl.Int64),
+                pl.col('binned_x').cast(pl.Int64),
+                pl.col('binned_y').cast(pl.Int64),
+            ])
+            .filter(pl.col('binned_x').is_not_null() & pl.col('binned_y').is_not_null())
+        )
+        if max_t_idx is not None:
+            pos = pos.filter(pl.col('t_bin_idx') < int(max_t_idx))
+
+        lut = (
+            in_field_lut
+            .select(['aclu', 'binned_x', 'binned_y'])
+            .with_columns([
+                pl.col('aclu').cast(pl.Int64),
+                pl.col('binned_x').cast(pl.Int64),
+                pl.col('binned_y').cast(pl.Int64),
+            ])
+            .unique()
+            .filter(pl.col('aclu').is_in(neuron_ids_i64.tolist()))
+        )
+
+        # Spikes: align 1-based spike t_bin_idx to 0-based animal t_bin_idx
+        spikes = (
+            pl.from_pandas(per_tbin[['aclu', 't_bin_idx', 'n_spikes']])
+            .with_columns([
+                pl.col('aclu').cast(pl.Int64),
+                (pl.col('t_bin_idx').cast(pl.Int64) - 1).alias('t_bin_idx'),
+                pl.col('n_spikes').cast(pl.Float64),
+            ])
+        )
+
+        # Visit counts per animal spatial bin (shared across aclus)
+        visit_counts = pos.group_by(['binned_x', 'binned_y']).agg(pl.len().alias('n_visits'))
+
+        # Active visits: cell fired in a t-bin while animal was at (bx, by)
+        active = (
+            spikes
+            .filter(pl.col('n_spikes') > 0)
+            .join(pos, on='t_bin_idx', how='inner')
+            .group_by(['aclu', 'binned_x', 'binned_y'])
+            .agg(pl.len().alias('n_active_visits'))
+        )
+
+        aclus = pl.DataFrame({'aclu': neuron_ids_i64})
+        bin_aggs = (
+            visit_counts
+            .join(aclus, how='cross')
+            .join(active, on=['aclu', 'binned_x', 'binned_y'], how='left')
+            .with_columns(pl.col('n_active_visits').fill_null(0).cast(pl.Float64))
+            .join(lut.with_columns(pl.lit(True).alias('is_in_field')), on=['aclu', 'binned_x', 'binned_y'], how='left')
+            .with_columns(pl.col('is_in_field').fill_null(False))
+            .with_columns((pl.col('n_active_visits') / pl.col('n_visits')).alias('p_fire'))
+            .with_columns([
+                (1.0 - pl.col('p_fire')).alias('p_silence'),
+                pl.when(pl.col('is_in_field')).then(pl.col('p_fire')).otherwise(1.0 - pl.col('p_fire')).alias('R_active'),
+                pl.when(pl.col('is_in_field')).then(pl.col('p_fire')).otherwise(1.0 - pl.col('p_fire')).alias('R_silent'),
+            ])
+        )
+
+        position_aclus_reliability_df: pd.DataFrame = bin_aggs.to_pandas()
+
+        R_active = np.zeros((n_flat, n_neurons), dtype=float)
+        R_silent = np.zeros((n_flat, n_neurons), dtype=float)
+        aclu_to_i = {int(a): i for i, a in enumerate(neuron_ids)}
+        for row in position_aclus_reliability_df.itertuples(index=False):
+            i = aclu_to_i.get(int(row.aclu))
+            if i is None:
+                continue
+            ix = int(row.binned_x) - 1
+            iy = int(row.binned_y) - 1
+            if (ix < 0) or (iy < 0) or (ix >= nx) or (iy >= ny):
+                continue
+            flat_idx = ix * ny + iy
+            R_active[flat_idx, i] = float(row.R_active)
+            R_silent[flat_idx, i] = float(row.R_silent)
+        ## END for row in position_aclus_reliability_df.itertuples(index=False)...
+
+        return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0), position_aclus_reliability_df
 
 
     @function_attributes(short_name=None, tags=['promence', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['build_in_field_masks_xy', '_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])

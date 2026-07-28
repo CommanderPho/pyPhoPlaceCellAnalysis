@@ -1522,7 +1522,8 @@ from matplotlib.patches import FancyBboxPatch
 from matplotlib.widgets import Slider, Button, RadioButtons, CheckButtons
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, ReliabilityEstimationMode, BayesianPlacemapPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
+from pyphoplacecellanalysis.Analysis.reliability import ReliabilityDecoderModifierMode, ReliabilityEstimationMode
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file, FileOutputManager, FigureOutputLocation, ContextToPathMode
 

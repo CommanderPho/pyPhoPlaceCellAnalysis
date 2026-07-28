@@ -219,8 +219,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             neuron_sliced_decoder.t_bin_aclus_reliability_df = None
         # Leave time-bin spike-count tables / sparse counts unset on the slice
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
+        neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = None
         neuron_sliced_decoder.time_bin_info_df = None
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
+        neuron_sliced_decoder.position_aclus_reliability_df = None
 
         # Invalidate decode caches (cannot neuron-slice a posterior)
         neuron_sliced_decoder.flat_p_x_given_n = None
