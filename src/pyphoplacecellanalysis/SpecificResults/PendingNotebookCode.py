@@ -1524,6 +1524,7 @@ from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
+from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file, FileOutputManager, FigureOutputLocation, ContextToPathMode
 
 
 @metadata_attributes(short_name=None, tags=['figure', 'interactive', 'decoder', 'bayesian', 'intuition', '2D', 'matplotlib', 'DST'], input_requires=[], output_provides=[], uses=['DisjointPlacefieldsExploration.compute_unit_pair_least_overlapping'], used_by=['build_interactive_bayesian_2d_eqn_viewer'], creation_date='2026-07-17 13:00', related_items=['DisjointPlacefieldsExploration'])
@@ -1543,9 +1544,10 @@ class InteractiveBayesian2DEquationDebugger:
     shows that cell's *uncustomized* per-cell ``L_i`` (``reliability_modifier_mode=IGNORE``, ``drop_negative_contributing_terms_mode=False``)
     so it can be compared against the bottom per-cell ``L`` row, which uses the viewer's active customization options.
 
-    Layout:
+    Layout (supports 1–10 active cells):
         Top: per-cell placefields (raw Hz); DST-only: uncustomized per-cell ``L_0``; per-cell likelihood terms (customized).
-        Bottom: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10).
+        Bottom: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10); DST adds conflict ``K``.
+        When there are more cells than bottom panels, each bottom panel spans multiple cell columns (widths need not match 1:1).
     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
 
     Usage:
@@ -1559,12 +1561,16 @@ class InteractiveBayesian2DEquationDebugger:
         # Optional: seed from a DecodedFilterEpochsResult
         # all_epochs_decoding_result = ...
         fig, sliced_decoder, used_ids = build_interactive_bayesian_2d_eqn_viewer(decoder=decoder, neuron_ids=None, # None → most-disjoint pair; or (38, 49)
-            all_epochs_decoding_result=None, seed_epoch_idx=0, seed_t_bin_idx=0, max_spikes_per_cell=15, show_log_likelihood=True)
+            all_epochs_decoding_result=None, seed_epoch_idx=0, seed_t_bin_idx=0, max_spikes_per_cell=15, show_log_likelihood=True,
+            curr_active_pipeline=curr_active_pipeline)
         plt.show()
+        # One-click: click "Export PNG", or:
+        # fig._bayes_eqn_ui['export_to_png']()
 
         # Or construct the class directly:
         # dbgr = InteractiveBayesian2DEquationDebugger(decoder=decoder, neuron_ids=(38, 49))
         # fig, sliced_decoder, used_ids = dbgr.as_viewer_tuple()
+        # dbgr.export_to_png(export_path=Path('out/bayes_2d_debug.png'))
 
     Returns (via ``as_viewer_tuple`` / wrapper):
         (fig, sliced_decoder, neuron_ids): figure with live UI refs on ``fig._bayes_eqn_ui``, neuron-sliced decoder, resolved cell ids.
@@ -1579,6 +1585,13 @@ class InteractiveBayesian2DEquationDebugger:
     show_log_likelihood: bool = field(default=True)
     drop_negative_contributing_terms_mode: bool = field(default=True)
     reliability_modifier_mode: ReliabilityDecoderModifierMode = field(default=ReliabilityDecoderModifierMode.IGNORE)
+
+    # PNG export config ________________________________________________________________________________________________ #
+    curr_active_pipeline: Optional[Any] = field(default=None)
+    export_output_parent_path: Optional[Path] = field(default=None)
+    export_dpi_multiplier: float = field(default=2.0)
+    export_include_controls: bool = field(default=False)  # False → hide sliders/buttons in PNG (plots only)
+    last_export_png_path: Optional[Path] = field(default=None)
 
 
     # Derived / UI state (populated in setup / buildUI) _______________________________________________________________ #
@@ -1614,6 +1627,10 @@ class InteractiveBayesian2DEquationDebugger:
     group_boxes: List[Any] = field(default=Factory(list))
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
+    cmap_vmax: float = field(default=1.0)  # shared clim upper for posterior + PF heatmaps ([0, cmap_vmax])
+    cmap_vmax_slider: Any = field(default=None)
+    cmap_vmax_slider_ax: Any = field(default=None)
+    observed_cmap_nanmax: Optional[float] = field(default=None)  # nanmax of current posterior (for →max button)
 
 
     def __attrs_post_init__(self):
@@ -1629,6 +1646,28 @@ class InteractiveBayesian2DEquationDebugger:
     def _orient_2d_for_imshow(cls, M: NDArray) -> NDArray:
         """Match placefield / posterior display orientation used elsewhere."""
         return np.fliplr(np.rot90(np.asarray(M, dtype=float), k=-1))
+
+
+    @classmethod
+    def _expand_mosaic_row(cls, labels: List[str], n_cols: int) -> List[str]:
+        """Pad/repeat labels so row length == n_cols (subplot_mosaic spanning).
+
+        When ``n_cols > len(labels)``, earlier panels get +1 span for any remainder so widths stay as even as possible.
+        """
+        n_labels: int = len(labels)
+        assert n_labels > 0, 'labels must be non-empty'
+        assert n_labels <= n_cols, f'Cannot expand {n_labels} labels into only {n_cols} columns; n_grid_cols must be >= n_factor_cols.'
+        if n_labels == n_cols:
+            return list(labels)
+        base, rem = divmod(n_cols, n_labels)
+        out: List[str] = []
+        for i, lab in enumerate(labels):
+            span = base + (1 if i < rem else 0)
+            out.extend([lab] * span)
+        ## END for i, lab in enumerate(labels)...
+
+        assert len(out) == n_cols
+        return out
 
 
     @classmethod
@@ -1886,6 +1925,7 @@ class InteractiveBayesian2DEquationDebugger:
         tau: float = float(sliced.time_bin_size)
         tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
         n_cells, nx, ny = tc.shape
+        assert 1 <= n_cells <= 10, f'InteractiveBayesian2DEquationDebugger supports 1–10 cells for now; got n_cells={n_cells} (neuron_ids={neuron_ids}).'
         aclu_list = list(map(int, sliced.ratemap.neuron_ids))
         xbin, ybin = sliced.xbin, sliced.ybin
         peak_rates = np.nanmax(tc.reshape(n_cells, -1), axis=1)
@@ -1932,10 +1972,10 @@ class InteractiveBayesian2DEquationDebugger:
     def buildUI(self):
         """Create figure, mosaic, sliders/buttons, connect callbacks, initial redraw."""
         n_cells = self.n_cells
+        assert 1 <= n_cells <= 10, f'InteractiveBayesian2DEquationDebugger supports 1–10 cells for now; got n_cells={n_cells}.'
         pad: int
         n_factor_cols: int = 5 if self.is_dst else 4  # posterior, power, exp, L (or logL), [conflict_K for DST]
-        # n_grid_cols: int = max(n_factor_cols, 2 * n_cells)  # room for PF + per-cell L on row 1
-        n_grid_cols: int = max(n_factor_cols, n_cells)  # room for PF + per-cell L on row 1
+        n_grid_cols: int = max(n_factor_cols, n_cells)  # room for one column per cell (or factor panels when fewer cells)
         pad = max(n_grid_cols - n_cells, 0)
 
         # Slider/control band sizing (figure fraction): pitch must clear Slider thumbs so tracks don't overlap
@@ -1944,26 +1984,27 @@ class InteractiveBayesian2DEquationDebugger:
         slider_pitch: float = slider_h + slider_gap
         controls_bottom: float = 0.018
         controls_top_pad: float = 0.018
-        controls_band_h: float = n_cells * slider_pitch + controls_top_pad
+        controls_band_h: float = (n_cells + 1) * slider_pitch + controls_top_pad  # +1 row for cmap vmax slider
         mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
         fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
         if self.is_dst:
             fig_h = fig_h + 0.9  # bump for extra E_i row
+        # Soften width for many columns (~3.2"/col up to 8 cols; ~28" total at 10)
+        fig_w: float = min(3.2, 28.0 / float(n_grid_cols)) * float(n_grid_cols)
 
-        fig = plt.figure(figsize=(3.2 * n_grid_cols, fig_h), constrained_layout=False)
+        fig = plt.figure(figsize=(fig_w, fig_h), constrained_layout=False)
 
-        ## INPUTS: fig
+        ## INPUTS: fig — cell columns + pad; bottom factor row spans the same grid (labels may repeat)
         pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
-        E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only: baseline L_0 row
         L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
-        factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood"]  # Bayesian default; DST overrides below
+        factor_labels = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
+        if self.is_dst:
+            factor_labels = ["decoded_posterior", "term0", "term1", "joint_likelihood", "conflict_K"]
+        factor_row = self._expand_mosaic_row(factor_labels, n_grid_cols)
 
         # Figure layout: PF (+ DST baseline L_0) + per-cell L (custom); then posterior + factors (+ conflict for DST); sliders below
         if self.is_dst:
-            factor_row = ["decoded_posterior", "term0", "term1", "joint_likelihood", "conflict_K"]
-            pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
-            E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
-            L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * max(n_grid_cols - n_cells, 0)
+            E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only: baseline L_0 row
             mosaic_layout = [pf_row, E_row, L_row, factor_row]
             height_ratios = [3.0, 2.8, 3.0, 3.2]
         else:
@@ -1995,7 +2036,7 @@ class InteractiveBayesian2DEquationDebugger:
         ax_exp = ax_dict['term1']
         ax_L = ax_dict['joint_likelihood']
 
-        # Here, assuming two cells: 'cell_a_pf' and 'cell_b_pf' exist in layout
+        # Per-cell axes: 'cell_a_pf', 'cell_b_pf', ... (up to 10 via chr(97+i))
         ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
         ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
         ax_cell_E = [ax_dict.get(f'cell_{chr(97 + i)}_E') for i in range(n_cells)] if self.is_dst else []
@@ -2033,37 +2074,44 @@ class InteractiveBayesian2DEquationDebugger:
             group_boxes.append(factor_box)
         self.group_boxes = group_boxes
 
-        # Left column: reliability radio + drop-n=0 checkbox — left of slider stack
+        # Left column: reliability radio + drop-n=0 checkbox — narrow so it clears slider labels
         mode_names = ReliabilityDecoderModifierMode.list_names()
+        # Short display labels (full enum names are too wide for the left column)
+        radio_display_labels = ['IGNORE', 'TEMPERING'] if mode_names == ['IGNORE', 'LIKELIHOOD_TEMPERING'] else mode_names
+        radio_label_to_mode = {'IGNORE': 'IGNORE', 'TEMPERING': 'LIKELIHOOD_TEMPERING', **{n: n for n in mode_names}}
         active_mode_idx = mode_names.index(self.reliability_modifier_mode.name)
         check_h: float = 0.038
         check_gap: float = 0.008
         radio_h: float = max(0.085, min(0.12, n_cells * slider_pitch))
+        left_col_x: float = 0.01
+        left_col_w: float = 0.095  # was 0.14; keep clear of slider labels
         left_col_h: float = radio_h + check_gap + check_h
-        left_col_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - left_col_h) * 0.5)
-        ax_check = fig.add_axes([0.01, left_col_y, 0.14, check_h])
-        drop_negative_terms_check = CheckButtons(ax_check, ['drop n=0 terms'], [bool(self.drop_negative_contributing_terms_mode)])
+        left_col_y: float = controls_bottom + max(0.0, ((n_cells + 1) * slider_pitch - left_col_h) * 0.5)
+        ax_check = fig.add_axes([left_col_x, left_col_y, left_col_w, check_h])
+        drop_negative_terms_check = CheckButtons(ax_check, ['drop n=0'], [bool(self.drop_negative_contributing_terms_mode)])
         for label in drop_negative_terms_check.labels:
-            label.set_fontsize(7)
+            label.set_fontsize(6)
         ## END for label in drop_negative_terms_check.labels...
         drop_negative_terms_check.on_clicked(self.on_drop_negative_terms)
         self.drop_negative_terms_check = drop_negative_terms_check
 
-        ax_radio = fig.add_axes([0.01, left_col_y + check_h + check_gap, 0.14, radio_h])
-        reliability_mode_radio = RadioButtons(ax_radio, mode_names, active=active_mode_idx)
+        ax_radio = fig.add_axes([left_col_x, left_col_y + check_h + check_gap, left_col_w, radio_h])
+        reliability_mode_radio = RadioButtons(ax_radio, radio_display_labels, active=active_mode_idx)
         for label in reliability_mode_radio.labels:
-            label.set_fontsize(7)
+            label.set_fontsize(6)
         ## END for label in reliability_mode_radio.labels...
-        ax_radio.set_title('reliability', fontsize=7, pad=2)
-        reliability_mode_radio.on_clicked(self.on_reliability_mode)
+        ax_radio.set_title('reliability', fontsize=6, pad=2)
+        reliability_mode_radio.on_clicked(lambda lab, _map=radio_label_to_mode: self.on_reliability_mode(_map.get(lab, lab)))
         self.reliability_mode_radio = reliability_mode_radio
 
-        # Sliders — y from bottom of stack upward; pitch clears thumb overlap
+        # Sliders — start right of left column; cmap vmax on bottom row; n-sliders stacked above
+        slider_left: float = 0.20  # was 0.17; room for n[...] labels after narrower left column
+        slider_w: float = 0.48  # leave room for →max button before action column at 0.88
         slider_axes = []
         sliders = []
         for i, aclu in enumerate(self.aclu_list):
-            y_s = controls_bottom + slider_pitch * (n_cells - 1 - i)
-            ax_s = fig.add_axes([0.17, y_s, 0.50, slider_h])
+            y_s = controls_bottom + slider_pitch * (n_cells - i)  # leave bottom row for cmap vmax
+            ax_s = fig.add_axes([slider_left, y_s, slider_w, slider_h])
             cell_cmap = cm.get_cmap(self.cell_cmaps[i])
             marker_color = cell_cmap(0.75)
             track_color = cell_cmap(0.22)
@@ -2085,21 +2133,40 @@ class InteractiveBayesian2DEquationDebugger:
             s.on_changed(self.on_slider)
         ## END for s in sliders...
 
-        # Quick-set buttons — vertically centered on the slider stack
+        ax_cmap = fig.add_axes([slider_left, controls_bottom, slider_w, slider_h])
+        cmap_vmax_slider = Slider(ax_cmap, 'cmap vmax', 0.01, 1.0, valinit=float(self.cmap_vmax), valfmt='%0.2f')
+        cmap_vmax_slider.on_changed(self.on_cmap_vmax)
+        self.cmap_vmax_slider_ax = ax_cmap
+        self.cmap_vmax_slider = cmap_vmax_slider
+
+        # Button immediately right of cmap vmax slider: snap clim to observed posterior nanmax
+        cmap_btn_left: float = slider_left + slider_w + 0.015  # ~0.695
+        cmap_btn_w: float = 0.10
+        ax_btn_nanmax = fig.add_axes([cmap_btn_left, controls_bottom, cmap_btn_w, max(slider_h, 0.028)])
+        btn_nanmax = Button(ax_btn_nanmax, '→max')
+        btn_nanmax.on_clicked(lambda _e: self.set_cmap_vmax_to_observed_nanmax())
+
+        # Right-aligned vertical action stack (Export PNG, n=0, vmax=1, …) — clears slider valtext
+        btn_left: float = 0.88
+        btn_w: float = 0.10
         btn_h: float = 0.04
-        btn_y: float = controls_bottom + max(0.0, (n_cells * slider_pitch - btn_h) * 0.5)
-        ax_btn_zero = fig.add_axes([0.72, btn_y, 0.08, btn_h])
-        ax_btn_one = fig.add_axes([0.81, btn_y, 0.08, btn_h])
-        ax_btn_exp = fig.add_axes([0.90, btn_y, 0.08, btn_h])
-        b_zero = Button(ax_btn_zero, 'n=0')
-        b_one = Button(ax_btn_one, 'n=1')
-        b_exp = Button(ax_btn_exp, 'n≈E')
+        btn_gap: float = 0.006
+        action_specs = [
+            ('Export PNG', lambda _e: self.export_to_png()),
+            ('n=0', lambda _e: self.set_all(np.zeros(n_cells))),
+            ('vmax=1', lambda _e: self.reset_cmap_vmax()),
+        ]
+        y0: float = controls_bottom + (n_cells + 1) * slider_pitch - btn_h
+        created_buttons = [btn_nanmax]
+        for i, (label, callback) in enumerate(action_specs):
+            y_i = max(controls_bottom, y0 - i * (btn_h + btn_gap))
+            ax_btn = fig.add_axes([btn_left, y_i, btn_w, btn_h])
+            btn = Button(ax_btn, label)
+            btn.on_clicked(callback)
+            created_buttons.append(btn)
+        ## END for i, (label, callback) in enumerate(action_specs)...
 
-        b_zero.on_clicked(lambda _e: self.set_all(np.zeros(n_cells)))
-        b_one.on_clicked(lambda _e: self.set_all(np.ones(n_cells)))
-        b_exp.on_clicked(lambda _e: self.set_all(np.clip(np.rint(self.tau * self.peak_rates), 0, self.max_spikes_per_cell)))
-
-        self.buttons = (b_zero, b_one, b_exp)
+        self.buttons = tuple(created_buttons)
 
         self.redraw()
 
@@ -2107,12 +2174,16 @@ class InteractiveBayesian2DEquationDebugger:
         fig._bayes_eqn_ui = dict(
             sliders=sliders, buttons=self.buttons, reliability_mode_radio=self.reliability_mode_radio,
             drop_negative_terms_check=self.drop_negative_terms_check,
+            cmap_vmax_slider=self.cmap_vmax_slider,
             group_boxes=self.group_boxes,
             sliced=self.sliced, neuron_ids=self.neuron_ids,
             is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
             reliability_silent=getattr(self.sliced, 'reliability_silent', None),
             debugger=self,
+            export_to_png=self.export_to_png,
+            reset_cmap_vmax=self.reset_cmap_vmax,
+            set_cmap_vmax_to_observed_nanmax=self.set_cmap_vmax_to_observed_nanmax,
         )
 
 
@@ -2141,7 +2212,13 @@ class InteractiveBayesian2DEquationDebugger:
             ax.cla()
         ## END for ax in self.ax_cell_E...
 
-        self._imshow_map(self.ax_post, parts['posterior'], self.xbin, self.ybin, r'Decoded $P(x\mid n)$')
+        vmax = float(self.cmap_vmax)
+        post_title = r'Decoded $P(x\mid n)$'
+        if vmax < 1.0:
+            post_title = post_title + rf'  clim=[0, {vmax:.3g}]'
+        self.observed_cmap_nanmax = float(np.nanmax(parts['posterior']))
+        self.ims = {}
+        self.ims['post'] = self._imshow_map(self.ax_post, parts['posterior'], self.xbin, self.ybin, post_title, vmin=0.0, vmax=vmax)
         self._imshow_map(self.ax_pow, parts['power_term'], self.xbin, self.ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
         self._imshow_map(self.ax_exp, parts['exp_term'], self.xbin, self.ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
         if self.show_log_likelihood:
@@ -2151,7 +2228,7 @@ class InteractiveBayesian2DEquationDebugger:
 
 
 
-        ## Place Cells
+        ## Place Cells (peak-normalized so shared cmap_vmax ∈ [0,1] is meaningful)
         for i, ax in enumerate(self.ax_cell_pf):
             cmap = self.cell_cmaps[i]
             pf_title = f'PF aclu={self.aclu_list[i]}  peak={self.peak_rates[i]:.1f}Hz  n={n[i]}'
@@ -2161,7 +2238,10 @@ class InteractiveBayesian2DEquationDebugger:
                     pf_title += rf'  $\alpha$={alpha_i:.2f}  $\alpha_{{silent}}$={float(self.sliced.reliability_silent[i]):.2f}'
                 else:
                     pf_title += rf'  $\alpha$={alpha_i:.2f}'
-            self._imshow_map(ax, self.tuning_curves[i], self.xbin, self.ybin, pf_title, cmap=cmap)
+            if vmax < 1.0:
+                pf_title = pf_title + f'  clim=[0, {vmax:.3g}]'
+            pf_norm = self.tuning_curves[i] / max(float(self.peak_rates[i]), 1e-12)
+            self.ims[f'pf_{i}'] = self._imshow_map(ax, pf_norm, self.xbin, self.ybin, pf_title, cmap=cmap, vmin=0.0, vmax=vmax)
             an_E_n = self.E_n[i] # tau * peak_rates[i]
             # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
@@ -2204,6 +2284,69 @@ class InteractiveBayesian2DEquationDebugger:
         self.redraw()
 
 
+    def on_cmap_vmax(self, val=None):
+        """Slider callback: update shared posterior/PF clim upper bound without full recompute when images exist."""
+        vmax = float(self.cmap_vmax_slider.val) if self.cmap_vmax_slider is not None else float(val if val is not None else self.cmap_vmax)
+        self.cmap_vmax = vmax
+        im_post = self.ims.get('post') if self.ims else None
+        if im_post is not None:
+            im_post.set_clim(0.0, vmax)
+            post_title = r'Decoded $P(x\mid n)$'
+            if vmax < 1.0:
+                post_title = post_title + rf'  clim=[0, {vmax:.3g}]'
+            self.ax_post.set_title(post_title, fontsize=10)
+            for i, ax in enumerate(self.ax_cell_pf):
+                im_pf = self.ims.get(f'pf_{i}')
+                if im_pf is not None:
+                    im_pf.set_clim(0.0, vmax)
+                # Refresh clim hint in PF title (keep peak/n/α prefix from last redraw)
+                title = ax.get_title()
+                if '  clim=[' in title:
+                    title = title.split('  clim=[')[0]
+                if vmax < 1.0:
+                    title = title + f'  clim=[0, {vmax:.3g}]'
+                ax.set_title(title, fontsize=10)
+            ## END for i, ax in enumerate(self.ax_cell_pf)...
+
+            self.fig.canvas.draw_idle()
+        else:
+            self.redraw()
+
+
+    def reset_cmap_vmax(self):
+        """Reset shared posterior/PF clim to [0, 1]."""
+        if self.cmap_vmax_slider is not None:
+            self.cmap_vmax_slider.set_val(1.0)
+        else:
+            self.cmap_vmax = 1.0
+            self.redraw()
+
+
+    def set_cmap_vmax_to_observed_nanmax(self):
+        """Set shared clim upper bound to nanmax of the current posterior."""
+        vmax = self.observed_cmap_nanmax
+        if vmax is None:
+            im_post = self.ims.get('post') if self.ims else None
+            if im_post is not None:
+                vmax = float(np.nanmax(np.asarray(im_post.get_array(), dtype=float)))
+            else:
+                return
+        vmax = float(vmax)
+        if not np.isfinite(vmax) or vmax <= 0.0:
+            vmax = 1e-12
+        if self.cmap_vmax_slider is not None:
+            s = self.cmap_vmax_slider
+            # Expand slider range if observed max falls outside current [valmin, valmax]
+            if vmax < float(s.valmin):
+                s.valmin = vmax
+            if vmax > float(s.valmax):
+                s.valmax = max(vmax, 1.0)
+            s.set_val(vmax)
+        else:
+            self.cmap_vmax = vmax
+            self.redraw()
+
+
     def on_reliability_mode(self, label: str):
         """RadioButtons callback: update ``reliability_modifier_mode`` and recompute if it changed."""
         new_mode = ReliabilityDecoderModifierMode[label]
@@ -2232,6 +2375,103 @@ class InteractiveBayesian2DEquationDebugger:
         self.on_slider()
 
 
+    def _get_export_control_axes(self) -> List[Any]:
+        """Axes that are UI chrome (sliders/buttons/radios) — hidden for plots-only PNG export."""
+        control_axes: List[Any] = list(self.slider_axes or [])
+        if self.cmap_vmax_slider_ax is not None:
+            control_axes.append(self.cmap_vmax_slider_ax)
+        if self.buttons is not None:
+            for btn in self.buttons:
+                ax = getattr(btn, 'ax', None)
+                if ax is not None:
+                    control_axes.append(ax)
+                ## END if ax is not None...
+            ## END for btn in self.buttons...
+        if self.reliability_mode_radio is not None:
+            ax = getattr(self.reliability_mode_radio, 'ax', None)
+            if ax is not None:
+                control_axes.append(ax)
+        if self.drop_negative_terms_check is not None:
+            ax = getattr(self.drop_negative_terms_check, 'ax', None)
+            if ax is not None:
+                control_axes.append(ax)
+        return control_axes
+
+
+    def _build_export_context(self) -> IdentifyingContext:
+        """Build IdentifyingContext used for programmatic figure filenames."""
+        n_tuple = tuple(int(x) for x in np.asarray(self.n).tolist()) if self.n is not None else ()
+        return IdentifyingContext(
+            display='interactive_bayesian_2d_eqn_viewer',
+            decoder_mode=('DST' if self.is_dst else 'Bayesian'),
+            neuron_ids=tuple(self.aclu_list),
+            n=n_tuple,
+            reliability_mode=self.reliability_modifier_mode.name,
+        )
+
+
+    def export_to_png(self, export_path: Optional[Union[str, Path]] = None, curr_active_pipeline=None, write_vector_format: bool = False, debug_print: bool = True, **kwargs) -> Path:
+        """Export the mosaic plot panels as PNG using Spike3D figure-export conventions.
+
+        Path resolution (first match wins):
+            1. Explicit ``export_path``
+            2. ``curr_active_pipeline.output_figure(...)`` (arg or ``self.curr_active_pipeline``)
+            3. ``build_and_write_to_file`` → daily programmatic output folder (or ``export_output_parent_path``)
+
+        By default hides sliders/buttons during save (``export_include_controls=False``).
+        Typical kwargs: ``dpi``, ``bbox_inches='tight'``, ``pad_inches=0``.
+        """
+        from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path
+
+        assert self.fig is not None, "Figure not built yet; call buildUI() first."
+        pipeline = curr_active_pipeline if curr_active_pipeline is not None else self.curr_active_pipeline
+        export_dpi: int = int(np.ceil(float(self.fig.dpi) * float(self.export_dpi_multiplier)))
+        save_kwargs = dict(dpi=export_dpi, bbox_inches='tight', pad_inches=0, write_png=True, write_vector_format=write_vector_format) | kwargs
+
+        control_axes = self._get_export_control_axes()
+        prev_visible = [ax.get_visible() for ax in control_axes]
+        hide_controls: bool = (not bool(self.export_include_controls))
+        if hide_controls:
+            for ax in control_axes:
+                ax.set_visible(False)
+            ## END for ax in control_axes...
+            self.fig.canvas.draw_idle()
+
+        final_context = self._build_export_context()
+        out_paths: List[Path] = []
+        try:
+            with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}):
+                if export_path is not None:
+                    out_path = Path(export_path)
+                    if out_path.suffix.lower() != '.png':
+                        out_path = out_path.with_suffix('.png')
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    fig_save_kwargs = {k: v for k, v in save_kwargs.items() if k not in ('write_png', 'write_vector_format')}
+                    self.fig.savefig(out_path, **fig_save_kwargs)
+                    out_paths = [out_path.resolve()]
+                    if debug_print:
+                        print(f'\t saved "{file_uri_from_path(out_paths[0])}"')
+                elif pipeline is not None:
+                    out_paths, final_context = pipeline.output_figure(final_context, self.fig, debug_print=debug_print, **save_kwargs)
+                else:
+                    if self.export_output_parent_path is not None:
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=Path(self.export_output_parent_path))
+                    else:
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                    out_paths = build_and_write_to_file(self.fig, final_context, fig_man=fig_man, progress_print=debug_print, debug_print=False, **save_kwargs)
+        finally:
+            if hide_controls:
+                for ax, was_visible in zip(control_axes, prev_visible):
+                    ax.set_visible(was_visible)
+                ## END for ax, was_visible in zip(control_axes, prev_visible)...
+                self.fig.canvas.draw_idle()
+
+        assert len(out_paths) > 0, "PNG export produced no output paths."
+        png_paths = [p for p in out_paths if str(p).lower().endswith('.png')]
+        self.last_export_png_path = Path(png_paths[0] if len(png_paths) > 0 else out_paths[0]).resolve()
+        return self.last_export_png_path
+
+
     def as_viewer_tuple(self):
         """Return ``(fig, sliced_decoder, neuron_ids)`` for backward compatibility with the old function API."""
         return self.fig, self.sliced, self.neuron_ids
@@ -2242,16 +2482,20 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
         max_spikes_per_cell: int = 15, show_log_likelihood: bool = True, drop_negative_contributing_terms_mode: bool = True,
         reliability_modifier_mode: ReliabilityDecoderModifierMode = ReliabilityDecoderModifierMode.IGNORE,
+        curr_active_pipeline=None, export_output_parent_path: Optional[Path] = None, export_dpi_multiplier: float = 2.0,
     ):
     """Interactive 2D Bayesian decode viewer — thin wrapper around ``InteractiveBayesian2DEquationDebugger``.
 
     Implemented via ``InteractiveBayesian2DEquationDebugger(...)``; returns ``(fig, sliced_decoder, neuron_ids)`` for compatibility.
     See that class docstring for equation decomposition, DST baseline ``L_0`` row, and usage.
+
+    Export: pass ``curr_active_pipeline`` (or ``export_output_parent_path``) and click **Export PNG**, or call ``fig._bayes_eqn_ui['export_to_png']()``.
     """
     dbgr = InteractiveBayesian2DEquationDebugger(decoder=decoder, neuron_ids=neuron_ids,
         all_epochs_decoding_result=all_epochs_decoding_result, seed_epoch_idx=seed_epoch_idx, seed_t_bin_idx=seed_t_bin_idx,
         max_spikes_per_cell=max_spikes_per_cell, show_log_likelihood=show_log_likelihood, drop_negative_contributing_terms_mode=drop_negative_contributing_terms_mode,
-        reliability_modifier_mode=reliability_modifier_mode)
+        reliability_modifier_mode=reliability_modifier_mode, curr_active_pipeline=curr_active_pipeline,
+        export_output_parent_path=export_output_parent_path, export_dpi_multiplier=export_dpi_multiplier)
     return dbgr.as_viewer_tuple()
 
 
