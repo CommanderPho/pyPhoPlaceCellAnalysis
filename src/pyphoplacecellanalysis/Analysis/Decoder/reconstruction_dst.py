@@ -60,8 +60,9 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         )
         # Or: a_dst_decoder2D = BayesianPlacemapPositionDecoderDST.init_from_stateful_decoder(pf2D_Decoder)
 
-        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; Skaggs is computed lazily):
+        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; without them reliability_* defaults to ones):
         # a_dst_decoder2D.compute_unit_confusion_reliability_variables(spikes_df=spikes_df, time_bin_size_seconds=a_dst_decoder2D.time_bin_size)
+        # a_dst_decoder2D._compute_reliability_metrics()  # PER_CELL (default) or set reliability_estimation_mode=POSITION_DEPENDENT first
         # # Or pass pipeline PeakProminence2D if already computed:
         # # a_dst_decoder2D.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=..., spikes_df=spikes_df, ...)
 
@@ -203,6 +204,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         # Reuse per-cell / position-dependent reliability / masks when already computed on the full decoder
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
+        neuron_sliced_decoder.reliability_estimation_mode = self.reliability_estimation_mode
         neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
         neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
         if self.in_field_masks is not None:

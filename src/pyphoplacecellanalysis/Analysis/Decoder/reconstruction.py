@@ -2321,6 +2321,25 @@ class ReliabilityDecoderModifierMode(Enum):
         return [e.name for e in cls]
 
 
+class ReliabilityEstimationMode(Enum):
+    """How per-cell reliability arrays are estimated from confusion-matrix products."""
+    PER_CELL = auto()              # (n_neurons,) from confusion rates
+    POSITION_DEPENDENT = auto()    # (n_flat_position_bins, n_neurons) from rates × in_field
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def list_values(cls):
+        """Returns a list of all enum values"""
+        return list(cls)
+
+    @classmethod
+    def list_names(cls):
+        """Returns a list of all enum names"""
+        return [e.name for e in cls]
+
+
 @custom_define(slots=False, eq=False)
 class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin, NeuronUnitSlicableObjectProtocol, BinnedPositionsMixin):
     """ 2023-04-06 - A simplified data-only version of the decoder that serves to remove all state related to specific computations to make each run independent 
@@ -3635,10 +3654,11 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     most_likely_positions: np.ndarray = None
     revised_most_likely_positions: np.ndarray = None
 
-    ## Cell confusion / reliability estimation (optional; Skaggs/confusion write per-cell reliability_* on Base):
+    ## Cell confusion / reliability estimation (optional; confusion rates write reliability_* on Base):
     n_top_peaks: int = serialized_field(default=3)
     slice_level_multiplier: float = serialized_field(default=0.20)
     fn_tn_mode: str = serialized_field(default='occupancy_seconds')
+    reliability_estimation_mode: ReliabilityEstimationMode = non_serialized_field(default=ReliabilityEstimationMode.PER_CELL)
     t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
     time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
@@ -3847,6 +3867,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
+        neuron_sliced_decoder.reliability_estimation_mode = self.reliability_estimation_mode
         neuron_sliced_decoder.n_top_peaks = self.n_top_peaks
         neuron_sliced_decoder.slice_level_multiplier = self.slice_level_multiplier
         neuron_sliced_decoder.fn_tn_mode = self.fn_tn_mode
@@ -4057,47 +4078,79 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
 
-        
+
+    def _build_position_dependent_reliability_maps(self, true_pos: np.ndarray, false_pos: np.ndarray, true_neg: np.ndarray, false_neg: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Build ``(n_flat_position_bins, n_neurons)`` reliability maps from per-cell confusion rates × in-field masks.
+
+        For hypothesized position x and cell i:
+            in-field:  R_active = true_pos[i],  R_silent = 1 - false_neg[i]
+            out-field: R_active = 1 - false_pos[i], R_silent = true_neg[i]
+        """
+        assert self.in_field_masks is not None, 'POSITION_DEPENDENT reliability requires in_field_masks; call compute_unit_confusion_reliability_variables(...) first.'
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        n_neurons: int = len(neuron_ids)
+        n_flat: int = int(self.flat_position_size) if (self.F is not None) else int(np.prod(self.original_position_data_shape))
+
+        in_field_flat = np.zeros((n_flat, n_neurons), dtype=bool)
+        for i, nid in enumerate(neuron_ids):
+            mask = self.in_field_masks.get(int(nid), None)
+            if mask is None:
+                continue
+            flat_mask = np.asarray(mask).ravel(order='C')
+            assert flat_mask.size == n_flat, f'in_field_masks[{nid}] flat size {flat_mask.size} != n_flat_position_bins {n_flat}'
+            in_field_flat[:, i] = flat_mask
+        ## END for i, nid in enumerate(neuron_ids)...
+
+        R_active = np.where(in_field_flat, true_pos[np.newaxis, :], (1.0 - false_pos)[np.newaxis, :])
+        R_silent = np.where(in_field_flat, (1.0 - false_neg)[np.newaxis, :], true_neg[np.newaxis, :])
+        return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0)
+
 
     def _compute_reliability_metrics(self, **kwargs):
         """
-        Builds static per-cell reliability (alpha_i) from Skaggs spatial information.
-        Requires only ``self.pf`` so first ``decode()`` / ``compute_all()`` works without
-        a prior ``compute_reliability_new`` call.
+        Builds reliability arrays from confusion-matrix rates (no Skaggs).
+
+        Modes (``self.reliability_estimation_mode``):
+            PER_CELL: ``(n_neurons,)`` from ``true_pos`` (default).
+            POSITION_DEPENDENT: ``(n_flat_position_bins, n_neurons)`` from rates × ``in_field_masks``.
+
+        If ``t_bin_aclus_reliability_df`` is missing, sets both arrays to ones (no discounting)
+        so decode still works. Call ``compute_unit_confusion_reliability_variables`` first for real rates.
         """
         assert (self.pf is not None)
+        n_neurons: int = int(self.num_neurons)
 
-        an_active_pf = deepcopy(self.pf)
+        has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
+        if not has_confusion:
+            R_ones = np.ones(n_neurons, dtype=float)
+            self.reliability_active = R_ones
+            self.reliability_silent = np.ones_like(R_ones)
+            return
 
-        if (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns):
-            daweights =  self.t_bin_aclus_reliability_df['true_pos'].to_numpy()
+        rel_df = self.t_bin_aclus_reliability_df
+        true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
+        false_pos = np.nan_to_num(rel_df['false_pos'].to_numpy(dtype=float), nan=0.0) if ('false_pos' in rel_df.columns) else (1.0 - true_pos)
+        true_neg = np.nan_to_num(rel_df['true_neg'].to_numpy(dtype=float), nan=0.0) if ('true_neg' in rel_df.columns) else np.zeros_like(true_pos)
+        false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
+
+        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
+        if estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
+            R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
+            self.reliability_active = R_active
+            if self.should_discount_silence:
+                self.reliability_silent = R_silent_from_confusion
+            else:
+                self.reliability_silent = np.ones_like(R_active)
         else:
-            ## INPUTS: an_active_pf
-            daweights = CellIndividualReliabilityMatrix.compute_skaggs_alpha(an_active_pf, k=1.0) # array([0.417225, 0.612937, 0.0186054, 0.839156, 0.253242, 0.390859, 0.551637, 0.410431, 0.232258, 0.319258, 0.0831956, 0.500425, 0.439415, 0.40174, 0.460294, 0.507179, 0.467489, 0.487803, 0.262977, 0.316431, 0.499277, 0.356243, 0.758122, 0.133721, 0.649214])
-            # alpha_sparsity = CellIndividualReliabilityMatrix.compute_sparsity_alpha(an_active_pf)  # correlated with Skaggs; do not multiply into alpha
-
-            # ## time-dependent alpha (requires per_tbin_aclu_spike_counts_sparse from compute_reliability_new)
-            # alpha_dsnr = CellIndividualReliabilityMatrix.compute_dsnr_alpha(an_active_pf, n_i = self.per_tbin_aclu_spike_counts_sparse.toarray(), tau=self.time_bin_size)
-
-            # Combine metrics to build the basal epistemic reliability limit (alpha_i) for each cell
-            # Ensuring the result is properly bounded [0, 1]
-            # Basal epistemic reliability (alpha_i) from Skaggs SI alone — already in [0, 1)
-
-        R_base = daweights
-        # R_base = np.clip(daweights, 0.0, 1.0)
-
-        ## 
-        # R_base = np.clip(daweights, 0.0, 1.0) / np.nansum(daweights) ## normalized weights from each cell
-        # R_base = R_base * 1000 # / np.nansum(R_base) ## NASTY NORMAL ICKY GROSS
-
-        self.reliability_active = R_base
-        
-        # Map reliability for silence (n_i = 0). 
-        # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
-        if self.should_discount_silence:
-            self.reliability_silent = R_base
-        else:
-            self.reliability_silent = np.ones_like(R_base)
+            # PER_CELL: position-independent reliability from true_pos
+            R_base = true_pos
+            self.reliability_active = R_base
+            # Map reliability for silence (n_i = 0).
+            # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
+            if self.should_discount_silence:
+                self.reliability_silent = R_base
+            else:
+                self.reliability_silent = np.ones_like(R_base)
 
 
 
