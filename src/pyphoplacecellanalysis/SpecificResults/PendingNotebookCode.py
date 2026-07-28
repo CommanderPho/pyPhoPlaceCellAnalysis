@@ -1518,6 +1518,7 @@ def plot_maze_probability_histograms(context_probability_df: pd.DataFrame, maze_
 from math import factorial
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.patches import FancyBboxPatch
 from matplotlib.widgets import Slider, Button, RadioButtons, CheckButtons
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
@@ -1610,6 +1611,7 @@ class InteractiveBayesian2DEquationDebugger:
     buttons: Optional[Tuple[Any, ...]] = field(default=None)
     reliability_mode_radio: Any = field(default=None)
     drop_negative_terms_check: Any = field(default=None)
+    group_boxes: List[Any] = field(default=Factory(list))
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
 
@@ -1833,6 +1835,22 @@ class InteractiveBayesian2DEquationDebugger:
         return im
 
 
+    @classmethod
+    def _add_axes_group_box(cls, fig, axes, *, pad: float = 0.008, edgecolor='0.55', linewidth: float = 1.2, zorder: float = -1):
+        """Draw a rounded figure-level outline around the union of the given axes' positions."""
+        positions = [ax.get_position() for ax in axes if ax is not None]
+        if len(positions) == 0:
+            return None
+        x0 = min(p.x0 for p in positions) - pad
+        y0 = min(p.y0 for p in positions) - pad
+        x1 = max(p.x1 for p in positions) + pad
+        y1 = max(p.y1 for p in positions) + pad
+        patch = FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle='round,pad=0.004', facecolor='none', edgecolor=edgecolor,
+                               linewidth=linewidth, transform=fig.transFigure, clip_on=False, zorder=zorder)
+        fig.add_artist(patch)
+        return patch
+
+
     # ==================================================================================================================================================================================================================================================================================== #
     # setup / buildUI / redraw                                                                                                                                                                                                                                                             #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -1995,6 +2013,26 @@ class InteractiveBayesian2DEquationDebugger:
         self.ax_cell_E = ax_cell_E
         self.text_formatter = text_formatter
 
+        # Figure-level group boxes: per-cell columns + bottom factor row (survive ax.cla in redraw)
+        group_boxes = []
+        for i in range(n_cells):
+            cell_axes = [ax_cell_pf[i], ax_cell_L[i]]
+            if self.is_dst and (i < len(ax_cell_E)):
+                cell_axes.insert(1, ax_cell_E[i])
+            cell_edge = cm.get_cmap(self.cell_cmaps[i])(0.75)
+            box = self._add_axes_group_box(fig, cell_axes, edgecolor=cell_edge)
+            if box is not None:
+                group_boxes.append(box)
+        ## END for i in range(n_cells)...
+
+        factor_axes = [ax_post, ax_pow, ax_exp, ax_L]
+        if ax_conflict_K is not None:
+            factor_axes.append(ax_conflict_K)
+        factor_box = self._add_axes_group_box(fig, factor_axes, edgecolor='0.45')
+        if factor_box is not None:
+            group_boxes.append(factor_box)
+        self.group_boxes = group_boxes
+
         # Left column: reliability radio + drop-n=0 checkbox — left of slider stack
         mode_names = ReliabilityDecoderModifierMode.list_names()
         active_mode_idx = mode_names.index(self.reliability_modifier_mode.name)
@@ -2069,6 +2107,7 @@ class InteractiveBayesian2DEquationDebugger:
         fig._bayes_eqn_ui = dict(
             sliders=sliders, buttons=self.buttons, reliability_mode_radio=self.reliability_mode_radio,
             drop_negative_terms_check=self.drop_negative_terms_check,
+            group_boxes=self.group_boxes,
             sliced=self.sliced, neuron_ids=self.neuron_ids,
             is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
