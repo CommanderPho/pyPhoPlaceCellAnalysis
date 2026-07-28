@@ -3876,8 +3876,12 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         if self.in_field_masks is not None:
             id_set = set(int(x) for x in ids)
             neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
-        # Leave time-bin reliability tables / sparse counts unset on the slice
-        neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        # Neuron-slice confusion rates so `_compute_reliability_metrics` can rebuild maps on the slice
+        if self.t_bin_aclus_reliability_df is not None:
+            neuron_sliced_decoder.t_bin_aclus_reliability_df = self.t_bin_aclus_reliability_df.reindex(source_ids[keep])
+        else:
+            neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        # Leave time-bin spike-count tables / sparse counts unset on the slice
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
         neuron_sliced_decoder.time_bin_info_df = None
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
@@ -4020,11 +4024,13 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     # Cell Reliability Computations                                                                                                                                                                                                                                                        #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
     def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
-        """Compute per-aclu reliability via CellIndividualReliabilityMatrix and store results on self.
+        """Compute per-aclu confusion-matrix reliability products and refresh ``reliability_*`` on self.
 
-        #TODO 2026-07-23 09:59: - [ ] this result is not currently used by any of the main computations because we use the skragg information reliability for each cell instead.
+        After writing confusion products, calls ``_compute_reliability_metrics()`` so
+        ``reliability_active`` / ``reliability_silent`` match ``reliability_estimation_mode``
+        (``PER_CELL`` or ``POSITION_DEPENDENT``).
 
         Parameters
         ----------
@@ -4035,7 +4041,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
         max_t_idx : optional cap on number of time bins (None = all).
 
-        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, and ``fn_tn_mode``.
+        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, ``fn_tn_mode``, and ``reliability_estimation_mode``.
 
         Returns
         -------
@@ -4043,7 +4049,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
 
         UPDATES:
-            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
+            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse,
+            self.reliability_active, self.reliability_silent
         """
         pfs = self.pf
         ratemaps = self.ratemap
@@ -4076,6 +4083,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx, **kwargs,
         )
 
+        self._compute_reliability_metrics()
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse
 
 
@@ -4114,26 +4122,31 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             PER_CELL: ``(n_neurons,)`` from ``true_pos`` (default).
             POSITION_DEPENDENT: ``(n_flat_position_bins, n_neurons)`` from rates × ``in_field_masks``.
 
-        If ``t_bin_aclus_reliability_df`` is missing, sets both arrays to ones (no discounting)
-        so decode still works. Call ``compute_unit_confusion_reliability_variables`` first for real rates.
+        If ``t_bin_aclus_reliability_df`` is missing:
+            PER_CELL → ones (no discounting) so decode still works.
+            POSITION_DEPENDENT → raises; call ``compute_unit_confusion_reliability_variables`` first.
         """
         assert (self.pf is not None)
-        n_neurons: int = int(self.num_neurons)
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        n_neurons: int = int(len(neuron_ids))
+        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
 
         has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
         if not has_confusion:
+            if estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
+                raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; call compute_unit_confusion_reliability_variables(...) first.')
             R_ones = np.ones(n_neurons, dtype=float)
             self.reliability_active = R_ones
             self.reliability_silent = np.ones_like(R_ones)
             return
 
-        rel_df = self.t_bin_aclus_reliability_df
+        rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
         true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
         false_pos = np.nan_to_num(rel_df['false_pos'].to_numpy(dtype=float), nan=0.0) if ('false_pos' in rel_df.columns) else (1.0 - true_pos)
         true_neg = np.nan_to_num(rel_df['true_neg'].to_numpy(dtype=float), nan=0.0) if ('true_neg' in rel_df.columns) else np.zeros_like(true_pos)
         false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
+        assert len(true_pos) == n_neurons, f'Confusion rates length {len(true_pos)} != n_neurons {n_neurons} after reindex by neuron_IDs.'
 
-        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
         if estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
             R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
             self.reliability_active = R_active

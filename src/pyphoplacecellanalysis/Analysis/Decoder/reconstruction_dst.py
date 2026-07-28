@@ -60,9 +60,10 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         )
         # Or: a_dst_decoder2D = BayesianPlacemapPositionDecoderDST.init_from_stateful_decoder(pf2D_Decoder)
 
-        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; without them reliability_* defaults to ones):
+        ## Optional: confusion-matrix reliability + sparse spike counts (not required for decode; without them PER_CELL reliability_* defaults to ones):
+        # a_dst_decoder2D.reliability_estimation_mode = ReliabilityEstimationMode.POSITION_DEPENDENT  # opt-in
         # a_dst_decoder2D.compute_unit_confusion_reliability_variables(spikes_df=spikes_df, time_bin_size_seconds=a_dst_decoder2D.time_bin_size)
-        # a_dst_decoder2D._compute_reliability_metrics()  # PER_CELL (default) or set reliability_estimation_mode=POSITION_DEPENDENT first
+        # # → also refreshes reliability_* via _compute_reliability_metrics
         # # Or pass pipeline PeakProminence2D if already computed:
         # # a_dst_decoder2D.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=..., spikes_df=spikes_df, ...)
 
@@ -211,8 +212,12 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             id_set = set(int(x) for x in ids)
             neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
 
-        # Leave time-bin reliability tables / sparse counts unset on the slice
-        neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        # Neuron-slice confusion rates so `_compute_reliability_metrics` can rebuild maps on the slice
+        if self.t_bin_aclus_reliability_df is not None:
+            neuron_sliced_decoder.t_bin_aclus_reliability_df = self.t_bin_aclus_reliability_df.reindex(source_ids[keep])
+        else:
+            neuron_sliced_decoder.t_bin_aclus_reliability_df = None
+        # Leave time-bin spike-count tables / sparse counts unset on the slice
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
         neuron_sliced_decoder.time_bin_info_df = None
         neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
