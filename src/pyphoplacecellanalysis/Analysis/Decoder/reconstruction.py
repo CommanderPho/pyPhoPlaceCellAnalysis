@@ -4125,6 +4125,9 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         If ``t_bin_aclus_reliability_df`` is missing:
             PER_CELL → ones (no discounting) so decode still works.
             POSITION_DEPENDENT → raises; call ``compute_unit_confusion_reliability_variables`` first.
+
+
+        Updates: self.t_bin_aclus_reliability_df, self.reliability_active, self.reliability_silent
         """
         assert (self.pf is not None)
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
@@ -4133,12 +4136,16 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
         has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
         if not has_confusion:
-            if estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
-                raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; call compute_unit_confusion_reliability_variables(...) first.')
-            R_ones = np.ones(n_neurons, dtype=float)
-            self.reliability_active = R_ones
-            self.reliability_silent = np.ones_like(R_ones)
-            return
+            if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
+                print(f'WARN: ._compute_reliability_metrics(...): POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
+                _ = self.compute_unit_confusion_reliability_variables()
+                print(f'\tdone.')
+                if self.t_bin_aclus_reliability_df is None:
+                    raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
+            # R_ones = np.ones(n_neurons, dtype=float)
+            # self.reliability_active = R_ones
+            # self.reliability_silent = np.ones_like(R_ones)
+            # return
 
         rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
         true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
@@ -4147,7 +4154,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
         assert len(true_pos) == n_neurons, f'Confusion rates length {len(true_pos)} != n_neurons {n_neurons} after reindex by neuron_IDs.'
 
-        if estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
+        if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
             R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
             self.reliability_active = R_active
             if self.should_discount_silence:
@@ -4229,6 +4236,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             ## set flat properties for compatibility (I guess)
             self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
             self.most_likely_position_flat_indicies = flat_outputs_container.most_likely_position_flat_indicies
+
 
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        

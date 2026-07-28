@@ -1255,7 +1255,8 @@ class CellIndividualReliabilityMatrix:
         DynamicParameters with ``xx``, ``yy``, ``results`` (compatible with ``build_in_field_masks_xy``).
         """
         import matplotlib
-        from neuropy.utils.dynamic_container import DynamicParameters
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        # from neuropy.utils.dynamic_container import DynamicParameters
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
 
         assert getattr(pf, 'ndim', 2) >= 2, "compute_peak_prominence_2d_from_pf requires 2D PfND"

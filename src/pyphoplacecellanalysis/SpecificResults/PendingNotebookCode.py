@@ -1522,7 +1522,7 @@ from matplotlib.patches import FancyBboxPatch
 from matplotlib.widgets import Slider, Button, RadioButtons, CheckButtons
 from neuropy.utils.matplotlib_helpers import FormattedFigureText
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
-from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, BayesianPlacemapPositionDecoder
+from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, ReliabilityDecoderModifierMode, ReliabilityEstimationMode, BayesianPlacemapPositionDecoder
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction_dst import BayesianPlacemapPositionDecoderDST
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import build_and_write_to_file, FileOutputManager, FigureOutputLocation, ContextToPathMode
 
@@ -1540,12 +1540,13 @@ class InteractiveBayesian2DEquationDebugger:
         P(x|n) = L(x) / Σ_x L(x)   (uniform prior; occupancy ``P_x`` is unused)
 
     Factor panels (power, exp, per-cell L, joint L) always show this Bayesian Poisson decomposition.
-    When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, an extra middle mosaic row under each placefield
+    When ``decoder`` is a ``BayesianPlacemapPositionDecoderDST``, an extra mosaic row under each placefield
     shows that cell's *uncustomized* per-cell ``L_i`` (``reliability_modifier_mode=IGNORE``, ``drop_negative_contributing_terms_mode=False``)
     so it can be compared against the bottom per-cell ``L`` row, which uses the viewer's active customization options.
 
     Layout (supports 1–10 active cells):
-        Top: per-cell placefields (raw Hz); DST-only: uncustomized per-cell ``L_0``; per-cell likelihood terms (customized).
+        Top: per-cell placefields (raw Hz); always a ``R_i(x)`` row (populated when ``reliability_estimation_mode=POSITION_DEPENDENT``);
+        DST-only: uncustomized per-cell ``L_0``; per-cell likelihood terms (customized).
         Bottom: posterior ``P(x|n)``, product power term, product exp term, joint ``L`` (optionally log10); DST adds conflict ``K``.
         When there are more cells than bottom panels, each bottom panel spans multiple cell columns (widths need not match 1:1).
     When ``n_i == 0``, that cell's term is ``exp(-τ f_i)`` (inverted relative to the ratemap — evidence from silence).
@@ -1585,6 +1586,7 @@ class InteractiveBayesian2DEquationDebugger:
     show_log_likelihood: bool = field(default=True)
     drop_negative_contributing_terms_mode: bool = field(default=True)
     reliability_modifier_mode: ReliabilityDecoderModifierMode = field(default=ReliabilityDecoderModifierMode.IGNORE)
+    reliability_estimation_mode: ReliabilityEstimationMode = field(default=ReliabilityEstimationMode.PER_CELL)
 
     # PNG export config ________________________________________________________________________________________________ #
     curr_active_pipeline: Optional[Any] = field(default=None)
@@ -1617,6 +1619,7 @@ class InteractiveBayesian2DEquationDebugger:
     ax_conflict_K: Any = field(default=None)  # DST-only: spatial conflict map
 
     ax_cell_pf: List[Any] = field(default=Factory(list))
+    ax_cell_R: List[Any] = field(default=Factory(list))  # position-dependent reliability R_i(x) under each PF
     ax_cell_L: List[Any] = field(default=Factory(list))
     ax_cell_E: List[Any] = field(default=Factory(list))  # DST-only middle row (baseline / uncustomized L_0)
     sliders: List[Any] = field(default=Factory(list))
@@ -1624,6 +1627,7 @@ class InteractiveBayesian2DEquationDebugger:
     buttons: Optional[Tuple[Any, ...]] = field(default=None)
     reliability_mode_radio: Any = field(default=None)
     drop_negative_terms_check: Any = field(default=None)
+    estimation_mode_check: Any = field(default=None)
     group_boxes: List[Any] = field(default=Factory(list))
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
@@ -1803,16 +1807,32 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     @classmethod
+    def _reliability_map_for_cell(cls, reliability_arr: NDArray, cell_idx: int, spatial_shape) -> NDArray:
+        """Per-cell reliability as a spatial map: 1D broadcasts a scalar; 2D reshapes ``R[:, i]``."""
+        R = np.asarray(reliability_arr, dtype=float)
+        if R.ndim == 1:
+            return np.full(spatial_shape, float(R[cell_idx]))
+        elif R.ndim == 2:
+            return R[:, cell_idx].reshape(spatial_shape)
+        else:
+            raise ValueError(f'Unsupported reliability ndim={R.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+
+
+    @classmethod
     def _dst_Ei_maps(cls, tuning_curves_xy: NDArray, spike_counts: NDArray, tau: float, reliability_active: NDArray, reliability_silent: NDArray) -> Dict[str, Any]:
         """Per-cell Shafer mass maps matching ``BayesianPlacemapPositionDecoderDST.compute_posterior``.
 
-        E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i].
+        E_i(x) = α · p_i(x) + (1 − α), with α = reliability_active[i] if n_i > 0 else reliability_silent[i]
+        (scalar for 1D reliability, spatial map for position-dependent 2D reliability).
         Factorial cancels under normalization of L_i → p_i.
         """
         n_cells = tuning_curves_xy.shape[0]
         assert len(spike_counts) == n_cells
         F = np.clip(np.nan_to_num(tuning_curves_xy, nan=0.0), 1e-12, None)  # (n_cells, nx, ny)
-        n_bins = int(np.prod(F.shape[1:]))
+        spatial_shape = F.shape[1:]
+        n_bins = int(np.prod(spatial_shape))
+        reliability_active = np.asarray(reliability_active, dtype=float)
+        reliability_silent = np.asarray(reliability_silent, dtype=float)
         per_cell_E = []
         alphas = np.zeros(n_cells, dtype=float)
 
@@ -1825,8 +1845,9 @@ class InteractiveBayesian2DEquationDebugger:
                 p_i = L_i / Z_i
             else:
                 p_i = np.full_like(L_i, 1.0 / float(n_bins))
-            alpha_i = float(reliability_active[i]) if n_i > 0 else float(reliability_silent[i])
-            alphas[i] = alpha_i
+            R_eff = reliability_active if (n_i > 0) else reliability_silent
+            alpha_i = cls._reliability_map_for_cell(R_eff, i, spatial_shape)
+            alphas[i] = float(np.nanmean(alpha_i))
             per_cell_E.append((alpha_i * p_i) + (1.0 - alpha_i))
         ## END for i in range(n_cells)...
 
@@ -1915,12 +1936,15 @@ class InteractiveBayesian2DEquationDebugger:
 
         sliced: BayesianPlacemapPositionDecoder = self.decoder.get_by_id(list(neuron_ids), defer_compute_all=True)
         is_dst: bool = isinstance(sliced, BayesianPlacemapPositionDecoderDST)
+        sliced.reliability_estimation_mode = self.reliability_estimation_mode
         if is_dst and (getattr(sliced, 'reliability_active', None) is None):
-            sliced._compute_reliability_metrics()  # populate α for titles / E_i; compute_posterior would do this lazily anyway
+            self._ensure_sliced_reliability_metrics(sliced)  # populate α for titles / E_i; compute_posterior would do this lazily anyway
 
         if (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(sliced, 'reliability_active', None) is None):
-            sliced._compute_reliability_metrics()  # needed for power-prior tempering on Bayesian path
+            self._ensure_sliced_reliability_metrics(sliced)  # needed for power-prior tempering on Bayesian path
 
+        if self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
+            self._ensure_sliced_reliability_metrics(sliced)
 
         tau: float = float(sliced.time_bin_size)
         tc = np.asarray(sliced.ratemap.tuning_curves, dtype=float)  # (n_cells, nx, ny)
@@ -1987,8 +2011,9 @@ class InteractiveBayesian2DEquationDebugger:
         controls_band_h: float = (n_cells + 1) * slider_pitch + controls_top_pad  # +1 row for cmap vmax slider
         mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
         fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
+        fig_h = fig_h + 0.7  # bump for R_i(x) row under PF
         if self.is_dst:
-            fig_h = fig_h + 0.9  # bump for extra E_i row
+            fig_h = fig_h + 0.9  # bump for extra E_i / L_0 row
         # Soften width for many columns (~3.2"/col up to 8 cols; ~28" total at 10)
         fig_w: float = min(3.2, 28.0 / float(n_grid_cols)) * float(n_grid_cols)
 
@@ -1996,20 +2021,21 @@ class InteractiveBayesian2DEquationDebugger:
 
         ## INPUTS: fig — cell columns + pad; bottom factor row spans the same grid (labels may repeat)
         pf_row = [f"cell_{chr(97 + i)}_pf" for i in range(n_cells)] + ["."] * pad
+        R_row = [f"cell_{chr(97 + i)}_R" for i in range(n_cells)] + ["."] * pad  # R_i(x) under each PF
         L_row = [f"cell_{chr(97 + i)}_exp_term" for i in range(n_cells)] + ["."] * pad
         factor_labels = ["decoded_posterior", "term0", "term1", "joint_likelihood"]
         if self.is_dst:
             factor_labels = ["decoded_posterior", "term0", "term1", "joint_likelihood", "conflict_K"]
         factor_row = self._expand_mosaic_row(factor_labels, n_grid_cols)
 
-        # Figure layout: PF (+ DST baseline L_0) + per-cell L (custom); then posterior + factors (+ conflict for DST); sliders below
+        # Figure layout: PF + R(x) (+ DST baseline L_0) + per-cell L (custom); then posterior + factors (+ conflict for DST); sliders below
         if self.is_dst:
             E_row = [f"cell_{chr(97 + i)}_E" for i in range(n_cells)] + ["."] * pad  # DST only: baseline L_0 row
-            mosaic_layout = [pf_row, E_row, L_row, factor_row]
-            height_ratios = [3.0, 2.8, 3.0, 3.2]
+            mosaic_layout = [pf_row, R_row, E_row, L_row, factor_row]
+            height_ratios = [3.0, 2.4, 2.8, 3.0, 3.2]
         else:
-            mosaic_layout = [pf_row, L_row, factor_row]
-            height_ratios = [3.0, 3.0, 3.2]
+            mosaic_layout = [pf_row, R_row, L_row, factor_row]
+            height_ratios = [3.0, 2.4, 3.0, 3.2]
 
         ax_dict = fig.subplot_mosaic(
             mosaic_layout,
@@ -2038,6 +2064,7 @@ class InteractiveBayesian2DEquationDebugger:
 
         # Per-cell axes: 'cell_a_pf', 'cell_b_pf', ... (up to 10 via chr(97+i))
         ax_cell_pf = [ax_dict.get(f'cell_{chr(97 + i)}_pf') for i in range(n_cells)]
+        ax_cell_R = [ax_dict.get(f'cell_{chr(97 + i)}_R') for i in range(n_cells)]
         ax_cell_L = [ax_dict.get(f'cell_{chr(97 + i)}_exp_term') for i in range(n_cells)]
         ax_cell_E = [ax_dict.get(f'cell_{chr(97 + i)}_E') for i in range(n_cells)] if self.is_dst else []
         ax_conflict_K = ax_dict.get('conflict_K', None)
@@ -2050,6 +2077,7 @@ class InteractiveBayesian2DEquationDebugger:
         self.ax_L = ax_L
         self.ax_conflict_K = ax_conflict_K
         self.ax_cell_pf = ax_cell_pf
+        self.ax_cell_R = ax_cell_R
         self.ax_cell_L = ax_cell_L
         self.ax_cell_E = ax_cell_E
         self.text_formatter = text_formatter
@@ -2057,9 +2085,9 @@ class InteractiveBayesian2DEquationDebugger:
         # Figure-level group boxes: per-cell columns + bottom factor row (survive ax.cla in redraw)
         group_boxes = []
         for i in range(n_cells):
-            cell_axes = [ax_cell_pf[i], ax_cell_L[i]]
+            cell_axes = [ax_cell_pf[i], ax_cell_R[i], ax_cell_L[i]]
             if self.is_dst and (i < len(ax_cell_E)):
-                cell_axes.insert(1, ax_cell_E[i])
+                cell_axes.insert(2, ax_cell_E[i])  # after PF + R, before custom L
             cell_edge = cm.get_cmap(self.cell_cmaps[i])(0.75)
             box = self._add_axes_group_box(fig, cell_axes, edgecolor=cell_edge)
             if box is not None:
@@ -2074,7 +2102,7 @@ class InteractiveBayesian2DEquationDebugger:
             group_boxes.append(factor_box)
         self.group_boxes = group_boxes
 
-        # Left column: reliability radio + drop-n=0 checkbox — narrow so it clears slider labels
+        # Left column: reliability radio + drop-n=0 + pos-dep R checkboxes — narrow so it clears slider labels
         mode_names = ReliabilityDecoderModifierMode.list_names()
         # Short display labels (full enum names are too wide for the left column)
         radio_display_labels = ['IGNORE', 'TEMPERING'] if mode_names == ['IGNORE', 'LIKELIHOOD_TEMPERING'] else mode_names
@@ -2085,7 +2113,7 @@ class InteractiveBayesian2DEquationDebugger:
         radio_h: float = max(0.085, min(0.12, n_cells * slider_pitch))
         left_col_x: float = 0.01
         left_col_w: float = 0.095  # was 0.14; keep clear of slider labels
-        left_col_h: float = radio_h + check_gap + check_h
+        left_col_h: float = radio_h + 2.0 * (check_gap + check_h)
         left_col_y: float = controls_bottom + max(0.0, ((n_cells + 1) * slider_pitch - left_col_h) * 0.5)
         ax_check = fig.add_axes([left_col_x, left_col_y, left_col_w, check_h])
         drop_negative_terms_check = CheckButtons(ax_check, ['drop n=0'], [bool(self.drop_negative_contributing_terms_mode)])
@@ -2095,7 +2123,15 @@ class InteractiveBayesian2DEquationDebugger:
         drop_negative_terms_check.on_clicked(self.on_drop_negative_terms)
         self.drop_negative_terms_check = drop_negative_terms_check
 
-        ax_radio = fig.add_axes([left_col_x, left_col_y + check_h + check_gap, left_col_w, radio_h])
+        ax_check_est = fig.add_axes([left_col_x, left_col_y + check_h + check_gap, left_col_w, check_h])
+        estimation_mode_check = CheckButtons(ax_check_est, ['pos-dep R'], [bool(self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT)])
+        for label in estimation_mode_check.labels:
+            label.set_fontsize(6)
+        ## END for label in estimation_mode_check.labels...
+        estimation_mode_check.on_clicked(self.on_estimation_mode)
+        self.estimation_mode_check = estimation_mode_check
+
+        ax_radio = fig.add_axes([left_col_x, left_col_y + 2.0 * (check_h + check_gap), left_col_w, radio_h])
         reliability_mode_radio = RadioButtons(ax_radio, radio_display_labels, active=active_mode_idx)
         for label in reliability_mode_radio.labels:
             label.set_fontsize(6)
@@ -2174,12 +2210,14 @@ class InteractiveBayesian2DEquationDebugger:
         fig._bayes_eqn_ui = dict(
             sliders=sliders, buttons=self.buttons, reliability_mode_radio=self.reliability_mode_radio,
             drop_negative_terms_check=self.drop_negative_terms_check,
+            estimation_mode_check=self.estimation_mode_check,
             cmap_vmax_slider=self.cmap_vmax_slider,
             group_boxes=self.group_boxes,
             sliced=self.sliced, neuron_ids=self.neuron_ids,
-            is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_conflict_K=ax_conflict_K,
+            is_dst=self.is_dst, ax_cell_E=ax_cell_E, ax_cell_R=ax_cell_R, ax_conflict_K=ax_conflict_K,
             reliability_active=getattr(self.sliced, 'reliability_active', None),
             reliability_silent=getattr(self.sliced, 'reliability_silent', None),
+            reliability_estimation_mode=self.reliability_estimation_mode.name,
             debugger=self,
             export_to_png=self.export_to_png,
             reset_cmap_vmax=self.reset_cmap_vmax,
@@ -2197,7 +2235,7 @@ class InteractiveBayesian2DEquationDebugger:
         parts = self._poisson_factor_maps(self.tuning_curves, n, self.tau, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode,
                                          reliability_modifier_mode=self.reliability_modifier_mode, reliability_active=getattr(self.sliced, 'reliability_active', None), reliability_silent=getattr(self.sliced, 'reliability_silent', None)) ## recompute
 
-        axes_to_clear = [self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf]
+        axes_to_clear = [self.ax_post, self.ax_pow, self.ax_exp, self.ax_L, *self.ax_cell_pf, *self.ax_cell_R]
         if self.ax_conflict_K is not None:
             axes_to_clear.append(self.ax_conflict_K)
         for ax in axes_to_clear:
@@ -2229,15 +2267,20 @@ class InteractiveBayesian2DEquationDebugger:
 
 
         ## Place Cells (peak-normalized so shared cmap_vmax ∈ [0,1] is meaningful)
+        spatial_shape = self.tuning_curves.shape[1:]
+        rel_active = getattr(self.sliced, 'reliability_active', None)
+        rel_silent = getattr(self.sliced, 'reliability_silent', None)
         for i, ax in enumerate(self.ax_cell_pf):
             cmap = self.cell_cmaps[i]
             pf_title = f'PF aclu={self.aclu_list[i]}  peak={self.peak_rates[i]:.1f}Hz  n={n[i]}'
-            if self.is_dst and (getattr(self.sliced, 'reliability_active', None) is not None):
-                alpha_i = float(self.sliced.reliability_active[i])
-                if getattr(self.sliced, 'discount_silence', False) and (getattr(self.sliced, 'reliability_silent', None) is not None):
-                    pf_title += rf'  $\alpha$={alpha_i:.2f}  $\alpha_{{silent}}$={float(self.sliced.reliability_silent[i]):.2f}'
+            if (rel_active is not None):
+                R_i = self._reliability_map_for_cell(np.asarray(rel_active, dtype=float), i, spatial_shape)
+                alpha_mean = float(np.nanmean(R_i))
+                if getattr(self.sliced, 'should_discount_silence', False) and (rel_silent is not None):
+                    R_s = self._reliability_map_for_cell(np.asarray(rel_silent, dtype=float), i, spatial_shape)
+                    pf_title += rf'  $\langle\alpha\rangle$={alpha_mean:.2f}  $\langle\alpha_{{silent}}\rangle$={float(np.nanmean(R_s)):.2f}'
                 else:
-                    pf_title += rf'  $\alpha$={alpha_i:.2f}'
+                    pf_title += rf'  $\langle\alpha\rangle$={alpha_mean:.2f}'
             if vmax < 1.0:
                 pf_title = pf_title + f'  clim=[0, {vmax:.3g}]'
             pf_norm = self.tuning_curves[i] / max(float(self.peak_rates[i]), 1e-12)
@@ -2247,6 +2290,24 @@ class InteractiveBayesian2DEquationDebugger:
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
 
         ## END for i, ax in enumerate(self.ax_cell_pf)...
+
+        ## Position-dependent reliability maps under each PF (populated when estimation mode is POSITION_DEPENDENT)
+        for i, ax in enumerate(self.ax_cell_R):
+            cmap = self.cell_cmaps[i]
+            if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (rel_active is not None) and (np.asarray(rel_active).ndim == 2):
+                use_silent: bool = (int(n[i]) == 0) and bool(getattr(self.sliced, 'should_discount_silence', False)) and (rel_silent is not None)
+                R_src = rel_silent if use_silent else rel_active
+                R_map = self._reliability_map_for_cell(np.asarray(R_src, dtype=float), i, spatial_shape)
+                r_lbl = r'$R_{\mathrm{silent}}$' if use_silent else r'$R$'
+                self.ims[f'R_{i}'] = self._imshow_map(ax, R_map, self.xbin, self.ybin, rf'{r_lbl}[{self.aclu_list[i]}]$(x)$', cmap=cmap, vmin=0.0, vmax=1.0)
+            else:
+                ax.set_title(rf'$R$ (PER_CELL)', fontsize=10)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+                ## END for spine in ax.spines.values()...
+        ## END for i, ax in enumerate(self.ax_cell_R)...
 
         if self.is_dst and (len(self.ax_cell_E) > 0):
             # Middle row: uncustomized per-cell L (IGNORE reliability; keep silence / n=0 terms)
@@ -2275,7 +2336,7 @@ class InteractiveBayesian2DEquationDebugger:
         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(self.aclu_list, n)])
         ml_flat = np.nanargmax(parts['posterior'])
         ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
-        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}  |  rel={self.reliability_modifier_mode.name}', fontsize=11)
+        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}  |  rel={self.reliability_modifier_mode.name}  |  est={self.reliability_estimation_mode.name}', fontsize=11)
         self.fig.canvas.draw_idle()
 
 
@@ -2354,8 +2415,32 @@ class InteractiveBayesian2DEquationDebugger:
             return
         self.reliability_modifier_mode = new_mode
         if (new_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(self.sliced, 'reliability_active', None) is None):
-            self.sliced._compute_reliability_metrics()
+            self._ensure_sliced_reliability_metrics(self.sliced)
         self.redraw()
+
+
+    def on_estimation_mode(self, _label: str):
+        """CheckButtons callback: toggle ``reliability_estimation_mode`` PER_CELL ↔ POSITION_DEPENDENT."""
+        want_pos_dep: bool = bool(self.estimation_mode_check.get_status()[0])
+        new_mode = ReliabilityEstimationMode.POSITION_DEPENDENT if want_pos_dep else ReliabilityEstimationMode.PER_CELL
+        if new_mode == self.reliability_estimation_mode:
+            return
+        self.reliability_estimation_mode = new_mode
+        self._ensure_sliced_reliability_metrics(self.sliced)
+        self.redraw()
+
+
+    def _ensure_sliced_reliability_metrics(self, sliced: Optional[BayesianPlacemapPositionDecoder] = None):
+        """Sync estimation mode onto ``sliced`` and (re)compute ``reliability_*`` from confusion products when needed."""
+        if sliced is None:
+            sliced = self.sliced
+        assert sliced is not None
+        sliced.reliability_estimation_mode = self.reliability_estimation_mode
+        has_confusion: bool = (getattr(sliced, 't_bin_aclus_reliability_df', None) is not None) and ('true_pos' in sliced.t_bin_aclus_reliability_df.columns)
+        if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (not has_confusion):
+            sliced.compute_unit_confusion_reliability_variables()
+        else:
+            sliced._compute_reliability_metrics()
 
 
     def on_drop_negative_terms(self, _label: str):
@@ -2395,6 +2480,10 @@ class InteractiveBayesian2DEquationDebugger:
             ax = getattr(self.drop_negative_terms_check, 'ax', None)
             if ax is not None:
                 control_axes.append(ax)
+        if self.estimation_mode_check is not None:
+            ax = getattr(self.estimation_mode_check, 'ax', None)
+            if ax is not None:
+                control_axes.append(ax)
         return control_axes
 
 
@@ -2407,6 +2496,7 @@ class InteractiveBayesian2DEquationDebugger:
             neuron_ids=tuple(self.aclu_list),
             n=n_tuple,
             reliability_mode=self.reliability_modifier_mode.name,
+            reliability_estimation_mode=self.reliability_estimation_mode.name,
         )
 
 
@@ -2482,19 +2572,21 @@ def build_interactive_bayesian_2d_eqn_viewer(decoder: BayesianPlacemapPositionDe
         all_epochs_decoding_result: Optional[DecodedFilterEpochsResult] = None, seed_epoch_idx: int = 0, seed_t_bin_idx: int = 0,
         max_spikes_per_cell: int = 15, show_log_likelihood: bool = True, drop_negative_contributing_terms_mode: bool = True,
         reliability_modifier_mode: ReliabilityDecoderModifierMode = ReliabilityDecoderModifierMode.IGNORE,
+        reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
         curr_active_pipeline=None, export_output_parent_path: Optional[Path] = None, export_dpi_multiplier: float = 2.0,
     ):
     """Interactive 2D Bayesian decode viewer — thin wrapper around ``InteractiveBayesian2DEquationDebugger``.
 
     Implemented via ``InteractiveBayesian2DEquationDebugger(...)``; returns ``(fig, sliced_decoder, neuron_ids)`` for compatibility.
-    See that class docstring for equation decomposition, DST baseline ``L_0`` row, and usage.
+    See that class docstring for equation decomposition, DST baseline ``L_0`` row, ``R_i(x)`` row, and usage.
 
     Export: pass ``curr_active_pipeline`` (or ``export_output_parent_path``) and click **Export PNG**, or call ``fig._bayes_eqn_ui['export_to_png']()``.
     """
     dbgr = InteractiveBayesian2DEquationDebugger(decoder=decoder, neuron_ids=neuron_ids,
         all_epochs_decoding_result=all_epochs_decoding_result, seed_epoch_idx=seed_epoch_idx, seed_t_bin_idx=seed_t_bin_idx,
         max_spikes_per_cell=max_spikes_per_cell, show_log_likelihood=show_log_likelihood, drop_negative_contributing_terms_mode=drop_negative_contributing_terms_mode,
-        reliability_modifier_mode=reliability_modifier_mode, curr_active_pipeline=curr_active_pipeline,
+        reliability_modifier_mode=reliability_modifier_mode, reliability_estimation_mode=reliability_estimation_mode,
+        curr_active_pipeline=curr_active_pipeline,
         export_output_parent_path=export_output_parent_path, export_dpi_multiplier=export_dpi_multiplier)
     return dbgr.as_viewer_tuple()
 
