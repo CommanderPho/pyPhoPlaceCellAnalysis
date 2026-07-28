@@ -968,23 +968,26 @@ class CellIndividualReliabilityMatrix:
         ## Positions:
         active_pos_df: pd.DataFrame = deepcopy(pfs.filtered_pos_df)
         # active_pos_df
+        active_pos_df = active_pos_df.position.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
         active_pos_df = active_pos_df.position.add_binned_time_column(time_bin_edges, time_bin_edges_binning_info)
         active_pos_df.rename(columns={'binned_time': 't_bin_idx'}, inplace=True)
-        active_pos_df['t_bin_idx'] = spikes_df['t_bin_idx'].astype(int)
-        active_pos_df = active_pos_df.dropna(subset=['binned_x', 'binned_y', 't_bin_idx']) # Drop rows with missing data in columns: 'binned_x', 'binned_y', 't_bin_idx'
+        # active_pos_df['t_bin_idx'] = active_pos_df['t_bin_idx'].astype(int) # #TODO 2026-07-28 19:19: - [ ] 't_bin_idx' was actually the problem, it was being set to the wrong dataframe's column and then forced to int (which np.nan can't go to int)
+        active_pos_df.dropna(subset=['binned_x', 'binned_y', 't_bin_idx'], inplace=True) # Drop rows with missing data in columns: 'binned_x', 'binned_y', 't_bin_idx'
+        active_pos_df['t_bin_idx'] = active_pos_df['t_bin_idx'].astype(int) ## convert to int
         active_pos_df
 
         # pos_df = pfs.filtered_pos_df  # or sess.position.to_dataframe()
 
         time_bin_info_df: pd.DataFrame = pd.DataFrame({'t': bin_container.centers, 't_bin_idx': np.arange(bin_container.num_bins),
-            'x': np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['x']),
+            'x': np.interp(bin_container.centers, active_pos_df['t'], active_pos_df['x']),
+            # 'y': np.interp(bin_container.centers, active_pos_df['t'], active_pos_df['y']),
         })
 
-        if 'y' in pfs.filtered_pos_df.columns:
-            time_bin_info_df['y'] = np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['y'])
+        if 'y' in active_pos_df.columns:
+            time_bin_info_df['y'] = np.interp(bin_container.centers, active_pos_df['t'], active_pos_df['y'])
 
-        if 'z' in pfs.filtered_pos_df.columns:
-            time_bin_info_df['z'] = np.interp(bin_container.centers, pfs.filtered_pos_df['t'], pfs.filtered_pos_df['z'])
+        if 'z' in active_pos_df.columns:
+            time_bin_info_df['z'] = np.interp(bin_container.centers, active_pos_df['t'], active_pos_df['z'])
 
 
         # time_bin_info_df.position.add

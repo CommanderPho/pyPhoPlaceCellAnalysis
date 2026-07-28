@@ -4094,7 +4094,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
 
 
     def _compute_reliability_metrics(self, **kwargs):
-        """
+        """ Called after main confusion computation
         Builds reliability arrays from confusion-matrix rates (no Skaggs).
 
         Modes (``self.reliability_estimation_mode``):
@@ -4114,11 +4114,15 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
         if not has_confusion:
             if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
-                raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; call compute_unit_confusion_reliability_variables(...) first.')
-            R_ones = np.ones(n_neurons, dtype=float)
-            self.reliability_active = R_ones
-            self.reliability_silent = np.ones_like(R_ones)
-            return
+                print(f'WARN: ._compute_reliability_metrics(...): POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
+                _ = self.compute_unit_confusion_reliability_variables() ## performing compute.
+                print(f'\tdone.')
+                if self.t_bin_aclus_reliability_df is None:
+                    raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
+            # R_ones = np.ones(n_neurons, dtype=float)
+            # self.reliability_active = R_ones
+            # self.reliability_silent = np.ones_like(R_ones)
+            # return
 
         rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
         true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
