@@ -4228,6 +4228,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             self.flat_p_x_given_n = flat_outputs_container.flat_p_x_given_n
             self.most_likely_position_flat_indicies = flat_outputs_container.most_likely_position_flat_indicies
 
+
     def compute_most_likely_positions(self):
         """ Computes the most likely positions at each timestep from self.flat_p_x_given_n """        
         raise NotImplementedError
