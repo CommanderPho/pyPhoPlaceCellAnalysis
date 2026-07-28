@@ -30,8 +30,13 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationF
         """
         def _initial_placefield_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
             from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-            format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(active_session.config.format_name)
-            uses_3d_only = format_cls is not None and format_cls.get_spatial_dimensionality(active_session) == 3
+            format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(getattr(getattr(active_session, 'config', None), 'format_name', None))
+            uses_3d_only = False
+            if format_cls is not None:
+                try:
+                    uses_3d_only = bool(format_cls.uses_3d_placefields_only(active_session))
+                except Exception:
+                    uses_3d_only = False
             if uses_3d_only:
                 prev_output_result.computed_data['pf3D'] = perform_compute_placefields_3d(active_session_spikes_df=active_session.spikes_df, active_pos=active_session.position, computation_config=pf_computation_config, active_epoch_placefields3D=None, included_epochs=pf_computation_config.computation_epochs, should_force_recompute_placefields=True)
                 prev_output_result.computed_data['pf1D'] = None
@@ -72,8 +77,14 @@ class PlacefieldComputations(AllFunctionEnumeratingMixin, metaclass=ComputationF
         """
         def _initial_time_dependent_placefield_computation(active_session, pf_computation_config, prev_output_result: ComputationResult):
             from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
-            format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(active_session.config.format_name)
-            if format_cls is not None and format_cls.get_spatial_dimensionality(active_session) == 3:
+            format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(getattr(getattr(active_session, 'config', None), 'format_name', None))
+            uses_3d_only = False
+            if format_cls is not None:
+                try:
+                    uses_3d_only = bool(format_cls.uses_3d_placefields_only(active_session))
+                except Exception:
+                    uses_3d_only = False
+            if uses_3d_only:
                 prev_output_result.computed_data['pf1D_dt'] = None
                 prev_output_result.computed_data['pf2D_dt'] = None
                 return prev_output_result

@@ -16,10 +16,33 @@ from pyphoplacecellanalysis.General.Model.ComputationResults import ComputationR
 from pyphocorehelpers.function_helpers import function_attributes
 from pyphocorehelpers.mixins.member_enumerating import AllFunctionEnumeratingMixin
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder, DecodedFilterEpochsResult, Zhang_Two_Step
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
-from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
-from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
-from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters, build_is_training_mask, clusterless_events_to_spyglass_spike_lists, epochs_from_pfnd, pfnd_to_spyglass_position_info
+try:
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_decoder import ClusterlessRTCPositionDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.rtc_clusterless_adapters import ClusterlessDecodingParameters, build_multiunits_from_array, build_multiunits_from_session, build_multiunits_from_spike_events, load_clusterless_spike_events
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_decoder import SpyglassClusterlessDecoder
+    from pyphoplacecellanalysis.Analysis.Decoder.spyglass_clusterless_adapters import SpyglassClusterlessDecodingParameters, build_is_training_mask, clusterless_events_to_spyglass_spike_lists, epochs_from_pfnd, pfnd_to_spyglass_position_info
+    _CLUSTERLESS_DECODER_AVAILABLE: bool = True
+    _CLUSTERLESS_IMPORT_ERROR: Optional[BaseException] = None
+except ImportError as e:
+    ClusterlessRTCPositionDecoder = None  # type: ignore
+    ClusterlessDecodingParameters = None  # type: ignore
+    build_multiunits_from_array = None  # type: ignore
+    build_multiunits_from_session = None  # type: ignore
+    build_multiunits_from_spike_events = None  # type: ignore
+    load_clusterless_spike_events = None  # type: ignore
+    SpyglassClusterlessDecoder = None  # type: ignore
+    SpyglassClusterlessDecodingParameters = None  # type: ignore
+    build_is_training_mask = None  # type: ignore
+    clusterless_events_to_spyglass_spike_lists = None  # type: ignore
+    epochs_from_pfnd = None  # type: ignore
+    pfnd_to_spyglass_position_info = None  # type: ignore
+    _CLUSTERLESS_DECODER_AVAILABLE = False
+    _CLUSTERLESS_IMPORT_ERROR = e
+
+
+def _require_clusterless_decoder_imports():
+    if not _CLUSTERLESS_DECODER_AVAILABLE:
+        raise ImportError(f"Clusterless decoding requires optional dependencies (e.g. replay_trajectory_classification). Original import error: {_CLUSTERLESS_IMPORT_ERROR}") from _CLUSTERLESS_IMPORT_ERROR
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.ComputationFunctionRegistryHolder import ComputationFunctionRegistryHolder, computation_precidence_specifying_function, global_function
 
@@ -35,12 +58,13 @@ from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import LeaveOneOutDe
 """-------------- Specific Computation Functions to be registered --------------"""
 
 def _session_uses_3d_placefields_only(sess) -> bool:
+    """True only for formats that explicitly opt into 3D-only placefields (e.g. dandi_nwb_001754)."""
     from neuropy.core.session.Formats.BaseDataSessionFormats import DataSessionFormatRegistryHolder
     format_cls = DataSessionFormatRegistryHolder.get_registry_data_session_type_class_name_dict().get(getattr(getattr(sess, 'config', None), 'format_name', None))
     if format_cls is None:
         return False
     try:
-        return format_cls.get_spatial_dimensionality(sess) == 3
+        return bool(format_cls.uses_3d_placefields_only(sess))
     except Exception:
         return False
 
@@ -117,10 +141,11 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_ClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_ClusterlessDecoder', None)), is_global=False)
     def _perform_clusterless_position_decoding_computation(computation_result: ComputationResult, sampling_frequency_hz: Optional[float] = None, time_bin_size: Optional[float] = None,
                                                         #    multiunits: Optional[np.ndarray] = None, rtc_time: Optional[np.ndarray] = None,
-                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[ClusterlessDecodingParameters] = None,
+                                                           clusterless_spike_events: Optional[Any] = None, clusterless_params: Optional[Any] = None,
                                                            should_defer_compute_all_decoded_times: bool = True,  
                                                              **kwargs):
         """ Builds clusterless 1D & 2D position decoders using replay_trajectory_classification on PfND spatial grids. """
+        _require_clusterless_decoder_imports()
         if _session_uses_3d_placefields_only(computation_result.sess):
             computation_result.computed_data['pf1D_ClusterlessDecoder'] = None
             computation_result.computed_data['pf2D_ClusterlessDecoder'] = None
@@ -241,8 +266,9 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
     @function_attributes(short_name='position_decoding_spyglass_clusterless', tags=['decoding', 'position', 'clusterless', 'spyglass'],
                           input_requires=["computation_result.computed_data['pf1D']", "computation_result.computed_data['pf2D']"], output_provides=["computation_result.computed_data['pf1D_SpyglassClusterlessDecoder']", "computation_result.computed_data['pf2D_SpyglassClusterlessDecoder']"], uses=['SpyglassClusterlessDecoder', 'ClusterlessDetector'], used_by=[], creation_date='2026-07-07 00:00', related_items=[],
         validate_computation_test=lambda curr_active_pipeline, computation_filter_name='maze': (curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf1D_SpyglassClusterlessDecoder', None), curr_active_pipeline.computation_results[computation_filter_name].computed_data.get('pf2D_SpyglassClusterlessDecoder', None)), is_global=False)
-    def _perform_spyglass_clusterless_position_decoding_computation(computation_result: ComputationResult, clusterless_spike_events: Optional[Any] = None, spyglass_params: Optional[SpyglassClusterlessDecodingParameters] = None, should_defer_compute_all_decoded_times: bool = True, **kwargs):
+    def _perform_spyglass_clusterless_position_decoding_computation(computation_result: ComputationResult, clusterless_spike_events: Optional[Any] = None, spyglass_params: Optional[Any] = None, should_defer_compute_all_decoded_times: bool = True, **kwargs):
         """ Builds Spyglass/non_local_detector clusterless 2D position decoders on PfND spatial grids. """
+        _require_clusterless_decoder_imports()
         if _session_uses_3d_placefields_only(computation_result.sess):
             computation_result.computed_data['pf1D_SpyglassClusterlessDecoder'] = None
             computation_result.computed_data['pf2D_SpyglassClusterlessDecoder'] = None

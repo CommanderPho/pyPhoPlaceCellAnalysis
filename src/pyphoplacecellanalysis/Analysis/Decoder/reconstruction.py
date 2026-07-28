@@ -929,7 +929,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     p_x_given_n_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_x_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     marginal_y_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
-    marginal_z_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
+    marginal_z_list: list = non_serialized_field(default=Factory(list), metadata={'shape': ('n_epochs',)})
     most_likely_position_indicies_list: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     spkcount: list = non_serialized_field(metadata={'shape': ('n_epochs',)})
     nbins: np.ndarray = serialized_field(metadata={'shape': ('n_epochs',)}) # an array of the number of time bins in each epoch
@@ -939,6 +939,15 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
     
     ## Optional Helpers
     pos_bin_edges: Optional[NDArray] = serialized_field(default=None, metadata={'desc':'the position bin edges of the decoder that was used to produce the result', 'shape': ('n_pos_bins+1', )})
+
+    @property
+    def decoding_time_bin_hop(self) -> Optional[float]:
+        """Legacy alias for decoding_slideby (sliding-window hop in seconds)."""
+        return self.decoding_slideby
+
+    @decoding_time_bin_hop.setter
+    def decoding_time_bin_hop(self, value: Optional[float]):
+        self.decoding_slideby = value
 
     @property
     def n_pos_bins(self) -> Optional[int]:
@@ -1298,6 +1307,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
         if 'decoding_slideby' not in self.__dict__:
             self.decoding_slideby = self.__dict__.get('decoding_time_bin_hop', None)
         self.__dict__.pop('decoding_time_bin_hop', None)
+        if 'marginal_z_list' not in self.__dict__ or self.__dict__.get('marginal_z_list', None) is None:
+            self.marginal_z_list = []
 
     def flatten(self):
         """ flattens the result over all epochs to produce one per time bin 
@@ -1852,22 +1863,33 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                 raise NotImplementedError(f'len(num_spatial_dims_list): {len(num_spatial_dims_list)}: num_spatial_dims_list: {num_spatial_dims_list} but expected 1, 2, or 3')
 
             a_time_bin_edges: NDArray = deepcopy(a_decoded_result.time_bin_edges[i])
-            if (len(a_time_bin_edges) != (num_time_bins+1)):
-                #@IgnoreException
-                print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
-                # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
-                # continue
-                break
+            a_time_bin_edges = np.asarray(a_time_bin_edges)
+            # Contiguous histogram edges are length (n_bins+1); overlapping sliding windows are shape (n_bins, 2).
+            if a_time_bin_edges.ndim == 1:
+                if (len(a_time_bin_edges) != (num_time_bins+1)):
+                    #@IgnoreException
+                    print(f'WARN: Epoch[{i}]: len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}.') # continuing.
+                    # raise IndexError(f'len(a_time_bin_edges): {len(a_time_bin_edges)} != (num_time_bins+1): {(num_time_bins+1)}') #@IgnoreException
+                    # continue
+                    break
+                else:
+                    assert len(a_time_bin_edges) == (num_time_bins+1)
+            elif a_time_bin_edges.ndim == 2:
+                if a_time_bin_edges.shape != (num_time_bins, 2):
+                    print(f'WARN: Epoch[{i}]: a_time_bin_edges.shape: {a_time_bin_edges.shape} != (num_time_bins, 2): {(num_time_bins, 2)}.')
+                    break
             else:
-                assert len(a_time_bin_edges) == (num_time_bins+1)
-        
-            unit_specific_time_binned_spike_counts, unique_units, (is_time_bin_active, inactive_mask, mask_rgba) = spikes_df.spikes.compute_unit_time_binned_spike_counts_and_mask(time_bin_edges=a_time_bin_edges,
-                                                                                                                                                                                    min_num_spikes_per_bin_to_be_considered_active=min_num_spikes_per_bin_to_be_considered_active,
-                                                                                                                                                                                    min_num_unique_active_neurons_per_time_bin=min_num_unique_active_neurons_per_time_bin)
+                print(f'WARN: Epoch[{i}]: unsupported a_time_bin_edges.ndim: {a_time_bin_edges.ndim}.')
+                break
+
+            is_time_bin_active = np.asarray(is_time_bin_active_list[i]).astype(bool)
+            assert len(is_time_bin_active) == num_time_bins, f"Epoch[{i}]: len(is_time_bin_active): {len(is_time_bin_active)} != num_time_bins: {num_time_bins}"
+            inactive_mask = np.logical_not(is_time_bin_active)
             
             # Make a copy of the original data before masking
             original_data = a_decoded_result.p_x_given_n_list[i].copy()
             all_time_bin_indicies = np.arange(num_time_bins, dtype=int) ## all time bins
+            last_valid_indices = None
 
             if masked_bin_fill_mode != 'ignore':
                 # Mask inactive time bins with NaN in all modes except ignore mode
@@ -1887,6 +1909,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
                         if is_time_bin_active[t]:
                             current_valid_idx = t
                         last_valid_indices[t] = current_valid_idx
+                    ## END for t in np.arange(num_time_bins)....
                     
                     ## when done, have `last_valid_indices`
                     # print(f'last_valid_indices: {last_valid_indices}')
@@ -1981,12 +2004,12 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
 
             ## END if np.any(is_time_bin_active)
-            is_time_bin_active_list.append(is_time_bin_active)
-            inactive_mask_list.append(last_valid_indices)
+            _out_is_time_bin_active_list.append(is_time_bin_active)
+            inactive_mask_list.append(inactive_mask)
             all_time_bin_indicies_list.append(all_time_bin_indicies)
             last_valid_indices_list.append(last_valid_indices)
                     
-        #END for i in np.arange(num_filter_epochs)
+        ## END for i in np.arange(num_filter_epochs)....
         
         ## 2026-01-19 - After masking, update filter_epochs and num_filter_epochs when using 'dropped' mode
         if masked_bin_fill_mode == 'dropped':

@@ -111,6 +111,64 @@ def normalize_continuous_decoding_cache_lookup_key(extant: Union[float, Decoding
         return (float(extant[0]), float(extant[1]))
     return decoding_continuous_cache_key(float(extant), slideby)
 
+
+_LEGACY_TRACK_TEMPLATE_DECODER_ATTR_TO_KEY = (
+    ('long_LR_decoder', 'long_LR'),
+    ('long_RL_decoder', 'long_RL'),
+    ('short_LR_decoder', 'short_LR'),
+    ('short_RL_decoder', 'short_RL'),
+)
+
+_LEGACY_ONE_STEP_DECODER_ATTR_TO_KEY = (
+    ('long_LR_one_step_decoder_1D', 'long_LR'),
+    ('long_RL_one_step_decoder_1D', 'long_RL'),
+    ('short_LR_one_step_decoder_1D', 'short_LR'),
+    ('short_RL_one_step_decoder_1D', 'short_RL'),
+)
+
+_LEGACY_SHARED_ACLUS_ONLY_DECODER_ATTR_TO_KEY = (
+    ('long_LR_shared_aclus_only_one_step_decoder_1D', 'long_LR'),
+    ('long_RL_shared_aclus_only_one_step_decoder_1D', 'long_RL'),
+    ('short_LR_shared_aclus_only_one_step_decoder_1D', 'short_LR'),
+    ('short_RL_shared_aclus_only_one_step_decoder_1D', 'short_RL'),
+)
+
+
+def _migrate_legacy_named_decoders_into_dict(obj_or_state: Any, attr_to_key: Tuple[Tuple[str, str], ...], target_dict_attr: str) -> None:
+    """Populate `target_dict_attr` from legacy named decoder fields (pickle / attrs layout migration)."""
+    is_mapping: bool = isinstance(obj_or_state, dict)
+    get_val = (lambda k, default=None: obj_or_state.get(k, default)) if is_mapping else (lambda k, default=None: getattr(obj_or_state, k, default))
+    set_val = (lambda k, v: obj_or_state.__setitem__(k, v)) if is_mapping else (lambda k, v: setattr(obj_or_state, k, v))
+    pop_val = (lambda k: obj_or_state.pop(k, None)) if is_mapping else (lambda k: obj_or_state.__dict__.pop(k, None))
+
+    extant_dict = get_val(target_dict_attr, None)
+    if extant_dict is None or (isinstance(extant_dict, dict) and len(extant_dict) == 0):
+        migrated: Dict[str, Any] = {}
+        for attr_name, decoder_key in attr_to_key:
+            legacy_val = get_val(attr_name, None)
+            if legacy_val is not None:
+                migrated[decoder_key] = legacy_val
+        ## END for attr_name, decoder_key in attr_to_key....
+
+        if len(migrated) > 0:
+            set_val(target_dict_attr, migrated)
+        elif extant_dict is None:
+            set_val(target_dict_attr, {})
+
+    for attr_name, _decoder_key in attr_to_key:
+        pop_val(attr_name)
+    ## END for attr_name, _decoder_key in attr_to_key....
+
+
+def _migrate_legacy_track_templates_state(obj_or_state: Any) -> None:
+    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_TRACK_TEMPLATE_DECODER_ATTR_TO_KEY, 'decoders_dict')
+
+
+def _migrate_legacy_directional_laps_state(obj_or_state: Any) -> None:
+    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_ONE_STEP_DECODER_ATTR_TO_KEY, 'one_step_decoder_1D_dict')
+    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_SHARED_ACLUS_ONLY_DECODER_ATTR_TO_KEY, 'shared_aclus_only_one_step_decoder_1D_dict')
+
+
 # DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
 # Assume a1 and a2 are your numpy arrays
@@ -839,6 +897,19 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
         return binned_x_transition_matrix_higher_order_list_dict
 
+
+    def __attrs_post_init__(self):
+        _migrate_legacy_track_templates_state(self)
+
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        return state
+
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        _migrate_legacy_track_templates_state(self)
 
 
 
@@ -1643,7 +1714,7 @@ class BaseDirectionalLapsResult(ComputedResult):
     
 
     def get_templates(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> BaseTrackTemplates:
-        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.get_decoders().items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.get_decoders().items() if k in self.get_RL_decoder_names()})
+        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.get_decoders_dict().items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.get_decoders_dict().items() if k in self.get_RL_decoder_names()})
         # _obj = BaseTrackTemplates.init_from_paired_decoders(LR_decoder_pair=(self.long_LR_one_step_decoder_1D, self.short_LR_one_step_decoder_1D), RL_decoder_pair=(self.long_RL_one_step_decoder_1D, self.short_RL_one_step_decoder_1D))
         if ((minimum_inclusion_fr_Hz is None) and (included_qclu_values is None)):
             return _obj
@@ -1652,7 +1723,7 @@ class BaseDirectionalLapsResult(ComputedResult):
     
 
     def get_shared_aclus_only_templates(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> BaseTrackTemplates:
-        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.get_shared_aclus_only_decoders().items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.get_shared_aclus_only_decoders().items() if k in self.get_RL_decoder_names()})
+        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.shared_aclus_only_one_step_decoder_1D_dict.items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.shared_aclus_only_one_step_decoder_1D_dict.items() if k in self.get_RL_decoder_names()})
         if ((minimum_inclusion_fr_Hz is None) and (included_qclu_values is None)):
             return _obj
         else:
@@ -1718,6 +1789,7 @@ class BaseDirectionalLapsResult(ComputedResult):
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         self.__dict__.update(state)
+        _migrate_legacy_directional_laps_state(self)
         # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
         # super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
 
@@ -1808,11 +1880,14 @@ class BaseDirectionalLapsResult(ComputedResult):
         directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
 
         # use the constrained epochs:
-        directional_laps_result.one_step_decoder_1D_dict = {k:a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)}
-
-
-        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
-        directional_laps_result.shared_aclus_only_one_step_decoder_1D_dict = shared_aclus_only_one_step_decoder_1D_dict
+        one_step = {
+            'long_LR': long_LR_shared_aclus_only_one_step_decoder_1D,
+            'long_RL': long_RL_shared_aclus_only_one_step_decoder_1D,
+            'short_LR': short_LR_shared_aclus_only_one_step_decoder_1D,
+            'short_RL': short_RL_shared_aclus_only_one_step_decoder_1D,
+        }
+        directional_laps_result.one_step_decoder_1D_dict = one_step
+        directional_laps_result.shared_aclus_only_one_step_decoder_1D_dict = dict(one_step)
 
         return directional_laps_result
 
@@ -1988,8 +2063,7 @@ class DirectionalLapsResult(BaseDirectionalLapsResult):
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         self.__dict__.update(state)
-        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        # super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
+        _migrate_legacy_directional_laps_state(self)
 
 
 
@@ -4002,6 +4076,22 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         else:
             # otherwise return the result            
             return {k:v.get('pseudo2D', None) for k, v in self.continuously_decoded_result_cache_dict.items()}   
+
+
+    def get_continuously_decoded_dict(self, key: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
+        """Lookup cached continuous decode dict by float W or (W, H) key."""
+        if self.continuously_decoded_result_cache_dict is None:
+            return None
+        ck: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(key, slideby)
+        return self.continuously_decoded_result_cache_dict.get(ck, None)
+
+
+    def get_continuously_decoded_pseudo2D(self, key: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> Optional[DecodedFilterEpochsResult]:
+        """Lookup cached pseudo2D continuous decode by float W or (W, H) key."""
+        continuously_decoded_dict = self.get_continuously_decoded_dict(key, slideby=slideby)
+        if continuously_decoded_dict is None:
+            return None
+        return continuously_decoded_dict.get('pseudo2D', None)
 
 
     @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result'])
