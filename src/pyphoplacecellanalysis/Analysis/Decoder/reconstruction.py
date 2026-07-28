@@ -4020,6 +4020,12 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.per_tbin_aclu_xy_spike_counts_df,
             self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.position_aclus_reliability_df (POSITION_DEPENDENT),
             self.reliability_active, self.reliability_silent
+
+
+        Usage:
+
+            t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = a_dst_decoder2D.compute_unit_confusion_reliability_variables()
+
         """
         pfs = self.pf
         ratemaps = self.ratemap

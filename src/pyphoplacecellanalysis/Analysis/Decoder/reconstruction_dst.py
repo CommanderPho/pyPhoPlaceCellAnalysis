@@ -170,7 +170,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     def setup(self):
         super().setup()
-        self._compute_reliability_metrics() ## compute
+        _ = self.compute_unit_confusion_reliability_variables()
+        # self._compute_reliability_metrics() ## compute
 
 
 
