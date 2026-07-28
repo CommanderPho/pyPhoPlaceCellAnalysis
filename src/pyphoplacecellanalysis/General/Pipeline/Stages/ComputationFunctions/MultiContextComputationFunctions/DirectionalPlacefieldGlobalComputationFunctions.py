@@ -2617,7 +2617,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @property
     def ripple_epochs_df(self) -> pd.DataFrame:
-        return deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+        a_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
+        return ensure_dataframe(a_df)
+    @ripple_epochs_df.setter
+    def ripple_epochs_df(self, value: pd.DataFrame):
+        self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs = ensure_dataframe(value)
+
 
     @property
     def laps_decoding_time_bin_size(self) -> float:
@@ -2640,8 +2645,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
 
         laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
-        laps_marginals_df['lap_start_t'] = self.laps_epochs_df['start'].to_numpy()
+        laps_marginals_df['lap_idx'] = np.asarray(laps_marginals_df.index)
+        laps_marginals_df['lap_start_t'] = np.asarray(self.laps_epochs_df['start'])
         
         ## ensure we have the generic columns too (duplicated):
         laps_marginals_df['epoch_idx'] = laps_marginals_df['lap_idx']
@@ -2659,8 +2664,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         ## Ripple marginals_df:
         ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
-        ripple_marginals_df['ripple_start_t'] = self.ripple_epochs_df['start'].to_numpy()
+        ripple_marginals_df['ripple_idx'] = np.asarray(ripple_marginals_df.index)
+        ripple_marginals_df['ripple_start_t'] = np.asarray(self.ripple_epochs_df['start'])
         
         ## ensure we have the generic columns too (duplicated):
         ripple_marginals_df['epoch_idx'] = ripple_marginals_df['ripple_idx']
@@ -2947,8 +2952,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['lap_idx'] = epoch_marginals_df.index.to_numpy()
-                    epoch_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                    epoch_marginals_df['lap_idx'] = np.asarray(epoch_marginals_df.index)
+                    epoch_marginals_df['lap_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
                     ## ensure we have the generic columns too (duplicated):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df['lap_idx']
                     epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['lap_start_t']                    
@@ -2964,8 +2969,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['ripple_idx'] = epoch_marginals_df.index.to_numpy()
-                    epoch_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                    epoch_marginals_df['ripple_idx'] = np.asarray(epoch_marginals_df.index)
+                    epoch_marginals_df['ripple_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
                     ## ensure we have the generic columns too (duplicated):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df['ripple_idx']
                     epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['ripple_start_t']
@@ -2981,8 +2986,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
-                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                    epoch_marginals_df['epoch_idx'] = np.asarray(epoch_marginals_df.index)
+                    epoch_marginals_df['epoch_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
                     
                 elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
                     # Case: Per-epoch any marginals
@@ -2996,8 +3001,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
-                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
+                    epoch_marginals_df['epoch_idx'] = np.asarray(epoch_marginals_df.index)
+                    epoch_marginals_df['epoch_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
 
                 else:
                     raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
@@ -3470,12 +3475,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         # epochs_marginals_df = pd.DataFrame(np.hstack((epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         # epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
         if epoch_idx_col_name is not None:
-            track_marginal_posterior_df[epoch_idx_col_name] = track_marginal_posterior_df.index.to_numpy()
+            track_marginal_posterior_df[epoch_idx_col_name] = np.asarray(track_marginal_posterior_df.index)
             
         if len(tentative_epochs_df) == len(track_marginal_posterior_df):
             if epoch_start_t_col_name is not None:
                 assert 'start' in tentative_epochs_df
-                track_marginal_posterior_df[epoch_start_t_col_name] = tentative_epochs_df['start'].to_numpy()
+                track_marginal_posterior_df[epoch_start_t_col_name] = np.asarray(tentative_epochs_df['start'])
             # epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
             # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
             # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
@@ -3486,7 +3491,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if additional_transfer_column_names is not None:
                 for a_col_name in additional_transfer_column_names:
                     if ((a_col_name in tentative_epochs_df) and (a_col_name not in track_marginal_posterior_df)):
-                        track_marginal_posterior_df[a_col_name] = tentative_epochs_df[a_col_name].to_numpy()
+                        track_marginal_posterior_df[a_col_name] = np.asarray(tentative_epochs_df[a_col_name])
                     else:
                         print(f'\tWARN: extra column: "{a_col_name}" was specified but not present in epochs_df (which has columns: {list(tentative_epochs_df.columns)}). Skipping.')
                      

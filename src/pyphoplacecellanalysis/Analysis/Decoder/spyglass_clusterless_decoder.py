@@ -302,13 +302,13 @@ class SpyglassClusterlessDecoder(SerializedAttributesAllowBlockSpecifyingClass, 
 
             most_likely_positions = np.atleast_1d(most_likely_positions)
             p_x_given_n = np.atleast_1d(p_x_given_n)
-            curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
+            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = self.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=debug_print)
             most_likely_positions_list.append(most_likely_positions)
             p_x_given_n_list.append(p_x_given_n)
             most_likely_position_indicies_list.append(np.atleast_1d(most_likely_position_indicies))
             marginal_x_list.append(curr_unit_marginal_x)
             marginal_y_list.append(curr_unit_marginal_y)
-            marginal_z_list.append(None)
+            marginal_z_list.append(curr_unit_marginal_z)
         ## END for epoch_idx in range(num_filter_epochs)...
 
 
@@ -369,8 +369,8 @@ class SpyglassClusterlessDecoder(SerializedAttributesAllowBlockSpecifyingClass, 
             raise ValueError("SpyglassClusterlessDecoder requires position_info, spike_times, spike_waveform_features, and decoding_interval before compute_all().")
         self.p_x_given_n, self.flat_p_x_given_n, self.most_likely_positions, self.most_likely_position_flat_indicies, self.most_likely_position_indicies = self._predict_spyglass_posterior(self.spike_times, self.spike_waveform_features, self.position_info, self.decoding_interval, encoding_interval_for_fit=self.encoding_interval, debug_print=(debug_print or self.debug_print))
         self.revised_most_likely_positions = self.most_likely_positions.copy()
-        curr_unit_marginal_x, curr_unit_marginal_y = self.perform_build_marginals(self.p_x_given_n, self.most_likely_positions, debug_print=(debug_print or self.debug_print))
-        self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+        curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = self.perform_build_marginals(self.p_x_given_n, self.most_likely_positions, debug_print=(debug_print or self.debug_print))
+        self.marginal = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y, z=curr_unit_marginal_z)
         if self.decode_times is not None and len(self.decode_times) > 0:
             time_window_edges, time_window_edges_binning_info = compute_spanning_bins(self.decode_times, bin_size=self.time_bin_size)
             self.time_binning_container = BinningContainer(edges=time_window_edges, edge_info=time_window_edges_binning_info)

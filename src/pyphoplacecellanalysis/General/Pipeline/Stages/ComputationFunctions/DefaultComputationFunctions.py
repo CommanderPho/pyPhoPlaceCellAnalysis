@@ -448,8 +448,8 @@ class DefaultComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computa
             two_step_decoder_result['most_likely_positions'] = two_step_decoder_result['most_likely_positions'].T
             
             ## Once done, compute marginals for the two-step:
-            curr_unit_marginal_x, curr_unit_marginal_y = prev_one_step_bayesian_decoder.perform_build_marginals(two_step_decoder_result['p_x_given_n_and_x_prev'], two_step_decoder_result['most_likely_positions'], debug_print=debug_print)
-            two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y)
+            curr_unit_marginal_x, curr_unit_marginal_y, curr_unit_marginal_z = prev_one_step_bayesian_decoder.perform_build_marginals(two_step_decoder_result['p_x_given_n_and_x_prev'], two_step_decoder_result['most_likely_positions'], debug_print=debug_print)
+            two_step_decoder_result['marginal'] = DynamicContainer(x=curr_unit_marginal_x, y=curr_unit_marginal_y, z=curr_unit_marginal_z)
             
             return two_step_decoder_result
 

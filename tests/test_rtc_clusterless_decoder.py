@@ -107,9 +107,10 @@ def test_perform_build_marginals_with_shaped_posterior():
     p_x_given_n = np.random.rand(n_x, n_y, n_time)
     p_x_given_n /= p_x_given_n.sum(axis=(0, 1), keepdims=True)
     most_likely_positions = np.column_stack([np.arange(n_time, dtype=float), np.arange(n_time, dtype=float)])
-    marginal_x, marginal_y = BasePositionDecoder.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=False)
+    marginal_x, marginal_y, marginal_z = BasePositionDecoder.perform_build_marginals(p_x_given_n, most_likely_positions, debug_print=False)
     assert marginal_x.p_x_given_n.shape == (n_x, n_time)
     assert marginal_y.p_x_given_n.shape == (n_y, n_time)
+    assert marginal_z is None
 
 
 def test_build_multiunits_from_rtc_simulation_shapes():
