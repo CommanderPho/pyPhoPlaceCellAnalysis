@@ -96,6 +96,8 @@ def plot_1d_placecell_validations(active_placefields1D, plotting_config, should_
     """ Uses plot_single_cell_1D_placecell_validation(...) to plot a series of plots, one for each potential placecell, that allows you to see how the spiking corresponds to the animal's position/lap and how that contributes to the computed placemap
     
     Usage:
+        from pyphoplacecellanalysis.PhoPositionalData.plotting.placefield import plot_1d_placecell_validations
+
         plot_1d_placecell_validations(active_epoch_placefields1D, should_save=True)
         plot_1d_placecell_validations(active_epoch_placefields1D, modifier_string='lap_only', should_save=False)
 
