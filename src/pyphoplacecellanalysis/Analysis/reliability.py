@@ -1854,7 +1854,7 @@ class CellIndividualReliabilityMatrix:
                                         reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
                                         in_field_masks: Optional[Dict[int, np.ndarray]] = None,
                                         included_neuron_ids: Optional[Sequence[int]] = None,
-                                        which: str = "both", max_n_cells: Optional[int] = None,
+                                        reliability_variables: str = "both", max_n_cells: Optional[int] = None,
                                         subplots: Optional[Tuple[int, int]] = None, figsize_per_cell: float = 2.5,
                                         mask_cmap: str = "Greens", mask_alpha: float = 0.35,
                                         heatmap_cmap: str = "viridis", heatmap_alpha: float = 0.9,
@@ -1890,8 +1890,8 @@ class CellIndividualReliabilityMatrix:
 
         assert getattr(pfs, "ndim", 2) >= 2, "plot_reliability_maps_with_spikes requires 2D PfND"
         assert reliability_active is not None and reliability_silent is not None, "reliability_active and reliability_silent are required"
-        which = str(which).lower().strip()
-        assert which in ("both", "active", "silent"), f'which must be "both", "active", or "silent"; got {which!r}'
+        reliability_variables = str(reliability_variables).lower().strip()
+        assert reliability_variables in ("both", "active", "silent"), f'which must be "both", "active", or "silent"; got {reliability_variables!r}'
 
         xbin = np.asarray(pfs.xbin)
         ybin = np.asarray(pfs.ybin)
@@ -1929,11 +1929,11 @@ class CellIndividualReliabilityMatrix:
         assert n > 0, "No neuron_ids to plot"
         aclu_to_i = {int(a): i for i, a in enumerate(neuron_ids)}
 
-        panels: List[str] = ["active", "silent"] if which == "both" else [which]
+        panels: List[str] = ["active", "silent"] if reliability_variables == "both" else [reliability_variables]
         n_panels: int = len(panels)
 
         if subplots is None:
-            if which == "both":
+            if reliability_variables == "both":
                 n_rows, n_cols_cells = n, 1
             else:
                 n_cols_cells = int(np.ceil(np.sqrt(n)))
