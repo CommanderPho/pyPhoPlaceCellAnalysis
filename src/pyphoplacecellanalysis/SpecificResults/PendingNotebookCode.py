@@ -1787,7 +1787,7 @@ class InteractiveBayesian2DEquationDebugger:
             'per_cell_L': per_cell_L,  # list of (nx, ny)
             'power_term': power_term,  # Π (τf)^{n}
             'exp_term': exp_term,  # Π e^{-τf}
-            'factorial_term': factorial_term,  # scalar Π 1/n! (or tempered)
+            'factorial_term': factorial_term,  # scalar Π 1/n!, or spatial map when POSITION_DEPENDENT tempering raises (1/n!)^{α(x)}
             'L': L,  # unnormalized joint
             'posterior': posterior,  # P(x|n)
             'F': F,
@@ -2338,7 +2338,10 @@ class InteractiveBayesian2DEquationDebugger:
         n_str = ', '.join([f'{a}:{ni}' for a, ni in zip(self.aclu_list, n)])
         ml_flat = np.nanargmax(parts['posterior'])
         ml_ij = np.unravel_index(ml_flat, parts['posterior'].shape)
-        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={parts["factorial_term"]:.3g}  |  rel={self.reliability_modifier_mode.name}  |  est={self.reliability_estimation_mode.name}', fontsize=11)
+        # POSITION_DEPENDENT tempering makes factorial_term spatial ((1/n!)^{α(x)}); title shows nanmean
+        fac_term = np.asarray(parts['factorial_term'], dtype=float)
+        fac_disp = float(np.nanmean(fac_term)) if (fac_term.ndim > 0) else float(fac_term)
+        self.fig.suptitle(rf'{mode_label} 2D decode intuition  |  $\tau={self.tau}$s  |  n=[{n_str}]  |  MAP bin (x,y)_idx={ml_ij}  |  $\prod 1/n!$={fac_disp:.3g}  |  rel={self.reliability_modifier_mode.name}  |  est={self.reliability_estimation_mode.name}', fontsize=11)
         self.fig.canvas.draw_idle()
 
 
