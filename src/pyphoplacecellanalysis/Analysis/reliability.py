@@ -882,16 +882,17 @@ class CellIndividualReliabilityMatrix:
         n_neuron_ids: int = len(neuron_ids)
         spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
 
-        _fake_reliability_df, in_field_masks = CellIndividualReliabilityMatrix._partial_compute_reliability_matrix(
-            spikes_df=spikes_df,
+        # STAGE_1: in-field masks from PeakProminence2D (or from pf via build_in_field_masks_xy_from_pf)
+        in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(
             active_peak_prominence_2d_results=active_peak_prominence_2d_results,
             ratemaps=ratemaps,
             n_top_peaks=3,
             # slice_level_multiplier=0.9,
             slice_level_multiplier=0.2,
-            fn_tn_mode='occupancy_seconds',  # or 'occupied_bins'
+            neuron_ids=neuron_ids,
         )
 
+        # STAGE_2: time-binned TP/FP/TN/FN confusion products
         t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df,
             ratemaps=ratemaps,
@@ -903,7 +904,10 @@ class CellIndividualReliabilityMatrix:
         )
         t_bin_aclus_reliability_df
 
-        ## OUTPUTS: _fake_reliability_df, in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+        ## OUTPUTS: in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+
+        # Or use the decoder mixin entrypoint (STAGE_1 + STAGE_2 + reliability_* metrics):
+        #   a_dst_decoder2D.compute_unit_confusion_reliability_variables()
 
 
     """
@@ -1068,7 +1072,61 @@ class CellIndividualReliabilityMatrix:
         return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
 
 
-    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
+    @classmethod
+    def _prepare_visit_polars_frames(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, neuron_ids, in_field_lut: pl.DataFrame, max_t_idx: Optional[int] = None, spike_t_bin_offset: int = 1) -> Tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, np.ndarray]:
+        """Cast/filter animal position, in-field LUT, and per-tbin spikes for visit-conditioned aggregations.
+
+        Spike ``t_bin_idx`` labels from ``compute_reliability_matrix`` are 1-based; animal
+        ``time_bin_info_df['t_bin_idx']`` is 0-based. Default ``spike_t_bin_offset=1`` subtracts
+        that offset so joins align on 0-based time bins.
+
+        Returns
+        -------
+        pos, lut, spikes, neuron_ids_i64
+        """
+        neuron_ids = np.asarray(neuron_ids)
+        neuron_ids_i64 = neuron_ids.astype(np.int64)
+
+        pos_cols = ['t_bin_idx', 'binned_x', 'binned_y']
+        assert all(c in time_bin_info_df.columns for c in pos_cols), f"time_bin_info_df missing {pos_cols}"
+
+        pos = (
+            pl.from_pandas(time_bin_info_df[pos_cols])
+            .with_columns([
+                pl.col('t_bin_idx').cast(pl.Int64),
+                pl.col('binned_x').cast(pl.Int64),
+                pl.col('binned_y').cast(pl.Int64),
+            ])
+            .filter(pl.col('binned_x').is_not_null() & pl.col('binned_y').is_not_null())
+        )
+        if max_t_idx is not None:
+            pos = pos.filter(pl.col('t_bin_idx') < int(max_t_idx))
+
+        lut = (
+            in_field_lut
+            .select(['aclu', 'binned_x', 'binned_y'])
+            .with_columns([
+                pl.col('aclu').cast(pl.Int64),
+                pl.col('binned_x').cast(pl.Int64),
+                pl.col('binned_y').cast(pl.Int64),
+            ])
+            .unique()
+            .filter(pl.col('aclu').is_in(neuron_ids_i64.tolist()))
+        )
+
+        # Align spike t_bin_idx to 0-based animal time_bin_info_df indices
+        spikes = (
+            pl.from_pandas(per_tbin[['aclu', 't_bin_idx', 'n_spikes']])
+            .with_columns([
+                pl.col('aclu').cast(pl.Int64),
+                (pl.col('t_bin_idx').cast(pl.Int64) - int(spike_t_bin_offset)).alias('t_bin_idx'),
+                pl.col('n_spikes').cast(pl.Float64),
+            ])
+        )
+        return pos, lut, spikes, neuron_ids_i64
+
+
+    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability'], input_requires=[], output_provides=[], uses=['_prepare_visit_polars_frames'], used_by=['compute_reliability_matrix'], creation_date='2026-07-22 19:39', related_items=[])
     @classmethod
     def perform_compute_confusion_matrix(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, neuron_ids,
                                          in_field_lut: pl.DataFrame, max_t_idx: Optional[int] = None, **kwargs) -> pd.DataFrame:
@@ -1078,8 +1136,8 @@ class CellIndividualReliabilityMatrix:
 
         Parameters
         ----------
-        per_tbin : DataFrame with columns ['aclu', 't_bin_idx', 'n_spikes'].
-        time_bin_info_df : per-time-bin animal position with ['t_bin_idx', 'binned_x', 'binned_y'] (1-based labels).
+        per_tbin : DataFrame with columns ['aclu', 't_bin_idx', 'n_spikes'] (spike ``t_bin_idx`` 1-based).
+        time_bin_info_df : per-time-bin animal position with 0-based ``t_bin_idx`` and 1-based ``binned_x``/``binned_y``.
         neuron_ids : ordered neuron ids (row order of output).
         in_field_lut : Polars DataFrame with columns ['aclu', 'binned_x', 'binned_y'] (in-field spatial bins only).
         max_t_idx : if set, only process rows with t_bin_idx < max_t_idx (debug/partial runs).
@@ -1099,37 +1157,9 @@ class CellIndividualReliabilityMatrix:
         ``TN = n_out - outfield_spike_tbins``.
         """
         neuron_ids = np.asarray(neuron_ids)
-        neuron_ids_i64 = neuron_ids.astype(np.int64)
-
-        pos_cols = ['t_bin_idx', 'binned_x', 'binned_y']
-        assert all(c in time_bin_info_df.columns for c in pos_cols), f"time_bin_info_df missing {pos_cols}"
-
-        pos = (
-            pl.from_pandas(time_bin_info_df[pos_cols])
-            .with_columns([
-                pl.col('t_bin_idx').cast(pl.Int64),
-                pl.col('binned_x').cast(pl.Int64),
-                pl.col('binned_y').cast(pl.Int64),
-            ])
-            .filter(pl.col('binned_x').is_not_null() & pl.col('binned_y').is_not_null())
-        )
-        if max_t_idx is not None:
-            pos = pos.filter(pl.col('t_bin_idx') < int(max_t_idx))
+        pos, lut, spikes, neuron_ids_i64 = cls._prepare_visit_polars_frames(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, max_t_idx=max_t_idx)
         n_computed_bins: int = pos.height
         print(f"n_tbins={len(time_bin_info_df)}, n_valid={n_computed_bins}, n_nan={len(time_bin_info_df) - n_computed_bins}")
-
-        lut = (
-            in_field_lut
-            .select(['aclu', 'binned_x', 'binned_y'])
-            .with_columns([
-                pl.col('aclu').cast(pl.Int64),
-                pl.col('binned_x').cast(pl.Int64),
-                pl.col('binned_y').cast(pl.Int64),
-            ])
-            .unique()
-        )
-        ## restrict LUT to requested neuron_ids
-        lut = lut.filter(pl.col('aclu').is_in(neuron_ids_i64.tolist()))
 
         known_keys = lut.select(['binned_x', 'binned_y']).unique()
         known_pos = pos.join(known_keys, on=['binned_x', 'binned_y'], how='inner')
@@ -1158,14 +1188,6 @@ class CellIndividualReliabilityMatrix:
         )
 
         ## spikes only at known animal-position bins
-        spikes = (
-            pl.from_pandas(per_tbin[['aclu', 't_bin_idx', 'n_spikes']])
-            .with_columns([
-                pl.col('aclu').cast(pl.Int64),
-                pl.col('t_bin_idx').cast(pl.Int64),
-                pl.col('n_spikes').cast(pl.Float64),
-            ])
-        )
         sp = (
             spikes
             .join(known_pos.select(['t_bin_idx', 'binned_x', 'binned_y']), on='t_bin_idx', how='inner')
@@ -1232,7 +1254,7 @@ class CellIndividualReliabilityMatrix:
         ])
 
 
-    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability', 'position-dependent'], input_requires=[], output_provides=[], uses=[], used_by=['BayesianPlacemapPositionDecoder._compute_reliability_metrics'], creation_date='2026-07-28 17:00', related_items=['perform_compute_confusion_matrix'])
+    @function_attributes(short_name=None, tags=['confusion_matrix', 'reliability', 'position-dependent'], input_requires=[], output_provides=[], uses=['_prepare_visit_polars_frames'], used_by=['BayesianPlacemapPositionDecoder._compute_reliability_metrics'], creation_date='2026-07-28 17:00', related_items=['perform_compute_confusion_matrix'])
     @classmethod
     def perform_compute_position_dependent_reliability_maps(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, neuron_ids, in_field_lut: pl.DataFrame, occupancy_shape: Tuple[int, ...], max_t_idx: Optional[int] = None, **kwargs) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame]:
         """Build visit-conditioned reliability maps ``(n_flat_position_bins, n_neurons)`` from animal position per t-bin.
@@ -1259,47 +1281,11 @@ class CellIndividualReliabilityMatrix:
         position_aclus_reliability_df : long DataFrame with per-(aclu, binned_x, binned_y) rates
         """
         neuron_ids = np.asarray(neuron_ids)
-        neuron_ids_i64 = neuron_ids.astype(np.int64)
         nx, ny = int(occupancy_shape[0]), int(occupancy_shape[1])
         n_flat: int = nx * ny
         n_neurons: int = len(neuron_ids)
 
-        pos_cols = ['t_bin_idx', 'binned_x', 'binned_y']
-        assert all(c in time_bin_info_df.columns for c in pos_cols), f"time_bin_info_df missing {pos_cols}"
-
-        pos = (
-            pl.from_pandas(time_bin_info_df[pos_cols])
-            .with_columns([
-                pl.col('t_bin_idx').cast(pl.Int64),
-                pl.col('binned_x').cast(pl.Int64),
-                pl.col('binned_y').cast(pl.Int64),
-            ])
-            .filter(pl.col('binned_x').is_not_null() & pl.col('binned_y').is_not_null())
-        )
-        if max_t_idx is not None:
-            pos = pos.filter(pl.col('t_bin_idx') < int(max_t_idx))
-
-        lut = (
-            in_field_lut
-            .select(['aclu', 'binned_x', 'binned_y'])
-            .with_columns([
-                pl.col('aclu').cast(pl.Int64),
-                pl.col('binned_x').cast(pl.Int64),
-                pl.col('binned_y').cast(pl.Int64),
-            ])
-            .unique()
-            .filter(pl.col('aclu').is_in(neuron_ids_i64.tolist()))
-        )
-
-        # Spikes: align 1-based spike t_bin_idx to 0-based animal t_bin_idx
-        spikes = (
-            pl.from_pandas(per_tbin[['aclu', 't_bin_idx', 'n_spikes']])
-            .with_columns([
-                pl.col('aclu').cast(pl.Int64),
-                (pl.col('t_bin_idx').cast(pl.Int64) - 1).alias('t_bin_idx'),
-                pl.col('n_spikes').cast(pl.Float64),
-            ])
-        )
+        pos, lut, spikes, neuron_ids_i64 = cls._prepare_visit_polars_frames(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, max_t_idx=max_t_idx)
 
         # Visit counts per animal spatial bin (shared across aclus)
         visit_counts = pos.group_by(['binned_x', 'binned_y']).agg(pl.len().alias('n_visits'))
@@ -1350,7 +1336,7 @@ class CellIndividualReliabilityMatrix:
         return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0), position_aclus_reliability_df
 
 
-    @function_attributes(short_name=None, tags=['promenece', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['build_in_field_masks_xy', '_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
+    @function_attributes(short_name=None, tags=['promenece', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['build_in_field_masks_xy'], creation_date='2026-07-22 19:26', related_items=[])
     @classmethod
     def _build_top_peak_90pct_masks(cls, active_peak_prominence_2d_results, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9) -> Dict[int, np.ndarray]:
         """Build per-neuron boolean masks (ny, nx) = union of top-N peak contours at `slice_level_multiplier` * peak height.
@@ -1499,7 +1485,7 @@ class CellIndividualReliabilityMatrix:
         return cls.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=pf.ratemap, n_top_peaks=n_top_peaks, slice_level_multiplier=slice_level_multiplier, neuron_ids=neuron_ids)
 
 
-    @function_attributes(short_name=None, tags=['prominence', 'in_field', 'mask'], input_requires=[], output_provides=[], uses=['_build_top_peak_90pct_masks'], used_by=['_partial_compute_reliability_matrix'], creation_date='2026-07-23 04:06', related_items=[])
+    @function_attributes(short_name=None, tags=['prominence', 'in_field', 'mask'], input_requires=[], output_provides=[], uses=['_build_top_peak_90pct_masks'], used_by=['compute_reliability_matrix', 'build_in_field_masks_xy_from_pf', 'CellIndividualReliabilityComputingMixin.compute_unit_confusion_reliability_variables'], creation_date='2026-07-23 04:06', related_items=[])
     @classmethod
     def build_in_field_masks_xy(cls, active_peak_prominence_2d_results, ratemaps, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9, neuron_ids=None) -> Dict[int, np.ndarray]:
         """Build per-neuron in-field boolean masks shaped like ratemap occupancy (nx, ny).
@@ -1865,17 +1851,54 @@ class CellIndividualReliabilityMatrix:
 
 @metadata_attributes(short_name=None, tags=['reliability', 'decoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-29 09:04', related_items=[])
 class CellIndividualReliabilityComputingMixin:
-    """ Implementors compute and use cell individual reliabilities
+    """ Implementors compute and use cell individual reliabilities.
 
     Usage:
         from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityComputingMixin, CellIndividualReliabilityMatrix, ReliabilityDecoderModifierMode, ReliabilityEstimationMode
+
+    Required ``self.`` properties (implementor must provide)
+    -------------------------------------------------------
+    Core decoder / placefield state:
+        pf : PfND
+            2D placefield; ``assert self.pf is not None`` in ``_compute_reliability_metrics``.
+        ratemap
+            Ratemap for bin edges / ``neuron_ids`` fallback (typically ``self.pf.ratemap``).
+        neuron_IDs : optional array-like
+            Neuron id order; if ``None``, uses ``self.ratemap.neuron_ids``.
+        spikes_df : optional DataFrame
+            May start as ``None``; filled from ``pf.filtered_spikes_df`` when needed.
+        time_bin_size : optional float
+            Default temporal bin width; may be written if ``None`` when compute is called.
+        F : optional ndarray
+            Flat tuning matrix; when not ``None``, ``flat_position_size`` is used for map shape checks.
+        flat_position_size : int
+            Number of flat position bins (used when ``F is not None``).
+        original_position_data_shape : tuple
+            Occupancy / map shape (used when ``F is None`` or in-field masks are empty).
+
+    Reliability configuration (read):
+        n_top_peaks : int
+            Top-N peaks for in-field mask contours.
+        slice_level_multiplier : float
+            Contour height fraction for in-field masks (e.g. 0.2).
+        reliability_estimation_mode : ReliabilityEstimationMode
+            ``PER_CELL`` vs ``POSITION_DEPENDENT`` (defaults via ``getattr`` to ``PER_CELL`` if missing).
+        should_discount_silence : bool
+            If True, ``reliability_silent`` uses confusion/visit rates; else ones.
+
+    Written / updated by this mixin
+    -------------------------------
+        in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df,
+        per_tbin_aclu_xy_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse,
+        position_aclus_reliability_df, reliability_active, reliability_silent
+        (and optionally ``spikes_df`` / ``time_bin_size`` when they were ``None``).
 
     """
     # ==================================================================================================================================================================================================================================================================================== #
     # Cell Reliability Computations                                                                                                                                                                                                                                                        #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.build_in_field_masks_xy_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
     def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
         """Compute per-aclu confusion-matrix reliability products and refresh ``reliability_*`` on self.
 
@@ -1886,8 +1909,9 @@ class CellIndividualReliabilityComputingMixin:
         Parameters
         ----------
         active_peak_prominence_2d_results : optional PeakProminence2D results for in-field masks.
-            If None, recomputes a minimal PeakProminence2D from ``self.pf`` via
-            ``CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf`` (no pipeline cache required).
+            If None, builds masks via ``CellIndividualReliabilityMatrix.build_in_field_masks_xy_from_pf``
+            (recomputes PeakProminence2D from ``self.pf``; no pipeline cache required).
+            If provided, uses ``build_in_field_masks_xy`` with those results.
         spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
         time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
         max_t_idx : optional cap on number of time bins (None = all).
@@ -1931,12 +1955,15 @@ class CellIndividualReliabilityComputingMixin:
             self.time_bin_size = time_bin_size_seconds
 
         if active_peak_prominence_2d_results is None:
-            active_peak_prominence_2d_results = CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf(pfs, neuron_ids=neuron_ids)
-
-        self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
-            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
-            neuron_ids=neuron_ids,
-        )
+            self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy_from_pf(
+                pf=pfs, n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, neuron_ids=neuron_ids,
+            )
+        else:
+            self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(
+                active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+                n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier,
+                neuron_ids=neuron_ids,
+            )
 
         ## add binned:
         spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True) ## #TODO 2026-07-28 19:47: - [ ] inefficient to do this again and again
