@@ -2020,6 +2020,9 @@ class CellIndividualReliabilityComputingMixin:
         If ``t_bin_aclus_reliability_df`` is missing:
             PER_CELL → ones (no discounting) so decode still works.
             POSITION_DEPENDENT → raises; call ``compute_unit_confusion_reliability_variables`` first.
+
+        Updates: self.reliability_active, self.reliability_silent
+
         """
         assert (self.pf is not None)
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
@@ -2027,17 +2030,22 @@ class CellIndividualReliabilityComputingMixin:
         estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
 
         has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
-        if not has_confusion:
-            if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
-                print(f'WARN: ._compute_reliability_metrics(...): POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
-                _ = self.compute_unit_confusion_reliability_variables() ## performing compute.
-                print(f'\tdone.')
-                if self.t_bin_aclus_reliability_df is None:
-                    raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
+        is_ignore_mode: bool = (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
+        if is_ignore_mode:
+            print(f'WARN: ._compute_reliability_metrics(...): called in (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.IGNORE) mode. skipping computations and returning.')
             # R_ones = np.ones(n_neurons, dtype=float)
             # self.reliability_active = R_ones
             # self.reliability_silent = np.ones_like(R_ones)
-            # return
+            return ### ignore, skipping computations
+
+        should_compute: bool = (not has_confusion) and (not is_ignore_mode)
+
+        if should_compute:
+            print(f'WARN: ._compute_reliability_metrics(...): reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
+            _ = self.compute_unit_confusion_reliability_variables() ## performing compute.
+            print(f'\tdone.')
+            if self.t_bin_aclus_reliability_df is None:
+                raise ValueError('reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
 
         rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
         true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
@@ -2046,7 +2054,7 @@ class CellIndividualReliabilityComputingMixin:
         false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
         assert len(true_pos) == n_neurons, f'Confusion rates length {len(true_pos)} != n_neurons {n_neurons} after reindex by neuron_IDs.'
 
-        if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
+        if (estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value):
             has_visit_tables: bool = (self.per_tbin_aclu_spike_counts_df is not None) and (self.time_bin_info_df is not None) and (self.in_field_masks is not None)
             if has_visit_tables:
                 if len(self.in_field_masks) > 0:
@@ -2065,6 +2073,8 @@ class CellIndividualReliabilityComputingMixin:
                 # Slice / partial state: fall back to global rates × masks
                 self.position_aclus_reliability_df = None
                 R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
+
+            ## OUTPUTS: R_active, R_silent_from_confusion
             self.reliability_active = R_active
             if self.should_discount_silence:
                 self.reliability_silent = R_silent_from_confusion
@@ -2072,7 +2082,7 @@ class CellIndividualReliabilityComputingMixin:
                 self.reliability_silent = np.ones_like(R_active)
         else:
             # PER_CELL: position-independent reliability from true_pos
-            self.position_aclus_reliability_df = None
+            # self.position_aclus_reliability_df = None ## do not need to clear the per-position reliability
             R_base = true_pos
             self.reliability_active = R_base
             # Map reliability for silence (n_i = 0).

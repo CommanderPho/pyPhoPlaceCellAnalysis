@@ -47,8 +47,7 @@ from pyphoplacecellanalysis.General.Mixins.CrossComputationComparisonHelpers imp
 from neuropy.utils.mixins.AttrsClassHelpers import AttrsBasedClassHelperMixin, custom_define, serialized_field, serialized_attribute_field, non_serialized_field
 from neuropy.utils.mixins.HDF5_representable import HDF_DeserializationMixin, post_deserialize, HDF_SerializationMixin, HDFMixin
 from neuropy.utils.mixins.peak_location_representing import ContinuousPeakLocationRepresentingMixin, PeakLocationRepresentingMixin
-from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix, ReliabilityDecoderModifierMode, ReliabilityEstimationMode
-
+from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityComputingMixin, ReliabilityDecoderModifierMode, ReliabilityEstimationMode
 
 from typing import Literal
 # Define a type that can only be one of these specific strings
@@ -2287,7 +2286,7 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 # Placemap Position Decoders                                                                                           #
 # ==================================================================================================================== #
 from neuropy.utils.mixins.binning_helpers import GridBinDebuggableMixin, DebugBinningInfo, BinnedPositionsMixin
-from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityComputingMixin, CellIndividualReliabilityMatrix, ReliabilityDecoderModifierMode, ReliabilityEstimationMode
+
 
 # ==================================================================================================================== #
 # Stateless Decoders (New 2023-04-06)                                                                                  #
