@@ -2439,9 +2439,9 @@ class InteractiveBayesian2DEquationDebugger:
         sliced.reliability_estimation_mode = self.reliability_estimation_mode
         has_confusion: bool = (getattr(sliced, 't_bin_aclus_reliability_df', None) is not None) and ('true_pos' in sliced.t_bin_aclus_reliability_df.columns)
         if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (not has_confusion):
-            sliced.compute_unit_confusion_reliability_variables()
+            sliced._perform_compute_unit_confusion_reliability_variables()
         else:
-            sliced._compute_reliability_metrics()
+            sliced.compute_reliability_metrics()
 
 
     def on_drop_negative_terms(self, _label: str):

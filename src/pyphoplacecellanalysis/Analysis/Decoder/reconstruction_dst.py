@@ -134,8 +134,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             should_discount_silence = discount_silence
         _obj = cls(time_bin_size=stateful_decoder.time_bin_size, pf=deepcopy(stateful_decoder.pf), spikes_df=deepcopy(stateful_decoder.spikes_df), field_threshold_frac=field_threshold_frac, should_discount_silence=should_discount_silence, debug_print=kwargs.pop('debug_print', stateful_decoder.debug_print), **kwargs)
         if active_peak_prominence_2d_results is not None:
-            _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=confusion_spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
-            _obj._compute_reliability_metrics() ## compute
+            _obj._perform_compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=confusion_spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
+            _obj.compute_reliability_metrics() ## compute
 
         return _obj
 
@@ -157,8 +157,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             should_discount_silence = discount_silence
         _obj = cls(time_bin_size=time_bin_size, pf=deepcopy(pf), spikes_df=deepcopy(spikes_df), field_threshold_frac=field_threshold_frac, should_discount_silence=should_discount_silence, debug_print=debug_print, **kwargs)
         if active_peak_prominence_2d_results is not None:
-            _obj.compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
-            _obj._compute_reliability_metrics() ## compute
+            _obj._perform_compute_unit_confusion_reliability_variables(active_peak_prominence_2d_results=active_peak_prominence_2d_results, spikes_df=spikes_df, time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx)
+            _obj.compute_reliability_metrics() ## compute
 
         return _obj
 
@@ -170,8 +170,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
     def setup(self):
         super().setup()
-        _ = self.compute_unit_confusion_reliability_variables() ## worse compute
-        self._compute_reliability_metrics() ## compute
+        self.compute_reliability_metrics() ## mode-gated: IGNORE→ones; else confusion-as-needed then maps
 
 
 
@@ -266,7 +265,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         # 2. Ensure spatial SNR metrics are prepared
         if self.reliability_active is None:
             # self._compute_reliability_metrics(ratemaps_flat)
-            self._compute_reliability_metrics()
+            self.compute_reliability_metrics()
 
         tau: float = self.time_bin_size
         nTimeBins: int = spkcount.shape[1]

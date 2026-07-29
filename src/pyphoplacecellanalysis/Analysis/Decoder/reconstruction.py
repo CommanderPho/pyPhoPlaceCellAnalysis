@@ -3769,6 +3769,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         self.most_likely_position_indicies = None
         self.marginal = None 
 
+        self.compute_reliability_metrics()
+
 
     def debug_dump_print(self):
         """ dumps the state for debugging purposes """

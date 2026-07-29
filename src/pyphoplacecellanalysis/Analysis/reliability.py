@@ -1899,7 +1899,7 @@ class CellIndividualReliabilityComputingMixin:
     # ==================================================================================================================================================================================================================================================================================== #
 
     @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.build_in_field_masks_xy_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
-    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
+    def _perform_compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
         """Compute per-aclu confusion-matrix reliability products and refresh ``reliability_*`` on self.
 
         After writing confusion products, calls ``_compute_reliability_metrics()`` so
@@ -1974,7 +1974,7 @@ class CellIndividualReliabilityComputingMixin:
             reliability_estimation_mode=self.reliability_estimation_mode, **kwargs,
         )
 
-        self._compute_reliability_metrics()
+        self.compute_reliability_metrics()
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df
 
 
@@ -2008,7 +2008,7 @@ class CellIndividualReliabilityComputingMixin:
         return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0)
 
 
-    def _compute_reliability_metrics(self, **kwargs):
+    def compute_reliability_metrics(self, debug_print: bool=False, **kwargs):
         """ Called after main confusion computation
         Builds reliability arrays from confusion-matrix rates (no Skaggs).
 
@@ -2017,35 +2017,42 @@ class CellIndividualReliabilityComputingMixin:
             POSITION_DEPENDENT: ``(n_flat_position_bins, n_neurons)`` visit-conditioned maps from
                 ``per_tbin_aclu_spike_counts_df`` × animal ``time_bin_info_df`` (falls back to global rates × ``in_field_masks``).
 
-        If ``t_bin_aclus_reliability_df`` is missing:
-            PER_CELL → ones (no discounting) so decode still works.
-            POSITION_DEPENDENT → raises; call ``compute_unit_confusion_reliability_variables`` first.
+        If ``reliability_modifier_mode == IGNORE``:
+            set ``reliability_*`` to ones and return (no discounting; avoids DST decode recursion).
+
+        If ``t_bin_aclus_reliability_df`` is missing (and not IGNORE):
+            run ``compute_unit_confusion_reliability_variables`` for both PER_CELL and POSITION_DEPENDENT
+            (both need confusion rates), then return (nested metrics already refreshed ``reliability_*``).
 
         Updates: self.reliability_active, self.reliability_silent
 
         """
+        is_ignore_mode: bool = (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
+        if is_ignore_mode:
+            if debug_print:
+                print(f'WARN: ._compute_reliability_metrics(...): called in (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.IGNORE) mode. skipping computations and returning.')
+
+            R_ones = np.ones(n_neurons, dtype=float)
+            self.reliability_active = R_ones
+            self.reliability_silent = np.ones_like(R_ones)
+            return ### ignore, skipping computations
+
         assert (self.pf is not None)
+        has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
+        should_compute: bool = (not has_confusion) and (not is_ignore_mode)
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
         n_neurons: int = int(len(neuron_ids))
         estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
 
-        has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
-        is_ignore_mode: bool = (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
-        if is_ignore_mode:
-            print(f'WARN: ._compute_reliability_metrics(...): called in (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.IGNORE) mode. skipping computations and returning.')
-            # R_ones = np.ones(n_neurons, dtype=float)
-            # self.reliability_active = R_ones
-            # self.reliability_silent = np.ones_like(R_ones)
-            return ### ignore, skipping computations
-
-        should_compute: bool = (not has_confusion) and (not is_ignore_mode)
-
         if should_compute:
-            print(f'WARN: ._compute_reliability_metrics(...): reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
-            _ = self.compute_unit_confusion_reliability_variables() ## performing compute.
-            print(f'\tdone.')
+            if debug_print:
+                print(f'WARN: ._compute_reliability_metrics(...): reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
+            _ = self._perform_compute_unit_confusion_reliability_variables(**kwargs) ## performing compute.
+            if debug_print:
+                print(f'\tdone.')
             if self.t_bin_aclus_reliability_df is None:
                 raise ValueError('reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
+            return  # nested call already refreshed reliability_*
 
         rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
         true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
