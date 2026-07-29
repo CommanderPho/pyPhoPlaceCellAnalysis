@@ -178,7 +178,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         """Return a DST copy restricted to ``ids``, preserving DST config and sliced reliability when present.
 
         Mirrors ``BayesianPlacemapPositionDecoder.get_by_id`` but constructs ``BayesianPlacemapPositionDecoderDST``.
-        Time-bin reliability tables / sparse spike counts are left None on the slice.
+        Visit-conditioned reliability tables are neuron-filtered onto the slice (sparse counts left None).
         """
         ids = np.asarray(ids)
         source_ids = np.asarray(self.neuron_IDs)
@@ -217,12 +217,26 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             neuron_sliced_decoder.t_bin_aclus_reliability_df = self.t_bin_aclus_reliability_df.reindex(source_ids[keep])
         else:
             neuron_sliced_decoder.t_bin_aclus_reliability_df = None
-        # Leave time-bin spike-count tables / sparse counts unset on the slice
-        neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
-        neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = None
-        neuron_sliced_decoder.time_bin_info_df = None
-        neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None
-        neuron_sliced_decoder.position_aclus_reliability_df = None
+        # Preserve visit-conditioned tables (filtered by aclu) so POSITION_DEPENDENT can rebuild without falling back to global rates × masks
+        keep_ids = source_ids[keep]
+        id_set = set(int(x) for x in keep_ids)
+        neuron_sliced_decoder.time_bin_info_df = deepcopy(self.time_bin_info_df) if (self.time_bin_info_df is not None) else None
+        if self.per_tbin_aclu_spike_counts_df is not None:
+            pdf = self.per_tbin_aclu_spike_counts_df
+            neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
+        else:
+            neuron_sliced_decoder.per_tbin_aclu_spike_counts_df = None
+        if self.per_tbin_aclu_xy_spike_counts_df is not None:
+            pdf = self.per_tbin_aclu_xy_spike_counts_df
+            neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
+        else:
+            neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = None
+        if self.position_aclus_reliability_df is not None:
+            pdf = self.position_aclus_reliability_df
+            neuron_sliced_decoder.position_aclus_reliability_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
+        else:
+            neuron_sliced_decoder.position_aclus_reliability_df = None
+        neuron_sliced_decoder.per_tbin_aclu_spike_counts_sparse = None  # sparse not needed for visit-conditioned rebuild
 
         # Invalidate decode caches (cannot neuron-slice a posterior)
         neuron_sliced_decoder.flat_p_x_given_n = None

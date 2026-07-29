@@ -1744,15 +1744,25 @@ class InteractiveBayesian2DEquationDebugger:
                 if R_eff.ndim == 1:
                     alpha_i = float(R_eff[i])
                     alphas[i] = alpha_i
+
+                    ## 1D tempering by cell by raising to the power of alpha_i
+                    cell_power = np.power(cell_power, alpha_i)
+                    cell_exp = np.power(cell_exp, alpha_i)
+                    cell_fac = np.power(cell_fac, alpha_i)
+
+
                 elif R_eff.ndim >= 2:
                     alpha_i = R_eff[..., i].reshape(spatial_shape)
                     alphas[i] = float(np.nanmean(alpha_i))
+
+                    ## Do true 2D tempering by position bin -- this is WAY more subtle isn't it?
+                    cell_power = cell_power * alpha_i # #np.power(cell_power, alpha_i)
+                    cell_exp = cell_exp ## don't multiply the other two terms as that'd be repeated multiplication
+                    cell_fac = cell_fac
+
                 else:
                     raise ValueError(f'Unsupported reliability ndim={R_eff.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
 
-                cell_power = np.power(cell_power, alpha_i)
-                cell_exp = np.power(cell_exp, alpha_i)
-                cell_fac = np.power(cell_fac, alpha_i)
                 cell_L = cell_power * cell_exp * cell_fac
 
 
@@ -2436,16 +2446,12 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     def _ensure_sliced_reliability_metrics(self, sliced: Optional[BayesianPlacemapPositionDecoder] = None):
-        """Sync estimation mode onto ``sliced`` and (re)compute ``reliability_*`` from confusion products when needed."""
+        """Sync estimation mode onto ``sliced`` and recompute ``reliability_*`` for the neuron slice."""
         if sliced is None:
             sliced = self.sliced
         assert sliced is not None
         sliced.reliability_estimation_mode = self.reliability_estimation_mode
-        has_confusion: bool = (getattr(sliced, 't_bin_aclus_reliability_df', None) is not None) and ('true_pos' in sliced.t_bin_aclus_reliability_df.columns)
-        if (self.reliability_estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value) and (not has_confusion):
-            sliced._perform_compute_unit_confusion_reliability_variables()
-        else:
-            sliced.compute_reliability_metrics()
+        sliced.compute_reliability_metrics()  # visit tables are preserved by get_by_id; POSITION_DEPENDENT rebuilds spatial maps
 
 
     def on_drop_negative_terms(self, _label: str):
