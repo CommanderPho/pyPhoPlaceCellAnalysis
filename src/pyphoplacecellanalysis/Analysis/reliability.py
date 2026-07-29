@@ -1854,7 +1854,7 @@ class CellIndividualReliabilityMatrix:
                                         reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
                                         in_field_masks: Optional[Dict[int, np.ndarray]] = None,
                                         included_neuron_ids: Optional[Sequence[int]] = None,
-                                        reliability_variables: str = "both", max_n_cells: Optional[int] = None,
+                                        reliability_variables: str = "active", max_n_cells: Optional[int] = None,
                                         subplots: Optional[Tuple[int, int]] = None, figsize_per_cell: float = 2.5,
                                         mask_cmap: str = "Greens", mask_alpha: float = 0.35,
                                         heatmap_cmap: str = "viridis", heatmap_alpha: float = 0.9,
