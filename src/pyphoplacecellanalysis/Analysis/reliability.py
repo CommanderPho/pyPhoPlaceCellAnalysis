@@ -950,8 +950,8 @@ class CellIndividualReliabilityMatrix:
         ## INPUTS: spikes_df, ratemaps
         # spikes_df should already have 'x' and 'y' (e.g. active_pf_2D.filtered_spikes_df)
 
-        # spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(spikes_df, bin_values=(ratemaps.xbin, ratemaps.ybin), position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=False)
-        spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+        # # spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(spikes_df, bin_values=(ratemaps.xbin, ratemaps.ybin), position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=False)
+        # spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
 
         if spikes_df.spikes.time_variable_name not in spikes_df.columns:
             if 't_seconds' in spikes_df.columns:
@@ -976,7 +976,16 @@ class CellIndividualReliabilityMatrix:
         active_pos_df['t_bin_idx'] = active_pos_df['t_bin_idx'].astype(int) ## convert to int
         active_pos_df
 
+
+        ## Interpolate the spikes positions from the position df:
         # pos_df = pfs.filtered_pos_df  # or sess.position.to_dataframe()
+        spikes_df = deepcopy(spikes_df).spikes.interpolate_spike_positions(
+            active_pos_df['t'].to_numpy(), active_pos_df['x'].to_numpy(), active_pos_df['y'].to_numpy(),
+            replace_existing=True,
+        )
+        # spikes_df, (xbin, ybin), bin_infos = build_df_discretized_binned_position_columns(spikes_df, bin_values=(ratemaps.xbin, ratemaps.ybin), position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=False)
+        spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+
 
         time_bin_info_df: pd.DataFrame = pd.DataFrame({'t': bin_container.centers, 't_bin_idx': np.arange(bin_container.num_bins),
             'x': np.interp(bin_container.centers, active_pos_df['t'], active_pos_df['x']),
@@ -1003,6 +1012,13 @@ class CellIndividualReliabilityMatrix:
         # ==================================================================================================================================================================================================================================================================================== #
         # in_field_masks: Dict[aclu, np.ndarray[bool] shape (nx, ny)]  # 0-based array indexing
         in_field_lut = cls.build_in_field_lut(in_field_masks)  # only True cells; absent = out-of-field / unknown spatial bin
+
+
+        # right after adding_binned_position_columns, before Polars:
+        print(spikes_df[['y','binned_y']].dtypes)
+        print(spikes_df['binned_y'].isna().mean())
+        print(spikes_df['y'].describe())
+        print(ratemaps.ybin[[0,-1]])
 
         # ==================================================================================================================================================================================================================================================================================== #
         # Polars: per-(aclu, t_bin, binned_x, binned_y) spike counts (spike locations)                                                                                                                                                                                                           #

@@ -4034,6 +4034,8 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             if self.spikes_df is None:
                 self.spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
             spikes_df = deepcopy(self.spikes_df)
+            spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+
 
         spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
         if time_bin_size_seconds is None:
@@ -4052,6 +4054,9 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
             neuron_ids=neuron_ids,
         )
+
+        ## add binned:
+        spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True) ## #TODO 2026-07-28 19:47: - [ ] inefficient to do this again and again
 
         self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
