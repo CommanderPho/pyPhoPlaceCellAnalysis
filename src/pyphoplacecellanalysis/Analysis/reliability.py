@@ -1745,7 +1745,7 @@ class CellIndividualReliabilityMatrix:
             from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
 
             ## Usage:
-            fig, axes = CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes(pfs, in_field_masks)
+            fig, axes = CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes(a_dst_decoder2D.pfs, a_dst_decoder2D.in_field_masks)
 
         """
         import matplotlib.pyplot as plt
@@ -1844,6 +1844,201 @@ class CellIndividualReliabilityMatrix:
         ## END for ax in flat_axes[n:]...
 
         fig.suptitle("PF heatmap + in-field masks + spikes", fontsize=12)
+        fig.tight_layout()
+        return fig, axes
+
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'figure', 'reliability'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-29 14:35', related_items=['plot_in_field_masks_with_spikes'])
+    @classmethod
+    def plot_reliability_maps_with_spikes(cls, pfs, reliability_active: np.ndarray, reliability_silent: np.ndarray, neuron_ids,
+                                        reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
+                                        in_field_masks: Optional[Dict[int, np.ndarray]] = None,
+                                        included_neuron_ids: Optional[Sequence[int]] = None,
+                                        which: str = "both", max_n_cells: Optional[int] = None,
+                                        subplots: Optional[Tuple[int, int]] = None, figsize_per_cell: float = 2.5,
+                                        mask_cmap: str = "Greens", mask_alpha: float = 0.35,
+                                        heatmap_cmap: str = "viridis", heatmap_alpha: float = 0.9,
+                                        spike_s: float = 2.0, spike_alpha: float = 0.3, color_by_in_field: bool = True,
+                                        use_pcolormesh: bool = True, show_trajectory: bool = False,
+                                        trajectory_alpha: float = 0.15) -> Tuple[Figure, np.ndarray]:
+        """Plot per-cell reliability maps (active | silent) + optional in-field mask + spike positions.
+
+        Layout: for each cell, side-by-side panels for ``reliability_active`` and ``reliability_silent``
+        (or a single panel when ``which`` is ``"active"`` / ``"silent"``).
+
+        Mode handling:
+            PER_CELL: scalar per neuron → constant ``(nx, ny)`` fill; title shows ``R_a`` / ``R_s``.
+            POSITION_DEPENDENT: spatial maps ``(*spatial, n_neurons)`` or flat ``(n_flat, n_neurons)``.
+
+        Layer order (bottom → top): trajectory (optional) → reliability heatmap → in-field mask (optional) → spikes.
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityMatrix
+
+            fig, axes = CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes(
+                a_dst_decoder2D.pf, a_dst_decoder2D.reliability_active, a_dst_decoder2D.reliability_silent,
+                neuron_ids=a_dst_decoder2D.neuron_IDs,
+                reliability_estimation_mode=a_dst_decoder2D.reliability_estimation_mode,
+                in_field_masks=a_dst_decoder2D.in_field_masks, max_n_cells=9,
+            )
+
+        """
+        import matplotlib.pyplot as plt
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+
+        assert getattr(pfs, "ndim", 2) >= 2, "plot_reliability_maps_with_spikes requires 2D PfND"
+        assert reliability_active is not None and reliability_silent is not None, "reliability_active and reliability_silent are required"
+        which = str(which).lower().strip()
+        assert which in ("both", "active", "silent"), f'which must be "both", "active", or "silent"; got {which!r}'
+
+        xbin = np.asarray(pfs.xbin)
+        ybin = np.asarray(pfs.ybin)
+        spikes_df = pfs.filtered_spikes_df
+        nx, ny = len(xbin) - 1, len(ybin) - 1
+        extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
+        n_flat: int = nx * ny
+
+        neuron_ids = np.asarray(neuron_ids)
+        n_neurons: int = len(neuron_ids)
+        R_active = np.asarray(reliability_active, dtype=float)
+        R_silent = np.asarray(reliability_silent, dtype=float)
+        assert R_active.shape == R_silent.shape, f'reliability_active shape {R_active.shape} != reliability_silent shape {R_silent.shape}'
+        assert R_active.shape[-1] == n_neurons, f'reliability last dim {R_active.shape[-1]} != len(neuron_ids) {n_neurons}'
+
+        estimation_mode = reliability_estimation_mode
+        is_position_dependent: bool = (estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value)
+        if is_position_dependent:
+            if R_active.ndim == 2:
+                assert R_active.shape[0] == n_flat, f'flat reliability size {R_active.shape[0]} != n_flat {n_flat}'
+            else:
+                assert R_active.ndim >= 3, f'POSITION_DEPENDENT reliability expected ndim>=2, got {R_active.ndim}'
+                assert int(np.prod(R_active.shape[:-1])) == n_flat, f'spatial reliability size {int(np.prod(R_active.shape[:-1]))} != n_flat {n_flat}'
+            ## END if R_active.ndim == 2...
+        else:
+            assert R_active.ndim == 1, f'PER_CELL reliability expected shape (n_neurons,), got {R_active.shape}'
+        ## END if is_position_dependent...
+
+        plot_neuron_ids = list(included_neuron_ids) if included_neuron_ids is not None else list(neuron_ids)
+        if max_n_cells is not None:
+            plot_neuron_ids = plot_neuron_ids[:int(max_n_cells)]
+        ## END if max_n_cells is not None...
+
+        n = len(plot_neuron_ids)
+        assert n > 0, "No neuron_ids to plot"
+        aclu_to_i = {int(a): i for i, a in enumerate(neuron_ids)}
+
+        panels: List[str] = ["active", "silent"] if which == "both" else [which]
+        n_panels: int = len(panels)
+
+        if subplots is None:
+            if which == "both":
+                n_rows, n_cols_cells = n, 1
+            else:
+                n_cols_cells = int(np.ceil(np.sqrt(n)))
+                n_rows = int(np.ceil(n / n_cols_cells))
+            ## END if which == "both"...
+        else:
+            n_rows, n_cols_cells = subplots
+        ## END if subplots is None...
+
+        n_ax_cols: int = n_cols_cells * n_panels
+        fig, axes = plt.subplots(n_rows, n_ax_cols, figsize=(figsize_per_cell * n_ax_cols, figsize_per_cell * n_rows), squeeze=False)
+        flat_axes: List[Axes] = list(axes.ravel())
+
+        def _map_for_cell(R: np.ndarray, cell_idx: int) -> np.ndarray:
+            if R.ndim == 1:
+                return np.full((nx, ny), float(R[cell_idx]), dtype=float)
+            if R.ndim == 2:
+                return np.asarray(R[:, cell_idx], dtype=float).reshape((nx, ny), order='C')
+            return np.asarray(R[..., cell_idx], dtype=float).reshape((nx, ny), order='C')
+
+
+        def _normalize_mask(aclu: int) -> Optional[np.ndarray]:
+            if in_field_masks is None:
+                return None
+            mask = np.asarray(in_field_masks.get(aclu, np.zeros((nx, ny), dtype=bool)), dtype=bool)
+            if mask.shape != (nx, ny):
+                if mask.shape == (ny, nx):
+                    mask = mask.T
+                else:
+                    raise ValueError(f"aclu {aclu}: mask shape {mask.shape} != expected {(nx, ny)}")
+                ## END if mask.shape == (ny, nx)...
+            ## END if mask.shape != (nx, ny)...
+            return mask
+
+
+        for cell_i, aclu in enumerate(plot_neuron_ids):
+            aclu = int(aclu)
+            cell_idx = aclu_to_i.get(aclu)
+            assert cell_idx is not None, f'aclu {aclu} not found in neuron_ids'
+            mask = _normalize_mask(aclu)
+            r_a = _map_for_cell(R_active, cell_idx)
+            r_s = _map_for_cell(R_silent, cell_idx)
+            maps_by_panel = {"active": r_a, "silent": r_s}
+
+            row = cell_i // n_cols_cells
+            col_cell = cell_i % n_cols_cells
+            for panel_j, panel_name in enumerate(panels):
+                ax = axes[row, col_cell * n_panels + panel_j]
+                rmap = maps_by_panel[panel_name]
+
+                if show_trajectory and hasattr(pfs, "x") and hasattr(pfs, "y"):
+                    ax.plot(pfs.x, pfs.y, color="#d3c5c5", alpha=trajectory_alpha, linewidth=0.5, zorder=0)
+                ## END if show_trajectory...
+
+                if use_pcolormesh:
+                    ax.pcolormesh(xbin, ybin, rmap.T, cmap=heatmap_cmap, alpha=heatmap_alpha, shading="flat", vmin=0, vmax=1, zorder=1)
+                else:
+                    plot_r = np.fliplr(np.rot90(rmap, k=-1))
+                    ax.imshow(plot_r, origin="lower", extent=extent, cmap=heatmap_cmap, alpha=heatmap_alpha, vmin=0, vmax=1, zorder=1, aspect="auto")
+                ## END if use_pcolormesh...
+
+                if mask is not None:
+                    if use_pcolormesh:
+                        ax.pcolormesh(xbin, ybin, mask.T.astype(float), cmap=mask_cmap, alpha=mask_alpha, shading="flat", vmin=0, vmax=1, zorder=2)
+                    else:
+                        plot_mask = np.fliplr(np.rot90(mask.astype(float), k=-1))
+                        ax.imshow(plot_mask, origin="lower", extent=extent, cmap=mask_cmap, alpha=mask_alpha, vmin=0, vmax=1, zorder=2, aspect="auto")
+                    ## END if use_pcolormesh...
+                ## END if mask is not None...
+
+                cell_spk = spikes_df[spikes_df["aclu"] == aclu]
+                if len(cell_spk) > 0:
+                    if color_by_in_field and (mask is not None) and {"binned_x", "binned_y"}.issubset(cell_spk.columns):
+                        bx = cell_spk["binned_x"].to_numpy().astype(int) - 1
+                        by = cell_spk["binned_y"].to_numpy().astype(int) - 1
+                        valid = (bx >= 0) & (by >= 0) & (bx < mask.shape[0]) & (by < mask.shape[1])
+                        in_field = np.zeros(len(cell_spk), dtype=bool)
+                        in_field[valid] = mask[bx[valid], by[valid]]
+                        ax.scatter(cell_spk.loc[~in_field, "x"], cell_spk.loc[~in_field, "y"], s=spike_s, c="0.45", alpha=spike_alpha * 0.7, marker=".", linewidths=0, zorder=3)
+                        ax.scatter(cell_spk.loc[in_field, "x"], cell_spk.loc[in_field, "y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=4)
+                    else:
+                        ax.scatter(cell_spk["x"], cell_spk["y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=3)
+                    ## END if color_by_in_field...
+                ## END if len(cell_spk) > 0...
+
+                ax.set_aspect("equal")
+                ax.set_xlim(xbin[0], xbin[-1])
+                ax.set_ylim(ybin[0], ybin[-1])
+                if not is_position_dependent:
+                    title = f"aclu {aclu}  R_a={float(R_active[cell_idx]):.2f}  R_s={float(R_silent[cell_idx]):.2f}  ({panel_name})"
+                else:
+                    title = f"aclu {aclu}  ({panel_name})"
+                ## END if not is_position_dependent...
+                ax.set_title(title, fontsize=8)
+                ax.axis("off")
+            ## END for panel_j, panel_name in enumerate(panels)...
+        ## END for cell_i, aclu in enumerate(plot_neuron_ids)...
+
+        n_used = n * n_panels
+        for ax in flat_axes[n_used:]:
+            ax.axis("off")
+        ## END for ax in flat_axes[n_used:]...
+
+        mode_label = str(estimation_mode)
+        fig.suptitle(f"Reliability maps ({mode_label}) + spikes", fontsize=12)
         fig.tight_layout()
         return fig, axes
 
@@ -2107,4 +2302,39 @@ class CellIndividualReliabilityComputingMixin:
                 self.reliability_silent = R_base
             else:
                 self.reliability_silent = np.ones_like(R_base)
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plotting Display                                                                                                                                                                                                                                                                     #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'figure', 'passthrough'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes'], used_by=[], creation_date='2026-07-29 14:35', related_items=[])
+    def plot_in_field_masks_with_spikes(self, included_neuron_ids: Optional[Sequence[int]] = None, **kwargs):
+        """Passthrough to ``CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes`` using ``self.pf`` / ``self.in_field_masks``.
+
+        Usage:
+            fig, axes = a_dst_decoder2D.plot_in_field_masks_with_spikes(max_n_cells=9)
+        """
+        assert self.in_field_masks is not None, 'in_field_masks is required; call compute_unit_confusion_reliability_variables(...) first.'
+        return CellIndividualReliabilityMatrix.plot_in_field_masks_with_spikes(
+            self.pf, self.in_field_masks,
+            included_neuron_ids=included_neuron_ids if included_neuron_ids is not None else (self.neuron_IDs if self.neuron_IDs is not None else None),
+            **kwargs,
+        )
+
+
+    @function_attributes(short_name=None, tags=['matplotlib', 'figure', 'passthrough', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes'], used_by=[], creation_date='2026-07-29 14:35', related_items=[])
+    def plot_reliability_maps_with_spikes(self, included_neuron_ids: Optional[Sequence[int]] = None, **kwargs):
+        """Passthrough to ``CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes`` using decoder reliability state.
+
+        Usage:
+            fig, axes = a_dst_decoder2D.plot_reliability_maps_with_spikes(max_n_cells=9)
+        """
+        assert self.reliability_active is not None and self.reliability_silent is not None, 'reliability_active and reliability_silent are required; call compute_reliability_metrics(...) first.'
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        return CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes(
+            self.pf, self.reliability_active, self.reliability_silent, neuron_ids,
+            reliability_estimation_mode=getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL),
+            in_field_masks=self.in_field_masks, included_neuron_ids=included_neuron_ids, **kwargs,
+        )
 
