@@ -1699,7 +1699,7 @@ class InteractiveBayesian2DEquationDebugger:
         spatial_shape = F.shape[1:]
 
         needs_raw_backup: bool = drop_negative_contributing_terms_mode
-        use_tempering: bool = (reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING)
+        use_tempering: bool = (reliability_modifier_mode.value == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING.value)
         if use_tempering:
             assert (reliability_active is not None) and (reliability_silent is not None), f'LIKELIHOOD_TEMPERING requires reliability_active and reliability_silent.'
             reliability_active = np.asarray(reliability_active, dtype=float)
@@ -1941,10 +1941,10 @@ class InteractiveBayesian2DEquationDebugger:
         if is_dst and (getattr(sliced, 'reliability_active', None) is None):
             self._ensure_sliced_reliability_metrics(sliced)  # populate α for titles / E_i; compute_posterior would do this lazily anyway
 
-        if (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(sliced, 'reliability_active', None) is None):
+        if (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING.value) and (getattr(sliced, 'reliability_active', None) is None):
             self._ensure_sliced_reliability_metrics(sliced)  # needed for power-prior tempering on Bayesian path
 
-        if self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT:
+        if self.reliability_estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
             self._ensure_sliced_reliability_metrics(sliced)
 
         tau: float = float(sliced.time_bin_size)
@@ -2125,7 +2125,8 @@ class InteractiveBayesian2DEquationDebugger:
         self.drop_negative_terms_check = drop_negative_terms_check
 
         ax_check_est = fig.add_axes([left_col_x, left_col_y + check_h + check_gap, left_col_w, check_h])
-        estimation_mode_check = CheckButtons(ax_check_est, ['pos-dep R'], [bool(self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT)])
+        want_pos_dep: bool = (self.reliability_estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value)
+        estimation_mode_check = CheckButtons(ax_check_est, ['pos-dep R'], [bool(want_pos_dep)])
         for label in estimation_mode_check.labels:
             label.set_fontsize(6)
         ## END for label in estimation_mode_check.labels...
@@ -2295,7 +2296,7 @@ class InteractiveBayesian2DEquationDebugger:
         ## Position-dependent reliability maps under each PF (populated when estimation mode is POSITION_DEPENDENT)
         for i, ax in enumerate(self.ax_cell_R):
             cmap = self.cell_cmaps[i]
-            if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (rel_active is not None) and (np.asarray(rel_active).ndim >= 2):
+            if (self.reliability_estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value) and (rel_active is not None) and (np.asarray(rel_active).ndim >= 2):
                 use_silent: bool = (int(n[i]) == 0) and bool(getattr(self.sliced, 'should_discount_silence', False)) and (rel_silent is not None)
                 R_src = rel_silent if use_silent else rel_active
                 R_map = self._reliability_map_for_cell(np.asarray(R_src, dtype=float), i, spatial_shape)
@@ -2412,10 +2413,10 @@ class InteractiveBayesian2DEquationDebugger:
     def on_reliability_mode(self, label: str):
         """RadioButtons callback: update ``reliability_modifier_mode`` and recompute if it changed."""
         new_mode = ReliabilityDecoderModifierMode[label]
-        if new_mode == self.reliability_modifier_mode:
+        if new_mode.value == self.reliability_modifier_mode.value:
             return
         self.reliability_modifier_mode = new_mode
-        if (new_mode == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING) and (getattr(self.sliced, 'reliability_active', None) is None):
+        if (new_mode.value == ReliabilityDecoderModifierMode.LIKELIHOOD_TEMPERING.value) and (getattr(self.sliced, 'reliability_active', None) is None):
             self._ensure_sliced_reliability_metrics(self.sliced)
         self.redraw()
 
@@ -2424,7 +2425,7 @@ class InteractiveBayesian2DEquationDebugger:
         """CheckButtons callback: toggle ``reliability_estimation_mode`` PER_CELL ↔ POSITION_DEPENDENT."""
         want_pos_dep: bool = bool(self.estimation_mode_check.get_status()[0])
         new_mode = ReliabilityEstimationMode.POSITION_DEPENDENT if want_pos_dep else ReliabilityEstimationMode.PER_CELL
-        if new_mode == self.reliability_estimation_mode:
+        if new_mode.value == self.reliability_estimation_mode.value:
             return
         self.reliability_estimation_mode = new_mode
         self._ensure_sliced_reliability_metrics(self.sliced)
@@ -2438,7 +2439,7 @@ class InteractiveBayesian2DEquationDebugger:
         assert sliced is not None
         sliced.reliability_estimation_mode = self.reliability_estimation_mode
         has_confusion: bool = (getattr(sliced, 't_bin_aclus_reliability_df', None) is not None) and ('true_pos' in sliced.t_bin_aclus_reliability_df.columns)
-        if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (not has_confusion):
+        if (self.reliability_estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value) and (not has_confusion):
             sliced._perform_compute_unit_confusion_reliability_variables()
         else:
             sliced.compute_reliability_metrics()
