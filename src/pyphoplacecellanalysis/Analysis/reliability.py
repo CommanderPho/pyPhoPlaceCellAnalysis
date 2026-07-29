@@ -827,6 +827,11 @@ def compute_spatially_binned_activity(an_active_pf: PfND): # , global_any_laps_e
     return position_binned_activity_matr_dict, split_spikes_df_dict, (neuron_id_to_new_IDX_map, lap_id_to_matrix_IDX_map)
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# Cell Individual Reliability and Confusion                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+
 class ReliabilityDecoderModifierMode(Enum):
     """How the reliability information is integrated into the decoder (when reliability is available on the decoder) """
     IGNORE = auto()
@@ -974,7 +979,7 @@ class CellIndividualReliabilityMatrix:
         # active_pos_df['t_bin_idx'] = active_pos_df['t_bin_idx'].astype(int) # #TODO 2026-07-28 19:19: - [ ] 't_bin_idx' was actually the problem, it was being set to the wrong dataframe's column and then forced to int (which np.nan can't go to int)
         active_pos_df.dropna(subset=['binned_x', 'binned_y', 't_bin_idx'], inplace=True) # Drop rows with missing data in columns: 'binned_x', 'binned_y', 't_bin_idx'
         active_pos_df['t_bin_idx'] = active_pos_df['t_bin_idx'].astype(int) ## convert to int
-        active_pos_df
+        
 
 
         ## Interpolate the spikes positions from the position df:
@@ -1014,11 +1019,11 @@ class CellIndividualReliabilityMatrix:
         in_field_lut = cls.build_in_field_lut(in_field_masks)  # only True cells; absent = out-of-field / unknown spatial bin
 
 
-        # right after adding_binned_position_columns, before Polars:
-        print(spikes_df[['y','binned_y']].dtypes)
-        print(spikes_df['binned_y'].isna().mean())
-        print(spikes_df['y'].describe())
-        print(ratemaps.ybin[[0,-1]])
+        # # right after adding_binned_position_columns, before Polars:
+        # print(spikes_df[['y','binned_y']].dtypes)
+        # print(spikes_df['binned_y'].isna().mean())
+        # print(spikes_df['y'].describe())
+        # print(ratemaps.ybin[[0,-1]])
 
         # ==================================================================================================================================================================================================================================================================================== #
         # Polars: per-(aclu, t_bin, binned_x, binned_y) spike counts (spike locations)                                                                                                                                                                                                           #
@@ -1345,7 +1350,7 @@ class CellIndividualReliabilityMatrix:
         return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0), position_aclus_reliability_df
 
 
-    @function_attributes(short_name=None, tags=['promence', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['build_in_field_masks_xy', '_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
+    @function_attributes(short_name=None, tags=['promenece', 'PeakPromenence', 'mask'], input_requires=[], output_provides=[], uses=[], used_by=['build_in_field_masks_xy', '_partial_compute_reliability_matrix'], creation_date='2026-07-22 19:26', related_items=[])
     @classmethod
     def _build_top_peak_90pct_masks(cls, active_peak_prominence_2d_results, n_top_peaks: int = 3, slice_level_multiplier: float = 0.9) -> Dict[int, np.ndarray]:
         """Build per-neuron boolean masks (ny, nx) = union of top-N peak contours at `slice_level_multiplier` * peak height.
@@ -1855,4 +1860,198 @@ class CellIndividualReliabilityMatrix:
         fig.suptitle("PF heatmap + in-field masks + spikes", fontsize=12)
         fig.tight_layout()
         return fig, axes
+
+
+
+@metadata_attributes(short_name=None, tags=['reliability', 'decoder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-29 09:04', related_items=[])
+class CellIndividualReliabilityComputingMixin:
+    """ Implementors compute and use cell individual reliabilities
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.reliability import CellIndividualReliabilityComputingMixin, CellIndividualReliabilityMatrix, ReliabilityDecoderModifierMode, ReliabilityEstimationMode
+
+    """
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Cell Reliability Computations                                                                                                                                                                                                                                                        #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
+    def compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
+        """Compute per-aclu confusion-matrix reliability products and refresh ``reliability_*`` on self.
+
+        After writing confusion products, calls ``_compute_reliability_metrics()`` so
+        ``reliability_active`` / ``reliability_silent`` match ``reliability_estimation_mode``
+        (``PER_CELL`` or ``POSITION_DEPENDENT``).
+
+        Parameters
+        ----------
+        active_peak_prominence_2d_results : optional PeakProminence2D results for in-field masks.
+            If None, recomputes a minimal PeakProminence2D from ``self.pf`` via
+            ``CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf`` (no pipeline cache required).
+        spikes_df : optional spikes override; defaults to `self.spikes_df` sliced to `self.neuron_IDs`.
+        time_bin_size_seconds : temporal bin width; defaults to `self.time_bin_size`.
+        max_t_idx : optional cap on number of time bins (None = all).
+
+        Uses instance fields ``n_top_peaks``, ``slice_level_multiplier``, ``fn_tn_mode``, and ``reliability_estimation_mode``.
+
+        Returns
+        -------
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+
+
+        UPDATES:
+            self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.per_tbin_aclu_xy_spike_counts_df,
+            self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.position_aclus_reliability_df (POSITION_DEPENDENT),
+            self.reliability_active, self.reliability_silent
+
+
+        Usage:
+
+            t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = a_dst_decoder2D.compute_unit_confusion_reliability_variables()
+
+        """
+        pfs = self.pf
+        ratemaps = self.ratemap
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
+        if spikes_df is None:
+            if self.spikes_df is None:
+                self.spikes_df = deepcopy(pfs.filtered_spikes_df).spikes.sliced_by_neuron_id(neuron_ids)
+            spikes_df = deepcopy(self.spikes_df)
+            spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True)
+
+
+        spikes_df = spikes_df.spikes.sliced_by_neuron_id(neuron_ids)
+        if time_bin_size_seconds is None:
+            time_bin_size_seconds = self.time_bin_size
+
+        if (self.spikes_df is None):
+            self.spikes_df = spikes_df
+
+        if (self.time_bin_size is None):
+            self.time_bin_size = time_bin_size_seconds
+
+        if active_peak_prominence_2d_results is None:
+            active_peak_prominence_2d_results = CellIndividualReliabilityMatrix.compute_peak_prominence_2d_from_pf(pfs, neuron_ids=neuron_ids)
+
+        self.in_field_masks = CellIndividualReliabilityMatrix.build_in_field_masks_xy(active_peak_prominence_2d_results=active_peak_prominence_2d_results, ratemaps=ratemaps,
+            n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, 
+            neuron_ids=neuron_ids,
+        )
+
+        ## add binned:
+        spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True) ## #TODO 2026-07-28 19:47: - [ ] inefficient to do this again and again
+
+        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+            spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
+            time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx,
+            reliability_estimation_mode=self.reliability_estimation_mode, **kwargs,
+        )
+
+        self._compute_reliability_metrics()
+        return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df
+
+
+    def _build_position_dependent_reliability_maps(self, true_pos: np.ndarray, false_pos: np.ndarray, true_neg: np.ndarray, false_neg: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Fallback: ``(n_flat, n_neurons)`` maps from global per-cell confusion rates × in-field masks.
+
+        Preferred POSITION_DEPENDENT path uses visit-conditioned
+        ``CellIndividualReliabilityMatrix.perform_compute_position_dependent_reliability_maps``.
+
+        For hypothesized position x and cell i:
+            in-field:  R_active = true_pos[i],  R_silent = 1 - false_neg[i]
+            out-field: R_active = 1 - false_pos[i], R_silent = true_neg[i]
+        """
+        assert self.in_field_masks is not None, 'POSITION_DEPENDENT reliability requires in_field_masks; call compute_unit_confusion_reliability_variables(...) first.'
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        n_neurons: int = len(neuron_ids)
+        n_flat: int = int(self.flat_position_size) if (self.F is not None) else int(np.prod(self.original_position_data_shape))
+
+        in_field_flat = np.zeros((n_flat, n_neurons), dtype=bool)
+        for i, nid in enumerate(neuron_ids):
+            mask = self.in_field_masks.get(int(nid), None)
+            if mask is None:
+                continue
+            flat_mask = np.asarray(mask).ravel(order='C')
+            assert flat_mask.size == n_flat, f'in_field_masks[{nid}] flat size {flat_mask.size} != n_flat_position_bins {n_flat}'
+            in_field_flat[:, i] = flat_mask
+        ## END for i, nid in enumerate(neuron_ids)...
+
+        R_active = np.where(in_field_flat, true_pos[np.newaxis, :], (1.0 - false_pos)[np.newaxis, :])
+        R_silent = np.where(in_field_flat, (1.0 - false_neg)[np.newaxis, :], true_neg[np.newaxis, :])
+        return np.nan_to_num(R_active, nan=0.0), np.nan_to_num(R_silent, nan=0.0)
+
+
+    def _compute_reliability_metrics(self, **kwargs):
+        """ Called after main confusion computation
+        Builds reliability arrays from confusion-matrix rates (no Skaggs).
+
+        Modes (``self.reliability_estimation_mode``):
+            PER_CELL: ``(n_neurons,)`` from ``true_pos`` (default).
+            POSITION_DEPENDENT: ``(n_flat_position_bins, n_neurons)`` visit-conditioned maps from
+                ``per_tbin_aclu_spike_counts_df`` × animal ``time_bin_info_df`` (falls back to global rates × ``in_field_masks``).
+
+        If ``t_bin_aclus_reliability_df`` is missing:
+            PER_CELL → ones (no discounting) so decode still works.
+            POSITION_DEPENDENT → raises; call ``compute_unit_confusion_reliability_variables`` first.
+        """
+        assert (self.pf is not None)
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        n_neurons: int = int(len(neuron_ids))
+        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
+
+        has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
+        if not has_confusion:
+            if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
+                print(f'WARN: ._compute_reliability_metrics(...): POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; calling .compute_unit_confusion_reliability_variables(...) first...')
+                _ = self.compute_unit_confusion_reliability_variables() ## performing compute.
+                print(f'\tdone.')
+                if self.t_bin_aclus_reliability_df is None:
+                    raise ValueError('POSITION_DEPENDENT reliability requires t_bin_aclus_reliability_df with true_pos; AND CALLING .compute_unit_confusion_reliability_variables(...) resulted in an empty reliability!')
+            # R_ones = np.ones(n_neurons, dtype=float)
+            # self.reliability_active = R_ones
+            # self.reliability_silent = np.ones_like(R_ones)
+            # return
+
+        rel_df = self.t_bin_aclus_reliability_df.reindex(neuron_ids)
+        true_pos = np.nan_to_num(rel_df['true_pos'].to_numpy(dtype=float), nan=0.0)
+        false_pos = np.nan_to_num(rel_df['false_pos'].to_numpy(dtype=float), nan=0.0) if ('false_pos' in rel_df.columns) else (1.0 - true_pos)
+        true_neg = np.nan_to_num(rel_df['true_neg'].to_numpy(dtype=float), nan=0.0) if ('true_neg' in rel_df.columns) else np.zeros_like(true_pos)
+        false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
+        assert len(true_pos) == n_neurons, f'Confusion rates length {len(true_pos)} != n_neurons {n_neurons} after reindex by neuron_IDs.'
+
+        if estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value:
+            has_visit_tables: bool = (self.per_tbin_aclu_spike_counts_df is not None) and (self.time_bin_info_df is not None) and (self.in_field_masks is not None)
+            if has_visit_tables:
+                if len(self.in_field_masks) > 0:
+                    sample_mask = next(iter(self.in_field_masks.values()))
+                    occupancy_shape = tuple(np.asarray(sample_mask).shape)
+                else:
+                    occupancy_shape = tuple(np.asarray(self.original_position_data_shape))
+                in_field_lut = CellIndividualReliabilityMatrix.build_in_field_lut(self.in_field_masks)
+                R_active, R_silent_from_confusion, self.position_aclus_reliability_df = CellIndividualReliabilityMatrix.perform_compute_position_dependent_reliability_maps(
+                    per_tbin=self.per_tbin_aclu_spike_counts_df, time_bin_info_df=self.time_bin_info_df, neuron_ids=neuron_ids,
+                    in_field_lut=in_field_lut, occupancy_shape=occupancy_shape, **kwargs,
+                )
+                n_flat: int = int(self.flat_position_size) if (self.F is not None) else int(np.prod(self.original_position_data_shape))
+                assert R_active.shape == (n_flat, n_neurons), f'visit-conditioned R_active shape {R_active.shape} != ({n_flat}, {n_neurons})'
+            else:
+                # Slice / partial state: fall back to global rates × masks
+                self.position_aclus_reliability_df = None
+                R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
+            self.reliability_active = R_active
+            if self.should_discount_silence:
+                self.reliability_silent = R_silent_from_confusion
+            else:
+                self.reliability_silent = np.ones_like(R_active)
+        else:
+            # PER_CELL: position-independent reliability from true_pos
+            self.position_aclus_reliability_df = None
+            R_base = true_pos
+            self.reliability_active = R_base
+            # Map reliability for silence (n_i = 0).
+            # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.
+            if self.should_discount_silence:
+                self.reliability_silent = R_base
+            else:
+                self.reliability_silent = np.ones_like(R_base)
 
