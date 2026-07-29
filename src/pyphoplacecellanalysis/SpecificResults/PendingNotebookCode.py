@@ -1744,11 +1744,11 @@ class InteractiveBayesian2DEquationDebugger:
                 if R_eff.ndim == 1:
                     alpha_i = float(R_eff[i])
                     alphas[i] = alpha_i
-                elif R_eff.ndim == 2:
-                    alpha_i = R_eff[:, i].reshape(spatial_shape)
+                elif R_eff.ndim >= 2:
+                    alpha_i = R_eff[..., i].reshape(spatial_shape)
                     alphas[i] = float(np.nanmean(alpha_i))
                 else:
-                    raise ValueError(f'Unsupported reliability ndim={R_eff.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+                    raise ValueError(f'Unsupported reliability ndim={R_eff.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
 
                 cell_power = np.power(cell_power, alpha_i)
                 cell_exp = np.power(cell_exp, alpha_i)
@@ -1813,10 +1813,10 @@ class InteractiveBayesian2DEquationDebugger:
         R = np.asarray(reliability_arr, dtype=float)
         if R.ndim == 1:
             return np.full(spatial_shape, float(R[cell_idx]))
-        elif R.ndim == 2:
-            return R[:, cell_idx].reshape(spatial_shape)
+        elif R.ndim >= 2:
+            return R[..., cell_idx].reshape(spatial_shape)
         else:
-            raise ValueError(f'Unsupported reliability ndim={R.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+            raise ValueError(f'Unsupported reliability ndim={R.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
 
 
     @classmethod
@@ -2295,7 +2295,7 @@ class InteractiveBayesian2DEquationDebugger:
         ## Position-dependent reliability maps under each PF (populated when estimation mode is POSITION_DEPENDENT)
         for i, ax in enumerate(self.ax_cell_R):
             cmap = self.cell_cmaps[i]
-            if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (rel_active is not None) and (np.asarray(rel_active).ndim == 2):
+            if (self.reliability_estimation_mode == ReliabilityEstimationMode.POSITION_DEPENDENT) and (rel_active is not None) and (np.asarray(rel_active).ndim >= 2):
                 use_silent: bool = (int(n[i]) == 0) and bool(getattr(self.sliced, 'should_discount_silence', False)) and (rel_silent is not None)
                 R_src = rel_silent if use_silent else rel_active
                 R_map = self._reliability_map_for_cell(np.asarray(R_src, dtype=float), i, spatial_shape)

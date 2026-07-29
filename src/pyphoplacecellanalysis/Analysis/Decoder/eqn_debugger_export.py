@@ -190,12 +190,12 @@ def _as_per_cell_reliability(arr, n_cells: int) -> np.ndarray:
     if arr.ndim == 1:
         assert arr.shape[0] == n_cells, f'reliability length {arr.shape[0]} != n_cells {n_cells}'
         return arr
-    if arr.ndim == 2:
-        # (n_flat, n_cells) → mean over position (matches scalar α usage in eqn debugger)
-        out = np.nanmean(arr, axis=0).astype(np.float32)
+    if arr.ndim >= 2:
+        # (*spatial_or_flat, n_cells) → mean over position (matches scalar α usage in eqn debugger)
+        out = np.nanmean(arr, axis=tuple(range(arr.ndim - 1))).astype(np.float32)
         assert out.shape[0] == n_cells
         return out
-    raise ValueError(f'Unsupported reliability ndim={arr.ndim}; expected 1 or 2.')
+    raise ValueError(f'Unsupported reliability ndim={arr.ndim}; expected 1 or >=2.')
 
 
 def list_eqn_debugger_groups(out_path: Union[str, Path]) -> List[str]:

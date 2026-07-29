@@ -2325,8 +2325,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
     ## Cell reliability variables:
     should_discount_silence: bool = non_serialized_field(default=False)
-    reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_flat_position_bins','n_neurons',)})
-    reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('n_flat_position_bins','n_neurons',)})
+    reliability_active: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('*spatial_or_n_flat', 'n_neurons')})
+    reliability_silent: Optional[np.ndarray] = non_serialized_field(default=None, is_computable=True, metadata={'shape': ('*spatial_or_n_flat', 'n_neurons')})
 
     ## alternative functions:
     drop_negative_contributing_terms_mode: bool = non_serialized_field(default=False)
@@ -2564,16 +2564,16 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     def _slice_reliability_array(cls, arr: Optional[np.ndarray], keep: np.ndarray) -> Optional[np.ndarray]:
-        """Neuron-slice reliability arrays for either per-cell ``(n_neurons,)`` or position-dependent ``(n_flat_position_bins, n_neurons)``."""
+        """Neuron-slice reliability arrays for per-cell ``(n_neurons,)``, flat ``(n_flat, n_neurons)``, or spatial ``(*spatial, n_neurons)``."""
         if arr is None:
             return None
         arr = np.asarray(arr)
         if arr.ndim == 1:
             return arr[keep]
-        elif arr.ndim == 2:
-            return arr[:, keep]
+        elif arr.ndim >= 2:
+            return arr[..., keep]
         else:
-            raise ValueError(f'Unsupported reliability array ndim={arr.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+            raise ValueError(f'Unsupported reliability array ndim={arr.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
 
 
     def _resolve_cell_reliability(self, cell_idx: int, active_mask: np.ndarray, n_position_bins: int) -> np.ndarray:
@@ -2581,7 +2581,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         Accepts:
             - per-cell scalars: ``reliability_*`` shape ``(n_neurons,)``
-            - position-dependent: ``reliability_*`` shape ``(n_flat_position_bins, n_neurons)``
+            - position-dependent flat: ``reliability_*`` shape ``(n_flat_position_bins, n_neurons)``
+            - position-dependent spatial: ``reliability_*`` shape ``(*original_position_data_shape, n_neurons)`` e.g. ``(nx, ny, n_neurons)``
 
         ``active_mask`` should be shape ``(nTimeBins, 1)``. Returns an array broadcastable to ``(nTimeBins, n_position_bins)``.
         """
@@ -2592,13 +2593,13 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
         if R_active.ndim == 1:
             return np.where(active_mask, R_active[cell_idx], R_silent[cell_idx])
-        elif R_active.ndim == 2:
-            assert R_active.shape[0] == n_position_bins, f'Position-dependent reliability expects first dim == n_position_bins ({n_position_bins}), got {R_active.shape[0]}'
-            R_active_i = R_active[:, cell_idx][np.newaxis, :]
-            R_silent_i = R_silent[:, cell_idx][np.newaxis, :]
+        elif R_active.ndim >= 2:
+            assert np.prod(R_active.shape[:-1]) == n_position_bins, f'Position-dependent reliability spatial size {np.prod(R_active.shape[:-1])} != n_position_bins ({n_position_bins}), got shape {R_active.shape}'
+            R_active_i = R_active[..., cell_idx].reshape(-1)[np.newaxis, :]
+            R_silent_i = R_silent[..., cell_idx].reshape(-1)[np.newaxis, :]
             return np.where(active_mask, R_active_i, R_silent_i)
         else:
-            raise ValueError(f'Unsupported reliability array ndim={R_active.ndim}; expected 1 (n_neurons,) or 2 (n_flat_position_bins, n_neurons).')
+            raise ValueError(f'Unsupported reliability array ndim={R_active.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
 
 
 

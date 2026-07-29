@@ -2014,8 +2014,10 @@ class CellIndividualReliabilityComputingMixin:
 
         Modes (``self.reliability_estimation_mode``):
             PER_CELL: ``(n_neurons,)`` from ``true_pos`` (default).
-            POSITION_DEPENDENT: ``(n_flat_position_bins, n_neurons)`` visit-conditioned maps from
+            POSITION_DEPENDENT: visit-conditioned maps from
                 ``per_tbin_aclu_spike_counts_df`` × animal ``time_bin_info_df`` (falls back to global rates × ``in_field_masks``).
+                Stored as ``(*original_position_data_shape, n_neurons)`` for 2D decoders (e.g. ``(nx, ny, n_neurons)``);
+                flat ``(n_flat, n_neurons)`` for 1D.
 
         If ``reliability_modifier_mode == IGNORE``:
             set ``reliability_*`` to ones and return (no discounting; avoids DST decode recursion).
@@ -2027,6 +2029,11 @@ class CellIndividualReliabilityComputingMixin:
         Updates: self.reliability_active, self.reliability_silent
 
         """
+        assert (self.pf is not None)
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        n_neurons: int = int(len(neuron_ids))
+        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
+
         is_ignore_mode: bool = (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
         if is_ignore_mode:
             if debug_print:
@@ -2037,12 +2044,8 @@ class CellIndividualReliabilityComputingMixin:
             self.reliability_silent = np.ones_like(R_ones)
             return ### ignore, skipping computations
 
-        assert (self.pf is not None)
         has_confusion: bool = (self.t_bin_aclus_reliability_df is not None) and ('true_pos' in self.t_bin_aclus_reliability_df.columns)
         should_compute: bool = (not has_confusion) and (not is_ignore_mode)
-        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
-        n_neurons: int = int(len(neuron_ids))
-        estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
 
         if should_compute:
             if debug_print:
@@ -2081,7 +2084,13 @@ class CellIndividualReliabilityComputingMixin:
                 self.position_aclus_reliability_df = None
                 R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
 
-            ## OUTPUTS: R_active, R_silent_from_confusion
+            ## OUTPUTS: R_active, R_silent_from_confusion — reshape to (*spatial, n_neurons) for 2D
+            if (int(self.ndim) >= 2) and (R_active.ndim == 2):
+                spatial_shape = tuple(np.asarray(self.original_position_data_shape))
+                assert R_active.shape[0] == int(np.prod(spatial_shape)), f'R_active flat size {R_active.shape[0]} != prod(spatial_shape) {int(np.prod(spatial_shape))}'
+                R_active = R_active.reshape((*spatial_shape, R_active.shape[-1]))
+                R_silent_from_confusion = R_silent_from_confusion.reshape((*spatial_shape, R_silent_from_confusion.shape[-1]))
+
             self.reliability_active = R_active
             if self.should_discount_silence:
                 self.reliability_silent = R_silent_from_confusion
