@@ -2135,6 +2135,25 @@ class CellIndividualReliabilityMatrix:
             ## END for yi in range(n_rows_laps + 1)...
 
 
+        def _bind_lap_format_coord(ax: Axes, count_mat: np.ndarray, x_edges: np.ndarray, y_edges: np.ndarray, lap_ids: np.ndarray):
+            """Restore status-bar hover to show bin count (pcolormesh omits z by default)."""
+            def format_coord(x, y):
+                if (not np.isfinite(x)) or (not np.isfinite(y)):
+                    return ""
+                if (x < x_edges[0]) or (x > x_edges[-1]) or (y < y_edges[0]) or (y > y_edges[-1]):
+                    return f'x={x:.2f}, y={y:.2f}'
+                ix = int(np.searchsorted(x_edges, x, side='right') - 1)
+                iy = int(np.searchsorted(y_edges, y, side='right') - 1)
+                ix = int(np.clip(ix, 0, count_mat.shape[1] - 1))
+                iy = int(np.clip(iy, 0, count_mat.shape[0] - 1))
+                z = int(count_mat[iy, ix])
+                lap_id = int(lap_ids[iy]) if (iy < len(lap_ids)) else iy
+                return f'x={x:.2f}, lap_idx={iy} (lap={lap_id}), count={z}'
+
+
+            ax.format_coord = format_coord
+
+
         def _fontsize_for_count(n_digits: int) -> float:
             """Pick a label size that fits inside one median bin (height and digit-width constrained)."""
             if count_label_fontsize is not None:
@@ -2201,6 +2220,7 @@ class CellIndividualReliabilityMatrix:
                     if show_bin_grid:
                         _draw_lap_x_bin_grid(ax, n_rows_laps)
                     ## END if show_bin_grid...
+                    _bind_lap_format_coord(ax, rmap, xbin, lap_y_edges, all_lap_ids)
                     ax.set_aspect("auto")
                     ax.set_xlim(xbin[0], xbin[-1])
                     ax.set_ylim(0.0, float(n_rows_laps))
