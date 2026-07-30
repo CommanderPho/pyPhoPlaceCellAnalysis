@@ -180,6 +180,7 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         Mirrors ``BayesianPlacemapPositionDecoder.get_by_id`` but constructs ``BayesianPlacemapPositionDecoderDST``.
         Visit-conditioned reliability tables are neuron-filtered onto the slice (sparse counts left None).
         """
+        self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
         ids = np.asarray(ids)
         source_ids = np.asarray(self.neuron_IDs)
         assert np.all(np.isin(ids, source_ids))
@@ -277,6 +278,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         """
         if ratemaps is None:
             ratemaps = self.ratemaps
+
+        self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
 
         # 1. Dynamically handle 1D vs 2D spatial layouts
         original_shape = ratemaps.shape
@@ -397,6 +400,8 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             else:
                 if (self.time_bin_size is None) or (time_bin_size != self.time_bin_size):
                     self.time_bin_size = time_bin_size
+
+            self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
 
             try:
                 

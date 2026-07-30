@@ -2459,6 +2459,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
+            self.adding_default_values_for_missing_fields() ## fill newly-added fields (e.g. reliability_modifier_mode) on older pickles
             self._setup_computation_variables()
             self.reliability_active = None
             self.reliability_silent = None
@@ -2472,6 +2473,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
         defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
             TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
         """
+        self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
         # call .get_by_id(ids) on the placefield (pf):
         neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
         ## apply the neuron_sliced_pf to the decoder:
@@ -2686,6 +2688,8 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             if time_bin_size is None:
                 print(f'time_bin_size is None, using internal self.time_bin_size.')
                 time_bin_size = self.time_bin_size
+
+            self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
             
             # Single sweep decoding:
             curr_flat_p_x_given_n = ZhangReconstructionImplementation.neuropy_bayesian_prob(time_bin_size, self.P_x, self.F, unit_specific_time_binned_spike_counts, debug_intermediates_mode=debug_intermediates_mode, use_flat_computation_mode=use_flat_computation_mode, debug_print=(debug_print or self.debug_print), reliability_modifier_mode=self.reliability_modifier_mode, drop_negative_contributing_terms_mode=self.drop_negative_contributing_terms_mode)
@@ -3724,6 +3728,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     def post_load(self):
         """ Called after deserializing/loading saved result from disk to rebuild the needed computed variables. """
         with WrappingMessagePrinter(f'post_load() called.', begin_line_ending='... ', finished_message='all rebuilding completed.', enable_print=self.debug_print):
+            self.adding_default_values_for_missing_fields() ## fill newly-added fields (e.g. reliability_modifier_mode) on older pickles
             self._setup_computation_variables()
             self._setup_time_bin_spike_counts_N_i()
             # self._setup_time_window_centers()
@@ -3816,6 +3821,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         Does not run post_load (no serialized posterior to restore).
         If defer_compute_all is False, also runs compute_all() for full-session decode caches.
         """
+        self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
         ids = np.asarray(ids)
         source_ids = np.asarray(self.neuron_IDs)
         assert np.all(np.isin(ids, source_ids))

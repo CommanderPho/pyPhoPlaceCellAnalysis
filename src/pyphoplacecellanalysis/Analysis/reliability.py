@@ -2569,6 +2569,8 @@ class CellIndividualReliabilityComputingMixin:
             # derived: a_dst_decoder2D.per_aclu_per_lap_confusion_tbin_counts_df, a_dst_decoder2D.confusion_condition_proportion_maps
 
         """
+        if hasattr(self, 'adding_default_values_for_missing_fields'):
+            self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
         pfs = self.pf
         ratemaps = self.ratemap
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else ratemaps.neuron_ids)
@@ -2677,12 +2679,15 @@ class CellIndividualReliabilityComputingMixin:
         Updates: self.reliability_active, self.reliability_silent
 
         """
+        if hasattr(self, 'adding_default_values_for_missing_fields'):
+            self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
         assert (self.pf is not None)
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
         n_neurons: int = int(len(neuron_ids))
         estimation_mode = getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL)
+        reliability_modifier_mode = getattr(self, 'reliability_modifier_mode', ReliabilityDecoderModifierMode.IGNORE)
 
-        is_ignore_mode: bool = (self.reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
+        is_ignore_mode: bool = (reliability_modifier_mode.value == ReliabilityDecoderModifierMode.IGNORE.value)
         if is_ignore_mode:
             if debug_print:
                 print(f'WARN: ._compute_reliability_metrics(...): called in (self.reliability_modifier_mode == ReliabilityDecoderModifierMode.IGNORE) mode. skipping computations and returning.')
