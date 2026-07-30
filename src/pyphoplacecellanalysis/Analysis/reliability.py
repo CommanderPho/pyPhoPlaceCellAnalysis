@@ -1166,16 +1166,19 @@ class CellIndividualReliabilityMatrix:
         Returns
         -------
         t_bin_aclus_reliability_df : indexed by aclu with true_pos/true_neg/false_pos/false_neg.
+            Position cols: ``n_infield_tbins``, ``n_outfield_tbins``, ``n_total_tbins``.
+            Spike cols: ``n_infield_spike_tbins``, ``n_outfield_spike_tbins``, ``n_infield_nonspike_tbins``, ``n_outfield_nonspike_tbins``.
             TP/FP are spike counts normalized by each cell's total spikes (TP+FP).
             TN/FN are silent time-bin counts normalized by each cell's opportunity counts:
-            true_neg = TN / n_out_of_field_tbins, false_neg = FN / n_in_field_tbins.
+            true_neg = n_outfield_nonspike_tbins / n_outfield_tbins, false_neg = n_infield_nonspike_tbins / n_infield_tbins.
 
         Notes
         -----
         Spatial bins absent from ``in_field_lut`` are "unknown": they contribute to ``n_computed_bins``
         but not to per-cell opportunities / TP/FP/TN/FN (matches prior empty-dict behavior).
-        For known bins: ``n_out = n_known_tbins - n_in``, ``FN = n_in - infield_spike_tbins``,
-        ``TN = n_out - outfield_spike_tbins``.
+        For known bins: ``n_outfield_tbins = n_total_tbins - n_infield_tbins``,
+        ``n_infield_nonspike_tbins = n_infield_tbins - n_infield_spike_tbins``,
+        ``n_outfield_nonspike_tbins = n_outfield_tbins - n_outfield_spike_tbins``.
         """
         neuron_ids = np.asarray(neuron_ids)
         pos, lut, spikes, neuron_ids_i64 = cls._prepare_visit_polars_frames(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, max_t_idx=max_t_idx)
@@ -1185,35 +1188,11 @@ class CellIndividualReliabilityMatrix:
         n_computed_bins: int = pos.height
         print(f"n_tbins={len(time_bin_info_df)}, n_valid={n_computed_bins}, n_nan={len(time_bin_info_df) - n_computed_bins}")
 
-        known_keys = lut.select(['binned_x', 'binned_y']).unique()
-        known_pos = pos.join(known_keys, on=['binned_x', 'binned_y'], how='inner') # ['t_bin_idx', 'binned_x', 'binned_y']
-        n_known_tbins: int = known_pos.height
+        known_pos = pos.join(lut.select(['binned_x', 'binned_y']).unique(), on=['binned_x', 'binned_y'], how='inner') # ['t_bin_idx', 'binned_x', 'binned_y']
+        n_total_tbins: int = known_pos.height
 
-        ## start with `time_bin_info_df` and just add the ['aclu', 'n_spikes'] info from `per_tbin`, which might increase the number of rows (because there will be duplicate rows for the same tbin if multiple cells fire in this tbin
-        # all_info_df: pd.DataFrame = time_bin_info_df.merge(per_tbin[['aclu', 't_bin_idx', 'n_spikes']], on='t_bin_idx', how='left') 
-
-
-        ## n_in_field per aclu = # known visits whose animal bin is in that cell's field
-        n_in_df = (
-            known_pos
-            .join(lut, on=['binned_x', 'binned_y'], how='inner')
-            .group_by('aclu')
-            .agg(pl.len().alias('n_in_field_tbins'))
-        )
-
-        base = pl.DataFrame({
-            'aclu': neuron_ids_i64,
-            'neuron_IDX': np.arange(len(neuron_ids), dtype=np.int64),
-        }).with_columns([
-            pl.lit(n_known_tbins).alias('n_known_tbins'),
-            pl.lit(n_computed_bins).alias('n_computed_bins'),
-        ])
-        base = (
-            base
-            .join(n_in_df, on='aclu', how='left')
-            .with_columns(pl.col('n_in_field_tbins').fill_null(0))
-            .with_columns((pl.col('n_known_tbins') - pl.col('n_in_field_tbins')).alias('n_out_of_field_tbins'))
-        )
+        ## n_infield per aclu = # known visits whose animal bin is in that cell's field
+        n_in = known_pos.join(lut, on=['binned_x', 'binned_y'], how='inner').group_by('aclu').agg(pl.len().alias('n_infield_tbins'))
 
         ## spikes only at known animal-position bins
         sp = (
@@ -1222,46 +1201,45 @@ class CellIndividualReliabilityMatrix:
             .join(lut.with_columns(pl.lit(True).alias('is_in_field')), on=['aclu', 'binned_x', 'binned_y'], how='left')
             .with_columns(pl.col('is_in_field').fill_null(False))
         )
-
         spike_aggs = sp.group_by('aclu').agg([
             pl.col('n_spikes').filter(pl.col('is_in_field')).sum().fill_null(0).alias('true_pos_n_spikes'),
             pl.col('n_spikes').filter(~pl.col('is_in_field')).sum().fill_null(0).alias('false_pos_n_spikes'),
-            pl.col('t_bin_idx').filter(pl.col('is_in_field')).n_unique().fill_null(0).alias('n_infield_spike_tbins'),
-            pl.col('t_bin_idx').filter(~pl.col('is_in_field')).n_unique().fill_null(0).alias('n_outfield_spike_tbins'),
+            pl.col('t_bin_idx').filter(pl.col('is_in_field')).len().fill_null(0).alias('n_infield_spike_tbins'),
+            pl.col('t_bin_idx').filter(~pl.col('is_in_field')).len().fill_null(0).alias('n_outfield_spike_tbins'),
         ])
 
         out_pl = (
-            base
+            pl.DataFrame({'aclu': neuron_ids_i64, 'neuron_IDX': np.arange(len(neuron_ids), dtype=np.int64)})
+            .with_columns([
+                pl.lit(n_total_tbins).alias('n_total_tbins'),
+                pl.lit(n_computed_bins).alias('n_computed_bins'),
+            ])
+            .join(n_in, on='aclu', how='left')
             .join(spike_aggs, on='aclu', how='left')
             .with_columns([
+                pl.col('n_infield_tbins').fill_null(0),
                 pl.col('true_pos_n_spikes').fill_null(0),
                 pl.col('false_pos_n_spikes').fill_null(0),
                 pl.col('n_infield_spike_tbins').fill_null(0),
                 pl.col('n_outfield_spike_tbins').fill_null(0),
             ])
+            .with_columns((pl.col('n_total_tbins') - pl.col('n_infield_tbins')).alias('n_outfield_tbins'))
             .with_columns([
-                (pl.col('n_in_field_tbins') - pl.col('n_infield_spike_tbins')).alias('false_neg_n_tbins'),
-                (pl.col('n_out_of_field_tbins') - pl.col('n_outfield_spike_tbins')).alias('true_neg_n_tbins'),
-            ])
-            .with_columns([
+                (pl.col('n_infield_tbins') - pl.col('n_infield_spike_tbins')).alias('n_infield_nonspike_tbins'),
+                (pl.col('n_outfield_tbins') - pl.col('n_outfield_spike_tbins')).alias('n_outfield_nonspike_tbins'),
                 (pl.col('true_pos_n_spikes') + pl.col('false_pos_n_spikes')).alias('n_total_spikes'),
             ])
             .with_columns([
                 pl.when(pl.col('n_total_spikes') > 0).then(pl.col('true_pos_n_spikes') / pl.col('n_total_spikes')).otherwise(None).alias('true_pos'),
                 pl.when(pl.col('n_total_spikes') > 0).then(pl.col('false_pos_n_spikes') / pl.col('n_total_spikes')).otherwise(None).alias('false_pos'),
-                pl.when(pl.col('n_out_of_field_tbins') > 0).then(pl.col('true_neg_n_tbins') / pl.col('n_out_of_field_tbins')).otherwise(None).alias('true_neg'),
-                pl.when(pl.col('n_in_field_tbins') > 0).then(pl.col('false_neg_n_tbins') / pl.col('n_in_field_tbins')).otherwise(None).alias('false_neg'),
+                pl.when(pl.col('n_outfield_tbins') > 0).then(pl.col('n_outfield_nonspike_tbins') / pl.col('n_outfield_tbins')).otherwise(None).alias('true_neg'),
+                pl.when(pl.col('n_infield_tbins') > 0).then(pl.col('n_infield_nonspike_tbins') / pl.col('n_infield_tbins')).otherwise(None).alias('false_neg'),
             ])
             .sort('neuron_IDX')
         )
 
+        ## OUTPUTS: t_bin_aclus_reliability_df — position_cols: (n_infield_tbins, n_outfield_tbins, n_total_tbins), spike_cols: (n_infield_spike_tbins, n_outfield_spike_tbins, n_infield_nonspike_tbins, n_outfield_nonspike_tbins)
         t_bin_aclus_reliability_df: pd.DataFrame = out_pl.to_pandas().set_index('aclu', drop=True, inplace=False)
-        ## drop helper cols not in prior schema
-        t_bin_aclus_reliability_df = t_bin_aclus_reliability_df.drop(columns=['n_known_tbins', 'n_infield_spike_tbins', 'n_outfield_spike_tbins'], errors='ignore')
-
-        ## for each aclu: position_cols: (n_infield_tbins, n_outfield_tbins, n_total_tbins), spike_cols: (n_infield_spike_tbins, n_outfield_spike_tbins, n_infield_nonspike_tbins, n_outfield_nonspike_tbins)
-
-        ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
 
 
@@ -2442,6 +2420,7 @@ class CellIndividualReliabilityComputingMixin:
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df
 
 
+    @function_attributes(short_name=None, tags=['_DEP', 'old', 'simplification'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-07-30 04:45', related_items=[])
     def _build_position_dependent_reliability_maps(self, true_pos: np.ndarray, false_pos: np.ndarray, true_neg: np.ndarray, false_neg: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Fallback: ``(n_flat, n_neurons)`` maps from global per-cell confusion rates × in-field masks.
 
@@ -2545,6 +2524,7 @@ class CellIndividualReliabilityComputingMixin:
                 assert R_active.shape == (n_flat, n_neurons), f'visit-conditioned R_active shape {R_active.shape} != ({n_flat}, {n_neurons})'
             else:
                 # Slice / partial state: fall back to global rates × masks
+                # raise NotImplementedError(f'_build_position_dependent_reliability_maps is off-limits because it is wrong. FIXME!')
                 self.position_aclus_reliability_df = None
                 R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
 
