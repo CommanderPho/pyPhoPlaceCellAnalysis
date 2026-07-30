@@ -1243,6 +1243,136 @@ class CellIndividualReliabilityMatrix:
         return t_bin_aclus_reliability_df
 
 
+    @function_attributes(short_name=None, tags=['confusion_matrix', 'lap', 'tbin'], input_requires=[], output_provides=[], uses=['_prepare_visit_polars_frames'], used_by=['CellIndividualReliabilityComputingMixin._perform_compute_unit_confusion_reliability_variables'], creation_date='2026-07-30 07:08', related_items=['perform_compute_confusion_matrix'])
+    @classmethod
+    def perform_build_aclu_tbin_confusion_lap_df(cls, per_tbin: pd.DataFrame, time_bin_info_df: pd.DataFrame, in_field_lut: pl.DataFrame, neuron_ids,
+                                                t_bin_lap_df: pd.DataFrame, max_t_idx: Optional[int] = None, **kwargs) -> pd.DataFrame:
+        """Build long per-(aclu, known t_bin) confusion+lap+animal-position table.
+
+        One row per (aclu, t_bin_idx) at known animal spatial bins (same known_pos universe as
+        ``perform_compute_confusion_matrix``), with ``lap > -1`` only.
+
+        Columns: aclu, t_bin_idx (0-based), lap, binned_x, binned_y, is_in_field, n_spikes, condition
+        where condition is TP/FP/TN/FN from (is_in_field, n_spikes>0).
+
+        Parameters
+        ----------
+        per_tbin : ['aclu', 't_bin_idx', 'n_spikes'] with 1-based spike ``t_bin_idx``.
+        t_bin_lap_df : ['t_bin_idx', 'lap'] with 0-based ``t_bin_idx`` matching ``time_bin_info_df``.
+        """
+        neuron_ids = np.asarray(neuron_ids)
+        pos, lut, spikes, neuron_ids_i64 = cls._prepare_visit_polars_frames(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, max_t_idx=max_t_idx)
+
+        known_pos = pos.join(lut.select(['binned_x', 'binned_y']).unique(), on=['binned_x', 'binned_y'], how='inner')
+        aclus = pl.DataFrame({'aclu': neuron_ids_i64})
+        lap_pl = (
+            pl.from_pandas(t_bin_lap_df[['t_bin_idx', 'lap']])
+            .with_columns([
+                pl.col('t_bin_idx').cast(pl.Int64),
+                pl.col('lap').cast(pl.Int64),
+            ])
+            .filter(pl.col('lap') > -1)
+        )
+
+        labeled = (
+            known_pos
+            .join(aclus, how='cross')
+            .join(lut.with_columns(pl.lit(True).alias('is_in_field')), on=['aclu', 'binned_x', 'binned_y'], how='left')
+            .with_columns(pl.col('is_in_field').fill_null(False))
+            .join(spikes.select(['aclu', 't_bin_idx', 'n_spikes']), on=['aclu', 't_bin_idx'], how='left')
+            .with_columns(pl.col('n_spikes').fill_null(0.0))
+            .join(lap_pl, on='t_bin_idx', how='inner')
+            .with_columns(
+                pl.when(pl.col('is_in_field') & (pl.col('n_spikes') > 0)).then(pl.lit('TP'))
+                .when((~pl.col('is_in_field')) & (pl.col('n_spikes') > 0)).then(pl.lit('FP'))
+                .when(pl.col('is_in_field') & (pl.col('n_spikes') <= 0)).then(pl.lit('FN'))
+                .otherwise(pl.lit('TN'))
+                .alias('condition')
+            )
+            .select(['aclu', 't_bin_idx', 'lap', 'binned_x', 'binned_y', 'is_in_field', 'n_spikes', 'condition'])
+        )
+        return labeled.to_pandas()
+
+
+    @classmethod
+    def summarize_per_aclu_per_lap_confusion_tbin_counts(cls, aclu_tbin_confusion_lap_df: pd.DataFrame) -> pd.DataFrame:
+        """Aggregate ``aclu_tbin_confusion_lap_df`` → per (aclu, lap, condition) n_tbins / p_tbin."""
+        if aclu_tbin_confusion_lap_df is None or len(aclu_tbin_confusion_lap_df) == 0:
+            return pd.DataFrame(columns=['aclu', 'lap', 'condition', 'n_tbins', 'n_tbins_in_lap', 'p_tbin'])
+        counts = (
+            aclu_tbin_confusion_lap_df
+            .groupby(['aclu', 'lap', 'condition'], as_index=False)
+            .size()
+            .rename(columns={'size': 'n_tbins'})
+        )
+        lap_totals = (
+            aclu_tbin_confusion_lap_df
+            .groupby(['aclu', 'lap'], as_index=False)
+            .size()
+            .rename(columns={'size': 'n_tbins_in_lap'})
+        )
+        out = counts.merge(lap_totals, on=['aclu', 'lap'], how='left')
+        out['p_tbin'] = out['n_tbins'] / out['n_tbins_in_lap'].replace(0, np.nan)
+        return out
+
+
+    @classmethod
+    def build_confusion_condition_proportion_maps(cls, aclu_tbin_confusion_lap_df: pd.DataFrame, neuron_ids, occupancy_shape: Tuple[int, ...]) -> Dict[str, np.ndarray]:
+        """Visit-conditioned local condition proportions, nanmean over laps.
+
+        For each lap at animal (ix, iy): p_C = n_C_tbins / n_visits; then nanmean over laps.
+        Returns dict TP/FP/TN/FN → ndarray shape (n_neurons, nx, ny); all-NaN bins → 0.
+        """
+        neuron_ids = np.asarray(neuron_ids)
+        nx, ny = int(occupancy_shape[0]), int(occupancy_shape[1])
+        n_neurons: int = len(neuron_ids)
+        conditions = ('TP', 'FP', 'TN', 'FN')
+        empty = {c: np.zeros((n_neurons, nx, ny), dtype=float) for c in conditions}
+        if aclu_tbin_confusion_lap_df is None or len(aclu_tbin_confusion_lap_df) == 0 or n_neurons == 0:
+            return empty
+
+        aclu_to_i = {int(a): i for i, a in enumerate(neuron_ids)}
+        df = aclu_tbin_confusion_lap_df
+        # Unique animal visits at (lap, bx, by) — not row count (df is aclu × tbin cross)
+        visit_counts = (
+            df.groupby(['lap', 'binned_x', 'binned_y'], as_index=False)['t_bin_idx']
+            .nunique()
+            .rename(columns={'t_bin_idx': 'n_visits'})
+        )
+        cond_counts = df.groupby(['aclu', 'lap', 'binned_x', 'binned_y', 'condition'], as_index=False).size().rename(columns={'size': 'n_cond'})
+        merged = cond_counts.merge(visit_counts, on=['lap', 'binned_x', 'binned_y'], how='left')
+        merged['p_cond'] = merged['n_cond'] / merged['n_visits'].replace(0, np.nan)
+
+        # Accumulate sum and count of finite per-lap proportions for nanmean
+        sum_maps = {c: np.zeros((n_neurons, nx, ny), dtype=float) for c in conditions}
+        cnt_maps = {c: np.zeros((n_neurons, nx, ny), dtype=float) for c in conditions}
+        for row in merged.itertuples(index=False):
+            i = aclu_to_i.get(int(row.aclu))
+            if i is None:
+                continue
+            ix = int(row.binned_x) - 1
+            iy = int(row.binned_y) - 1
+            if (ix < 0) or (iy < 0) or (ix >= nx) or (iy >= ny):
+                continue
+            cond = str(row.condition)
+            if cond not in sum_maps:
+                continue
+            p = float(row.p_cond)
+            if not np.isfinite(p):
+                continue
+            sum_maps[cond][i, ix, iy] += p
+            cnt_maps[cond][i, ix, iy] += 1.0
+        ## END for row in merged.itertuples(index=False)...
+
+        out: Dict[str, np.ndarray] = {}
+        for cond in conditions:
+            with np.errstate(invalid='ignore', divide='ignore'):
+                m = np.divide(sum_maps[cond], cnt_maps[cond], out=np.full_like(sum_maps[cond], np.nan), where=cnt_maps[cond] > 0)
+            out[cond] = np.nan_to_num(m, nan=0.0)
+        ## END for cond in conditions...
+        return out
+
+
     @classmethod
     def build_in_field_lut(cls, in_field_masks: Dict[int, np.ndarray]) -> pl.DataFrame:
         """Convert Dict[aclu, (nx, ny) bool] masks to Polars LUT with 1-based ``binned_x``/``binned_y`` labels."""
@@ -2329,7 +2459,7 @@ class CellIndividualReliabilityComputingMixin:
     -------------------------------
         in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df,
         per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df,
-        time_bin_info_df, per_tbin_aclu_spike_counts_sparse,
+        aclu_tbin_confusion_lap_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse,
         position_aclus_reliability_df, reliability_active, reliability_silent
         (and optionally ``spikes_df`` / ``time_bin_size`` when they were ``None``).
 
@@ -2337,6 +2467,67 @@ class CellIndividualReliabilityComputingMixin:
     # ==================================================================================================================================================================================================================================================================================== #
     # Cell Reliability Computations                                                                                                                                                                                                                                                        #
     # ==================================================================================================================================================================================================================================================================================== #
+
+    @property
+    def per_aclu_per_lap_confusion_tbin_counts_df(self) -> Optional[pd.DataFrame]:
+        """Derived: n_tbins / p_tbin per (aclu, lap, condition) from ``aclu_tbin_confusion_lap_df``."""
+        df = getattr(self, 'aclu_tbin_confusion_lap_df', None)
+        if df is None:
+            return None
+        return CellIndividualReliabilityMatrix.summarize_per_aclu_per_lap_confusion_tbin_counts(df)
+
+
+    @property
+    def confusion_condition_proportion_maps(self) -> Optional[Dict[str, np.ndarray]]:
+        """Derived: visit-conditioned TP/FP/TN/FN proportion maps ``(n_neurons, nx, ny)``, nanmean over laps."""
+        df = getattr(self, 'aclu_tbin_confusion_lap_df', None)
+        if df is None:
+            return None
+        neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
+        occupancy_shape = tuple(self.original_position_data_shape[:2]) if getattr(self, 'original_position_data_shape', None) is not None else tuple(np.asarray(self.ratemap.occupancy).shape[:2])
+        return CellIndividualReliabilityMatrix.build_confusion_condition_proportion_maps(df, neuron_ids=neuron_ids, occupancy_shape=occupancy_shape)
+
+
+    @classmethod
+    def _build_t_bin_lap_df(cls, pfs, time_bin_info_df: pd.DataFrame, per_tbin_aclu_per_lap_xy_spike_counts_df: Optional[pd.DataFrame] = None) -> Optional[pd.DataFrame]:
+        """Build 0-based t_bin_idx → lap lookup (modal / nearest lap). Prefer position ``lap``, else spike lap table."""
+        pos_df = getattr(pfs, 'filtered_pos_df', None)
+        if (pos_df is not None) and ('lap' in pos_df.columns) and ('t' in pos_df.columns) and (time_bin_info_df is not None) and ('t' in time_bin_info_df.columns):
+            pos_sub = pos_df.loc[pos_df['lap'].notna() & (pos_df['lap'].to_numpy().astype(float) > -1), ['t', 'lap']].copy()
+            if len(pos_sub) > 0:
+                pos_sub['lap'] = pos_sub['lap'].astype(int)
+                pos_sub = pos_sub.sort_values('t')
+                tb = time_bin_info_df[['t', 't_bin_idx']].copy().sort_values('t')
+                merged = pd.merge_asof(tb, pos_sub, on='t', direction='nearest')
+                mode_df = (
+                    merged.groupby('t_bin_idx')['lap']
+                    .agg(lambda s: int(s.mode().iloc[0]) if len(s.mode()) else int(s.iloc[0]))
+                    .reset_index()
+                )
+                mode_df = mode_df[mode_df['lap'] > -1]
+                if len(mode_df) > 0:
+                    return mode_df
+                ## END if len(mode_df) > 0...
+            ## END if len(pos_sub) > 0...
+        ## END if (pos_df is not None)...
+
+        if per_tbin_aclu_per_lap_xy_spike_counts_df is not None and len(per_tbin_aclu_per_lap_xy_spike_counts_df) > 0:
+            sub = per_tbin_aclu_per_lap_xy_spike_counts_df[['t_bin_idx', 'lap']].copy()
+            valid = sub['lap'].notna() & (sub['lap'].to_numpy().astype(float) > -1)
+            sub = sub.loc[valid]
+            if len(sub) == 0:
+                return None
+            # Spike t_bin_idx is 1-based → 0-based for time_bin_info_df alignment
+            sub['t_bin_idx'] = sub['t_bin_idx'].astype(int) - 1
+            sub['lap'] = sub['lap'].astype(int)
+            mode_df = (
+                sub.groupby('t_bin_idx')['lap']
+                .agg(lambda s: int(s.mode().iloc[0]) if len(s.mode()) else int(s.iloc[0]))
+                .reset_index()
+            )
+            return mode_df
+        ## END if per_tbin_aclu_per_lap_xy_spike_counts_df is not None...
+        return None
 
     @function_attributes(short_name=None, tags=['UNUSED', 'ALT', 'pho', 'true-positive', 'false-positive', 'reliability'], input_requires=[], output_provides=[], uses=['CellIndividualReliabilityMatrix.build_in_field_masks_xy_from_pf', 'CellIndividualReliabilityMatrix.build_in_field_masks_xy', 'CellIndividualReliabilityMatrix.compute_reliability_matrix', '_compute_reliability_metrics'], used_by=[], creation_date='2026-07-23 09:58', related_items=[])
     def _perform_compute_unit_confusion_reliability_variables(self, active_peak_prominence_2d_results=None, spikes_df: Optional[pd.DataFrame] = None, time_bin_size_seconds: Optional[float] = None, max_t_idx: Optional[int] = None, **kwargs):
@@ -2366,6 +2557,7 @@ class CellIndividualReliabilityComputingMixin:
         UPDATES:
             self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.per_tbin_aclu_xy_spike_counts_df,
             self.per_tbin_aclu_per_lap_xy_spike_counts_df (when spikes have ``lap``; else None),
+            self.aclu_tbin_confusion_lap_df (when lap lookup available; else None),
             self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.position_aclus_reliability_df (POSITION_DEPENDENT),
             self.reliability_active, self.reliability_silent
 
@@ -2373,7 +2565,8 @@ class CellIndividualReliabilityComputingMixin:
         Usage:
 
             t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = a_dst_decoder2D.compute_unit_confusion_reliability_variables()
-            # also stored: a_dst_decoder2D.per_tbin_aclu_per_lap_xy_spike_counts_df
+            # also stored: a_dst_decoder2D.per_tbin_aclu_per_lap_xy_spike_counts_df, a_dst_decoder2D.aclu_tbin_confusion_lap_df
+            # derived: a_dst_decoder2D.per_aclu_per_lap_confusion_tbin_counts_df, a_dst_decoder2D.confusion_condition_proportion_maps
 
         """
         pfs = self.pf
@@ -2415,6 +2608,18 @@ class CellIndividualReliabilityComputingMixin:
             time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx,
             reliability_estimation_mode=self.reliability_estimation_mode, **kwargs,
         )
+
+        # General per-(aclu, t_bin) confusion+lap table when a lap lookup is available
+        t_bin_lap_df = self._build_t_bin_lap_df(pfs, self.time_bin_info_df, self.per_tbin_aclu_per_lap_xy_spike_counts_df)
+        if t_bin_lap_df is not None:
+            in_field_lut = CellIndividualReliabilityMatrix.build_in_field_lut(self.in_field_masks)
+            self.aclu_tbin_confusion_lap_df = CellIndividualReliabilityMatrix.perform_build_aclu_tbin_confusion_lap_df(
+                per_tbin=self.per_tbin_aclu_spike_counts_df, time_bin_info_df=self.time_bin_info_df, in_field_lut=in_field_lut,
+                neuron_ids=neuron_ids, t_bin_lap_df=t_bin_lap_df, max_t_idx=max_t_idx, **kwargs,
+            )
+        else:
+            self.aclu_tbin_confusion_lap_df = None
+        ## END if t_bin_lap_df is not None...
 
         self.compute_reliability_metrics()
         return self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df
