@@ -1633,10 +1633,10 @@ class InteractiveBayesian2DEquationDebugger:
     group_boxes: List[Any] = field(default=Factory(list))
     text_formatter: Any = field(default=None)
     ims: Dict[str, Any] = field(default=Factory(dict))
-    cmap_vmax: float = field(default=1.0)  # shared clim upper for posterior + PF heatmaps ([0, cmap_vmax])
+    cmap_vmax: float = field(default=1.0)  # PF ratemap clim upper ([0, cmap_vmax]); posterior uses auto clim
     cmap_vmax_slider: Any = field(default=None)
     cmap_vmax_slider_ax: Any = field(default=None)
-    observed_cmap_nanmax: Optional[float] = field(default=None)  # nanmax of current posterior (for →max button)
+    observed_cmap_nanmax: Optional[float] = field(default=None)  # nanmax of peak-normalized PF maps (for →max button)
 
 
     def __attrs_post_init__(self):
@@ -2021,7 +2021,7 @@ class InteractiveBayesian2DEquationDebugger:
         slider_pitch: float = slider_h + slider_gap
         controls_bottom: float = 0.018
         controls_top_pad: float = 0.018
-        controls_band_h: float = (n_cells + 1) * slider_pitch + controls_top_pad  # +1 row for cmap vmax slider
+        controls_band_h: float = (n_cells + 1) * slider_pitch + controls_top_pad  # +1 row for PF cmap vmax slider
         mosaic_bottom: float = controls_bottom + controls_band_h + 0.02
         fig_h: float = 6.4 + max(mosaic_bottom, 0.14) * 7.0 + 0.45 * max(0, n_cells - 2)
         fig_h = fig_h + 0.7  # bump for R_i(x) row under PF
@@ -2154,13 +2154,13 @@ class InteractiveBayesian2DEquationDebugger:
         reliability_mode_radio.on_clicked(lambda lab, _map=radio_label_to_mode: self.on_reliability_mode(_map.get(lab, lab)))
         self.reliability_mode_radio = reliability_mode_radio
 
-        # Sliders — start right of left column; cmap vmax on bottom row; n-sliders stacked above
+        # Sliders — start right of left column; PF cmap vmax on bottom row; n-sliders stacked above
         slider_left: float = 0.20  # was 0.17; room for n[...] labels after narrower left column
         slider_w: float = 0.48  # leave room for →max button before action column at 0.88
         slider_axes = []
         sliders = []
         for i, aclu in enumerate(self.aclu_list):
-            y_s = controls_bottom + slider_pitch * (n_cells - i)  # leave bottom row for cmap vmax
+            y_s = controls_bottom + slider_pitch * (n_cells - i)  # leave bottom row for PF cmap vmax
             ax_s = fig.add_axes([slider_left, y_s, slider_w, slider_h])
             cell_cmap = cm.get_cmap(self.cell_cmaps[i])
             marker_color = cell_cmap(0.75)
@@ -2184,12 +2184,12 @@ class InteractiveBayesian2DEquationDebugger:
         ## END for s in sliders...
 
         ax_cmap = fig.add_axes([slider_left, controls_bottom, slider_w, slider_h])
-        cmap_vmax_slider = Slider(ax_cmap, 'cmap vmax', 0.01, 1.0, valinit=float(self.cmap_vmax), valfmt='%0.2f')
+        cmap_vmax_slider = Slider(ax_cmap, 'PF cmap vmax', 0.01, 1.0, valinit=float(self.cmap_vmax), valfmt='%0.2f')
         cmap_vmax_slider.on_changed(self.on_cmap_vmax)
         self.cmap_vmax_slider_ax = ax_cmap
         self.cmap_vmax_slider = cmap_vmax_slider
 
-        # Button immediately right of cmap vmax slider: snap clim to observed posterior nanmax
+        # Button immediately right of PF cmap vmax slider: snap PF clim to observed PF nanmax
         cmap_btn_left: float = slider_left + slider_w + 0.015  # ~0.695
         cmap_btn_w: float = 0.10
         ax_btn_nanmax = fig.add_axes([cmap_btn_left, controls_bottom, cmap_btn_w, max(slider_h, 0.028)])
@@ -2266,11 +2266,8 @@ class InteractiveBayesian2DEquationDebugger:
 
         vmax = float(self.cmap_vmax)
         post_title = r'Decoded $P(x\mid n)$'
-        if vmax < 1.0:
-            post_title = post_title + rf'  clim=[0, {vmax:.3g}]'
-        self.observed_cmap_nanmax = float(np.nanmax(parts['posterior']))
         self.ims = {}
-        self.ims['post'] = self._imshow_map(self.ax_post, parts['posterior'], self.xbin, self.ybin, post_title, vmin=0.0, vmax=vmax)
+        self.ims['post'] = self._imshow_map(self.ax_post, parts['posterior'], self.xbin, self.ybin, post_title)  # auto clim (posterior scale ≠ PF)
         self._imshow_map(self.ax_pow, parts['power_term'], self.xbin, self.ybin, r'$\prod_i (\tau f_i)^{n_i}$', cmap='magma')
         self._imshow_map(self.ax_exp, parts['exp_term'], self.xbin, self.ybin, r'$\prod_i e^{-\tau f_i}$', cmap='cividis')
         if self.show_log_likelihood:
@@ -2280,10 +2277,11 @@ class InteractiveBayesian2DEquationDebugger:
 
 
 
-        ## Place Cells (peak-normalized so shared cmap_vmax ∈ [0,1] is meaningful)
+        ## Place Cells (peak-normalized so PF cmap_vmax ∈ [0,1] is meaningful)
         spatial_shape = self.tuning_curves.shape[1:]
         rel_active = getattr(self.sliced, 'reliability_active', None)
         rel_silent = getattr(self.sliced, 'reliability_silent', None)
+        pf_norm_nanmaxes: List[float] = []
         for i, ax in enumerate(self.ax_cell_pf):
             cmap = self.cell_cmaps[i]
             pf_title = f'PF aclu={self.aclu_list[i]}  peak={self.peak_rates[i]:.1f}Hz  n={n[i]}'
@@ -2298,12 +2296,15 @@ class InteractiveBayesian2DEquationDebugger:
             if vmax < 1.0:
                 pf_title = pf_title + f'  clim=[0, {vmax:.3g}]'
             pf_norm = self.tuning_curves[i] / max(float(self.peak_rates[i]), 1e-12)
+            pf_norm_nanmaxes.append(float(np.nanmax(pf_norm)))
             self.ims[f'pf_{i}'] = self._imshow_map(ax, pf_norm, self.xbin, self.ybin, pf_title, cmap=cmap, vmin=0.0, vmax=vmax)
             an_E_n = self.E_n[i] # tau * peak_rates[i]
             # ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak $=\tau f_{{peak}}={an_E_n:.2f}$', fontsize=8)
             ax.set_xlabel(rf'$\mathbb{{E}}[n]$ at peak ${an_E_n:.2f}$ spikes/tbin', fontsize=8)
 
         ## END for i, ax in enumerate(self.ax_cell_pf)...
+
+        self.observed_cmap_nanmax = float(np.nanmax(pf_norm_nanmaxes)) if len(pf_norm_nanmaxes) > 0 else 1.0
 
         ## Position-dependent reliability maps under each PF (populated when estimation mode is POSITION_DEPENDENT)
         for i, ax in enumerate(self.ax_cell_R):
@@ -2363,16 +2364,11 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     def on_cmap_vmax(self, val=None):
-        """Slider callback: update shared posterior/PF clim upper bound without full recompute when images exist."""
+        """Slider callback: update PF ratemap clim upper bound without full recompute when images exist. Posterior clim is unaffected."""
         vmax = float(self.cmap_vmax_slider.val) if self.cmap_vmax_slider is not None else float(val if val is not None else self.cmap_vmax)
         self.cmap_vmax = vmax
-        im_post = self.ims.get('post') if self.ims else None
-        if im_post is not None:
-            im_post.set_clim(0.0, vmax)
-            post_title = r'Decoded $P(x\mid n)$'
-            if vmax < 1.0:
-                post_title = post_title + rf'  clim=[0, {vmax:.3g}]'
-            self.ax_post.set_title(post_title, fontsize=10)
+        has_pf_ims: bool = bool(self.ims) and any(self.ims.get(f'pf_{i}') is not None for i in range(len(self.ax_cell_pf)))
+        if has_pf_ims:
             for i, ax in enumerate(self.ax_cell_pf):
                 im_pf = self.ims.get(f'pf_{i}')
                 if im_pf is not None:
@@ -2392,7 +2388,7 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     def reset_cmap_vmax(self):
-        """Reset shared posterior/PF clim to [0, 1]."""
+        """Reset PF ratemap clim to [0, 1]. Posterior clim is unaffected."""
         if self.cmap_vmax_slider is not None:
             self.cmap_vmax_slider.set_val(1.0)
         else:
@@ -2401,14 +2397,19 @@ class InteractiveBayesian2DEquationDebugger:
 
 
     def set_cmap_vmax_to_observed_nanmax(self):
-        """Set shared clim upper bound to nanmax of the current posterior."""
+        """Set PF clim upper bound to nanmax of the current peak-normalized placefield maps. Posterior clim is unaffected."""
         vmax = self.observed_cmap_nanmax
         if vmax is None:
-            im_post = self.ims.get('post') if self.ims else None
-            if im_post is not None:
-                vmax = float(np.nanmax(np.asarray(im_post.get_array(), dtype=float)))
-            else:
+            pf_maxes: List[float] = []
+            for i in range(len(self.ax_cell_pf)):
+                im_pf = self.ims.get(f'pf_{i}') if self.ims else None
+                if im_pf is not None:
+                    pf_maxes.append(float(np.nanmax(np.asarray(im_pf.get_array(), dtype=float))))
+                ## END if im_pf is not None...
+            ## END for i in range(len(self.ax_cell_pf))...
+            if len(pf_maxes) == 0:
                 return
+            vmax = float(np.nanmax(pf_maxes))
         vmax = float(vmax)
         if not np.isfinite(vmax) or vmax <= 0.0:
             vmax = 1e-12
