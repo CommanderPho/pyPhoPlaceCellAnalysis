@@ -239,6 +239,14 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
     pos_df = position_obj.to_dataframe()
     
     curr_laps_df = sess.laps.to_dataframe()
+    # Non-legacy mode indexes into pos arrays via start/end_position_index; recompute if missing (e.g. after filter/trim).
+    if (not legacy_plotting_mode) and (('start_position_index' not in curr_laps_df.columns) or ('end_position_index' not in curr_laps_df.columns)):
+        from neuropy.analyses.laps import _subfn_perform_compute_laps_pos_indicies
+        pos_df_for_idx = pos_df.reset_index(drop=True) # indices must match .to_numpy() positions used by _plot_helper_render_laps
+        curr_laps_df = _subfn_perform_compute_laps_pos_indicies(curr_laps_df.reset_index(drop=True), pos_df=pos_df_for_idx)
+        pos_df = pos_df_for_idx
+    ## END if missing start/end_position_index...
+
     fig, out_axes_list = plot_position_curves_figure(position_obj, **(override_dict(dict(include_velocity=True, include_accel=False, figsize=(24, 10), axes_list=None), kwargs))) #include_velocity=True, include_accel=True, figsize=(24, 10))
 
     ## Draw on top of the existing position curves with the lap colors:
@@ -272,6 +280,7 @@ def plot_laps_2d(sess, legacy_plotting_mode=True, **kwargs):
                                     curr_laps_df.loc[(curr_laps_df.lap_dir == 1), 'start_position_index'].to_numpy(),
                                     None, 
                                     curr_laps_df.loc[(curr_laps_df.lap_dir == 1),'end_position_index'].to_numpy(), **(default_odd_lap_kwargs | kwargs.get('odd_lap_kwargs', {})), ax=an_axis)
+    ## END for an_axis in out_axes_list...
             
     
     # _plot_helper_render_lap(pos_df['t'].to_numpy(), pos_df['x'].to_numpy(), desc_crossing_beginings, None, desc_crossing_endings, color='r', ax=out_axes_list[0])

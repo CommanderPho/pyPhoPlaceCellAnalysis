@@ -783,10 +783,13 @@ class DynamicDockDisplayAreaContentMixin(BaseDynamicInstanceConformingMixin):
         
     def clear_all_display_docks(self):
         """ removes all display docks """
-        for group_identifier, extant_group_items in self.dynamic_display_dict.items():
+        # Snapshot keys first: remove_display_dock / on_dock_closed mutate dynamic_display_dict during close.
+        for group_identifier in list(self.dynamic_display_dict.keys()):
             self.remove_display_dock(group_identifier)
             # for unique_identifier in extant_group_items.keys():
             #     self.remove_display_dock(unique_identifier)
+        ## END for group_identifier in list(self.dynamic_display_dict.keys())...
+
         # TODO: Persistance:
         # self.plotDict[name] = {"dock":dock, "widget":widget, "view":view}
     
