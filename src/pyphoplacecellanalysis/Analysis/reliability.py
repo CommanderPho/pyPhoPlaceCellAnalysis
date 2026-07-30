@@ -893,7 +893,7 @@ class CellIndividualReliabilityMatrix:
         )
 
         # STAGE_2: time-binned TP/FP/TN/FN confusion products
-        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+        t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df,
             ratemaps=ratemaps,
             pfs=pfs,
@@ -904,7 +904,7 @@ class CellIndividualReliabilityMatrix:
         )
         t_bin_aclus_reliability_df
 
-        ## OUTPUTS: in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+        ## OUTPUTS: in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df
 
         # Or use the decoder mixin entrypoint (STAGE_1 + STAGE_2 + reliability_* metrics):
         #   a_dst_decoder2D.compute_unit_confusion_reliability_variables()
@@ -938,6 +938,9 @@ class CellIndividualReliabilityMatrix:
             Zero entries mean no spikes in that (aclu, t_bin).
         per_tbin_aclu_xy_spike_counts_df : long DataFrame with columns ['aclu', 't_bin_idx', 'binned_x', 'binned_y', 'n_spikes']
             (nonzero spike-location bins only; spike ``t_bin_idx`` is 1-based; ``binned_x``/``binned_y`` are spike positions).
+        per_tbin_aclu_per_lap_xy_spike_counts_df : long DataFrame with columns
+            ['aclu', 't_bin_idx', 'lap', 'binned_x', 'binned_y', 'n_spikes'] when ``spikes_df`` has a ``lap`` column;
+            otherwise ``None``. Spike ``t_bin_idx`` is 1-based.
         """
         # ==================================================================================================================================================================================================================================================================================== #
         # Main Compute Block                                                                                                                                                                                                                                                                   #
@@ -1045,6 +1048,24 @@ class CellIndividualReliabilityMatrix:
             .agg([pl.len().alias("n_spikes")])
         ).to_pandas()
 
+        # Optional lap-partitioned counts (same spike locations, split by lap); None when no lap column
+        if "lap" in spikes_df.columns:
+            spikes_lap_pl = pl.from_pandas(spikes_df[["t_bin_idx", "aclu", "lap", "binned_x", "binned_y"]]).with_columns([
+                pl.col("binned_x").cast(pl.Int64),
+                pl.col("binned_y").cast(pl.Int64),
+                pl.col("aclu").cast(pl.Int64),
+                pl.col("t_bin_idx").cast(pl.Int64),
+                pl.col("lap").cast(pl.Int64),
+            ])
+            per_tbin_aclu_per_lap_xy_spike_counts_df = (
+                spikes_lap_pl
+                .group_by(["aclu", "t_bin_idx", "lap", "binned_x", "binned_y"])
+                .agg([pl.len().alias("n_spikes")])
+            ).to_pandas()
+        else:
+            per_tbin_aclu_per_lap_xy_spike_counts_df = None
+        ## END if "lap" in spikes_df.columns...
+
         # Coarse per-(aclu, t_bin) counts for PER_CELL confusion + sparse matrix (sum over spike locations)
         per_tbin_aclu_spike_counts_df = (
             per_tbin_aclu_xy_spike_counts_df
@@ -1068,8 +1089,8 @@ class CellIndividualReliabilityMatrix:
         # ==================================================================================================================================================================================================================================================================================== #
         t_bin_aclus_reliability_df = cls.perform_compute_confusion_matrix(per_tbin=per_tbin_aclu_spike_counts_df, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, **kwargs)
 
-        ## OUTPUTS: t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
-        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df
+        ## OUTPUTS: t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df
+        return t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df
 
 
     @classmethod
@@ -2294,7 +2315,8 @@ class CellIndividualReliabilityComputingMixin:
     Written / updated by this mixin
     -------------------------------
         in_field_masks, t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df,
-        per_tbin_aclu_xy_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse,
+        per_tbin_aclu_xy_spike_counts_df, per_tbin_aclu_per_lap_xy_spike_counts_df,
+        time_bin_info_df, per_tbin_aclu_spike_counts_sparse,
         position_aclus_reliability_df, reliability_active, reliability_silent
         (and optionally ``spikes_df`` / ``time_bin_size`` when they were ``None``).
 
@@ -2330,6 +2352,7 @@ class CellIndividualReliabilityComputingMixin:
 
         UPDATES:
             self.in_field_masks, self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.per_tbin_aclu_xy_spike_counts_df,
+            self.per_tbin_aclu_per_lap_xy_spike_counts_df (when spikes have ``lap``; else None),
             self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.position_aclus_reliability_df (POSITION_DEPENDENT),
             self.reliability_active, self.reliability_silent
 
@@ -2337,6 +2360,7 @@ class CellIndividualReliabilityComputingMixin:
         Usage:
 
             t_bin_aclus_reliability_df, per_tbin_aclu_spike_counts_df, time_bin_info_df, per_tbin_aclu_spike_counts_sparse, per_tbin_aclu_xy_spike_counts_df = a_dst_decoder2D.compute_unit_confusion_reliability_variables()
+            # also stored: a_dst_decoder2D.per_tbin_aclu_per_lap_xy_spike_counts_df
 
         """
         pfs = self.pf
@@ -2373,7 +2397,7 @@ class CellIndividualReliabilityComputingMixin:
         ## add binned:
         spikes_df = spikes_df.spikes.adding_binned_position_columns(xbin_edges=ratemaps.xbin, ybin_edges=ratemaps.ybin, position_column_names=('x', 'y'), binned_column_names=('binned_x', 'binned_y'), force_recompute=True) ## #TODO 2026-07-28 19:47: - [ ] inefficient to do this again and again
 
-        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
+        self.t_bin_aclus_reliability_df, self.per_tbin_aclu_spike_counts_df, self.time_bin_info_df, self.per_tbin_aclu_spike_counts_sparse, self.per_tbin_aclu_xy_spike_counts_df, self.per_tbin_aclu_per_lap_xy_spike_counts_df = CellIndividualReliabilityMatrix.compute_reliability_matrix(
             spikes_df=spikes_df, pfs=pfs, ratemaps=ratemaps, in_field_masks=self.in_field_masks, neuron_ids=neuron_ids,
             time_bin_size_seconds=time_bin_size_seconds, max_t_idx=max_t_idx,
             reliability_estimation_mode=self.reliability_estimation_mode, **kwargs,

@@ -231,6 +231,11 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
             neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
         else:
             neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = None
+        if self.per_tbin_aclu_per_lap_xy_spike_counts_df is not None:
+            pdf = self.per_tbin_aclu_per_lap_xy_spike_counts_df
+            neuron_sliced_decoder.per_tbin_aclu_per_lap_xy_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
+        else:
+            neuron_sliced_decoder.per_tbin_aclu_per_lap_xy_spike_counts_df = None
         if self.position_aclus_reliability_df is not None:
             pdf = self.position_aclus_reliability_df
             neuron_sliced_decoder.position_aclus_reliability_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()

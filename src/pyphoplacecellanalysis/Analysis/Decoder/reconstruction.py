@@ -3623,6 +3623,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
     t_bin_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons',)})
     per_tbin_aclu_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins','n_neurons',)})
     per_tbin_aclu_xy_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_spike_location_bins',)})
+    per_tbin_aclu_per_lap_xy_spike_counts_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_spike_location_bins',)})
     time_bin_info_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_t_bins',)})
     per_tbin_aclu_spike_counts_sparse: csr_matrix = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_neurons','n_t_bins',)})
     position_aclus_reliability_df: pd.DataFrame = serialized_field(default=None, is_computable=True, metadata={'shape': ('n_visited_bins', 'n_neurons')})
@@ -3733,6 +3734,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             self.t_bin_aclus_reliability_df = None
             self.per_tbin_aclu_spike_counts_df = None
             self.per_tbin_aclu_xy_spike_counts_df = None
+            self.per_tbin_aclu_per_lap_xy_spike_counts_df = None
             self.time_bin_info_df = None
             self.per_tbin_aclu_spike_counts_sparse = None
             self.position_aclus_reliability_df = None
@@ -3750,6 +3752,7 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
         self.t_bin_aclus_reliability_df = None
         self.per_tbin_aclu_spike_counts_df = None
         self.per_tbin_aclu_xy_spike_counts_df = None
+        self.per_tbin_aclu_per_lap_xy_spike_counts_df = None
         self.time_bin_info_df = None
         self.per_tbin_aclu_spike_counts_sparse = None
         self.position_aclus_reliability_df = None
@@ -3864,6 +3867,11 @@ class BayesianPlacemapPositionDecoder(SerializedAttributesAllowBlockSpecifyingCl
             neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
         else:
             neuron_sliced_decoder.per_tbin_aclu_xy_spike_counts_df = None
+        if self.per_tbin_aclu_per_lap_xy_spike_counts_df is not None:
+            pdf = self.per_tbin_aclu_per_lap_xy_spike_counts_df
+            neuron_sliced_decoder.per_tbin_aclu_per_lap_xy_spike_counts_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
+        else:
+            neuron_sliced_decoder.per_tbin_aclu_per_lap_xy_spike_counts_df = None
         if self.position_aclus_reliability_df is not None:
             pdf = self.position_aclus_reliability_df
             neuron_sliced_decoder.position_aclus_reliability_df = pdf[np.isin(pdf['aclu'].to_numpy(), list(id_set))].copy()
