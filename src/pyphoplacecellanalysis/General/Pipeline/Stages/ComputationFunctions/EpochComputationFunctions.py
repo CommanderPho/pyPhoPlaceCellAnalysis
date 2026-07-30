@@ -1640,8 +1640,15 @@ class EpochComputationsComputationsContainer(ComputedResult):
             a_filtered_epochs_df = ensure_dataframe(deepcopy(a_filter_epoch_obj)).epochs.filtered_by_duration(min_duration=epochs_decoding_time_bin_size*2)
             # active_filter_epochs = a_filter_epoch_obj
             active_filter_epochs = a_filtered_epochs_df
+            if (active_filter_epochs is None) or (len(active_filter_epochs) == 0):
+                print(f'WARN: no epochs remaining after duration filter for {a_decoded_epoch_context} (min_duration={epochs_decoding_time_bin_size*2}); skipping.')
+                continue
+
             a_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult = non_PBE_all_directional_pf1D_Decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(active_filter_epochs), decoding_time_bin_size=epochs_decoding_time_bin_size, debug_print=False)
-            
+            if (a_pseudo2D_continuous_specific_decoded_result is None) or (getattr(a_pseudo2D_continuous_specific_decoded_result, 'num_filter_epochs', 0) == 0) or (len(getattr(a_pseudo2D_continuous_specific_decoded_result, 'p_x_given_n_list', [])) == 0):
+                print(f'WARN: decode produced empty result for {a_decoded_epoch_context}; skipping.')
+                continue
+
             ## add time bin to the epoch
             a_decoded_epoch_context = a_decoded_epoch_context.overwriting_context(decoding_time_bin_size=epochs_decoding_time_bin_size)
 
@@ -1658,6 +1665,9 @@ class EpochComputationsComputationsContainer(ComputedResult):
                 
 
                 a_masked_decoded_result, _mask_index_tuple = a_pseudo2D_continuous_specific_decoded_result.mask_computed_DecodedFilterEpochsResult_by_required_spike_counts_per_time_bin(spikes_df=deepcopy(spikes_df), masked_bin_fill_mode=a_masked_bin_fill_mode) ## Masks the low-firing bins so they don't confound the analysis.
+                if (a_masked_decoded_result is None) or (getattr(a_masked_decoded_result, 'num_filter_epochs', 0) == 0) or (len(getattr(a_masked_decoded_result, 'p_x_given_n_list', [])) == 0):
+                    print(f'WARN: after masking with masked_bin_fill_mode={a_masked_bin_fill_mode!r}, no epochs remain for {a_masked_decoded_epoch_context}; skipping.')
+                    continue
 
                 # _a_masked_unused_marginal, a_masked_posterior_df = DirectionalPseudo2DDecodersResult.build_generalized_non_marginalized_raw_posteriors(a_masked_decoded_result, unique_decoder_names=unique_decoder_names) #[0]['p_x_given_n']
 
@@ -1676,13 +1686,13 @@ class EpochComputationsComputationsContainer(ComputedResult):
                 filter_epochs_pseudo2D_continuous_specific_decoded_result[a_masked_decoded_epoch_context] = a_masked_decoded_result ## add result to outputs dict
                 filter_epochs_decoder_dict[a_masked_decoded_epoch_context] = deepcopy(non_PBE_all_directional_pf1D_Decoder)
                 filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict[a_masked_decoded_epoch_context] = a_masked_posterior_df
-            ## END for a_masked_bin_fill_m...
+            ## END for a_masked_bin_fill_mode in masked_bin_fill_modes...
+
             # Assert.same_length(filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
 
             ## UPDATES: filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict
+        ## END for a_decoded_epoch_context, a_filter_epoch_obj in filter_epochs_to_decode_dict.items()...
 
-        # END for a_decoded_epoch_context, a_fi...
-        
         Assert.same_length(filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict)
         
         return (filter_epochs_to_decoded_dict, filter_epochs_pseudo2D_continuous_specific_decoded_result, filter_epochs_decoder_dict, filter_epochs_decoded_filter_epoch_track_marginal_posterior_df_dict) ## return a plain tuple of dicts

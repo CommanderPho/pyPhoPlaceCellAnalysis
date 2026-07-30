@@ -3095,6 +3095,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         Supports 3D `(n_pos_bins, n_contexts, n_time_bins)` and 4D `(n_xbins, n_ybins, n_contexts, n_time_bins)` posteriors.
         """
         p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        assert len(p_x_given_n_list) > 0, f"p_x_given_n_list is empty; cannot resolve pseudo2D context layout from filter_epochs_decoder_result of type {type(filter_epochs_decoder_result)} (num_filter_epochs={getattr(filter_epochs_decoder_result, 'num_filter_epochs', None)})"
         p_x_given_n_list_ndim_sizes = np.array([np.ndim(a_p_x_given_n) for a_p_x_given_n in p_x_given_n_list])
         p_x_given_n_ndim: int = int(p_x_given_n_list_ndim_sizes[0])
         assert np.all([v == p_x_given_n_ndim for v in p_x_given_n_list_ndim_sizes]), f"the first ndim must equal all the others, but p_x_given_n_ndim: {p_x_given_n_ndim}, p_x_given_n_list_ndim_sizes: {p_x_given_n_list_ndim_sizes}"
