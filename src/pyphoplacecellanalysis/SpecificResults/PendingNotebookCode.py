@@ -1719,8 +1719,6 @@ class InteractiveBayesian2DEquationDebugger:
             per_cell_L_raw = []
 
 
-
-
         alphas = np.ones(n_cells, dtype=float)
 
         for i in range(n_cells):
@@ -1756,7 +1754,9 @@ class InteractiveBayesian2DEquationDebugger:
                     alphas[i] = float(np.nanmean(alpha_i))
 
                     ## Do true 2D tempering by position bin -- this is WAY more subtle isn't it?
-                    cell_power = cell_power * alpha_i # #np.power(cell_power, alpha_i)
+                    # cell_power = cell_power * alpha_i # #np.power(cell_power, alpha_i)
+                    cell_power = np.power(cell_power, alpha_i) ## elementwise power hopefully
+
                     cell_exp = cell_exp ## don't multiply the other two terms as that'd be repeated multiplication
                     cell_fac = cell_fac
 
