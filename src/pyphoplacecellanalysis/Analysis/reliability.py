@@ -1179,12 +1179,19 @@ class CellIndividualReliabilityMatrix:
         """
         neuron_ids = np.asarray(neuron_ids)
         pos, lut, spikes, neuron_ids_i64 = cls._prepare_visit_polars_frames(per_tbin=per_tbin, time_bin_info_df=time_bin_info_df, neuron_ids=neuron_ids, in_field_lut=in_field_lut, max_t_idx=max_t_idx)
+        ## spikes: ['aclu', 't_bin_idx', 'n_spikes']
+        ## pos: ['t_bin_idx', 'binned_x', 'binned_y']
+
         n_computed_bins: int = pos.height
         print(f"n_tbins={len(time_bin_info_df)}, n_valid={n_computed_bins}, n_nan={len(time_bin_info_df) - n_computed_bins}")
 
         known_keys = lut.select(['binned_x', 'binned_y']).unique()
-        known_pos = pos.join(known_keys, on=['binned_x', 'binned_y'], how='inner')
+        known_pos = pos.join(known_keys, on=['binned_x', 'binned_y'], how='inner') # ['t_bin_idx', 'binned_x', 'binned_y']
         n_known_tbins: int = known_pos.height
+
+        ## start with `time_bin_info_df` and just add the ['aclu', 'n_spikes'] info from `per_tbin`, which might increase the number of rows (because there will be duplicate rows for the same tbin if multiple cells fire in this tbin
+        # all_info_df: pd.DataFrame = time_bin_info_df.merge(per_tbin[['aclu', 't_bin_idx', 'n_spikes']], on='t_bin_idx', how='left') 
+
 
         ## n_in_field per aclu = # known visits whose animal bin is in that cell's field
         n_in_df = (
@@ -1251,6 +1258,8 @@ class CellIndividualReliabilityMatrix:
         t_bin_aclus_reliability_df: pd.DataFrame = out_pl.to_pandas().set_index('aclu', drop=True, inplace=False)
         ## drop helper cols not in prior schema
         t_bin_aclus_reliability_df = t_bin_aclus_reliability_df.drop(columns=['n_known_tbins', 'n_infield_spike_tbins', 'n_outfield_spike_tbins'], errors='ignore')
+
+        ## for each aclu: position_cols: (n_infield_tbins, n_outfield_tbins, n_total_tbins), spike_cols: (n_infield_spike_tbins, n_outfield_spike_tbins, n_infield_nonspike_tbins, n_outfield_nonspike_tbins)
 
         ## OUTPUTS: t_bin_aclus_reliability_df
         return t_bin_aclus_reliability_df
