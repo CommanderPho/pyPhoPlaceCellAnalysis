@@ -411,7 +411,8 @@ class DisjointPlacefieldsExploration:
     @function_attributes(short_name=None, tags=['placefields', 'overlap', 'analaysis', 'debug', 'visual'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_plot_for_disjoint_cell_pairs'], creation_date='2026-07-09 06:50', related_items=[])
     @classmethod
     def plot_pfs_and_decoded_posterior(cls, neuron_sliced_decoder, co_firing_posteriors, tuple_key, t_idx: Optional[int] = None, nan_less_than_value: float = 1e-7, include_occupancy: bool = True, co_firing_time_bin_indices: Optional[NDArray] = None, enable_t_idx_slider: bool = False):
-        """
+        """ Plots the two active pf cells as two colors and their decoded posterior for a single time bin, and a slider that allows you to scrub through all decoded time bins in the epoch
+
         Usage:
         
             ## INPUTS: tuple_key, good_pairs_co_firing_posteriors_dict, neuron_sliced_decoder
