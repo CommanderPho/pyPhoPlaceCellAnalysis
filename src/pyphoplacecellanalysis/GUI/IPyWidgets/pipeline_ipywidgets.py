@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 from pyphocorehelpers.gui.Jupyter.JupyterButtonRowWidget import build_fn_bound_buttons, JupyterButtonRowWidget, JupyterButtonColumnWidget
 from pyphocorehelpers.Filesystem.open_in_system_file_manager import reveal_in_system_file_manager
-from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default
+from pyphocorehelpers.Filesystem.path_helpers import open_file_with_system_default, parse_unique_file_name
 from pyphocorehelpers.assertion_helpers import Assert
 
 
@@ -1183,14 +1183,33 @@ class PipelinePickleFileSelectorWidget:
     @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
     def try_select_first_valid_files(self, require_global_file: bool=False) -> bool:
         """
-        try selecting the first
+        Try selecting the first non-temporary local pickle.
+
+        Skips `TEMP_THEN_OVERWRITE` datetime-prefixed temps like `20260730150642-loadedSessPickle.pkl`
+        (incomplete pickles left behind when saving never finished), preferring canonical names
+        such as `loadedSessPickle.pkl`.
         """
-        if len(self.active_local_file_names_list) < 1:
+        local_file_names_list = self.active_local_file_names_list
+        if len(local_file_names_list) < 1:
             print(f'have 0 local files, cannot select first.')
             return False
-        
+
+        ## Prefer non-temporary files (no leading YYYYMMDDHHMMSS- from build_unique_filename)
+        selected_local_section_index: Optional[int] = None
+        for i, a_local_file_name in enumerate(local_file_names_list):
+            if parse_unique_file_name(a_local_file_name) is not None:
+                # e.g. '20260730150642-loadedSessPickle.pkl' — skip potentially incomplete temp pickle
+                continue
+            selected_local_section_index = i
+            break
+        ## END for i, a_local_file_name in enumerate(local_file_names_list)...
+
+        if selected_local_section_index is None:
+            print(f'have no non-temporary local files (all appear datetime-prefixed), cannot select first.')
+            return False
+
         ## otherwise it's safe to set the selection
-        self.local_file_browser_widget.selection = [0]
+        self.local_file_browser_widget.selection = [selected_local_section_index]
         # self.global_file_browser_widget.selection = [0]
         first_selected_local_path: Path = Path(self.selected_local_pkl_files[0])
         selected_local_file_name: str = first_selected_local_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
