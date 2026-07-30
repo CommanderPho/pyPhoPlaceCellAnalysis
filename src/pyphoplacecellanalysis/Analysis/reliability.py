@@ -1853,24 +1853,46 @@ class CellIndividualReliabilityMatrix:
     def plot_reliability_maps_with_spikes(cls, pfs, reliability_active: np.ndarray, reliability_silent: np.ndarray, neuron_ids,
                                         reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
                                         in_field_masks: Optional[Dict[int, np.ndarray]] = None,
+                                        position_aclus_reliability_df: Optional[pd.DataFrame] = None,
                                         included_neuron_ids: Optional[Sequence[int]] = None,
-                                        reliability_variables: str = "active", max_n_cells: Optional[int] = None,
+                                        reliability_variables: str = "active", show_confusion_counts: bool = True,
+                                        should_display_lap_by_lap_spike_counts: bool = False,
+                                        max_n_cells: Optional[int] = None,
                                         subplots: Optional[Tuple[int, int]] = None, figsize_per_cell: float = 2.5,
                                         mask_cmap: str = "Greens", mask_alpha: float = 0.35,
                                         heatmap_cmap: str = "viridis", heatmap_alpha: float = 0.9,
+                                        count_cmap: str = "YlOrRd", count_alpha: float = 0.95,
                                         spike_s: float = 2.0, spike_alpha: float = 0.3, color_by_in_field: bool = True,
                                         use_pcolormesh: bool = True, show_trajectory: bool = False,
-                                        trajectory_alpha: float = 0.15) -> Tuple[Figure, np.ndarray]:
-        """Plot per-cell reliability maps (active | silent) + optional in-field mask + spike positions.
+                                        trajectory_alpha: float = 0.15, show_count_bin_labels: bool = True,
+                                        show_bin_grid: bool = True, count_label_fontsize: Optional[float] = None,
+                                        bin_grid_linewidth: float = 0.25, bin_grid_color: str = "0.35",
+                                        bin_grid_alpha: float = 0.65) -> Tuple[Figure, np.ndarray]:
+        """Plot per-cell reliability maps (active | silent) + optional TP/FP/TN/FN count maps + spikes.
 
-        Layout: for each cell, side-by-side panels for ``reliability_active`` and ``reliability_silent``
-        (or a single panel when ``which`` is ``"active"`` / ``"silent"``).
+        Layout: for each cell, panels for selected reliability variable(s), and when
+        ``position_aclus_reliability_df`` is provided and ``show_confusion_counts`` is True,
+        four additional panels of raw visit-event counts: TP / FP / TN / FN.
+        When ``should_display_lap_by_lap_spike_counts`` is True, an additional panel shows a
+        vertical stack (one row per lap) of spike counts in each marginal_x position bin.
+
+        Per-position confusion counts (from visit-conditioned ``position_aclus_reliability_df``):
+            TP = n_active_visits when in-field
+            FP = n_active_visits when out-of-field
+            FN = (n_visits - n_active_visits) when in-field
+            TN = (n_visits - n_active_visits) when out-of-field
+
+        Count panels draw a thin bin grid and tiny integer labels on every non-zero bin.
+        Each count panel uses its own vmax (not shared across TP/FP/TN/FN) so sparse maps remain visible.
+        ``count_label_fontsize=None`` auto-sizes labels from median bin size vs axis display size (clamped).
+        Lap×x panels use the same count colormap; y is lap index (not maze y), aspect auto.
 
         Mode handling:
             PER_CELL: scalar per neuron → constant ``(nx, ny)`` fill; title shows ``R_a`` / ``R_s``.
             POSITION_DEPENDENT: spatial maps ``(*spatial, n_neurons)`` or flat ``(n_flat, n_neurons)``.
 
-        Layer order (bottom → top): trajectory (optional) → reliability heatmap → in-field mask (optional) → spikes.
+        Layer order (bottom → top): trajectory (optional) → heatmap → in-field mask (optional) → spikes
+        (count panels: heatmap → bin grid → count labels; no spikes/mask overlay).
 
         Usage:
 
@@ -1880,7 +1902,9 @@ class CellIndividualReliabilityMatrix:
                 a_dst_decoder2D.pf, a_dst_decoder2D.reliability_active, a_dst_decoder2D.reliability_silent,
                 neuron_ids=a_dst_decoder2D.neuron_IDs,
                 reliability_estimation_mode=a_dst_decoder2D.reliability_estimation_mode,
-                in_field_masks=a_dst_decoder2D.in_field_masks, max_n_cells=9,
+                in_field_masks=a_dst_decoder2D.in_field_masks,
+                position_aclus_reliability_df=a_dst_decoder2D.position_aclus_reliability_df, max_n_cells=9,
+                should_display_lap_by_lap_spike_counts=True,
             )
 
         """
@@ -1891,7 +1915,7 @@ class CellIndividualReliabilityMatrix:
         assert getattr(pfs, "ndim", 2) >= 2, "plot_reliability_maps_with_spikes requires 2D PfND"
         assert reliability_active is not None and reliability_silent is not None, "reliability_active and reliability_silent are required"
         reliability_variables = str(reliability_variables).lower().strip()
-        assert reliability_variables in ("both", "active", "silent"), f'which must be "both", "active", or "silent"; got {reliability_variables!r}'
+        assert reliability_variables in ("both", "active", "silent"), f'reliability_variables must be "both", "active", or "silent"; got {reliability_variables!r}'
 
         xbin = np.asarray(pfs.xbin)
         ybin = np.asarray(pfs.ybin)
@@ -1899,6 +1923,24 @@ class CellIndividualReliabilityMatrix:
         nx, ny = len(xbin) - 1, len(ybin) - 1
         extent = (xbin[0], xbin[-1], ybin[0], ybin[-1])
         n_flat: int = nx * ny
+        x_centers = 0.5 * (xbin[:-1] + xbin[1:])
+        y_centers = 0.5 * (ybin[:-1] + ybin[1:])
+        median_bin_w = float(np.median(np.diff(xbin))) if nx > 0 else 1.0
+        median_bin_h = float(np.median(np.diff(ybin))) if ny > 0 else 1.0
+        data_w = float(xbin[-1] - xbin[0])
+        data_h = float(ybin[-1] - ybin[0])
+        # Approximate displayed axes size (inches) before tight_layout; equal-aspect letterboxing applied below.
+        ax_disp_in = float(figsize_per_cell) * 0.78
+        data_aspect = data_w / max(data_h, 1e-9)
+        if data_aspect >= 1.0:
+            disp_w_in, disp_h_in = ax_disp_in, ax_disp_in / data_aspect
+        else:
+            disp_w_in, disp_h_in = ax_disp_in * data_aspect, ax_disp_in
+        ## END if data_aspect >= 1.0...
+        pts_per_x = (disp_w_in * 72.0) / max(data_w, 1e-9)
+        pts_per_y = (disp_h_in * 72.0) / max(data_h, 1e-9)
+        bin_w_pts = median_bin_w * pts_per_x
+        bin_h_pts = median_bin_h * pts_per_y
 
         neuron_ids = np.asarray(neuron_ids)
         n_neurons: int = len(neuron_ids)
@@ -1929,16 +1971,38 @@ class CellIndividualReliabilityMatrix:
         assert n > 0, "No neuron_ids to plot"
         aclu_to_i = {int(a): i for i, a in enumerate(neuron_ids)}
 
-        panels: List[str] = ["active", "silent"] if reliability_variables == "both" else [reliability_variables]
+        reliability_panels: List[str] = ["active", "silent"] if reliability_variables == "both" else [reliability_variables]
+        confusion_panels: List[str] = ["TP", "FP", "TN", "FN"] if (show_confusion_counts and (position_aclus_reliability_df is not None)) else []
+        lap_panels: List[str] = ["laps"] if should_display_lap_by_lap_spike_counts else []
+        panels: List[str] = list(reliability_panels) + list(confusion_panels) + list(lap_panels)
         n_panels: int = len(panels)
+        confusion_panel_set = set(confusion_panels)
+        lap_panel_set = set(lap_panels)
+
+        # Shared lap identity order across cells (valid laps only)
+        all_lap_ids: np.ndarray = np.array([], dtype=int)
+        lap_id_to_idx: Dict[int, int] = {}
+        n_laps: int = 0
+        if should_display_lap_by_lap_spike_counts:
+            assert "lap" in spikes_df.columns, 'should_display_lap_by_lap_spike_counts=True requires a "lap" column on pfs.filtered_spikes_df'
+            lap_vals = spikes_df["lap"].to_numpy()
+            valid_lap_mask = pd.notna(lap_vals) & (np.asarray(lap_vals, dtype=float) > -1)
+            all_lap_ids = np.sort(np.unique(np.asarray(lap_vals[valid_lap_mask], dtype=int)))
+            n_laps = int(len(all_lap_ids))
+            lap_id_to_idx = {int(lid): i for i, lid in enumerate(all_lap_ids)}
+            if n_laps == 0:
+                warnings.warn('should_display_lap_by_lap_spike_counts=True but no valid laps (lap > -1) found in spikes_df; lap panels will be empty.')
+            ## END if n_laps == 0...
+        ## END if should_display_lap_by_lap_spike_counts...
 
         if subplots is None:
-            if reliability_variables == "both":
+            # One row per cell when showing multiple panel types (reliability both and/or confusion counts / lap stacks)
+            if (reliability_variables == "both") or (len(confusion_panels) > 0) or should_display_lap_by_lap_spike_counts:
                 n_rows, n_cols_cells = n, 1
             else:
                 n_cols_cells = int(np.ceil(np.sqrt(n)))
                 n_rows = int(np.ceil(n / n_cols_cells))
-            ## END if which == "both"...
+            ## END if (reliability_variables == "both") or (len(confusion_panels) > 0) or should_display_lap_by_lap_spike_counts...
         else:
             n_rows, n_cols_cells = subplots
         ## END if subplots is None...
@@ -1969,6 +2033,101 @@ class CellIndividualReliabilityMatrix:
             return mask
 
 
+        def _confusion_count_maps_for_aclu(aclu: int) -> Dict[str, np.ndarray]:
+            """Build (nx, ny) TP/FP/TN/FN visit-event count maps for one aclu from position_aclus_reliability_df."""
+            out = {k: np.zeros((nx, ny), dtype=float) for k in ("TP", "FP", "TN", "FN")}
+            if position_aclus_reliability_df is None:
+                return out
+            cell_df = position_aclus_reliability_df[position_aclus_reliability_df['aclu'].to_numpy() == aclu]
+            if len(cell_df) == 0:
+                return out
+            for row in cell_df.itertuples(index=False):
+                ix = int(row.binned_x) - 1
+                iy = int(row.binned_y) - 1
+                if (ix < 0) or (iy < 0) or (ix >= nx) or (iy >= ny):
+                    continue
+                n_visits = float(getattr(row, 'n_visits', 0.0))
+                n_active = float(getattr(row, 'n_active_visits', 0.0))
+                n_silent = max(n_visits - n_active, 0.0)
+                is_in_field = bool(getattr(row, 'is_in_field', False))
+                if is_in_field:
+                    out["TP"][ix, iy] = n_active
+                    out["FN"][ix, iy] = n_silent
+                else:
+                    out["FP"][ix, iy] = n_active
+                    out["TN"][ix, iy] = n_silent
+                ## END if is_in_field...
+            ## END for row in cell_df.itertuples(index=False)...
+            return out
+
+
+        def _lap_by_lap_marginal_x_counts(aclu: int) -> np.ndarray:
+            """Build (n_laps, nx) spike-count matrix: one row per lap, columns = marginal_x bins.
+            captures: n_laps, spikes_df, xbin
+            """
+            n_rows_laps: int = max(n_laps, 1)
+            out = np.zeros((n_rows_laps, nx), dtype=float)
+            if n_laps == 0:
+                return out
+            cell_spk = spikes_df[spikes_df["aclu"] == aclu]
+            if len(cell_spk) == 0:
+                return out
+            lap_col = cell_spk["lap"].to_numpy()
+            valid_lap = pd.notna(lap_col) & (np.asarray(lap_col, dtype=float) > -1)
+            if "binned_x" in cell_spk.columns:
+                bx = cell_spk["binned_x"].to_numpy().astype(float)
+            else:
+                assert "x" in cell_spk.columns, 'spikes_df needs "binned_x" or "x" to build lap×marginal_x counts'
+                bx = np.digitize(cell_spk["x"].to_numpy(), xbin).astype(float)
+            ## END if "binned_x" in cell_spk.columns...
+            valid_bx = np.isfinite(bx) & (bx >= 1) & (bx <= nx)
+            valid = valid_lap & valid_bx
+            if not np.any(valid):
+                return out
+            lap_i = np.asarray([lap_id_to_idx[int(lid)] for lid in lap_col[valid]], dtype=int)
+            bx_i = bx[valid].astype(int) - 1
+            np.add.at(out, (lap_i, bx_i), 1.0)
+            return out
+
+
+        def _draw_bin_grid(ax: Axes):
+            for xv in xbin:
+                ax.axvline(xv, color=bin_grid_color, linewidth=bin_grid_linewidth, alpha=bin_grid_alpha, zorder=4)
+            ## END for xv in xbin...
+            for yv in ybin:
+                ax.axhline(yv, color=bin_grid_color, linewidth=bin_grid_linewidth, alpha=bin_grid_alpha, zorder=4)
+            ## END for yv in ybin...
+
+
+        def _draw_lap_x_bin_grid(ax: Axes, n_rows_laps: int):
+            for xv in xbin:
+                ax.axvline(xv, color=bin_grid_color, linewidth=bin_grid_linewidth, alpha=bin_grid_alpha, zorder=4)
+            ## END for xv in xbin...
+            for yi in range(n_rows_laps + 1):
+                ax.axhline(float(yi), color=bin_grid_color, linewidth=bin_grid_linewidth, alpha=bin_grid_alpha, zorder=4)
+            ## END for yi in range(n_rows_laps + 1)...
+
+
+        def _fontsize_for_count(n_digits: int) -> float:
+            """Pick a label size that fits inside one median bin (height and digit-width constrained)."""
+            if count_label_fontsize is not None:
+                return float(count_label_fontsize)
+            # ~0.55em per digit width; leave ~20% padding inside the bin
+            fit_h = 0.78 * bin_h_pts
+            fit_w = (0.88 * bin_w_pts) / max(0.55 * float(max(n_digits, 1)), 1e-6)
+            return float(np.clip(min(fit_h, fit_w), 5.5, 11.0))
+
+
+        def _draw_nonzero_count_labels(ax: Axes, count_map: np.ndarray):
+            ixs, iys = np.nonzero(count_map > 0)
+            for ix, iy in zip(ixs, iys):
+                n_val = int(count_map[ix, iy])
+                ax.text(float(x_centers[ix]), float(y_centers[iy]), f"{n_val}",
+                        ha="center", va="center", fontsize=_fontsize_for_count(len(str(n_val))),
+                        color="0.05", clip_on=True, zorder=5)
+            ## END for ix, iy in zip(ixs, iys)...
+
+
         for cell_i, aclu in enumerate(plot_neuron_ids):
             aclu = int(aclu)
             cell_idx = aclu_to_i.get(aclu)
@@ -1976,57 +2135,106 @@ class CellIndividualReliabilityMatrix:
             mask = _normalize_mask(aclu)
             r_a = _map_for_cell(R_active, cell_idx)
             r_s = _map_for_cell(R_silent, cell_idx)
-            maps_by_panel = {"active": r_a, "silent": r_s}
+            maps_by_panel: Dict[str, np.ndarray] = {"active": r_a, "silent": r_s}
+            if len(confusion_panels) > 0:
+                maps_by_panel.update(_confusion_count_maps_for_aclu(aclu))
+            ## END if len(confusion_panels) > 0...
+            if should_display_lap_by_lap_spike_counts:
+                maps_by_panel["laps"] = _lap_by_lap_marginal_x_counts(aclu)
+            ## END if should_display_lap_by_lap_spike_counts...
 
             row = cell_i // n_cols_cells
             col_cell = cell_i % n_cols_cells
             for panel_j, panel_name in enumerate(panels):
                 ax = axes[row, col_cell * n_panels + panel_j]
                 rmap = maps_by_panel[panel_name]
-
-                if show_trajectory and hasattr(pfs, "x") and hasattr(pfs, "y"):
-                    ax.plot(pfs.x, pfs.y, color="#d3c5c5", alpha=trajectory_alpha, linewidth=0.5, zorder=0)
-                ## END if show_trajectory...
-
-                if use_pcolormesh:
-                    ax.pcolormesh(xbin, ybin, rmap.T, cmap=heatmap_cmap, alpha=heatmap_alpha, shading="flat", vmin=0, vmax=1, zorder=1)
+                is_lap_panel: bool = (panel_name in lap_panel_set)
+                is_count_panel: bool = (panel_name in confusion_panel_set)
+                panel_cmap = count_cmap if (is_count_panel or is_lap_panel) else heatmap_cmap
+                panel_alpha = count_alpha if (is_count_panel or is_lap_panel) else heatmap_alpha
+                if is_count_panel or is_lap_panel:
+                    panel_vmax = float(np.nanmax(rmap)) if np.any(np.isfinite(rmap)) else 1.0
+                    if (not np.isfinite(panel_vmax)) or (panel_vmax <= 0.0):
+                        panel_vmax = 1.0
+                    ## END if (not np.isfinite(panel_vmax)) or (panel_vmax <= 0.0)...
+                    panel_vmin = 0.0
                 else:
-                    plot_r = np.fliplr(np.rot90(rmap, k=-1))
-                    ax.imshow(plot_r, origin="lower", extent=extent, cmap=heatmap_cmap, alpha=heatmap_alpha, vmin=0, vmax=1, zorder=1, aspect="auto")
-                ## END if use_pcolormesh...
+                    panel_vmin, panel_vmax = 0.0, 1.0
+                ## END if is_count_panel or is_lap_panel...
 
-                if mask is not None:
+                if is_lap_panel:
+                    # rmap: (n_laps, nx) — rows = laps (bottom→top), cols = marginal_x
+                    n_rows_laps = int(rmap.shape[0])
+                    lap_y_edges = np.arange(n_rows_laps + 1, dtype=float)
                     if use_pcolormesh:
-                        ax.pcolormesh(xbin, ybin, mask.T.astype(float), cmap=mask_cmap, alpha=mask_alpha, shading="flat", vmin=0, vmax=1, zorder=2)
+                        ax.pcolormesh(xbin, lap_y_edges, rmap, cmap=panel_cmap, alpha=panel_alpha, shading="flat", vmin=panel_vmin, vmax=panel_vmax, zorder=1)
                     else:
-                        plot_mask = np.fliplr(np.rot90(mask.astype(float), k=-1))
-                        ax.imshow(plot_mask, origin="lower", extent=extent, cmap=mask_cmap, alpha=mask_alpha, vmin=0, vmax=1, zorder=2, aspect="auto")
+                        ax.imshow(rmap, origin="lower", extent=(xbin[0], xbin[-1], 0.0, float(n_rows_laps)), cmap=panel_cmap, alpha=panel_alpha, vmin=panel_vmin, vmax=panel_vmax, zorder=1, aspect="auto", interpolation="nearest")
                     ## END if use_pcolormesh...
-                ## END if mask is not None...
-
-                cell_spk = spikes_df[spikes_df["aclu"] == aclu]
-                if len(cell_spk) > 0:
-                    if color_by_in_field and (mask is not None) and {"binned_x", "binned_y"}.issubset(cell_spk.columns):
-                        bx = cell_spk["binned_x"].to_numpy().astype(int) - 1
-                        by = cell_spk["binned_y"].to_numpy().astype(int) - 1
-                        valid = (bx >= 0) & (by >= 0) & (bx < mask.shape[0]) & (by < mask.shape[1])
-                        in_field = np.zeros(len(cell_spk), dtype=bool)
-                        in_field[valid] = mask[bx[valid], by[valid]]
-                        ax.scatter(cell_spk.loc[~in_field, "x"], cell_spk.loc[~in_field, "y"], s=spike_s, c="0.45", alpha=spike_alpha * 0.7, marker=".", linewidths=0, zorder=3)
-                        ax.scatter(cell_spk.loc[in_field, "x"], cell_spk.loc[in_field, "y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=4)
-                    else:
-                        ax.scatter(cell_spk["x"], cell_spk["y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=3)
-                    ## END if color_by_in_field...
-                ## END if len(cell_spk) > 0...
-
-                ax.set_aspect("equal")
-                ax.set_xlim(xbin[0], xbin[-1])
-                ax.set_ylim(ybin[0], ybin[-1])
-                if not is_position_dependent:
-                    title = f"aclu {aclu}  R_a={float(R_active[cell_idx]):.2f}  R_s={float(R_silent[cell_idx]):.2f}  ({panel_name})"
+                    if show_bin_grid:
+                        _draw_lap_x_bin_grid(ax, n_rows_laps)
+                    ## END if show_bin_grid...
+                    ax.set_aspect("auto")
+                    ax.set_xlim(xbin[0], xbin[-1])
+                    ax.set_ylim(0.0, float(n_rows_laps))
+                    title = f"aclu {aclu}  lap×x  n_laps={n_laps}  Σ={int(np.nansum(rmap))}"
                 else:
-                    title = f"aclu {aclu}  ({panel_name})"
-                ## END if not is_position_dependent...
+                    if show_trajectory and hasattr(pfs, "x") and hasattr(pfs, "y"):
+                        ax.plot(pfs.x, pfs.y, color="#d3c5c5", alpha=trajectory_alpha, linewidth=0.5, zorder=0)
+                    ## END if show_trajectory...
+
+                    if use_pcolormesh:
+                        ax.pcolormesh(xbin, ybin, rmap.T, cmap=panel_cmap, alpha=panel_alpha, shading="flat", vmin=panel_vmin, vmax=panel_vmax, zorder=1)
+                    else:
+                        plot_r = np.fliplr(np.rot90(rmap, k=-1))
+                        ax.imshow(plot_r, origin="lower", extent=extent, cmap=panel_cmap, alpha=panel_alpha, vmin=panel_vmin, vmax=panel_vmax, zorder=1, aspect="auto")
+                    ## END if use_pcolormesh...
+
+                    # Count panels: thin bin grid + integer labels (skip mask/spikes so counts stay readable)
+                    if is_count_panel:
+                        if show_bin_grid:
+                            _draw_bin_grid(ax)
+                        ## END if show_bin_grid...
+                        if show_count_bin_labels:
+                            _draw_nonzero_count_labels(ax, rmap)
+                        ## END if show_count_bin_labels...
+                    else:
+                        if mask is not None:
+                            if use_pcolormesh:
+                                ax.pcolormesh(xbin, ybin, mask.T.astype(float), cmap=mask_cmap, alpha=mask_alpha, shading="flat", vmin=0, vmax=1, zorder=2)
+                            else:
+                                plot_mask = np.fliplr(np.rot90(mask.astype(float), k=-1))
+                                ax.imshow(plot_mask, origin="lower", extent=extent, cmap=mask_cmap, alpha=mask_alpha, vmin=0, vmax=1, zorder=2, aspect="auto")
+                            ## END if use_pcolormesh...
+                        ## END if mask is not None...
+
+                        cell_spk = spikes_df[spikes_df["aclu"] == aclu]
+                        if len(cell_spk) > 0:
+                            if color_by_in_field and (mask is not None) and {"binned_x", "binned_y"}.issubset(cell_spk.columns):
+                                bx = cell_spk["binned_x"].to_numpy().astype(int) - 1
+                                by = cell_spk["binned_y"].to_numpy().astype(int) - 1
+                                valid = (bx >= 0) & (by >= 0) & (bx < mask.shape[0]) & (by < mask.shape[1])
+                                in_field = np.zeros(len(cell_spk), dtype=bool)
+                                in_field[valid] = mask[bx[valid], by[valid]]
+                                ax.scatter(cell_spk.loc[~in_field, "x"], cell_spk.loc[~in_field, "y"], s=spike_s, c="0.45", alpha=spike_alpha * 0.7, marker=".", linewidths=0, zorder=3)
+                                ax.scatter(cell_spk.loc[in_field, "x"], cell_spk.loc[in_field, "y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=4)
+                            else:
+                                ax.scatter(cell_spk["x"], cell_spk["y"], s=spike_s, c="red", alpha=spike_alpha, marker=".", linewidths=0, zorder=3)
+                            ## END if color_by_in_field...
+                        ## END if len(cell_spk) > 0...
+                    ## END if is_count_panel...
+
+                    ax.set_aspect("equal")
+                    ax.set_xlim(xbin[0], xbin[-1])
+                    ax.set_ylim(ybin[0], ybin[-1])
+                    if is_count_panel:
+                        title = f"aclu {aclu}  {panel_name}  Σ={int(np.nansum(rmap))}"
+                    elif not is_position_dependent:
+                        title = f"aclu {aclu}  R_a={float(R_active[cell_idx]):.2f}  R_s={float(R_silent[cell_idx]):.2f}  ({panel_name})"
+                    else:
+                        title = f"aclu {aclu}  ({panel_name})"
+                    ## END if is_count_panel...
+                ## END if is_lap_panel...
                 ax.set_title(title, fontsize=8)
                 ax.axis("off")
             ## END for panel_j, panel_name in enumerate(panels)...
@@ -2038,7 +2246,9 @@ class CellIndividualReliabilityMatrix:
         ## END for ax in flat_axes[n_used:]...
 
         mode_label = str(estimation_mode)
-        fig.suptitle(f"Reliability maps ({mode_label}) + spikes", fontsize=12)
+        count_suffix = " + TP/FP/TN/FN" if len(confusion_panels) > 0 else ""
+        lap_suffix = " + lap×x spike counts" if should_display_lap_by_lap_spike_counts else ""
+        fig.suptitle(f"Reliability maps ({mode_label}){count_suffix}{lap_suffix} + spikes", fontsize=12)
         fig.tight_layout()
         return fig, axes
 
@@ -2328,13 +2538,15 @@ class CellIndividualReliabilityComputingMixin:
         """Passthrough to ``CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes`` using decoder reliability state.
 
         Usage:
-            fig, axes = a_dst_decoder2D.plot_reliability_maps_with_spikes(max_n_cells=9)
+            fig, axes = a_dst_decoder2D.plot_reliability_maps_with_spikes(max_n_cells=9, should_display_lap_by_lap_spike_counts=True)
         """
         assert self.reliability_active is not None and self.reliability_silent is not None, 'reliability_active and reliability_silent are required; call compute_reliability_metrics(...) first.'
         neuron_ids = np.asarray(self.neuron_IDs if self.neuron_IDs is not None else self.ratemap.neuron_ids)
         return CellIndividualReliabilityMatrix.plot_reliability_maps_with_spikes(
             self.pf, self.reliability_active, self.reliability_silent, neuron_ids,
             reliability_estimation_mode=getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL),
-            in_field_masks=self.in_field_masks, included_neuron_ids=included_neuron_ids, **kwargs,
+            in_field_masks=self.in_field_masks,
+            position_aclus_reliability_df=getattr(self, 'position_aclus_reliability_df', None),
+            included_neuron_ids=included_neuron_ids, **kwargs,
         )
 
