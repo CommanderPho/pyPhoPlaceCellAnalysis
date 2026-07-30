@@ -2717,6 +2717,10 @@ class CellIndividualReliabilityComputingMixin:
         false_neg = np.nan_to_num(rel_df['false_neg'].to_numpy(dtype=float), nan=0.0) if ('false_neg' in rel_df.columns) else np.zeros_like(true_pos)
         assert len(true_pos) == n_neurons, f'Confusion rates length {len(true_pos)} != n_neurons {n_neurons} after reindex by neuron_IDs.'
 
+        #TODO 2026-07-30 19:06: - [ ] overwrite alpha for per-cel
+        rel_df['alpha'] = rel_df['n_infield_spike_tbins'] / (rel_df['n_infield_spike_tbins'] + rel_df['n_infield_nonspike_tbins'])
+
+
         if (estimation_mode.value == ReliabilityEstimationMode.POSITION_DEPENDENT.value):
             has_visit_tables: bool = (self.per_tbin_aclu_spike_counts_df is not None) and (self.time_bin_info_df is not None) and (self.in_field_masks is not None)
             if has_visit_tables:
@@ -2753,7 +2757,8 @@ class CellIndividualReliabilityComputingMixin:
         else:
             # PER_CELL: position-independent reliability from true_pos
             # self.position_aclus_reliability_df = None ## do not need to clear the per-position reliability
-            R_base = true_pos
+            # R_base = true_pos
+            R_base = rel_df['alpha'].to_numpy()
             self.reliability_active = R_base
             # Map reliability for silence (n_i = 0).
             # Defaults to 1.0 (perfect reliability -> collapses to pure Bayesian) if discounting is disabled.

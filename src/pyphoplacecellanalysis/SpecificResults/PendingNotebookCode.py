@@ -1746,9 +1746,15 @@ class InteractiveBayesian2DEquationDebugger:
                     alphas[i] = alpha_i
 
                     ## 1D tempering by cell by raising to the power of alpha_i
-                    cell_power = np.power(cell_power, alpha_i)
-                    cell_exp = np.power(cell_exp, alpha_i)
-                    cell_fac = np.power(cell_fac, alpha_i)
+                    # cell_power = np.power(cell_power, alpha_i)
+                    # cell_exp = np.power(cell_exp, alpha_i)
+                    # cell_fac = np.power(cell_fac, alpha_i)
+
+                    effective_alpha: float = (1.0 + 3.0*(1.0 - alpha_i))
+                    cell_power = np.power(cell_power, effective_alpha)
+                    cell_exp = np.power(cell_exp, effective_alpha)
+                    cell_fac = np.power(cell_fac, effective_alpha)
+
 
 
                 elif R_eff.ndim >= 2:
