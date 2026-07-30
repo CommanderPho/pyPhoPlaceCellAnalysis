@@ -1741,6 +1741,7 @@ class InteractiveBayesian2DEquationDebugger:
                 ## Power-prior: L_i(x) ← L_i(x)^{α_i}  (equivalently raise each Poisson factor)
                 R_eff = reliability_active if (n_i > 0) else reliability_silent
                 if R_eff.ndim == 1:
+                    ## PER-CELL Reliability
                     alpha_i = float(R_eff[i])
                     alphas[i] = alpha_i
 
@@ -1751,15 +1752,15 @@ class InteractiveBayesian2DEquationDebugger:
 
 
                 elif R_eff.ndim >= 2:
+                    ## PER-CELL POSITION-DEPENDENT:
                     alpha_i = R_eff[..., i].reshape(spatial_shape)
                     alphas[i] = float(np.nanmean(alpha_i))
 
                     ## Do true 2D tempering by position bin -- this is WAY more subtle isn't it?
                     # cell_power = cell_power * alpha_i # #np.power(cell_power, alpha_i)
                     cell_power = np.power(cell_power, alpha_i) ## elementwise power hopefully
-
-                    cell_exp = cell_exp ## don't multiply the other two terms as that'd be repeated multiplication
-                    cell_fac = cell_fac
+                    cell_exp = np.power(cell_exp, alpha_i)
+                    cell_fac = np.power(cell_fac, alpha_i)
 
                 else:
                     raise ValueError(f'Unsupported reliability ndim={R_eff.ndim}; expected 1 (n_neurons,) or >=2 (*spatial_or_flat, n_neurons).')
