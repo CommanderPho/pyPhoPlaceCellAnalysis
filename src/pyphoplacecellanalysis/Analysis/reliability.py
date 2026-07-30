@@ -2524,7 +2524,7 @@ class CellIndividualReliabilityComputingMixin:
                 assert R_active.shape == (n_flat, n_neurons), f'visit-conditioned R_active shape {R_active.shape} != ({n_flat}, {n_neurons})'
             else:
                 # Slice / partial state: fall back to global rates × masks
-                # raise NotImplementedError(f'_build_position_dependent_reliability_maps is off-limits because it is wrong. FIXME!')
+                raise NotImplementedError(f'_build_position_dependent_reliability_maps is off-limits because it is wrong. FIXME!')
                 self.position_aclus_reliability_df = None
                 R_active, R_silent_from_confusion = self._build_position_dependent_reliability_maps(true_pos=true_pos, false_pos=false_pos, true_neg=true_neg, false_neg=false_neg)
 
