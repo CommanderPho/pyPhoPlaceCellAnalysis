@@ -1875,6 +1875,7 @@ class CellIndividualReliabilityMatrix:
                                         reliability_estimation_mode: ReliabilityEstimationMode = ReliabilityEstimationMode.PER_CELL,
                                         in_field_masks: Optional[Dict[int, np.ndarray]] = None,
                                         position_aclus_reliability_df: Optional[pd.DataFrame] = None,
+                                        per_tbin_aclu_per_lap_xy_spike_counts_df: Optional[pd.DataFrame] = None,
                                         included_neuron_ids: Optional[Sequence[int]] = None,
                                         reliability_variables: str = "active", show_confusion_counts: bool = True,
                                         should_display_lap_by_lap_spike_counts: bool = False,
@@ -1895,7 +1896,8 @@ class CellIndividualReliabilityMatrix:
         ``position_aclus_reliability_df`` is provided and ``show_confusion_counts`` is True,
         four additional panels of raw visit-event counts: TP / FP / TN / FN.
         When ``should_display_lap_by_lap_spike_counts`` is True, an additional panel shows a
-        vertical stack (one row per lap) of spike counts in each marginal_x position bin.
+        vertical stack (one row per lap) of spike counts in each marginal_x position bin,
+        built from ``per_tbin_aclu_per_lap_xy_spike_counts_df`` (summed over t-bins and y).
 
         Per-position confusion counts (from visit-conditioned ``position_aclus_reliability_df``):
             TP = n_active_visits when in-field
@@ -1924,8 +1926,9 @@ class CellIndividualReliabilityMatrix:
                 neuron_ids=a_dst_decoder2D.neuron_IDs,
                 reliability_estimation_mode=a_dst_decoder2D.reliability_estimation_mode,
                 in_field_masks=a_dst_decoder2D.in_field_masks,
-                position_aclus_reliability_df=a_dst_decoder2D.position_aclus_reliability_df, max_n_cells=9,
-                should_display_lap_by_lap_spike_counts=True,
+                position_aclus_reliability_df=a_dst_decoder2D.position_aclus_reliability_df,
+                per_tbin_aclu_per_lap_xy_spike_counts_df=a_dst_decoder2D.per_tbin_aclu_per_lap_xy_spike_counts_df,
+                max_n_cells=9, should_display_lap_by_lap_spike_counts=True,
             )
 
         """
@@ -2000,19 +2003,25 @@ class CellIndividualReliabilityMatrix:
         confusion_panel_set = set(confusion_panels)
         lap_panel_set = set(lap_panels)
 
-        # Shared lap identity order across cells (valid laps only)
+        # Shared lap identity order across cells from per_tbin_aclu_per_lap_xy_spike_counts_df (valid laps only)
         all_lap_ids: np.ndarray = np.array([], dtype=int)
         lap_id_to_idx: Dict[int, int] = {}
         n_laps: int = 0
         if should_display_lap_by_lap_spike_counts:
-            assert "lap" in spikes_df.columns, 'should_display_lap_by_lap_spike_counts=True requires a "lap" column on pfs.filtered_spikes_df'
-            lap_vals = spikes_df["lap"].to_numpy()
+            assert per_tbin_aclu_per_lap_xy_spike_counts_df is not None, (
+                'should_display_lap_by_lap_spike_counts=True requires per_tbin_aclu_per_lap_xy_spike_counts_df; '
+                'call compute_unit_confusion_reliability_variables(...) with spikes that include a "lap" column.'
+            )
+            required_lap_cols = {'aclu', 'lap', 'binned_x', 'n_spikes'}
+            missing = required_lap_cols - set(per_tbin_aclu_per_lap_xy_spike_counts_df.columns)
+            assert len(missing) == 0, f'per_tbin_aclu_per_lap_xy_spike_counts_df missing columns: {sorted(missing)}'
+            lap_vals = per_tbin_aclu_per_lap_xy_spike_counts_df['lap'].to_numpy()
             valid_lap_mask = pd.notna(lap_vals) & (np.asarray(lap_vals, dtype=float) > -1)
             all_lap_ids = np.sort(np.unique(np.asarray(lap_vals[valid_lap_mask], dtype=int)))
             n_laps = int(len(all_lap_ids))
             lap_id_to_idx = {int(lid): i for i, lid in enumerate(all_lap_ids)}
             if n_laps == 0:
-                warnings.warn('should_display_lap_by_lap_spike_counts=True but no valid laps (lap > -1) found in spikes_df; lap panels will be empty.')
+                warnings.warn('should_display_lap_by_lap_spike_counts=True but no valid laps (lap > -1) found in per_tbin_aclu_per_lap_xy_spike_counts_df; lap panels will be empty.')
             ## END if n_laps == 0...
         ## END if should_display_lap_by_lap_spike_counts...
 
@@ -2083,31 +2092,28 @@ class CellIndividualReliabilityMatrix:
 
 
         def _lap_by_lap_marginal_x_counts(aclu: int) -> np.ndarray:
-            """Build (n_laps, nx) spike-count matrix: one row per lap, columns = marginal_x bins.
-            captures: n_laps, spikes_df, xbin
+            """Build (n_laps, nx) spike-count matrix from per_tbin_aclu_per_lap_xy_spike_counts_df.
+
+            One row per lap, columns = marginal_x bins (sum over t_bin_idx and binned_y).
             """
             n_rows_laps: int = max(n_laps, 1)
             out = np.zeros((n_rows_laps, nx), dtype=float)
-            if n_laps == 0:
+            if (n_laps == 0) or (per_tbin_aclu_per_lap_xy_spike_counts_df is None):
                 return out
-            cell_spk = spikes_df[spikes_df["aclu"] == aclu]
-            if len(cell_spk) == 0:
+            cell_df = per_tbin_aclu_per_lap_xy_spike_counts_df[per_tbin_aclu_per_lap_xy_spike_counts_df['aclu'].to_numpy() == aclu]
+            if len(cell_df) == 0:
                 return out
-            lap_col = cell_spk["lap"].to_numpy()
+            lap_col = cell_df['lap'].to_numpy()
             valid_lap = pd.notna(lap_col) & (np.asarray(lap_col, dtype=float) > -1)
-            if "binned_x" in cell_spk.columns:
-                bx = cell_spk["binned_x"].to_numpy().astype(float)
-            else:
-                assert "x" in cell_spk.columns, 'spikes_df needs "binned_x" or "x" to build lap×marginal_x counts'
-                bx = np.digitize(cell_spk["x"].to_numpy(), xbin).astype(float)
-            ## END if "binned_x" in cell_spk.columns...
+            bx = cell_df['binned_x'].to_numpy().astype(float)
             valid_bx = np.isfinite(bx) & (bx >= 1) & (bx <= nx)
             valid = valid_lap & valid_bx
             if not np.any(valid):
                 return out
             lap_i = np.asarray([lap_id_to_idx[int(lid)] for lid in lap_col[valid]], dtype=int)
             bx_i = bx[valid].astype(int) - 1
-            np.add.at(out, (lap_i, bx_i), 1.0)
+            n_spk = cell_df['n_spikes'].to_numpy(dtype=float)[valid]
+            np.add.at(out, (lap_i, bx_i), n_spk)
             return out
 
 
@@ -2171,7 +2177,7 @@ class CellIndividualReliabilityMatrix:
                 rmap = maps_by_panel[panel_name]
                 is_lap_panel: bool = (panel_name in lap_panel_set)
                 is_count_panel: bool = (panel_name in confusion_panel_set)
-                panel_cmap = count_cmap if (is_count_panel or is_lap_panel) else heatmap_cmap
+                panel_cmap = "CMRmap" if is_lap_panel else (count_cmap if is_count_panel else heatmap_cmap)
                 panel_alpha = count_alpha if (is_count_panel or is_lap_panel) else heatmap_alpha
                 if is_count_panel or is_lap_panel:
                     panel_vmax = float(np.nanmax(rmap)) if np.any(np.isfinite(rmap)) else 1.0
@@ -2571,6 +2577,7 @@ class CellIndividualReliabilityComputingMixin:
             reliability_estimation_mode=getattr(self, 'reliability_estimation_mode', ReliabilityEstimationMode.PER_CELL),
             in_field_masks=self.in_field_masks,
             position_aclus_reliability_df=getattr(self, 'position_aclus_reliability_df', None),
+            per_tbin_aclu_per_lap_xy_spike_counts_df=getattr(self, 'per_tbin_aclu_per_lap_xy_spike_counts_df', None),
             included_neuron_ids=included_neuron_ids, **kwargs,
         )
 
