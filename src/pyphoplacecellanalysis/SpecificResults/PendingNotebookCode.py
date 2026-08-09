@@ -7815,7 +7815,7 @@ def build_proper_epoch_intervals(curr_active_pipeline, active_2d_plot, y_locatio
     ## INPUTS: curr_paradigm_df
 
     # 'lap_color', 'lap_accent_color'
-    curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
+    curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_color'].tolist()]
     curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
     curr_paradigm_df['y_location'] = y_location
     curr_paradigm_df['height'] = height

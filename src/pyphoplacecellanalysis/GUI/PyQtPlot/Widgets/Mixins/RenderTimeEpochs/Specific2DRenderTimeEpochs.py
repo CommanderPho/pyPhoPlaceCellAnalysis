@@ -35,7 +35,7 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
     _required_interval_visualization_columns = ['t_start', 't_duration', 'series_vertical_offset', 'series_height', 'pen', 'brush']
     
     @classmethod
-    def _update_df_visualization_columns(cls, active_df: pd.DataFrame, y_location=None, height=None, pen_color=None, brush_color=None, **kwargs) -> pd.DataFrame:
+    def _update_df_visualization_columns(cls, active_df: pd.DataFrame, y_location=None, height=None, pen_color=None, brush_color=None, isVisible=None, **kwargs) -> pd.DataFrame:
         """ updates the columns of the provided active_df given the values specified. If values aren't provided, they aren't changed. 
         
         active_df['series_vertical_offset', 'series_height', 'pen', 'brush']
@@ -45,41 +45,57 @@ class General2DRenderTimeEpochs(ReprPrintableItemMixin, object):
         if y_location is not None:
             ## y_location:
             if isinstance(y_location, (list, tuple)):
-                active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', [a_y_location for a_y_location in y_location])
+                active_df['series_vertical_offset'] = [a_y_location for a_y_location in y_location]
             else:
                 # Scalar value assignment:
-                active_df['series_vertical_offset'] = kwargs.setdefault('series_vertical_offset', y_location)
+                active_df['series_vertical_offset'] = y_location
+        elif 'series_vertical_offset' in kwargs:
+            active_df['series_vertical_offset'] = kwargs['series_vertical_offset']
                 
         if height is not None:
             ## series_height:
             if isinstance(height, (list, tuple)):
-                active_df['series_height'] = kwargs.setdefault('series_height', [a_height for a_height in height])
+                active_df['series_height'] = [a_height for a_height in height]
             else:
                 # Scalar value assignment:
-                active_df['series_height'] = kwargs.setdefault('series_height', height)
+                active_df['series_height'] = height
+        elif 'series_height' in kwargs:
+            active_df['series_height'] = kwargs['series_height']
 
         if pen_color is not None:
             ## pen_color:
             if isinstance(pen_color, (list, tuple)):
-                active_df['pen'] = kwargs.setdefault('pen', [pg.mkPen(a_pen_color) for a_pen_color in pen_color])
+                active_df['pen'] = [pg.mkPen(a_pen_color) for a_pen_color in pen_color]
             else:
                 # Scalar value assignment:
-                active_df['pen'] = kwargs.setdefault('pen', pg.mkPen(pen_color)) 
+                active_df['pen'] = pg.mkPen(pen_color)
+        elif 'pen' in kwargs:
+            active_df['pen'] = kwargs['pen']
             
         if brush_color is not None:
             ## brush_color:
             if isinstance(brush_color, (list, tuple)):
-                active_df['brush'] = kwargs.setdefault('brush', [pg.mkBrush(a_color) for a_color in brush_color])  
+                active_df['brush'] = [pg.mkBrush(a_color) for a_color in brush_color]
             else:
                 # Scalar value assignment:
-                active_df['brush'] = kwargs.setdefault('brush', pg.mkBrush(brush_color))
+                active_df['brush'] = pg.mkBrush(brush_color)
+        elif 'brush' in kwargs:
+            active_df['brush'] = kwargs['brush']
 
-        text_label = kwargs.get('label', kwargs.get('name', None))
-        if text_label is not None and 'label' in active_df.columns:
+        if isVisible is not None:
+            if isinstance(isVisible, (list, tuple)):
+                active_df['isVisible'] = list(isVisible)
+            else:
+                active_df['isVisible'] = isVisible
+
+        text_label = kwargs.get('label', None)
+        if text_label is not None:
             if isinstance(text_label, (list, tuple)):
                 active_df['label'] = list(text_label)
             else:
                 active_df['label'] = text_label
+        elif 'name' in kwargs and 'label' not in active_df.columns:
+            active_df['label'] = kwargs['name']
 
         return active_df #, kwargs
     
