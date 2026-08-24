@@ -506,6 +506,9 @@ class TrialByTrialActivityWindow:
                 plot_array[a_linear_index].addItem(additional_img_item)
                 additional_img_items_dict[decoder_name].append(additional_img_item)
 
+        ## END for i, (decoder_name, heatmap_matrix) in enumerate(addition...
+
+
         ## Add the legend below all the rows:
         root_render_widget.nextRow()
         # Create a layout for the legend at the new row
@@ -529,7 +532,8 @@ class TrialByTrialActivityWindow:
             legend_entries_dict[label] = legend_text
             # legend_layout.addItem(legend_text, row=0, col=i)  # Place all labels in a single row
             legend_layout.addItem(legend_text, row=i, col=0)  # Place all labels in a single columns
-            
+        ## END for i, (label, color) in enumerate(additional_legend_entries)...            
+
         legend_layout.setMaximumWidth(100)
 
         #TODO 2024-11-12 12:22: - [ ] Add position plot to the right-most column of the figure, spanning all rows after the first.
