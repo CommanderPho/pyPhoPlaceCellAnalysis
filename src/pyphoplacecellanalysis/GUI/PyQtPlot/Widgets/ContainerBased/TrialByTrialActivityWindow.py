@@ -536,26 +536,44 @@ class TrialByTrialActivityWindow:
 
         legend_layout.setMaximumWidth(100)
 
-        #TODO 2024-11-12 12:22: - [ ] Add position plot to the right-most column of the figure, spanning all rows after the first.
-        if not is_publication_ready_figure:
-            ## Add position plot
-            root_render_widget.nextRow()
-            # position_plot_layout: pg.GraphicsLayout = root_render_widget.addLayout()  # Automatically places in the next available row
-            position_plot = root_render_widget.addPlot(row=3, col=5, rowspan=4, colspan=1) # start below the legend. Ideally span to rows until the end of the figure.
-            # position_plot.addCurve() # 
-            # active_trial_by_trial_activity_obj # don't have the position, tragic
-            ## Usage:
-            # position_plot = _a_trial_by_trial_window.plots.position_plot # PlotItem
-            # pos_df: pd.DataFrame = deepcopy(active_pf_dt.position.to_dataframe())
-            # position_plot.clearPlots()
-            # position_plot.plot(x=pos_df['x'].to_numpy(), y=pos_df['t'].to_numpy())
-        else:
-            position_plot = None
-            
-        # END if is_overlaid_heatmaps_mode                
-        parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
-
         additional_img_items_dict['long_LR'] = img_item_array # set first decoder to original image items
+
+        ## Large right-side axes: hover-preview of the hovered subplot (non-publication only)
+        plots_start_row_idx: int = 1
+        max_num_columns: int = 5
+        num_plot_rows: int = max(d['curr_page_relative_row'] for d in plot_data_array) + 1
+        hover_preview_img_items_dict: Dict[types.DecoderName, pg.ImageItem] = {}
+        if not is_publication_ready_figure:
+            hover_preview_plot = root_render_widget.addPlot(row=plots_start_row_idx, col=max_num_columns, rowspan=num_plot_rows, colspan=1)
+            hover_preview_plot.setDefaultPadding(0.0)
+            hover_preview_plot.setTitle('')
+            hover_preview_plot.hideButtons()
+            hover_preview_plot.setMouseEnabled(x=False, y=False)
+
+            ref_plot_data = plot_data_array[0]
+            x_range = ref_plot_data['x_range']
+            y_range = ref_plot_data['y_range']
+            hover_preview_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+            hover_preview_plot.setLimits(xMin=x_range[0], xMax=x_range[-1], yMin=y_range[0], yMax=y_range[-1])
+
+            for decoder_name in directional_active_lap_pf_results_dicts.keys():
+                cmap = additional_cmaps[decoder_name]
+                preview_img_item = pg.ImageItem(levels=(0, 1))
+                if isinstance(cmap, NDArray):
+                    preview_img_item.setLookupTable(cmap, update=False)
+                else:
+                    preview_img_item.setLookupTable(cmap.getLookupTable(nPts=256), update=False)
+                preview_img_item.setOpacity(1.0)
+                hover_preview_plot.addItem(preview_img_item)
+                hover_preview_img_items_dict[decoder_name] = preview_img_item
+            ## END for decoder_name in directional_active_lap_pf_results_dicts.keys()....
+
+            position_plot = hover_preview_plot  # notebook-compat alias
+        else:
+            hover_preview_plot = None
+            position_plot = None
+
+        parent_root_widget.setWindowTitle('TrialByTrialActivity - trial_to_trial_reliability_all_decoders_image_stack')
 
         _obj = cls(is_publication_ready_figure=is_publication_ready_figure)
         ## Build final .plots and .plots_data:
@@ -566,9 +584,10 @@ class TrialByTrialActivityWindow:
                                  legend_entries_dict=legend_entries_dict,
                                  other_components_array=other_components_array,
                                  img_item_array=img_item_array,
-                                 additional_img_items_dict=additional_img_items_dict, 
-                                #  position_plot_layout=position_plot_layout,
-                                 position_plot=position_plot, 
+                                 additional_img_items_dict=additional_img_items_dict,
+                                 position_plot=position_plot,
+                                 hover_preview_plot=hover_preview_plot,
+                                 hover_preview_img_items_dict=hover_preview_img_items_dict,
                                  ) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
         _obj.plots_data = RenderPlotsData(name=name, 
                                           plot_data_array=plot_data_array,
@@ -579,7 +598,7 @@ class TrialByTrialActivityWindow:
                                             )
         _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
                                  lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
-        _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, **param_kwargs)
+        _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, hovered_linear_index=None, **param_kwargs)
         _obj.build_internal_callbacks()
         return _obj
 
@@ -597,13 +616,20 @@ class TrialByTrialActivityWindow:
             override_active_one_step_decoder = self.plots_data.active_one_step_decoder
         return self.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu, is_publication_ready_figure=self.is_publication_ready_figure)
 
+
     def build_internal_callbacks(self):
         ## add selection changed callbacks
         for a_linear_index, a_plot_item in enumerate(self.plot_array):
             a_plot_item.sigSelectedChanged.connect(self.on_change_selection)
+        ## END for a_linear_index, a_plot_item in enumerate(self.plot_array)....
 
         for a_decoder_name, a_label_item in self.plots.legend_entries_dict.items():
             a_label_item.sigSelectedChanged.connect(self.on_change_series_legend_selection)
+        ## END for a_decoder_name, a_label_item in self.plots.legend_entries_dict.items()....
+
+        hover_preview_plot = getattr(self.plots, 'hover_preview_plot', None)
+        if hover_preview_plot is not None:
+            self.ui.root_render_widget.scene().sigMouseHover.connect(self.on_scene_mouse_hover)
 
 
     @function_attributes(short_name=None, tags=['opacity', 'series'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-12 00:00', related_items=[])
@@ -613,7 +639,13 @@ class TrialByTrialActivityWindow:
             
         for an_img_item in self.plots.additional_img_items_dict[target_decoder_name]:
             an_img_item.setOpacity(target_opacity)
-            
+        ## END for an_img_item in self.plots.additional_img_items_dict[target_decoder_name]....
+
+        hover_preview_img_items_dict = getattr(self.plots, 'hover_preview_img_items_dict', None) or {}
+        if target_decoder_name in hover_preview_img_items_dict:
+            hover_preview_img_items_dict[target_decoder_name].setOpacity(target_opacity)
+
+
     @function_attributes(short_name=None, tags=['opacity', 'series'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-12 00:00', related_items=[])
     def restore_all_series_opacity(self, override_all_opacity: Optional[float] = None):
         if 'long_LR' not in self.plots.additional_img_items_dict:
@@ -625,6 +657,14 @@ class TrialByTrialActivityWindow:
         for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
             for an_img_item in an_img_item_arr:
                 an_img_item.setOpacity(override_all_opacity)
+            ## END for an_img_item in an_img_item_arr....
+        ## END for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items()....
+
+        hover_preview_img_items_dict = getattr(self.plots, 'hover_preview_img_items_dict', None) or {}
+        for a_decoder_name, preview_img_item in hover_preview_img_items_dict.items():
+            preview_img_item.setOpacity(override_all_opacity)
+        ## END for a_decoder_name, preview_img_item in hover_preview_img_items_dict.items()....
+
 
     def on_change_series_legend_selection(self, a_selectable_label, new_is_selected: bool):
         """ called when one of the aclu subplots selection changes 
@@ -633,7 +673,8 @@ class TrialByTrialActivityWindow:
         self.update_all_series_opacities_from_legend()
         # a_decoder_name: str = str(a_selectable_label.text)
         # self.set_series_opacity(target_decoder_name=a_decoder_name, target_opacity=0.1)
-        
+
+
     def update_all_series_opacities_from_legend(self):
         """ uses the legend label's selected status to determine the opacity for the data series. """
         for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items():
@@ -644,7 +685,81 @@ class TrialByTrialActivityWindow:
                 curr_desired_opacity: float = 0.1
             for an_img_item in an_img_item_arr:
                 an_img_item.setOpacity(curr_desired_opacity)
-                
+            ## END for an_img_item in an_img_item_arr....
+        ## END for a_decoder_name, an_img_item_arr in self.plots.additional_img_items_dict.items()....
+
+        ## Keep hover-preview layers in sync with legend selection
+        hover_preview_img_items_dict = getattr(self.plots, 'hover_preview_img_items_dict', None) or {}
+        for a_decoder_name, preview_img_item in hover_preview_img_items_dict.items():
+            a_label_item = self.plots.legend_entries_dict[a_decoder_name]
+            preview_desired_opacity: float = 1.0 if a_label_item.is_selected else 0.1
+            preview_img_item.setOpacity(preview_desired_opacity)
+        ## END for a_decoder_name, preview_img_item in hover_preview_img_items_dict.items()....
+
+
+    def on_scene_mouse_hover(self, items):
+        """Resolve which subplot is under the cursor and update the large preview axes."""
+        hover_preview_plot = getattr(self.plots, 'hover_preview_plot', None)
+        if hover_preview_plot is None:
+            return
+
+        hovered_plot = None
+        for item in items:
+            p = item
+            while p is not None:
+                if p is hover_preview_plot:
+                    break
+                if isinstance(p, SelectablePlotItem) and (p in self.plot_array):
+                    hovered_plot = p
+                    break
+                p = p.parentItem()
+            ## END while p is not None....
+
+            if hovered_plot is not None:
+                break
+        ## END for item in items....
+
+        if hovered_plot is not None:
+            a_linear_index: int = self.plot_array.index(hovered_plot)
+            self.update_hover_preview(a_linear_index)
+    ## END def on_scene_mouse_hover(self, items)...
+
+
+    @function_attributes(short_name=None, tags=['hover', 'preview', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-24 14:50', related_items=[])
+    def update_hover_preview(self, a_linear_index: int):
+        """Copy the hovered subplot's multi-decoder heatmaps into the large right-side preview axes."""
+        hover_preview_plot = getattr(self.plots, 'hover_preview_plot', None)
+        hover_preview_img_items_dict = getattr(self.plots, 'hover_preview_img_items_dict', None) or {}
+        if (hover_preview_plot is None) or (len(hover_preview_img_items_dict) == 0):
+            return
+
+        if getattr(self.params, 'hovered_linear_index', None) == a_linear_index:
+            return
+
+        self.params.hovered_linear_index = a_linear_index
+        if 'long_LR' not in self.plots.additional_img_items_dict:
+            self.plots.additional_img_items_dict['long_LR'] = self.plots.img_item_array
+
+        plot_data = self.plots_data.plot_data_array[a_linear_index]
+        image_bounds_extent = plot_data['image_bounds_extent']
+        x_range = plot_data['x_range']
+        y_range = plot_data['y_range']
+
+        for decoder_name, preview_img_item in hover_preview_img_items_dict.items():
+            source_img_item = self.plots.additional_img_items_dict[decoder_name][a_linear_index]
+            preview_img_item.setImage(source_img_item.image, rect=image_bounds_extent, autoLevels=False)
+            preview_img_item.setOpacity(source_img_item.opacity())
+        ## END for decoder_name, preview_img_item in hover_preview_img_items_dict.items()....
+
+        hover_preview_plot.setRange(xRange=x_range, yRange=y_range, padding=0.0, update=False, disableAutoRange=True)
+        formatted_title = plot_data.get('formatted_title') or plot_data.get('curr_cell_identifier_string', '')
+        hover_preview_plot.setTitle(formatted_title)
+
+        neuron_aclu = plot_data.get('neuron_aclu', None)
+        if (self.ui.lblFooter is not None) and (neuron_aclu is not None):
+            self.ui.lblFooter.setText(f'Hovered: aclu {neuron_aclu}')
+    ## END def update_hover_preview(self, a_linear_index: int)...
+
 
     @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
     def on_change_selection(self, a_plot_item, new_is_selected: bool):
