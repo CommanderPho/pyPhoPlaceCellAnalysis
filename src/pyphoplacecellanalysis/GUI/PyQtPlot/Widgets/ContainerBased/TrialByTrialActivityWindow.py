@@ -389,7 +389,22 @@ class TrialByTrialActivityWindow:
             
    
         return app, parent_root_widget, root_render_widget, plot_array, img_item_array, other_components_array, plot_data_array, (lblTitle, lblFooter)
-    
+
+
+    @classmethod
+    def _build_hover_preview_y_row_label_items(cls, hover_preview_plot, n_epochs: int, x_range) -> List[pg.TextItem]:
+        """Tiny white row-index labels along the y-axis of the hover-preview plot."""
+        label_items: List[pg.TextItem] = []
+        label_x = x_range[0]
+        for row_idx in range(n_epochs):
+            label_text = pg.TextItem(html=f"<span style='color:white; font-size:6pt;'>{row_idx}</span>", anchor=(0, 0.5))
+            label_text.setPos(label_x, float(row_idx))
+            hover_preview_plot.addItem(label_text)
+            label_items.append(label_text)
+        ## END for row_idx in range(n_epochs)....
+
+        return label_items
+
 
     @function_attributes(short_name=None, tags=['reliability', 'decoders', 'all', 'pyqtgraph', 'display', 'figure', 'main'], input_requires=[], output_provides=[], uses=['plot_trial_to_trial_reliability_image_array', 'create_transparent_colormap'], used_by=[], creation_date='2024-08-29 04:34', related_items=[])
     @classmethod
@@ -542,7 +557,9 @@ class TrialByTrialActivityWindow:
         plots_start_row_idx: int = 1
         max_num_columns: int = 5
         num_plot_rows: int = max(d['curr_page_relative_row'] for d in plot_data_array) + 1
+        n_epochs: int = int(np.shape(active_z_scored_tuning_map_matrix)[0])
         hover_preview_img_items_dict: Dict[types.DecoderName, pg.ImageItem] = {}
+        hover_preview_y_row_label_items: List[pg.TextItem] = []
         if not is_publication_ready_figure:
             hover_preview_plot = root_render_widget.addPlot(row=plots_start_row_idx, col=max_num_columns, rowspan=num_plot_rows, colspan=1)
             hover_preview_plot.setDefaultPadding(0.0)
@@ -568,6 +585,8 @@ class TrialByTrialActivityWindow:
                 hover_preview_img_items_dict[decoder_name] = preview_img_item
             ## END for decoder_name in directional_active_lap_pf_results_dicts.keys()....
 
+            hover_preview_y_row_label_items = cls._build_hover_preview_y_row_label_items(hover_preview_plot=hover_preview_plot, n_epochs=n_epochs, x_range=x_range)
+
             position_plot = hover_preview_plot  # notebook-compat alias
         else:
             hover_preview_plot = None
@@ -588,6 +607,7 @@ class TrialByTrialActivityWindow:
                                  position_plot=position_plot,
                                  hover_preview_plot=hover_preview_plot,
                                  hover_preview_img_items_dict=hover_preview_img_items_dict,
+                                 hover_preview_y_row_label_items=hover_preview_y_row_label_items,
                                  ) # , ctrl_widgets={'slider': slider} # .plots.additional_img_items_dict
         _obj.plots_data = RenderPlotsData(name=name, 
                                           plot_data_array=plot_data_array,
