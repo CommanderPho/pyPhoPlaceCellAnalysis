@@ -780,6 +780,7 @@ class TrialByTrialActivityWindow:
             self.ui.lblFooter.setText(f'Hovered: aclu {neuron_aclu}')
 
         self._update_hover_preview_peak_markers(neuron_aclu)
+        self._update_hover_preview_peak_track_id_labels(neuron_aclu)
     ## END def update_hover_preview(self, a_linear_index: int)...
 
 
@@ -796,6 +797,46 @@ class TrialByTrialActivityWindow:
                 hover_preview_plot.removeItem(existing)
 
         self.plots.hover_preview_peak_center_vertical_markers = None
+
+
+
+    def _clear_peak_track_id_debug_labels(self):
+        """Remove peak_track_id debug TextItems from subplots and hover-preview."""
+        existing_labels = self.plots.get('peak_track_id_debug_labels', None)
+        if existing_labels is not None:
+            aclu_to_plot_idx: Dict[int, int] = {}
+            for a_plot_data_dict in self.plots_data.plot_data_array:
+                neuron_aclu = a_plot_data_dict.get('neuron_aclu', None)
+                if neuron_aclu is not None:
+                    aclu_to_plot_idx[int(neuron_aclu)] = int(a_plot_data_dict['a_linear_index'])
+            ## END for a_plot_data_dict in self.plots_data.plot_data_array....
+
+            for aclu, label_items in existing_labels.items():
+                plot_idx = aclu_to_plot_idx.get(int(aclu), None)
+                if plot_idx is None:
+                    continue
+                curr_plot = self.plots.plot_array[plot_idx]
+                if isinstance(label_items, (list, tuple)):
+                    for a_label in label_items:
+                        curr_plot.removeItem(a_label)
+                    ## END for a_label in label_items....
+                else:
+                    curr_plot.removeItem(label_items)
+            ## END for aclu, label_items in existing_labels.items()....
+
+        self.plots.peak_track_id_debug_labels = None
+
+        hover_preview_plot = self.plots.get('hover_preview_plot', None)
+        existing_hover = self.plots.get('hover_preview_peak_track_id_debug_labels', None)
+        if (hover_preview_plot is not None) and (existing_hover is not None):
+            if isinstance(existing_hover, (list, tuple)):
+                for a_label in existing_hover:
+                    hover_preview_plot.removeItem(a_label)
+                ## END for a_label in existing_hover....
+            else:
+                hover_preview_plot.removeItem(existing_hover)
+
+        self.plots.hover_preview_peak_track_id_debug_labels = None
 
 
 
@@ -903,6 +944,33 @@ class TrialByTrialActivityWindow:
 
 
 
+    @classmethod
+    def _build_peak_track_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, peak_track_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.5, font_size_pt: int = 6) -> List[pg.TextItem]:
+        """Build tiny semi-transparent ``peak_track_id`` labels above each peak vertical tick."""
+        peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
+        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
+        peak_track_id = np.asarray(peak_track_id, dtype=float).ravel()
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx) & np.isfinite(peak_track_id)
+        peak_center_x = peak_center_x[valid_mask]
+        trial_idx = trial_idx[valid_mask]
+        peak_track_id = peak_track_id[valid_mask]
+        if peak_center_x.size == 0:
+            return []
+
+        label_items: List[pg.TextItem] = []
+        label_y_offset: float = 0.05
+        for a_x, a_trial_idx, a_peak_track_id in zip(peak_center_x, trial_idx, peak_track_id):
+            label_text = pg.TextItem(html=f"<span style='color:white; font-size:{int(font_size_pt)}pt;'>{int(a_peak_track_id)}</span>", anchor=(0.5, 1.0))
+            label_text.setOpacity(float(label_alpha))
+            label_text.setPos(float(a_x), float(a_trial_idx) + float(trial_half_height) + label_y_offset)
+            label_text.setZValue(101)
+            label_items.append(label_text)
+        ## END for a_x, a_trial_idx, a_peak_track_id in zip(peak_center_x, trial_idx, peak_track_id)...
+
+        return label_items
+
+
+
     def _update_hover_preview_peak_markers(self, neuron_aclu):
         """Draw the hovered aclu's peak-center vertical markers on the hover-preview axes (one batched scatter)."""
         hover_preview_plot = self.plots.get('hover_preview_plot', None)
@@ -934,6 +1002,47 @@ class TrialByTrialActivityWindow:
         ## END for a_scatter in scatter_items....
 
         self.plots.hover_preview_peak_center_vertical_markers = scatter_items if (len(scatter_items) > 1) else scatter_items[0]
+
+
+
+    def _update_hover_preview_peak_track_id_labels(self, neuron_aclu):
+        """Draw the hovered aclu's peak_track_id debug labels on the hover-preview axes."""
+        hover_preview_plot = self.plots.get('hover_preview_plot', None)
+        if hover_preview_plot is None:
+            return
+
+        existing_hover = self.plots.get('hover_preview_peak_track_id_debug_labels', None)
+        if existing_hover is not None:
+            if isinstance(existing_hover, (list, tuple)):
+                for a_label in existing_hover:
+                    hover_preview_plot.removeItem(a_label)
+                ## END for a_label in existing_hover....
+            else:
+                hover_preview_plot.removeItem(existing_hover)
+
+        self.plots.hover_preview_peak_track_id_debug_labels = None
+
+        peaks_df = self.plots_data.get('peak_track_id_labels_df', None)
+        if (peaks_df is None) or (neuron_aclu is None) or (len(peaks_df) == 0):
+            return
+
+        trial_half_height: float = float(self.params.get('peak_track_id_label_trial_half_height', self.params.get('peak_center_marker_trial_half_height', 0.45)))
+        label_alpha: float = float(self.params.get('peak_track_id_label_alpha', 0.5))
+        font_size_pt: int = int(self.params.get('peak_track_id_label_font_size_pt', 6))
+
+        aclu_peaks_df = peaks_df.loc[peaks_df['aclu'].astype(int) == int(neuron_aclu)]
+        if len(aclu_peaks_df) == 0:
+            return
+
+        label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt)
+        if len(label_items) == 0:
+            return
+
+        for a_label in label_items:
+            hover_preview_plot.addItem(a_label)
+        ## END for a_label in label_items....
+
+        self.plots.hover_preview_peak_track_id_debug_labels = label_items if (len(label_items) > 1) else label_items[0]
 
 
 
@@ -1078,6 +1187,94 @@ class TrialByTrialActivityWindow:
             self._update_hover_preview_peak_markers(hovered_plot_data.get('neuron_aclu', None))
 
         return new_markers
+
+
+    @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'peak', 'marker', 'debug', 'peak_track_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 15:30', related_items=['add_peak_center_vertical_markers'])
+    def add_peak_track_id_debug_labels(self, peaks_df: Optional[pd.DataFrame] = None, label_alpha: float = 0.5, font_size_pt: int = 6, trial_half_height: Optional[float] = None, clear_existing: bool = True, include_hover_preview: bool = True) -> Dict[int, List[pg.TextItem]]:
+        """Add tiny semi-transparent ``peak_track_id`` labels above each peak vertical tick (debug overlay).
+
+        Parameters
+        ----------
+        peaks_df : pd.DataFrame, optional
+            Required columns: ``['aclu', 'trial_idx', 'peak_center_x', 'peak_track_id']``.
+            If None, uses ``self.plots_data.peak_center_markers_df`` (must include ``peak_track_id``).
+        label_alpha : float
+            Text opacity (default 0.5).
+        font_size_pt : int
+            Label font size in points (default 6).
+        trial_half_height : float, optional
+            Half-height of peak ticks in trial/y units; defaults to peak marker param or 0.45.
+        clear_existing : bool
+            If True, remove any previously added peak_track_id debug labels first.
+        include_hover_preview : bool
+            If True, refresh hover-preview labels for the currently hovered cell.
+
+        Returns
+        -------
+        Dict[int, List[pg.TextItem]]
+            Mapping ``aclu → label items`` added for that cell.
+
+        Usage
+        -----
+            a_TbyT_activity_win.add_peak_center_vertical_markers(tracked_df[['aclu', 'trial_idx', 'peak_center_x', 'summit_idx']])
+            a_TbyT_activity_win.add_peak_track_id_debug_labels(tracked_df)
+
+        """
+        if peaks_df is None:
+            peaks_df = self.plots_data.get('peak_center_markers_df', None)
+        assert peaks_df is not None, "peaks_df is None and no peak_center_markers_df stored on plots_data"
+
+        required_cols = {'aclu', 'trial_idx', 'peak_center_x', 'peak_track_id'}
+        missing_cols = required_cols - set(peaks_df.columns)
+        assert len(missing_cols) == 0, f"peaks_df missing required columns: {missing_cols}"
+
+        peaks_df = deepcopy(peaks_df)
+        peaks_df['trial_idx'] = peaks_df['trial_idx'] - 1 # convert from 1-based to 0-based indexing
+        peaks_df['trial_idx'] = peaks_df['trial_idx'] * 2 ## handle the double-spacing of results
+
+        if trial_half_height is None:
+            trial_half_height = float(self.params.get('peak_center_marker_trial_half_height', 0.45))
+
+        aclu_to_plot_idx: Dict[int, int] = {}
+        for a_plot_data_dict in self.plots_data.plot_data_array:
+            neuron_aclu = a_plot_data_dict.get('neuron_aclu', None)
+            if neuron_aclu is not None:
+                aclu_to_plot_idx[int(neuron_aclu)] = int(a_plot_data_dict['a_linear_index'])
+        ## END for a_plot_data_dict in self.plots_data.plot_data_array....
+
+        if clear_existing:
+            self._clear_peak_track_id_debug_labels()
+
+        label_cols = ['aclu', 'trial_idx', 'peak_center_x', 'peak_track_id']
+        active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), label_cols].copy()
+        active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
+
+        new_labels: Dict[int, List[pg.TextItem]] = {}
+        for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
+            label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=float(trial_half_height), label_alpha=float(label_alpha), font_size_pt=int(font_size_pt))
+            if len(label_items) == 0:
+                continue
+            plot_idx = aclu_to_plot_idx[int(aclu)]
+            curr_plot = self.plots.plot_array[plot_idx]
+            for a_label in label_items:
+                curr_plot.addItem(a_label)
+            ## END for a_label in label_items....
+            new_labels[int(aclu)] = label_items
+        ## END for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False)....
+
+        self.plots.peak_track_id_debug_labels = new_labels
+        self.plots_data.peak_track_id_labels_df = deepcopy(active_peaks_df)
+        self.params.peak_track_id_label_alpha = float(label_alpha)
+        self.params.peak_track_id_label_font_size_pt = int(font_size_pt)
+        self.params.peak_track_id_label_trial_half_height = float(trial_half_height)
+
+        if include_hover_preview:
+            hovered_idx = self.params.get('hovered_linear_index', None)
+            if hovered_idx is not None:
+                hovered_plot_data = self.plots_data.plot_data_array[int(hovered_idx)]
+                self._update_hover_preview_peak_track_id_labels(hovered_plot_data.get('neuron_aclu', None))
+
+        return new_labels
 
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'pf_stable_formation_time', 'AcluFirstPlacefieldStabilityThresholdFigure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-20 10:19', related_items=['AcluFirstPlacefieldStabilityThresholdFigure', 'AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure'])
