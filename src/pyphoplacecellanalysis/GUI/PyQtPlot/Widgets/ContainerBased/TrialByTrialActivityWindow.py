@@ -778,7 +778,94 @@ class TrialByTrialActivityWindow:
         neuron_aclu = plot_data.get('neuron_aclu', None)
         if (self.ui.lblFooter is not None) and (neuron_aclu is not None):
             self.ui.lblFooter.setText(f'Hovered: aclu {neuron_aclu}')
+
+        self._update_hover_preview_peak_markers(neuron_aclu)
     ## END def update_hover_preview(self, a_linear_index: int)...
+
+
+    def _clear_hover_preview_peak_markers(self):
+        """Remove any peak-center vertical markers from the hover-preview axes."""
+        hover_preview_plot = self.plots.get('hover_preview_plot', None)
+        existing = self.plots.get('hover_preview_peak_center_vertical_markers', None)
+        if (hover_preview_plot is not None) and (existing is not None):
+            if isinstance(existing, (list, tuple)):
+                for a_line in existing:
+                    hover_preview_plot.removeItem(a_line)
+                ## END for a_line in existing....
+            else:
+                hover_preview_plot.removeItem(existing)
+
+        self.plots.hover_preview_peak_center_vertical_markers = None
+
+
+
+    @classmethod
+    def _build_vertical_tick_symbol(cls, trial_half_height: float = 0.45) -> pg.QtGui.QPainterPath:
+        """Data-coordinate vertical tick symbol for ``ScatterPlotItem`` (``pxMode=False``, ``size=1``)."""
+        path = pg.QtGui.QPainterPath()
+        path.moveTo(0.0, -float(trial_half_height))
+        path.lineTo(0.0, float(trial_half_height))
+        return path
+
+
+
+    @classmethod
+    def _build_peak_marker_scatter(cls, peak_center_x: NDArray, trial_idx: NDArray, pen=None, trial_half_height: float = 0.45) -> Optional[pg.ScatterPlotItem]:
+        """One batched scatter of vertical ticks (avoids PlotCurveItem OpenGL LINE_STRIP ignoring connect='pairs')."""
+        peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
+        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx)
+        peak_center_x = peak_center_x[valid_mask]
+        trial_idx = trial_idx[valid_mask]
+        if peak_center_x.size == 0:
+            return None
+
+        if pen is None:
+            pen = pg.mkPen('w', width=1.5)
+
+        a_scatter = pg.ScatterPlotItem(
+            x=peak_center_x,
+            y=trial_idx,
+            symbol=cls._build_vertical_tick_symbol(trial_half_height=trial_half_height),
+            size=1.0,
+            pxMode=False,
+            pen=pen,
+            brush=pg.mkBrush(None),
+            hoverable=False,
+        )
+        a_scatter.setZValue(100)
+        return a_scatter
+
+
+
+    def _update_hover_preview_peak_markers(self, neuron_aclu):
+        """Draw the hovered aclu's peak-center vertical markers on the hover-preview axes (one batched scatter)."""
+        hover_preview_plot = self.plots.get('hover_preview_plot', None)
+        if hover_preview_plot is None:
+            return
+
+        self._clear_hover_preview_peak_markers()
+
+        peaks_df = self.plots_data.get('peak_center_markers_df', None)
+        if (peaks_df is None) or (neuron_aclu is None) or (len(peaks_df) == 0):
+            return
+
+        pen = self.params.get('peak_center_marker_pen', None)
+        if pen is None:
+            pen = pg.mkPen('w', width=1.5)
+        trial_half_height: float = float(self.params.get('peak_center_marker_trial_half_height', 0.45))
+
+        aclu_peaks_df = peaks_df.loc[peaks_df['aclu'].astype(int) == int(neuron_aclu)]
+        if len(aclu_peaks_df) == 0:
+            return
+
+        a_scatter = self._build_peak_marker_scatter(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height)
+        if a_scatter is None:
+            return
+
+        hover_preview_plot.addItem(a_scatter)
+        self.plots.hover_preview_peak_center_vertical_markers = a_scatter
+
 
 
     @function_attributes(short_name=None, tags=['selection', 'aclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 01:11', related_items=[])
@@ -815,6 +902,104 @@ class TrialByTrialActivityWindow:
             ## return map from aclu to is_selected
             return is_aclu_selected_dict
         
+
+
+    @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'peak', 'marker', 'vertical_line'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 11:50', related_items=[])
+    def add_peak_center_vertical_markers(self, peaks_df: pd.DataFrame, pen=None, trial_half_height: float = 0.45, clear_existing: bool = True):
+        """Add short vertical line markers at each peak center on the matching aclu subplot.
+
+        Efficient: one ``ScatterPlotItem`` per aclu (all ticks batched). Avoids ``PlotCurveItem(connect='pairs')``,
+        which becomes a continuous zigzag under OpenGL ``paintGL`` (``GL_LINE_STRIP`` ignores ``connect``).
+
+        Each row of ``peaks_df`` contributes one vertical tick spanning
+        ``[trial_idx - trial_half_height, trial_idx + trial_half_height]`` at ``x = peak_center_x``.
+
+        Parameters
+        ----------
+        peaks_df : pd.DataFrame
+            Required columns: ``['aclu', 'trial_idx', 'peak_center_x']``.
+        pen : optional
+            pyqtgraph pen for the markers. Defaults to a thin white pen.
+        trial_half_height : float
+            Half-height of each vertical tick in trial/y units (default 0.45 ≈ one trial row).
+        clear_existing : bool
+            If True, remove any previously added peak-center markers first.
+
+        Returns
+        -------
+        Dict[int, pg.ScatterPlotItem]
+            Mapping ``aclu → batched scatter item`` added for that cell.
+
+        Usage
+        -----
+            peaks_df = pd.DataFrame({'aclu': [...], 'trial_idx': [...], 'peak_center_x': [...]})
+            a_TbyT_activity_win.add_peak_center_vertical_markers(peaks_df)
+
+        """
+        required_cols = {'aclu', 'trial_idx', 'peak_center_x'}
+        missing_cols = required_cols - set(peaks_df.columns)
+        assert len(missing_cols) == 0, f"peaks_df missing required columns: {missing_cols}"
+
+        ## Transform to correct indexing:
+        # peaks_df = pd.DataFrame({'aclu': [...], 'trial_idx': [...], 'peak_center_x': [...]})
+        peaks_df['trial_idx'] = peaks_df['trial_idx'] - 1 # convert from 1-based to 0-based indexing
+        peaks_df['trial_idx'] = peaks_df['trial_idx'] * 2 ## handle the double-spacing of results
+
+        if pen is None:
+            pen = pg.mkPen('w', width=1.5)
+
+        ## Build aclu → plot index map from plot_data_array
+        aclu_to_plot_idx: Dict[int, int] = {}
+        for a_plot_data_dict in self.plots_data.plot_data_array:
+            neuron_aclu = a_plot_data_dict.get('neuron_aclu', None)
+            if neuron_aclu is not None:
+                aclu_to_plot_idx[int(neuron_aclu)] = int(a_plot_data_dict['a_linear_index'])
+        ## END for a_plot_data_dict in self.plots_data.plot_data_array....
+
+        ## Optionally clear prior markers (supports old List-per-aclu or new single-item-per-aclu)
+        existing_markers = self.plots.get('peak_center_vertical_markers', None)
+        if clear_existing and (existing_markers is not None):
+            for aclu, line_items in existing_markers.items():
+                plot_idx = aclu_to_plot_idx.get(int(aclu), None)
+                if plot_idx is None:
+                    continue
+                curr_plot = self.plots.plot_array[plot_idx]
+                if isinstance(line_items, (list, tuple)):
+                    for a_line in line_items:
+                        curr_plot.removeItem(a_line)
+                    ## END for a_line in line_items....
+                else:
+                    curr_plot.removeItem(line_items)
+            ## END for aclu, line_items in existing_markers.items()....
+
+        self._clear_hover_preview_peak_markers()
+
+        new_markers: Dict[int, pg.ScatterPlotItem] = {}
+        active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), ['aclu', 'trial_idx', 'peak_center_x']].copy()
+        active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
+
+        for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
+            a_scatter = self._build_peak_marker_scatter(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height)
+            if a_scatter is None:
+                continue
+            plot_idx = aclu_to_plot_idx[int(aclu)]
+            curr_plot = self.plots.plot_array[plot_idx]
+            curr_plot.addItem(a_scatter)
+            new_markers[int(aclu)] = a_scatter
+        ## END for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False)....
+
+        self.plots.peak_center_vertical_markers = new_markers
+        self.plots_data.peak_center_markers_df = deepcopy(active_peaks_df)
+        self.params.peak_center_marker_pen = pen
+        self.params.peak_center_marker_trial_half_height = float(trial_half_height)
+
+        ## Refresh hover-preview markers for the currently hovered cell (if any)
+        hovered_idx = self.params.get('hovered_linear_index', None)
+        if hovered_idx is not None:
+            hovered_plot_data = self.plots_data.plot_data_array[int(hovered_idx)]
+            self._update_hover_preview_peak_markers(hovered_plot_data.get('neuron_aclu', None))
+
+        return new_markers
 
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'pf_stable_formation_time', 'AcluFirstPlacefieldStabilityThresholdFigure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-20 10:19', related_items=['AcluFirstPlacefieldStabilityThresholdFigure', 'AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure'])
