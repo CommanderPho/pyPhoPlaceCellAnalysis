@@ -519,7 +519,7 @@ class TrialByTrialActivity:
 
     @function_attributes(short_name=None, tags=['compute', 'sliding-window', 'tuning_map_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 10:35', related_items=[])
     @classmethod
-    def compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any], C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any]=None, window_size: int = 5, debug_print: bool = True) -> NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]:
+    def compute_sliding_window_tuning_map_matrix(cls, z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any], C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any]=None, window_size: int = 5, debug_print: bool = False) -> NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]:
         """ Compute the sliding-window average over trials with the specified window_size
 
         Usage:
