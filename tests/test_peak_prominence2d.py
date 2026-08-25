@@ -178,21 +178,30 @@ class TestCompute1dDtPosteriorPeakPromenences(unittest.TestCase):
         self.assertIn((0, 0), tuples_dict)
         self.assertIn((1, 3), tuples_dict)
         self.assertIsInstance(peak_prominence_df, pd.DataFrame)
-        self.assertTrue({'neuron_id', 'time_bin_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'peak_center_binned_x'}.issubset(peak_prominence_df.columns))
+        self.assertTrue({'neuron_IDX', 'time_bin_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'peak_center_binned_x'}.issubset(peak_prominence_df.columns))
 
     def test_build_df_optional_ids_and_xbins(self):
-        """neuron_IDs/xbin_centers optional: neuron_id=IDX, peak_center_x=bin index."""
-        Z = np.array([0.0, 0.2, 1.0, 0.2, 0.0, 0.3, 0.8, 0.3, 0.0])
+        """neuron_IDs/xbin_centers optional: neuron_IDX=IDX, peak_center_x=bin index; summit_idx ranks by height."""
+        # Shorter peak first spatially (0.8), taller second (1.0) — summit_idx must reorder by height
+        Z = np.array([0.0, 0.3, 0.8, 0.3, 0.0, 0.2, 1.0, 0.2, 0.0])
         peak_coords, prominences = PeakPromenence.compute_1d_peak_prominence(Z)
         peak_heights = Z[peak_coords[:, 0]]
+        self.assertLess(peak_heights[0], peak_heights[1])  # spatial order: shorter then taller
         tuples_dict = {(0, 0): (peak_coords, prominences, peak_heights)}
         df = PeakPromenence._build_1d_peak_prominence_df(tuples_dict)
-        self.assertEqual(df.loc[0, 'neuron_id'], 0)
+        self.assertEqual(df.loc[0, 'neuron_IDX'], 0)
         np.testing.assert_array_equal(df['peak_center_x'].to_numpy(), df['peak_center_binned_x'].to_numpy().astype(float))
+        self.assertEqual(len(df), 2)
+        self.assertEqual(df.loc[0, 'summit_idx'], 0)
+        self.assertEqual(df.loc[1, 'summit_idx'], 1)
+        self.assertGreater(df.loc[0, 'peak_height'], df.loc[1, 'peak_height'])
+        np.testing.assert_allclose(df['peak_height'].to_numpy(), np.sort(peak_heights)[::-1])
+        self.assertEqual(df.loc[0, 'peak_center_binned_x'], 6)  # taller peak bin
+        self.assertEqual(df.loc[1, 'peak_center_binned_x'], 2)  # shorter peak bin
         neuron_IDs = np.array([42])
         xbin_centers = np.arange(len(Z), dtype=float) * 2.0
         df2 = PeakPromenence._build_1d_peak_prominence_df(tuples_dict, neuron_IDs=neuron_IDs, xbin_centers=xbin_centers)
-        self.assertEqual(df2.loc[0, 'neuron_id'], 42)
+        self.assertEqual(df2.loc[0, 'aclu'], 42)
         np.testing.assert_allclose(df2['peak_center_x'].to_numpy(), xbin_centers[df2['peak_center_binned_x'].to_numpy()])
 
 

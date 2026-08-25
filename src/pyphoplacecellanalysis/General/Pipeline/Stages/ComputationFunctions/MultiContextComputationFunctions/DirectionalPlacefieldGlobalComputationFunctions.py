@@ -6813,6 +6813,140 @@ class TrialByTrialActivityResult(ComputedResult):
         return (stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Extra Computations                                                                                                                                                                                                                                                                   #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    def computing_smoothed_results(self, window_size: int = 3):
+        """ Smooths the results over trials
+
+        Usage:
+            import napari
+            from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
+            
+            smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix = a_trial_by_trial_result.computing_smoothed_results(window_size=3)
+
+            ## Display the smoothed results
+            ## INPUTS: smoothed_z_scored_tuning_map_matrix_dict
+            include_trial_by_trial_correlation_matrix: bool = False
+            custom_direction_split_layers_dict = {}
+            layers_list_sort_order = ['long_LR_z_scored_tuning_maps', 'long_LR_C_trial_by_trial_correlation_matrix', 'long_RL_z_scored_tuning_maps', 'long_RL_C_trial_by_trial_correlation_matrix', 'short_LR_z_scored_tuning_maps', 'short_LR_C_trial_by_trial_correlation_matrix', 'short_RL_z_scored_tuning_maps', 'short_RL_C_trial_by_trial_correlation_matrix']
+
+            ## Build the image data layers for each
+            # for an_epoch_name, (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) in directional_active_lap_pf_results_dicts.items():
+
+            for an_epoch_name, smoothed_z_scored_tuning_map_matrix in smoothed_z_scored_tuning_map_matrix_dict.items():
+                custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_smoothed_z_scored_tuning_maps', img_data=smoothed_z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
+                # if include_trial_by_trial_correlation_matrix:
+                #     C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
+                #     custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
+
+
+            # for an_epoch_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():
+            #     # (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids)
+            #     z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix
+            #     custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
+            #     if include_trial_by_trial_correlation_matrix:
+            #         C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
+            #         custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
+
+            # custom_direction_split_layers_dict
+
+            # directional_viewer, directional_image_layer_dict = napari_trial_by_trial_activity_viz(None, None, layers_dict=custom_direction_split_layers_dict)
+
+            ## sort the layers dict:
+            custom_direction_split_layers_dict = {k:custom_direction_split_layers_dict[k] for k in reversed(layers_list_sort_order) if k in custom_direction_split_layers_dict}
+
+            directional_viewer, directional_image_layer_dict = napari_from_layers_dict(layers_dict=custom_direction_split_layers_dict, title='Directional Trial-by-Trial Activity', axis_labels=('aclu', 'lap', 'xbin'))
+            if include_trial_by_trial_correlation_matrix:
+                directional_viewer.grid.shape = (-1, 4)
+            else:
+                directional_viewer.grid.shape = (2, -1)
+
+
+        """
+        # window_size: int = 5
+        smoothed_z_scored_tuning_map_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]] = {}
+        smoothed_C_trial_by_trial_correlation_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_ACLUS, N_SMOOTHED_TRIALS, N_SMOOTHED_TRIALS"], Any]] = {}
+
+        for (a_decoder_name, a_result) in self.directional_active_lap_pf_results_dicts.items():
+            ## Find the point where the trial-to-trial correlation (stability) exceeds a requirement for 3 successive laps (allowing for LR/RL only firing)
+            C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = a_result.C_trial_by_trial_correlation_matrix
+            z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = a_result.z_scored_tuning_map_matrix
+            aclu_to_matrix_IDX_map = deepcopy(a_result.aclu_to_matrix_IDX_map)
+
+            # C_trial_by_trial_correlation_matrix
+            # z_scored_tuning_map_matrix
+
+            # smoothed_z_scored_tuning_map_matrix: NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any] = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
+            # smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
+            smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=None, window_size=window_size)
+
+            smoothed_z_scored_tuning_map_matrix_dict[a_decoder_name] = smoothed_z_scored_tuning_map_matrix
+            smoothed_C_trial_by_trial_correlation_matrix_dict[a_decoder_name] = smoothed_C_trial_by_trial_correlation_matrix
+
+        ## END for (a_decoder_name, a_result) in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
+
+        # smoothed_z_scored_tuning_map_matrix
+        ## OUTPUTS: smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
+        return smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
+
+
+    @function_attributes(short_name=None, tags=['peak-promenence', 'peaks', 'pure'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_1d_posterior_peak_promenences'], used_by=[], creation_date='2026-08-25 12:46', related_items=[])
+    def computing_trial_peak_promenences(self, max_peak_idx: Optional[int]=None):
+        """ computes the peak promenences (1D) for the trial-by-trial result 
+
+        max_peak_idx: `max_peak_idx=0` returns only the max peak, `max_peak_idx=1` returns only the the top 2 largest peaks, etc.
+        """
+        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+        peak_prominence_df_dict: Dict[types.DecoderName, pd.DataFrame] = {}
+
+        for a_decoder_name, a_result in self.directional_active_lap_pf_results_dicts.items():
+            a_trial_epochs = ensure_dataframe(self.directional_lap_epochs_dict[a_decoder_name])
+            ## Find the point where the trial-to-trial correlation (stability) exceeds a requirement for 3 successive laps (allowing for LR/RL only firing)
+            C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = a_result.C_trial_by_trial_correlation_matrix
+            z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = a_result.z_scored_tuning_map_matrix
+            aclu_to_matrix_IDX_map = deepcopy(a_result.aclu_to_matrix_IDX_map)
+
+            ## INPUTS: a_trial_by_trial_result, z_scored_tuning_map_matrix
+            n_trials, n_aclus, n_xbins = np.shape(z_scored_tuning_map_matrix)
+            peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_1d_posterior_peak_promenences(
+                p_x_given_n_list=[np.squeeze(z_scored_tuning_map_matrix[:, neuron_IDX, :]).T for neuron_IDX in np.arange(n_aclus)],
+                alpha=0.9,
+                xbin_centers = self.active_pf_dt.xbin_centers,
+                neuron_IDs = deepcopy(self.active_pf_dt.included_neuron_IDs),
+            )
+            peak_prominence_df = peak_prominence_df.rename(columns={'time_bin_idx': 'trial_idx'}, inplace=False)    
+            rel_trial_to_lap_dict = dict(zip(list(a_trial_epochs.index.to_numpy()), a_trial_epochs['lap_id'].to_numpy().astype(int)))
+            peak_prominence_df['rel_trial_idx'] = deepcopy(peak_prominence_df['trial_idx'])
+            peak_prominence_df['trial_idx'] = peak_prominence_df['rel_trial_idx'].map(rel_trial_to_lap_dict)
+            peak_prominence_df['decoder_name'] = a_decoder_name
+
+            if (max_peak_idx is None) or (max_peak_idx < 0):
+                peak_prominence_df_dict[a_decoder_name] = peak_prominence_df
+
+            else:
+                # max_peak_only_peak_prominence_df = deepcopy(peak_prominence_df[peak_prominence_df['summit_idx'] == 0])
+                max_peak_only_peak_prominence_df = deepcopy(peak_prominence_df[peak_prominence_df['summit_idx'] <= max_peak_idx])
+
+                peak_prominence_df_dict[a_decoder_name] = max_peak_only_peak_prominence_df
+
+        ## END for a_decoder_name, a_result in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
+
+        # peak_prominence_df_dict
+        all_decoders_peak_prominence_df: pd.DataFrame = pd.concat(list(peak_prominence_df_dict.values())).sort_values(['aclu', 'trial_idx', 'peak_height', 'summit_idx'])
+        all_decoders_peak_prominence_df
+
+        ## OUTPUTS: all_decoders_peak_prominence_df, peak_prominence_df_dict
+        return all_decoders_peak_prominence_df, peak_prominence_df_dict
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Plotting/Figure/Display Functions                                                                                                                                                                                                                                                    #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     @function_attributes(short_name=None, tags=['figure', 'napari', 'visualization'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-15 13:21', related_items=[])
     def plot_napari_trial_by_trial_correlation_matrix(self, include_trial_by_trial_correlation_matrix:bool=True):
         """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.

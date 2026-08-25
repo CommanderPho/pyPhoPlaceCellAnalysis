@@ -2378,21 +2378,21 @@ class PeakPromenence:
 
             peak_bin_idxs = peak_coords[:, 0]
             peak_center_x = xbin_centers[peak_bin_idxs] if (xbin_centers is not None) else peak_bin_idxs.astype(float)
-            n_peaks: int = len(peak_heights)
+            sort_order = np.argsort(peak_heights)[::-1]  # highest peak -> summit_idx=0
             if debug_print:
                 print(f'({neuron_id_column_name}, neuron_IDX, trial_idx): {(neuron_identifier, neuron_IDX, trial_idx)} prominences: {prominences}, peak_heights: {peak_heights}, peak_center_x: {peak_center_x}')
-            for peak_idx in np.arange(n_peaks):
+            for summit_idx, peak_idx in enumerate(sort_order):
                 _records.append({
                     neuron_id_column_name: neuron_identifier,
                     'time_bin_idx': int(trial_idx),
-                    'summit_idx': int(peak_idx),
+                    'summit_idx': int(summit_idx),
                     'peak_prominence': float(prominences[peak_idx]),
                     'peak_height': float(peak_heights[peak_idx]),
                     'peak_relative_height': float(peak_heights[peak_idx]),
                     'peak_center_x': float(peak_center_x[peak_idx]),
                     'peak_center_binned_x': int(peak_bin_idxs[peak_idx]),
                 })
-            ## END for peak_idx in np.arange(n_peaks)...
+            ## END for summit_idx, peak_idx in enumerate(sort_order)...
         ## END for (neuron_IDX, trial_idx), ... in all_epochs_promenence_tuples_dict.items()...
 
         return pd.DataFrame.from_records(_records, columns=[
