@@ -6892,7 +6892,7 @@ class TrialByTrialActivityResult(ComputedResult):
         return smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
 
 
-    @function_attributes(short_name=None, tags=['peak-promenence', 'peaks', 'pure'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_1d_posterior_peak_promenences'], used_by=[], creation_date='2026-08-25 12:46', related_items=[])
+    @function_attributes(short_name=None, tags=['peak-promenence', 'peaks', 'pure'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_1d_posterior_peak_promenences', 'PeakPromenence.track_peaks_across_trials'], used_by=[], creation_date='2026-08-25 12:46', related_items=[])
     def computing_trial_peak_promenences(self, max_peak_idx: Optional[int]=None, peak_prom_alpha: float = 0.9,
                                 max_match_n_xbins: Optional[int] = 10, translate_threshold_n_xbins: Optional[int] = 25,
                                 max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
