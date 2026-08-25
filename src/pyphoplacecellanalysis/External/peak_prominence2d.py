@@ -2313,11 +2313,14 @@ class PeakPromenence:
                                 max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
                                 w_height: float = 0.0, w_prominence: float = 0.0) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Assign stable peak_track_id per (decoder_name, aclu) and build transition rows.
+        Assign stable peak_track_id per (decoder_name, aclu), reset within each aclu group, and build transition rows.
+
+        ``peak_track_id`` is unique within each (decoder_name, aclu) group (starts at 0 per aclu).
+        ``global_field_peak_id`` is globally unique across all groups/aclus.
 
         Returns
         -------
-        tracked_peaks_df : original rows + peak_track_id
+        tracked_peaks_df : original rows + peak_track_id + global_field_peak_id
         peak_transitions_df : one row per appear/disappear/translate/stable event between consecutive trials
 
         Usage:
@@ -2413,7 +2416,7 @@ class PeakPromenence:
 
         tracked_rows: List[dict] = []
         transition_rows: List[dict] = []
-        next_track_id = 0
+        next_global_field_peak_id = 0
 
         group_cols = ['decoder_name', 'aclu'] if 'decoder_name' in peak_prominence_df.columns else ['aclu']
 
@@ -2421,14 +2424,16 @@ class PeakPromenence:
             if not isinstance(group_key, tuple):
                 group_key = (group_key,)
 
+            next_peak_track_id = 0
+
             trial_groups = {
                 int(trial_val): trial_df.sort_values('summit_idx').reset_index(drop=False)
                 for trial_val, trial_df in aclu_df.groupby(trial_order_col, sort=True)
             }
             sorted_trials = sorted(trial_groups.keys())
 
-            # trial -> {original_row_index: peak_track_id}
-            trial_track_maps: Dict[int, Dict[int, int]] = {}
+            # trial -> {original_row_index: (peak_track_id, global_field_peak_id)}
+            trial_track_maps: Dict[int, Dict[int, Tuple[int, int]]] = {}
 
             for trial_i, rel_trial in enumerate(sorted_trials):
                 trial_df = trial_groups[rel_trial]
@@ -2436,8 +2441,9 @@ class PeakPromenence:
                 if trial_i == 0:
                     track_map = {}
                     for _, row in trial_df.iterrows():
-                        track_map[int(row['index'])] = next_track_id
-                        next_track_id += 1
+                        track_map[int(row['index'])] = (next_peak_track_id, next_global_field_peak_id)
+                        next_peak_track_id += 1
+                        next_global_field_peak_id += 1
                     trial_track_maps[rel_trial] = track_map
                     continue
 
@@ -2455,8 +2461,8 @@ class PeakPromenence:
                 prev_track_map = trial_track_maps[prev_rel_trial]
 
                 for prev_idx, next_idx in matched_pairs:
-                    track_id = prev_track_map[prev_idx]
-                    track_map[next_idx] = track_id
+                    peak_track_id, global_field_peak_id = prev_track_map[prev_idx]
+                    track_map[next_idx] = (peak_track_id, global_field_peak_id)
 
                     prev_row = prev_df.loc[prev_idx]
                     next_row = next_df.loc[next_idx]
@@ -2472,7 +2478,8 @@ class PeakPromenence:
                         'rel_trial_idx_next': rel_trial,
                         'trial_idx_prev': int(prev_row.get('trial_idx', prev_rel_trial)),
                         'trial_idx_next': int(next_row.get('trial_idx', rel_trial)),
-                        'peak_track_id': track_id,
+                        'peak_track_id': peak_track_id,
+                        'global_field_peak_id': global_field_peak_id,
                         'summit_idx_prev': int(prev_row['summit_idx']),
                         'summit_idx_next': int(next_row['summit_idx']),
                         'peak_center_x_prev': float(prev_row['peak_center_x']),
@@ -2482,13 +2489,15 @@ class PeakPromenence:
                     })
 
                 for prev_idx in unmatched_prev:
+                    peak_track_id, global_field_peak_id = prev_track_map[prev_idx]
                     transition_rows.append({
                         **dict(zip(group_cols, group_key)),
                         'rel_trial_idx_prev': prev_rel_trial,
                         'rel_trial_idx_next': rel_trial,
                         'trial_idx_prev': int(prev_df.loc[prev_idx].get('trial_idx', prev_rel_trial)),
                         'trial_idx_next': np.nan,
-                        'peak_track_id': prev_track_map[prev_idx],
+                        'peak_track_id': peak_track_id,
+                        'global_field_peak_id': global_field_peak_id,
                         'summit_idx_prev': int(prev_df.loc[prev_idx]['summit_idx']),
                         'summit_idx_next': np.nan,
                         'peak_center_x_prev': float(prev_df.loc[prev_idx]['peak_center_x']),
@@ -2498,15 +2507,19 @@ class PeakPromenence:
                     })
 
                 for next_idx in unmatched_next:
-                    track_map[next_idx] = next_track_id
-                    next_track_id += 1
+                    peak_track_id = next_peak_track_id
+                    global_field_peak_id = next_global_field_peak_id
+                    next_peak_track_id += 1
+                    next_global_field_peak_id += 1
+                    track_map[next_idx] = (peak_track_id, global_field_peak_id)
                     transition_rows.append({
                         **dict(zip(group_cols, group_key)),
                         'rel_trial_idx_prev': prev_rel_trial,
                         'rel_trial_idx_next': rel_trial,
                         'trial_idx_prev': np.nan,
                         'trial_idx_next': int(next_df.loc[next_idx].get('trial_idx', rel_trial)),
-                        'peak_track_id': track_map[next_idx],
+                        'peak_track_id': peak_track_id,
+                        'global_field_peak_id': global_field_peak_id,
                         'summit_idx_prev': np.nan,
                         'summit_idx_next': int(next_df.loc[next_idx]['summit_idx']),
                         'peak_center_x_prev': np.nan,
@@ -2521,7 +2534,9 @@ class PeakPromenence:
                 track_map = trial_track_maps[rel_trial]
                 for _, row in trial_df.iterrows():
                     out_row = row.drop(labels=['index']).to_dict()
-                    out_row['peak_track_id'] = track_map[int(row['index'])]
+                    peak_track_id, global_field_peak_id = track_map[int(row['index'])]
+                    out_row['peak_track_id'] = peak_track_id
+                    out_row['global_field_peak_id'] = global_field_peak_id
                     tracked_rows.append(out_row)
 
         tracked_peaks_df = pd.DataFrame(tracked_rows)
