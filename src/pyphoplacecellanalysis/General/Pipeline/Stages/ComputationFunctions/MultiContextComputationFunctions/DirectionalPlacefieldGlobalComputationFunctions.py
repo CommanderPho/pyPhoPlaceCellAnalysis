@@ -6893,14 +6893,47 @@ class TrialByTrialActivityResult(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['peak-promenence', 'peaks', 'pure'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_1d_posterior_peak_promenences'], used_by=[], creation_date='2026-08-25 12:46', related_items=[])
-    def computing_trial_peak_promenences(self, max_peak_idx: Optional[int]=None):
+    def computing_trial_peak_promenences(self, max_peak_idx: Optional[int]=None, peak_prom_alpha: float = 0.9,
+                                max_match_n_xbins: Optional[int] = 10, translate_threshold_n_xbins: Optional[int] = 25,
+                                max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
+                                w_height: float = 0.0, w_prominence: float = 0.0):
         """ computes the peak promenences (1D) for the trial-by-trial result 
 
         max_peak_idx: `max_peak_idx=0` returns only the max peak, `max_peak_idx=1` returns only the the top 2 largest peaks, etc.
+
+        Usage:
+
+            from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+            ## INPUTS: a_trial_by_trial_result
+            all_decoders_peak_prominence_df, peak_prominence_df_dict, peak_transitions_df_dict = a_trial_by_trial_result.computing_trial_peak_promenences(max_peak_idx=2)
+            all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
+            # all_decoders_peak_transitions_df
+            all_decoders_peak_prominence_df
+
         """
         from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
 
         peak_prominence_df_dict: Dict[types.DecoderName, pd.DataFrame] = {}
+        peak_transitions_df_dict: Dict[types.DecoderName, pd.DataFrame] = {}
+
+        # optional: set from active_pf_dt bin width
+        # xstep = float(directional_trial_by_trial_activity_result.active_pf_dt.bin_info['xstep'])
+        # max_match_distance = 2.0 * xstep
+
+        xstep: float = float(self.active_pf_dt.bin_info['xstep'])
+        # max_match_distance: float = 10.0 * xstep # 10 bins away to match
+        # translate_threshold: float = 25.0 * xstep # 25 bins away
+
+        if (max_match_distance is None) and (max_match_n_xbins is not None):
+            assert (xstep is not None)
+            max_match_distance = float(max_match_n_xbins) * xstep # 10 bins away to match
+
+        if (translate_threshold is None) and (translate_threshold_n_xbins is not None):
+            assert (xstep is not None)
+            translate_threshold = float(translate_threshold_n_xbins) * xstep # 25 bins away
+
 
         for a_decoder_name, a_result in self.directional_active_lap_pf_results_dicts.items():
             a_trial_epochs = ensure_dataframe(self.directional_lap_epochs_dict[a_decoder_name])
@@ -6913,7 +6946,7 @@ class TrialByTrialActivityResult(ComputedResult):
             n_trials, n_aclus, n_xbins = np.shape(z_scored_tuning_map_matrix)
             peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_1d_posterior_peak_promenences(
                 p_x_given_n_list=[np.squeeze(z_scored_tuning_map_matrix[:, neuron_IDX, :]).T for neuron_IDX in np.arange(n_aclus)],
-                alpha=0.9,
+                alpha=peak_prom_alpha,
                 xbin_centers = self.active_pf_dt.xbin_centers,
                 neuron_IDs = deepcopy(self.active_pf_dt.included_neuron_IDs),
             )
@@ -6922,6 +6955,18 @@ class TrialByTrialActivityResult(ComputedResult):
             peak_prominence_df['rel_trial_idx'] = deepcopy(peak_prominence_df['trial_idx'])
             peak_prominence_df['trial_idx'] = peak_prominence_df['rel_trial_idx'].map(rel_trial_to_lap_dict)
             peak_prominence_df['decoder_name'] = a_decoder_name
+
+            ## add absolute trial-to-trial unique peak indicies/transitions
+            peak_prominence_df, transitions_df = PeakPromenence.track_peaks_across_trials(
+                peak_prominence_df,
+                trial_order_col='rel_trial_idx',
+                max_match_distance=max_match_distance,   # or 2.0 * xstep
+                translate_threshold=translate_threshold,  # or 0.5 * xstep for "stable"
+                w_height=w_height,            # try 0.1–0.3 if peaks swap summit_idx often
+                w_prominence=w_prominence,
+            )
+            # tracked_peak_prominence_df_dict[a_decoder_name] = tracked_df
+            peak_transitions_df_dict[a_decoder_name] = transitions_df
 
             if (max_peak_idx is None) or (max_peak_idx < 0):
                 peak_prominence_df_dict[a_decoder_name] = peak_prominence_df
@@ -6935,11 +6980,14 @@ class TrialByTrialActivityResult(ComputedResult):
         ## END for a_decoder_name, a_result in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
 
         # peak_prominence_df_dict
-        all_decoders_peak_prominence_df: pd.DataFrame = pd.concat(list(peak_prominence_df_dict.values())).sort_values(['aclu', 'trial_idx', 'peak_height', 'summit_idx'])
-        all_decoders_peak_prominence_df
+        all_decoders_peak_prominence_df: pd.DataFrame = pd.concat(list(peak_prominence_df_dict.values()), ignore_index=True) # .sort_values(['aclu', 'trial_idx', 'peak_height', 'summit_idx'])
+        all_decoders_peak_prominence_df = all_decoders_peak_prominence_df.sort_values(['aclu', 'trial_idx', 'decoder_name', 'peak_height', 'summit_idx', 'peak_track_id'], ascending=[True, True, True, False, True, True]).reset_index(drop=True)
+
+        # all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
+        # all_decoders_peak_transitions_df
 
         ## OUTPUTS: all_decoders_peak_prominence_df, peak_prominence_df_dict
-        return all_decoders_peak_prominence_df, peak_prominence_df_dict
+        return all_decoders_peak_prominence_df, peak_prominence_df_dict, peak_transitions_df_dict
 
 
 

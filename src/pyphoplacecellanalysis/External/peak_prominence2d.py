@@ -2303,6 +2303,232 @@ class PeakPromenence:
 
         return epoch_promenence_tuples, epoch_masks
 
+    
+
+
+
+
+    @function_attributes(short_name=None, tags=['trials', 'peaks'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 15:36', related_items=[])
+    def track_peaks_across_trials(peak_prominence_df: pd.DataFrame, trial_order_col: str = 'rel_trial_idx',
+                                max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
+                                w_height: float = 0.0, w_prominence: float = 0.0) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Assign stable peak_track_id per (decoder_name, aclu) and build transition rows.
+
+        Returns
+        -------
+        tracked_peaks_df : original rows + peak_track_id
+        peak_transitions_df : one row per appear/disappear/translate/stable event between consecutive trials
+
+        Usage:
+
+            peak_prominence_df_dict = all_decoders_peak_prominence_df.pho.partition_df_dict('decoder_name')
+
+            tracked_peak_prominence_df_dict = {}
+            peak_transitions_df_dict = {}
+
+            # optional: set from active_pf_dt bin width
+            # xstep = float(directional_trial_by_trial_activity_result.active_pf_dt.bin_info['xstep'])
+            # max_match_distance = 2.0 * xstep
+
+            xstep = float(directional_trial_by_trial_activity_result.active_pf_dt.bin_info['xstep'])
+            max_match_distance = 10.0 * xstep # 10 bins away to match
+            translate_threshold = 25.0 * xstep # 25 bins away
+
+            for a_decoder_name, a_peak_prominence_df in peak_prominence_df_dict.items():
+                tracked_df, transitions_df = PeakPromenence.track_peaks_across_trials(
+                    a_peak_prominence_df,
+                    trial_order_col='rel_trial_idx',
+                    # max_match_distance=None,   # or 2.0 * xstep
+                    # translate_threshold=None,  # or 0.5 * xstep for "stable"
+                    max_match_distance=max_match_distance,   # or 2.0 * xstep
+                    translate_threshold=translate_threshold,  # or 0.5 * xstep for "stable"
+                    w_height=0.0,            # try 0.1–0.3 if peaks swap summit_idx often
+                    w_prominence=0.0,
+                )
+                tracked_peak_prominence_df_dict[a_decoder_name] = tracked_df
+                peak_transitions_df_dict[a_decoder_name] = transitions_df
+
+            all_decoders_tracked_peak_prominence_df = pd.concat(tracked_peak_prominence_df_dict.values(), ignore_index=True)
+            all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
+            all_decoders_peak_transitions_df
+
+        """
+        from scipy.optimize import linear_sum_assignment
+
+        def _subfn_match_peaks_between_trials(prev_df: pd.DataFrame, next_df: pd.DataFrame, max_match_distance: float, w_x: float = 1.0, w_height: float = 0.0, w_prominence: float = 0.0) -> Tuple[List[Tuple[int, int]], List[int], List[int]]:
+            """Match rows in prev_df to next_df. Returns (matched_pairs, unmatched_prev_row_idxs, unmatched_next_row_idxs)."""
+            if len(prev_df) == 0:
+                return [], [], list(next_df.index)
+            if len(next_df) == 0:
+                return [], list(prev_df.index), []
+
+            x_prev = prev_df['peak_center_x'].to_numpy(dtype=float)
+            x_next = next_df['peak_center_x'].to_numpy(dtype=float)
+            cost = w_x * np.abs(x_prev[:, None] - x_next[None, :])
+
+            if (w_height > 0.0) and ('peak_height' in prev_df.columns):
+                h_prev = prev_df['peak_height'].to_numpy(dtype=float)
+                h_next = next_df['peak_height'].to_numpy(dtype=float)
+                cost = cost + w_height * np.abs(h_prev[:, None] - h_next[None, :])
+
+            if (w_prominence > 0.0) and ('peak_prominence' in prev_df.columns):
+                p_prev = prev_df['peak_prominence'].to_numpy(dtype=float)
+                p_next = next_df['peak_prominence'].to_numpy(dtype=float)
+                cost = cost + w_prominence * np.abs(p_prev[:, None] - p_next[None, :])
+
+            row_ind, col_ind = linear_sum_assignment(cost)
+
+            prev_idx_list = list(prev_df.index)
+            next_idx_list = list(next_df.index)
+            matched_pairs: List[Tuple[int, int]] = []
+            matched_prev = set()
+            matched_next = set()
+
+            for r, c in zip(row_ind, col_ind):
+                if cost[r, c] <= max_match_distance:
+                    matched_pairs.append((prev_idx_list[r], next_idx_list[c]))
+                    matched_prev.add(prev_idx_list[r])
+                    matched_next.add(next_idx_list[c])
+
+            unmatched_prev = [idx for idx in prev_idx_list if idx not in matched_prev]
+            unmatched_next = [idx for idx in next_idx_list if idx not in matched_next]
+            return matched_pairs, unmatched_prev, unmatched_next
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+        # ==================================================================================================================================================================================================================================================================================== #
+
+        if max_match_distance is None:
+            # default: ~2 position bins if binned_x available, else 5 cm
+            if 'peak_center_binned_x' in peak_prominence_df.columns:
+                bin_step = float(np.nanmedian(np.diff(np.sort(peak_prominence_df['peak_center_x'].dropna().unique()))))
+                max_match_distance = 2.0 * bin_step
+            else:
+                max_match_distance = 5.0
+
+        if translate_threshold is None:
+            translate_threshold = max_match_distance / 4.0
+
+        tracked_rows: List[dict] = []
+        transition_rows: List[dict] = []
+        next_track_id = 0
+
+        group_cols = ['decoder_name', 'aclu'] if 'decoder_name' in peak_prominence_df.columns else ['aclu']
+
+        for group_key, aclu_df in peak_prominence_df.groupby(group_cols, sort=False):
+            if not isinstance(group_key, tuple):
+                group_key = (group_key,)
+
+            trial_groups = {
+                int(trial_val): trial_df.sort_values('summit_idx').reset_index(drop=False)
+                for trial_val, trial_df in aclu_df.groupby(trial_order_col, sort=True)
+            }
+            sorted_trials = sorted(trial_groups.keys())
+
+            # trial -> {original_row_index: peak_track_id}
+            trial_track_maps: Dict[int, Dict[int, int]] = {}
+
+            for trial_i, rel_trial in enumerate(sorted_trials):
+                trial_df = trial_groups[rel_trial]
+
+                if trial_i == 0:
+                    track_map = {}
+                    for _, row in trial_df.iterrows():
+                        track_map[int(row['index'])] = next_track_id
+                        next_track_id += 1
+                    trial_track_maps[rel_trial] = track_map
+                    continue
+
+                prev_rel_trial = sorted_trials[trial_i - 1]
+                prev_df = trial_groups[prev_rel_trial].set_index('index')
+                next_df = trial_df.set_index('index')
+
+                matched_pairs, unmatched_prev, unmatched_next = _subfn_match_peaks_between_trials(
+                    prev_df, next_df,
+                    max_match_distance=max_match_distance,
+                    w_height=w_height, w_prominence=w_prominence,
+                )
+
+                track_map = {}
+                prev_track_map = trial_track_maps[prev_rel_trial]
+
+                for prev_idx, next_idx in matched_pairs:
+                    track_id = prev_track_map[prev_idx]
+                    track_map[next_idx] = track_id
+
+                    prev_row = prev_df.loc[prev_idx]
+                    next_row = next_df.loc[next_idx]
+                    delta_x = float(next_row['peak_center_x'] - prev_row['peak_center_x'])
+                    if abs(delta_x) <= translate_threshold:
+                        event_type = 'stable'
+                    else:
+                        event_type = 'translate'
+
+                    transition_rows.append({
+                        **dict(zip(group_cols, group_key)),
+                        'rel_trial_idx_prev': prev_rel_trial,
+                        'rel_trial_idx_next': rel_trial,
+                        'trial_idx_prev': int(prev_row.get('trial_idx', prev_rel_trial)),
+                        'trial_idx_next': int(next_row.get('trial_idx', rel_trial)),
+                        'peak_track_id': track_id,
+                        'summit_idx_prev': int(prev_row['summit_idx']),
+                        'summit_idx_next': int(next_row['summit_idx']),
+                        'peak_center_x_prev': float(prev_row['peak_center_x']),
+                        'peak_center_x_next': float(next_row['peak_center_x']),
+                        'delta_peak_center_x': delta_x,
+                        'event_type': event_type,
+                    })
+
+                for prev_idx in unmatched_prev:
+                    transition_rows.append({
+                        **dict(zip(group_cols, group_key)),
+                        'rel_trial_idx_prev': prev_rel_trial,
+                        'rel_trial_idx_next': rel_trial,
+                        'trial_idx_prev': int(prev_df.loc[prev_idx].get('trial_idx', prev_rel_trial)),
+                        'trial_idx_next': np.nan,
+                        'peak_track_id': prev_track_map[prev_idx],
+                        'summit_idx_prev': int(prev_df.loc[prev_idx]['summit_idx']),
+                        'summit_idx_next': np.nan,
+                        'peak_center_x_prev': float(prev_df.loc[prev_idx]['peak_center_x']),
+                        'peak_center_x_next': np.nan,
+                        'delta_peak_center_x': np.nan,
+                        'event_type': 'disappear',
+                    })
+
+                for next_idx in unmatched_next:
+                    track_map[next_idx] = next_track_id
+                    next_track_id += 1
+                    transition_rows.append({
+                        **dict(zip(group_cols, group_key)),
+                        'rel_trial_idx_prev': prev_rel_trial,
+                        'rel_trial_idx_next': rel_trial,
+                        'trial_idx_prev': np.nan,
+                        'trial_idx_next': int(next_df.loc[next_idx].get('trial_idx', rel_trial)),
+                        'peak_track_id': track_map[next_idx],
+                        'summit_idx_prev': np.nan,
+                        'summit_idx_next': int(next_df.loc[next_idx]['summit_idx']),
+                        'peak_center_x_prev': np.nan,
+                        'peak_center_x_next': float(next_df.loc[next_idx]['peak_center_x']),
+                        'delta_peak_center_x': np.nan,
+                        'event_type': 'appear',
+                    })
+
+                trial_track_maps[rel_trial] = track_map
+
+            for rel_trial, trial_df in trial_groups.items():
+                track_map = trial_track_maps[rel_trial]
+                for _, row in trial_df.iterrows():
+                    out_row = row.drop(labels=['index']).to_dict()
+                    out_row['peak_track_id'] = track_map[int(row['index'])]
+                    tracked_rows.append(out_row)
+
+        tracked_peaks_df = pd.DataFrame(tracked_rows)
+        peak_transitions_df = pd.DataFrame(transition_rows)
+        return tracked_peaks_df, peak_transitions_df
+
+
 
     @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite', '1d'], input_requires=[], output_provides=[], uses=['cls.compute_1d_dt_posterior_peak_promenences', 'cls.build_1d_peak_prominence_df'], used_by=[], creation_date='2026-08-25 11:00', related_items=['compute_posterior_peak_promenences'])
     @classmethod
