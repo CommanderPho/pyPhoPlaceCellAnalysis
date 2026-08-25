@@ -941,7 +941,7 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.5, font_size_pt: int = 6, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None) -> List[pg.TextItem]:
+    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.7, font_size_pt: int = 8, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None) -> List[pg.TextItem]:
         """Build tiny semi-transparent ``aclu_field_peak_id`` labels centered on each peak vertical tick."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
         trial_idx = np.asarray(trial_idx, dtype=float).ravel()
