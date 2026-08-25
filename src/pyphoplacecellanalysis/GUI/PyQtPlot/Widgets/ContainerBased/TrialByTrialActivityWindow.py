@@ -825,6 +825,7 @@ class TrialByTrialActivityWindow:
             ## END for aclu, label_items in existing_labels.items()....
 
         self.plots.peak_track_id_debug_labels = None
+        self.plots_data.peak_track_id_color_maps_dict = None
 
         hover_preview_plot = self.plots.get('hover_preview_plot', None)
         existing_hover = self.plots.get('hover_preview_peak_track_id_debug_labels', None)
@@ -945,7 +946,24 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_peak_track_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, peak_track_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.5, font_size_pt: int = 6) -> List[pg.TextItem]:
+    def _build_peak_track_id_color_map(cls, peak_track_ids: NDArray) -> Dict[int, str]:
+        """Map each unique ``peak_track_id`` to a distinct hex color (stable sort by id)."""
+        unique_peak_track_ids = sorted({int(v) for v in np.asarray(peak_track_ids, dtype=float).ravel() if np.isfinite(v)})
+        if len(unique_peak_track_ids) == 0:
+            return {}
+
+        n_colors: int = len(unique_peak_track_ids)
+        color_map: Dict[int, str] = {}
+        for color_idx, a_peak_track_id in enumerate(unique_peak_track_ids):
+            color_map[a_peak_track_id] = pg.intColor(color_idx, hues=n_colors).name()
+        ## END for color_idx, a_peak_track_id in enumerate(unique_peak_track_ids)...
+
+        return color_map
+
+
+
+    @classmethod
+    def _build_peak_track_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, peak_track_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.5, font_size_pt: int = 6, peak_track_id_color_map: Optional[Dict[int, str]] = None) -> List[pg.TextItem]:
         """Build tiny semi-transparent ``peak_track_id`` labels above each peak vertical tick."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
         trial_idx = np.asarray(trial_idx, dtype=float).ravel()
@@ -957,10 +975,14 @@ class TrialByTrialActivityWindow:
         if peak_center_x.size == 0:
             return []
 
+        if peak_track_id_color_map is None:
+            peak_track_id_color_map = cls._build_peak_track_id_color_map(peak_track_ids=peak_track_id)
+
         label_items: List[pg.TextItem] = []
         label_y_offset: float = 0.05
         for a_x, a_trial_idx, a_peak_track_id in zip(peak_center_x, trial_idx, peak_track_id):
-            label_text = pg.TextItem(html=f"<span style='color:white; font-size:{int(font_size_pt)}pt;'>{int(a_peak_track_id)}</span>", anchor=(0.5, 1.0))
+            track_color: str = peak_track_id_color_map.get(int(a_peak_track_id), '#ffffff')
+            label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_peak_track_id)}</span>", anchor=(0.5, 1.0))
             label_text.setOpacity(float(label_alpha))
             label_text.setPos(float(a_x), float(a_trial_idx) + float(trial_half_height) + label_y_offset)
             label_text.setZValue(101)
@@ -1034,7 +1056,10 @@ class TrialByTrialActivityWindow:
         if len(aclu_peaks_df) == 0:
             return
 
-        label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt)
+        peak_track_id_color_maps_dict = self.plots_data.get('peak_track_id_color_maps_dict', None)
+        peak_track_id_color_map = None if (peak_track_id_color_maps_dict is None) else peak_track_id_color_maps_dict.get(int(neuron_aclu), None)
+
+        label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt, peak_track_id_color_map=peak_track_id_color_map)
         if len(label_items) == 0:
             return
 
@@ -1193,6 +1218,9 @@ class TrialByTrialActivityWindow:
     def add_peak_track_id_debug_labels(self, peaks_df: Optional[pd.DataFrame] = None, label_alpha: float = 0.5, font_size_pt: int = 6, trial_half_height: Optional[float] = None, clear_existing: bool = True, include_hover_preview: bool = True) -> Dict[int, List[pg.TextItem]]:
         """Add tiny semi-transparent ``peak_track_id`` labels above each peak vertical tick (debug overlay).
 
+        Each unique ``peak_track_id`` within an aclu is assigned a distinct color so tracks
+        are visually identifiable across trials on that subplot.
+
         Parameters
         ----------
         peaks_df : pd.DataFrame, optional
@@ -1250,8 +1278,11 @@ class TrialByTrialActivityWindow:
         active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
 
         new_labels: Dict[int, List[pg.TextItem]] = {}
+        peak_track_id_color_maps_dict: Dict[int, Dict[int, str]] = {}
         for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
-            label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=float(trial_half_height), label_alpha=float(label_alpha), font_size_pt=int(font_size_pt))
+            peak_track_id_color_map = self._build_peak_track_id_color_map(peak_track_ids=aclu_peaks_df['peak_track_id'].to_numpy())
+            peak_track_id_color_maps_dict[int(aclu)] = peak_track_id_color_map
+            label_items = self._build_peak_track_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), peak_track_id=aclu_peaks_df['peak_track_id'].to_numpy(), trial_half_height=float(trial_half_height), label_alpha=float(label_alpha), font_size_pt=int(font_size_pt), peak_track_id_color_map=peak_track_id_color_map)
             if len(label_items) == 0:
                 continue
             plot_idx = aclu_to_plot_idx[int(aclu)]
@@ -1264,6 +1295,7 @@ class TrialByTrialActivityWindow:
 
         self.plots.peak_track_id_debug_labels = new_labels
         self.plots_data.peak_track_id_labels_df = deepcopy(active_peaks_df)
+        self.plots_data.peak_track_id_color_maps_dict = peak_track_id_color_maps_dict
         self.params.peak_track_id_label_alpha = float(label_alpha)
         self.params.peak_track_id_label_font_size_pt = int(font_size_pt)
         self.params.peak_track_id_label_trial_half_height = float(trial_half_height)
