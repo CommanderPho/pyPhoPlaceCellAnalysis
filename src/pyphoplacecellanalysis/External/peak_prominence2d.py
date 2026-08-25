@@ -58,6 +58,7 @@ from neuropy.utils.mixins.AttrsClassHelpers import serialized_field, non_seriali
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset, pop_dict_subset
 from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
 from scipy import ndimage # used for `PeakPromenence.compute_2d_peak_prominence`
+from scipy.signal import find_peaks, peak_prominences # used for `PeakPromenence.compute_1d_peak_prominence`
 from skimage.morphology import reconstruction # used for `PeakPromenence.compute_2d_peak_prominence`
 
 
@@ -2213,6 +2214,192 @@ class PeakPromenence:
 
         return all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks
 
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2026-08-25 - High-efficiency 1D peak promenence calculations                                                                                                                                                                                                                         #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite', '1d'], input_requires=[], output_provides=[], uses=['scipy.signal.find_peaks', 'scipy.signal.peak_prominences'], used_by=['cls.compute_1d_dt_posterior_peak_promenences'], creation_date='2026-08-25 11:00', related_items=['compute_2d_peak_prominence'])
+    @classmethod
+    def compute_1d_peak_prominence(cls, Z_1d: NDArray[ND.Shape["N_XBINS"], Any]):
+        """
+        Computes prominence for all 1D local maxima in Z_1d.
+
+        1D counterpart to ``compute_2d_peak_prominence``, using SciPy's discrete prominence definition.
+
+        Returns:
+            peak_coords: (N, 1) array of peak bin indices (argwhere-style, mirrors 2D's (N, 2))
+            prominences: (N,) prominence values
+        """
+        if Z_1d.ndim != 1:
+            raise ValueError(f"compute_1d_peak_prominence expects a 1D array, got shape {Z_1d.shape}")
+
+        peaks, _ = find_peaks(Z_1d)
+        if len(peaks) == 0:
+            return np.zeros((0, 1), dtype=int), np.array([], dtype=float)
+
+        prominences, _left_bases, _right_bases = peak_prominences(Z_1d, peaks)
+        peak_coords = peaks.reshape(-1, 1)
+        return peak_coords, prominences
+
+
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite', '1d'], input_requires=[], output_provides=[], uses=['cls.compute_1d_peak_prominence'], used_by=['cls.compute_1d_posterior_peak_promenences'], creation_date='2026-08-25 11:00', related_items=['compute_2d_dt_posterior_peak_promenences'])
+    @classmethod
+    def compute_1d_dt_posterior_peak_promenences(cls, a_p_x_given_n: NDArray[ND.Shape["N_XBINS, N_TBINS"], Any], alpha: Union[float, List[float]] = 0.9, memory_warn_bytes: Optional[int] = int(60 * 1024**3), memory_strict: bool = True):
+        """For a single 1D posterior (from a single decoded epoch, etc) process each time bin.
+
+        Input shape: (n_xbins, n_tbins).
+
+        Returns:
+            epoch_promenence_tuples: list length n_t of (peak_coords, prominences, peak_heights)
+            epoch_masks: list of bool NDArray each shape (n_xbins, n_tbins), one per alpha
+        """
+        if a_p_x_given_n.ndim != 2:
+            raise ValueError(f"compute_1d_dt_posterior_peak_promenences expects a 2D array (n_xbins, n_tbins), got shape {a_p_x_given_n.shape}")
+
+        if np.isscalar(alpha):
+            alpha = [alpha] ## make into a single element list
+
+        n_x_bins, n_t_bins = a_p_x_given_n.shape[0], a_p_x_given_n.shape[1]
+        n_alpha = len(alpha)
+        estimated_mask_bytes = n_x_bins * n_t_bins * n_alpha * np.dtype(bool).itemsize
+        if memory_warn_bytes is not None and estimated_mask_bytes > memory_warn_bytes:
+            msg = f"compute_1d_dt_posterior_peak_promenences estimated mask memory {estimated_mask_bytes / (1024**2):.1f} MiB exceeds threshold {memory_warn_bytes / (1024**2):.1f} MiB (shape {n_x_bins}x{n_t_bins}, {n_alpha} alpha)."
+            if memory_strict:
+                raise MemoryError(msg)
+            warn(msg)
+
+        epoch_masks: List[NDArray] = [np.zeros((n_x_bins, n_t_bins), dtype=bool) for _ in alpha]
+        epoch_promenence_tuples: List[Tuple] = []
+
+        structure = ndimage.generate_binary_structure(1, 1)  # 1D 2-connected for binary_propagation
+        threshold_buf = np.empty((n_x_bins,), dtype=bool)
+        prop_seed_buf = np.zeros((n_x_bins,), dtype=bool)
+
+        def _subfn_dominant_peak_mask_at_alpha(Z_1d: NDArray, peak_coords: NDArray, peak_heights: NDArray, a_peak_idx: int, an_alpha: float, out_threshold: NDArray, out_seed: NDArray) -> NDArray:
+            px = int(peak_coords[a_peak_idx, 0])
+            np.greater_equal(Z_1d, an_alpha * float(peak_heights[a_peak_idx]), out=out_threshold)
+            out_seed.fill(False)
+            out_seed[px] = True
+            return ndimage.binary_propagation(out_seed, mask=out_threshold, structure=structure)
+
+        for t_idx in range(n_t_bins):
+            Z_1d = a_p_x_given_n[:, t_idx]
+            peak_coords, prominences = cls.compute_1d_peak_prominence(Z_1d)
+            if peak_coords.size == 0:
+                epoch_promenence_tuples.append((peak_coords, np.array([]), np.array([])))
+                continue
+
+            peak_heights = Z_1d[peak_coords[:, 0]]
+            dominant_peak_idx: int = int(np.argmax(peak_heights))
+            for an_alpha_idx, an_alpha in enumerate(alpha):
+                a_dominant_peak_mask = _subfn_dominant_peak_mask_at_alpha(Z_1d=Z_1d, peak_coords=peak_coords, peak_heights=peak_heights, a_peak_idx=dominant_peak_idx, an_alpha=an_alpha, out_threshold=threshold_buf, out_seed=prop_seed_buf)
+                epoch_masks[an_alpha_idx][:, t_idx] = a_dominant_peak_mask
+            ## END for an_alpha_idx, an_alpha in enumerate(alpha)...
+
+            epoch_promenence_tuples.append((peak_coords, prominences, peak_heights))
+        ## END for t_idx in range(n_t_bins)...
+
+        return epoch_promenence_tuples, epoch_masks
+
+
+    @function_attributes(short_name=None, tags=['high-efficiency', 'rewrite', '1d'], input_requires=[], output_provides=[], uses=['cls.compute_1d_dt_posterior_peak_promenences', 'cls.build_1d_peak_prominence_df'], used_by=[], creation_date='2026-08-25 11:00', related_items=['compute_posterior_peak_promenences'])
+    @classmethod
+    def compute_1d_posterior_peak_promenences(cls, p_x_given_n_list: List[NDArray[ND.Shape["N_XBINS, N_TBINS"], Any]], alpha: Union[float, List[float]] = 0.9, neuron_IDs=None, xbin_centers=None, debug_print: bool = False):
+        """Multi-epoch wrapper for 1D posterior peak prominences.
+
+        Usage:
+            from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+            peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_1d_posterior_peak_promenences(p_x_given_n_list=..., alpha=0.9, neuron_IDs=..., xbin_centers=...)
+
+        Example 2 (with xbin_centers and neuron_IDs):
+
+            from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+            ## INPUTS: a_trial_by_trial_result, z_scored_tuning_map_matrix
+            n_trials, n_aclus, n_xbins = np.shape(z_scored_tuning_map_matrix)
+            peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_1d_posterior_peak_promenences(
+                p_x_given_n_list=[np.squeeze(z_scored_tuning_map_matrix[:, neuron_IDX, :]).T for neuron_IDX in np.arange(n_aclus)],
+                alpha=0.9,
+                xbin_centers = a_trial_by_trial_result.active_pf_dt.xbin_centers,
+                neuron_IDs = deepcopy(a_trial_by_trial_result.active_pf_dt.included_neuron_IDs),
+            )
+            peak_prominence_df
+
+        """
+        all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list: List[DecodedEpochTimeBinIndexTuple] = []
+        all_epochs_promenence_tuples_dict: Dict[DecodedEpochTimeBinIndexTuple, Tuple] = {}
+        all_epochs_promenence_tuples: List[Tuple] = []
+        all_epochs_masks: List[List[NDArray]] = []
+
+        for epoch_idx, a_p_x_given_n in enumerate(p_x_given_n_list):
+            n_t_bins = np.shape(a_p_x_given_n)[-1]
+            epoch_promenences, epoch_masks_dict = cls.compute_1d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha)
+            all_epochs_promenence_tuples.append(epoch_promenences)
+
+            all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list.extend([(epoch_idx, a_t_bin_idx) for a_t_bin_idx in np.arange(n_t_bins)])
+            curr_epoch_promp_tuples_dict = {(epoch_idx, a_t_bin_idx): a_prom_tuple for a_t_bin_idx, a_prom_tuple in enumerate(epoch_promenences)} ## each value of a_prom_tuple is (peak_coords, prominences, peak_heights)
+            all_epochs_promenence_tuples_dict.update(curr_epoch_promp_tuples_dict)
+            all_epochs_masks.append(epoch_masks_dict)
+        ## END for epoch_idx, a_p_x_given_n in enumerate(p_x_given_n_list)...
+
+        peak_prominence_df = cls._build_1d_peak_prominence_df(all_epochs_promenence_tuples_dict, neuron_IDs=neuron_IDs, xbin_centers=xbin_centers, debug_print=debug_print)
+
+        return peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks
+
+
+    @function_attributes(short_name=None, tags=['private', 'rewrite', '1d', 'dataframe'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_1d_posterior_peak_promenences'], creation_date='2026-08-25 11:00', related_items=[])
+    @classmethod
+    def _build_1d_peak_prominence_df(cls, all_epochs_promenence_tuples_dict, neuron_IDs=None, xbin_centers=None, debug_print: bool = False) -> pd.DataFrame:
+        """Flatten ``compute_1d_posterior_peak_promenences`` tuples into a ``flat_peaks_df``-style table.
+
+        Parameters
+        ----------
+        all_epochs_promenence_tuples_dict
+            Dict keyed by ``(neuron_IDX, trial_idx)`` → ``(peak_coords, prominences, peak_heights)``.
+        neuron_IDs
+            Optional sequence of aclus aligned with neuron matrix indices. If None, ``neuron_id`` = ``neuron_IDX``.
+        xbin_centers
+            Optional 1D array of spatial bin centers. If None, ``peak_center_x`` = bin index.
+
+        Returns
+        -------
+        pd.DataFrame with columns:
+            neuron_id, time_bin_idx, summit_idx, peak_prominence, peak_height,
+            peak_relative_height, peak_center_x, peak_center_binned_x
+        """
+        _records = []
+        neuron_id_column_name: str = 'aclu' if (neuron_IDs is not None) else 'neuron_IDX'
+
+        for (neuron_IDX, trial_idx), (peak_coords, prominences, peak_heights) in all_epochs_promenence_tuples_dict.items():
+            neuron_identifier: int = int(neuron_IDs[neuron_IDX]) if (neuron_IDs is not None) else int(neuron_IDX)
+
+            peak_bin_idxs = peak_coords[:, 0]
+            peak_center_x = xbin_centers[peak_bin_idxs] if (xbin_centers is not None) else peak_bin_idxs.astype(float)
+            n_peaks: int = len(peak_heights)
+            if debug_print:
+                print(f'({neuron_id_column_name}, neuron_IDX, trial_idx): {(neuron_identifier, neuron_IDX, trial_idx)} prominences: {prominences}, peak_heights: {peak_heights}, peak_center_x: {peak_center_x}')
+            for peak_idx in np.arange(n_peaks):
+                _records.append({
+                    neuron_id_column_name: neuron_identifier,
+                    'time_bin_idx': int(trial_idx),
+                    'summit_idx': int(peak_idx),
+                    'peak_prominence': float(prominences[peak_idx]),
+                    'peak_height': float(peak_heights[peak_idx]),
+                    'peak_relative_height': float(peak_heights[peak_idx]),
+                    'peak_center_x': float(peak_center_x[peak_idx]),
+                    'peak_center_binned_x': int(peak_bin_idxs[peak_idx]),
+                })
+            ## END for peak_idx in np.arange(n_peaks)...
+        ## END for (neuron_IDX, trial_idx), ... in all_epochs_promenence_tuples_dict.items()...
+
+        return pd.DataFrame.from_records(_records, columns=[
+            neuron_id_column_name, 'time_bin_idx', 'summit_idx',
+            'peak_prominence', 'peak_height', 'peak_relative_height',
+            'peak_center_x', 'peak_center_binned_x',
+        ])
 
 
     # # ==================================================================================================================================================================================================================================================================================== #
