@@ -810,6 +810,40 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
+    def _peak_marker_opacity_for_summit_idx(cls, summit_idx_val: int) -> float:
+        """Return marker opacity for a given ``summit_idx`` rank."""
+        summit_idx_val = int(summit_idx_val)
+        if summit_idx_val <= 0:
+            return 1.0
+        if summit_idx_val == 1:
+            return 0.75
+        if summit_idx_val == 2:
+            return 0.65
+        return 0.5
+
+
+
+    @classmethod
+    def _peak_marker_pen_for_summit_idx(cls, summit_idx_val: int, base_pen=None):
+        """Return a pen with width ``base / 2**summit_idx_val`` and summit-rank opacity."""
+        if base_pen is None:
+            base_pen = pg.mkPen('w', width=1.5)
+        else:
+            base_pen = pg.mkPen(base_pen)
+
+        base_pen_width: float = float(base_pen.widthF()) if (base_pen.widthF() > 0.0) else 1.5
+        pen_width: float = float(base_pen_width) / float(2 ** int(summit_idx_val))
+        pen_opacity: float = cls._peak_marker_opacity_for_summit_idx(summit_idx_val=int(summit_idx_val))
+        pen_color = pg.mkColor(base_pen.color())
+        pen_color.setAlphaF(float(pen_opacity))
+        a_pen = pg.QtGui.QPen(base_pen)
+        a_pen.setWidthF(pen_width)
+        a_pen.setColor(pen_color)
+        return a_pen
+
+
+
+    @classmethod
     def _build_peak_marker_scatter(cls, peak_center_x: NDArray, trial_idx: NDArray, pen=None, trial_half_height: float = 0.45) -> Optional[pg.ScatterPlotItem]:
         """One batched scatter of vertical ticks (avoids PlotCurveItem OpenGL LINE_STRIP ignoring connect='pairs')."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
@@ -838,6 +872,37 @@ class TrialByTrialActivityWindow:
 
 
 
+    @classmethod
+    def _build_peak_marker_scatter_items(cls, peak_center_x: NDArray, trial_idx: NDArray, pen=None, trial_half_height: float = 0.45, summit_idx: Optional[NDArray] = None) -> List[pg.ScatterPlotItem]:
+        """Build one or more batched scatters; groups by ``summit_idx`` when present (one pen per group)."""
+        peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
+        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
+        summit_idx_arr = None if (summit_idx is None) else np.asarray(summit_idx, dtype=int).ravel()
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx)
+        peak_center_x = peak_center_x[valid_mask]
+        trial_idx = trial_idx[valid_mask]
+        if summit_idx_arr is not None:
+            summit_idx_arr = summit_idx_arr[valid_mask]
+        if peak_center_x.size == 0:
+            return []
+
+        if summit_idx_arr is None:
+            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x, trial_idx=trial_idx, pen=pen, trial_half_height=trial_half_height)
+            return [] if (a_scatter is None) else [a_scatter]
+
+        scatter_items: List[pg.ScatterPlotItem] = []
+        for a_summit_idx_val in np.unique(summit_idx_arr):
+            summit_mask = summit_idx_arr == a_summit_idx_val
+            group_pen = cls._peak_marker_pen_for_summit_idx(summit_idx_val=int(a_summit_idx_val), base_pen=pen)
+            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_idx=trial_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
+            if a_scatter is not None:
+                scatter_items.append(a_scatter)
+        ## END for a_summit_idx_val in np.unique(summit_idx_arr)...
+
+        return scatter_items
+
+
+
     def _update_hover_preview_peak_markers(self, neuron_aclu):
         """Draw the hovered aclu's peak-center vertical markers on the hover-preview axes (one batched scatter)."""
         hover_preview_plot = self.plots.get('hover_preview_plot', None)
@@ -859,12 +924,16 @@ class TrialByTrialActivityWindow:
         if len(aclu_peaks_df) == 0:
             return
 
-        a_scatter = self._build_peak_marker_scatter(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height)
-        if a_scatter is None:
+        summit_idx = aclu_peaks_df['summit_idx'].to_numpy() if ('summit_idx' in aclu_peaks_df.columns) else None
+        scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
+        if len(scatter_items) == 0:
             return
 
-        hover_preview_plot.addItem(a_scatter)
-        self.plots.hover_preview_peak_center_vertical_markers = a_scatter
+        for a_scatter in scatter_items:
+            hover_preview_plot.addItem(a_scatter)
+        ## END for a_scatter in scatter_items....
+
+        self.plots.hover_preview_peak_center_vertical_markers = scatter_items if (len(scatter_items) > 1) else scatter_items[0]
 
 
 
@@ -918,6 +987,9 @@ class TrialByTrialActivityWindow:
         ----------
         peaks_df : pd.DataFrame
             Required columns: ``['aclu', 'trial_idx', 'peak_center_x']``.
+            Optional column: ``'summit_idx'`` — when present, marker pen width is scaled as
+            ``base_width / 2**summit_idx`` (0 = full thickness, 1 = half, 2 = quarter, …) and opacity is
+            reduced for higher ranks (0→1.0, 1→0.75, 2→0.65, 3+→0.5).
         pen : optional
             pyqtgraph pen for the markers. Defaults to a thin white pen.
         trial_half_height : float
@@ -974,18 +1046,24 @@ class TrialByTrialActivityWindow:
 
         self._clear_hover_preview_peak_markers()
 
-        new_markers: Dict[int, pg.ScatterPlotItem] = {}
-        active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), ['aclu', 'trial_idx', 'peak_center_x']].copy()
+        new_markers: Dict[int, Union[pg.ScatterPlotItem, List[pg.ScatterPlotItem]]] = {}
+        marker_cols = ['aclu', 'trial_idx', 'peak_center_x']
+        if 'summit_idx' in peaks_df.columns:
+            marker_cols.append('summit_idx')
+        active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), marker_cols].copy()
         active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
 
         for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
-            a_scatter = self._build_peak_marker_scatter(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height)
-            if a_scatter is None:
+            summit_idx = aclu_peaks_df['summit_idx'].to_numpy() if ('summit_idx' in aclu_peaks_df.columns) else None
+            scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
+            if len(scatter_items) == 0:
                 continue
             plot_idx = aclu_to_plot_idx[int(aclu)]
             curr_plot = self.plots.plot_array[plot_idx]
-            curr_plot.addItem(a_scatter)
-            new_markers[int(aclu)] = a_scatter
+            for a_scatter in scatter_items:
+                curr_plot.addItem(a_scatter)
+            ## END for a_scatter in scatter_items....
+            new_markers[int(aclu)] = scatter_items if (len(scatter_items) > 1) else scatter_items[0]
         ## END for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False)....
 
         self.plots.peak_center_vertical_markers = new_markers
