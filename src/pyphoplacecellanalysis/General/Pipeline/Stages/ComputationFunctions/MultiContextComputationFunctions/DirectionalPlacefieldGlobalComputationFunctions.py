@@ -6981,7 +6981,7 @@ class TrialByTrialActivityResult(ComputedResult):
 
         # peak_prominence_df_dict
         all_decoders_peak_prominence_df: pd.DataFrame = pd.concat(list(peak_prominence_df_dict.values()), ignore_index=True) # .sort_values(['aclu', 'trial_idx', 'peak_height', 'summit_idx'])
-        all_decoders_peak_prominence_df = all_decoders_peak_prominence_df.sort_values(['aclu', 'trial_idx', 'decoder_name', 'peak_height', 'summit_idx', 'peak_track_id'], ascending=[True, True, True, False, True, True]).reset_index(drop=True)
+        all_decoders_peak_prominence_df = all_decoders_peak_prominence_df.sort_values(['aclu', 'trial_idx', 'decoder_name', 'peak_height', 'summit_idx', 'aclu_field_peak_id'], ascending=[True, True, True, False, True, True]).reset_index(drop=True)
 
         # all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
         # all_decoders_peak_transitions_df
