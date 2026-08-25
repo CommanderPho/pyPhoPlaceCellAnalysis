@@ -392,6 +392,7 @@ class TrialByTrialActivity:
         return epoch_pf_results_dict
 
 
+    @function_attributes(short_name=None, tags=['compute'], input_requires=[], output_provides=[], uses=[], used_by=['cls.directional_compute_trial_by_trial_correlation_matrix'], creation_date='2024-02-02 00:00', related_items=[])
     @classmethod
     def compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, occupancy_weighted_tuning_maps_matrix: NDArray[ND.Shape["N_ACLUS, N_TRIALS, N_XBINS"], Any], included_neuron_IDs=None, epsilon_value: float = 1e-12) -> Tuple[NDArray, NDArray, Dict]:
         """ 2024-02-02 - computes the Trial-by-trial Correlation Matrix C 
@@ -444,6 +445,7 @@ class TrialByTrialActivity:
 
 
     ## MAIN CALL:
+    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.compute_trial_by_trial_correlation_matrix'], used_by=[], creation_date='2024-02-02 00:00 22:00', related_items=[])
     @classmethod
     def directional_compute_trial_by_trial_correlation_matrix(cls, active_pf_dt: PfND_TimeDependent, directional_lap_epochs_dict: Dict[types.DecoderName, Epoch], included_neuron_IDs=None) -> Dict[types.DecoderName, "TrialByTrialActivity"]:
         """ Computes the trial-by-trial (lap-by-lap) correlation for each cell
@@ -511,8 +513,109 @@ class TrialByTrialActivity:
         return directional_active_lap_pf_results_dicts
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Extra/Additional Computations                                                                                                                                                                                                                                                        #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['compute', 'sliding-window', 'tuning_map_matrix'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 10:35', related_items=[])
     @classmethod
-    def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True):
+    def compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any], C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any]=None, window_size: int = 5, debug_print: bool = True) -> NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]:
+        """ Compute the sliding-window average over trials with the specified window_size
+
+        Usage:
+            from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+
+
+            ## INPUTS: a_trial_by_trial_result
+            ## run:
+            window_size: int = 3
+            # window_size: int = 5
+            smoothed_z_scored_tuning_map_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]] = {}
+            smoothed_C_trial_by_trial_correlation_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_ACLUS, N_SMOOTHED_TRIALS, N_SMOOTHED_TRIALS"], Any]] = {}
+
+            for (a_decoder_name, a_result) in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items():
+                ## Find the point where the trial-to-trial correlation (stability) exceeds a requirement for 3 successive laps (allowing for LR/RL only firing)
+                C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = a_result.C_trial_by_trial_correlation_matrix
+                z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = a_result.z_scored_tuning_map_matrix
+                aclu_to_matrix_IDX_map = deepcopy(a_result.aclu_to_matrix_IDX_map)
+
+                # C_trial_by_trial_correlation_matrix
+                # z_scored_tuning_map_matrix
+
+                # smoothed_z_scored_tuning_map_matrix: NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any] = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
+                # smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
+                smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=None, window_size=window_size)
+
+                smoothed_z_scored_tuning_map_matrix_dict[a_decoder_name] = smoothed_z_scored_tuning_map_matrix
+                smoothed_C_trial_by_trial_correlation_matrix_dict[a_decoder_name] = smoothed_C_trial_by_trial_correlation_matrix
+
+            ## END for (a_decoder_name, a_result) in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
+
+            # smoothed_z_scored_tuning_map_matrix
+            ## OUTPUTS: smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
+
+
+        """
+        # from scipy.ndimage import gaussian_filter
+        import scipy.ndimage as ndimage
+
+        # Create uniform weights that sum to 1
+        # weights = np.ones(window_size) / window_size
+
+        # weights = np.ones_like(C_trial_by_trial_correlation_matrix) / window_size
+
+        # smoothed_C_trial_by_trial_correlation_matrix = np.convolve(C_trial_by_trial_correlation_matrix, weights, mode='valid')
+
+        # smoothed_C_trial_by_trial_correlation_matrix = pd.DataFrame(C_trial_by_trial_correlation_matrix, weights, mode='valid')
+
+        # Calculate moving average along the horizontal axis (axis=1)
+        # 'mode=reflect' handles edges smoothly by reflecting data
+        # smoothed_C_trial_by_trial_correlation_matrix = ndimage.uniform_filter1d(C_trial_by_trial_correlation_matrix, size=window_size, axis=(1, 2),
+        #                                                     # mode='valid',
+        #                                                     mode='reflect',
+        # )
+
+
+        # n_trials: int = np.shape(C_trial_by_trial_correlation_matrix)[-1]
+        # smoothed_C_trial_by_trial_correlation_matrix = np.zeros_like(C_trial_by_trial_correlation_matrix)
+
+        n_trials: int = np.shape(z_scored_tuning_map_matrix)[0]
+        n_smoothed_trials: int = n_trials - (window_size - 1)
+        if debug_print:
+            print(f'n_trials: {n_trials}, n_smoothed_trials: {n_smoothed_trials}')
+
+        smoothed_z_scored_tuning_map_matrix = np.zeros((n_smoothed_trials, *np.shape(z_scored_tuning_map_matrix)[1:])) ## real-outputs
+        if C_trial_by_trial_correlation_matrix is not None:
+            smoothed_C_trial_by_trial_correlation_matrix = np.zeros((np.shape(C_trial_by_trial_correlation_matrix)[0], n_smoothed_trials, n_smoothed_trials))
+        else:
+            smoothed_C_trial_by_trial_correlation_matrix = None
+
+        # smoothed_z_scored_tuning_map_matrix = np.zeros_like(z_scored_tuning_map_matrix) ## real-outputs
+        integration_windows = [(np.arange(window_size) + i) for i in np.arange(n_smoothed_trials)]
+        # integration_windows
+        for (j, curr_integration_window) in enumerate(integration_windows):
+            # smoothed_C_trial_by_trial_correlation_matrix[:, i, i]
+            smoothed_z_scored_tuning_map_matrix[j, :, :] = np.nanmean(z_scored_tuning_map_matrix[curr_integration_window, :, :], axis=0)
+            if smoothed_C_trial_by_trial_correlation_matrix is not None:
+                smoothed_C_trial_by_trial_correlation_matrix[:, j, j] = np.nanmean(C_trial_by_trial_correlation_matrix[:, curr_integration_window, curr_integration_window], axis=(1, 2))
+
+        ## END for (j, curr_integration_window) in enumerate(integration_windows)...
+
+        return (smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix)
+
+        # if smoothed_C_trial_by_trial_correlation_matrix is None:
+        #     return (smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix)
+        # else:
+        #     return smoothed_z_scored_tuning_map_matrix
+
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Figures/Display                                                                                                                                                                                                                                                                      #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @classmethod
+    def plot_napari_trial_by_trial_correlation_matrix(cls, directional_active_lap_pf_results_dicts: Dict[types.DecoderName, "TrialByTrialActivity"], include_trial_by_trial_correlation_matrix:bool=True, plot_separate_napari_widgets: bool = False):
         """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.
 
         aTbyT:TrialByTrialActivity = a_trial_by_trial_result.directional_active_lap_pf_results_dicts['long_LR']
@@ -527,9 +630,10 @@ class TrialByTrialActivity:
         ## Directional
         directional_viewer, directional_image_layer_dict, custom_direction_split_layers_dict = napari_plot_directional_trial_by_trial_activity_viz(directional_active_lap_pf_results_dicts, include_trial_by_trial_correlation_matrix=include_trial_by_trial_correlation_matrix)
     
-        for a_decoder_name, a_result in directional_active_lap_pf_results_dicts.items():
-            ## Global:
-            viewer, image_layer_dict = napari_trial_by_trial_activity_viz(a_result.z_scored_tuning_map_matrix, a_result.C_trial_by_trial_correlation_matrix, title=f'Trial-by-trial Correlation Matrix C - Decoder {a_decoder_name}', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
+        if plot_separate_napari_widgets:
+            for a_decoder_name, a_result in directional_active_lap_pf_results_dicts.items():
+                ## Global:
+                viewer, image_layer_dict = napari_trial_by_trial_activity_viz(a_result.z_scored_tuning_map_matrix, a_result.C_trial_by_trial_correlation_matrix, title=f'Trial-by-trial Correlation Matrix C - Decoder {a_decoder_name}', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
             
         ## Global:
         # viewer, image_layer_dict = napari_trial_by_trial_activity_viz(z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix, title='Trial-by-trial Correlation Matrix C', axis_labels=('aclu', 'lap', 'xbin')) # GLOBAL
