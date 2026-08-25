@@ -801,29 +801,7 @@ class TrialByTrialActivityWindow:
 
 
     def _clear_aclu_field_peak_id_debug_labels(self):
-        """Remove aclu_field_peak_id debug TextItems from subplots and hover-preview."""
-        existing_labels = self.plots.get('aclu_field_peak_id_debug_labels', None)
-        if existing_labels is not None:
-            aclu_to_plot_idx: Dict[int, int] = {}
-            for a_plot_data_dict in self.plots_data.plot_data_array:
-                neuron_aclu = a_plot_data_dict.get('neuron_aclu', None)
-                if neuron_aclu is not None:
-                    aclu_to_plot_idx[int(neuron_aclu)] = int(a_plot_data_dict['a_linear_index'])
-            ## END for a_plot_data_dict in self.plots_data.plot_data_array....
-
-            for aclu, label_items in existing_labels.items():
-                plot_idx = aclu_to_plot_idx.get(int(aclu), None)
-                if plot_idx is None:
-                    continue
-                curr_plot = self.plots.plot_array[plot_idx]
-                if isinstance(label_items, (list, tuple)):
-                    for a_label in label_items:
-                        curr_plot.removeItem(a_label)
-                    ## END for a_label in label_items....
-                else:
-                    curr_plot.removeItem(label_items)
-            ## END for aclu, label_items in existing_labels.items()....
-
+        """Remove aclu_field_peak_id debug TextItems from the hover-preview axes."""
         self.plots.aclu_field_peak_id_debug_labels = None
         self.plots_data.aclu_field_peak_id_color_maps_dict = None
 
@@ -964,7 +942,7 @@ class TrialByTrialActivityWindow:
 
     @classmethod
     def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.5, font_size_pt: int = 6, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None) -> List[pg.TextItem]:
-        """Build tiny semi-transparent ``aclu_field_peak_id`` labels above each peak vertical tick."""
+        """Build tiny semi-transparent ``aclu_field_peak_id`` labels centered on each peak vertical tick."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
         trial_idx = np.asarray(trial_idx, dtype=float).ravel()
         aclu_field_peak_id = np.asarray(aclu_field_peak_id, dtype=float).ravel()
@@ -979,12 +957,11 @@ class TrialByTrialActivityWindow:
             aclu_field_peak_id_color_map = cls._build_aclu_field_peak_id_color_map(aclu_field_peak_ids=aclu_field_peak_id)
 
         label_items: List[pg.TextItem] = []
-        label_y_offset: float = 0.05
         for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id):
             track_color: str = aclu_field_peak_id_color_map.get(int(a_aclu_field_peak_id), '#ffffff')
-            label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_aclu_field_peak_id)}</span>", anchor=(0.5, 1.0))
+            label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_aclu_field_peak_id)}</span>", anchor=(0.5, 0.5))
             label_text.setOpacity(float(label_alpha))
-            label_text.setPos(float(a_x), float(a_trial_idx) + float(trial_half_height) + label_y_offset)
+            label_text.setPos(float(a_x), float(a_trial_idx))
             label_text.setZValue(101)
             label_items.append(label_text)
         ## END for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id)...
@@ -1216,10 +1193,10 @@ class TrialByTrialActivityWindow:
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'peak', 'marker', 'debug', 'aclu_field_peak_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 15:30', related_items=['add_peak_center_vertical_markers'])
     def add_aclu_field_peak_id_debug_labels(self, peaks_df: Optional[pd.DataFrame] = None, label_alpha: float = 0.5, font_size_pt: int = 6, trial_half_height: Optional[float] = None, clear_existing: bool = True, include_hover_preview: bool = True) -> Dict[int, List[pg.TextItem]]:
-        """Add tiny semi-transparent ``aclu_field_peak_id`` labels above each peak vertical tick (debug overlay).
+        """Store ``aclu_field_peak_id`` debug label data for the hover-preview axes (labels are not drawn on main subplots).
 
         Each unique ``aclu_field_peak_id`` within an aclu is assigned a distinct color so tracks
-        are visually identifiable across trials on that subplot.
+        are visually identifiable across trials when hovering that cell.
 
         Parameters
         ----------
@@ -1240,7 +1217,7 @@ class TrialByTrialActivityWindow:
         Returns
         -------
         Dict[int, List[pg.TextItem]]
-            Mapping ``aclu → label items`` added for that cell.
+            Empty dict (labels are drawn only on the hover-preview axes, not on main subplots).
 
         Usage
         -----
@@ -1277,23 +1254,13 @@ class TrialByTrialActivityWindow:
         active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), label_cols].copy()
         active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
 
-        new_labels: Dict[int, List[pg.TextItem]] = {}
         aclu_field_peak_id_color_maps_dict: Dict[int, Dict[int, str]] = {}
         for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
             aclu_field_peak_id_color_map = self._build_aclu_field_peak_id_color_map(aclu_field_peak_ids=aclu_peaks_df['aclu_field_peak_id'].to_numpy())
             aclu_field_peak_id_color_maps_dict[int(aclu)] = aclu_field_peak_id_color_map
-            label_items = self._build_aclu_field_peak_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), aclu_field_peak_id=aclu_peaks_df['aclu_field_peak_id'].to_numpy(), trial_half_height=float(trial_half_height), label_alpha=float(label_alpha), font_size_pt=int(font_size_pt), aclu_field_peak_id_color_map=aclu_field_peak_id_color_map)
-            if len(label_items) == 0:
-                continue
-            plot_idx = aclu_to_plot_idx[int(aclu)]
-            curr_plot = self.plots.plot_array[plot_idx]
-            for a_label in label_items:
-                curr_plot.addItem(a_label)
-            ## END for a_label in label_items....
-            new_labels[int(aclu)] = label_items
         ## END for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False)....
 
-        self.plots.aclu_field_peak_id_debug_labels = new_labels
+        self.plots.aclu_field_peak_id_debug_labels = None
         self.plots_data.aclu_field_peak_id_labels_df = deepcopy(active_peaks_df)
         self.plots_data.aclu_field_peak_id_color_maps_dict = aclu_field_peak_id_color_maps_dict
         self.params.aclu_field_peak_id_label_alpha = float(label_alpha)
@@ -1306,7 +1273,7 @@ class TrialByTrialActivityWindow:
                 hovered_plot_data = self.plots_data.plot_data_array[int(hovered_idx)]
                 self._update_hover_preview_aclu_field_peak_id_labels(hovered_plot_data.get('neuron_aclu', None))
 
-        return new_labels
+        return {}
 
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'pf_stable_formation_time', 'AcluFirstPlacefieldStabilityThresholdFigure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-20 10:19', related_items=['AcluFirstPlacefieldStabilityThresholdFigure', 'AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure'])
