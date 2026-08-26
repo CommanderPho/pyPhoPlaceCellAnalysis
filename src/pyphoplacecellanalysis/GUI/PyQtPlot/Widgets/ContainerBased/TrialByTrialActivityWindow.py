@@ -560,7 +560,12 @@ class TrialByTrialActivityWindow:
         n_epochs: int = int(np.shape(active_z_scored_tuning_map_matrix)[0])
         hover_preview_img_items_dict: Dict[types.DecoderName, pg.ImageItem] = {}
         hover_preview_y_row_label_items: List[pg.TextItem] = []
+        peak_prominence_table_view = None
+        peak_prominence_table_model = None
+        content_container = None
         if not is_publication_ready_figure:
+            from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+
             hover_preview_plot = root_render_widget.addPlot(row=plots_start_row_idx, col=max_num_columns, rowspan=num_plot_rows, colspan=1)
             hover_preview_plot.setDefaultPadding(0.0)
             hover_preview_plot.setTitle('')
@@ -588,6 +593,20 @@ class TrialByTrialActivityWindow:
             hover_preview_y_row_label_items = cls._build_hover_preview_y_row_label_items(hover_preview_plot=hover_preview_plot, n_epochs=n_epochs, x_range=x_range)
 
             position_plot = hover_preview_plot  # notebook-compat alias
+
+            ## Scrollable peak-prominence DataFrame table to the right of the hover preview (full window height)
+            peak_prominence_table_model = SimplePandasModel(pd.DataFrame())
+            peak_prominence_table_view = pg.QtWidgets.QTableView()
+            peak_prominence_table_view.setModel(peak_prominence_table_model)
+            peak_prominence_table_view.setMinimumWidth(360)
+            peak_prominence_table_view.resizeColumnsToContents()
+
+            content_container = pg.QtWidgets.QWidget()
+            hbox = pg.QtWidgets.QHBoxLayout(content_container)
+            hbox.setContentsMargins(0, 0, 0, 0)
+            hbox.addWidget(root_render_widget, stretch=3)
+            hbox.addWidget(peak_prominence_table_view, stretch=1)
+            parent_root_widget.setCentralWidget(content_container)
         else:
             hover_preview_plot = None
             position_plot = None
@@ -614,10 +633,14 @@ class TrialByTrialActivityWindow:
                                           active_neuron_IDs=deepcopy(active_neuron_IDs),
                                           active_one_step_decoder=deepcopy(active_one_step_decoder),
                                           color_dict=color_dict,
+                                          all_decoders_peak_prominence_df=None,
                                             # **{k:v for k, v in _obj.plots_data.to_dict().items() if k not in ['name']},
                                             )
         _obj.ui = PhoUIContainer(name=name, app=app, root_render_widget=root_render_widget, parent_root_widget=parent_root_widget,
-                                 lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None) # , **utility_controls_ui_dict, **info_labels_widgets_dict
+                                 lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None,
+                                 peak_prominence_table_view=peak_prominence_table_view,
+                                 peak_prominence_table_model=peak_prominence_table_model,
+                                 content_container=content_container) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, hovered_linear_index=None, **param_kwargs)
         _obj.build_internal_callbacks()
         return _obj
@@ -759,6 +782,7 @@ class TrialByTrialActivityWindow:
             neuron_aclu = plot_data.get('neuron_aclu', None)
             self._update_hover_preview_peak_markers(neuron_aclu)
             self._update_hover_preview_aclu_field_peak_id_labels(neuron_aclu)
+            self._update_hover_peak_prominence_table(neuron_aclu)
             return
 
         self.params.hovered_linear_index = a_linear_index
@@ -786,7 +810,29 @@ class TrialByTrialActivityWindow:
 
         self._update_hover_preview_peak_markers(neuron_aclu)
         self._update_hover_preview_aclu_field_peak_id_labels(neuron_aclu)
+        self._update_hover_peak_prominence_table(neuron_aclu)
     ## END def update_hover_preview(self, a_linear_index: int)...
+
+
+    def _update_hover_peak_prominence_table(self, neuron_aclu):
+        """Filter ``all_decoders_peak_prominence_df`` to the hovered aclu and show it in the side table."""
+        from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
+
+        table_view = getattr(self.ui, 'peak_prominence_table_view', None)
+        if table_view is None:
+            return
+
+        peaks_df = self.plots_data.get('all_decoders_peak_prominence_df', None)
+        if (peaks_df is None) or (neuron_aclu is None):
+            filtered_df = pd.DataFrame()
+        else:
+            filtered_df = peaks_df.loc[peaks_df['aclu'] == neuron_aclu].copy()
+
+        peak_prominence_table_model = SimplePandasModel(filtered_df)
+        table_view.setModel(peak_prominence_table_model)
+        table_view.resizeColumnsToContents()
+        self.ui.peak_prominence_table_model = peak_prominence_table_model
+
 
 
     def _clear_hover_preview_peak_markers(self):
@@ -1298,6 +1344,28 @@ class TrialByTrialActivityWindow:
                 self._update_hover_preview_aclu_field_peak_id_labels(hovered_plot_data.get('neuron_aclu', None))
 
         return {}
+
+
+    @function_attributes(short_name=None, tags=['table', 'dataframe', 'peak', 'prominence', 'hover'], input_requires=[], output_provides=[], uses=['_update_hover_peak_prominence_table'], used_by=[], creation_date='2026-08-25 18:00', related_items=['add_peak_center_vertical_markers', 'add_aclu_field_peak_id_debug_labels'])
+    def set_all_decoders_peak_prominence_df(self, all_decoders_peak_prominence_df: pd.DataFrame):
+        """Store the untransformed peak-prominence DataFrame for the hover-side scrollable table.
+
+        On hover, the table shows rows filtered to the hovered ``aclu`` only.
+        Do not apply the marker ``trial_idx`` plot transforms here — display original values.
+
+        Usage
+        -----
+            all_decoders_peak_prominence_df, _, _ = a_trial_by_trial_result.computing_trial_peak_promenences(max_peak_idx=2)
+            a_TbyT_activity_win.set_all_decoders_peak_prominence_df(all_decoders_peak_prominence_df)
+
+        """
+        self.plots_data.all_decoders_peak_prominence_df = deepcopy(all_decoders_peak_prominence_df)
+
+        hovered_idx = self.params.get('hovered_linear_index', None)
+        if hovered_idx is not None:
+            hovered_plot_data = self.plots_data.plot_data_array[int(hovered_idx)]
+            self._update_hover_peak_prominence_table(hovered_plot_data.get('neuron_aclu', None))
+
 
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'pf_stable_formation_time', 'AcluFirstPlacefieldStabilityThresholdFigure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-20 10:19', related_items=['AcluFirstPlacefieldStabilityThresholdFigure', 'AcluFirstPlacefieldStabilityThresholdFigure.plot_aclus_first_significance_figure'])
