@@ -754,6 +754,11 @@ class TrialByTrialActivityWindow:
             return
 
         if getattr(self.params, 'hovered_linear_index', None) == a_linear_index:
+            # Same cell: still refresh peak overlays so label/marker style changes take effect without re-hovering.
+            plot_data = self.plots_data.plot_data_array[a_linear_index]
+            neuron_aclu = plot_data.get('neuron_aclu', None)
+            self._update_hover_preview_peak_markers(neuron_aclu)
+            self._update_hover_preview_aclu_field_peak_id_labels(neuron_aclu)
             return
 
         self.params.hovered_linear_index = a_linear_index
@@ -852,7 +857,9 @@ class TrialByTrialActivityWindow:
             base_pen = pg.mkPen(base_pen)
 
         base_pen_width: float = float(base_pen.widthF()) if (base_pen.widthF() > 0.0) else 1.5
-        pen_width: float = float(base_pen_width) / float(2 ** int(summit_idx_val))
+        # pen_width: float = float(base_pen_width) / float(2 ** int(summit_idx_val))
+        pen_width: float = float(base_pen_width) / float(2 * int(summit_idx_val)) if (summit_idx_val > 0) else base_pen_width
+
         pen_opacity: float = cls._peak_marker_opacity_for_summit_idx(summit_idx_val=int(summit_idx_val))
         pen_color = pg.mkColor(base_pen.color())
         pen_color.setAlphaF(float(pen_opacity))
@@ -912,7 +919,7 @@ class TrialByTrialActivityWindow:
 
         scatter_items: List[pg.ScatterPlotItem] = []
         for a_summit_idx_val in np.unique(summit_idx_arr):
-            summit_mask = summit_idx_arr == a_summit_idx_val
+            summit_mask = (summit_idx_arr == a_summit_idx_val)
             group_pen = cls._peak_marker_pen_for_summit_idx(summit_idx_val=int(a_summit_idx_val), base_pen=pen)
             a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_idx=trial_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
             if a_scatter is not None:
@@ -941,8 +948,12 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.7, font_size_pt: int = 8, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None) -> List[pg.TextItem]:
-        """Build tiny semi-transparent ``aclu_field_peak_id`` labels centered on each peak vertical tick."""
+    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.9, font_size_pt: int = 8, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None, label_y_offset: float = 0.75) -> List[pg.TextItem]:
+        """Build tiny semi-transparent ``aclu_field_peak_id`` labels just below each peak vertical tick.
+
+        TextItem glyphs are screen-pixel sized (not data-scaled), so ``label_y_offset`` must be large
+        enough in data units to clear the tick visually on tall hover axes (many trial rows).
+        """
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
         trial_idx = np.asarray(trial_idx, dtype=float).ravel()
         aclu_field_peak_id = np.asarray(aclu_field_peak_id, dtype=float).ravel()
@@ -956,12 +967,20 @@ class TrialByTrialActivityWindow:
         if aclu_field_peak_id_color_map is None:
             aclu_field_peak_id_color_map = cls._build_aclu_field_peak_id_color_map(aclu_field_peak_ids=aclu_field_peak_id)
 
+        # y increases upward: pin top of text just under the tick so the glyph hangs toward smaller y (screen-below).
+        # Plain text (not HTML) keeps bounding-box / anchor behavior reliable.
+        label_font = pg.QtGui.QFont()
+        label_font.setPointSize(int(font_size_pt))
+        label_y: float = -float(trial_half_height) - float(label_y_offset)
+
         label_items: List[pg.TextItem] = []
         for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id):
             track_color: str = aclu_field_peak_id_color_map.get(int(a_aclu_field_peak_id), '#ffffff')
-            label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_aclu_field_peak_id)}</span>", anchor=(0.5, 0.5))
+            label_text = pg.TextItem(text=str(int(a_aclu_field_peak_id)), color=track_color, anchor=(0.5, 0.5))
+            # label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_aclu_field_peak_id)}</span>", anchor=(0.5, 0.0))
+            label_text.setFont(label_font)
             label_text.setOpacity(float(label_alpha))
-            label_text.setPos(float(a_x), float(a_trial_idx))
+            label_text.setPos(float(a_x), float(a_trial_idx) + label_y)
             label_text.setZValue(101)
             label_items.append(label_text)
         ## END for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id)...
@@ -1028,6 +1047,7 @@ class TrialByTrialActivityWindow:
         trial_half_height: float = float(self.params.get('aclu_field_peak_id_label_trial_half_height', self.params.get('peak_center_marker_trial_half_height', 0.45)))
         label_alpha: float = float(self.params.get('aclu_field_peak_id_label_alpha', 0.5))
         font_size_pt: int = int(self.params.get('aclu_field_peak_id_label_font_size_pt', 6))
+        label_y_offset: float = float(self.params.get('aclu_field_peak_id_label_y_offset', 0.75))
 
         aclu_peaks_df = peaks_df.loc[peaks_df['aclu'].astype(int) == int(neuron_aclu)]
         if len(aclu_peaks_df) == 0:
@@ -1036,7 +1056,7 @@ class TrialByTrialActivityWindow:
         aclu_field_peak_id_color_maps_dict = self.plots_data.get('aclu_field_peak_id_color_maps_dict', None)
         aclu_field_peak_id_color_map = None if (aclu_field_peak_id_color_maps_dict is None) else aclu_field_peak_id_color_maps_dict.get(int(neuron_aclu), None)
 
-        label_items = self._build_aclu_field_peak_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), aclu_field_peak_id=aclu_peaks_df['aclu_field_peak_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt, aclu_field_peak_id_color_map=aclu_field_peak_id_color_map)
+        label_items = self._build_aclu_field_peak_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), aclu_field_peak_id=aclu_peaks_df['aclu_field_peak_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt, aclu_field_peak_id_color_map=aclu_field_peak_id_color_map, label_y_offset=label_y_offset)
         if len(label_items) == 0:
             return
 
@@ -1192,7 +1212,7 @@ class TrialByTrialActivityWindow:
 
 
     @function_attributes(short_name=None, tags=['plot', 'pyqtgraph', 'peak', 'marker', 'debug', 'aclu_field_peak_id'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-25 15:30', related_items=['add_peak_center_vertical_markers'])
-    def add_aclu_field_peak_id_debug_labels(self, peaks_df: Optional[pd.DataFrame] = None, label_alpha: float = 0.5, font_size_pt: int = 6, trial_half_height: Optional[float] = None, clear_existing: bool = True, include_hover_preview: bool = True) -> Dict[int, List[pg.TextItem]]:
+    def add_aclu_field_peak_id_debug_labels(self, peaks_df: Optional[pd.DataFrame] = None, label_alpha: float = 0.9, font_size_pt: int = 7, trial_half_height: Optional[float] = None, label_y_offset: float = 0.75, clear_existing: bool = True, include_hover_preview: bool = True) -> Dict[int, List[pg.TextItem]]:
         """Store ``aclu_field_peak_id`` debug label data for the hover-preview axes (labels are not drawn on main subplots).
 
         Each unique ``aclu_field_peak_id`` within an aclu is assigned a distinct color so tracks
@@ -1209,6 +1229,9 @@ class TrialByTrialActivityWindow:
             Label font size in points (default 6).
         trial_half_height : float, optional
             Half-height of peak ticks in trial/y units; defaults to peak marker param or 0.45.
+        label_y_offset : float
+            Extra data-unit gap below the tick bottom before the top of the label (default 0.75).
+            Must be fairly large because TextItem size is in screen pixels, not data units.
         clear_existing : bool
             If True, remove any previously added aclu_field_peak_id debug labels first.
         include_hover_preview : bool
@@ -1266,6 +1289,7 @@ class TrialByTrialActivityWindow:
         self.params.aclu_field_peak_id_label_alpha = float(label_alpha)
         self.params.aclu_field_peak_id_label_font_size_pt = int(font_size_pt)
         self.params.aclu_field_peak_id_label_trial_half_height = float(trial_half_height)
+        self.params.aclu_field_peak_id_label_y_offset = float(label_y_offset)
 
         if include_hover_preview:
             hovered_idx = self.params.get('hovered_linear_index', None)
