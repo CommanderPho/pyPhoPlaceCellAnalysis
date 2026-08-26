@@ -822,11 +822,17 @@ class TrialByTrialActivityWindow:
         if table_view is None:
             return
 
+        included_columns_list = self.params.get('peak_prominence_table_included_columns', None)
+        if included_columns_list is None:
+            included_columns_list = ['trial_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id']
+
         peaks_df = self.plots_data.get('all_decoders_peak_prominence_df', None)
         if (peaks_df is None) or (neuron_aclu is None):
-            filtered_df = pd.DataFrame()
+            filtered_df = pd.DataFrame(columns=included_columns_list)
         else:
             filtered_df = peaks_df.loc[peaks_df['aclu'] == neuron_aclu].copy()
+            present_cols = [c for c in included_columns_list if c in filtered_df.columns]
+            filtered_df = filtered_df.loc[:, present_cols]
 
         peak_prominence_table_model = SimplePandasModel(filtered_df)
         table_view.setModel(peak_prominence_table_model)
@@ -1347,11 +1353,19 @@ class TrialByTrialActivityWindow:
 
 
     @function_attributes(short_name=None, tags=['table', 'dataframe', 'peak', 'prominence', 'hover'], input_requires=[], output_provides=[], uses=['_update_hover_peak_prominence_table'], used_by=[], creation_date='2026-08-25 18:00', related_items=['add_peak_center_vertical_markers', 'add_aclu_field_peak_id_debug_labels'])
-    def set_all_decoders_peak_prominence_df(self, all_decoders_peak_prominence_df: pd.DataFrame):
+    def set_all_decoders_peak_prominence_df(self, all_decoders_peak_prominence_df: pd.DataFrame, included_columns_list: Optional[List[str]] = None):
         """Store the untransformed peak-prominence DataFrame for the hover-side scrollable table.
 
         On hover, the table shows rows filtered to the hovered ``aclu`` only.
         Do not apply the marker ``trial_idx`` plot transforms here — display original values.
+
+        Parameters
+        ----------
+        all_decoders_peak_prominence_df : pd.DataFrame
+            Full peak-prominence results (all aclus/decoders).
+        included_columns_list : list of str, optional
+            Columns shown in the table. Defaults to
+            ``['trial_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id']``.
 
         Usage
         -----
@@ -1359,6 +1373,9 @@ class TrialByTrialActivityWindow:
             a_TbyT_activity_win.set_all_decoders_peak_prominence_df(all_decoders_peak_prominence_df)
 
         """
+        if included_columns_list is None:
+            included_columns_list = ['trial_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id']
+        self.params.peak_prominence_table_included_columns = list(included_columns_list)
         self.plots_data.all_decoders_peak_prominence_df = deepcopy(all_decoders_peak_prominence_df)
 
         hovered_idx = self.params.get('hovered_linear_index', None)
