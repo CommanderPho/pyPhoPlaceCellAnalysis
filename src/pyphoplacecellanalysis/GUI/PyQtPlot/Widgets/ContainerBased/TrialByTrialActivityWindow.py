@@ -923,13 +923,13 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_peak_marker_scatter(cls, peak_center_x: NDArray, trial_idx: NDArray, pen=None, trial_half_height: float = 0.45) -> Optional[pg.ScatterPlotItem]:
+    def _build_peak_marker_scatter(cls, peak_center_x: NDArray, trial_row_idx: NDArray, pen=None, trial_half_height: float = 0.45) -> Optional[pg.ScatterPlotItem]:
         """One batched scatter of vertical ticks (avoids PlotCurveItem OpenGL LINE_STRIP ignoring connect='pairs')."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
-        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
-        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx)
+        trial_row_idx = np.asarray(trial_row_idx, dtype=float).ravel()
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_row_idx)
         peak_center_x = peak_center_x[valid_mask]
-        trial_idx = trial_idx[valid_mask]
+        trial_row_idx = trial_row_idx[valid_mask]
         if peak_center_x.size == 0:
             return None
 
@@ -938,7 +938,7 @@ class TrialByTrialActivityWindow:
 
         a_scatter = pg.ScatterPlotItem(
             x=peak_center_x,
-            y=trial_idx,
+            y=trial_row_idx,
             symbol=cls._build_vertical_tick_symbol(trial_half_height=trial_half_height),
             size=1.0,
             pxMode=False,
@@ -952,28 +952,28 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_peak_marker_scatter_items(cls, peak_center_x: NDArray, trial_idx: NDArray, pen=None, trial_half_height: float = 0.45, summit_idx: Optional[NDArray] = None) -> List[pg.ScatterPlotItem]:
+    def _build_peak_marker_scatter_items(cls, peak_center_x: NDArray, trial_row_idx: NDArray, pen=None, trial_half_height: float = 0.45, summit_idx: Optional[NDArray] = None) -> List[pg.ScatterPlotItem]:
         """Build one or more batched scatters; groups by ``summit_idx`` when present (one pen per group)."""
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
-        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
+        trial_row_idx = np.asarray(trial_row_idx, dtype=float).ravel()
         summit_idx_arr = None if (summit_idx is None) else np.asarray(summit_idx, dtype=int).ravel()
-        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx)
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_row_idx)
         peak_center_x = peak_center_x[valid_mask]
-        trial_idx = trial_idx[valid_mask]
+        trial_row_idx = trial_row_idx[valid_mask]
         if summit_idx_arr is not None:
             summit_idx_arr = summit_idx_arr[valid_mask]
         if peak_center_x.size == 0:
             return []
 
         if summit_idx_arr is None:
-            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x, trial_idx=trial_idx, pen=pen, trial_half_height=trial_half_height)
+            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x, trial_row_idx=trial_row_idx, pen=pen, trial_half_height=trial_half_height)
             return [] if (a_scatter is None) else [a_scatter]
 
         scatter_items: List[pg.ScatterPlotItem] = []
         for a_summit_idx_val in np.unique(summit_idx_arr):
             summit_mask = (summit_idx_arr == a_summit_idx_val)
             group_pen = cls._peak_marker_pen_for_summit_idx(summit_idx_val=int(a_summit_idx_val), base_pen=pen)
-            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_idx=trial_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
+            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_row_idx=trial_row_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
             if a_scatter is not None:
                 scatter_items.append(a_scatter)
         ## END for a_summit_idx_val in np.unique(summit_idx_arr)...
@@ -1000,18 +1000,18 @@ class TrialByTrialActivityWindow:
 
 
     @classmethod
-    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.9, font_size_pt: int = 8, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None, label_y_offset: float = 0.75) -> List[pg.TextItem]:
+    def _build_aclu_field_peak_id_label_items(cls, peak_center_x: NDArray, trial_row_idx: NDArray, aclu_field_peak_id: NDArray, trial_half_height: float = 0.45, label_alpha: float = 0.9, font_size_pt: int = 8, aclu_field_peak_id_color_map: Optional[Dict[int, str]] = None, label_y_offset: float = 0.75) -> List[pg.TextItem]:
         """Build tiny semi-transparent ``aclu_field_peak_id`` labels just below each peak vertical tick.
 
         TextItem glyphs are screen-pixel sized (not data-scaled), so ``label_y_offset`` must be large
         enough in data units to clear the tick visually on tall hover axes (many trial rows).
         """
         peak_center_x = np.asarray(peak_center_x, dtype=float).ravel()
-        trial_idx = np.asarray(trial_idx, dtype=float).ravel()
+        trial_row_idx = np.asarray(trial_row_idx, dtype=float).ravel()
         aclu_field_peak_id = np.asarray(aclu_field_peak_id, dtype=float).ravel()
-        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_idx) & np.isfinite(aclu_field_peak_id)
+        valid_mask = np.isfinite(peak_center_x) & np.isfinite(trial_row_idx) & np.isfinite(aclu_field_peak_id)
         peak_center_x = peak_center_x[valid_mask]
-        trial_idx = trial_idx[valid_mask]
+        trial_row_idx = trial_row_idx[valid_mask]
         aclu_field_peak_id = aclu_field_peak_id[valid_mask]
         if peak_center_x.size == 0:
             return []
@@ -1026,16 +1026,16 @@ class TrialByTrialActivityWindow:
         label_y: float = -float(trial_half_height) - float(label_y_offset)
 
         label_items: List[pg.TextItem] = []
-        for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id):
+        for a_x, a_trial_row_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_row_idx, aclu_field_peak_id):
             track_color: str = aclu_field_peak_id_color_map.get(int(a_aclu_field_peak_id), '#ffffff')
             label_text = pg.TextItem(text=str(int(a_aclu_field_peak_id)), color=track_color, anchor=(0.5, 0.5))
             # label_text = pg.TextItem(html=f"<span style='color:{track_color}; font-size:{int(font_size_pt)}pt;'>{int(a_aclu_field_peak_id)}</span>", anchor=(0.5, 0.0))
             label_text.setFont(label_font)
             label_text.setOpacity(float(label_alpha))
-            label_text.setPos(float(a_x), float(a_trial_idx) + label_y)
+            label_text.setPos(float(a_x), float(a_trial_row_idx) + label_y)
             label_text.setZValue(101)
             label_items.append(label_text)
-        ## END for a_x, a_trial_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_idx, aclu_field_peak_id)...
+        ## END for a_x, a_trial_row_idx, a_aclu_field_peak_id in zip(peak_center_x, trial_row_idx, aclu_field_peak_id)...
 
         return label_items
 
@@ -1063,7 +1063,7 @@ class TrialByTrialActivityWindow:
             return
 
         summit_idx = aclu_peaks_df['summit_idx'].to_numpy() if ('summit_idx' in aclu_peaks_df.columns) else None
-        scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
+        scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_row_idx=aclu_peaks_df['trial_row_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
         if len(scatter_items) == 0:
             return
 
@@ -1108,7 +1108,7 @@ class TrialByTrialActivityWindow:
         aclu_field_peak_id_color_maps_dict = self.plots_data.get('aclu_field_peak_id_color_maps_dict', None)
         aclu_field_peak_id_color_map = None if (aclu_field_peak_id_color_maps_dict is None) else aclu_field_peak_id_color_maps_dict.get(int(neuron_aclu), None)
 
-        label_items = self._build_aclu_field_peak_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), aclu_field_peak_id=aclu_peaks_df['aclu_field_peak_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt, aclu_field_peak_id_color_map=aclu_field_peak_id_color_map, label_y_offset=label_y_offset)
+        label_items = self._build_aclu_field_peak_id_label_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_row_idx=aclu_peaks_df['trial_row_idx'].to_numpy(), aclu_field_peak_id=aclu_peaks_df['aclu_field_peak_id'].to_numpy(), trial_half_height=trial_half_height, label_alpha=label_alpha, font_size_pt=font_size_pt, aclu_field_peak_id_color_map=aclu_field_peak_id_color_map, label_y_offset=label_y_offset)
         if len(label_items) == 0:
             return
 
@@ -1164,7 +1164,7 @@ class TrialByTrialActivityWindow:
         which becomes a continuous zigzag under OpenGL ``paintGL`` (``GL_LINE_STRIP`` ignores ``connect``).
 
         Each row of ``peaks_df`` contributes one vertical tick spanning
-        ``[trial_idx - trial_half_height, trial_idx + trial_half_height]`` at ``x = peak_center_x``.
+        ``[trial_row_idx - trial_half_height, trial_row_idx + trial_half_height]`` at ``x = peak_center_x``.
 
         Parameters
         ----------
@@ -1173,6 +1173,8 @@ class TrialByTrialActivityWindow:
             Optional column: ``'summit_idx'`` — when present, marker pen width is scaled as
             ``base_width / 2**summit_idx`` (0 = full thickness, 1 = half, 2 = quarter, …) and opacity is
             reduced for higher ranks (0→1.0, 1→0.75, 2→0.65, 3+→0.5).
+            A derived ``trial_row_idx`` column is created for plot y-coords (``(trial_idx - 1) * 2``)
+            so original ``trial_idx`` is preserved.
         pen : optional
             pyqtgraph pen for the markers. Defaults to a thin white pen.
         trial_half_height : float
@@ -1195,10 +1197,13 @@ class TrialByTrialActivityWindow:
         missing_cols = required_cols - set(peaks_df.columns)
         assert len(missing_cols) == 0, f"peaks_df missing required columns: {missing_cols}"
 
+        peaks_df = deepcopy(peaks_df) ## deepcopy the peaks_df to avoid accidentally mutating it
+
         ## Transform to correct indexing:
-        # peaks_df = pd.DataFrame({'aclu': [...], 'trial_idx': [...], 'peak_center_x': [...]})
-        peaks_df['trial_idx'] = peaks_df['trial_idx'] - 1 # convert from 1-based to 0-based indexing
-        peaks_df['trial_idx'] = peaks_df['trial_idx'] * 2 ## handle the double-spacing of results
+        if 'trial_row_idx' not in peaks_df:
+            ## create a 'trial_row_idx' col to actually use in this class for visualization derived from 'trial_idx' so that 'trial_idx' isn't repeatedly overwritten
+            peaks_df['trial_row_idx'] = deepcopy(peaks_df['trial_idx']) - 1 # convert from 1-based to 0-based indexing
+            peaks_df['trial_row_idx'] = peaks_df['trial_row_idx'] * 2 ## handle the double-spacing of results
 
         if pen is None:
             pen = pg.mkPen('w', width=1.5)
@@ -1230,7 +1235,7 @@ class TrialByTrialActivityWindow:
         self._clear_hover_preview_peak_markers()
 
         new_markers: Dict[int, Union[pg.ScatterPlotItem, List[pg.ScatterPlotItem]]] = {}
-        marker_cols = ['aclu', 'trial_idx', 'peak_center_x']
+        marker_cols = ['aclu', 'trial_idx', 'trial_row_idx', 'peak_center_x']
         if 'summit_idx' in peaks_df.columns:
             marker_cols.append('summit_idx')
         active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), marker_cols].copy()
@@ -1238,7 +1243,7 @@ class TrialByTrialActivityWindow:
 
         for aclu, aclu_peaks_df in active_peaks_df.groupby('aclu', sort=False):
             summit_idx = aclu_peaks_df['summit_idx'].to_numpy() if ('summit_idx' in aclu_peaks_df.columns) else None
-            scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_idx=aclu_peaks_df['trial_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
+            scatter_items = self._build_peak_marker_scatter_items(peak_center_x=aclu_peaks_df['peak_center_x'].to_numpy(), trial_row_idx=aclu_peaks_df['trial_row_idx'].to_numpy(), pen=pen, trial_half_height=trial_half_height, summit_idx=summit_idx)
             if len(scatter_items) == 0:
                 continue
             plot_idx = aclu_to_plot_idx[int(aclu)]
@@ -1302,15 +1307,21 @@ class TrialByTrialActivityWindow:
         """
         if peaks_df is None:
             peaks_df = self.plots_data.get('peak_center_markers_df', None)
+        else:
+            peaks_df = deepcopy(peaks_df) ## deepcopy to avoid mutation
+
         assert peaks_df is not None, "peaks_df is None and no peak_center_markers_df stored on plots_data"
 
         required_cols = {'aclu', 'trial_idx', 'peak_center_x', 'aclu_field_peak_id'}
         missing_cols = required_cols - set(peaks_df.columns)
         assert len(missing_cols) == 0, f"peaks_df missing required columns: {missing_cols}"
 
-        peaks_df = deepcopy(peaks_df)
-        peaks_df['trial_idx'] = peaks_df['trial_idx'] - 1 # convert from 1-based to 0-based indexing
-        peaks_df['trial_idx'] = peaks_df['trial_idx'] * 2 ## handle the double-spacing of results
+        # peaks_df = deepcopy(peaks_df)
+
+        if 'trial_row_idx' not in peaks_df:
+            ## create a 'trial_row_idx' col to actually use in this class for visualization derived from 'trial_idx' so that 'trial_idx' isn't repeatedly overwritten
+            peaks_df['trial_row_idx'] = deepcopy(peaks_df['trial_idx']) - 1 # convert from 1-based to 0-based indexing
+            peaks_df['trial_row_idx'] = peaks_df['trial_row_idx'] * 2 ## handle the double-spacing of results
 
         if trial_half_height is None:
             trial_half_height = float(self.params.get('peak_center_marker_trial_half_height', 0.45))
@@ -1325,7 +1336,7 @@ class TrialByTrialActivityWindow:
         if clear_existing:
             self._clear_aclu_field_peak_id_debug_labels()
 
-        label_cols = ['aclu', 'trial_idx', 'peak_center_x', 'aclu_field_peak_id']
+        label_cols = ['aclu', 'trial_idx', 'trial_row_idx', 'peak_center_x', 'aclu_field_peak_id']
         active_peaks_df = peaks_df.loc[peaks_df['aclu'].isin(list(aclu_to_plot_idx.keys())), label_cols].copy()
         active_peaks_df['aclu'] = active_peaks_df['aclu'].astype(int)
 
@@ -1374,9 +1385,14 @@ class TrialByTrialActivityWindow:
 
         """
         if included_columns_list is None:
-            included_columns_list = ['trial_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id']
+            included_columns_list = ['trial_idx', 'trial_row_idx', 'summit_idx', 'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id']
         self.params.peak_prominence_table_included_columns = list(included_columns_list)
         self.plots_data.all_decoders_peak_prominence_df = deepcopy(all_decoders_peak_prominence_df)
+        if 'trial_row_idx' not in self.plots_data.all_decoders_peak_prominence_df:
+            ## create a 'trial_row_idx' col to actually use in this class for visualization derived from 'trial_idx' so that 'trial_idx' isn't repeatedly overwritten
+            self.plots_data.all_decoders_peak_prominence_df['trial_row_idx'] = deepcopy(self.plots_data.all_decoders_peak_prominence_df['trial_idx']) - 1 # convert from 1-based to 0-based indexing
+            self.plots_data.all_decoders_peak_prominence_df['trial_row_idx'] = self.plots_data.all_decoders_peak_prominence_df['trial_row_idx'] * 2 ## handle the double-spacing of results
+
 
         hovered_idx = self.params.get('hovered_linear_index', None)
         if hovered_idx is not None:
