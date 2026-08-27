@@ -725,104 +725,8 @@ anchor_mode_options = ['left', 'right', 'mid', 'non_linear']
 # LR_peaks_df.loc[(LR_peaks_df['peak_diff'] > n_linear_remapping_value), 'anchor_mode'] = 'non_linear'
 # LR_peaks_df
 
-@function_attributes(short_name=None, tags=['anchor', 'origin', 'multi-anchor-origin'], input_requires=[], output_provides=[], uses=[], used_by=['compute_anchor_mode_cols'], creation_date='2026-08-26 16:54', related_items=['find_mixed_anchor_mode_aclus'])
-def compute_single_dir_anchor_mode_col(any_dir_peaks_df: pd.DataFrame, min_expected_x_translation_magnitude: Optional[float]=None, max_expected_x_translation_magnitude: Optional[float]=None, expected_x_translation_magnitude: float = 35, suffix: str = '', debug_print: bool=False):
-    """ compute for a single direction 
 
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_single_dir_anchor_mode_col, anchor_mode_options, find_mixed_anchor_mode_aclus
-
-        expected_x_translation_magnitude: float = 35
-        ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
-        # non-aclu-specific w_i widths: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        w_i: float = 10
-        min_expected_x_translation_magnitude: float = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
-        max_expected_x_translation_magnitude: float = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
-
-
-        # # aclu-specific field widths w_i _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        ## 2026-08-26 13:56: - [X] Make w_i reflect each aclu's specific `pf_half_width`.
-        # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
-        # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
-
-        ## OUTPUTS: any_dir_peaks_df
-
-
-        ## determine where multi-anchor-origin remapping occurs for separate fields in the same aclu:
-        any_dir_peaks_field_anchor_summary_df = (
-            any_dir_peaks_df
-            .groupby(['aclu', 'aclu_field_peak_id'], as_index=False)
-            .agg(
-                peak_diff_LR=('peak_diff_LR', 'first'),
-                peak_diff_RL=('peak_diff_RL', 'first'),
-                anchor_mode_LR=('anchor_mode_LR', 'first'),
-                anchor_mode_RL=('anchor_mode_RL', 'first'),
-            )
-        )
-
-        # aclus where not all fields share the same LR anchor mode
-        mixed_lr_aclus = (
-            any_dir_peaks_field_anchor_summary_df
-            .groupby('aclu')['anchor_mode_LR']
-            .nunique()
-            .loc[lambda s: s > 1]
-            .index
-        )
-
-        any_dir_peaks_mixed_lr_fields_df = any_dir_peaks_field_anchor_summary_df[
-            any_dir_peaks_field_anchor_summary_df['aclu'].isin(mixed_lr_aclus)
-        ].sort_values(['aclu', 'aclu_field_peak_id'], inplace=False)
-
-        any_dir_peaks_mixed_lr_fields_df
-
-    """
-
-    if (min_expected_x_translation_magnitude is None) or (max_expected_x_translation_magnitude is None):
-        ## try to use column
-        half_width_w_i_col_name: str = f'long{suffix}_pf_half_width'
-
-        if (half_width_w_i_col_name in any_dir_peaks_df.columns):
-            ## override w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude
-            # print(f'WARNING: overriding w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude due to presnece of half_width_w_i_col_name: {half_width_w_i_col_name}.')
-            w_i = any_dir_peaks_df[half_width_w_i_col_name].to_numpy()
-            if min_expected_x_translation_magnitude is None:
-                min_expected_x_translation_magnitude = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
-            if max_expected_x_translation_magnitude is None:
-                max_expected_x_translation_magnitude = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
-
-            if debug_print:
-                print(f'min_expected_x_translation_magnitude: {min_expected_x_translation_magnitude}, max_expected_x_translation_magnitude: {max_expected_x_translation_magnitude}')
-                ## add columns for debugging:
-                any_dir_peaks_df['min_expected_x_translation_magnitude'] = min_expected_x_translation_magnitude
-                any_dir_peaks_df['max_expected_x_translation_magnitude'] = max_expected_x_translation_magnitude
-
-        else:
-            print(f'WARNING: half_width_w_i_col_name: {half_width_w_i_col_name} not found.')
-
-
-    assert min_expected_x_translation_magnitude is not None
-    assert max_expected_x_translation_magnitude is not None
-
-
-    any_dir_peaks_df[f'anchor_mode{suffix}'] = 'mid' ## default to midpoint-anchored mode
-    any_dir_peaks_df.loc[(np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) > max_expected_x_translation_magnitude), f'anchor_mode{suffix}'] = 'non_linear' ## delta translation greater than expected
-
-    any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() > 0.0),
-        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
-        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'left'
-
-    ## -53.6 should be non_linear, but is being assigned mid
-    any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() < 0.0),
-        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
-        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'right'
-
-    any_dir_peaks_df.loc[any_dir_peaks_df[f'peak_diff{suffix}'].isna(), f'anchor_mode{suffix}'] = pd.NA ## delta translation greater than expected
-
-    return any_dir_peaks_df
-
-@function_attributes(short_name=None, tags=['anchor'], input_requires=[], output_provides=[], uses=['compute_single_dir_anchor_mode_col'], used_by=[], creation_date='2026-08-27 03:16', related_items=[])
+@function_attributes(short_name=None, tags=['anchor', 'origin', 'multi-anchor-origin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 03:16', related_items=['find_mixed_anchor_mode_aclus'])
 def compute_anchor_mode_cols(any_dir_peaks_df: pd.DataFrame, 
     fixed_w_i: Optional[float] = None,
     min_expected_x_translation_magnitude: Optional[float]=None, max_expected_x_translation_magnitude: Optional[float]=None, expected_x_translation_magnitude: float = 35, debug_print: bool=False) -> pd.DataFrame:
@@ -883,20 +787,123 @@ def compute_anchor_mode_cols(any_dir_peaks_df: pd.DataFrame,
         any_dir_peaks_mixed_lr_fields_df
 
     """
+    def _subfn_compute_single_dir_anchor_mode_col(any_dir_peaks_df: pd.DataFrame, min_expected_x_translation_magnitude: Optional[float]=None, max_expected_x_translation_magnitude: Optional[float]=None, expected_x_translation_magnitude: float = 35, suffix: str = '', debug_print: bool=False):
+        """ compute for a single direction 
+
+        History: previously named `compute_single_dir_anchor_mode_col` and top-level
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import anchor_mode_options, find_mixed_anchor_mode_aclus
+
+            expected_x_translation_magnitude: float = 35
+            ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+            # non-aclu-specific w_i widths: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            w_i: float = 10
+            min_expected_x_translation_magnitude: float = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
+            max_expected_x_translation_magnitude: float = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
+            any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+            any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+
+            # # aclu-specific field widths w_i _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            ## 2026-08-26 13:56: - [X] Make w_i reflect each aclu's specific `pf_half_width`.
+            # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+            # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+            ## OUTPUTS: any_dir_peaks_df
+
+
+            ## determine where multi-anchor-origin remapping occurs for separate fields in the same aclu:
+            any_dir_peaks_field_anchor_summary_df = (
+                any_dir_peaks_df
+                .groupby(['aclu', 'aclu_field_peak_id'], as_index=False)
+                .agg(
+                    peak_diff_LR=('peak_diff_LR', 'first'),
+                    peak_diff_RL=('peak_diff_RL', 'first'),
+                    anchor_mode_LR=('anchor_mode_LR', 'first'),
+                    anchor_mode_RL=('anchor_mode_RL', 'first'),
+                )
+            )
+
+            # aclus where not all fields share the same LR anchor mode
+            mixed_lr_aclus = (
+                any_dir_peaks_field_anchor_summary_df
+                .groupby('aclu')['anchor_mode_LR']
+                .nunique()
+                .loc[lambda s: s > 1]
+                .index
+            )
+
+            any_dir_peaks_mixed_lr_fields_df = any_dir_peaks_field_anchor_summary_df[
+                any_dir_peaks_field_anchor_summary_df['aclu'].isin(mixed_lr_aclus)
+            ].sort_values(['aclu', 'aclu_field_peak_id'], inplace=False)
+
+            any_dir_peaks_mixed_lr_fields_df
+
+        """
+
+        if (min_expected_x_translation_magnitude is None) or (max_expected_x_translation_magnitude is None):
+            ## try to use column
+            half_width_w_i_col_name: str = f'long{suffix}_pf_half_width'
+
+            if (half_width_w_i_col_name in any_dir_peaks_df.columns):
+                ## override w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude
+                # print(f'WARNING: overriding w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude due to presnece of half_width_w_i_col_name: {half_width_w_i_col_name}.')
+                w_i = any_dir_peaks_df[half_width_w_i_col_name].to_numpy()
+                if min_expected_x_translation_magnitude is None:
+                    min_expected_x_translation_magnitude = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
+                if max_expected_x_translation_magnitude is None:
+                    max_expected_x_translation_magnitude = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
+
+                if debug_print:
+                    print(f'min_expected_x_translation_magnitude: {min_expected_x_translation_magnitude}, max_expected_x_translation_magnitude: {max_expected_x_translation_magnitude}')
+                    ## add columns for debugging:
+                    any_dir_peaks_df['min_expected_x_translation_magnitude'] = min_expected_x_translation_magnitude
+                    any_dir_peaks_df['max_expected_x_translation_magnitude'] = max_expected_x_translation_magnitude
+
+            else:
+                print(f'WARNING: half_width_w_i_col_name: {half_width_w_i_col_name} not found.')
+
+
+        assert min_expected_x_translation_magnitude is not None
+        assert max_expected_x_translation_magnitude is not None
+
+
+        any_dir_peaks_df[f'anchor_mode{suffix}'] = 'mid' ## default to midpoint-anchored mode
+        any_dir_peaks_df.loc[(np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) > max_expected_x_translation_magnitude), f'anchor_mode{suffix}'] = 'non_linear' ## delta translation greater than expected
+
+        any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() > 0.0),
+            (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
+            (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'left'
+
+        ## -53.6 should be non_linear, but is being assigned mid
+        any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() < 0.0),
+            (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
+            (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'right'
+
+        any_dir_peaks_df.loc[any_dir_peaks_df[f'peak_diff{suffix}'].isna(), f'anchor_mode{suffix}'] = pd.NA ## delta translation greater than expected
+
+        return any_dir_peaks_df
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
     ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
     # non-aclu-specific w_i widths: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     # w_i: float = 10
     if fixed_w_i is not None:
         min_expected_x_translation_magnitude: float = (expected_x_translation_magnitude - fixed_w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
         max_expected_x_translation_magnitude: float = (expected_x_translation_magnitude + fixed_w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR', debug_print=debug_print)
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL', debug_print=debug_print)
+        any_dir_peaks_df = _subfn_compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR', debug_print=debug_print)
+        any_dir_peaks_df = _subfn_compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL', debug_print=debug_print)
 
     else:
         # aclu-specific field widths w_i _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         # 2026-08-26 13:56: - [X] Make w_i reflect each aclu's specific `pf_half_width`.
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR', debug_print=debug_print)
-        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL', debug_print=debug_print)
+        any_dir_peaks_df = _subfn_compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR', debug_print=debug_print)
+        any_dir_peaks_df = _subfn_compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL', debug_print=debug_print)
 
     ## OUTPUTS: any_dir_peaks_df
     return any_dir_peaks_df
@@ -905,7 +912,7 @@ def compute_anchor_mode_cols(any_dir_peaks_df: pd.DataFrame,
 
 @function_attributes(short_name=None, tags=['multi-anchor-origin', 'anchor', 'origin', 'helper', 'mixed', 'pf', '1D', 'KDIBA'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-26 18:07', related_items=['compute_single_dir_anchor_mode_col'])
 def find_mixed_anchor_mode_aclus(any_dir_peaks_df: pd.DataFrame):
-    """ aclus where not all fields share the same LR anchor mode 
+    """ aclus where not all fields share the same anchor mode (indicitive of multi-anchor-origins for the fields for that aclu)
 
     Usage:
 
