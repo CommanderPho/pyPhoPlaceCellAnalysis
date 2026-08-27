@@ -918,6 +918,7 @@ class TrialByTrialActivityWindow:
         a_pen = pg.QtGui.QPen(base_pen)
         a_pen.setWidthF(pen_width)
         a_pen.setColor(pen_color)
+        a_pen.setCosmetic(True)  # stable stroke width under ViewBox rescale / OpenGL
         return a_pen
 
 
@@ -935,6 +936,9 @@ class TrialByTrialActivityWindow:
 
         if pen is None:
             pen = pg.mkPen('w', width=1.5)
+        else:
+            pen = pg.mkPen(pen)
+        pen.setCosmetic(True)  # stable stroke width under ViewBox rescale / OpenGL
 
         a_scatter = pg.ScatterPlotItem(
             x=peak_center_x,
@@ -1042,7 +1046,7 @@ class TrialByTrialActivityWindow:
 
 
     def _update_hover_preview_peak_markers(self, neuron_aclu):
-        """Draw the hovered aclu's peak-center vertical markers on the hover-preview axes (one batched scatter)."""
+        """Draw the hovered aclu's peak-center white vertical markers on the hover-preview axes (one batched scatter)."""
         hover_preview_plot = self.plots.get('hover_preview_plot', None)
         if hover_preview_plot is None:
             return
