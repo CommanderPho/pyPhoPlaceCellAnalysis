@@ -528,7 +528,8 @@ def plot_static_decoder_placefields_in_trial_by_trial_activity_window(
             a_TbyT_activity_win.add_peak_center_vertical_markers(peaks_for_plot[marker_cols])
         if add_aclu_field_peak_id_labels and ('aclu_field_peak_id' in peaks_for_plot.columns):
             label_cols = ['aclu', 'trial_idx', 'trial_row_idx', 'peak_center_x', 'aclu_field_peak_id']
-            a_TbyT_activity_win.add_aclu_field_peak_id_debug_labels(peaks_for_plot[label_cols])
+            # Static layout has ~1 y-unit per decoder row; default label_y_offset=0.75 (for tall lap stacks) shifts labels into adjacent bands.
+            a_TbyT_activity_win.add_aclu_field_peak_id_debug_labels(peaks_for_plot[label_cols], label_y_offset=0.05)
 
     return a_TbyT_activity_win, static_directional_active_lap_pf_results_dicts, peaks_for_plot
 
