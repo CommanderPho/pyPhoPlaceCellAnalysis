@@ -306,7 +306,17 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline):
     a_TbyT_activity_win.root_render_widget.useOpenGL(False)
 
     _outputs_dict = {'a_TbyT_activity_win': a_TbyT_activity_win,
-
+        'LR_peaks_df': LR_peaks_df,
+        'RL_peaks_df': RL_peaks_df,
+        'all_decoder_peaks_df': all_decoder_peaks_df,
+        'decoder_peak_diffs_df': decoder_peak_diffs_df,
+        'peak_diff_from_transitions_df': peak_diff_from_transitions_df,
+        'all_decoders_peak_prominence_df': all_decoders_peak_prominence_df,
+        'all_decoders_peak_transitions_df': all_decoders_peak_transitions_df,
+        'any_dir_peaks_df': any_dir_peaks_df,
+        'any_dir_peaks_mixed_fields_df': any_dir_peaks_mixed_fields_df,
+        'any_dir_peaks_field_anchor_summary_df': any_dir_peaks_field_anchor_summary_df,
+        'peaks_for_plot': peaks_for_plot,
     }
 
     return _outputs_dict
