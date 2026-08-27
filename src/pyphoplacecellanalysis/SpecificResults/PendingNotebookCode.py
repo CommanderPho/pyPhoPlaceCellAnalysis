@@ -131,7 +131,7 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 @function_attributes(short_name=None, tags=['batch', 'compute', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 05:41', related_items=[])
-def compute_run_peak_matching_remapping_all(curr_active_pipeline):
+def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclusion_fr_Hz: float = 1.0, included_qclu_values: Optional[List[int]] = None, tuning_curve_peak_height: float = 0.2, tuning_curve_peak_width: int = 2, max_n_peaks: int = 3, expected_x_translation_magnitude: float = 35):
     """ for batch computations 
 
     To be called from `compute_and_export_session_trial_by_trial_performance_completion_function`
@@ -201,11 +201,8 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline):
 
     directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
 
-    # optional filters (typical notebook pattern):
-    minimum_inclusion_fr_Hz = 1.0
-    # minimum_inclusion_fr_Hz = 5.0
-    # included_qclu_values = [1, 2]  # or whatever you use
-    included_qclu_values = None
+    # optional filters (typical notebook pattern): minimum_inclusion_fr_Hz, included_qclu_values
+    # e.g. minimum_inclusion_fr_Hz=5.0, included_qclu_values=[1, 2]
 
     track_templates: TrackTemplates = directional_laps_results.get_templates(
         minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
@@ -233,11 +230,10 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline):
     #    Require width so find_peaks returns 'widths'
     _, _, decoder_peaks_df_dict = track_templates.get_decoders_tuning_curve_modes(
         peak_mode='peaks',
-        height=0.2,
-        width=2,   # important: enables widths in the peak properties
+        height=tuning_curve_peak_height,
+        width=tuning_curve_peak_width,   # important: enables widths in the peak properties
     )
 
-    max_n_peaks: int = 3
     all_decoder_peaks_df_list = []
     for decoder_name, peaks_df in decoder_peaks_df_dict.items():
         peaks_df = peaks_df[peaks_df['subpeak_idx'] < max_n_peaks].copy()
@@ -281,7 +277,6 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline):
     decoder_peak_diffs_df
 
     any_dir_peaks_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
-    expected_x_translation_magnitude: float = 35
     ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
     any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
     # any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
