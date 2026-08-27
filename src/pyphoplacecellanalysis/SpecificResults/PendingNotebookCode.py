@@ -130,6 +130,586 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+
+# 2026-08-26 - Peak Matching for placefields similar to `.computing_trial_peak_promenences(...)`                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+@function_attributes(short_name=None, tags=['peak_matched', 'pf', 'remapping', 'peaks', 'long-short', 'AI'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-26 16:51', related_items=['PeakPromenence.computing_trial_peak_promenences'])
+def compute_peak_matched_long_short_pf_remapping(track_templates, max_peak_idx: Optional[int]=None, peak_prom_alpha: float = 0.9,
+                                max_match_n_xbins: Optional[int] = 10, translate_threshold_n_xbins: Optional[int] = 25,
+                                max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
+                                w_height: float = 0.0, w_prominence: float = 0.0):
+    """ for each aclu, tries to match the specific placefields/peaks between long/short using the same techniques written for the trial-by-trial placefields (wanting only to compare between decoder long/short). 
+            It then can be used to classify the anchor of each field independently to find aclus that demonstrate multi-anchor-origin remapping between long/short. 
+
+        ## for each 'aclu', for each 'aclu_field_peak_id', compute the difference between 'peak_center_x' between ['long_LR', 'short_LR'] and ['long_RL', 'short_RL']
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_peak_matched_long_short_pf_remapping
+
+        decoder_peak_diffs_df, peak_diff_from_transitions_df, all_decoders_peak_prominence_df, all_decoders_peak_transitions_df = compute_peak_matched_long_short_pf_remapping(track_templates)
+        decoder_peak_diffs_df
+
+
+    History:
+        Derived from `PeakPromenence.computing_trial_peak_promenences` on 2026-08-26 for use with placefields instead of trials
+
+    """
+    from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
+
+    decoders_dict = track_templates.get_decoders_dict()
+    decoder_order = ['long_LR', 'long_RL', 'short_LR', 'short_RL']  # explicit
+    any_decoder_neuron_IDs = deepcopy(track_templates.any_decoder_neuron_IDs)
+    a_decoder_ref = decoders_dict[decoder_order[0]]
+    xbin_centers = deepcopy(a_decoder_ref.xbin_centers)
+    xstep = float(a_decoder_ref.pf.bin_info['xstep'])
+    n_xbins = len(xbin_centers)
+
+    # --- build (n_decoders, n_aclus, n_xbins) matrix ---
+    tuning_stack_list = []
+    for decoder_name in decoder_order:
+        a_decoder = decoders_dict[decoder_name]
+        row_list = []
+        for aclu in any_decoder_neuron_IDs:
+            tc = a_decoder.pf.tuning_curves_dict.get(aclu, np.full(n_xbins, np.nan))
+            row_list.append(tc)
+        tuning_stack_list.append(np.stack(row_list, axis=0))  # (n_aclus, n_xbins)
+
+    tuning_curves_trial_by_trial_like_matrix = np.stack(tuning_stack_list, axis=0)  # (4, n_aclus, n_xbins)
+    n_trials, n_aclus, n_xbins = tuning_curves_trial_by_trial_like_matrix.shape
+
+    peak_prominence_df, *_ = PeakPromenence.compute_1d_posterior_peak_promenences(
+        p_x_given_n_list=[np.squeeze(tuning_curves_trial_by_trial_like_matrix[:, neuron_IDX, :]).T for neuron_IDX in np.arange(n_aclus)],
+        alpha=peak_prom_alpha,
+        xbin_centers=xbin_centers,
+        neuron_IDs=deepcopy(any_decoder_neuron_IDs),
+    )
+    peak_prominence_df = peak_prominence_df.rename(columns={'time_bin_idx': 'rel_trial_idx'})
+    peak_prominence_df['decoder_name'] = peak_prominence_df['rel_trial_idx'].map(dict(enumerate(decoder_order)))
+
+    max_peak_idx = 2  # top 3 peaks per decoder
+    if max_peak_idx is not None and max_peak_idx >= 0:
+        peak_prominence_df = peak_prominence_df[peak_prominence_df['summit_idx'] <= max_peak_idx].copy()
+
+    if (max_match_distance is None) and (max_match_n_xbins is not None):
+        assert (xstep is not None)
+        max_match_distance = float(max_match_n_xbins) * xstep # 10 bins away to match
+
+    if (translate_threshold is None) and (translate_threshold_n_xbins is not None):
+        assert (xstep is not None)
+        translate_threshold = float(translate_threshold_n_xbins) * xstep # 25 bins away
+
+    def _subfn_track_long_short_pair(peak_df: pd.DataFrame, long_decoder: str, short_decoder: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Track peaks long -> short for one direction. aclu_field_peak_id is shared across long/short.
+
+        Captures: max_match_distance, translate_threshold, w_height, w_prominence
+        """
+        sub = peak_df[peak_df['decoder_name'].isin([long_decoder, short_decoder])].copy()
+        sub['rel_trial_idx'] = sub['decoder_name'].map({long_decoder: 0, short_decoder: 1})
+        # Drop decoder_name so track_peaks_across_trials groups only by aclu
+        sub_for_track = sub.drop(columns=['decoder_name'])
+        tracked_df, transitions_df = PeakPromenence.track_peaks_across_trials(
+            sub_for_track,
+            trial_order_col='rel_trial_idx',
+            max_match_distance=max_match_distance,
+            translate_threshold=translate_threshold,
+            w_height=w_height,            # try 0.1–0.3 if peaks swap summit_idx often
+            w_prominence=w_prominence,
+        )
+        tracked_df = tracked_df.merge(
+            sub[['aclu', 'rel_trial_idx', 'summit_idx', 'decoder_name']],
+            on=['aclu', 'rel_trial_idx', 'summit_idx'],
+            how='left',
+        )
+        transitions_df['direction_pair'] = f'{long_decoder}_to_{short_decoder}'
+        tracked_df['direction_pair'] = f'{long_decoder}_vs_{short_decoder}'
+        return tracked_df, transitions_df
+
+    tracked_lr_df, transitions_lr_df = _subfn_track_long_short_pair(peak_prominence_df, 'long_LR', 'short_LR')
+    tracked_rl_df, transitions_rl_df = _subfn_track_long_short_pair(peak_prominence_df, 'long_RL', 'short_RL')
+
+    all_decoders_peak_prominence_df = pd.concat([tracked_lr_df, tracked_rl_df], ignore_index=True)
+    all_decoders_peak_transitions_df = pd.concat([transitions_lr_df, transitions_rl_df], ignore_index=True)
+    peak_diff_from_transitions_df = all_decoders_peak_transitions_df.copy()
+    peak_diff_from_transitions_df['peak_diff'] = peak_diff_from_transitions_df['delta_peak_center_x']  # short - long
+    peak_diff_from_transitions_df = peak_diff_from_transitions_df[
+        ['aclu', 'aclu_field_peak_id', 'direction_pair', 'peak_center_x_prev', 'peak_center_x_next', 'peak_diff', 'event_type']
+    ]
+
+    ## OUTPUTS: all_decoders_peak_prominence_df, all_decoders_peak_transitions_df, peak_diff_from_transitions_df, decoder_peak_diffs_df
+    
+    def _subfn_peak_metrics_wide(tracked_df: pd.DataFrame, long_decoder: str, short_decoder: str, suffix: str) -> pd.DataFrame:
+        wide = tracked_df.pivot_table(
+            index=['aclu', 'aclu_field_peak_id'],
+            columns='decoder_name',
+            values='peak_center_x',
+            aggfunc='first',
+        ).reset_index()
+        wide[f'peak_diff{suffix}'] = wide[short_decoder] - wide[long_decoder]
+        return wide
+
+    lr_wide = _subfn_peak_metrics_wide(tracked_lr_df, 'long_LR', 'short_LR', '_LR')
+    rl_wide = _subfn_peak_metrics_wide(tracked_rl_df, 'long_RL', 'short_RL', '_RL')
+
+    # merge LR + RL diffs on (aclu, aclu_field_peak_id) — ids are independent per direction pair
+    decoder_peak_diffs_df = lr_wide[['aclu', 'aclu_field_peak_id', 'long_LR', 'short_LR', 'peak_diff_LR']].merge(
+        rl_wide[['aclu', 'aclu_field_peak_id', 'long_RL', 'short_RL', 'peak_diff_RL']],
+        on=['aclu', 'aclu_field_peak_id'],
+        how='outer',
+    )
+
+    return decoder_peak_diffs_df, peak_diff_from_transitions_df, all_decoders_peak_prominence_df, all_decoders_peak_transitions_df
+
+from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.TrialByTrialActivityWindow import TrialByTrialActivityWindow
+
+@function_attributes(short_name=None, tags=['HACK', 'UNFINISHED', 'AI', 'pending', 'display', 'window', 'placefields'], input_requires=[], output_provides=[], uses=['TrialByTrialActivityWindow'], used_by=[], creation_date='2026-08-26 17:46', related_items=[])
+def plot_static_decoder_placefields_in_trial_by_trial_activity_window(
+    track_templates,
+    all_decoders_peak_prominence_df: Optional[pd.DataFrame] = None,
+    active_one_step_decoder=None,
+    override_active_neuron_IDs: Optional[np.ndarray] = None,
+    decoder_order: Optional[List[str]] = None,
+    tuning_curve_source: str = 'normalized_zscore',
+    compute_peaks_from_static_pfs: bool = False,
+    find_peaks_kwargs: Optional[Dict[str, Any]] = None,
+    max_n_peaks_per_decoder: Optional[int] = 3,
+    drop_below_threshold: float = 0.0000001,
+    defer_show: bool = False,
+    add_peak_markers: bool = True,
+    add_aclu_field_peak_id_labels: bool = True,
+    peak_prominence_table_columns: Optional[List[str]] = None,
+    frate_thresh_fallback: float = 0.01,
+    **plot_kwargs,
+) -> Tuple[TrialByTrialActivityWindow, Dict[str, TrialByTrialActivity], Optional[pd.DataFrame]]:
+    """ 
+    Kinda-works, lines and labels seem completely wrong
+
+    PROMPT: "How to visualize the placefields described above like I can for TrialByTrialActivity data via `TrialByTrialActivityWindow` (perhaps using a hack to format the data in the form needed to plot using `TrialByTrialActivityWindow` directly)?"
+
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_static_decoder_placefields_in_trial_by_trial_activity_window
+
+        a_TbyT_activity_win, static_dict, peaks_for_plot = plot_static_decoder_placefields_in_trial_by_trial_activity_window(
+            track_templates=track_templates,
+            all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
+            override_active_neuron_IDs=np.sort(any_dir_peaks_df['aclu'].unique()),
+        )
+
+
+    """
+
+    def _subfn_ensure_ratemap_includes_neuron_ids(active_one_step_decoder, required_neuron_ids: np.ndarray, frate_thresh_fallback: float = 0.01) -> np.ndarray:
+        """Recompute pf with low frate_thresh if needed (same trick as _display_trial_to_trial_reliability)."""
+        required_neuron_ids = np.asarray(required_neuron_ids)
+        if len(required_neuron_ids) == 0:
+            return required_neuron_ids
+        ratemap_neuron_ids = np.asarray(active_one_step_decoder.ratemap.neuron_ids)
+        if np.all(np.isin(required_neuron_ids, ratemap_neuron_ids)):
+            return required_neuron_ids
+        if hasattr(active_one_step_decoder, 'config') and hasattr(active_one_step_decoder.config, 'frate_thresh'):
+            _bak_frate_thresh = deepcopy(active_one_step_decoder.config.frate_thresh)
+            active_one_step_decoder.config.frate_thresh = frate_thresh_fallback
+            active_one_step_decoder.compute()
+            active_one_step_decoder.config.frate_thresh = _bak_frate_thresh
+            ratemap_neuron_ids = np.asarray(active_one_step_decoder.ratemap.neuron_ids)
+        included_neuron_ids = required_neuron_ids[np.isin(required_neuron_ids, ratemap_neuron_ids)]
+        dropped_neuron_ids = required_neuron_ids[~np.isin(required_neuron_ids, ratemap_neuron_ids)]
+        if len(dropped_neuron_ids) > 0:
+            print(
+                f"WARNING: dropping {len(dropped_neuron_ids)} aclus not present in active_one_step_decoder.ratemap "
+                f"even after recompute: {np.sort(dropped_neuron_ids)[:20]}{'...' if len(dropped_neuron_ids) > 20 else ''}"
+            )
+        return included_neuron_ids
+
+
+    def _subfn_resolve_active_one_step_decoder_for_tbyt_display(track_templates, override_active_neuron_IDs: Optional[np.ndarray], active_one_step_decoder=None):
+        """Pick a decoder whose ratemap covers the requested aclus; prefer user/global pf1D if passed."""
+        decoders_dict = track_templates.get_decoders_dict()
+        if active_one_step_decoder is not None:
+            return deepcopy(active_one_step_decoder)
+        req = np.asarray(override_active_neuron_IDs) if override_active_neuron_IDs is not None else np.asarray(track_templates.any_decoder_neuron_IDs)
+        best_decoder_name = max(
+            decoders_dict.keys(),
+            key=lambda decoder_name: int(np.sum(np.isin(req, decoders_dict[decoder_name].ratemap.neuron_ids))),
+        )
+        print(f"Auto-selected active_one_step_decoder={best_decoder_name!r} for title/xbin lookup.")
+        return deepcopy(decoders_dict[best_decoder_name])
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    decoders_dict = track_templates.get_decoders_dict()
+    if decoder_order is None:
+        decoder_order = list(TrackTemplates.get_decoder_names())
+    decoder_order = [str(k) for k in decoder_order]
+
+    any_decoder_neuron_IDs = np.array(track_templates.any_decoder_neuron_IDs)
+    if override_active_neuron_IDs is None:
+        override_active_neuron_IDs = deepcopy(any_decoder_neuron_IDs)
+    override_active_neuron_IDs = np.asarray(override_active_neuron_IDs)
+
+    active_one_step_decoder = _subfn_resolve_active_one_step_decoder_for_tbyt_display(
+        track_templates=track_templates,
+        override_active_neuron_IDs=override_active_neuron_IDs,
+        active_one_step_decoder=active_one_step_decoder,
+    )
+    override_active_neuron_IDs = _subfn_ensure_ratemap_includes_neuron_ids(
+        active_one_step_decoder=active_one_step_decoder,
+        required_neuron_ids=override_active_neuron_IDs,
+        frate_thresh_fallback=frate_thresh_fallback,
+    )
+    assert len(override_active_neuron_IDs) > 0, "No requested aclus remain after filtering to active_one_step_decoder.ratemap.neuron_ids"
+    assert float(np.nansum(active_one_step_decoder.ratemap.occupancy)) > 0.0, (
+        "active_one_step_decoder.ratemap.occupancy is zero — pass a computed pf decoder."
+    )
+
+    n_aclus = len(any_decoder_neuron_IDs)
+    n_epochs = len(decoder_order)
+    n_xbins = len(active_one_step_decoder.xbin) - 1
+    aclu_to_matrix_IDX_map = dict(zip(any_decoder_neuron_IDs, np.arange(n_aclus)))
+
+    def _zscore_1d(tc: np.ndarray) -> np.ndarray:
+        tc = np.asarray(tc, dtype=float)
+        std = np.nanstd(tc)
+        if std <= 0:
+            return tc - np.nanmean(tc)
+        return (tc - np.nanmean(tc)) / std
+
+    def _get_decoder_tuning_curve(a_decoder, aclu) -> Optional[np.ndarray]:
+        if tuning_curve_source in ('normalized_zscore', 'normalized'):
+            tc = a_decoder.pf.normalized_tuning_curves_dict.get(aclu, None)
+            if tc is None:
+                neuron_ids = np.asarray(a_decoder.pf.ratemap.neuron_ids)
+                if aclu in neuron_ids:
+                    tc = a_decoder.pf.ratemap.normalized_tuning_curves[np.where(neuron_ids == aclu)[0][0], :]
+        elif tuning_curve_source == 'tuning_curves_zscore':
+            tc = a_decoder.pf.tuning_curves_dict.get(aclu, None)
+            if tc is None:
+                neuron_ids = np.asarray(a_decoder.pf.ratemap.neuron_ids)
+                if aclu in neuron_ids:
+                    tc = a_decoder.pf.ratemap.tuning_curves[np.where(neuron_ids == aclu)[0][0], :]
+        else:
+            raise ValueError(f"Unknown tuning_curve_source: {tuning_curve_source!r}")
+        if tc is None:
+            return None
+        tc = np.asarray(tc, dtype=float)
+        if tuning_curve_source.endswith('_zscore'):
+            return _zscore_1d(tc)
+        return tc
+
+    full_z_matrix = np.full((n_epochs, n_aclus, n_xbins), np.nan)
+    for row_idx, decoder_name in enumerate(decoder_order):
+        a_decoder = decoders_dict[decoder_name]
+        for aclu_i, aclu in enumerate(any_decoder_neuron_IDs):
+            tc = _get_decoder_tuning_curve(a_decoder, aclu)
+            if tc is None:
+                continue
+            if len(tc) != n_xbins:
+                raise ValueError(
+                    f"Decoder {decoder_name!r} aclu {aclu}: tuning curve length {len(tc)} != n_xbins {n_xbins}."
+                )
+            full_z_matrix[row_idx, aclu_i, :] = tc
+    ## END for row_idx, decoder_name in enumerate(decoder_order)...
+
+    fake_epochs_df = pd.DataFrame({
+        'start': np.arange(n_epochs, dtype=float),
+        'stop': np.arange(n_epochs, dtype=float) + 1.0,
+        'label': decoder_order,
+        'decoder_name': decoder_order,
+    })
+
+    static_directional_active_lap_pf_results_dicts: Dict[str, TrialByTrialActivity] = {}
+    for decoder_name in decoder_order:
+        row_idx = decoder_order.index(decoder_name)
+        z_matrix = np.full((n_epochs, n_aclus, n_xbins), np.nan)
+        z_matrix[row_idx, :, :] = full_z_matrix[row_idx, :, :]
+        C = np.full((n_aclus, n_epochs, n_epochs), np.nan)
+        static_directional_active_lap_pf_results_dicts[decoder_name] = TrialByTrialActivity(
+            active_epochs_df=deepcopy(fake_epochs_df),
+            C_trial_by_trial_correlation_matrix=C,
+            z_scored_tuning_map_matrix=z_matrix,
+            aclu_to_matrix_IDX_map=deepcopy(aclu_to_matrix_IDX_map),
+            neuron_ids=deepcopy(any_decoder_neuron_IDs),
+        )
+    ## END for decoder_name in decoder_order...
+
+    static_directional_active_lap_pf_results_dicts = {
+        k: v.sliced_by_neuron_id(included_neuron_ids=override_active_neuron_IDs)
+        for k, v in static_directional_active_lap_pf_results_dicts.items()
+    }
+
+    def _subfn_compute_static_decoder_peaks_df() -> pd.DataFrame:
+        """ CAPTURES: find_peaks_kwargs, track_templates, decoder_order, max_n_peaks_per_decoder
+        """
+        _find_peaks_kwargs = {'height': 0.2, 'width': 2} | (find_peaks_kwargs or {})
+        _, _, decoder_peaks_results_df_dict = track_templates.get_decoders_tuning_curve_modes(
+            peak_mode='peaks', **_find_peaks_kwargs,
+        )
+        peak_rows: List[pd.DataFrame] = []
+        for decoder_name in decoder_order:
+            a_peaks_df = decoder_peaks_results_df_dict.get(decoder_name, None)
+            if a_peaks_df is None or len(a_peaks_df) == 0:
+                continue
+            a_df = a_peaks_df.copy()
+            if max_n_peaks_per_decoder is not None:
+                a_df = a_df[a_df['subpeak_idx'] < max_n_peaks_per_decoder]
+            a_df['decoder_name'] = decoder_name
+            peak_rows.append(a_df)
+        ## END for decoder_name in decoder_order...
+        return pd.concat(peak_rows, axis='index', ignore_index=True) if len(peak_rows) > 0 else pd.DataFrame()
+
+
+    def _subfn_format_static_decoder_peaks_df_for_tbyt_window(peaks_df: pd.DataFrame) -> pd.DataFrame:
+        """ CAPTURES: decoder_order, override_active_neuron_IDs
+        """
+        peaks_df = deepcopy(peaks_df)
+        decoder_to_trial_idx = {name: i + 1 for i, name in enumerate(decoder_order)}
+        decoder_to_trial_row_idx = {name: i for i, name in enumerate(decoder_order)}
+
+        if ('decoder_name' not in peaks_df.columns) and ('rel_trial_idx' in peaks_df.columns):
+            peaks_df['decoder_name'] = peaks_df['rel_trial_idx'].map(dict(enumerate(decoder_order)))
+        if 'decoder_name' in peaks_df.columns:
+            peaks_df['decoder_name'] = peaks_df['decoder_name'].astype(str)
+            if 'trial_idx' not in peaks_df.columns:
+                peaks_df['trial_idx'] = peaks_df['decoder_name'].map(decoder_to_trial_idx)
+            if 'trial_row_idx' not in peaks_df.columns:
+                peaks_df['trial_row_idx'] = peaks_df['decoder_name'].map(decoder_to_trial_row_idx)
+        elif 'rel_trial_idx' in peaks_df.columns:
+            peaks_df['trial_idx'] = peaks_df['rel_trial_idx'].astype(int) + 1
+            peaks_df['trial_row_idx'] = peaks_df['rel_trial_idx'].astype(int)
+        elif ('trial_idx' in peaks_df.columns) and ('trial_row_idx' not in peaks_df.columns):
+            peaks_df['trial_row_idx'] = peaks_df['trial_idx'].astype(int) - 1
+
+        if 'summit_idx' not in peaks_df.columns and 'subpeak_idx' in peaks_df.columns:
+            peaks_df['summit_idx'] = peaks_df['subpeak_idx']
+        if 'peak_center_x' not in peaks_df.columns:
+            for alt_col in ('pos', 'peak_position', 'peak_x'):
+                if alt_col in peaks_df.columns:
+                    peaks_df['peak_center_x'] = peaks_df[alt_col]
+                    break
+        if 'peak_height' not in peaks_df.columns and 'peak_heights' in peaks_df.columns:
+            peaks_df['peak_height'] = peaks_df['peak_heights']
+        if 'peak_prominence' not in peaks_df.columns and 'prominences' in peaks_df.columns:
+            peaks_df['peak_prominence'] = peaks_df['prominences']
+        if 'aclu_field_peak_id' not in peaks_df.columns:
+            peaks_df['aclu_field_peak_id'] = peaks_df['summit_idx'] if 'summit_idx' in peaks_df.columns else 0
+
+        peaks_df = peaks_df[np.isin(peaks_df['aclu'].astype(int), override_active_neuron_IDs)].copy()
+        peaks_df['aclu'] = peaks_df['aclu'].astype(int)
+        peaks_df['trial_idx'] = peaks_df['trial_idx'].astype(int)
+        peaks_df['trial_row_idx'] = peaks_df['trial_row_idx'].astype(int)
+        return peaks_df
+
+
+    peaks_for_plot: Optional[pd.DataFrame] = None
+    if all_decoders_peak_prominence_df is not None:
+        peaks_for_plot = _subfn_format_static_decoder_peaks_df_for_tbyt_window(all_decoders_peak_prominence_df)
+    elif compute_peaks_from_static_pfs:
+        peaks_for_plot = _subfn_format_static_decoder_peaks_df_for_tbyt_window(_subfn_compute_static_decoder_peaks_df())
+
+    a_TbyT_activity_win: TrialByTrialActivityWindow = TrialByTrialActivityWindow.plot_trial_to_trial_reliability_all_decoders_image_stack(
+        directional_active_lap_pf_results_dicts=static_directional_active_lap_pf_results_dicts,
+        active_one_step_decoder=active_one_step_decoder,
+        drop_below_threshold=drop_below_threshold,
+        override_active_neuron_IDs=override_active_neuron_IDs,
+        defer_show=defer_show,
+        **plot_kwargs,
+    )
+
+    if peaks_for_plot is not None and len(peaks_for_plot) > 0:
+        if peak_prominence_table_columns is None:
+            peak_prominence_table_columns = [
+                'trial_idx', 'trial_row_idx', 'decoder_name', 'summit_idx',
+                'peak_prominence', 'peak_height', 'peak_center_x', 'aclu_field_peak_id',
+            ]
+        included_columns_list = [c for c in peak_prominence_table_columns if c in peaks_for_plot.columns]
+        a_TbyT_activity_win.set_all_decoders_peak_prominence_df(peaks_for_plot, included_columns_list=included_columns_list)
+        if add_peak_markers:
+            marker_cols = ['aclu', 'trial_idx', 'trial_row_idx', 'peak_center_x']
+            if 'summit_idx' in peaks_for_plot.columns:
+                marker_cols.append('summit_idx')
+            a_TbyT_activity_win.add_peak_center_vertical_markers(peaks_for_plot[marker_cols])
+        if add_aclu_field_peak_id_labels and ('aclu_field_peak_id' in peaks_for_plot.columns):
+            label_cols = ['aclu', 'trial_idx', 'trial_row_idx', 'peak_center_x', 'aclu_field_peak_id']
+            a_TbyT_activity_win.add_aclu_field_peak_id_debug_labels(peaks_for_plot[label_cols])
+
+    return a_TbyT_activity_win, static_directional_active_lap_pf_results_dicts, peaks_for_plot
+
+
+
+## Options
+anchor_mode_options = ['left', 'right', 'mid', 'non_linear']
+
+## INPUTS: LR_peaks_df
+# LR_peaks_df['anchor_mode'] = 'mid' ## default to midpoint
+# LR_peaks_df.loc[(LR_peaks_df['peak_diff'] > n_linear_remapping_value), 'anchor_mode'] = 'non_linear'
+# LR_peaks_df
+
+@function_attributes(short_name=None, tags=['anchor', 'origin', 'multi-anchor-origin'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-26 16:54', related_items=['find_mixed_anchor_mode_aclus'])
+def compute_single_dir_anchor_mode_col(any_dir_peaks_df: pd.DataFrame, min_expected_x_translation_magnitude: Optional[float]=None, max_expected_x_translation_magnitude: Optional[float]=None, expected_x_translation_magnitude: float = 35, suffix: str = '', debug_print: bool=False):
+    """ compute for a single direction 
+
+Usage:
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_single_dir_anchor_mode_col, anchor_mode_options, find_mixed_anchor_mode_aclus
+
+    expected_x_translation_magnitude: float = 35
+    ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+    # non-aclu-specific w_i widths: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    w_i: float = 10
+    min_expected_x_translation_magnitude: float = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
+    max_expected_x_translation_magnitude: float = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
+    any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+    any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+
+    # # aclu-specific field widths w_i _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    ## 2026-08-26 13:56: - [X] Make w_i reflect each aclu's specific `pf_half_width`.
+    # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+    # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+    ## OUTPUTS: any_dir_peaks_df
+
+
+    ## determine where multi-anchor-origin remapping occurs for separate fields in the same aclu:
+    any_dir_peaks_field_anchor_summary_df = (
+        any_dir_peaks_df
+        .groupby(['aclu', 'aclu_field_peak_id'], as_index=False)
+        .agg(
+            peak_diff_LR=('peak_diff_LR', 'first'),
+            peak_diff_RL=('peak_diff_RL', 'first'),
+            anchor_mode_LR=('anchor_mode_LR', 'first'),
+            anchor_mode_RL=('anchor_mode_RL', 'first'),
+        )
+    )
+
+    # aclus where not all fields share the same LR anchor mode
+    mixed_lr_aclus = (
+        any_dir_peaks_field_anchor_summary_df
+        .groupby('aclu')['anchor_mode_LR']
+        .nunique()
+        .loc[lambda s: s > 1]
+        .index
+    )
+
+    any_dir_peaks_mixed_lr_fields_df = any_dir_peaks_field_anchor_summary_df[
+        any_dir_peaks_field_anchor_summary_df['aclu'].isin(mixed_lr_aclus)
+    ].sort_values(['aclu', 'aclu_field_peak_id'], inplace=False)
+
+    any_dir_peaks_mixed_lr_fields_df
+
+    """
+
+    if (min_expected_x_translation_magnitude is None) or (max_expected_x_translation_magnitude is None):
+        ## try to use column
+        half_width_w_i_col_name: str = f'long{suffix}_pf_half_width'
+
+        if (half_width_w_i_col_name in any_dir_peaks_df.columns):
+            ## override w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude
+            # print(f'WARNING: overriding w_i, min_expected_x_translation_magnitude, max_expected_x_translation_magnitude due to presnece of half_width_w_i_col_name: {half_width_w_i_col_name}.')
+            w_i = any_dir_peaks_df[half_width_w_i_col_name].to_numpy()
+            if min_expected_x_translation_magnitude is None:
+                min_expected_x_translation_magnitude = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
+            if max_expected_x_translation_magnitude is None:
+                max_expected_x_translation_magnitude = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
+
+            if debug_print:
+                print(f'min_expected_x_translation_magnitude: {min_expected_x_translation_magnitude}, max_expected_x_translation_magnitude: {max_expected_x_translation_magnitude}')
+                ## add columns for debugging:
+                any_dir_peaks_df['min_expected_x_translation_magnitude'] = min_expected_x_translation_magnitude
+                any_dir_peaks_df['max_expected_x_translation_magnitude'] = max_expected_x_translation_magnitude
+
+        else:
+            print(f'WARNING: half_width_w_i_col_name: {half_width_w_i_col_name} not found.')
+
+
+    assert min_expected_x_translation_magnitude is not None
+    assert max_expected_x_translation_magnitude is not None
+
+
+    any_dir_peaks_df[f'anchor_mode{suffix}'] = 'mid' ## default to midpoint-anchored mode
+    any_dir_peaks_df.loc[(np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) > max_expected_x_translation_magnitude), f'anchor_mode{suffix}'] = 'non_linear' ## delta translation greater than expected
+
+    any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() > 0.0),
+        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
+        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'left'
+
+    ## -53.6 should be non_linear, but is being assigned mid
+    any_dir_peaks_df.loc[np.logical_and(np.logical_and((any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy() < 0.0),
+        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) <= max_expected_x_translation_magnitude)),
+        (np.abs(any_dir_peaks_df[f'peak_diff{suffix}'].to_numpy()) >= min_expected_x_translation_magnitude)), f'anchor_mode{suffix}'] = 'right'
+
+    any_dir_peaks_df.loc[any_dir_peaks_df[f'peak_diff{suffix}'].isna(), f'anchor_mode{suffix}'] = pd.NA ## delta translation greater than expected
+
+    return any_dir_peaks_df
+
+@function_attributes(short_name=None, tags=['multi-anchor-origin', 'anchor', 'origin', 'helper', 'mixed', 'pf', '1D', 'KDIBA'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-26 18:07', related_items=['compute_single_dir_anchor_mode_col'])
+def find_mixed_anchor_mode_aclus(any_dir_peaks_df: pd.DataFrame):
+    """ aclus where not all fields share the same LR anchor mode 
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_single_dir_anchor_mode_col, anchor_mode_options, find_mixed_anchor_mode_aclus
+
+        any_dir_peaks_df = deepcopy(decoder_peak_diffs_df)
+
+        expected_x_translation_magnitude: float = 35
+        ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+        # non-aclu-specific w_i widths: ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        w_i: float = 10
+        min_expected_x_translation_magnitude: float = (expected_x_translation_magnitude - w_i) ## minimum abs change in delta_x to be considered a translation (otherwise considered 'mid')
+        max_expected_x_translation_magnitude: float = (expected_x_translation_magnitude + w_i) ## maximum abs change in delta_x, another above is considered 'non_linear'
+        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+        any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, min_expected_x_translation_magnitude=min_expected_x_translation_magnitude, max_expected_x_translation_magnitude=max_expected_x_translation_magnitude, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+
+        # # aclu-specific field widths w_i _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        ## 2026-08-26 13:56: - [X] Make w_i reflect each aclu's specific `pf_half_width`.
+        # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_LR')
+        # any_dir_peaks_df = compute_single_dir_anchor_mode_col(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, suffix='_RL')
+
+        any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=any_dir_peaks_df)
+        any_dir_peaks_mixed_fields_df
+    """
+
+    def _subfn_find_mixed_anchor_mode_aclus_single_dir(any_dir_peaks_field_anchor_summary_df: pd.DataFrame, suffix: str = '_LR'):
+        """ aclus where not all fields share the same LR anchor mode """
+        mixed_aclus = any_dir_peaks_field_anchor_summary_df.groupby('aclu')[f'anchor_mode{suffix}'].nunique().loc[lambda s: s > 1].index
+        any_dir_peaks_mixed_fields_df = any_dir_peaks_field_anchor_summary_df[any_dir_peaks_field_anchor_summary_df['aclu'].isin(mixed_aclus)].sort_values(['aclu', 'aclu_field_peak_id'], inplace=False)
+        return any_dir_peaks_mixed_fields_df, mixed_aclus
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    any_dir_peaks_field_anchor_summary_df = (
+        any_dir_peaks_df
+        .groupby(['aclu', 'aclu_field_peak_id'], as_index=False)
+        .agg(
+            peak_diff_LR=('peak_diff_LR', 'first'),
+            peak_diff_RL=('peak_diff_RL', 'first'),
+            anchor_mode_LR=('anchor_mode_LR', 'first'),
+            anchor_mode_RL=('anchor_mode_RL', 'first'),
+        )
+    )
+    any_dir_peaks_field_anchor_summary_df
+
+    peaks_mixed_LR_fields_df, mixed_LR_aclus = _subfn_find_mixed_anchor_mode_aclus_single_dir(any_dir_peaks_field_anchor_summary_df=any_dir_peaks_field_anchor_summary_df, suffix='_LR')
+    peaks_mixed_RL_fields_df, mixed_RL_aclus = _subfn_find_mixed_anchor_mode_aclus_single_dir(any_dir_peaks_field_anchor_summary_df=any_dir_peaks_field_anchor_summary_df, suffix='_RL')
+    mixed_any_aclus = np.unique([*mixed_LR_aclus, *mixed_RL_aclus])
+    any_dir_peaks_mixed_fields_df: pd.DataFrame = any_dir_peaks_field_anchor_summary_df[any_dir_peaks_field_anchor_summary_df['aclu'].isin(mixed_any_aclus)].sort_values(['aclu', 'aclu_field_peak_id'], inplace=False)
+
+    ##OUTPUTS: any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df
+    # return any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df
+
+    return any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df
+
+
 # ==================================================================================================================== #
 # 2026-07-09 - Placefield Decoding when Disjoint Exploration                                                           #
 # ==================================================================================================================== #
