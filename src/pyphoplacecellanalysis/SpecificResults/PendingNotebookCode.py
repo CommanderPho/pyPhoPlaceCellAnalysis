@@ -130,6 +130,129 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+@function_attributes(short_name=None, tags=['batch', 'compute', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 05:41', related_items=[])
+def compute_run_peak_matching_remapping_all(curr_active_pipeline):
+    """ for batch computations 
+    """
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_peak_matched_long_short_pf_remapping
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_anchor_mode_cols, anchor_mode_options, find_mixed_anchor_mode_aclus
+    import pyphoplacecellanalysis.External.pyqtgraph as pg
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_static_decoder_placefields_in_trial_by_trial_activity_window
+
+    directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+
+    # optional filters (typical notebook pattern):
+    minimum_inclusion_fr_Hz = 1.0
+    # minimum_inclusion_fr_Hz = 5.0
+    # included_qclu_values = [1, 2]  # or whatever you use
+    included_qclu_values = None
+
+    track_templates: TrackTemplates = directional_laps_results.get_templates(
+        minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+        included_qclu_values=included_qclu_values,
+    )
+
+    # unpack
+    long_LR, long_RL, short_LR, short_RL = track_templates.get_decoders()
+    # or:
+    decoders_dict = track_templates.get_decoders_dict()
+    # {'long_LR': ..., 'long_RL': ..., 'short_LR': ..., 'short_RL': ...}
+
+    (LR_peaks_df, RL_peaks_df), any_dir_peaks_df = track_templates.get_directional_pf_maximum_peaks_dfs(
+        drop_aclu_if_missing_long_or_short=False,  # keep cells with only one track
+    )
+
+    # columns like: long_LR, short_LR, peak_diff   (and RL analogs)
+    # any_dir also has: peak_diff_LR, peak_diff_RL
+    # LR_peaks_df
+    # RL_peaks_df
+    any_dir_peaks_df
+
+
+    # 2) Full peak info (includes widths) for each of the 4 decoders
+    #    Require width so find_peaks returns 'widths'
+    _, _, decoder_peaks_df_dict = track_templates.get_decoders_tuning_curve_modes(
+        peak_mode='peaks',
+        height=0.2,
+        width=2,   # important: enables widths in the peak properties
+    )
+
+    max_n_peaks: int = 3
+    all_decoder_peaks_df_list = []
+    for decoder_name, peaks_df in decoder_peaks_df_dict.items():
+        peaks_df = peaks_df[peaks_df['subpeak_idx'] < max_n_peaks].copy()
+        peaks_df['decoder_name'] = decoder_name
+        all_decoder_peaks_df_list.append(peaks_df)
+
+    all_decoder_peaks_df = pd.concat(all_decoder_peaks_df_list, ignore_index=True)
+    # columns include: aclu, subpeak_idx, pos, bin_index, peak_heights, widths, ...
+    all_decoder_peaks_df
+    ## OUTPUTS: all_decoder_peaks_df
+
+
+    #TODO 2026-08-27 04:14: - [ ] this messes up the df and removes the 'aclu' column?!?
+    xstep = float(track_templates.long_LR_decoder.pf.bin_info['xstep'])  # cm / bin
+
+    def max_peak_half_width_cm(peaks_df: pd.DataFrame, xstep: float) -> pd.Series:
+        """One half-width (cm) per aclu from the tallest peak (subpeak_idx == 0)."""
+        df = peaks_df.copy()
+        if 'aclu' not in df.columns:
+            # some versions use series_idx -> map to neuron_ids; ratemap path usually already has aclu
+            raise KeyError(df.columns.tolist())
+        # prefer primary/max peak
+        if 'subpeak_idx' in df.columns:
+            df = df[df['subpeak_idx'] == 0]
+        elif 'peak_heights' in df.columns:
+            df = df.sort_values('peak_heights', ascending=False).groupby('aclu', as_index=False).first()
+        # scipy widths are in bins; half-width in cm
+        return (df.set_index('aclu')['widths'] * xstep / 2.0).rename('pf_half_width')
+
+    # 3) Attach one column per decoder, then a convenient aggregate
+    for decoder_name, peaks_df in decoder_peaks_df_dict.items():
+        hw = max_peak_half_width_cm(peaks_df, xstep=xstep)
+        any_dir_peaks_df[f'{decoder_name}_pf_half_width'] = any_dir_peaks_df.index.map(hw)
+
+    # # Optional: single w_i-like column (e.g. mean of available long/short for that direction)
+    # any_dir_peaks_df['pf_half_width_LR'] = any_dir_peaks_df[['long_LR_pf_half_width', 'short_LR_pf_half_width']].mean(axis=1, skipna=True)
+    # any_dir_peaks_df['pf_half_width_RL'] = any_dir_peaks_df[['long_RL_pf_half_width', 'short_RL_pf_half_width']].mean(axis=1, skipna=True)
+    any_dir_peaks_df
+
+    decoder_peak_diffs_df, peak_diff_from_transitions_df, all_decoders_peak_prominence_df, all_decoders_peak_transitions_df = compute_peak_matched_long_short_pf_remapping(track_templates)
+    decoder_peak_diffs_df
+
+    any_dir_peaks_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
+    expected_x_translation_magnitude: float = 35
+    ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+    any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
+    # any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
+    any_dir_peaks_df
+
+    ## OUTPUTS: any_dir_peaks_df
+
+    # any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=any_dir_peaks_df)
+    any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=any_dir_peaks_df)
+    any_dir_peaks_mixed_fields_df
+
+
+    # Graphics/Display/Figures ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    ## INPUTS: track_templates, any_dir_peaks_df
+    pg.setConfigOptions(useOpenGL=False)
+    a_TbyT_activity_win, static_dict, peaks_for_plot = plot_static_decoder_placefields_in_trial_by_trial_activity_window(
+        track_templates=track_templates,
+        # all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
+        compute_peaks_from_static_pfs = True, ## compute dynamically
+        override_active_neuron_IDs=np.sort(any_dir_peaks_df['aclu'].unique()),
+    )
+    a_TbyT_activity_win.root_render_widget.useOpenGL(False)
+
+    _outputs_dict = {'a_TbyT_activity_win': a_TbyT_activity_win,
+
+    }
+
+    return _outputs_dict
+
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 
