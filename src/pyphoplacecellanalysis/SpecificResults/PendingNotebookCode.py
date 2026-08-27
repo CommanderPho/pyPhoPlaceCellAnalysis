@@ -133,6 +133,65 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 @function_attributes(short_name=None, tags=['batch', 'compute', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 05:41', related_items=[])
 def compute_run_peak_matching_remapping_all(curr_active_pipeline):
     """ for batch computations 
+
+    To be called from `compute_and_export_session_trial_by_trial_performance_completion_function`
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_trial_by_trial_performance_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import SimpleBatchComputationDummy
+        from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
+
+        a_dummy = SimpleBatchComputationDummy(BATCH_DATE_TO_USE, collected_outputs_path, True)
+
+        ## Settings:
+        return_full_decoding_results: bool = True
+        save_hdf: bool = True
+        save_csvs:bool = True
+        _across_session_results_extended_dict = {}
+
+        additional_session_context = None
+        try:
+            if custom_suffix is not None:
+                additional_session_context = IdentifyingContext(custom_suffix=custom_suffix)
+                print(f'Using custom suffix: "{custom_suffix}" - additional_session_context: "{additional_session_context}"')
+        except NameError as err:
+            additional_session_context = None
+            print(f'NO CUSTOM SUFFIX.')    
+            
+        # active_laps_decoding_time_bin_size: float = 0.025
+        active_laps_decoding_time_bin_size: float = 0.050
+
+        _across_session_results_extended_dict = _across_session_results_extended_dict | compute_and_export_session_trial_by_trial_performance_completion_function(a_dummy, None,
+                                                        curr_session_context=curr_active_pipeline.get_session_context(), curr_session_basedir=curr_active_pipeline.sess.basepath.resolve(), curr_active_pipeline=curr_active_pipeline,
+                                                        across_session_results_extended_dict=_across_session_results_extended_dict, active_laps_decoding_time_bin_size=active_laps_decoding_time_bin_size,
+                                                        # # additional_session_context=additional_session_context,
+                                                        # additional_session_context=IdentifyingContext(custom_suffix=None)
+                                                        )
+
+        global_spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
+        global_spikes_df.spikes.neuron_ids
+        any_decoder_neuron_IDs: NDArray = deepcopy(track_templates.any_decoder_neuron_IDs)
+        any_decoder_neuron_IDs
+
+
+        callback_outputs = _across_session_results_extended_dict['compute_and_export_session_trial_by_trial_performance_completion_function']
+        a_trial_by_trial_result: TrialByTrialActivityResult = callback_outputs['a_trial_by_trial_result']
+        stability_df: pd.DataFrame = deepcopy(callback_outputs['stability_df'])
+        subset_neuron_IDs_dict = callback_outputs['subset_neuron_IDs_dict']
+        subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
+        subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
+        directional_active_lap_pf_results_dicts: Dict[types.DecoderName, TrialByTrialActivity] = a_trial_by_trial_result.directional_active_lap_pf_results_dicts
+        _out_subset_decode_results_track_id_correct_performance_dict = callback_outputs['subset_decode_results_track_id_correct_performance_dict']
+        _out_subset_decode_results_dict = callback_outputs['subset_decode_results_dict']
+        neuron_group_split_stability_dfs_tuple = callback_outputs['neuron_group_split_stability_dfs_tuple']
+        neuron_group_split_stability_aclus_tuple = callback_outputs['neuron_group_split_stability_aclus_tuple']
+
+        appearing_stability_df, disappearing_stability_df, appearing_or_disappearing_stability_df, stable_both_stability_df, stable_neither_stability_df, stable_long_stability_df, stable_short_stability_df = neuron_group_split_stability_dfs_tuple
+        appearing_aclus, disappearing_aclus, appearing_or_disappearing_aclus, stable_both_aclus, stable_neither_aclus, stable_long_aclus, stable_short_aclus = neuron_group_split_stability_aclus_tuple
+        stability_df
+
     """
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult, TrackTemplates
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_peak_matched_long_short_pf_remapping

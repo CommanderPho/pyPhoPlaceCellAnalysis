@@ -1254,8 +1254,6 @@ def compute_and_export_session_trial_by_trial_performance_completion_function(se
     #         percent_laps_track_identity_estimated_correctly: float = (round(_out_subset_decode_results_track_id_correct_performance_dict[a_subset_name], ndigits=5) * 100.0)
     #         print(f'aclu subset: "{a_subset_name}"\n\ta_neuron_IDs_subset: {a_neuron_IDs_subset}\n\tpercent_laps_track_identity_estimated_correctly: {percent_laps_track_identity_estimated_correctly} %')
             
-
-
     #     # ==================================================================================================================== #
     #     # Process Outputs to get marginals                                                                                     #
     #     # ==================================================================================================================== #
