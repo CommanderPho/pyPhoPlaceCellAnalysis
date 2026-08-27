@@ -275,6 +275,10 @@ class BatchSessionCompletionHandler:
     force_recompute_override_computations_includelist: list = field(default=Factory(list)) # empty list by default. For example self.force_recompute_override_computations_includelist = ['rank_order_shuffle_analysis'] would force recomputation of that global computation function
     force_recompute_override_computation_kwargs_dict: list = field(default=Factory(dict))
 
+    apply_track_body_aclu_filter: bool = field(default=False)
+    track_body_filter_minimum_inclusion_fr_Hz: Optional[float] = field(default=None)
+    track_body_filter_included_qclu_values: Optional[List] = field(default=None)
+
     # @property
     # def override_session_computation_results_pickle_filename(self) -> Optional[str]:
     #     return self.session_computations_options.override_file
@@ -655,6 +659,15 @@ class BatchSessionCompletionHandler:
 
         # Computation ________________________________________________________________________________________________________ #
         if self.global_computations_options.should_compute:
+            if self.apply_track_body_aclu_filter:
+                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_good_aclus_by_track_body_prop, apply_included_aclus_filter_to_pipeline
+                included_aclus = determine_good_aclus_by_track_body_prop(
+                    curr_active_pipeline,
+                    minimum_inclusion_fr_Hz=self.track_body_filter_minimum_inclusion_fr_Hz or 2.0,
+                    included_qclu_values=self.track_body_filter_included_qclu_values,
+                )
+                apply_included_aclus_filter_to_pipeline(curr_active_pipeline, included_aclus, debug_print=True)
+
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
             is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()

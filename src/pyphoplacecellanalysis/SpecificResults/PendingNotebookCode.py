@@ -131,12 +131,14 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
-## Track body helpers:
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-08-27 - Filter ACLUs to only those units with peaks on the track body proper, and not the endcaps:                                                                                                                                                                              #
+# ==================================================================================================================================================================================================================================================================================== #
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult
 
 @function_attributes(short_name=None, tags=['track-body', 'aclu', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 16:09', related_items=[])
-def determine_good_aclus_by_track_body_prop(curr_active_pipeline):
+def determine_good_aclus_by_track_body_prop(curr_active_pipeline, minimum_inclusion_fr_Hz: float = 2.0, included_qclu_values: Optional[List[int]] = None, require_both_directions: bool = True) -> NDArray:
     """ only those aclus with their primary peak on the track body (as opposed to the endcaps) for both the LONG and the SHORT track 
 
     #TODO 2026-08-27 16:08: - [ ] potentially rename to match `determine_good_aclus_by_qclu(...)`
@@ -157,22 +159,14 @@ def determine_good_aclus_by_track_body_prop(curr_active_pipeline):
     # 1) track_templates (same pattern you already use)
     directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
     track_templates = directional_laps_results.get_templates(
-        minimum_inclusion_fr_Hz=2.0,
-        # included_qclu_values=[1, 2],
+        minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+        included_qclu_values=included_qclu_values,
     )
 
     # 2) primary peak x per decoder (index = aclu)
     (LR_peaks_df, RL_peaks_df), any_dir_pf_max_peak_df = track_templates.get_directional_pf_maximum_peaks_dfs(
         drop_aclu_if_missing_long_or_short=True,
-        # drop_aclu_if_missing_long_or_short=False,
     )
-
-
-    ## from prev computations:
-    # any_dir_pf_max_peak_df = _outputs_dict['any_dir_pf_max_peak_df']
-
-
-    ## INPUTS: any_dir_pf_max_peak_df
 
     # 3) track geometry for body vs endcap
     long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
@@ -186,21 +180,22 @@ def determine_good_aclus_by_track_body_prop(curr_active_pipeline):
     df['long_on_body']  = df['long_LR'].map(lambda x: is_on_track_body(x, long_track_inst))
     df['short_on_body'] = df['short_LR'].map(lambda x: is_on_track_body(x, short_track_inst))
 
-    both_body_aclus_LR = df.index[
-        df['long_on_body'] & df['short_on_body']
-        & df['long_LR'].notna() & df['short_LR'].notna()
-    ].astype(int).to_numpy()
-    df['long_RL_on_body']  = df['long_RL'].map(lambda x: is_on_track_body(x, long_track_inst))
-    df['short_RL_on_body'] = df['short_RL'].map(lambda x: is_on_track_body(x, short_track_inst))
+    if require_both_directions:
+        df['long_RL_on_body']  = df['long_RL'].map(lambda x: is_on_track_body(x, long_track_inst))
+        df['short_RL_on_body'] = df['short_RL'].map(lambda x: is_on_track_body(x, short_track_inst))
+        body_aclus = df.index[
+            df['long_on_body'] & df['short_on_body']
+            & df['long_RL_on_body'] & df['short_RL_on_body']
+            & df[['long_LR', 'short_LR', 'long_RL', 'short_RL']].notna().all(axis=1)
+        ].astype(int).to_numpy()
+    else:
+        body_aclus = df.index[
+            df['long_on_body'] & df['short_on_body']
+            & df['long_LR'].notna() & df['short_LR'].notna()
+        ].astype(int).to_numpy()
 
-    both_body_aclus_both_dirs = df.index[
-        df['long_on_body'] & df['short_on_body']
-        & df['long_RL_on_body'] & df['short_RL_on_body']
-        & df[['long_LR','short_LR','long_RL','short_RL']].notna().all(axis=1) ## they all have to be non-nan and on body the whole time.
-    ].astype(int).to_numpy()
-
-    both_body_aclus_both_dirs ## [ 2,  9, 12, 14, 18, 21, 22, 28, 30, 32]
-    return both_body_aclus_both_dirs
+    body_aclus = np.intersect1d(body_aclus, track_templates.any_decoder_neuron_IDs).astype(int)
+    return body_aclus
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -15878,6 +15873,45 @@ def add_unit_spike_count_visualization(active_2d_plot, neuron_ids: NDArray, time
 # ==================================================================================================================== #
 # 2025-02-27 - Filtering Pipeline                                                                                      #
 # ==================================================================================================================== #
+
+@function_attributes(short_name=None, tags=['pipeline', 'filter', 'aclu', 'track-body'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 16:30', related_items=['determine_good_aclus_by_track_body_prop'])
+def apply_included_aclus_filter_to_pipeline(curr_active_pipeline, included_aclus, debug_print: bool = False) -> Dict[str, Any]:
+    """Slice DirectionalLaps to included_aclus and drop all downstream global computation results so batch can recompute them.
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import (
+            determine_good_aclus_by_track_body_prop,
+            apply_included_aclus_filter_to_pipeline,
+        )
+
+        included_aclus = determine_good_aclus_by_track_body_prop(curr_active_pipeline)
+        filter_summary = apply_included_aclus_filter_to_pipeline(curr_active_pipeline, included_aclus, debug_print=True)
+
+    """
+    computed_data = curr_active_pipeline.global_computation_results.computed_data
+    assert 'DirectionalLaps' in computed_data, "apply_included_aclus_filter_to_pipeline requires global_computation_results.computed_data['DirectionalLaps']"
+
+    directional_laps_results = computed_data['DirectionalLaps']
+    track_templates = directional_laps_results.get_templates()
+    included_aclus = np.intersect1d(np.asarray(included_aclus, dtype=int), track_templates.any_decoder_neuron_IDs).astype(int)
+    if len(included_aclus) == 0:
+        raise ValueError("apply_included_aclus_filter_to_pipeline: no included_aclus remain after intersection with decoder neuron IDs")
+
+    filtered_directional_laps_results = directional_laps_results.filtered_by_included_aclus(included_aclus)
+    computed_data['DirectionalLaps'] = filtered_directional_laps_results
+
+    _, (downstream_global_keys, _downstream_local_keys) = curr_active_pipeline.find_downstream_dependencies(provided_global_keys=['DirectionalLaps'], debug_print=debug_print)
+    keys_to_drop = [a_key for a_key in downstream_global_keys if a_key != 'DirectionalLaps']
+    if len(keys_to_drop) > 0:
+        curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=keys_to_drop, debug_print=debug_print)
+
+    if debug_print:
+        print(f"apply_included_aclus_filter_to_pipeline: n_included_aclus={len(included_aclus)}, included_aclus={included_aclus.tolist()}")
+        print(f"apply_included_aclus_filter_to_pipeline: dropped_global_keys={keys_to_drop}")
+
+    return {'included_aclus': included_aclus, 'n_included': len(included_aclus), 'dropped_global_keys': keys_to_drop}
+
 
 @function_attributes(short_name=None, tags=['pipeline', 'filter', 'qclu'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-27 14:31', related_items=[])
 def filtered_by_frate_and_qclu(curr_active_pipeline, desired_qclu_subset=[1, 2], desired_minimum_inclusion_fr_Hz: float = 4.0):
