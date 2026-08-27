@@ -56,6 +56,8 @@ from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionD
 
 __all__ = ['TemplateDebugger']
 
+PF1D_HEATMAP_AXIS_ORDER = 'row-major'  # (n_cells, n_bins) data: bins map to x-axis, cells to y-axis
+
 
 # ==================================================================================================================== #
 # Helper functions                                                                                                     #
@@ -78,7 +80,7 @@ def build_pf1D_heatmap_with_labels_and_peaks(pf1D_decoder, visible_aclus, plot_i
 
     enable_cell_colored_heatmap_rows: bool = (a_decoder_aclu_to_color_map is not None)
     
-    curr_img = pg.ImageItem()
+    curr_img = pg.ImageItem(axisOrder=PF1D_HEATMAP_AXIS_ORDER)
     plot_item.addItem(curr_img)
 
     n_visible_cells = len(visible_aclus)
@@ -265,7 +267,7 @@ class BaseTemplateDebuggingMixin:
         extant_win = _out_ui.get('win', None)
         # extant_plot_item = _out_ui.get('plot_item', None)
         
-        _out_plots.pf1D_heatmap = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=extant_win, defer_show=True)
+        _out_plots.pf1D_heatmap = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=extant_win, defer_show=True, axisOrder=PF1D_HEATMAP_AXIS_ORDER)
 
         curr_win, curr_img = _out_plots.pf1D_heatmap
         if _out_params.debug_draw:
@@ -948,7 +950,7 @@ class TemplateDebugger:
             curr_pf_peak_locations = sorted_pf_peak_location_list[i]
             curr_xbins = deepcopy(a_decoder.pf.ratemap.xbin)
             
-            _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
+            _out_plots.pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(curr_curves, title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True, axisOrder=PF1D_HEATMAP_AXIS_ORDER) # Sort to match first decoder (long_LR)
             # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
             curr_win, curr_img = _out_plots.pf1D_heatmaps[a_decoder_name] # win, img
             # curr_win.setObjectName(a_decoder_name)

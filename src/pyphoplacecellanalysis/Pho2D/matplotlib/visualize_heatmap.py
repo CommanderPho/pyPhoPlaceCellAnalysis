@@ -76,14 +76,14 @@ def visualize_heatmap(data, ax=None, show_value_labels=False, title="Simple Heat
     return fig, ax, im
 
 
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 import pyphoplacecellanalysis.External.pyqtgraph as pg
 from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore, QtGui
 from pyphoplacecellanalysis.External.pyqtgraph_extensions.PlotWidget.CustomPlotWidget import CustomPlotWidget
 
 @function_attributes(short_name='heatmap_pyqtgraph', tags=['pyqtgraph', 'heatmap', 'app', 'window'], input_requires=[], output_provides=[], uses=[], used_by=['plot_kourosh_activity_style_figure'], creation_date='2023-06-21 15:27', related_items=[])
-def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False) -> Tuple[CustomPlotWidget, pg.ImageItem]:
+def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="Simple Heatmap", show_xticks=False, show_yticks=False, show_colorbar=False, defer_show:bool = False, axisOrder: Optional[str] = None) -> Tuple[CustomPlotWidget, pg.ImageItem]:
     """
     Creates a simple heatmap visualization of the given 2D numpy array data.
 
@@ -122,7 +122,10 @@ def visualize_heatmap_pyqtgraph(data, win=None, show_value_labels=False, title="
         did_create_win = False
 
     # Create an image item to display the heatmap
-    img = pg.ImageItem(data)
+    if axisOrder is not None:
+        img = pg.ImageItem(data, axisOrder=axisOrder)
+    else:
+        img = pg.ImageItem(data)
 
     # Add the image item to the PlotWidget
     win.addItem(img)
