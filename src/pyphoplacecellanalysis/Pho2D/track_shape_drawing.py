@@ -1302,6 +1302,25 @@ def _build_track_1D_verticies(platform_length: float = 22.0, track_length: float
     return path
 
 
+def _build_track_1D_endcap_separator_line_segments(platform_length: float, track_length: float, platform_1D_height: float, track_center_midpoint_x: float, transformation) -> List[Tuple[Tuple[float, float], Tuple[float, float]]]:
+    """ Returns two vertical line segments marking inner endcap/body boundaries, in transformed coordinates. """
+    total_track_length: float = platform_length + track_length + platform_length
+    track_center_offset_x: float = track_center_midpoint_x - total_track_length / 2.0
+    left_inner_x: float = platform_length + track_center_offset_x
+    right_inner_x: float = platform_length + track_length + track_center_offset_x
+    local_segments = [
+        ((left_inner_x, platform_1D_height), (left_inner_x, 0.0)),
+        ((right_inner_x, platform_1D_height), (right_inner_x, 0.0)),
+    ]
+    transformed_segments: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+    for (x0, y0), (x1, y1) in local_segments:
+        pt0 = transformation.transform((x0, y0))
+        pt1 = transformation.transform((x1, y1))
+        transformed_segments.append(((float(pt0[0]), float(pt0[1])), (float(pt1[0]), float(pt1[1]))))
+    ## END for (x0, y0), (x1, y1) in local_segments...
+
+    return transformed_segments
+
 
 @function_attributes(short_name=None, tags=['matplotlib', 'track_plotting', '2D', 'ax'], input_requires=[], output_provides=[], uses=[], used_by=['DecodedTrajectoryMatplotlibPlotter'], creation_date='2024-04-16 16:51', related_items=[])
 def _perform_plot_matplotlib_2D_tracks(long_track_inst: LinearTrackInstance, short_track_inst: LinearTrackInstance, ax=None, perform_autoscale: bool = True, rotate_to_vertical:bool=False, track_background_opacity: Optional[float] = None):
@@ -1764,8 +1783,13 @@ class TrackRemappingDiagramFigure:
         # Draw the long/short track shapes: __________________________________________________________________________________ #
         long_patch = patches.PathPatch(long_path, **long_track_color, alpha=0.5, lw=2)
         short_patch = patches.PathPatch(short_path, **short_track_color, alpha=0.5, lw=2)
+
+        platform_length: float = 22.0
+        long_platform_1D_height: float = (track_1D_height * long_height_multiplier) + base_platform_additive_height
+        long_endcap_separator_lines = _build_track_1D_endcap_separator_line_segments(platform_length=platform_length, track_length=long_track_dims.track_length, platform_1D_height=long_platform_1D_height, track_center_midpoint_x=long_track.grid_bin_bounds.center_point[0], transformation=long_transformation)
+        short_endcap_separator_lines = _build_track_1D_endcap_separator_line_segments(platform_length=platform_length, track_length=short_track_dims.track_length, platform_1D_height=platform_1D_height, track_center_midpoint_x=short_track.grid_bin_bounds.center_point[0], transformation=short_transformation)
         
-        return (long_patch, long_path), (short_patch, short_path)
+        return (long_patch, long_path, long_endcap_separator_lines), (short_patch, short_path, short_endcap_separator_lines)
 
 
     @function_attributes(short_name=None, tags=['matplotlib', 'track', 'remapping', 'good', 'working'], input_requires=[], output_provides=[], uses=['_plot_helper_add_track_shapes'], used_by=['plot_bidirectional_track_remapping_diagram'], creation_date='2024-02-22 11:12', related_items=[])
@@ -1997,7 +2021,7 @@ class TrackRemappingDiagramFigure:
         # if did_create_new_figure:
         extant_long_patch = extant_plot_container.plots.get('long_patch', None)
         if extant_long_patch is None:
-            (long_patch, long_path), (short_patch, short_path) = cls._plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, **track_shapes_kwargs, debug_print=debug_print)
+            (long_patch, long_path, long_endcap_separator_lines), (short_patch, short_path, short_endcap_separator_lines) = cls._plot_helper_add_track_shapes(grid_bin_bounds=grid_bin_bounds, is_dark_mode=is_dark_mode, **track_shapes_kwargs, debug_print=debug_print)
             if long_patch is not None:
                 extant_plot_container.plots.long_patch = long_patch
             if long_path is not None:
@@ -2011,6 +2035,10 @@ class TrackRemappingDiagramFigure:
             if ax is not None:
                 ax.add_patch(long_patch)
                 ax.add_patch(short_patch)
+                endcap_separator_line_color = '#333333' if is_dark_mode else '#CCCCCC'
+                for (x0, y0), (x1, y1) in long_endcap_separator_lines + short_endcap_separator_lines:
+                    ax.plot([x0, x1], [y0, y1], color=endcap_separator_line_color, linewidth=0.75, zorder=2, solid_capstyle='butt')
+                ## END for (x0, y0), (x1, y1) in long_endcap_separator_lines + short_endcap_separator_lines...
                 ax.autoscale()
         else:
             print(f'\twarn: already had track extant_long_patch. Skipping duplicate plotting.')

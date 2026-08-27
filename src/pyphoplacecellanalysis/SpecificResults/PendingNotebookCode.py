@@ -130,6 +130,82 @@ from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool
 from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
+
+## Track body helpers:
+
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult
+
+@function_attributes(short_name=None, tags=['track-body', 'aclu', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 16:09', related_items=[])
+def determine_good_aclus_by_track_body_prop(curr_active_pipeline):
+    """ only those aclus with their primary peak on the track body (as opposed to the endcaps) for both the LONG and the SHORT track 
+
+    #TODO 2026-08-27 16:08: - [ ] potentially rename to match `determine_good_aclus_by_qclu(...)`
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_good_aclus_by_track_body_prop
+
+
+        both_body_aclus_both_dirs = determine_good_aclus_by_track_body_prop(curr_active_pipeline)
+        included_aclus = deepcopy(both_body_aclus_both_dirs) ## [ 2,  9, 12, 14, 18, 21, 22, 28, 30, 32]
+        ## now re-run all computations restricting results to only the `included_aclus`
+        included_aclus
+
+    """
+    from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+
+    # 1) track_templates (same pattern you already use)
+    directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+    track_templates = directional_laps_results.get_templates(
+        minimum_inclusion_fr_Hz=2.0,
+        # included_qclu_values=[1, 2],
+    )
+
+    # 2) primary peak x per decoder (index = aclu)
+    (LR_peaks_df, RL_peaks_df), any_dir_pf_max_peak_df = track_templates.get_directional_pf_maximum_peaks_dfs(
+        drop_aclu_if_missing_long_or_short=True,
+        # drop_aclu_if_missing_long_or_short=False,
+    )
+
+
+    ## from prev computations:
+    # any_dir_pf_max_peak_df = _outputs_dict['any_dir_pf_max_peak_df']
+
+
+    ## INPUTS: any_dir_pf_max_peak_df
+
+    # 3) track geometry for body vs endcap
+    long_track_inst, short_track_inst = LinearTrackInstance.init_tracks_from_session_config(curr_active_pipeline.sess.config)
+
+    def is_on_track_body(peak_x, track_inst) -> bool:
+        if pd.isna(peak_x):
+            return False
+        return track_inst.classify_x_position(float(peak_x)).is_track_straightaway
+
+    df = any_dir_pf_max_peak_df.copy()
+    df['long_on_body']  = df['long_LR'].map(lambda x: is_on_track_body(x, long_track_inst))
+    df['short_on_body'] = df['short_LR'].map(lambda x: is_on_track_body(x, short_track_inst))
+
+    both_body_aclus_LR = df.index[
+        df['long_on_body'] & df['short_on_body']
+        & df['long_LR'].notna() & df['short_LR'].notna()
+    ].astype(int).to_numpy()
+    df['long_RL_on_body']  = df['long_RL'].map(lambda x: is_on_track_body(x, long_track_inst))
+    df['short_RL_on_body'] = df['short_RL'].map(lambda x: is_on_track_body(x, short_track_inst))
+
+    both_body_aclus_both_dirs = df.index[
+        df['long_on_body'] & df['short_on_body']
+        & df['long_RL_on_body'] & df['short_RL_on_body']
+        & df[['long_LR','short_LR','long_RL','short_RL']].notna().all(axis=1) ## they all have to be non-nan and on body the whole time.
+    ].astype(int).to_numpy()
+
+    both_body_aclus_both_dirs ## [ 2,  9, 12, 14, 18, 21, 22, 28, 30, 32]
+    return both_body_aclus_both_dirs
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-08-27 - Peak-matching trial-by-trial and Long-Short pfs                                                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
 @function_attributes(short_name=None, tags=['batch', 'compute', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 05:41', related_items=[])
 def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclusion_fr_Hz: float = 1.0, included_qclu_values: Optional[List[int]] = None, tuning_curve_peak_height: float = 0.2, tuning_curve_peak_width: int = 2, max_n_peaks: int = 3, expected_x_translation_magnitude: float = 35,
         should_display: bool = False,
