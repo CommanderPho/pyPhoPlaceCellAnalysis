@@ -155,12 +155,21 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
             minimum_inclusion_fr_Hz=2.0, included_qclu_values=None,
             max_n_peaks=3,
             expected_x_translation_magnitude=35,
+            should_display=True,
         )
-        _outputs_dict
+        # OUTPUTS: _outputs_dict
+
         ## `decoder_peak_diffs_df`: has all peaks for each aclu, this is likely the one you want
         decoder_peak_diffs_df: pd.DataFrame = deepcopy(_outputs_dict['decoder_peak_diffs_df']) ## 61 rows
         ## `any_dir_pf_max_peak_df`: has pf width columns while `decoder_peak_diffs_df` does not, but only contains the max peak
         any_dir_pf_max_peak_df: pd.DataFrame = deepcopy(_outputs_dict['any_dir_pf_max_peak_df']) ## 22 rows
+
+        decoder_peak_diffs_df
+
+        any_dir_peaks_mixed_fields_df: pd.DataFrame = _outputs_dict['any_dir_peaks_mixed_fields_df']
+        any_dir_peaks_field_anchor_summary_df: pd.DataFrame = _outputs_dict['any_dir_peaks_field_anchor_summary_df']
+        any_dir_peaks_field_anchor_summary_df
+
 
     Example Old:
 
