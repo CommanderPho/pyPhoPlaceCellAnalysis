@@ -93,6 +93,7 @@ class TrialByTrialActivityWindow:
         
         cls.perform_build_single_cell_formatted_descriptor_string(active_one_step_decoder=override_active_one_step_decoder, aclu=aclu, is_publication_ready_figure=is_publication_ready_figure)
         """
+        aclu = int(aclu)
         # neuron_i: int = list(self.plots_data.active_one_step_decoder.included_neuron_IDs).index(aclu)
         if is_publication_ready_figure:
             # For publication figures: just "Cell ID: {aclu}" with Arial font and 9pt size

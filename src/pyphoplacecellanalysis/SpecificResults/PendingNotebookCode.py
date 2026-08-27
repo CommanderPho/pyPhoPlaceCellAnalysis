@@ -241,6 +241,12 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
         return (df.set_index('aclu')['widths'] * xstep / 2.0).rename('pf_half_width')
 
 
+    def _subfn_cast_aclu_col_to_int(df: pd.DataFrame) -> pd.DataFrame:
+        if 'aclu' in df.columns:
+            df = df.copy()
+            df['aclu'] = df['aclu'].astype(int)
+        return df
+
     # ==================================================================================================================================================================================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
@@ -305,6 +311,7 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
         # any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.reset_index(drop=True, inplace=False)
         # any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.rename(columns={'Index':'aclu'}, inplace=False)
         any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.reset_index(drop=False, inplace=False, names='aclu', allow_duplicates=False)
+    any_dir_pf_max_peak_df = _subfn_cast_aclu_col_to_int(any_dir_pf_max_peak_df)
         
     ## INPUTS: any_dir_pf_max_peak_df, expected_x_translation_magnitude
     any_dir_pf_max_peak_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_pf_max_peak_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
@@ -344,6 +351,11 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
         print(f'WARNING: compute_run_peak_matching_remapping_all peak-matched remapping failed: {err}')
 
 
+    for _output_key, _output_val in _outputs_dict.items():
+        if isinstance(_output_val, pd.DataFrame):
+            _outputs_dict[_output_key] = _subfn_cast_aclu_col_to_int(_output_val)
+
+
     # Graphics/Display/Figures ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     ## INPUTS: track_templates, any_dir_pf_max_peak_df
     if should_display:
@@ -355,7 +367,7 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
                 # all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
                 compute_peaks_from_static_pfs = True, ## compute dynamically
                 # override_active_neuron_IDs=np.sort(any_dir_pf_max_peak_df['aclu'].unique()),
-                override_active_neuron_IDs=np.sort(_outputs_dict['decoder_peak_diffs_df']['aclu'].unique()),
+                override_active_neuron_IDs=np.sort(_outputs_dict['decoder_peak_diffs_df']['aclu'].unique()).astype(int),
             )
             a_TbyT_activity_win.root_render_widget.useOpenGL(False)
             _outputs_dict.update({'a_TbyT_activity_win': a_TbyT_activity_win, 'static_dict': static_dict, 'peaks_for_plot': peaks_for_plot})
@@ -589,7 +601,7 @@ def plot_static_decoder_placefields_in_trial_by_trial_activity_window(
     any_decoder_neuron_IDs = np.array(track_templates.any_decoder_neuron_IDs)
     if override_active_neuron_IDs is None:
         override_active_neuron_IDs = deepcopy(any_decoder_neuron_IDs)
-    override_active_neuron_IDs = np.asarray(override_active_neuron_IDs)
+    override_active_neuron_IDs = np.asarray(override_active_neuron_IDs, dtype=int)
 
     active_one_step_decoder = _subfn_resolve_active_one_step_decoder_for_tbyt_display(
         track_templates=track_templates,
