@@ -234,6 +234,8 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
 
+    _outputs_dict: Dict[str, Any] = {}
+
     directional_laps_results: DirectionalLapsResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
 
     # optional filters (typical notebook pattern): minimum_inclusion_fr_Hz, included_qclu_values
@@ -247,6 +249,7 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
     (LR_peaks_df, RL_peaks_df), any_dir_peaks_df = track_templates.get_directional_pf_maximum_peaks_dfs(
         drop_aclu_if_missing_long_or_short=False,  # keep cells with only one track
     )
+    _outputs_dict.update({'LR_peaks_df': LR_peaks_df, 'RL_peaks_df': RL_peaks_df, 'any_dir_peaks_df': any_dir_peaks_df})
 
     # columns like: any_dir_peaks_df: ['long_LR', 'short_LR', 'peak_diff_LR']   (and RL analogs)
     # any_dir also has: ['peak_diff_LR', 'peak_diff_RL']
@@ -271,6 +274,7 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
     # columns include: aclu, subpeak_idx, pos, bin_index, peak_heights, widths, ...
     all_decoder_peaks_df
     ## OUTPUTS: all_decoder_peaks_df
+    _outputs_dict['all_decoder_peaks_df'] = all_decoder_peaks_df
 
 
     # Add '*_pf_half_width' columns ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -281,60 +285,60 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
         hw = _subfn_max_peak_half_width_cm(peaks_df, xstep=xstep)
         any_dir_peaks_df[f'{decoder_name}_pf_half_width'] = any_dir_peaks_df.index.map(hw)
 
-    ## OUTPUTS: any_dir_peaks_df
-
     ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
     any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
     # any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
     ## OUTPUTS: any_dir_peaks_df
+    _outputs_dict['any_dir_peaks_df'] = any_dir_peaks_df
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Placefield Peak-matched Remapping                                                                                                                                                                                                                                                    #
     # ==================================================================================================================================================================================================================================================================================== #
-    decoder_peak_diffs_df, peak_diff_from_transitions_df, all_decoders_peak_prominence_df, all_decoders_peak_transitions_df = compute_peak_matched_long_short_pf_remapping(track_templates)
-    
-    # any_dir_peaks_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
-    ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
-    decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
-    # decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
-    decoder_peak_diffs_df
+    try:
+        decoder_peak_diffs_df, peak_diff_from_transitions_df, all_decoders_peak_prominence_df, all_decoders_peak_transitions_df = compute_peak_matched_long_short_pf_remapping(track_templates)
+        _outputs_dict.update({
+            'decoder_peak_diffs_df': decoder_peak_diffs_df,
+            'peak_diff_from_transitions_df': peak_diff_from_transitions_df,
+            'all_decoders_peak_prominence_df': all_decoders_peak_prominence_df,
+            'all_decoders_peak_transitions_df': all_decoders_peak_transitions_df,
+        })
 
-    ## OUTPUTS: decoder_peak_diffs_df
+        # any_dir_peaks_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
+        ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+        decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
+        # decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
+        decoder_peak_diffs_df
+        ## OUTPUTS: decoder_peak_diffs_df
+        _outputs_dict['decoder_peak_diffs_df'] = decoder_peak_diffs_df
 
-
-    # any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
-    any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
-    any_dir_peaks_mixed_fields_df
+        # any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
+        any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
+        any_dir_peaks_mixed_fields_df
+        _outputs_dict.update({
+            'any_dir_peaks_mixed_fields_df': any_dir_peaks_mixed_fields_df,
+            'any_dir_peaks_field_anchor_summary_df': any_dir_peaks_field_anchor_summary_df,
+        })
+    except Exception as err:
+        print(f'WARNING: compute_run_peak_matching_remapping_all peak-matched remapping failed: {err}')
 
 
     # Graphics/Display/Figures ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     ## INPUTS: track_templates, any_dir_peaks_df
     if should_display:
-        pg.setConfigOptions(useOpenGL=False)
-        a_TbyT_activity_win, static_dict, peaks_for_plot = plot_static_decoder_placefields_in_trial_by_trial_activity_window(
-            track_templates=track_templates,
-            # all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
-            compute_peaks_from_static_pfs = True, ## compute dynamically
-            # override_active_neuron_IDs=np.sort(any_dir_peaks_df['aclu'].unique()),
-            override_active_neuron_IDs=np.sort(decoder_peak_diffs_df['aclu'].unique()),
-        )
-        a_TbyT_activity_win.root_render_widget.useOpenGL(False)
+        try:
+            pg.setConfigOptions(useOpenGL=False)
+            a_TbyT_activity_win, static_dict, peaks_for_plot = plot_static_decoder_placefields_in_trial_by_trial_activity_window(
+                track_templates=track_templates,
+                # all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
+                compute_peaks_from_static_pfs = True, ## compute dynamically
+                # override_active_neuron_IDs=np.sort(any_dir_peaks_df['aclu'].unique()),
+                override_active_neuron_IDs=np.sort(_outputs_dict['decoder_peak_diffs_df']['aclu'].unique()),
+            )
+            a_TbyT_activity_win.root_render_widget.useOpenGL(False)
+            _outputs_dict.update({'a_TbyT_activity_win': a_TbyT_activity_win, 'static_dict': static_dict, 'peaks_for_plot': peaks_for_plot})
+        except Exception as err:
+            print(f'WARNING: compute_run_peak_matching_remapping_all display failed: {err}')
 
-
-
-    _outputs_dict = {'a_TbyT_activity_win': a_TbyT_activity_win,
-        'LR_peaks_df': LR_peaks_df,
-        'RL_peaks_df': RL_peaks_df,
-        'all_decoder_peaks_df': all_decoder_peaks_df,
-        'decoder_peak_diffs_df': decoder_peak_diffs_df,
-        'peak_diff_from_transitions_df': peak_diff_from_transitions_df,
-        'all_decoders_peak_prominence_df': all_decoders_peak_prominence_df,
-        'all_decoders_peak_transitions_df': all_decoders_peak_transitions_df,
-        'any_dir_peaks_df': any_dir_peaks_df,
-        'any_dir_peaks_mixed_fields_df': any_dir_peaks_mixed_fields_df,
-        'any_dir_peaks_field_anchor_summary_df': any_dir_peaks_field_anchor_summary_df,
-        'peaks_for_plot': peaks_for_plot,
-    }
 
     return _outputs_dict
 
