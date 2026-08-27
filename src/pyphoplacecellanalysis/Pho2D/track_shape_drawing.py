@@ -2035,9 +2035,10 @@ class TrackRemappingDiagramFigure:
             if ax is not None:
                 ax.add_patch(long_patch)
                 ax.add_patch(short_patch)
-                endcap_separator_line_color = '#333333' if is_dark_mode else '#CCCCCC'
+                endcap_separator_line_color = long_patch.get_edgecolor()
+                endcap_separator_line_linewidth = long_patch.get_linewidth()
                 for (x0, y0), (x1, y1) in long_endcap_separator_lines + short_endcap_separator_lines:
-                    ax.plot([x0, x1], [y0, y1], color=endcap_separator_line_color, linewidth=0.75, zorder=2, solid_capstyle='butt')
+                    ax.plot([x0, x1], [y0, y1], color=endcap_separator_line_color, linewidth=endcap_separator_line_linewidth, zorder=2, solid_capstyle='butt')
                 ## END for (x0, y0), (x1, y1) in long_endcap_separator_lines + short_endcap_separator_lines...
                 ax.autoscale()
         else:
