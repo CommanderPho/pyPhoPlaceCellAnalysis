@@ -146,6 +146,7 @@ class TrialByTrialActivityWindow:
         # ybin_edges=active_one_step_decoder.ybin
         ybin_edges = np.arange(n_epochs+1) - 0.5 # correct ybin_edges are n_epochs
         root_render_widget, parent_root_widget, app = pyqtplot_common_setup(f'TrialByTrialActivityArray: {np.shape(images)}', app=app, parent_root_widget=parent_root_widget, root_render_widget=root_render_widget) ## 🚧 TODO: BUG: this makes a new QMainWindow to hold this item, which is inappropriate if it's to be rendered as a child of another control
+        root_render_widget.useOpenGL(False) ## Disable OpenGL to prevent line-thickness render errors -- 2026-08-27
 
         pg.setConfigOptions(imageAxisOrder='col-major') # this causes the placefields to be rendered horizontally, like they were in _temp_pyqtplot_plot_image_array
 
@@ -903,12 +904,13 @@ class TrialByTrialActivityWindow:
     @classmethod
     def _peak_marker_pen_for_summit_idx(cls, summit_idx_val: int, base_pen=None):
         """Return a pen with width ``base / 2**summit_idx_val`` and summit-rank opacity."""
+        _build_pen_kwargs = dict(cosmetic=True)
         if base_pen is None:
-            base_pen = pg.mkPen('w', width=1.5)
+            base_pen = pg.mkPen('w', width=2.0, **_build_pen_kwargs)
         else:
-            base_pen = pg.mkPen(base_pen)
+            base_pen = pg.mkPen(base_pen, **_build_pen_kwargs)
 
-        base_pen_width: float = float(base_pen.widthF()) if (base_pen.widthF() > 0.0) else 1.5
+        base_pen_width: float = float(base_pen.widthF()) if (base_pen.widthF() > 0.0) else 2.0
         # pen_width: float = float(base_pen_width) / float(2 ** int(summit_idx_val))
         pen_width: float = float(base_pen_width) / float(2 * int(summit_idx_val)) if (summit_idx_val > 0) else base_pen_width
 
@@ -934,10 +936,13 @@ class TrialByTrialActivityWindow:
         if peak_center_x.size == 0:
             return None
 
+        _build_pen_kwargs = dict(cosmetic=True)
+
         if pen is None:
-            pen = pg.mkPen('w', width=1.5)
+            pen = pg.mkPen('w', width=2.0, **_build_pen_kwargs)
         else:
-            pen = pg.mkPen(pen)
+            pen = pg.mkPen(pen, **_build_pen_kwargs)
+
         pen.setCosmetic(True)  # stable stroke width under ViewBox rescale / OpenGL
 
         a_scatter = pg.ScatterPlotItem(
@@ -972,15 +977,15 @@ class TrialByTrialActivityWindow:
         if summit_idx_arr is None:
             a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x, trial_row_idx=trial_row_idx, pen=pen, trial_half_height=trial_half_height)
             return [] if (a_scatter is None) else [a_scatter]
-
-        scatter_items: List[pg.ScatterPlotItem] = []
-        for a_summit_idx_val in np.unique(summit_idx_arr):
-            summit_mask = (summit_idx_arr == a_summit_idx_val)
-            group_pen = cls._peak_marker_pen_for_summit_idx(summit_idx_val=int(a_summit_idx_val), base_pen=pen)
-            a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_row_idx=trial_row_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
-            if a_scatter is not None:
-                scatter_items.append(a_scatter)
-        ## END for a_summit_idx_val in np.unique(summit_idx_arr)...
+        else:
+            scatter_items: List[pg.ScatterPlotItem] = []
+            for a_summit_idx_val in np.unique(summit_idx_arr):
+                summit_mask = (summit_idx_arr == a_summit_idx_val)
+                group_pen = cls._peak_marker_pen_for_summit_idx(summit_idx_val=int(a_summit_idx_val), base_pen=pen)
+                a_scatter = cls._build_peak_marker_scatter(peak_center_x=peak_center_x[summit_mask], trial_row_idx=trial_row_idx[summit_mask], pen=group_pen, trial_half_height=trial_half_height)
+                if a_scatter is not None:
+                    scatter_items.append(a_scatter)
+            ## END for a_summit_idx_val in np.unique(summit_idx_arr)...
 
         return scatter_items
 
@@ -1059,7 +1064,7 @@ class TrialByTrialActivityWindow:
 
         pen = self.params.get('peak_center_marker_pen', None)
         if pen is None:
-            pen = pg.mkPen('w', width=1.5)
+            pen = pg.mkPen('w', width=2.0)
         trial_half_height: float = float(self.params.get('peak_center_marker_trial_half_height', 0.45))
 
         aclu_peaks_df = peaks_df.loc[peaks_df['aclu'].astype(int) == int(neuron_aclu)]
@@ -1210,7 +1215,8 @@ class TrialByTrialActivityWindow:
             peaks_df['trial_row_idx'] = peaks_df['trial_row_idx'] * 2 ## handle the double-spacing of results
 
         if pen is None:
-            pen = pg.mkPen('w', width=1.5)
+            _build_pen_kwargs = dict(cosmetic=True)
+            pen = pg.mkPen('w', width=2.0, **_build_pen_kwargs)
 
         ## Build aclu → plot index map from plot_data_array
         aclu_to_plot_idx: Dict[int, int] = {}
@@ -1324,8 +1330,8 @@ class TrialByTrialActivityWindow:
 
         if 'trial_row_idx' not in peaks_df:
             ## create a 'trial_row_idx' col to actually use in this class for visualization derived from 'trial_idx' so that 'trial_idx' isn't repeatedly overwritten
-            peaks_df['trial_row_idx'] = deepcopy(peaks_df['trial_idx']) - 1 # convert from 1-based to 0-based indexing
-            peaks_df['trial_row_idx'] = peaks_df['trial_row_idx'] * 2 ## handle the double-spacing of results
+            peaks_df['trial_row_idx'] = (deepcopy(peaks_df['trial_idx']) - 1) # convert from 1-based to 0-based indexing
+            peaks_df['trial_row_idx'] = (peaks_df['trial_row_idx'] * 2) ## handle the double-spacing of results
 
         if trial_half_height is None:
             trial_half_height = float(self.params.get('peak_center_marker_trial_half_height', 0.45))
