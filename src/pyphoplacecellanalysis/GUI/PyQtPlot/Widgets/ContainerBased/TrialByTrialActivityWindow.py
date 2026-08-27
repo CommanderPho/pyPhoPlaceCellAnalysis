@@ -565,6 +565,7 @@ class TrialByTrialActivityWindow:
         peak_prominence_table_view = None
         peak_prominence_table_model = None
         content_container = None
+        content_hbox = None
         if not is_publication_ready_figure:
             from pyphocorehelpers.gui.Qt.pandas_model import SimplePandasModel
 
@@ -594,20 +595,32 @@ class TrialByTrialActivityWindow:
 
             hover_preview_y_row_label_items = cls._build_hover_preview_y_row_label_items(hover_preview_plot=hover_preview_plot, n_epochs=n_epochs, x_range=x_range)
 
+            preview_layout = root_render_widget.ci.layout
+            preview_layout.setColumnStretchFactor(max_num_columns, 1)
+            for col_idx in range(max_num_columns):
+                preview_layout.setColumnStretchFactor(col_idx, 3)
+            ## END for col_idx in range(max_num_columns)....
+
             position_plot = hover_preview_plot  # notebook-compat alias
 
             ## Scrollable peak-prominence DataFrame table to the right of the hover preview (full window height)
             peak_prominence_table_model = SimplePandasModel(pd.DataFrame())
             peak_prominence_table_view = pg.QtWidgets.QTableView()
             peak_prominence_table_view.setModel(peak_prominence_table_model)
-            peak_prominence_table_view.setMinimumWidth(360)
+            peak_prominence_table_font = pg.QtGui.QFont()
+            peak_prominence_table_font.setPointSize(7)
+            peak_prominence_table_view.setFont(peak_prominence_table_font)
+            peak_prominence_table_view.horizontalHeader().setFont(peak_prominence_table_font)
+            peak_prominence_table_view.setMinimumWidth(200) ## was 360
+            peak_prominence_table_view.setSizePolicy(pg.QtWidgets.QSizePolicy.Policy.Preferred, pg.QtWidgets.QSizePolicy.Policy.Expanding)
             peak_prominence_table_view.resizeColumnsToContents()
+            peak_prominence_table_view.setVisible(False)
 
             content_container = pg.QtWidgets.QWidget()
-            hbox = pg.QtWidgets.QHBoxLayout(content_container)
-            hbox.setContentsMargins(0, 0, 0, 0)
-            hbox.addWidget(root_render_widget, stretch=3)
-            hbox.addWidget(peak_prominence_table_view, stretch=1)
+            content_hbox = pg.QtWidgets.QHBoxLayout(content_container)
+            content_hbox.setContentsMargins(0, 0, 0, 0)
+            content_hbox.addWidget(root_render_widget, stretch=1)
+            content_hbox.addWidget(peak_prominence_table_view, stretch=0)
             parent_root_widget.setCentralWidget(content_container)
         else:
             hover_preview_plot = None
@@ -642,7 +655,8 @@ class TrialByTrialActivityWindow:
                                  lblTitle=lblTitle, lblFooter=lblFooter, controlled_references=None,
                                  peak_prominence_table_view=peak_prominence_table_view,
                                  peak_prominence_table_model=peak_prominence_table_model,
-                                 content_container=content_container) # , **utility_controls_ui_dict, **info_labels_widgets_dict
+                                 content_container=content_container,
+                                 content_hbox=content_hbox) # , **utility_controls_ui_dict, **info_labels_widgets_dict
         _obj.params = VisualizationParameters(name=name, use_plaintext_title=False, hovered_linear_index=None, **param_kwargs)
         _obj.build_internal_callbacks()
         return _obj
@@ -814,6 +828,17 @@ class TrialByTrialActivityWindow:
         self._update_hover_preview_aclu_field_peak_id_labels(neuron_aclu)
         self._update_hover_peak_prominence_table(neuron_aclu)
     ## END def update_hover_preview(self, a_linear_index: int)...
+
+
+    def _set_peak_prominence_table_visible(self, is_visible: bool):
+        """Show or hide the peak-prominence table column."""
+        table_view = getattr(self.ui, 'peak_prominence_table_view', None)
+        if table_view is None:
+            return
+        if table_view.isVisible() == is_visible:
+            return
+        table_view.setVisible(is_visible)
+
 
 
     def _update_hover_peak_prominence_table(self, neuron_aclu):
@@ -1405,10 +1430,17 @@ class TrialByTrialActivityWindow:
             self.plots_data.all_decoders_peak_prominence_df['trial_row_idx'] = self.plots_data.all_decoders_peak_prominence_df['trial_row_idx'] * 2 ## handle the double-spacing of results
 
 
+        has_peak_table_data = (all_decoders_peak_prominence_df is not None) and (len(all_decoders_peak_prominence_df) > 0)
+        self._set_peak_prominence_table_visible(has_peak_table_data)
+
         hovered_idx = self.params.get('hovered_linear_index', None)
         if hovered_idx is not None:
             hovered_plot_data = self.plots_data.plot_data_array[int(hovered_idx)]
             self._update_hover_peak_prominence_table(hovered_plot_data.get('neuron_aclu', None))
+        elif has_peak_table_data:
+            table_view = getattr(self.ui, 'peak_prominence_table_view', None)
+            if table_view is not None:
+                table_view.resizeColumnsToContents()
 
 
 
