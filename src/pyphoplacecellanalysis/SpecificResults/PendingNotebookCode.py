@@ -138,18 +138,29 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
 
     To be called from `compute_and_export_session_trial_by_trial_performance_completion_function`
 
+    OUTPUTS:
+
+        ## `decoder_peak_diffs_df`: has all peaks for each aclu, this is likely the one you want
+        decoder_peak_diffs_df: pd.DataFrame = deepcopy(_outputs_dict['decoder_peak_diffs_df']) ## 61 rows
+        ## `any_dir_pf_max_peak_df`: has pf width columns while `decoder_peak_diffs_df` does not, but only contains the max peak
+        any_dir_pf_max_peak_df: pd.DataFrame = deepcopy(_outputs_dict['any_dir_pf_max_peak_df']) ## 22 rows
+
+
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compute_run_peak_matching_remapping_all
 
-        _outputs = compute_run_peak_matching_remapping_all(
+        _outputs_dict = compute_run_peak_matching_remapping_all(
             curr_active_pipeline,
             # minimum_inclusion_fr_Hz=5.0, included_qclu_values=[1, 2],
             minimum_inclusion_fr_Hz=2.0, included_qclu_values=None,
             max_n_peaks=3,
             expected_x_translation_magnitude=35,
         )
-        _outputs
-
+        _outputs_dict
+        ## `decoder_peak_diffs_df`: has all peaks for each aclu, this is likely the one you want
+        decoder_peak_diffs_df: pd.DataFrame = deepcopy(_outputs_dict['decoder_peak_diffs_df']) ## 61 rows
+        ## `any_dir_pf_max_peak_df`: has pf width columns while `decoder_peak_diffs_df` does not, but only contains the max peak
+        any_dir_pf_max_peak_df: pd.DataFrame = deepcopy(_outputs_dict['any_dir_pf_max_peak_df']) ## 22 rows
 
     Example Old:
 
@@ -246,50 +257,60 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
         included_qclu_values=included_qclu_values,
     )
 
-    (LR_peaks_df, RL_peaks_df), any_dir_peaks_df = track_templates.get_directional_pf_maximum_peaks_dfs(
+    (LR_peaks_df, RL_peaks_df), any_dir_pf_max_peak_df = track_templates.get_directional_pf_maximum_peaks_dfs(
         drop_aclu_if_missing_long_or_short=False,  # keep cells with only one track
     )
-    _outputs_dict.update({'LR_peaks_df': LR_peaks_df, 'RL_peaks_df': RL_peaks_df, 'any_dir_peaks_df': any_dir_peaks_df})
+    _outputs_dict.update({'LR_peaks_df': LR_peaks_df, 'RL_peaks_df': RL_peaks_df, 'any_dir_pf_max_peak_df': any_dir_pf_max_peak_df})
 
-    # columns like: any_dir_peaks_df: ['long_LR', 'short_LR', 'peak_diff_LR']   (and RL analogs)
+    # columns like: any_dir_pf_max_peak_df: ['long_LR', 'short_LR', 'peak_diff_LR']   (and RL analogs)
     # any_dir also has: ['peak_diff_LR', 'peak_diff_RL']
-    ## OUTPUTS: any_dir_peaks_df, LR_peaks_df, RL_peaks_df
+    ## OUTPUTS: any_dir_pf_max_peak_df, LR_peaks_df, RL_peaks_df
     
 
     # 2) Full peak info (includes widths) for each of the 4 decoders
     #    Require width so find_peaks returns 'widths'
-    _, _, decoder_peaks_df_dict = track_templates.get_decoders_tuning_curve_modes(
+    _, _, decoder_max_peak_only_df_dict = track_templates.get_decoders_tuning_curve_modes(
         peak_mode='peaks',
         height=tuning_curve_peak_height,
         width=tuning_curve_peak_width,   # important: enables widths in the peak properties
     )
 
-    all_decoder_peaks_df_list = []
-    for decoder_name, peaks_df in decoder_peaks_df_dict.items():
-        peaks_df = peaks_df[peaks_df['subpeak_idx'] < max_n_peaks].copy()
-        peaks_df['decoder_name'] = decoder_name
-        all_decoder_peaks_df_list.append(peaks_df)
+    ## just a filtered version with limited number of peaks
+    # all_decoder_peaks_df_list = []
+    # for decoder_name, peaks_df in decoder_peaks_df_dict.items():
+    #     peaks_df = peaks_df[peaks_df['subpeak_idx'] < max_n_peaks].copy()
+    #     peaks_df['decoder_name'] = decoder_name
+    #     all_decoder_peaks_df_list.append(peaks_df)
 
-    all_decoder_peaks_df = pd.concat(all_decoder_peaks_df_list, ignore_index=True)
-    # columns include: aclu, subpeak_idx, pos, bin_index, peak_heights, widths, ...
-    all_decoder_peaks_df
-    ## OUTPUTS: all_decoder_peaks_df
-    _outputs_dict['all_decoder_peaks_df'] = all_decoder_peaks_df
+    # all_decoder_peaks_df = pd.concat(all_decoder_peaks_df_list, ignore_index=True)
+    # # columns include: aclu, subpeak_idx, pos, bin_index, peak_heights, widths, ...
+    # all_decoder_peaks_df
+    # ## OUTPUTS: all_decoder_peaks_df
+    # _outputs_dict['all_decoder_peaks_df'] = all_decoder_peaks_df
 
 
     # Add '*_pf_half_width' columns ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     xstep: float = float(track_templates.long_LR_decoder.pf.bin_info['xstep'])  # cm / bin
 
     # 3) Attach one column per decoder, then a convenient aggregate
-    for decoder_name, peaks_df in decoder_peaks_df_dict.items():
+    for decoder_name, peaks_df in decoder_max_peak_only_df_dict.items():
         hw = _subfn_max_peak_half_width_cm(peaks_df, xstep=xstep)
-        any_dir_peaks_df[f'{decoder_name}_pf_half_width'] = any_dir_peaks_df.index.map(hw)
+        any_dir_pf_max_peak_df[f'{decoder_name}_pf_half_width'] = any_dir_pf_max_peak_df.index.map(hw)
 
-    ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
-    any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
-    # any_dir_peaks_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_peaks_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
-    ## OUTPUTS: any_dir_peaks_df
-    _outputs_dict['any_dir_peaks_df'] = any_dir_peaks_df
+
+    ## Ensure it has the 'aclu' column (by default it is the df's index:
+    if ('aclu' not in any_dir_pf_max_peak_df):
+        # any_dir_pf_max_peak_df['aclu'] = any_dir_pf_max_peak_df.index.to_numpy().astype(int) ## extract aclus
+        ## reset index
+        # any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.reset_index(drop=True, inplace=False)
+        # any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.rename(columns={'Index':'aclu'}, inplace=False)
+        any_dir_pf_max_peak_df = any_dir_pf_max_peak_df.reset_index(drop=False, inplace=False, names='aclu', allow_duplicates=False)
+        
+    ## INPUTS: any_dir_pf_max_peak_df, expected_x_translation_magnitude
+    any_dir_pf_max_peak_df = compute_anchor_mode_cols(any_dir_peaks_df=any_dir_pf_max_peak_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
+    # any_dir_pf_max_peak_df = compute_anchor_mode_cols(any_dir_pf_max_peak_df=any_dir_pf_max_peak_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
+    ## OUTPUTS: any_dir_pf_max_peak_df
+    _outputs_dict['any_dir_pf_max_peak_df'] = any_dir_pf_max_peak_df
 
     # ==================================================================================================================================================================================================================================================================================== #
     # Placefield Peak-matched Remapping                                                                                                                                                                                                                                                    #
@@ -303,14 +324,15 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
             'all_decoders_peak_transitions_df': all_decoders_peak_transitions_df,
         })
 
-        # any_dir_peaks_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
-        ## INPUTS: any_dir_peaks_df, expected_x_translation_magnitude
+        # any_dir_pf_max_peak_df = deepcopy(decoder_peak_diffs_df) ## INPUTS: decoder_peak_diffs_df
+        ## INPUTS: any_dir_pf_max_peak_df, expected_x_translation_magnitude
         decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude, fixed_w_i=10.0)
-        # decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_peaks_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
+        # decoder_peak_diffs_df = compute_anchor_mode_cols(any_dir_pf_max_peak_df=decoder_peak_diffs_df, expected_x_translation_magnitude=expected_x_translation_magnitude)
         decoder_peak_diffs_df
         ## OUTPUTS: decoder_peak_diffs_df
         _outputs_dict['decoder_peak_diffs_df'] = decoder_peak_diffs_df
 
+        # Only needed for placefields, not trials ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         # any_dir_peaks_mixed_fields_df, (peaks_mixed_LR_fields_df, peaks_mixed_RL_fields_df), any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
         any_dir_peaks_mixed_fields_df, any_dir_peaks_field_anchor_summary_df = find_mixed_anchor_mode_aclus(any_dir_peaks_df=decoder_peak_diffs_df)
         any_dir_peaks_mixed_fields_df
@@ -323,15 +345,16 @@ def compute_run_peak_matching_remapping_all(curr_active_pipeline, minimum_inclus
 
 
     # Graphics/Display/Figures ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-    ## INPUTS: track_templates, any_dir_peaks_df
+    ## INPUTS: track_templates, any_dir_pf_max_peak_df
     if should_display:
         try:
+            # NOTE: `plot_static_decoder_placefields_in_trial_by_trial_activity_window` seems to redo the entire peaks computation internally when `compute_peaks_from_static_pfs = True` is passed ______________________________________________________________________________________________ #
             pg.setConfigOptions(useOpenGL=False)
             a_TbyT_activity_win, static_dict, peaks_for_plot = plot_static_decoder_placefields_in_trial_by_trial_activity_window(
                 track_templates=track_templates,
                 # all_decoders_peak_prominence_df=deepcopy(all_decoders_peak_prominence_df),
                 compute_peaks_from_static_pfs = True, ## compute dynamically
-                # override_active_neuron_IDs=np.sort(any_dir_peaks_df['aclu'].unique()),
+                # override_active_neuron_IDs=np.sort(any_dir_pf_max_peak_df['aclu'].unique()),
                 override_active_neuron_IDs=np.sort(_outputs_dict['decoder_peak_diffs_df']['aclu'].unique()),
             )
             a_TbyT_activity_win.root_render_widget.useOpenGL(False)
