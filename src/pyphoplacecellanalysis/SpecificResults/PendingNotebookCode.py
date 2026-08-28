@@ -138,8 +138,14 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsResult
 
 @function_attributes(short_name=None, tags=['track-body', 'aclu', 'filter'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-08-27 16:09', related_items=[])
-def determine_good_aclus_by_track_body_prop(curr_active_pipeline, minimum_inclusion_fr_Hz: float = 2.0, included_qclu_values: Optional[List[int]] = None, require_both_directions: bool = True) -> NDArray:
-    """ only those aclus with their primary peak on the track body (as opposed to the endcaps) for both the LONG and the SHORT track 
+def determine_good_aclus_by_track_body_prop(curr_active_pipeline, minimum_inclusion_fr_Hz: float = 2.0, included_qclu_values: Optional[List[int]] = None, require_both_directions: bool = False, require_both_tracks: bool = False) -> NDArray:
+    """ ACLUs whose primary peak(s) fall on the track body (not endcaps).
+
+    When ``require_both_tracks`` is True, require both Long and Short peaks on the track body.
+    When False, require either a Long peak on the track body OR a Short peak on the track body.
+
+    When ``require_both_directions`` is True, the Long/Short on-body requirement applies to both LR and RL peaks.
+    When False, either an LR or RL on-body peak suffices for each track.
 
     #TODO 2026-08-27 16:08: - [ ] potentially rename to match `determine_good_aclus_by_qclu(...)`
 
@@ -179,20 +185,34 @@ def determine_good_aclus_by_track_body_prop(curr_active_pipeline, minimum_inclus
     df = any_dir_pf_max_peak_df.copy()
     df['long_on_body']  = df['long_LR'].map(lambda x: is_on_track_body(x, long_track_inst))
     df['short_on_body'] = df['short_LR'].map(lambda x: is_on_track_body(x, short_track_inst))
+    df['long_RL_on_body']  = df['long_RL'].map(lambda x: is_on_track_body(x, long_track_inst))
+    df['short_RL_on_body'] = df['short_RL'].map(lambda x: is_on_track_body(x, short_track_inst))
 
     if require_both_directions:
-        df['long_RL_on_body']  = df['long_RL'].map(lambda x: is_on_track_body(x, long_track_inst))
-        df['short_RL_on_body'] = df['short_RL'].map(lambda x: is_on_track_body(x, short_track_inst))
-        body_aclus = df.index[
-            df['long_on_body'] & df['short_on_body']
-            & df['long_RL_on_body'] & df['short_RL_on_body']
-            & df[['long_LR', 'short_LR', 'long_RL', 'short_RL']].notna().all(axis=1)
-        ].astype(int).to_numpy()
+        long_track_on_body = (
+            df['long_on_body'] & df['long_RL_on_body']
+            & df['long_LR'].notna() & df['long_RL'].notna()
+        )
+        short_track_on_body = (
+            df['short_on_body'] & df['short_RL_on_body']
+            & df['short_LR'].notna() & df['short_RL'].notna()
+        )
     else:
-        body_aclus = df.index[
-            df['long_on_body'] & df['short_on_body']
-            & df['long_LR'].notna() & df['short_LR'].notna()
-        ].astype(int).to_numpy()
+        long_track_on_body = (
+            (df['long_on_body'] & df['long_LR'].notna())
+            | (df['long_RL_on_body'] & df['long_RL'].notna())
+        )
+        short_track_on_body = (
+            (df['short_on_body'] & df['short_LR'].notna())
+            | (df['short_RL_on_body'] & df['short_RL'].notna())
+        )
+
+    if require_both_tracks:
+        track_body_mask = long_track_on_body & short_track_on_body
+    else:
+        track_body_mask = long_track_on_body | short_track_on_body
+
+    body_aclus = df.index[track_body_mask].astype(int).to_numpy()
 
     body_aclus = np.intersect1d(body_aclus, track_templates.any_decoder_neuron_IDs).astype(int)
     return body_aclus
