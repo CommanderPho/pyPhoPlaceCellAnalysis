@@ -3377,7 +3377,8 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
     extended_file_types_list = ['laps_simple_pf_pearson_merged_df', 'ripple_simple_pf_pearson_merged_df', 'laps_weighted_corr_merged_df', 'ripple_weighted_corr_merged_df', 'laps_all_scores_merged_df', 'ripple_all_scores_merged_df', 'merged_complete_epoch_stats_df']
 
-    sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv")
+    #TODO 2026-08-28 15:00: - [ ] Commented out because the file was missing, not sure what it does but `_callback_add_df_columns` seems to be used at least.
+    # sessions_df, (experience_rank_map_dict, experience_orientation_rank_map_dict), _callback_add_df_columns = load_and_apply_session_experience_rank_csv("./data/sessions_experiment_datetime_df.csv")
     
     # Sort by columns: 'session' (ascending), 'custom_replay_name' (ascending) and 3 other columns
     parsed_csv_files_df = parsed_csv_files_df.sort_values(['session', 'file_type', 'custom_replay_name', 'decoding_time_bin_size_str', 'export_datetime'], ascending=[True, True, True, True, False]).reset_index(drop=True) # ensures all are sorted ascending except for export_datetime, which are sorted decending so the first value is the most recent.
