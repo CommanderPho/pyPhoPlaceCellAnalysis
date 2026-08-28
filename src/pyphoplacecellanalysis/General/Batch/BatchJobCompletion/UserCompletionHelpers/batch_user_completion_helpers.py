@@ -74,6 +74,15 @@ and can be extracted from batch output by:
 # self.collected_outputs_path: Path = Path('/home/halechr/cloud/turbo/Data/Output/collected_outputs').resolve() # GreatLakes
 # collected_outputs_path = Path(r'C:\Users\pho\repos\Spike3DWorkEnv\Spike3D\output\collected_outputs').resolve() # Apogee
 
+
+@function_attributes(short_name=None, tags=['export', 'filename', 'suffix', 'variant'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function', 'save_custom_session_files_completion_function', 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2026-08-27 17:00', related_items=['get_custom_pipeline_filenames_from_parameters'])
+def apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> None:
+    """ Sets a transient attribute on the pipeline so that `get_custom_pipeline_filenames_from_parameters()`/`custom_save_pipeline_as()` append extra parser-safe suffix parts (e.g. ['variant_trackBodyPeakOnly']) to export filenames.
+    Each part must contain an underscore separating key and value (e.g. 'variant_trackBodyPeakOnly') to stay compatible with `ExportValueNameCleaner.parse_comparable_custom_replay_name_to_separate_columns`.
+    """
+    if export_filename_extra_suffix_parts:
+        curr_active_pipeline._export_filename_extra_suffix_parts = list(export_filename_extra_suffix_parts)
+
 # ==================================================================================================================== #
 # Specific Decoding Parameter Sweeps                                                                                   #
 # ==================================================================================================================== #
@@ -2901,7 +2910,7 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 
 
 @function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
-def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict) -> dict:
+def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
     """ Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import backup_previous_session_files_completion_function
@@ -2915,7 +2924,9 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     import sys
     from datetime import timedelta, datetime
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
 
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
     custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -3220,7 +3231,7 @@ def compute_and_export_session_extended_placefield_peak_information_completion_f
 
 
 @function_attributes(short_name=None, tags=['posterior', 'marginal', 'CSV', 'non-PBE', 'epochs', 'decoding'], input_requires=[], output_provides=[], uses=['GenericDecoderDictDecodedEpochsDictResult', 'pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions.EpochComputationFunctions.perform_compute_non_PBE_epochs'], used_by=[], creation_date='2025-03-09 16:35', related_items=['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'])
-def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, compute_2D=False) -> dict:
+def generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, epochs_decoding_time_bin_size:float=0.025, force_recompute:bool=True, debug_print:bool=True, export_pkl: bool=True, compute_2D=False, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
     """ Aims to generally:
     1. Build a dict of decoders (usually 1D) built on several different subsets of input epochs (long_LR_laps-only, long_laps-only, long_non_PBE-only, ...etc
     2. Use these decoders and the neural data to decode posteriors for a variety of parameters (e.g. cell types, epochs-to-be-decoded, time_bin_sizes, etc)
@@ -3268,6 +3279,9 @@ def generalized_decode_epochs_dict_and_export_results_completion_function(self, 
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print(f'generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}, force_recompute: {force_recompute}, ...)')
+
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
 
     # ==================================================================================================================== #
     # New 2025-03-11 Generic Result:                                                                                       #
@@ -4529,7 +4543,7 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                         included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
-                                                                                        fail_on_exception_for_debugging:bool=False,
+                                                                                        fail_on_exception_for_debugging:bool=False, export_filename_extra_suffix_parts: Optional[List[str]]=None,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
@@ -4559,6 +4573,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
     from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import Assert
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
+
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly'); note figure filenames built from display contexts are unaffected
 
     # 'trackID_weighted_position_posterior'
     if across_session_results_extended_dict is None:

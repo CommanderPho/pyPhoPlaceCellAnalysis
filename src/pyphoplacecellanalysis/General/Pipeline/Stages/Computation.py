@@ -3418,6 +3418,14 @@ class PipelineWithComputedPipelineStageMixin:
         # print(f'custom_save_filenames: {custom_save_filenames}')
         # print(f'custom_suffix: "{custom_suffix}"')
         
+        ## Optionally append extra export filename suffix parts (e.g. ['variant_trackBodyPeakOnly']) set transiently on the pipeline (e.g. by batch completion handlers) to disambiguate variant outputs:
+        extra_suffix_parts = getattr(self, '_export_filename_extra_suffix_parts', None) or []
+        if len(extra_suffix_parts) > 0:
+            _old_custom_suffix: str = custom_suffix
+            custom_suffix = parts_separator.join([custom_suffix, *extra_suffix_parts]) # e.g. '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly'
+            custom_save_filenames = {k:v.replace(_old_custom_suffix, custom_suffix) for k, v in custom_save_filenames.items()}
+            custom_save_filepaths = {k:(v.replace(_old_custom_suffix, custom_suffix) if isinstance(v, str) else v) for k, v in custom_save_filepaths.items()}
+
         return custom_save_filepaths, custom_save_filenames, custom_suffix
     
 

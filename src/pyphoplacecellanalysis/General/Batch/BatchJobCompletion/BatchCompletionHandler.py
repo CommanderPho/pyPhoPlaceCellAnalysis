@@ -279,6 +279,8 @@ class BatchSessionCompletionHandler:
     track_body_filter_minimum_inclusion_fr_Hz: Optional[float] = field(default=None)
     track_body_filter_included_qclu_values: Optional[List] = field(default=None)
 
+    export_filename_extra_suffix_parts: List[str] = field(default=Factory(list)) # e.g. ['variant_trackBodyPeakOnly'] - parser-safe extra suffix parts appended to export filenames (each part must contain an underscore separating key and value)
+
     # @property
     # def override_session_computation_results_pickle_filename(self) -> Optional[str]:
     #     return self.session_computations_options.override_file
@@ -913,6 +915,12 @@ class BatchSessionCompletionHandler:
         ## get override kwargs
         override_user_completion_function_kwargs_dict = deepcopy(self.override_user_completion_function_kwargs_dict) ## previously used a blank override config, making it useless. {}
         
+        ## apply any extra export filename suffix parts (e.g. ['variant_trackBodyPeakOnly']) to the pipeline so completion function exports are disambiguated:
+        if len(self.export_filename_extra_suffix_parts) > 0:
+            from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
+            print(f'\t\t applying export_filename_extra_suffix_parts: {self.export_filename_extra_suffix_parts} to pipeline...')
+            apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=self.export_filename_extra_suffix_parts)
+
         print(f'\t\t ---- on_complete_success_execution_session(...): starting self.completion_functions execution...')
 
         ## run external completion functions:

@@ -274,7 +274,7 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
 
 
 @function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'save', 'save_custom'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'helper_perform_pickle_pipeline'], used_by=[], creation_date='2024-10-28 14:08', related_items=[])
-def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='normal_computed', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, parts_separator:str='-') -> Tuple[Dict[str, Path], str]:
+def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='normal_computed', minimum_inclusion_fr_Hz=None, included_qclu_values=None, enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = False, saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, parts_separator:str='-', extra_suffix_parts: Optional[List[str]]=None) -> Tuple[Dict[str, Path], str]:
     """ Saves a pipeline with custom parameters
 
     Usage:   
@@ -283,6 +283,13 @@ def save_custom_parameters_pipeline(a_curr_active_pipeline, epochs_source: str='
 
     """	
     custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
+    ## Optionally append extra export filename suffix parts (e.g. ['variant_trackBodyPeakOnly']) to disambiguate variant outputs:
+    extra_suffix_parts = extra_suffix_parts or []
+    if len(extra_suffix_parts) > 0:
+        _old_custom_suffix: str = custom_suffix
+        custom_suffix = parts_separator.join([custom_suffix, *extra_suffix_parts])
+        custom_save_filenames = {k:v.replace(_old_custom_suffix, custom_suffix) for k, v in custom_save_filenames.items()}
+        custom_save_filepaths = {k:(v.replace(_old_custom_suffix, custom_suffix) if isinstance(v, str) else v) for k, v in custom_save_filepaths.items()}
     print(f'custom_save_filenames: {custom_save_filenames}')
     ## Pickle again after recomputing:
     custom_save_filepaths_dict = helper_perform_pickle_pipeline(a_curr_active_pipeline=a_curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths_dict=custom_save_filepaths,
@@ -1189,8 +1196,9 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
 
+        extra_suffix_parts = getattr(self, '_export_filename_extra_suffix_parts', None) or [] # e.g. ['variant_trackBodyPeakOnly'] -- set transiently (e.g. by batch completion handlers) to disambiguate variant outputs
         custom_save_filepaths_dict, custom_suffix = save_custom_parameters_pipeline(self, epochs_source=epochs_source, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, 
-                                                                saving_mode=saving_mode, enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
+                                                                saving_mode=saving_mode, enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5, extra_suffix_parts=extra_suffix_parts)
         return custom_save_filepaths_dict, custom_suffix
 
 

@@ -2283,6 +2283,7 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
         date_day_time_missing_custom_replay_name = "2024-11-27_1220PM-kdiba_gor01_one_2006-6-12_15-55-31-(laps_simple_pf_pearson_merged_df)_tbin-0.25",
         date_day_time_variant_suffix_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025",
         date_day_time_variant_suffix_missing_tbin_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)",
+        track_body_variant_name = "2026-08-27_0500PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly-(ripple_all_scores_merged_df)_tbin-0.075",
         )
 
         expected_parse_results_dict = dict(
@@ -2290,7 +2291,8 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
             date_day_only_with_suffix_name = (datetime(2024, 11, 27, 0, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
             date_day_time_missing_custom_replay_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', None, 'laps_simple_pf_pearson_merged_df', '0.25'),
             date_day_time_variant_suffix_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
-            date_day_time_variant_suffix_missing_tbin_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', None)
+            date_day_time_variant_suffix_missing_tbin_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', None),
+            track_body_variant_name = (datetime(2026, 8, 27, 17, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'ripple_all_scores_merged_df', '0.075')
         )
 
         ## perform the actual parsing:
@@ -4213,12 +4215,26 @@ class ExportValueNameCleaner:
             'qclu': '[1, 2, 4, 6, 7, 8, 9]',
             'frateThresh': '2.0'}
         
+        Variant example (track-body peaks-only runs append a parser-safe '-variant_trackBodyPeakOnly' segment):
+            split_dict = cls.parse_comparable_custom_replay_name_to_separate_columns(comparable_custom_replay_name= 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly')
+
+            {'replayMethod': 'withNormalComputedReplays',
+            'qclu': '[1, 2, 4, 6, 7, 8, 9]',
+            'frateThresh': '2.0',
+            'variant': 'trackBodyPeakOnly'}
+        
         """
         replay_name, *split_parts = comparable_custom_replay_name.split('-')
         split_dict = {'replayMethod': replay_name}
         for a_part in split_parts:
-            a_key, a_value = a_part.split('_', maxsplit=1)
-            split_dict[a_key] = a_value
+            if '_' in a_part:
+                a_key, a_value = a_part.split('_', maxsplit=1)
+                split_dict[a_key] = a_value
+            else:
+                ## unknown extra segment without a key_value underscore separator (e.g. a bare suffix) -- store it under its own name so parsing doesn't fail:
+                split_dict[a_part] = ''
+        ## END for a_part in split_parts...
+
         return split_dict
 
 
