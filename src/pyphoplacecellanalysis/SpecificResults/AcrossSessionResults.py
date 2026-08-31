@@ -2284,6 +2284,7 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
         date_day_time_variant_suffix_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)_tbin-0.025",
         date_day_time_variant_suffix_missing_tbin_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)",
         track_body_variant_name = "2026-08-27_0500PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly-(ripple_all_scores_merged_df)_tbin-0.075",
+        track_body_variant_perfmnc_session_name = "2026-08-28_0830PM-kdiba_gor01_one_2006-6-08_14-26-15__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly-(perfmnc_session)_tbin-0.075",
         )
 
         expected_parse_results_dict = dict(
@@ -2292,7 +2293,8 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
             date_day_time_missing_custom_replay_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', None, 'laps_simple_pf_pearson_merged_df', '0.25'),
             date_day_time_variant_suffix_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
             date_day_time_variant_suffix_missing_tbin_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', None),
-            track_body_variant_name = (datetime(2026, 8, 27, 17, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'ripple_all_scores_merged_df', '0.075')
+            track_body_variant_name = (datetime(2026, 8, 27, 17, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'ripple_all_scores_merged_df', '0.075'),
+            track_body_variant_perfmnc_session_name = (datetime(2026, 8, 28, 20, 30), 'kdiba_gor01_one_2006-6-08_14-26-15', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'perfmnc_session', '0.075')
         )
 
         ## perform the actual parsing:
@@ -3289,12 +3291,12 @@ def _concat_custom_dict_to_df(final_sessions_loaded_df_dict):
     )
 
 
-def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: str, debug_print:bool=False, allow_CONCAT_to_existing: bool=False, **additional_columns) -> bool:
+def _subfn_new_df_process_and_load_exported_file(file_path, loaded_dict: Dict, session_name: str, curr_session_t_delta: float, time_key: Optional[str] = None, debug_print:bool=False, allow_CONCAT_to_existing: bool=False, **additional_columns) -> bool:
     try:
         # loaded_dict[session_name] = read_and_process_csv_file(file_path, session_name, curr_session_t_delta, time_key)
         df = pd.read_csv(file_path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False) # `low_memory=False` tells pandas to use more memory to correctly infer data types.
         df['session_name'] = session_name
-        if curr_session_t_delta is not None:
+        if (curr_session_t_delta is not None) and (time_key is not None) and (time_key in df.columns):
             df['delta_aligned_start_t'] = df[time_key] - curr_session_t_delta
 
         # loaded_dict_key = session_name # old way, session only
@@ -3370,8 +3372,10 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     
 
     final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_WCorrShuffle_df': {},
+                                                            'perfmnc_session': {},
                                            }
     final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_WCorrShuffle_df': None,
+                                                                'perfmnc_session': None,
                                       }
     
     basic_marginals_file_types = ['laps_marginals_df', 'ripple_marginals_df', 'laps_time_bin_marginals_df', 'ripple_time_bin_marginals_df',]
@@ -3475,6 +3479,11 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
             elif file_type == 'ripple_WCorrShuffle_df':
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
+                ## update when done:
+                final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type == 'perfmnc_session':
+                _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
+                _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=None, **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
             elif file_type == 'FAT':
