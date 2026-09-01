@@ -3140,6 +3140,28 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
 
     @classmethod
+    def _marginalize_p_x_given_n_over_context_groups_in_position_space(cls, a_p_x_given_n: NDArray, context_dim_idx: int, spatial_sum_axes: Tuple[int, ...], group_indices_list: List[List[int]]) -> NDArray:
+        """Sum context groups in full posterior space, then marginalize spatial dims (KDiba pseudo2D order).
+
+        Matches the pre-generalization KDiba path: combine contexts at each spatial bin first,
+        sum over position, then normalize across groups per time bin (not normalize across all contexts first).
+        """
+        n_groups: int = len(group_indices_list)
+        grouped_in_position_space_shape: Tuple[int, ...] = tuple(np.shape(a_p_x_given_n)[dim_idx] if dim_idx != context_dim_idx else n_groups for dim_idx in range(a_p_x_given_n.ndim))
+        grouped_in_position_space: NDArray = np.zeros(grouped_in_position_space_shape, dtype=a_p_x_given_n.dtype)
+        for group_idx, group_indices in enumerate(group_indices_list):
+            group_context_slice: NDArray = np.take(a_p_x_given_n, group_indices, axis=context_dim_idx)
+            group_summed_in_position_space: NDArray = np.sum(group_context_slice, axis=context_dim_idx)
+            group_position_space_index: Tuple[Union[slice, int], ...] = tuple(group_idx if dim_idx == context_dim_idx else slice(None) for dim_idx in range(a_p_x_given_n.ndim))
+            grouped_in_position_space[group_position_space_index] = group_summed_in_position_space
+        ## END for group_idx, group_indices in enumerate(group_indices_list)...
+        grouped_marginal_p_x_given_n: NDArray = np.squeeze(np.nansum(grouped_in_position_space, axis=spatial_sum_axes))
+        if grouped_marginal_p_x_given_n.ndim == 1:
+            grouped_marginal_p_x_given_n = grouped_marginal_p_x_given_n.reshape(n_groups, -1)
+        return cls._normalize_per_timebin_context_marginal(grouped_marginal_p_x_given_n)
+
+
+    @classmethod
     def _resolve_pseudo2D_continuous_result(cls, pseudo2D_result) -> Tuple[Any, NDArray, str]:
         """Normalize pseudo2D cache entries to SingleEpochDecodedResult + time centers and detect decoder format."""
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
@@ -3544,8 +3566,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
             assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
-            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
-            directional_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [lr_context_indices, rl_context_indices])
+            directional_marginal_p_x_given_n = cls._marginalize_p_x_given_n_over_context_groups_in_position_space(a_p_x_given_n, context_layout.context_dim_idx, context_layout.spatial_sum_axes, group_indices_list=[lr_context_indices, rl_context_indices])
             curr_unit_marginal_y = DynamicContainer(p_x_given_n=directional_marginal_p_x_given_n, most_likely_positions_1D=None)
             if debug_print:
                 print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
@@ -3573,8 +3594,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
             assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
-            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
-            track_identity_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [long_context_indices, short_context_indices]) #TODO 2026-09-01 15:43: - [ ] does not match Diba2025 implementation
+            track_identity_marginal_p_x_given_n = cls._marginalize_p_x_given_n_over_context_groups_in_position_space(a_p_x_given_n, context_layout.context_dim_idx, context_layout.spatial_sum_axes, group_indices_list=[long_context_indices, short_context_indices])
             curr_unit_marginal_x = DynamicContainer(p_x_given_n=track_identity_marginal_p_x_given_n, most_likely_positions_1D=None)
             if debug_print:
                 print(f'np.shape(curr_unit_marginal_x.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
