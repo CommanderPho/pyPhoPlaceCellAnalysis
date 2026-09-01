@@ -3526,6 +3526,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
         return custom_curr_unit_marginal_list
 
+
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_directional_likelihoods'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
     def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
@@ -3581,6 +3582,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
         return custom_curr_unit_marginal_list
         
+
     # Higher-level likelihood access functions ___________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
@@ -3594,6 +3596,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder)
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
+
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
     def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> DecodedMarginalResultTuple:
