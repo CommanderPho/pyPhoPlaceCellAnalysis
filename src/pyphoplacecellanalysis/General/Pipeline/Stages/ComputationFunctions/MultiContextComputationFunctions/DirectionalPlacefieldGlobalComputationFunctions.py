@@ -5395,7 +5395,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
         measured_decoded_position_comparion: MeasuredDecodedPositionComparison = deepcopy(test_all_directional_laps_decoder_result.measured_decoded_position_comparion) ## provides actual measured positions at each of these bins
         
-        active_filter_epochs: pd.DataFrame = deepcopy(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
+        active_filter_epochs: pd.DataFrame = ensure_dataframe(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
 
         Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.measured_positions_dfs_list)
         Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.decoded_positions_df_list)
