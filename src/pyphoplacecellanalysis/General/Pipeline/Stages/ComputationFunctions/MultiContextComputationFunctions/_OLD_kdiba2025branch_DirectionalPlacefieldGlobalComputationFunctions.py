@@ -9,7 +9,7 @@ from collections import namedtuple
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable, Set
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, Iterable
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -32,7 +32,7 @@ from pyphocorehelpers.indexing_helpers import reorder_columns_relative
 from neuropy.core.laps import Laps, LapsAccessor # used in `DirectionalLapsHelpers`
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
-from neuropy.utils.mixins.dict_representable import override_dict # used to build config
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset # used to build config
 from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters
 from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
@@ -75,99 +75,6 @@ DecodedMarginalResultTuple: TypeAlias = Tuple[
     NDArray[ND.Shape["*"], ND.Int],
     NDArray[ND.Shape["*"], ND.Bool]
 ] 
-
-Pseudo2DContextLayout: TypeAlias = namedtuple('Pseudo2DContextLayout', ['p_x_given_n_list', 'p_x_given_n_ndim', 'context_dim_idx', 'n_contexts', 'spatial_sum_axes', 'context_names', 'direction_group_indices', 'track_identity_group_indices'])
-
-DecodingContinuousCacheKey: TypeAlias = Tuple[float, float]
-
-
-def decoding_continuous_cache_key(decoding_time_bin_size: float, slideby: Optional[float]) -> DecodingContinuousCacheKey:
-    """Stable cache key (window_width_sec, slideby_sec). None slideby means non-overlapping bins (slideby == window width)."""
-    w = float(decoding_time_bin_size)
-    h = float(slideby) if slideby is not None else w
-    return (w, h)
-
-
-def coerce_continuously_decoded_cache_dict_keys(cache_dict: Optional[Dict[Any, Any]]) -> Optional[Dict[DecodingContinuousCacheKey, Any]]:
-    """Normalize legacy float keys to (w, w) tuples."""
-    if cache_dict is None:
-        return None
-    out: Dict[DecodingContinuousCacheKey, Any] = {}
-    for k, v in cache_dict.items():
-        if isinstance(k, tuple) and len(k) == 2:
-            nk: DecodingContinuousCacheKey = (float(k[0]), float(k[1]))
-        else:
-            w = float(k)
-            nk = (w, w)
-        if nk in out:
-            raise ValueError(f"Duplicate decoding cache key after normalization: {nk}")
-        out[nk] = v
-    return out
-
-
-def normalize_continuous_decoding_cache_lookup_key(extant: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> DecodingContinuousCacheKey:
-    """Resolve user lookup (float W or (W,H) tuple) to a cache key."""
-    if isinstance(extant, tuple) and len(extant) == 2:
-        return (float(extant[0]), float(extant[1]))
-    return decoding_continuous_cache_key(float(extant), slideby)
-
-
-_LEGACY_TRACK_TEMPLATE_DECODER_ATTR_TO_KEY = (
-    ('long_LR_decoder', 'long_LR'),
-    ('long_RL_decoder', 'long_RL'),
-    ('short_LR_decoder', 'short_LR'),
-    ('short_RL_decoder', 'short_RL'),
-)
-
-_LEGACY_ONE_STEP_DECODER_ATTR_TO_KEY = (
-    ('long_LR_one_step_decoder_1D', 'long_LR'),
-    ('long_RL_one_step_decoder_1D', 'long_RL'),
-    ('short_LR_one_step_decoder_1D', 'short_LR'),
-    ('short_RL_one_step_decoder_1D', 'short_RL'),
-)
-
-_LEGACY_SHARED_ACLUS_ONLY_DECODER_ATTR_TO_KEY = (
-    ('long_LR_shared_aclus_only_one_step_decoder_1D', 'long_LR'),
-    ('long_RL_shared_aclus_only_one_step_decoder_1D', 'long_RL'),
-    ('short_LR_shared_aclus_only_one_step_decoder_1D', 'short_LR'),
-    ('short_RL_shared_aclus_only_one_step_decoder_1D', 'short_RL'),
-)
-
-
-def _migrate_legacy_named_decoders_into_dict(obj_or_state: Any, attr_to_key: Tuple[Tuple[str, str], ...], target_dict_attr: str) -> None:
-    """Populate `target_dict_attr` from legacy named decoder fields (pickle / attrs layout migration)."""
-    is_mapping: bool = isinstance(obj_or_state, dict)
-    get_val = (lambda k, default=None: obj_or_state.get(k, default)) if is_mapping else (lambda k, default=None: getattr(obj_or_state, k, default))
-    set_val = (lambda k, v: obj_or_state.__setitem__(k, v)) if is_mapping else (lambda k, v: setattr(obj_or_state, k, v))
-    pop_val = (lambda k: obj_or_state.pop(k, None)) if is_mapping else (lambda k: obj_or_state.__dict__.pop(k, None))
-
-    extant_dict = get_val(target_dict_attr, None)
-    if extant_dict is None or (isinstance(extant_dict, dict) and len(extant_dict) == 0):
-        migrated: Dict[str, Any] = {}
-        for attr_name, decoder_key in attr_to_key:
-            legacy_val = get_val(attr_name, None)
-            if legacy_val is not None:
-                migrated[decoder_key] = legacy_val
-        ## END for attr_name, decoder_key in attr_to_key....
-
-        if len(migrated) > 0:
-            set_val(target_dict_attr, migrated)
-        elif extant_dict is None:
-            set_val(target_dict_attr, {})
-
-    for attr_name, _decoder_key in attr_to_key:
-        pop_val(attr_name)
-    ## END for attr_name, _decoder_key in attr_to_key....
-
-
-def _migrate_legacy_track_templates_state(obj_or_state: Any) -> None:
-    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_TRACK_TEMPLATE_DECODER_ATTR_TO_KEY, 'decoders_dict')
-
-
-def _migrate_legacy_directional_laps_state(obj_or_state: Any) -> None:
-    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_ONE_STEP_DECODER_ATTR_TO_KEY, 'one_step_decoder_1D_dict')
-    _migrate_legacy_named_decoders_into_dict(obj_or_state, _LEGACY_SHARED_ACLUS_ONLY_DECODER_ATTR_TO_KEY, 'shared_aclus_only_one_step_decoder_1D_dict')
-
 
 # DecodedMarginalResultTuple = NewType('DecodedMarginalResultTuple', Tuple[List[DynamicContainer], NDArray[float], NDArray[int], NDArray[bool]])
 
@@ -264,7 +171,7 @@ def add_laps_groundtruth_information_to_dataframe(curr_active_pipeline, result_l
 DirectionalDecodersTuple = namedtuple('DirectionalDecodersTuple', ['long_LR', 'long_RL', 'short_LR', 'short_RL'])
 
 @define(slots=False, repr=False, eq=False)
-class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
+class TrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
     """ Holds the four directional templates for direction placefield analysis.
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
 
@@ -274,8 +181,11 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
 
     """
-    decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=Factory(dict), repr=False)
-    
+    long_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
+    long_RL_decoder: BasePositionDecoder = serialized_field(repr=False) # keys_only_repr
+    short_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
+    short_RL_decoder: BasePositionDecoder = serialized_field(repr=False)
+
     # ## Computed properties
     shared_LR_aclus_only_neuron_IDs: NDArray = serialized_field(repr=True)
     is_good_LR_aclus: NDArray = serialized_field(repr=False)
@@ -289,10 +199,11 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
 
     rank_method: str = serialized_attribute_field(default="average", is_computable=False, repr=True)
 
+
     @property
     def decoder_neuron_IDs_list(self) -> List[NDArray]:
         """ a list of the neuron_IDs for each decoder (independently) """
-        return [a_decoder.pf.ratemap.neuron_ids for a_decoder in list(self.decoders_dict.values())]
+        return [a_decoder.pf.ratemap.neuron_ids for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
     
     @property
     def any_decoder_neuron_IDs(self) -> NDArray:
@@ -302,7 +213,7 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
     @property
     def decoder_peak_location_list(self) -> List[NDArray]:
         """ a list of the peak_tuning_curve_center_of_masses for each decoder (independently) """
-        return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in list(self.decoders_dict.values())]
+        return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
     
     @property
     def decoder_peak_rank_list_dict(self) -> Dict[str, NDArray]:
@@ -319,698 +230,11 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
         return {a_name:a_decoder.pf.normalized_tuning_curves_dict for a_name, a_decoder in self.get_decoders_dict().items()}
             
+
     @property
     def decoder_stability_dict_dict(self): # -> Dict[str, Dict[types.aclu_index, NDArray]]:
         # """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
         return {a_name:a_decoder.pf.ratemap.spatial_sparcity for a_name, a_decoder in self.get_decoders_dict().items()}
-    
-
-    def get_decoders_tuning_curve_modes(self, peak_mode='peaks', **find_peaks_kwargs) -> Tuple[Dict[decoder_name_str, Dict[types.aclu_index, NDArray]], Dict[decoder_name_str, Dict[types.aclu_index, int]], Dict[decoder_name_str, pd.DataFrame]]:
-        """ 2023-12-19 - Uses `scipy.signal.find_peaks to find the number of peaks or ("modes") for each of the cells in the ratemap. 
-        Can detect bimodal (or multi-modal) placefields.
-        
-        Depends on:
-            self.tuning_curves
-        
-        Returns:
-            aclu_n_peaks_dict: Dict[int, int] - A mapping between aclu:n_tuning_curve_modes
-        Usage:    
-            decoder_peaks_dict_dict, decoder_aclu_n_peaks_dict_dict, decoder_peaks_results_df_dict = track_templates.get_decoders_tuning_curve_modes()
-
-        """
-        decoder_peaks_results_tuples_dict = {a_decoder_name:a_decoder.pf.ratemap.compute_tuning_curve_modes(peak_mode=peak_mode, **find_peaks_kwargs) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
-        # each tuple contains: peaks_dict, aclu_n_peaks_dict, peaks_results_df, so unwrap below
-        
-        decoder_peaks_dict_dict = {k:v[0] for k,v in decoder_peaks_results_tuples_dict.items()}
-        decoder_aclu_n_peaks_dict_dict = {k:v[1] for k,v in decoder_peaks_results_tuples_dict.items()}
-        decoder_peaks_results_df_dict = {k:v[2] for k,v in decoder_peaks_results_tuples_dict.items()}
-
-        # return peaks_dict, aclu_n_peaks_dict, unimodal_peaks_dict, peaks_results_dict
-        return decoder_peaks_dict_dict, decoder_aclu_n_peaks_dict_dict, decoder_peaks_results_df_dict
-    
-
-    @function_attributes(short_name=None, tags=['WORKING', 'peak', 'multi-peak', 'decoder', 'pfs'], input_requires=[], output_provides=[], uses=['get_tuning_curve_peak_positions'], used_by=['add_directional_pf_maximum_peaks'], creation_date='2024-05-21 19:00', related_items=[])
-    def get_directional_pf_maximum_peaks_dfs(self, drop_aclu_if_missing_long_or_short: bool = True) -> Tuple[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
-        """ The only version that only gets the maximum peaks appropriate for each decoder.
-
-        # 2024-05-21 - Replaces `.get_decoders_aclu_peak_location_df(...)` for properly getting peak locations. Is correct (which is why the old result was replaced) but has a potential drawback of not currently accepting `, **find_peaks_kwargs`. I only see `width=None` ever passed in like this though.
-
-        # 2024-04-09 00:36: - [X] Could be refactored into TrackTemplates
-
-        #TODO 2024-05-21 22:53: - [ ] Noticed that short track always has all-non-NaN peaks (has a value for each peak) and long track is missing values. This doesn't make sense because many of the peaks indicated for short occur only on the long-track, which makes no sense.
-
-        Usage:
-
-            (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df = track_templates.get_directional_pf_maximum_peaks_dfs(drop_aclu_if_missing_long_or_short=False)
-
-            AnyDir_decoder_aclu_MAX_peak_maps_df
-            LR_only_decoder_aclu_MAX_peak_maps_df
-            RL_only_decoder_aclu_MAX_peak_maps_df
-
-
-        """
-        # drop_aclu_if_missing_long_or_short: bool = True ## default=True; Drop entire row if either long/short is missing a value
-        # drop_aclu_if_missing_long_or_short: bool = False
-        # from neuropy.utils.indexing_helpers import intersection_of_arrays, union_of_arrays
-        from neuropy.utils.indexing_helpers import unwrap_single_item
-
-
-        ## Split into LR/RL groups to get proper peak differences:
-        # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        LR_decoder_names = self.get_LR_decoder_names() # ['long_LR', 'short_LR']
-        RL_decoder_names = self.get_RL_decoder_names() # ['long_RL', 'short_RL']
-
-        ## Only the maximums (height=1 items), guaranteed to be a single (or None) location:
-        decoder_aclu_MAX_peak_maps_dict: Dict[types.DecoderName, Dict[types.aclu_index, Optional[float]]] = {types.DecoderName(a_name):{k:unwrap_single_item(v) for k, v in deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks', height=1)))).items()} for a_name, a_decoder in self.get_decoders_dict().items()}
-        #TODO 2024-05-21 22:59: - [ ] NEed to ensure that `a_decoder.neuron_IDs` and `a_decoder.get_tuning_curve_peak_positions(peak_mode='peaks', height=1)` are returned in the same order for sure
-            # it should because it's dependent only on `pdf_normalized_tuning_curves`, which is in the neuron_IDs order. The only issue could be if the subpeaks sorting issue happens
-
-        # decoder_aclu_MAX_peak_maps_dict
-        AnyDir_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in (LR_decoder_names + RL_decoder_names)}) # either direction decoder
-
-        ## Splits by direction:
-        LR_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in LR_decoder_names})
-        RL_only_decoder_aclu_MAX_peak_maps_df: pd.DataFrame = pd.DataFrame({k:v for k,v in decoder_aclu_MAX_peak_maps_dict.items() if k in RL_decoder_names})
-
-        ## Drop entire row if either long/short is missing a value:
-        if drop_aclu_if_missing_long_or_short:
-            LR_only_decoder_aclu_MAX_peak_maps_df = LR_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
-            RL_only_decoder_aclu_MAX_peak_maps_df = RL_only_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any')
-
-            AnyDir_decoder_aclu_MAX_peak_maps_df = AnyDir_decoder_aclu_MAX_peak_maps_df.dropna(axis=0, how='any') # might need to think this through a little better. Currently only using the `AnyDir_*` result with `drop_aclu_if_missing_long_or_short == False`
-
-        ## Compute the difference between the Long/Short peaks: I don't follow this:
-        LR_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = LR_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
-        RL_only_decoder_aclu_MAX_peak_maps_df['peak_diff'] = RL_only_decoder_aclu_MAX_peak_maps_df.diff(axis='columns').to_numpy()[:, -1]
-
-        AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_LR'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(LR_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
-        AnyDir_decoder_aclu_MAX_peak_maps_df['peak_diff_RL'] = AnyDir_decoder_aclu_MAX_peak_maps_df[list(RL_decoder_names)].diff(axis='columns').to_numpy()[:, -1]
-
-        # ## UNUSED BLOCK:
-        # # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged['long_LR_peak_height'] == 1.0]
-
-        # LR_height_column_names = ['long_LR_peak_height', 'short_LR_peak_height']
-
-        # # [decoder_aclu_peak_location_df_merged[a_name] == 1.0 for a_name in LR_height_column_names]
-
-        # LR_max_peak_dfs = [deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[a_name] == 1.0].drop(columns=['subpeak_idx', 'series_idx', 'LR_peak_diff', 'RL_peak_diff', a_name]) for a_name in LR_height_column_names]
-
-        # aclus_with_LR_peaks = intersection_of_arrays(*[a_df.aclu.unique() for a_df in LR_max_peak_dfs])
-        # aclus_with_LR_peaks
-
-        # ## Align them now:
-        # LR_max_peak_dfs = [a_df[a_df.aclu.isin(aclus_with_LR_peaks)] for a_df in LR_max_peak_dfs]
-        # LR_max_peak_dfs
-
-        # maximal_peak_only_decoder_aclu_peak_location_df_merged = deepcopy(decoder_aclu_peak_location_df_merged)[decoder_aclu_peak_location_df_merged[LR_height_column_names] == 1.0]
-        # maximal_peak_only_decoder_aclu_peak_location_df_merged
-
-        # OUTPUTS: LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df
-        return (LR_only_decoder_aclu_MAX_peak_maps_df, RL_only_decoder_aclu_MAX_peak_maps_df), AnyDir_decoder_aclu_MAX_peak_maps_df
-
-
-    ## WARNING 2024-02-07 - The following all use .peak_tuning_curve_center_of_masses: .get_decoder_aclu_peak_maps, get_decoder_aclu_peak_map_dict, get_decoder_aclu_peak_map_dict
-    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_long_short_decoder_shifts(self):
-        """ uses `find_shift` """
-
-        def _subfn_long_short_decoder_shift(long_dir_decoder, short_dir_decoder):
-            """ finds the offsets
-            """
-            long_dir_pf1D = deepcopy(long_dir_decoder.pf.ratemap.pdf_normalized_tuning_curves)
-            short_dir_pf1D = deepcopy(short_dir_decoder.pf.ratemap.pdf_normalized_tuning_curves)
-
-            assert np.shape(long_dir_pf1D) == np.shape(short_dir_pf1D)
-            assert short_dir_decoder.num_neurons == long_dir_decoder.num_neurons
-            neuron_ids = deepcopy(short_dir_decoder.pf.ratemap.neuron_ids)
-            # xbin_centers = deepcopy(short_dir_decoder.xbin_centers)
-
-            # shift = find_shift(long_dir_pf1D[:,i], short_dir_pf1D[:,i])
-            shift = np.array([find_shift(long_dir_pf1D[i,:], short_dir_pf1D[i,:]) for i in np.arange(long_dir_decoder.num_neurons)])
-            shift_x = shift.astype(float) * float(long_dir_decoder.pf.bin_info['xstep']) # In position coordinates
-            
-            return shift_x, shift, neuron_ids
-
-
-        LR_shift_x, LR_shift, LR_neuron_ids = _subfn_long_short_decoder_shift(long_dir_decoder=self.long_LR_decoder, short_dir_decoder=self.short_LR_decoder)
-        RL_shift_x, RL_shift, RL_neuron_ids = _subfn_long_short_decoder_shift(long_dir_decoder=self.long_RL_decoder, short_dir_decoder=self.short_RL_decoder)
-
-        return (LR_shift_x, LR_shift, LR_neuron_ids), (RL_shift_x, RL_shift, RL_neuron_ids)
-    
-    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_decoder_aclu_peak_maps(self, peak_mode='CoM') -> DirectionalDecodersTuple:
-        """ returns a tuple of dicts, each containing a mapping between aclu:peak_pf_x for a given decoder. 
-         
-        # Naievely:
-        long_LR_aclu_peak_map = deepcopy(dict(zip(self.long_LR_decoder.neuron_IDs, self.long_LR_decoder.peak_locations)))
-        long_RL_aclu_peak_map = deepcopy(dict(zip(self.long_RL_decoder.neuron_IDs, self.long_RL_decoder.peak_locations)))
-        short_LR_aclu_peak_map = deepcopy(dict(zip(self.short_LR_decoder.neuron_IDs, self.short_LR_decoder.peak_locations)))
-        short_RL_aclu_peak_map = deepcopy(dict(zip(self.short_RL_decoder.neuron_IDs, self.short_RL_decoder.peak_locations)))
-        
-        """
-        assert peak_mode in ['peaks', 'CoM']
-        if peak_mode == 'peaks':
-            # return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.get_tuning_curve_peak_positions(peak_mode=peak_mode)))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
-            return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_locations))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]) ## #TODO 2024-02-16 04:27: - [ ] This uses .peak_locations which are the positions corresponding to the peak position bin (but not continuously the peak from the curve).
-        elif peak_mode == 'CoM':
-            return DirectionalDecodersTuple(*[deepcopy(dict(zip(a_decoder.neuron_IDs, a_decoder.peak_tuning_curve_center_of_masses))) for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)])
-        else:
-            raise NotImplementedError(f"peak_mode: '{peak_mode}' is not supported.")
-    
-
-    @function_attributes(short_name=None, tags=[''], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-02-06 00:00', related_items=[])
-    def get_decoder_aclu_peak_map_dict(self, peak_mode='CoM') -> Dict[decoder_name_str, Dict]:
-        return dict(zip(self.get_decoder_names(), self.get_decoder_aclu_peak_maps(peak_mode=peak_mode)))
-
-    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_extended_placefield_peak_information_completion_function', 'determine_quant_cell_eXclusivities'], creation_date='2025-07-08 06:03', related_items=[])
-    @classmethod
-    def perform_determine_quant_cell_eXclusivities(cls, track_templates: "TrackTemplates", cell_LS_eXclusivity_threshold: bool = 0.85, cell_LS_fr_percent_change_eXclusivity_threshold: bool = 8.0) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
-        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
-
-        Columns:
-            ['aclu', 'long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes', 'pct_long_n_spikes', 'pct_short_n_spikes', 'is_n_spikes_LxC', 'is_n_spikes_SxC']
-            ['long_LR_lap_dur', 'long_RL_lap_dur', 'short_LR_lap_dur', 'short_RL_lap_dur', 'long_lap_dur', 'short_lap_dur', 'total_lap_dur', 'long_fr_Hz', 'short_fr_Hz', 'total_fr_Hz', 'pct_long_fr_Hz', 'pct_short_fr_Hz', 'is_fr_Hz_LxC', 'is_fr_Hz_SxC']
-        Usage:        
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-        
-            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = TrackTemplates.perform_determine_quant_cell_eXclusivities(track_templates=track_templates)
-            decoders_total_num_spikes_df
-            LxC_cells_df, SxC_cells_df
-
-        """
-        spike_counts_dict = {a_decoder_name:deepcopy(a_decoder.pf.filtered_spikes_df['aclu']).value_counts().to_dict() for a_decoder_name, a_decoder in track_templates.get_decoders_dict().items()}
-        any_decoder_aclus_list = deepcopy(track_templates.any_decoder_neuron_IDs)
-        total_duration_dict = {k:deepcopy(v.pf.epochs.duration).sum() for k, v in track_templates.get_decoders_dict().items()}
-        
-        value_counts = []
-        for aclu in any_decoder_aclus_list:
-            value_counts.append({k:v.get(aclu, 0) for k, v in spike_counts_dict.items()})
-
-        decoders_total_num_spikes_df: pd.DataFrame = pd.DataFrame(value_counts, index=any_decoder_aclus_list)
-        decoders_total_num_spikes_df['long'] = decoders_total_num_spikes_df[['long_LR', 'long_RL']].sum(axis='columns')
-        decoders_total_num_spikes_df['short'] = decoders_total_num_spikes_df[['short_LR', 'short_RL']].sum(axis='columns')
-        decoders_total_num_spikes_df['total'] = decoders_total_num_spikes_df['long'] + decoders_total_num_spikes_df['short']
-
-        ## percent long (used for determing exclusivity)
-        decoders_total_num_spikes_df['pct_long'] = decoders_total_num_spikes_df['long'] / decoders_total_num_spikes_df['total']
-        decoders_total_num_spikes_df['pct_short'] = decoders_total_num_spikes_df['short'] / decoders_total_num_spikes_df['total']
-
-        decoders_total_num_spikes_df = decoders_total_num_spikes_df.add_suffix('_n_spikes')    
-        decoders_total_num_spikes_df['is_n_spikes_LxC'] = decoders_total_num_spikes_df['pct_long_n_spikes'] >= cell_LS_eXclusivity_threshold
-        decoders_total_num_spikes_df['is_n_spikes_SxC'] = decoders_total_num_spikes_df['pct_short_n_spikes'] >= cell_LS_eXclusivity_threshold
-
-        ## Use n_spikes combined with duration info to compute firing rates:
-        for k, laps_duration in total_duration_dict.items():
-            decoders_total_num_spikes_df[f'{k}_lap_dur'] = laps_duration
-        decoders_total_num_spikes_df['long_lap_dur'] = decoders_total_num_spikes_df[['long_LR_lap_dur', 'long_RL_lap_dur']].sum(axis='columns')
-        decoders_total_num_spikes_df['short_lap_dur'] = decoders_total_num_spikes_df[['short_LR_lap_dur', 'short_RL_lap_dur']].sum(axis='columns')
-        decoders_total_num_spikes_df['total_lap_dur'] = decoders_total_num_spikes_df['long_lap_dur'] + decoders_total_num_spikes_df['short_lap_dur']
-        
-        firing_rate_suffix: str = '_fr_Hz'
-        _spikes_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
-        _duration_col_names = ['long_LR_n_spikes', 'long_RL_n_spikes', 'short_LR_n_spikes', 'short_RL_n_spikes', 'long_n_spikes', 'short_n_spikes', 'total_n_spikes']
-        decoders_total_num_spikes_df['long_fr_Hz'] = decoders_total_num_spikes_df['long_n_spikes'] / decoders_total_num_spikes_df['long_lap_dur'] # , 'long_RL']].sum(axis='columns')
-        decoders_total_num_spikes_df['short_fr_Hz'] = decoders_total_num_spikes_df['short_n_spikes'] / decoders_total_num_spikes_df['short_lap_dur']
-        decoders_total_num_spikes_df['total_fr_Hz'] = decoders_total_num_spikes_df['total_n_spikes'] / decoders_total_num_spikes_df['total_lap_dur']
-                
-        ## percent long (used for determing exclusivity)
-        decoders_total_num_spikes_df['pct_LS_fr_Hz'] = (decoders_total_num_spikes_df['short_fr_Hz'] - decoders_total_num_spikes_df['long_fr_Hz']) / decoders_total_num_spikes_df['long_fr_Hz']
-        # decoders_total_num_spikes_df['pct_short_fr_Hz'] = decoders_total_num_spikes_df['short_fr_Hz'] / decoders_total_num_spikes_df['total_fr_Hz']
-        
-        ## negative if LONG is bigger:
-        decoders_total_num_spikes_df['is_fr_Hz_LxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] <= -cell_LS_fr_percent_change_eXclusivity_threshold
-        decoders_total_num_spikes_df['is_fr_Hz_SxC'] = decoders_total_num_spikes_df['pct_LS_fr_Hz'] >= cell_LS_fr_percent_change_eXclusivity_threshold
-
-        decoders_total_num_spikes_df['aclu'] = decoders_total_num_spikes_df.index
-        decoders_total_num_spikes_df = reorder_columns_relative(decoders_total_num_spikes_df, column_names=['aclu'], relative_mode='start')
-
-        LxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_LxC']]
-        SxC_cells_df: pd.DataFrame = decoders_total_num_spikes_df[decoders_total_num_spikes_df['is_n_spikes_SxC']]
-
-        ## OUTPUTS: decoders_total_num_spikes_df
-        return decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df)
-
-
-    @function_attributes(short_name=None, tags=['n_spikes', 'LxC', 'SxC', 'cell_exclusivity', 'XxC'], input_requires=[], output_provides=[], uses=['cls.perform_determine_quant_cell_eXclusivities'], used_by=[], creation_date='2025-07-08 06:03', related_items=[])
-    def determine_quant_cell_eXclusivities(self, cell_LS_eXclusivity_threshold: bool = 0.90) -> Tuple[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
-        """ Uses the total number of spikes fired during laps for each decoder to determine quantitative/objective cell exclusivity thresholds
-
-        Usage:        
-            decoders_total_num_spikes_df, (LxC_cells_df, SxC_cells_df) = track_templates.determine_quant_cell_eXclusivities()
-            decoders_total_num_spikes_df
-            LxC_cells_df, SxC_cells_df
-
-        """
-        return self.perform_determine_quant_cell_eXclusivities(track_templates=self, cell_LS_eXclusivity_threshold=cell_LS_eXclusivity_threshold)
-
-
-    def __repr__(self):
-        """ 
-        TrackTemplates(long_LR_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
-            long_RL_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
-            short_LR_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
-            short_RL_decoder: pyphoplacecellanalysis.Analysis.Decoder.reconstruction.BasePositionDecoder,
-            shared_LR_aclus_only_neuron_IDs: numpy.ndarray,
-            is_good_LR_aclus: NoneType,
-            shared_RL_aclus_only_neuron_IDs: numpy.ndarray,
-            is_good_RL_aclus: NoneType,
-            decoder_LR_pf_peak_ranks_list: list,
-            decoder_RL_pf_peak_ranks_list: list
-        )
-        """
-        content = ",\n\t".join([f"{a.name}: {strip_type_str_to_classname(type(getattr(self, a.name)))}" for a in self.__attrs_attrs__])
-        return f"{type(self).__name__}({content}\n)"
-
-
-    # @classmethod
-    # def get_decoder_names(cls) -> Tuple[str, str, str, str]:
-    #     return tuple(list(self.decoders_dict.keys())) # ('long_LR','long_RL','short_LR','short_RL')
-    
-    # @classmethod
-    # def get_LR_decoder_names(cls) -> Tuple[str, str]:
-    #     return ('long_LR', 'short_LR')
-    
-    # @classmethod
-    # def get_RL_decoder_names(cls) -> Tuple[str, str]:
-    #     return ('long_RL', 'short_RL')
-    
-
-    def get_decoders(self) -> Tuple[BasePositionDecoder]:
-        """
-        long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D = directional_laps_results.get_decoders()
-        """
-        return tuple(list(self.decoders_dict.values()))
-
-    
-    def get_decoder_names(self) -> Tuple[str]:
-        return tuple(list(self.decoders_dict.keys())) # ('long_LR','long_RL','short_LR','short_RL')
-    
-    def get_LR_decoder_names(self) -> Tuple[str, str]:
-        return [k for k in self.get_decoder_names() if k.endswith('_LR')]
-    
-    def get_RL_decoder_names(self) -> Tuple[str, str]:
-        # return ('long_RL', 'short_RL')
-        return [k for k in self.get_decoder_names() if k.endswith('_RL')]
-
-    def get_decoders_dict(self) -> Dict[types.DecoderName, BasePositionDecoder]:
-        return self.decoders_dict
-    
-
-    def get_track_length_dict(self) -> Dict[types.DecoderName, float]:
-        """ gets the length of the track for all four decoders """
-        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import get_track_length_dict
-        decoder_grid_bin_bounds_dict = {a_name:a_decoder.pf.config.grid_bin_bounds for a_name, a_decoder in self.get_decoders_dict().items()}
-        assert NumpyHelpers.all_allclose(list(decoder_grid_bin_bounds_dict.values())), f"all decoders should have the same grid_bin_bounds (independent of whether they are built on long/short, etc but they do not! This violates following assumptions."
-        grid_bin_bounds = list(decoder_grid_bin_bounds_dict.values())[0] # tuple
-        actual_track_length_dict, idealized_track_length_dict = get_track_length_dict(grid_bin_bounds, grid_bin_bounds)
-        # idealized_track_length_dict # {'long': 214.0, 'short': 144.0}
-        return {a_name:idealized_track_length_dict[a_name.split('_', maxsplit=1)[0]] for a_name in self.get_decoder_names()} # {'long_LR': 214.0, 'long_RL': 214.0, 'short_LR': 144.0, 'short_RL': 144.0}
-    
-    
-    # Slicing/Filtering by Neuron Properties _____________________________________________________________________________ #
-    def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
-        """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
-        """
-        _obj = deepcopy(self) # temporary copy of the object
-        # assert np.all([(v in _obj.neuron_ids) for v in included_neuron_ids]), f"All included_neuron_ids must already exist in the object: included_neuron_ids: {included_neuron_ids}\n\t_obj.neuron_ids: {_obj.neuron_ids}"
-        # n_aclus = len(included_neuron_ids)
-        # is_neuron_id_included = np.isin(included_neuron_ids, _obj.neuron_ids)
-        # is_neuron_id_included = np.where(np.isin(included_neuron_ids, _obj.neuron_ids))[0]
-        # z_scored_tuning_map_matrix = deepcopy(z_scored_tuning_map_matrix)
-        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = _obj.long_LR_decoder, _obj.long_RL_decoder, _obj.short_LR_decoder, _obj.short_RL_decoder
-        # original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        # is_aclu_included_list = [np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        individual_decoder_filtered_aclus_list = [np.array(a_decoder.pf.ratemap.neuron_ids)[np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0]] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-
-        ## For a given run direction (LR/RL) let's require inclusion in either (OR) long v. short to be included.
-        filtered_included_LR_aclus = np.union1d(individual_decoder_filtered_aclus_list[0], individual_decoder_filtered_aclus_list[2])
-        filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
-        # build the final shared aclus:
-        filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
-        # rebuild the is_aclu_included_list from the shared aclus
-        # is_aclu_included_list = [np.isin(an_original_neuron_ids, a_filtered_neuron_ids) for an_original_neuron_ids, a_filtered_neuron_ids in zip(original_neuron_ids_list, filtered_direction_shared_aclus_list)]
-        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip((long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder), filtered_direction_shared_aclus_list)]
-        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack filtered decoders
-        
-        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=_obj.rank_method)
-        assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
-        assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
-        assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
-        assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
-        return _obj
-
-
-    def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
-        """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-        minimum_inclusion_fr_Hz: float = 5.0
-        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-        Usage:
-            minimum_inclusion_fr_Hz: float = 5.0
-            filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
-        """
-        return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
-    
-
-    @function_attributes(short_name=None, tags=['main', 'filter', 'qclu', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 03:50', related_items=[])
-    def filtered_by_frate_and_qclu(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> "TrackTemplates":
-        """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-        Usage:
-            filtered_track_templates = track_templates.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=5.0, included_qclu_values=[1, 2])
-        """
-        filtered_decoder_list, filtered_direction_shared_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate_and_qclu(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)        
-        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack
-        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=self.rank_method)
-        assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
-        assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
-        assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
-        assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
-        return _obj
-
-
-
-    # Init/ClassMethods __________________________________________________________________________________________________ #
-
-    @classmethod
-    def init_from_paired_decoders_dicts(cls, LR_decoders_dict: Dict[types.DecoderName, BasePositionDecoder], RL_decoders_dict: Dict[types.DecoderName, BasePositionDecoder], rank_method:str='average') -> "BaseTrackTemplates":
-        """ 2023-10-31 - Extract from pairs
-
-        """
-        
-        LR_decoders_dict_neuron_IDs = [deepcopy(v.neuron_IDs) for k, v in LR_decoders_dict.items()]
-        Assert.all_equal(*LR_decoders_dict_neuron_IDs)
-        shared_LR_aclus_only_neuron_IDs = LR_decoders_dict_neuron_IDs[0]
-        # assert np.all(short_LR_decoder.neuron_IDs == shared_LR_aclus_only_neuron_IDs), f"{short_LR_decoder.neuron_IDs} != {shared_LR_aclus_only_neuron_IDs}"
-
-        RL_decoders_dict_neuron_IDs = [deepcopy(v.neuron_IDs) for k, v in RL_decoders_dict.items()]
-        Assert.all_equal(*RL_decoders_dict_neuron_IDs)
-        shared_RL_aclus_only_neuron_IDs = RL_decoders_dict_neuron_IDs[0]
-        # assert np.all(short_RL_decoder.neuron_IDs == shared_RL_aclus_only_neuron_IDs), f"{short_RL_decoder.neuron_IDs} != {shared_RL_aclus_only_neuron_IDs}"
-
-        # is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
-        # shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
-
-        ## 2023-10-11 - Get the long/short peak locations
-        # decoder_peak_coms_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[is_good_aclus] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        ## Compute the ranks:
-        # decoder_pf_peak_ranks_list = [scipy.stats.rankdata(a_peaks_com, method='dense') for a_peaks_com in decoder_peak_coms_list]
-
-        #TODO 2023-11-21 13:06: - [ ] Note these are in order of the original entries, and do not reflect any sorts or ordering changes.
-        decoders_dict = dict(**LR_decoders_dict, **RL_decoders_dict)
-        decoder_LR_pf_peak_ranks_list = [scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for k, a_decoder in LR_decoders_dict.items()]
-        decoder_RL_pf_peak_ranks_list = [scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for k, a_decoder in RL_decoders_dict.items()]
-
-        return cls(decoders_dict=decoders_dict, shared_LR_aclus_only_neuron_IDs=shared_LR_aclus_only_neuron_IDs, is_good_LR_aclus=None, shared_RL_aclus_only_neuron_IDs=shared_RL_aclus_only_neuron_IDs, is_good_RL_aclus=None,
-                    decoder_LR_pf_peak_ranks_list=decoder_LR_pf_peak_ranks_list,
-                    decoder_RL_pf_peak_ranks_list=decoder_RL_pf_peak_ranks_list,
-                    rank_method=rank_method)
-
-
-    # @classmethod
-    # def init_from_paired_decoders(cls, LR_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], RL_decoder_pair: Tuple[BasePositionDecoder, BasePositionDecoder], rank_method:str='average') -> "TrackTemplates":
-    #     """ 2023-10-31 - Extract from pairs
-
-    #     """
-    #     long_LR_decoder, short_LR_decoder = LR_decoder_pair
-    #     long_RL_decoder, short_RL_decoder = RL_decoder_pair
-
-    #     shared_LR_aclus_only_neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs)
-    #     assert np.all(short_LR_decoder.neuron_IDs == shared_LR_aclus_only_neuron_IDs), f"{short_LR_decoder.neuron_IDs} != {shared_LR_aclus_only_neuron_IDs}"
-
-    #     shared_RL_aclus_only_neuron_IDs = deepcopy(long_RL_decoder.neuron_IDs)
-    #     assert np.all(short_RL_decoder.neuron_IDs == shared_RL_aclus_only_neuron_IDs), f"{short_RL_decoder.neuron_IDs} != {shared_RL_aclus_only_neuron_IDs}"
-
-    #     # is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
-    #     # shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
-
-    #     ## 2023-10-11 - Get the long/short peak locations
-    #     # decoder_peak_coms_list = [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses[is_good_aclus] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-    #     ## Compute the ranks:
-    #     # decoder_pf_peak_ranks_list = [scipy.stats.rankdata(a_peaks_com, method='dense') for a_peaks_com in decoder_peak_coms_list]
-
-    #     #TODO 2023-11-21 13:06: - [ ] Note these are in order of the original entries, and do not reflect any sorts or ordering changes.
-
-    #     return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
-    #                 decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_LR_decoder, short_LR_decoder)],
-    #                 decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_RL_decoder, short_RL_decoder)],
-    #                 rank_method=rank_method)
-
-    @classmethod
-    def determine_decoder_aclus_filtered_by_frate_and_qclu(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None):
-        """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-        minimum_inclusion_fr_Hz: float = 5.0
-        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-
-        individual_decoder_filtered_aclus_list: list of four lists of aclus, not constrained to have the same aclus as its long/short pair
-
-        Usage:
-            filtered_decoder_list, filtered_direction_shared_aclus_list = TrackTemplates.determine_decoder_aclus_filtered_by_frate(decoders_dict=track_templates.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-
-        """
-        decoder_names = cls.get_decoder_names() # ('long_LR', 'long_RL', 'short_LR', 'short_RL')
-        modified_neuron_ids_dict = TrackTemplates._perform_determine_decoder_aclus_filtered_by_qclu_and_frate(decoders_dict=decoders_dict, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        # individual_decoder_filtered_aclus_list = list(modified_neuron_ids_dict.values())
-        individual_decoder_filtered_aclus_list = [modified_neuron_ids_dict[a_decoder_name] for a_decoder_name in decoder_names]
-        assert len(individual_decoder_filtered_aclus_list) == 4, f"len(individual_decoder_filtered_aclus_list): {len(individual_decoder_filtered_aclus_list)} but expected 4!"
-        original_decoder_list = [deepcopy(decoders_dict[a_decoder_name]) for a_decoder_name in decoder_names]
-        ## For a given run direction (LR/RL) let's require inclusion in either (OR) long v. short to be included.
-        filtered_included_LR_aclus = np.union1d(individual_decoder_filtered_aclus_list[0], individual_decoder_filtered_aclus_list[2])
-        filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
-        # build the final shared aclus:
-        filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
-        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)]
-        return filtered_decoder_list, filtered_direction_shared_aclus_list
-    
-    @classmethod
-    def _perform_determine_decoder_aclus_filtered_by_qclu_and_frate(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None):
-        """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`) and their `qclu` values.
-
-        minimum_inclusion_fr_Hz: float = 5.0
-        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-
-        individual_decoder_filtered_aclus_list: list of four lists of aclus, not constrained to have the same aclus as its long/short pair
-
-        Usage:
-            modified_neuron_ids_dict = TrackTemplates._perform_determine_decoder_aclus_filtered_by_qclu_and_frate(decoders_dict=track_templates.get_decoders_dict())
-            
-            decoders_dict=self.get_decoders_dict()
-            
-        """
-        # original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        original_neuron_ids_dict = {a_decoder_name:deepcopy(a_decoder.pf.ratemap.neuron_ids) for a_decoder_name, a_decoder in decoders_dict.items()}
-        if (minimum_inclusion_fr_Hz is not None) and (minimum_inclusion_fr_Hz > 0.0):
-            modified_neuron_ids_dict = {a_decoder_name:np.array(a_decoder.pf.ratemap.neuron_ids)[a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates >= minimum_inclusion_fr_Hz] for a_decoder_name, a_decoder in decoders_dict.items()}
-        else:            
-            modified_neuron_ids_dict = {a_decoder_name:deepcopy(a_decoder_neuron_ids) for a_decoder_name, a_decoder_neuron_ids in original_neuron_ids_dict.items()}
-        
-        if included_qclu_values is not None:
-            # filter by included_qclu_values
-            for a_decoder_name, a_decoder in decoders_dict.items():
-                # a_decoder.pf.spikes_df
-                neuron_identities: pd.DataFrame = deepcopy(a_decoder.pf.filtered_spikes_df).spikes.extract_unique_neuron_identities()
-                # filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
-                filtered_neuron_identities: pd.DataFrame = deepcopy(neuron_identities)
-                filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
-                # filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, original_neuron_ids_dict[a_decoder_name])]
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, modified_neuron_ids_dict[a_decoder_name])] # require to match to decoders
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
-                final_included_aclus = filtered_neuron_identities['aclu'].to_numpy()
-                modified_neuron_ids_dict[a_decoder_name] = deepcopy(final_included_aclus) #.tolist()
-                
-        return modified_neuron_ids_dict
-    
-
-    def determine_decoder_aclus_filtered_by_qclu_and_frate(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None):
-        """ Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`) and their `qclu` values.
-
-        minimum_inclusion_fr_Hz: float = 5.0
-        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-
-        individual_decoder_filtered_aclus_list: list of four lists of aclus, not constrained to have the same aclus as its long/short pair
-
-        Usage:
-            modified_neuron_ids_dict = TrackTemplates.determine_decoder_aclus_filtered_by_qclu_and_frate(track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)
-
-        """
-        return TrackTemplates._perform_determine_decoder_aclus_filtered_by_qclu_and_frate(decoders_dict=self.get_decoders_dict(), minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-
-    @classmethod
-    def determine_active_min_num_unique_aclu_inclusions_requirement(cls, min_num_unique_aclu_inclusions: int, total_num_cells: int, required_min_percentage_of_active_cells: float = 0.3, debug_print=False) -> int:
-        """ 2023-12-21 - Compute the dynamic minimum number of active cells
-
-            active_min_num_unique_aclu_inclusions_requirement: int = cls.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions,
-                                                                                                                                    total_num_cells=len(any_list_neuron_IDs))
-
-        """
-        required_min_percentage_of_active_cells = float(required_min_percentage_of_active_cells)
-        if debug_print:
-            print(f'required_min_percentage_of_active_cells: {required_min_percentage_of_active_cells}') # 20% of active cells
-        dynamic_percentage_minimum_num_unique_aclu_inclusions: int = int(round((float(total_num_cells) * required_min_percentage_of_active_cells))) # dynamic_percentage_minimum_num_unique_aclu_inclusions: the percentage-based requirement for the number of active cells
-        active_min_num_unique_aclu_inclusions_requirement: int = max(dynamic_percentage_minimum_num_unique_aclu_inclusions, min_num_unique_aclu_inclusions)
-        if debug_print:
-            print(f'active_min_num_unique_aclu_inclusions_requirement: {active_min_num_unique_aclu_inclusions_requirement}')
-        return active_min_num_unique_aclu_inclusions_requirement
-
-
-    def min_num_unique_aclu_inclusions_requirement(self, curr_active_pipeline, required_min_percentage_of_active_cells: float = 0.3, debug_print=False) -> int:
-        """ 2023-12-21 - Compute the dynamic minimum number of active cells
-
-            active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.3333)
-
-        """
-        smallest_template_n_neurons: int = np.min([len(v) for v in self.decoder_neuron_IDs_list]) # smallest_template_n_neurons: the fewest number of neurons any template has
-        ## Compute the dynamic minimum number of active cells from current num total cells and the `curr_active_pipeline.sess.config.preprocessing_parameters` values:`
-        return self.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions,
-                                                                                total_num_cells=smallest_template_n_neurons, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells)
-
-
-    def min_num_unique_aclu_inclusions_requirement_dict(self, curr_active_pipeline, required_min_percentage_of_active_cells: float = 0.3, debug_print=False) -> Dict[str, int]:
-        """ 2023-12-21 - Compute the dynamic minimum number of active cells
-
-            active_min_num_unique_aclu_inclusions_requirement: int = track_templates.min_num_unique_aclu_inclusions_requirement(curr_active_pipeline, required_min_percentage_of_active_cells=0.3333)
-
-        """
-        decoder_neuron_IDs_dict = dict(zip(self.get_decoder_names(), self.decoder_neuron_IDs_list))
-        decoder_num_neurons_dict = {k:len(v) for k, v in decoder_neuron_IDs_dict.items()}
-        return {k:self.determine_active_min_num_unique_aclu_inclusions_requirement(min_num_unique_aclu_inclusions=curr_active_pipeline.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays.min_num_unique_aclu_inclusions,
-                                                                                total_num_cells=a_n_neurons, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells) for k, a_n_neurons in decoder_num_neurons_dict.items()}
-
-
-    @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations'], used_by=[], creation_date='2024-08-02 07:33', related_items=[])
-    def compute_decoder_transition_matricies(self, n_powers:int=50, use_direct_observations_for_order:bool=True) -> Dict[types.DecoderName, List[NDArray]]:
-        """ Computes the position transition matricies for each of the decoders 
-        returns a list of length n_powers for each decoder
-        
-        Usage:
-            binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = track_templates.compute_decoder_transition_matricies(n_powers=50)
-        
-        """
-        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
-        
-        ## INPUTS: track_templates
-        decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = self.get_decoders_dict()
-        binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = {}
-
-        for a_decoder_name, a_decoder in decoders_dict.items():
-            a_pf1D = deepcopy(a_decoder.pf)
-            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x_index_sequence=(a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy()-1), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order) # the -1 here is to convert to (binned_x_index_sequence = binned_x - 1)
-
-        # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
-        return binned_x_transition_matrix_higher_order_list_dict
-
-
-    def __attrs_post_init__(self):
-        _migrate_legacy_track_templates_state(self)
-
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        return state
-
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        _migrate_legacy_track_templates_state(self)
-
-
-
-
-@define(slots=False, repr=False, eq=False)
-class TrackTemplates(BaseTrackTemplates):
-    """ Holds the four directional templates for direction placefield analysis.
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-
-    History:
-        Based off of `ShuffleHelper` on 2023-10-27
-        TODO: eliminate functional overlap with `ShuffleHelper`
-        TODO: should be moved into `DirectionalPlacefieldGlobalComputation` instead of RankOrder
-
-    """
-    # long_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
-    # long_RL_decoder: BasePositionDecoder = serialized_field(repr=False) # keys_only_repr
-    # short_LR_decoder: BasePositionDecoder = serialized_field(repr=False)
-    # short_RL_decoder: BasePositionDecoder = serialized_field(repr=False)
-
-    # # ## Computed properties
-    # shared_LR_aclus_only_neuron_IDs: NDArray = serialized_field(repr=True)
-    # is_good_LR_aclus: NDArray = serialized_field(repr=False)
-
-    # shared_RL_aclus_only_neuron_IDs: NDArray = serialized_field(repr=True)
-    # is_good_RL_aclus: NDArray = serialized_field(repr=False)
-
-    # ## Computed properties
-    # decoder_LR_pf_peak_ranks_list: List = serialized_field(repr=True)
-    # decoder_RL_pf_peak_ranks_list: List = serialized_field(repr=True)
-
-    # rank_method: str = serialized_attribute_field(default="average", is_computable=False, repr=True)
-
-
-    @property
-    def long_LR_decoder(self) -> BasePositionDecoder:
-        return self.decoders_dict['long_LR']
-    @long_LR_decoder.setter
-    def long_LR_decoder(self, value: BasePositionDecoder):
-        self.decoders_dict['long_LR'] = value
-
-
-    @property
-    def long_RL_decoder(self) -> BasePositionDecoder:
-        return self.decoders_dict['long_RL']
-    @long_RL_decoder.setter
-    def long_RL_decoder(self, value: BasePositionDecoder):
-        self.decoders_dict['long_RL'] = value
-
-
-    @property
-    def short_LR_decoder(self) -> BasePositionDecoder:
-        return self.decoders_dict['short_LR']
-    @short_LR_decoder.setter
-    def short_LR_decoder(self, value: BasePositionDecoder):
-        self.decoders_dict['short_LR'] = value
-
-    @property
-    def short_RL_decoder(self) -> BasePositionDecoder:
-        return self.decoders_dict['short_RL']
-    @short_RL_decoder.setter
-    def short_RL_decoder(self, value: BasePositionDecoder):
-        self.decoders_dict['short_RL'] = value
-
-
-
-    # @property
-    # def decoder_neuron_IDs_list(self) -> List[NDArray]:
-    #     """ a list of the neuron_IDs for each decoder (independently) """
-    #     return [a_decoder.pf.ratemap.neuron_ids for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
-    
-    # @property
-    # def any_decoder_neuron_IDs(self) -> NDArray:
-    #     """ a list of the neuron_IDs for each decoder (independently) """
-    #     return np.sort(union_of_arrays(*self.decoder_neuron_IDs_list)) # neuron_IDs as they appear in any list
-
-    # @property
-    # def decoder_peak_location_list(self) -> List[NDArray]:
-    #     """ a list of the peak_tuning_curve_center_of_masses for each decoder (independently) """
-    #     return [a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses for a_decoder in (self.long_LR_decoder, self.long_RL_decoder, self.short_LR_decoder, self.short_RL_decoder)]
-    
-    # @property
-    # def decoder_peak_rank_list_dict(self) -> Dict[str, NDArray]:
-    #     """ a dict (one for each decoder) of the rank_lists for each decoder (independently) """
-    #     return {a_decoder_name:scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
-    
-    # @property
-    # def decoder_aclu_peak_rank_dict_dict(self) -> Dict[str, Dict[types.aclu_index, float]]:
-    #     """ a Dict (one for each decoder) of aclu-to-rank maps for each decoder (independently) """
-    #     return {a_decoder_name:dict(zip(a_decoder.pf.ratemap.neuron_ids, scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=self.rank_method))) for a_decoder_name, a_decoder in self.get_decoders_dict().items()}
-    
-    # @property
-    # def decoder_normalized_tuning_curves_dict_dict(self) -> Dict[str, Dict[types.aclu_index, NDArray]]:
-    #     """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
-    #     return {a_name:a_decoder.pf.normalized_tuning_curves_dict for a_name, a_decoder in self.get_decoders_dict().items()}
-            
-
-    # @property
-    # def decoder_stability_dict_dict(self): # -> Dict[str, Dict[types.aclu_index, NDArray]]:
-    #     # """ a Dict (one for each decoder) of aclu-to-1D normalized placefields for each decoder (independently) """
-    #     return {a_name:a_decoder.pf.ratemap.spatial_sparcity for a_name, a_decoder in self.get_decoders_dict().items()}
     
 
     def get_decoders_tuning_curve_modes(self, peak_mode='peaks', **find_peaks_kwargs) -> Tuple[Dict[decoder_name_str, Dict[types.aclu_index, NDArray]], Dict[decoder_name_str, Dict[types.aclu_index, int]], Dict[decoder_name_str, pd.DataFrame]]:
@@ -1310,47 +534,47 @@ class TrackTemplates(BaseTrackTemplates):
     
     
     # Slicing/Filtering by Neuron Properties _____________________________________________________________________________ #
-    # def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
-    #     """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
-    #     """
-    #     _obj = deepcopy(self) # temporary copy of the object
-    #     # assert np.all([(v in _obj.neuron_ids) for v in included_neuron_ids]), f"All included_neuron_ids must already exist in the object: included_neuron_ids: {included_neuron_ids}\n\t_obj.neuron_ids: {_obj.neuron_ids}"
-    #     # n_aclus = len(included_neuron_ids)
-    #     # is_neuron_id_included = np.isin(included_neuron_ids, _obj.neuron_ids)
-    #     # is_neuron_id_included = np.where(np.isin(included_neuron_ids, _obj.neuron_ids))[0]
-    #     # z_scored_tuning_map_matrix = deepcopy(z_scored_tuning_map_matrix)
-    #     long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = _obj.long_LR_decoder, _obj.long_RL_decoder, _obj.short_LR_decoder, _obj.short_RL_decoder
-    #     # original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-    #     # is_aclu_included_list = [np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-    #     individual_decoder_filtered_aclus_list = [np.array(a_decoder.pf.ratemap.neuron_ids)[np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0]] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+    def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrackTemplates":
+        """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
+        """
+        _obj = deepcopy(self) # temporary copy of the object
+        # assert np.all([(v in _obj.neuron_ids) for v in included_neuron_ids]), f"All included_neuron_ids must already exist in the object: included_neuron_ids: {included_neuron_ids}\n\t_obj.neuron_ids: {_obj.neuron_ids}"
+        # n_aclus = len(included_neuron_ids)
+        # is_neuron_id_included = np.isin(included_neuron_ids, _obj.neuron_ids)
+        # is_neuron_id_included = np.where(np.isin(included_neuron_ids, _obj.neuron_ids))[0]
+        # z_scored_tuning_map_matrix = deepcopy(z_scored_tuning_map_matrix)
+        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = _obj.long_LR_decoder, _obj.long_RL_decoder, _obj.short_LR_decoder, _obj.short_RL_decoder
+        # original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+        # is_aclu_included_list = [np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
+        individual_decoder_filtered_aclus_list = [np.array(a_decoder.pf.ratemap.neuron_ids)[np.where(np.isin(included_neuron_ids, a_decoder.pf.ratemap.neuron_ids))[0]] for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
 
-    #     ## For a given run direction (LR/RL) let's require inclusion in either (OR) long v. short to be included.
-    #     filtered_included_LR_aclus = np.union1d(individual_decoder_filtered_aclus_list[0], individual_decoder_filtered_aclus_list[2])
-    #     filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
-    #     # build the final shared aclus:
-    #     filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
-    #     # rebuild the is_aclu_included_list from the shared aclus
-    #     # is_aclu_included_list = [np.isin(an_original_neuron_ids, a_filtered_neuron_ids) for an_original_neuron_ids, a_filtered_neuron_ids in zip(original_neuron_ids_list, filtered_direction_shared_aclus_list)]
-    #     filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip((long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder), filtered_direction_shared_aclus_list)]
-    #     long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack filtered decoders
+        ## For a given run direction (LR/RL) let's require inclusion in either (OR) long v. short to be included.
+        filtered_included_LR_aclus = np.union1d(individual_decoder_filtered_aclus_list[0], individual_decoder_filtered_aclus_list[2])
+        filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
+        # build the final shared aclus:
+        filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
+        # rebuild the is_aclu_included_list from the shared aclus
+        # is_aclu_included_list = [np.isin(an_original_neuron_ids, a_filtered_neuron_ids) for an_original_neuron_ids, a_filtered_neuron_ids in zip(original_neuron_ids_list, filtered_direction_shared_aclus_list)]
+        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip((long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder), filtered_direction_shared_aclus_list)]
+        long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder = filtered_decoder_list # unpack filtered decoders
         
-    #     _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=_obj.rank_method)
-    #     assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
-    #     assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
-    #     assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
-    #     assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
-    #     return _obj
+        _obj = TrackTemplates.init_from_paired_decoders(LR_decoder_pair=(long_LR_decoder, short_LR_decoder), RL_decoder_pair=(long_RL_decoder, short_RL_decoder), rank_method=_obj.rank_method)
+        assert np.all(filtered_direction_shared_aclus_list[0] == _obj.shared_LR_aclus_only_neuron_IDs)
+        assert np.all(filtered_direction_shared_aclus_list[1] == _obj.shared_RL_aclus_only_neuron_IDs)
+        assert len(filtered_direction_shared_aclus_list[0]) == len(_obj.decoder_LR_pf_peak_ranks_list[0])
+        assert len(filtered_direction_shared_aclus_list[1]) == len(_obj.decoder_RL_pf_peak_ranks_list[0])
+        return _obj
 
 
-    # def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
-    #     """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
-    #     minimum_inclusion_fr_Hz: float = 5.0
-    #     modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
-    #     Usage:
-    #         minimum_inclusion_fr_Hz: float = 5.0
-    #         filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
-    #     """
-    #     return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
+    def filtered_by_frate(self, minimum_inclusion_fr_Hz: float = 5.0) -> "TrackTemplates":
+        """ Does not modify self! Returns a copy! Filters the included neuron_ids by their `tuning_curve_unsmoothed_peak_firing_rates` (a property of their `.pf.ratemap`)
+        minimum_inclusion_fr_Hz: float = 5.0
+        modified_long_LR_decoder = filtered_by_frate(track_templates.long_LR_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True)
+        Usage:
+            minimum_inclusion_fr_Hz: float = 5.0
+            filtered_decoder_list = [filtered_by_frate(a_decoder, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, debug_print=True) for a_decoder in (track_templates.long_LR_decoder, track_templates.long_RL_decoder, track_templates.short_LR_decoder, track_templates.short_RL_decoder)]
+        """
+        return self.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=None)
     
 
     @function_attributes(short_name=None, tags=['main', 'filter', 'qclu', 'frate'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-22 03:50', related_items=[])
@@ -1377,14 +601,14 @@ class TrackTemplates(BaseTrackTemplates):
         """ 2023-10-31 - Extract from pairs
 
         """
-        # long_LR_decoder, short_LR_decoder = LR_decoder_pair
-        # long_RL_decoder, short_RL_decoder = RL_decoder_pair
+        long_LR_decoder, short_LR_decoder = LR_decoder_pair
+        long_RL_decoder, short_RL_decoder = RL_decoder_pair
 
-        # shared_LR_aclus_only_neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs)
-        # assert np.all(short_LR_decoder.neuron_IDs == shared_LR_aclus_only_neuron_IDs), f"{short_LR_decoder.neuron_IDs} != {shared_LR_aclus_only_neuron_IDs}"
+        shared_LR_aclus_only_neuron_IDs = deepcopy(long_LR_decoder.neuron_IDs)
+        assert np.all(short_LR_decoder.neuron_IDs == shared_LR_aclus_only_neuron_IDs), f"{short_LR_decoder.neuron_IDs} != {shared_LR_aclus_only_neuron_IDs}"
 
-        # shared_RL_aclus_only_neuron_IDs = deepcopy(long_RL_decoder.neuron_IDs)
-        # assert np.all(short_RL_decoder.neuron_IDs == shared_RL_aclus_only_neuron_IDs), f"{short_RL_decoder.neuron_IDs} != {shared_RL_aclus_only_neuron_IDs}"
+        shared_RL_aclus_only_neuron_IDs = deepcopy(long_RL_decoder.neuron_IDs)
+        assert np.all(short_RL_decoder.neuron_IDs == shared_RL_aclus_only_neuron_IDs), f"{short_RL_decoder.neuron_IDs} != {shared_RL_aclus_only_neuron_IDs}"
 
         # is_good_aclus = np.logical_not(np.isin(shared_aclus_only_neuron_IDs, bimodal_exclude_aclus))
         # shared_aclus_only_neuron_IDs = shared_aclus_only_neuron_IDs[is_good_aclus]
@@ -1396,14 +620,10 @@ class TrackTemplates(BaseTrackTemplates):
 
         #TODO 2023-11-21 13:06: - [ ] Note these are in order of the original entries, and do not reflect any sorts or ordering changes.
 
-        # return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
-        #             decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_LR_decoder, short_LR_decoder)],
-        #             decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_RL_decoder, short_RL_decoder)],
-        #             rank_method=rank_method)
-        
-        return cls.init_from_paired_decoders_dicts(LR_decoders_dict=dict(zip(('long_LR', 'short_LR'), LR_decoder_pair)), RL_decoders_dict=dict(zip(('long_RL', 'short_RL'), RL_decoder_pair)), rank_method=rank_method)
-        
-        
+        return cls(long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder, shared_LR_aclus_only_neuron_IDs, None, shared_RL_aclus_only_neuron_IDs, None,
+                    decoder_LR_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_LR_decoder, short_LR_decoder)],
+                    decoder_RL_pf_peak_ranks_list=[scipy.stats.rankdata(a_decoder.pf.ratemap.peak_tuning_curve_center_of_masses, method=rank_method) for a_decoder in (long_RL_decoder, short_RL_decoder)],
+                    rank_method=rank_method)
 
     @classmethod
     def determine_decoder_aclus_filtered_by_frate_and_qclu(cls, decoders_dict: Dict[types.DecoderName, BasePositionDecoder], minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None):
@@ -1526,27 +746,28 @@ class TrackTemplates(BaseTrackTemplates):
                                                                                 total_num_cells=a_n_neurons, required_min_percentage_of_active_cells=required_min_percentage_of_active_cells) for k, a_n_neurons in decoder_num_neurons_dict.items()}
 
 
-    # @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations'], used_by=[], creation_date='2024-08-02 07:33', related_items=[])
-    # def compute_decoder_transition_matricies(self, n_powers:int=50, use_direct_observations_for_order:bool=True) -> Dict[types.DecoderName, List[NDArray]]:
-    #     """ Computes the position transition matricies for each of the decoders 
-    #     returns a list of length n_powers for each decoder
+    @function_attributes(short_name=None, tags=['transition_matrix'], input_requires=[], output_provides=[], uses=['TransitionMatrixComputations'], used_by=[], creation_date='2024-08-02 07:33', related_items=[])
+    def compute_decoder_transition_matricies(self, n_powers:int=50, use_direct_observations_for_order:bool=True) -> Dict[types.DecoderName, List[NDArray]]:
+        """ Computes the position transition matricies for each of the decoders 
+        returns a list of length n_powers for each decoder
         
-    #     Usage:
-    #         binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = track_templates.compute_decoder_transition_matricies(n_powers=50)
+        Usage:
+            binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = track_templates.compute_decoder_transition_matricies(n_powers=50)
         
-    #     """
-    #     from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.transition_matrix import TransitionMatrixComputations
         
-    #     ## INPUTS: track_templates
-    #     decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = self.get_decoders_dict()
-    #     binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = {}
+        ## INPUTS: track_templates
+        decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = self.get_decoders_dict()
+        binned_x_transition_matrix_higher_order_list_dict: Dict[types.DecoderName, NDArray] = {}
 
-    #     for a_decoder_name, a_decoder in decoders_dict.items():
-    #         a_pf1D = deepcopy(a_decoder.pf)
-    #         binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x_index_sequence=(a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy()-1), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order) # the -1 here is to convert to (binned_x_index_sequence = binned_x - 1)
+        for a_decoder_name, a_decoder in decoders_dict.items():
+            a_pf1D = deepcopy(a_decoder.pf)
+            binned_x_transition_matrix_higher_order_list_dict[a_decoder_name] = TransitionMatrixComputations._compute_position_transition_matrix(a_pf1D.xbin_labels, binned_x_index_sequence=(a_pf1D.filtered_pos_df['binned_x'].dropna().to_numpy()-1), n_powers=n_powers, use_direct_observations_for_order=use_direct_observations_for_order) # the -1 here is to convert to (binned_x_index_sequence = binned_x - 1)
 
-    #     # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
-    #     return binned_x_transition_matrix_higher_order_list_dict
+        # OUTPUTS: binned_x_transition_matrix_higher_order_list_dict
+        return binned_x_transition_matrix_higher_order_list_dict
+
 
 
 
@@ -1656,9 +877,8 @@ def filter_and_update_epochs_and_spikes(curr_active_pipeline, global_epoch_name:
     return active_epochs_df, active_spikes_df
 
 
-
 @define(slots=False, repr=False)
-class BaseDirectionalLapsResult(ComputedResult):
+class DirectionalLapsResult(ComputedResult):
     """ a container for holding information regarding the computation of directional laps.
 
     ## Build a `DirectionalLapsResult` container object to hold the result:
@@ -1679,7 +899,7 @@ class BaseDirectionalLapsResult(ComputedResult):
     long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
 
     """
-    _VersionedResultMixin_version: str = "2025.09.10_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version
     
     directional_lap_specific_configs: Dict = non_serialized_field(default=Factory(dict))
     split_directional_laps_dict: Dict = non_serialized_field(default=Factory(dict))
@@ -1687,314 +907,17 @@ class BaseDirectionalLapsResult(ComputedResult):
     split_directional_laps_config_names: List[str] = serialized_field(default=Factory(list))
     computed_base_epoch_names: List[str] = serialized_field(default=Factory(list))
 
-    one_step_decoder_1D_dict: Dict[str, BasePositionDecoder] = serialized_field(default=Factory(dict))
-    shared_aclus_only_one_step_decoder_1D_dict: Dict[str, BasePositionDecoder] = serialized_field(default=Factory(dict))
+    long_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    long_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    short_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
+    short_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
 
-
-    # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D
-    def get_decoders(self) -> Tuple[BasePositionDecoder]:
-        return tuple(list(self.one_step_decoder_1D_dict.values()))
-
-    def get_shared_aclus_only_decoders(self) -> Tuple[BasePositionDecoder]:
-        return tuple(list(self.shared_aclus_only_one_step_decoder_1D_dict.values()))
-
-    
-    def get_decoder_names(self) -> Tuple[str]:
-        return tuple(list(self.one_step_decoder_1D_dict.keys())) # ('long_LR','long_RL','short_LR','short_RL')
-    
-    def get_LR_decoder_names(self) -> Tuple[str, str]:
-        return [k for k in self.get_decoder_names() if k.endswith('_LR')]
-    
-    def get_RL_decoder_names(self) -> Tuple[str, str]:
-        # return ('long_RL', 'short_RL')
-        return [k for k in self.get_decoder_names() if k.endswith('_RL')]
-
-    def get_decoders_dict(self) -> Dict[types.DecoderName, BasePositionDecoder]:
-        return self.one_step_decoder_1D_dict
-    
-
-    def get_templates(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> BaseTrackTemplates:
-        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.get_decoders_dict().items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.get_decoders_dict().items() if k in self.get_RL_decoder_names()})
-        # _obj = BaseTrackTemplates.init_from_paired_decoders(LR_decoder_pair=(self.long_LR_one_step_decoder_1D, self.short_LR_one_step_decoder_1D), RL_decoder_pair=(self.long_RL_one_step_decoder_1D, self.short_RL_one_step_decoder_1D))
-        if ((minimum_inclusion_fr_Hz is None) and (included_qclu_values is None)):
-            return _obj
-        else:
-            return _obj.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-    
-
-    def get_shared_aclus_only_templates(self, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values:Optional[List]=None) -> BaseTrackTemplates:
-        _obj = BaseTrackTemplates.init_from_paired_decoders_dicts(LR_decoders_dict={k:v for k, v in self.shared_aclus_only_one_step_decoder_1D_dict.items() if k in self.get_LR_decoder_names()}, RL_decoders_dict={k:v for k, v in self.shared_aclus_only_one_step_decoder_1D_dict.items() if k in self.get_RL_decoder_names()})
-        if ((minimum_inclusion_fr_Hz is None) and (included_qclu_values is None)):
-            return _obj
-        else:
-            # return _obj.filtered_by_frate(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz)
-            return _obj.filtered_by_frate_and_qclu(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        
-
-    def filtered_by_included_aclus(self, included_neuronIDs) -> "BaseDirectionalLapsResult":
-        """ Returns a copy of self with each decoder filtered by the `qclu_included_aclus`
-        
-        Usage:
-        
-        qclu_included_aclus = curr_active_pipeline.determine_good_aclus_by_qclu(included_qclu_values=[1,2,4,9])
-        modified_directional_laps_results = directional_laps_results.filtered_by_included_aclus(included_neuronIDs=qclu_included_aclus)
-        modified_directional_laps_results
-
-        """
-        directional_laps_results = deepcopy(self)
-        
-        # decoders_list = [directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D,
-        #                  directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D
-        #                 ]
-        # modified_decoders_list = []
-        # for a_decoder in decoders_list:
-        #     # a_decoder = deepcopy(directional_laps_results.long_LR_one_step_decoder_1D)
-        #     is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, included_neuronIDs)
-        #     included_aclus = np.array(a_decoder.pf.ratemap.neuron_ids)[is_aclu_qclu_included_list]
-        #     modified_decoder = a_decoder.get_by_id(included_aclus)
-        #     modified_decoders_list.append(modified_decoder)
-
-        # ## Assign the modified decoders:
-        # directional_laps_results.long_LR_one_step_decoder_1D, directional_laps_results.long_RL_one_step_decoder_1D, directional_laps_results.short_LR_one_step_decoder_1D, directional_laps_results.short_RL_one_step_decoder_1D, directional_laps_results.long_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.long_RL_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_LR_shared_aclus_only_one_step_decoder_1D, directional_laps_results.short_RL_shared_aclus_only_one_step_decoder_1D = modified_decoders_list
-
-        modified_decoders_list = {}
-        for a_name, a_decoder in directional_laps_results.one_step_decoder_1D_dict.items():
-            is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, included_neuronIDs)
-            included_aclus = np.array(a_decoder.pf.ratemap.neuron_ids)[is_aclu_qclu_included_list]
-            modified_decoder = a_decoder.get_by_id(included_aclus)
-            modified_decoders_list[a_name] = modified_decoder
-
-        for a_name, a_decoder in modified_decoders_list.items():
-            directional_laps_results.one_step_decoder_1D_dict[a_name] = a_decoder
-
-
-        modified_decoders_list = {}
-        for a_name, a_decoder in directional_laps_results.shared_aclus_only_one_step_decoder_1D_dict.items():
-            is_aclu_qclu_included_list = np.isin(a_decoder.pf.ratemap.neuron_ids, included_neuronIDs)
-            included_aclus = np.array(a_decoder.pf.ratemap.neuron_ids)[is_aclu_qclu_included_list]
-            modified_decoder = a_decoder.get_by_id(included_aclus)
-            modified_decoders_list[a_name] = modified_decoder
-
-        for a_name, a_decoder in modified_decoders_list.items():
-            directional_laps_results.shared_aclus_only_one_step_decoder_1D_dict[a_name] = a_decoder
-
-        return directional_laps_results
-    
-    ## For serialization/pickling:
-    def __getstate__(self):
-        # Copy the object's state from self.__dict__ which contains all our instance attributes. Always use the dict.copy() method to avoid modifying the original state.
-        state = self.__dict__.copy()
-        return state
-
-    def __setstate__(self, state):
-        # Restore instance attributes (i.e., _mapping and _keys_at_init).
-        self.__dict__.update(state)
-        _migrate_legacy_directional_laps_state(self)
-        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        # super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
-
-
-
-    @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=['DirectionalPlacefieldGlobalComputationFunctions._split_to_directional_laps'], creation_date='2025-02-13 16:46', related_items=[])
-    @classmethod
-    def init_from_pipeline_natural_epochs(cls, curr_active_pipeline, progress_print=False) -> "BaseDirectionalLapsResult":
-        """ 2023-10-31 - 4pm  - Main computation function, simply extracts the diretional laps from the existing epochs.
-
-        PURE?: Does not update `curr_active_pipeline` or mess with its filters/configs/etc.
-
-                ## {"even": "RL", "odd": "LR"}
-
-        #TODO 2023-11-10 21:00: - [ ] Convert above "LR/RL" notation to new "LR/RL" versions:
-
-        
-        History 2025-02-13 16:52 used to be called 'DirectionalLapsHelpers.build_global_directional_result_from_natural_epochs'
-        
-        Uses:
-        
-            curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)
-        
-        
-        """
-
-        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # ('maze1_any', 'maze2_any', 'maze_any')
-        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-        # long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
-
-        # Unwrap the naturally produced directional placefields:
-        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-        # (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
-        # (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
-        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-        # (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
-        # (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
-        # (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
-
-        # Unpack all directional variables:
-        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name # ('maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any')
-
-        # Validate:
-        assert not (curr_active_pipeline.computation_results[long_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
-        assert not (curr_active_pipeline.computation_results[short_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
-        # Fix the computation epochs to be constrained to the proper long/short intervals:
-        was_modified = DirectionalLapsHelpers.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline) # cls: DirectionalLapsResult
-        was_modified = was_modified or DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
-        print(f'DirectionalLapsResult.init_from_pipeline_natural_epochs(...): was_modified: {was_modified}')
-
-        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
-        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
-
-        ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
-        long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_LR_results, long_RL_results, short_LR_results, short_RL_results)]
-
-
-        #TODO 2023-12-07 20:48: - [ ] It looks like I'm still only looking at the intersection here! Do I want this?
-
-        ## Version 2023-10-31 - 4pm - Two sets of templates for (Odd/Even) shared aclus:
-        # Kamran says LR and RL sets should be shared
-        ## Odd Laps:
-        LR_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-        LR_shared_aclus = np.array(list(set.intersection(*map(set,LR_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-        LR_n_neurons = len(LR_shared_aclus)
-        if progress_print:
-            print(f'LR_n_neurons: {LR_n_neurons}, LR_shared_aclus: {LR_shared_aclus}')
-
-        ## Even Laps:
-        RL_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-        RL_shared_aclus = np.array(list(set.intersection(*map(set,RL_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-        RL_n_neurons = len(RL_shared_aclus)
-        if progress_print:
-            print(f'RL_n_neurons: {RL_n_neurons}, RL_shared_aclus: {RL_shared_aclus}')
-
-        # Direction Separate shared_aclus decoders: Odd set is limited to LR_shared_aclus and RL set is limited to RL_shared_aclus:
-        long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-        long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(RL_shared_aclus) for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-
-        ## Build a `DirectionalLapsResult` (a `ComputedResult`) container object to hold the result:
-        directional_laps_result = cls(is_global=True, result_version=cls._VersionedResultMixin_version)
-        directional_laps_result.directional_lap_specific_configs = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # directional_lap_specific_configs
-        directional_laps_result.split_directional_laps_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)}  # split_directional_laps_dict
-        directional_laps_result.split_directional_laps_contexts_dict = {a_name:curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # split_directional_laps_contexts_dict
-        directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
-
-        # use the constrained epochs:
-        one_step = {
-            'long_LR': long_LR_shared_aclus_only_one_step_decoder_1D,
-            'long_RL': long_RL_shared_aclus_only_one_step_decoder_1D,
-            'short_LR': short_LR_shared_aclus_only_one_step_decoder_1D,
-            'short_RL': short_RL_shared_aclus_only_one_step_decoder_1D,
-        }
-        directional_laps_result.one_step_decoder_1D_dict = one_step
-        directional_laps_result.shared_aclus_only_one_step_decoder_1D_dict = dict(one_step)
-
-        return directional_laps_result
-
-
-
-
-@define(slots=False, repr=False)
-class DirectionalLapsResult(BaseDirectionalLapsResult):
-    """ a container for holding information regarding the computation of directional laps.
-
-    ## Build a `DirectionalLapsResult` container object to hold the result:
-    directional_laps_result = DirectionalLapsResult()
-    directional_laps_result.directional_lap_specific_configs = directional_lap_specific_configs
-    directional_laps_result.split_directional_laps_dict = split_directional_laps_dict
-    directional_laps_result.split_directional_laps_contexts_dict = split_directional_laps_contexts_dict
-    directional_laps_result.split_directional_laps_config_names = split_directional_laps_config_names
-    directional_laps_result.computed_base_epoch_names = computed_base_epoch_names
-
-    # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
-    directional_laps_result.long_LR_shared_aclus_only_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
-    directional_laps_result.long_even_shared_aclus_only_one_step_decoder_1D = long_even_shared_aclus_only_one_step_decoder_1D
-    directional_laps_result.short_odd_shared_aclus_only_one_step_decoder_1D = short_odd_shared_aclus_only_one_step_decoder_1D
-    directional_laps_result.short_even_shared_aclus_only_one_step_decoder_1D = short_even_shared_aclus_only_one_step_decoder_1D
-
-
-    long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [directional_laps_results.__dict__[k] for k in ['long_LR_shared_aclus_only_one_step_decoder_1D', 'long_RL_shared_aclus_only_one_step_decoder_1D', 'short_LR_shared_aclus_only_one_step_decoder_1D', 'short_RL_shared_aclus_only_one_step_decoder_1D']]
-
-    """
-    _VersionedResultMixin_version: str = "2025.09.10_0" # to be updated in your IMPLEMENTOR to indicate its version
-    
-    # directional_lap_specific_configs: Dict = non_serialized_field(default=Factory(dict))
-    # split_directional_laps_dict: Dict = non_serialized_field(default=Factory(dict))
-    # split_directional_laps_contexts_dict: Dict = non_serialized_field(default=Factory(dict))
-    # split_directional_laps_config_names: List[str] = serialized_field(default=Factory(list))
-    # computed_base_epoch_names: List[str] = serialized_field(default=Factory(list))
-
-
-    @property
-    def long_LR_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.one_step_decoder_1D_dict['long_LR']
-    @long_LR_one_step_decoder_1D.setter
-    def long_LR_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.one_step_decoder_1D_dict['long_LR'] = value
-
-    @property
-    def long_RL_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.one_step_decoder_1D_dict['long_RL']
-    @long_RL_one_step_decoder_1D.setter
-    def long_RL_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.one_step_decoder_1D_dict['long_RL'] = value
-
-    @property
-    def short_LR_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.one_step_decoder_1D_dict['short_LR']
-    @short_LR_one_step_decoder_1D.setter
-    def short_LR_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.one_step_decoder_1D_dict['short_LR'] = value
-
-    @property
-    def short_RL_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.one_step_decoder_1D_dict['short_RL']
-    @short_RL_one_step_decoder_1D.setter
-    def short_RL_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.one_step_decoder_1D_dict['short_RL'] = value
-
-
-    @property
-    def long_LR_shared_aclus_only_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.shared_aclus_only_one_step_decoder_1D_dict['long_LR']
-    @long_LR_shared_aclus_only_one_step_decoder_1D.setter
-    def long_LR_shared_aclus_only_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.shared_aclus_only_one_step_decoder_1D_dict['long_LR'] = value
-
-    @property
-    def long_RL_shared_aclus_only_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.shared_aclus_only_one_step_decoder_1D_dict['long_RL']
-    @long_RL_shared_aclus_only_one_step_decoder_1D.setter
-    def long_RL_shared_aclus_only_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.shared_aclus_only_one_step_decoder_1D_dict['long_RL'] = value
-
-    @property
-    def short_LR_shared_aclus_only_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.shared_aclus_only_one_step_decoder_1D_dict['short_LR']
-    @short_LR_shared_aclus_only_one_step_decoder_1D.setter
-    def short_LR_shared_aclus_only_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.shared_aclus_only_one_step_decoder_1D_dict['short_LR'] = value
-
-    @property
-    def short_RL_shared_aclus_only_one_step_decoder_1D(self) -> BasePositionDecoder:
-        return self.shared_aclus_only_one_step_decoder_1D_dict['short_RL']
-    @short_RL_shared_aclus_only_one_step_decoder_1D.setter
-    def short_RL_shared_aclus_only_one_step_decoder_1D(self, value: BasePositionDecoder):
-        self.shared_aclus_only_one_step_decoder_1D_dict['short_RL'] = value
-        
-
-    # long_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
-    # long_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
-    # short_LR_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
-    # short_RL_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None)
-
-    # long_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_odd_shared_aclus_only_one_step_decoder_1D')
-    # long_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_even_shared_aclus_only_one_step_decoder_1D')
-    # short_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_odd_shared_aclus_only_one_step_decoder_1D')
-    # short_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_even_shared_aclus_only_one_step_decoder_1D')
+    long_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_odd_shared_aclus_only_one_step_decoder_1D')
+    long_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='long_even_shared_aclus_only_one_step_decoder_1D')
+    short_LR_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_odd_shared_aclus_only_one_step_decoder_1D')
+    short_RL_shared_aclus_only_one_step_decoder_1D: BasePositionDecoder = serialized_field(default=None, alias='short_even_shared_aclus_only_one_step_decoder_1D')
 
     # long_LR_one_step_decoder_1D, long_RL_one_step_decoder_1D, short_LR_one_step_decoder_1D, short_RL_one_step_decoder_1D
-
 
     def get_decoders(self) -> Tuple[BasePositionDecoder, BasePositionDecoder, BasePositionDecoder, BasePositionDecoder]:
         """
@@ -2063,7 +986,8 @@ class DirectionalLapsResult(BaseDirectionalLapsResult):
     def __setstate__(self, state):
         # Restore instance attributes (i.e., _mapping and _keys_at_init).
         self.__dict__.update(state)
-        _migrate_legacy_directional_laps_state(self)
+        # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
+        # super(DirectionalLapsResult, self).__init__() # TypeError: super(type, obj): obj must be an instance or subtype of type.
 
 
 
@@ -2387,132 +1311,104 @@ class DirectionalLapsHelpers:
         
         
         """
-        is_kdiba_session: bool = curr_active_pipeline.is_kdiba_session()
-        
-        if is_kdiba_session:
-            long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # ('maze1_any', 'maze2_any', 'maze_any')
-            # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
-            long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
 
-            # Unwrap the naturally produced directional placefields:
-            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-            # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-            (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
-            (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
-            (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-            (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
-            (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
-            (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+        long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names() # ('maze1_any', 'maze2_any', 'maze_any')
+        # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
+        long_epoch_obj, short_epoch_obj = [Epoch(curr_active_pipeline.sess.epochs.to_dataframe().epochs.label_slice(an_epoch_name.removesuffix('_any'))) for an_epoch_name in [long_epoch_name, short_epoch_name]] #TODO 2023-11-10 20:41: - [ ] Issue with getting actual Epochs from sess.epochs for directional laps: emerges because long_epoch_name: 'maze1_any' and the actual epoch label in curr_active_pipeline.sess.epochs is 'maze1' without the '_any' part.
 
-            # Unpack all directional variables:
-            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name # ('maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any')
+        # Unwrap the naturally produced directional placefields:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+        # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+        (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        long_LR_epochs_obj, long_RL_epochs_obj, short_LR_epochs_obj, short_RL_epochs_obj, global_any_laps_epochs_obj = [curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name, global_any_name)] # note has global also
+        (long_LR_session, long_RL_session, short_LR_session, short_RL_session) = [curr_active_pipeline.filtered_sessions[an_epoch_name] for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)] # sessions are correct at least, seems like just the computation parameters are messed up
+        (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [curr_active_pipeline.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_computation_config, long_RL_computation_config, short_LR_computation_config, short_RL_computation_config) = [curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+        (long_LR_pf1D, long_RL_pf1D, short_LR_pf1D, short_RL_pf1D) = (long_LR_results.pf1D, long_RL_results.pf1D, short_LR_results.pf1D, short_RL_results.pf1D)
+        (long_LR_pf2D, long_RL_pf2D, short_LR_pf2D, short_RL_pf2D) = (long_LR_results.pf2D, long_RL_results.pf2D, short_LR_results.pf2D, short_RL_results.pf2D)
+        (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
 
-            # Validate:
-            assert not (curr_active_pipeline.computation_results[long_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
-            assert not (curr_active_pipeline.computation_results[short_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
-            # Fix the computation epochs to be constrained to the proper long/short intervals:
-            was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
-            was_modified = was_modified or DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
-            print(f'build_global_directional_result_from_natural_epochs(...): was_modified: {was_modified}')
+        # Unpack all directional variables:
+        long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name # ('maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any')
 
-            # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
-            # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
+        # Validate:
+        assert not (curr_active_pipeline.computation_results[long_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
+        assert not (curr_active_pipeline.computation_results[short_LR_name].computation_config['pf_params'].computation_epochs is curr_active_pipeline.computation_results[long_RL_name].computation_config['pf_params'].computation_epochs)
+        # Fix the computation epochs to be constrained to the proper long/short intervals:
+        was_modified = cls.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
+        was_modified = was_modified or DirectionalLapsHelpers.fixup_directional_pipeline_if_needed(curr_active_pipeline)
+        print(f'build_global_directional_result_from_natural_epochs(...): was_modified: {was_modified}')
 
-            ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
-            long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_LR_results, long_RL_results, short_LR_results, short_RL_results)]
+        # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D  = DirectionalLapsHelpers.build_directional_constrained_decoders(curr_active_pipeline)
+
+        ## Build the `BasePositionDecoder` for each of the four templates analagous to what is done in `_long_short_decoding_analysis_from_decoders`:
+        long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D  = [BasePositionDecoder.init_from_stateful_decoder(deepcopy(results_data.get('pf1D_Decoder', None))) for results_data in (long_LR_results, long_RL_results, short_LR_results, short_RL_results)]
 
 
-            #TODO 2023-12-07 20:48: - [ ] It looks like I'm still only looking at the intersection here! Do I want this?
+        #TODO 2023-12-07 20:48: - [ ] It looks like I'm still only looking at the intersection here! Do I want this?
 
-            # # ## Version 2023-10-30 - All four templates with same shared_aclus version:
-            # # # Prune to the shared aclus in both epochs (short/long):
-            # active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-            # # Find only the common aclus amongst all four templates:
-            # shared_aclus = np.array(list(set.intersection(*map(set,active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-            # n_neurons = len(shared_aclus)
-            # print(f'n_neurons: {n_neurons}, shared_aclus: {shared_aclus}')
-            # # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
-            # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        # # ## Version 2023-10-30 - All four templates with same shared_aclus version:
+        # # # Prune to the shared aclus in both epochs (short/long):
+        # active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        # # Find only the common aclus amongst all four templates:
+        # shared_aclus = np.array(list(set.intersection(*map(set,active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        # n_neurons = len(shared_aclus)
+        # print(f'n_neurons: {n_neurons}, shared_aclus: {shared_aclus}')
+        # # build the four `*_shared_aclus_only_one_step_decoder_1D` versions of the decoders constrained only to common aclus:
+        # long_LR_shared_aclus_only_one_step_decoder_1D, long_RL_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, long_RL_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
 
-            ## Version 2023-10-31 - 4pm - Two sets of templates for (Odd/Even) shared aclus:
-            # Kamran says LR and RL sets should be shared
-            ## Odd Laps:
-            LR_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-            LR_shared_aclus = np.array(list(set.intersection(*map(set,LR_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-            LR_n_neurons = len(LR_shared_aclus)
-            if progress_print:
-                print(f'LR_n_neurons: {LR_n_neurons}, LR_shared_aclus: {LR_shared_aclus}')
+        ## Version 2023-10-31 - 4pm - Two sets of templates for (Odd/Even) shared aclus:
+        # Kamran says LR and RL sets should be shared
+        ## Odd Laps:
+        LR_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
+        LR_shared_aclus = np.array(list(set.intersection(*map(set,LR_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        LR_n_neurons = len(LR_shared_aclus)
+        if progress_print:
+            print(f'LR_n_neurons: {LR_n_neurons}, LR_shared_aclus: {LR_shared_aclus}')
 
-            ## Even Laps:
-            RL_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-            RL_shared_aclus = np.array(list(set.intersection(*map(set,RL_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
-            RL_n_neurons = len(RL_shared_aclus)
-            if progress_print:
-                print(f'RL_n_neurons: {RL_n_neurons}, RL_shared_aclus: {RL_shared_aclus}')
+        ## Even Laps:
+        RL_active_neuron_IDs_list = [a_decoder.neuron_IDs for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
+        RL_shared_aclus = np.array(list(set.intersection(*map(set,RL_active_neuron_IDs_list)))) # array([ 6,  7,  8, 11, 15, 16, 20, 24, 25, 26, 31, 33, 34, 35, 39, 40, 45, 46, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 63, 64])
+        RL_n_neurons = len(RL_shared_aclus)
+        if progress_print:
+            print(f'RL_n_neurons: {RL_n_neurons}, RL_shared_aclus: {RL_shared_aclus}')
 
-            # Direction Separate shared_aclus decoders: Odd set is limited to LR_shared_aclus and RL set is limited to RL_shared_aclus:
-            long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
-            long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(RL_shared_aclus) for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
-
-
-            # ## Encode/Decode from global result:
-            # # Unpacking:
-            # directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
-            # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
-            # # split_directional_laps_config_names
-
-            ## Build a `DirectionalLapsResult` (a `ComputedResult`) container object to hold the result:
-            directional_laps_result = DirectionalLapsResult(is_global=True, result_version=DirectionalLapsResult._VersionedResultMixin_version)
-            directional_laps_result.directional_lap_specific_configs = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # directional_lap_specific_configs
-            directional_laps_result.split_directional_laps_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)}  # split_directional_laps_dict
-            directional_laps_result.split_directional_laps_contexts_dict = {a_name:curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # split_directional_laps_contexts_dict
-            directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
-
-            # # use the non-constrained epochs:
-            # directional_laps_result.long_LR_one_step_decoder_1D = long_LR_laps_one_step_decoder_1D
-            # directional_laps_result.long_RL_one_step_decoder_1D = long_RL_laps_one_step_decoder_1D
-            # directional_laps_result.short_LR_one_step_decoder_1D = short_LR_laps_one_step_decoder_1D
-            # directional_laps_result.short_RL_one_step_decoder_1D = short_RL_laps_one_step_decoder_1D
-
-            # use the constrained epochs:
-            directional_laps_result.long_LR_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.long_RL_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.short_LR_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.short_RL_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
-
-            # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
-            directional_laps_result.long_LR_shared_aclus_only_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.long_RL_shared_aclus_only_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.short_LR_shared_aclus_only_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
-            directional_laps_result.short_RL_shared_aclus_only_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
-        else:
-            ## non-kdiba session
-            session_epochs: Epoch = BapunDataSessionFormatRegisteredClass.session_fixup_epochs(sess=curr_active_pipeline.sess)
-            session_epochs
-
-            curr_epoch_names: List[str] = curr_active_pipeline.sess.epochs.to_dataframe()['label'].to_list()
-            print(f'curr_epoch_names: {curr_epoch_names}')
-
-            ## Build umap position so it will go to filtered
-
-            active_maze_epoch_names = deepcopy(hardcoded_params.non_global_activity_session_names) # ['maze1', 'maze2'] or ['roam', 'sprinkle']
-            active_maze_epochs_df: pd.DataFrame = curr_active_pipeline.sess.paradigm.to_dataframe() # ['label']
-            active_maze_epochs_df = active_maze_epochs_df[active_maze_epochs_df['label'].isin(active_maze_epoch_names)]
-            curr_active_pipeline.sess.active_maze_epochs_df = ensure_Epoch(deepcopy(active_maze_epochs_df)) ## Set the dataframe's `curr_active_pipeline.sess.active_maze_epochs_df` property
-
-            print(f'computing linearized position for session using method="umap"...')
-            sess = curr_active_pipeline.sess.position.compute_linearized_position(method='umap')
-            print(f'estimating the laps from the linear position...')
-            sess = estimate_session_laps(curr_active_pipeline.sess, should_plot_laps_2d=False) ## unfiltered session 
-            laps_obj = curr_active_pipeline.sess.laps # Laps
-            laps_df: pd.DataFrame = laps_obj.to_dataframe()
-            print(f'estimating the maze_id to laps...')
-            laps_df = laps_df.epochs.adding_maze_id_if_needed(active_maze_epochs_df=active_maze_epochs_df)
-            curr_active_pipeline.sess.laps._df = laps_df
+        # Direction Separate shared_aclus decoders: Odd set is limited to LR_shared_aclus and RL set is limited to RL_shared_aclus:
+        long_LR_shared_aclus_only_one_step_decoder_1D, short_LR_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(LR_shared_aclus) for a_decoder in (long_LR_laps_one_step_decoder_1D, short_LR_laps_one_step_decoder_1D)]
+        long_RL_shared_aclus_only_one_step_decoder_1D, short_RL_shared_aclus_only_one_step_decoder_1D = [a_decoder.get_by_id(RL_shared_aclus) for a_decoder in (long_RL_laps_one_step_decoder_1D, short_RL_laps_one_step_decoder_1D)]
 
 
+        # ## Encode/Decode from global result:
+        # # Unpacking:
+        # directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps']
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_config_names, computed_base_epoch_names = [directional_laps_results[k] for k in ['directional_lap_specific_configs', 'split_directional_laps_dict', 'split_directional_laps_names', 'computed_base_epoch_names']]
+        # # split_directional_laps_config_names
+
+        ## Build a `DirectionalLapsResult` (a `ComputedResult`) container object to hold the result:
+        directional_laps_result = DirectionalLapsResult(is_global=True, result_version=DirectionalLapsResult._VersionedResultMixin_version)
+        directional_laps_result.directional_lap_specific_configs = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # directional_lap_specific_configs
+        directional_laps_result.split_directional_laps_dict = {an_epoch_name:curr_active_pipeline.computation_results[an_epoch_name].computation_config.pf_params.computation_epochs for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)}  # split_directional_laps_dict
+        directional_laps_result.split_directional_laps_contexts_dict = {a_name:curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)} # split_directional_laps_contexts_dict
+        directional_laps_result.split_directional_laps_config_names = [long_LR_name, long_RL_name, short_LR_name, short_RL_name] # split_directional_laps_config_names
+
+        # # use the non-constrained epochs:
+        # directional_laps_result.long_LR_one_step_decoder_1D = long_LR_laps_one_step_decoder_1D
+        # directional_laps_result.long_RL_one_step_decoder_1D = long_RL_laps_one_step_decoder_1D
+        # directional_laps_result.short_LR_one_step_decoder_1D = short_LR_laps_one_step_decoder_1D
+        # directional_laps_result.short_RL_one_step_decoder_1D = short_RL_laps_one_step_decoder_1D
+
+        # use the constrained epochs:
+        directional_laps_result.long_LR_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.long_RL_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_LR_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_RL_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
+
+        # directional_lap_specific_configs, split_directional_laps_dict, split_directional_laps_contexts_dict, split_directional_laps_config_names, computed_base_epoch_names
+        directional_laps_result.long_LR_shared_aclus_only_one_step_decoder_1D = long_LR_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.long_RL_shared_aclus_only_one_step_decoder_1D = long_RL_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_LR_shared_aclus_only_one_step_decoder_1D = short_LR_shared_aclus_only_one_step_decoder_1D
+        directional_laps_result.short_RL_shared_aclus_only_one_step_decoder_1D = short_RL_shared_aclus_only_one_step_decoder_1D
 
         return directional_laps_result
 
@@ -2617,12 +1513,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @property
     def ripple_epochs_df(self) -> pd.DataFrame:
-        a_df = deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
-        return ensure_dataframe(a_df)
-    @ripple_epochs_df.setter
-    def ripple_epochs_df(self, value: pd.DataFrame):
-        self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs = ensure_dataframe(value)
-
+        return deepcopy(self.all_directional_ripple_filter_epochs_decoder_result.filter_epochs)
 
     @property
     def laps_decoding_time_bin_size(self) -> float:
@@ -2645,8 +1536,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         laps_track_identity_marginals, laps_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = self.laps_track_identity_marginals_tuple
 
         laps_marginals_df = pd.DataFrame(np.hstack((laps_directional_all_epoch_bins_marginal, laps_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        laps_marginals_df['lap_idx'] = np.asarray(laps_marginals_df.index)
-        laps_marginals_df['lap_start_t'] = np.asarray(self.laps_epochs_df['start'])
+        laps_marginals_df['lap_idx'] = laps_marginals_df.index.to_numpy()
+        laps_marginals_df['lap_start_t'] = self.laps_epochs_df['start'].to_numpy()
         
         ## ensure we have the generic columns too (duplicated):
         laps_marginals_df['epoch_idx'] = laps_marginals_df['lap_idx']
@@ -2664,8 +1555,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
         ## Ripple marginals_df:
         ripple_marginals_df = pd.DataFrame(np.hstack((ripple_directional_all_epoch_bins_marginal, ripple_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-        ripple_marginals_df['ripple_idx'] = np.asarray(ripple_marginals_df.index)
-        ripple_marginals_df['ripple_start_t'] = np.asarray(self.ripple_epochs_df['start'])
+        ripple_marginals_df['ripple_idx'] = ripple_marginals_df.index.to_numpy()
+        ripple_marginals_df['ripple_start_t'] = self.ripple_epochs_df['start'].to_numpy()
         
         ## ensure we have the generic columns too (duplicated):
         ripple_marginals_df['epoch_idx'] = ripple_marginals_df['ripple_idx']
@@ -2952,8 +1843,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, laps_most_likely_track_identity_from_decoder, laps_is_most_likely_track_identity_Long = laps_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['lap_idx'] = np.asarray(epoch_marginals_df.index)
-                    epoch_marginals_df['lap_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
+                    epoch_marginals_df['lap_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['lap_start_t'] = a_result.filter_epochs['start'].to_numpy()
                     ## ensure we have the generic columns too (duplicated):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df['lap_idx']
                     epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['lap_start_t']                    
@@ -2969,8 +1860,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, ripple_most_likely_track_identity_from_decoder, ripple_is_most_likely_track_identity_Long = ripple_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['ripple_idx'] = np.asarray(epoch_marginals_df.index)
-                    epoch_marginals_df['ripple_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
+                    epoch_marginals_df['ripple_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['ripple_start_t'] = a_result.filter_epochs['start'].to_numpy()
                     ## ensure we have the generic columns too (duplicated):
                     epoch_marginals_df['epoch_idx'] = epoch_marginals_df['ripple_idx']
                     epoch_marginals_df['epoch_start_t'] = epoch_marginals_df['ripple_start_t']
@@ -2986,8 +1877,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['epoch_idx'] = np.asarray(epoch_marginals_df.index)
-                    epoch_marginals_df['epoch_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
                     
                 elif known_named_decoding_epochs_type in ('replay', 'ripple', 'non_pbe', 'non_pbe_endcaps'):
                     # Case: Per-epoch any marginals
@@ -3001,8 +1892,8 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
                     epoch_track_identity_marginals, epoch_track_identity_all_epoch_bins_marginal, epoch_most_likely_track_identity_from_decoder, epoch_is_most_likely_track_identity_Long = epoch_track_identity_marginals_tuple
 
                     epoch_marginals_df = pd.DataFrame(np.hstack((epoch_directional_all_epoch_bins_marginal, epoch_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
-                    epoch_marginals_df['epoch_idx'] = np.asarray(epoch_marginals_df.index)
-                    epoch_marginals_df['epoch_start_t'] = np.asarray(ensure_dataframe(a_result.filter_epochs)['start'])
+                    epoch_marginals_df['epoch_idx'] = epoch_marginals_df.index.to_numpy()
+                    epoch_marginals_df['epoch_start_t'] = a_result.filter_epochs['start'].to_numpy()
 
                 else:
                     raise ValueError(f"Unexpected value for known_named_decoding_epochs_type: {known_named_decoding_epochs_type}")
@@ -3044,154 +1935,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             p_x_given_n_list = filter_epochs_decoder_result.p_x_given_n_list
 
         return p_x_given_n_list
-
-
-    @classmethod
-    def _resolve_context_names(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], n_contexts: int, context_names: Optional[List[str]]=None) -> List[str]:
-        if context_names is not None:
-            assert len(context_names) == n_contexts, f"context_names: {context_names} must have len {n_contexts}, got len(context_names): {len(context_names)}"
-            return list(context_names)
-        for attr_name in ('pseudo2D_decoder_names_list', 'context_names', 'decoder_names'):
-            candidate_context_names = getattr(filter_epochs_decoder_result, attr_name, None) if (not isinstance(filter_epochs_decoder_result, (List, NDArray))) else None
-            if candidate_context_names is not None:
-                candidate_context_names = list(candidate_context_names)
-                if len(candidate_context_names) >= n_contexts:
-                    return candidate_context_names[:n_contexts]
-        if n_contexts == 4:
-            return ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-        if n_contexts == 2:
-            return ['long', 'short']
-        return [f'context_{i}' for i in range(n_contexts)]
-
-
-    @classmethod
-    def _infer_direction_group_indices(cls, context_names: List[str], n_contexts: int) -> Optional[Tuple[List[int], List[int]]]:
-        lr_context_indices = [i for i, a_name in enumerate(context_names) if a_name.endswith('_LR')]
-        rl_context_indices = [i for i, a_name in enumerate(context_names) if a_name.endswith('_RL')]
-        if len(lr_context_indices) > 0 and len(rl_context_indices) > 0:
-            return lr_context_indices, rl_context_indices
-        if n_contexts == 4:
-            return [0, 2], [1, 3]
-        return None
-
-
-    @classmethod
-    def _infer_track_identity_group_indices(cls, context_names: List[str], n_contexts: int) -> Optional[Tuple[List[int], List[int]]]:
-        long_context_indices = [i for i, a_name in enumerate(context_names) if (a_name.startswith('long') or a_name.split('_', maxsplit=1)[0] == 'long')]
-        short_context_indices = [i for i, a_name in enumerate(context_names) if (a_name.startswith('short') or a_name.split('_', maxsplit=1)[0] == 'short')]
-        if len(long_context_indices) > 0 and len(short_context_indices) > 0:
-            return long_context_indices, short_context_indices
-        if n_contexts == 4:
-            return [0, 1], [2, 3]
-        if n_contexts == 2:
-            return [0], [1]
-        return None
-
-
-    @classmethod
-    def _resolve_pseudo2D_context_layout(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> Pseudo2DContextLayout:
-        """Resolve pseudo2D/context decoder posterior layout from array shapes.
-
-        Supports 3D `(n_pos_bins, n_contexts, n_time_bins)` and 4D `(n_xbins, n_ybins, n_contexts, n_time_bins)` posteriors.
-        """
-        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
-        assert len(p_x_given_n_list) > 0, f"p_x_given_n_list is empty; cannot resolve pseudo2D context layout from filter_epochs_decoder_result of type {type(filter_epochs_decoder_result)} (num_filter_epochs={getattr(filter_epochs_decoder_result, 'num_filter_epochs', None)})"
-        p_x_given_n_list_ndim_sizes = np.array([np.ndim(a_p_x_given_n) for a_p_x_given_n in p_x_given_n_list])
-        p_x_given_n_ndim: int = int(p_x_given_n_list_ndim_sizes[0])
-        assert np.all([v == p_x_given_n_ndim for v in p_x_given_n_list_ndim_sizes]), f"the first ndim must equal all the others, but p_x_given_n_ndim: {p_x_given_n_ndim}, p_x_given_n_list_ndim_sizes: {p_x_given_n_list_ndim_sizes}"
-        if p_x_given_n_ndim == 4:
-            context_dim_idx: int = 2
-            spatial_sum_axes: Tuple[int, ...] = (0, 1)
-        elif p_x_given_n_ndim == 3:
-            context_dim_idx: int = 1
-            spatial_sum_axes = (0,)
-        else:
-            raise ValueError(f"Unsupported pseudo2D posterior ndim: {p_x_given_n_ndim}. Expected 3D or 4D posteriors.")
-        p_x_given_n_list_context_dim_sizes = np.array([np.shape(a_p_x_given_n)[context_dim_idx] for a_p_x_given_n in p_x_given_n_list])
-        n_contexts: int = int(p_x_given_n_list_context_dim_sizes[0])
-        assert np.all([v == n_contexts for v in p_x_given_n_list_context_dim_sizes]), f"the first n_contexts must equal all the others, but n_contexts: {n_contexts}, p_x_given_n_list_context_dim_sizes: {p_x_given_n_list_context_dim_sizes}"
-        resolved_context_names: List[str] = cls._resolve_context_names(filter_epochs_decoder_result, n_contexts, context_names=context_names)
-        direction_group_indices = cls._infer_direction_group_indices(resolved_context_names, n_contexts)
-        track_identity_group_indices = cls._infer_track_identity_group_indices(resolved_context_names, n_contexts)
-        return Pseudo2DContextLayout(p_x_given_n_list, p_x_given_n_ndim, context_dim_idx, n_contexts, spatial_sum_axes, tuple(resolved_context_names), direction_group_indices, track_identity_group_indices)
-
-
-    @classmethod
-    def _normalize_per_timebin_context_marginal(cls, marginal_p_x_given_n: NDArray) -> NDArray:
-        normalized_marginal_p_x_given_n = np.squeeze(marginal_p_x_given_n)
-        normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n / np.sum(normalized_marginal_p_x_given_n, axis=0, keepdims=True) # sum over all contexts for each time_bin (so there's a normalized distribution at each timestep)
-        if normalized_marginal_p_x_given_n.ndim == 0:
-            normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n.reshape(1, 1)
-        elif normalized_marginal_p_x_given_n.ndim == 1:
-            normalized_marginal_p_x_given_n = normalized_marginal_p_x_given_n[:, np.newaxis]
-        return normalized_marginal_p_x_given_n
-
-
-    @classmethod
-    def _marginalize_p_x_given_n_to_context_probs(cls, a_p_x_given_n: NDArray, spatial_sum_axes: Tuple[int, ...]) -> NDArray:
-        context_marginal_p_x_given_n = np.squeeze(np.nansum(a_p_x_given_n, axis=spatial_sum_axes)) #TODO 2026-09-01 15:47: - [ ] Issue, collapses to (n_contexts, n_timebins) from (n_x_bins, n_contexts, n_timebins)
-        return cls._normalize_per_timebin_context_marginal(context_marginal_p_x_given_n)
-
-
-    @classmethod
-    def _group_context_marginal(cls, context_marginal_p_x_given_n: NDArray, group_indices_list: List[List[int]]) -> NDArray:
-        grouped_context_marginal_p_x_given_n = np.stack([np.sum(context_marginal_p_x_given_n[group_indices, :], axis=0) for group_indices in group_indices_list], axis=0)
-        return cls._normalize_per_timebin_context_marginal(grouped_context_marginal_p_x_given_n)
-
-
-    @classmethod
-    def _resolve_pseudo2D_continuous_result(cls, pseudo2D_result) -> Tuple[Any, NDArray, str]:
-        """Normalize pseudo2D cache entries to SingleEpochDecodedResult + time centers and detect decoder format."""
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
-
-        assert pseudo2D_result is not None, "pseudo2D_result is None"
-        if isinstance(pseudo2D_result, DecodedFilterEpochsResult):
-            assert len(pseudo2D_result.p_x_given_n_list) == 1, f"expected single global epoch in continuous decode, found {len(pseudo2D_result.p_x_given_n_list)}"
-            single_epoch_result = pseudo2D_result.get_result_for_epoch(0)
-            time_window_centers = pseudo2D_result.time_bin_containers[0].centers
-        elif isinstance(pseudo2D_result, SingleEpochDecodedResult):
-            single_epoch_result = pseudo2D_result
-            time_window_centers = single_epoch_result.time_bin_container.centers
-        else:
-            raise TypeError(f"Unsupported pseudo2D_result type: {type(pseudo2D_result)}")
-
-        p_x_given_n = single_epoch_result.p_x_given_n
-        if p_x_given_n.ndim == 3 and p_x_given_n.shape[1] == 4:
-            decoder_format = 'four_directional'
-        elif p_x_given_n.ndim == 4:
-            decoder_format = 'contextual_pf2D'
-        else:
-            raise ValueError(f"Unsupported pseudo2D posterior shape {p_x_given_n.shape} (ndim={p_x_given_n.ndim})")
-        return single_epoch_result, time_window_centers, decoder_format
-
-
-    @classmethod
-    def build_contextual_marginal_over_track_ID(cls, single_epoch_result, debug_print: bool = False) -> NDArray:
-        """Context marginal for Bapun-style contextual pf2D: sum over spatial dims, normalize per time bin."""
-        if getattr(single_epoch_result, 'marginal_z', None) is not None and single_epoch_result.marginal_z.p_x_given_n is not None:
-            marginal_over_track_ID = deepcopy(single_epoch_result.marginal_z.p_x_given_n)
-        else:
-            p_x_given_n = single_epoch_result.p_x_given_n
-            marginal_over_track_ID = np.nansum(p_x_given_n, axis=(0, 1))
-            col_sums = np.sum(marginal_over_track_ID, axis=0, keepdims=True)
-            col_sums[col_sums == 0] = 1.0
-            marginal_over_track_ID = marginal_over_track_ID / col_sums
-        if debug_print:
-            print(f'build_contextual_marginal_over_track_ID: shape={marginal_over_track_ID.shape}')
-        return marginal_over_track_ID
-
-
-    @classmethod
-    def _get_context_y_bin_labels(cls, curr_active_pipeline, n_contexts: int) -> List[str]:
-        try:
-            directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-            pf1D_Decoder_dict = directional_decoders_decode_result.pf1D_Decoder_dict
-            if pf1D_Decoder_dict is not None and len(pf1D_Decoder_dict) >= n_contexts:
-                return list(pf1D_Decoder_dict.keys())[:n_contexts]
-        except (KeyError, AttributeError, TypeError):
-            pass
-        return [f'context_{i}' for i in range(n_contexts)]
-
+    
 
     @classmethod
     def build_top_level_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
@@ -3476,12 +2220,12 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
         # epochs_marginals_df = pd.DataFrame(np.hstack((epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['P_LR', 'P_RL', 'P_Long', 'P_Short'])
         # epochs_marginals_df = pd.DataFrame(np.hstack((non_marginalized_decoder_all_epoch_bins_marginal, epochs_directional_all_epoch_bins_marginal, epochs_track_identity_all_epoch_bins_marginal)), columns=['long_LR', 'long_RL', 'short_LR', 'short_RL', 'P_LR', 'P_RL', 'P_Long', 'P_Short'])
         if epoch_idx_col_name is not None:
-            track_marginal_posterior_df[epoch_idx_col_name] = np.asarray(track_marginal_posterior_df.index)
+            track_marginal_posterior_df[epoch_idx_col_name] = track_marginal_posterior_df.index.to_numpy()
             
         if len(tentative_epochs_df) == len(track_marginal_posterior_df):
             if epoch_start_t_col_name is not None:
                 assert 'start' in tentative_epochs_df
-                track_marginal_posterior_df[epoch_start_t_col_name] = np.asarray(tentative_epochs_df['start'])
+                track_marginal_posterior_df[epoch_start_t_col_name] = tentative_epochs_df['start'].to_numpy()
             # epochs_marginals_df[epoch_start_t_col_name] = epochs_df['start'].to_numpy()
             # epochs_marginals_df['stop'] = epochs_epochs_df['stop'].to_numpy()
             # epochs_marginals_df['label'] = epochs_epochs_df['label'].to_numpy()
@@ -3492,7 +2236,7 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
             if additional_transfer_column_names is not None:
                 for a_col_name in additional_transfer_column_names:
                     if ((a_col_name in tentative_epochs_df) and (a_col_name not in track_marginal_posterior_df)):
-                        track_marginal_posterior_df[a_col_name] = np.asarray(tentative_epochs_df[a_col_name])
+                        track_marginal_posterior_df[a_col_name] = tentative_epochs_df[a_col_name].to_numpy()
                     else:
                         print(f'\tWARN: extra column: "{a_col_name}" was specified but not present in epochs_df (which has columns: {list(tentative_epochs_df.columns)}). Skipping.')
                      
@@ -3508,116 +2252,299 @@ class DirectionalPseudo2DDecodersResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['cls.determine_non_marginalized_decoder_likelihoods', 'AddNewDecodedEpochMarginal_MatplotlibPlotCommand.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals', '_display_directional_merged_pf_decoded_epochs'], creation_date='2025-05-02 17:29', related_items=[])
     @classmethod
-    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
-        """Build per-epoch non-marginalized context posteriors summed over spatial dimensions.
+    def build_non_marginalized_raw_posteriors(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
+        """ only works for the all-directional coder with the four items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
-        Works for pseudo2D/context decoders with arbitrary `n_contexts` in 3D or 4D posteriors.
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
         """
-        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
-        for a_p_x_given_n in context_layout.p_x_given_n_list:
-            curr_array_shape = np.shape(a_p_x_given_n)
+        
+        for a_p_x_given_n in p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
+            curr_array_shape = np.shape(a_p_x_given_n) # .shape # (62, 4, 236) - (n_pos_bins, 4, n_epoch_t_bins[i])
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
-            curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
-            curr_unit_marginal_x.p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
-            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
-        ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
-        return custom_curr_unit_marginal_list
 
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            if debug_print:
+                print(f'np.shape(a_p_x_given_n): {np.shape(curr_array_shape)}')
+                
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=a_p_x_given_n, most_likely_positions_1D=None)
+            
+            if debug_print:
+                print(f'np.shape(curr_unit_posterior_list.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+            
+            # y-axis marginal:
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(a_p_x_given_n, axis=0)) # sum over all x. Result should be (4, n_epoch_t_bins[i])
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all four decoders for each time_bin (so there's a normalized distribution at each timestep)
+
+            ## Ensures that the marginal posterior is at least 2D:
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
+            custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
+        return custom_curr_unit_marginal_list
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_directional_likelihoods'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
-    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
-        """Marginalize pseudo2D/context posteriors over direction groups inferred from context names.
+    def build_custom_marginal_over_direction(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
+        """ only works for the all-directional coder with the four items
+        
+        Requires: filter_epochs_decoder_result.p_x_given_n_list
 
-        For KDiba linear-track 4-context decoders this yields [LR, RL]. Requires resolvable direction groups.
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
+
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_direction(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
         """
-        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
-        if context_layout.direction_group_indices is None:
-            raise ValueError(f"Cannot infer direction groups for context_names: {context_layout.context_names} (n_contexts={context_layout.n_contexts}).")
-        lr_context_indices, rl_context_indices = context_layout.direction_group_indices
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
-        for a_p_x_given_n in context_layout.p_x_given_n_list:
+        
+        ## Make sure it is the Pseudo2D (all-directional) decoder by checking shape:
+        p_x_given_n_list_second_dim_sizes = np.array([np.shape(a_p_x_given_n)[1] for a_p_x_given_n in p_x_given_n_list])
+        is_pseudo2D_decoder = np.all((p_x_given_n_list_second_dim_sizes == 4)) # only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+        if not is_pseudo2D_decoder:
+            raise ValueError(f"this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] but p_x_given_n_list_second_dim_sizes: {p_x_given_n_list_second_dim_sizes} ")
+        
+        for a_p_x_given_n in p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
-            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
-            directional_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [lr_context_indices, rl_context_indices])
-            curr_unit_marginal_y = DynamicContainer(p_x_given_n=directional_marginal_p_x_given_n, most_likely_positions_1D=None)
+
+            assert curr_array_shape[1] == 4, f"curr_array_shape: {curr_array_shape} but this only works with the Pseudo2D (all-directional) decoder with posteriors with .shape[1] == 4, corresponding to ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            ## I don't want to use np.nansum(...) here because I DO want to propgate NaNs if one of the elements are NaN:
+            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
+            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
+
+            normalized_out_p_x_given_n = out_p_x_given_n
+
+            input_array = normalized_out_p_x_given_n
+
+            if debug_print:
+                print(f'np.shape(input_array): {np.shape(input_array)}')
+            # custom marginal over long/short, leaving only LR/RL:
+            curr_unit_marginal_y = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_y.p_x_given_n = input_array
+            
+            # y-axis marginal:
+            curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+
+            curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+
             if debug_print:
                 print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_y.p_x_given_n)}')
+            
+            ## Ensures that the marginal posterior is at least 2D:
+            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
+            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
+            if curr_unit_marginal_y.p_x_given_n.ndim == 0:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_y.p_x_given_n.ndim == 1:
+                curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_y.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_y)
-
-        ## END for a_p_x_given_n in p_x_given_n_list...
-
         return custom_curr_unit_marginal_list
 
 
     @function_attributes(short_name=None, tags=['marginal'], input_requires=[], output_provides=[], uses=[], used_by=['determine_long_short_likelihoods', 'prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-05-02 17:30', related_items=[])
     @classmethod
-    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> List[DynamicContainer]:
-        """Marginalize pseudo2D/context posteriors over track-identity groups inferred from context names.
+    def build_custom_marginal_over_long_short(cls, filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> List[DynamicContainer]:
+        """ only works for the all-directional coder with the four items
+        
+        Usage:
+            from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import plot_decoded_epoch_slices
 
-        For KDiba linear-track 4-context decoders this yields [Long, Short]. Requires resolvable track-identity groups.
+            active_decoder = all_directional_pf1D_Decoder
+            laps_plot_tuple = plot_decoded_epoch_slices(global_any_laps_epochs_obj, laps_filter_epochs_decoder_result, global_pos_df=global_session.position.to_dataframe(), xbin=active_decoder.xbin,
+                                                        name='stacked_epoch_slices_matplotlib_subplots_LAPS',
+                                                        # active_marginal_fn = lambda filter_epochs_decoder_result: filter_epochs_decoder_result.marginal_y_list,
+                                                        active_marginal_fn = lambda filter_epochs_decoder_result: build_custom_marginal_over_long_short(filter_epochs_decoder_result),
+                                                        )
+                                    
+                                                        
+        0: LR
+        1: RL
+        
         """
-        context_layout = cls._resolve_pseudo2D_context_layout(filter_epochs_decoder_result, context_names=context_names)
-        if context_layout.track_identity_group_indices is None:
-            raise ValueError(f"Cannot infer track-identity groups for context_names: {context_layout.context_names} (n_contexts={context_layout.n_contexts}).")
-        long_context_indices, short_context_indices = context_layout.track_identity_group_indices
+        p_x_given_n_list = cls.get_proper_p_x_given_n_list(filter_epochs_decoder_result)
+        
         custom_curr_unit_marginal_list = []
-        for a_p_x_given_n in context_layout.p_x_given_n_list:
+        
+        for a_p_x_given_n in p_x_given_n_list:
+            # an_array = all_directional_laps_filter_epochs_decoder_result.p_x_given_n_list[0] # .shape # (62, 4, 236)
             curr_array_shape = np.shape(a_p_x_given_n)
             if debug_print:
                 print(f'a_p_x_given_n.shape: {curr_array_shape}')
-            assert curr_array_shape[context_layout.context_dim_idx] == context_layout.n_contexts, f"expected n_contexts: {context_layout.n_contexts} at context_dim_idx: {context_layout.context_dim_idx}, but curr_array_shape: {curr_array_shape}, context_names: {context_layout.context_names}"
-            context_marginal_p_x_given_n = cls._marginalize_p_x_given_n_to_context_probs(a_p_x_given_n, context_layout.spatial_sum_axes)
-            track_identity_marginal_p_x_given_n = cls._group_context_marginal(context_marginal_p_x_given_n, [long_context_indices, short_context_indices]) #TODO 2026-09-01 15:43: - [ ] does not match Diba2025 implementation
-            curr_unit_marginal_x = DynamicContainer(p_x_given_n=track_identity_marginal_p_x_given_n, most_likely_positions_1D=None)
+            # ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            # (['long', 'long', 'short', 'short'])
+            # (n_neurons, is_long, is_LR, pos_bins)
+            assert curr_array_shape[1] == 4, f"only works with the all-directional decoder with ['long_LR', 'long_RL', 'short_LR', 'short_RL'] "
+
+            # out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            # out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 2, :]) # LR_marginal = long_LR + short_LR
+            # out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 1, :] + a_p_x_given_n[:, 3, :]) # RL_marginal = long_RL + short_RL
+
+            # Extract the Long/Short items
+            out_p_x_given_n = np.zeros((curr_array_shape[0], 2, curr_array_shape[-1]))
+            out_p_x_given_n[:, 0, :] = (a_p_x_given_n[:, 0, :] + a_p_x_given_n[:, 1, :]) # Long_marginal = long_LR + long_RL 
+            out_p_x_given_n[:, 1, :] = (a_p_x_given_n[:, 2, :] + a_p_x_given_n[:, 3, :]) # Short_marginal = short_LR + short_RL
+            # normalized_out_p_x_given_n = out_p_x_given_n / np.sum(out_p_x_given_n, axis=1) # , keepdims=True
+            normalized_out_p_x_given_n = out_p_x_given_n
+            # reshaped_p_x_given_n = np.reshape(a_p_x_given_n, (curr_array_shape[0], 2, 2, curr_array_shape[-1]))
+            # assert np.array_equiv(reshaped_p_x_given_n[:,0,0,:], a_p_x_given_n[:, 0, :]) # long_LR
+            # assert np.array_equiv(reshaped_p_x_given_n[:,1,0,:], a_p_x_given_n[:, 2, :]) # short_LR
+
+            # print(f'np.shape(reshaped_p_x_given_n): {np.shape(reshaped_p_x_given_n)}')
+
+            # input_array = a_p_x_given_n
+            # input_array = normalized_reshaped_p_x_given_n
+            input_array = normalized_out_p_x_given_n
+
             if debug_print:
-                print(f'np.shape(curr_unit_marginal_x.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+                print(f'np.shape(input_array): {np.shape(input_array)}')
+            # custom marginal over long/short, leaving only LR/RL:
+            curr_unit_marginal_x = DynamicContainer(p_x_given_n=None, most_likely_positions_1D=None)
+            curr_unit_marginal_x.p_x_given_n = input_array
+            
+            # Collapse the 2D position posterior into two separate 1D (X & Y) marginal posteriors. Be sure to re-normalize each marginal after summing
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, 1)) # sum over all y. Result should be [x_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+        
+            # y-axis marginal:
+            curr_unit_marginal_x.p_x_given_n = np.squeeze(np.sum(input_array, axis=0)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=1, keepdims=True) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+
+            curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n / np.sum(curr_unit_marginal_x.p_x_given_n, axis=0, keepdims=True) # sum over all directions for each time_bin (so there's a normalized distribution at each timestep)
+
+            # curr_unit_marginal_y.p_x_given_n = np.squeeze(np.sum(input_array, axis=1)) # sum over all x. Result should be [y_bins x time_bins]
+            # curr_unit_marginal_y.p_x_given_n = curr_unit_marginal_y.p_x_given_n / np.sum(curr_unit_marginal_y.p_x_given_n, axis=0) # sum over all positions for each time_bin (so there's a normalized distribution at each timestep)
+            if debug_print:
+                print(f'np.shape(curr_unit_marginal_y.p_x_given_n): {np.shape(curr_unit_marginal_x.p_x_given_n)}')
+            
+            ## Ensures that the marginal posterior is at least 2D:
+            # print(f"curr_unit_marginal_y.p_x_given_n.ndim: {curr_unit_marginal_y.p_x_given_n.ndim}")
+            # assert curr_unit_marginal_y.p_x_given_n.ndim >= 2
+            if curr_unit_marginal_x.p_x_given_n.ndim == 0:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n.reshape(1, 1)
+            elif curr_unit_marginal_x.p_x_given_n.ndim == 1:
+                curr_unit_marginal_x.p_x_given_n = curr_unit_marginal_x.p_x_given_n[:, np.newaxis]
+                if debug_print:
+                    print(f'\t added dimension to curr_posterior for marginal_y: {curr_unit_marginal_x.p_x_given_n.shape}')
             custom_curr_unit_marginal_list.append(curr_unit_marginal_x)
-        ## END for a_p_x_given_n in context_layout.p_x_given_n_list...
         return custom_curr_unit_marginal_list
         
-
     # Higher-level likelihood access functions ___________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> DecodedMarginalResultTuple:
-        """Compute per-epoch direction marginals (e.g. [LR, RL]) from pseudo2D/context posteriors."""
-        directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
+    def determine_directional_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
+        """ 
+
+        determine_directional_likelihoods
+
+        directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decode, is_most_likely_direction_LR_dir = DirectionalPseudo2DDecodersResult.determine_directional_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+
+        0: LR
+        1: RL
+        
+        """
+        directional_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_direction(all_directional_laps_filter_epochs_decoder_result)
         if len(directional_marginals) == 0:
             raise ValueError(f'No values!')
-        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0)
-        most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1)
-        is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder)
+        
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        directional_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in directional_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+        
+        # Compute the likelihood of [LR, RL] for each epoch using information from both Long/Short
+        # directional_all_epoch_bins_marginal = np.stack([
+        #     np.nansum(v.p_x_given_n, axis=-1) / np.maximum(np.nansum(v.p_x_given_n, axis=(-2, -1)), _prevent_div_by_zero_epsilon)
+        #     for v in directional_marginals
+        # ], axis=0)  # sum over all time-bins within the epoch to reach a consensus
+
+        # Find the indicies via this method:
+        most_likely_direction_from_decoder = np.argmax(directional_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        is_most_likely_direction_LR_dir = np.logical_not(most_likely_direction_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return directional_marginals, directional_all_epoch_bins_marginal, most_likely_direction_from_decoder, is_most_likely_direction_LR_dir
     
-
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None) -> DecodedMarginalResultTuple:
-        """Compute per-epoch track-identity marginals (e.g. [Long, Short]) from pseudo2D/context posteriors."""
-        track_identity_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
-        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0)
-        most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1)
-        is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder)
+    def determine_long_short_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult]) -> DecodedMarginalResultTuple:
+        """ 
+        
+        laps_track_identity_marginals = DirectionalPseudo2DDecodersResult.determine_long_short_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long = laps_track_identity_marginals
+        
+        0: Long
+        1: Short
+        
+        """
+        track_identity_marginals: List[DynamicContainer] = cls.build_custom_marginal_over_long_short(all_directional_laps_filter_epochs_decoder_result)
+        
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        track_identity_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in track_identity_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus
+
+        # Find the indicies via this method:
+        most_likely_track_identity_from_decoder = np.argmax(track_identity_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time
+        is_most_likely_track_identity_Long = np.logical_not(most_likely_track_identity_from_decoder) # consistent with 'is_LR_dir' column. for LR_dir, values become more positive with time
         return track_identity_marginals, track_identity_all_epoch_bins_marginal, most_likely_track_identity_from_decoder, is_most_likely_track_identity_Long
 
 
     @function_attributes(short_name=None, tags=['marginal', 'MAIN'], input_requires=[], output_provides=[], uses=['cls.build_custom_marginal_over_direction'], used_by=['DecodedFilterEpochsResult.perform_compute_marginals'], creation_date='2025-04-01 00:00', related_items=[])
     @classmethod
-    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], context_names: Optional[List[str]]=None, debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
-        """Compute per-epoch likelihoods for each context/decoder without marginalizing over context."""
-        context_layout = cls._resolve_pseudo2D_context_layout(all_directional_laps_filter_epochs_decoder_result, context_names=context_names)
-        non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, context_names=list(context_layout.context_names), debug_print=debug_print)
-        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0)
-        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1)
-        assert np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == context_layout.n_contexts, f"shape of non_marginalized_decoder_all_epoch_bins_marginal must match n_contexts ({context_layout.n_contexts}) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
-        non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=list(context_layout.context_names))
+    def determine_non_marginalized_decoder_likelihoods(cls, all_directional_laps_filter_epochs_decoder_result: Union[List[NDArray], List[DynamicContainer], NDArray, DecodedFilterEpochsResult], debug_print=False) -> Tuple[List[DynamicContainer], NDArray[float], NDArray[int], pd.DataFrame]:
+        """ 
+        
+        non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df = DirectionalPseudo2DDecodersResult.determine_non_marginalized_decoder_likelihoods(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)
+        
+        
+        [(4, 47), (4, 31), (4, 33), ]
+        
+        """
+        non_marginalized_decoder_marginals: List[DynamicContainer] = cls.build_non_marginalized_raw_posteriors(all_directional_laps_filter_epochs_decoder_result, debug_print=debug_print) # each P-x[i].shape: (4, n_epoch_t_bins[i])
+        # gives the likelihood of [LR, RL] for each epoch using information from both Long/Short:
+        non_marginalized_decoder_all_epoch_bins_marginal = np.stack([np.sum(v.p_x_given_n, axis=-1)/np.sum(v.p_x_given_n, axis=(-2, -1)) for v in non_marginalized_decoder_marginals], axis=0) # sum over all time-bins within the epoch to reach a consensus .shape: (4, )
+
+        # non_marginalized_decoder_all_epoch_bins_marginal.shape: [n_epochs, 4]
+        most_likely_decoder_idxs = np.argmax(non_marginalized_decoder_all_epoch_bins_marginal, axis=1) # consistent with 'lap_dir' columns. for LR_dir, values become more positive with time | most_likely_decoder_idxs will always contain valid indices, not NaN.
+        # build the dataframe:
+        assert (np.shape(non_marginalized_decoder_all_epoch_bins_marginal)[1] == 4), f"shape of non_marginalized_decoder_all_epoch_bins_marginal must be 4 (corresponding to the 4 decoders) but instead np.shape(non_marginalized_decoder_all_epoch_bins_marginal): {np.shape(non_marginalized_decoder_all_epoch_bins_marginal)}"
+        non_marginalized_decoder_all_epoch_bins_decoder_probs_df: pd.DataFrame = pd.DataFrame(non_marginalized_decoder_all_epoch_bins_marginal, columns=['long_LR', 'long_RL', 'short_LR', 'short_RL'])
         return non_marginalized_decoder_marginals, non_marginalized_decoder_all_epoch_bins_marginal, most_likely_decoder_idxs, non_marginalized_decoder_all_epoch_bins_decoder_probs_df
 
 
@@ -4017,43 +2944,28 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
     spikes_df: pd.DataFrame = serialized_field(default=None, metadata={'field_added': "2024.01.22_0"}) # global
     
     # Posteriors computed via the all_directional decoder:
-    continuously_decoded_result_cache_dict: Optional[Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, DecodedFilterEpochsResult]]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"})  # key is (window_sec, hop_sec); legacy pickles used float W -> coerced to (W,W) in __attrs_post_init__
-
-
-    def __attrs_post_init__(self):
-        coerced = coerce_continuously_decoded_cache_dict_keys(self.continuously_decoded_result_cache_dict)
-        if coerced is not self.continuously_decoded_result_cache_dict:
-            self.continuously_decoded_result_cache_dict = coerced
-
-
-    def __setstate__(self, state):
-        super().__setstate__(state)
-        coerced = coerce_continuously_decoded_cache_dict_keys(self.continuously_decoded_result_cache_dict)
-        if coerced is not None:
-            self.continuously_decoded_result_cache_dict = coerced
+    continuously_decoded_result_cache_dict: Dict[float, Dict[types.DecoderName, DecodedFilterEpochsResult]] = serialized_field(default=None, metadata={'field_added': "2024.01.16_0"}) # key is the t_bin_size in seconds
     
 
     @property
-    def most_recent_continuous_decoding_cache_key(self) -> Optional[DecodingContinuousCacheKey]:
-        if (self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict) < 1):
-            return None
-        return list(self.continuously_decoded_result_cache_dict.keys())[-1]
-
-
-    @property
     def most_recent_decoding_time_bin_size(self) -> Optional[float]:
-        """Most recent cached entry: decoding window width W (seconds), first component of the cache key."""
-        k = self.most_recent_continuous_decoding_cache_key
-        return None if k is None else k[0]
-
+        """Gets the last cached continuously_decoded_dict property."""
+        if ((self.continuously_decoded_result_cache_dict is None) or (len(self.continuously_decoded_result_cache_dict or {}) < 1)):
+            return None
+        else:
+            last_time_bin_size: float = list(self.continuously_decoded_result_cache_dict.keys())[-1]
+            return last_time_bin_size   
+        
 
     @property
     def most_recent_continuously_decoded_dict(self) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
         """Gets the last cached continuously_decoded_dict property."""
-        k = self.most_recent_continuous_decoding_cache_key
-        if k is None:
+        last_time_bin_size = self.most_recent_decoding_time_bin_size
+        if (last_time_bin_size is None):
             return None
-        return self.continuously_decoded_result_cache_dict[k]
+        else:
+            # otherwise return the result            
+            return self.continuously_decoded_result_cache_dict[last_time_bin_size]         
 
 
     @property
@@ -4063,15 +2975,17 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('pseudo2D', None)
         
         """
-        k = self.most_recent_continuous_decoding_cache_key
-        if k is None:
+        last_time_bin_size = self.most_recent_decoding_time_bin_size
+        if (last_time_bin_size is None):
             return None
-        return self.continuously_decoded_result_cache_dict[k].get('pseudo2D', None)
+        else:
+            # otherwise return the result            
+            return self.continuously_decoded_result_cache_dict[last_time_bin_size].get('pseudo2D', None)    
 
 
     @property
-    def continuously_decoded_pseudo2D_decoder_dict(self) -> Optional[Dict[DecodingContinuousCacheKey, DecodedFilterEpochsResult]]:
-        """Gets 'pseudo2D' result only for each (W, H) cache key
+    def continuously_decoded_pseudo2D_decoder_dict(self) -> Optional[Dict[float, DecodedFilterEpochsResult]]:
+        """Gets 'pseudo2D' result only for each time_bin_size
         
         ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
         assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
@@ -4085,22 +2999,6 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         else:
             # otherwise return the result            
             return {k:v.get('pseudo2D', None) for k, v in self.continuously_decoded_result_cache_dict.items()}   
-
-
-    def get_continuously_decoded_dict(self, key: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> Optional[Dict[str, DecodedFilterEpochsResult]]:
-        """Lookup cached continuous decode dict by float W or (W, H) key."""
-        if self.continuously_decoded_result_cache_dict is None:
-            return None
-        ck: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(key, slideby)
-        return self.continuously_decoded_result_cache_dict.get(ck, None)
-
-
-    def get_continuously_decoded_pseudo2D(self, key: Union[float, DecodingContinuousCacheKey], slideby: Optional[float] = None) -> Optional[DecodedFilterEpochsResult]:
-        """Lookup cached pseudo2D continuous decode by float W or (W, H) key."""
-        continuously_decoded_dict = self.get_continuously_decoded_dict(key, slideby=slideby)
-        if continuously_decoded_dict is None:
-            return None
-        return continuously_decoded_dict.get('pseudo2D', None)
 
 
     @function_attributes(short_name=None, tags=['pseudo2D', 'timeline-track', '1D', 'split-to-1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-02-26 07:23', related_items=['pyphoplacecellanalysis.Analysis.Decoder.reconstruction.DecodedFilterEpochsResult.split_pseudo2D_result_to_1D_result'])
@@ -4134,14 +3032,14 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         # all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
         # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
 
-        all_time_bin_sizes_output_dict: Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, SingleEpochDecodedResult]] = {}
-
-        for cache_key, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
+        all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = {} ## time_bin_size: 1D_tracks
+        
+        for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
             ## Each iteration here adds 4 more tracks -- one for each decoding context
             
             # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
             if debug_print:
-                print(f'continuous_decoding_cache_key (W, H): {cache_key}')
+                print(f'time_bin_size: {time_bin_size}')
 
             # info_string: str = f" - t_bin_size: {time_bin_size}"
             
@@ -4222,9 +3120,9 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
                 # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = _out_tuple
                 # output_dict[a_decoder_name] = _out_tuple
             ## END for i, a_de...
-            all_time_bin_sizes_output_dict[cache_key] = output_pseudo2D_split_to_1D_continuous_results_dict
-
-        ## END for cache_key, a_continuously_decoded_dict in continuously_decoded_result_cache_dict
+            all_time_bin_sizes_output_dict[time_bin_size] = output_pseudo2D_split_to_1D_continuous_results_dict
+            
+        ## END for time_bin_size, a_continuously_decoded_dict in cont
         
         return all_time_bin_sizes_output_dict
 
@@ -4257,9 +3155,7 @@ class DirectionalDecodersContinuouslyDecodedResult(ComputedResult):
         if continuously_decoded_dict is None:
             return False
         pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
-        pseudo3D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo3D', None)
-
-        if (pseudo2D_decoder_continuously_decoded_result is None) and (pseudo3D_decoder_continuously_decoded_result is None):
+        if pseudo2D_decoder_continuously_decoded_result is None:
             return False
 
         return True
@@ -4287,9 +3183,7 @@ def _workaround_validate_has_directional_decoded_continuous_epochs(curr_active_p
     if continuously_decoded_dict is None:
         return False
     pseudo2D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo2D', None)
-    pseudo3D_decoder_continuously_decoded_result = continuously_decoded_dict.get('pseudo3D', None)
-
-    if (pseudo2D_decoder_continuously_decoded_result is None) and (pseudo3D_decoder_continuously_decoded_result is None):
+    if pseudo2D_decoder_continuously_decoded_result is None:
         return False
 
     return True
@@ -5165,6 +4059,10 @@ class MeasuredDecodedPositionComparison(UnpackableMixin, object):
     measured_positions_dfs_list: List[pd.DataFrame] = field()
     decoded_positions_df_list: List[pd.DataFrame] = field()
     decoded_measured_diff_df: pd.DataFrame = field()
+    measured_post_prob_df: Optional[pd.DataFrame] = field(default=None)
+    
+
+
     
 @define(slots=False)
 class CustomDecodeEpochsResult(UnpackableMixin):
@@ -5185,7 +4083,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     
 
     @classmethod
-    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False) -> "CustomDecodeEpochsResult":
+    def init_from_single_decoder_decoding_result_and_measured_pos_df(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, pfND_Decoder: Optional[BasePositionDecoder]=None, debug_print:bool=False, **kwargs) -> "CustomDecodeEpochsResult":
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
         
          all_directional_laps_filter_epochs_decoder_custom_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
@@ -5194,7 +4092,8 @@ class CustomDecodeEpochsResult(UnpackableMixin):
         # all_directional_laps_filter_epochs_decoder_custom_result: MeasuredDecodedPositionComparison = cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=deepcopy(all_directional_laps_filter_epochs_decoder_result), global_measured_position_df=deepcopy(curr_active_pipeline.sess.position.to_dataframe()).dropna(subset=['lap']))
         a_custom_decoder_decoding_result = cls(measured_decoded_position_comparion=cls.build_single_measured_decoded_position_comparison(a_decoder_decoding_result=a_decoder_decoding_result, global_measured_position_df=global_measured_position_df),
                                                                                                  decoder_result=a_decoder_decoding_result,
-                                                                                                 epochs_bin_by_bin_performance_analysis_df=None,
+                                                                                                 epochs_bin_by_bin_performance_analysis_df=None, 
+                                                                                                 **kwargs,
         )
         if pfND_Decoder is not None:
             try:
@@ -5214,33 +4113,24 @@ class CustomDecodeEpochsResult(UnpackableMixin):
     @classmethod
     def build_single_measured_decoded_position_comparison(cls, a_decoder_decoding_result: DecodedFilterEpochsResult, global_measured_position_df: pd.DataFrame, should_drop_epochs_with_no_valid_timebins: bool = True) -> MeasuredDecodedPositionComparison:
         """ compare the decoded most-likely-positions and the measured positions interpolated to the same time bins.
-
-        When the decoder produces multi-dimensional positions (2D or higher, e.g. ``pf2D_Decoder``), adds ``sq_err_2D`` / ``err_cm_2D``: RMSE of Euclidean distance in ``(x, y)`` vs interpolated measured ``x`` and ``y``. ``sq_err`` / ``err_cm`` remain x-marginal vs measured ``x`` for backward compatibility.
-
-        When ``lin_pos`` is present and the decoder produces native 1D positions (e.g. ``pf1D_Decoder``), also compares decoded positions to measured ``lin_pos`` and adds ``sq_err_1D`` / ``err_cm_1D`` columns.
         
         """
         from sklearn.metrics import mean_squared_error
 
         decoded_time_bin_centers_list = deepcopy([a_cont.centers for a_cont in a_decoder_decoding_result.time_bin_containers]) # this is NOT the same for all decoders because they could have different numbers of test laps because different directions/configs might have different numbers of general laps
 
-        should_compute_1D_lin_pos_comparison = ('lin_pos' in global_measured_position_df.columns) and global_measured_position_df['lin_pos'].notna().any()
-        additional_interp_column_names = ['lin_pos'] if should_compute_1D_lin_pos_comparison else None
-
         measured_positions_dfs_list = []
         decoded_positions_df_list = [] # one per epoch
-        decoded_measured_diff_rows = [] # one per epoch
+        decoded_measured_diff_df = [] # one per epoch
 
         for epoch_idx, a_sample_times in enumerate(decoded_time_bin_centers_list):
-            interpolated_measured_df = TrainTestLapsSplitting.interpolate_positions(global_measured_position_df, a_sample_times, additional_interp_column_names=additional_interp_column_names)
+            interpolated_measured_df = TrainTestLapsSplitting.interpolate_positions(global_measured_position_df, a_sample_times)
             measured_positions_dfs_list.append(interpolated_measured_df)
 
-            raw_decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
-            raw_decoded_positions_arr = np.asarray(raw_decoded_positions, dtype=float)
-            is_native_1D_decode = raw_decoded_positions_arr.ndim < 2
-            is_multi_dimensional_decode = (not is_native_1D_decode) and (raw_decoded_positions_arr.shape[-1] >= 2)
-            decoded_positions = raw_decoded_positions if is_native_1D_decode else a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
-            if not is_native_1D_decode:
+            decoded_positions = a_decoder_decoding_result.most_likely_positions_list[epoch_idx]
+            if np.ndim(decoded_positions) > 1:
+                ## 2D positions, need to get only the x or get the marginals
+                decoded_positions = a_decoder_decoding_result.marginal_x_list[epoch_idx]['most_likely_positions_1D']
                 assert np.ndim(decoded_positions) < 2, f" the new decoded positions should now be 1D but instead: np.ndim(decoded_positions): {np.ndim(decoded_positions)}, and np.shape(decoded_positions): {np.shape(decoded_positions)}"
             assert len(a_sample_times) == len(decoded_positions), f"len(a_sample_times): {len(a_sample_times)} == len(decoded_positions): {len(decoded_positions)}"
             
@@ -5255,17 +4145,28 @@ class CustomDecodeEpochsResult(UnpackableMixin):
             a_valid_interpolated_measured_x = interpolated_measured_x[timebin_is_valid_for_both]
             assert len(a_valid_sample_times) == len(a_valid_decoded_positions), f"len(a_valid_sample_times): {len(a_valid_sample_times)} == len(a_valid_decoded_positions): {len(a_valid_decoded_positions)}"
             
+
             ## one for each decoder:
             # test_decoded_positions_df = pd.DataFrame({'t':a_sample_times, 'x':decoded_positions, 'is_timebin_valid_for_both': timebin_is_valid_for_both})
 
             ## only get valid bins: do we need all bins?
-            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions})
+            test_decoded_positions_df = pd.DataFrame({'t':a_valid_sample_times, 'x':a_valid_decoded_positions, 'x_meas': a_valid_interpolated_measured_x})
             center_epoch_time = np.mean(a_sample_times)
+            # test_decoded_positions_df['is_timebin_valid_for_both'] = timebin_is_valid_for_both
+            sq_err_out_list = []
+            # test_decoded_positions_df['sq_err'] = np.nan
+            for a_row in test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False):
+                sq_err_out_list.append(mean_squared_error([a_row.x], [a_row.x_meas]))
+            ## END for a_row in test_decoded_positions_...
+            
+            test_decoded_positions_df['sq_err'] = np.array(sq_err_out_list)
+
+            # test_decoded_positions_df['sq_err'] = test_decoded_positions_df[['x', 'x_meas']].itertuples(index=False).map(lambda a_row: mean_squared_error(a_row.x, a_row.x_meas))
+            test_decoded_positions_df['err_cm'] = np.sqrt(test_decoded_positions_df['sq_err'])
 
             decoded_positions_df_list.append(test_decoded_positions_df)
             # compute the diff error:
             # mean_squared_error(y_true, y_pred)
-            
 
             if (num_valid_timebins == 0):
                 print(f'WARN: encountered epoch[{epoch_idx}] with no valid timebins.')
@@ -5286,45 +4187,14 @@ class CustomDecodeEpochsResult(UnpackableMixin):
                 test_decoded_measured_diff: float = mean_squared_error(a_valid_interpolated_measured_x, a_valid_decoded_positions) # single float error
                 test_decoded_measured_diff_cm: float = np.sqrt(test_decoded_measured_diff)
 
-            diff_row = {'t': center_epoch_time, 'sq_err': test_decoded_measured_diff, 'err_cm': test_decoded_measured_diff_cm}
-            if is_multi_dimensional_decode:
-                decoded_xy = raw_decoded_positions_arr if raw_decoded_positions_arr.ndim >= 2 else raw_decoded_positions_arr.reshape(-1, 1)
-                if decoded_xy.shape[0] != len(a_sample_times) and decoded_xy.shape[1] == len(a_sample_times) and decoded_xy.shape[0] >= 2:
-                    decoded_xy = decoded_xy.T
-                interpolated_measured_y = interpolated_measured_df['y'].to_numpy()
-                n_spatial_dims = min(decoded_xy.shape[-1], 2)
-                timebin_is_valid_for_2D: NDArray = np.all(np.isfinite(decoded_xy[:, :n_spatial_dims]), axis=1) & np.isfinite(interpolated_measured_x) & np.isfinite(interpolated_measured_y)
-                num_valid_timebins_2D = np.sum(timebin_is_valid_for_2D)
-                if num_valid_timebins_2D == 0:
-                    diff_row['sq_err_2D'] = np.nan
-                    diff_row['err_cm_2D'] = np.nan
-                else:
-                    dx = decoded_xy[timebin_is_valid_for_2D, 0] - interpolated_measured_x[timebin_is_valid_for_2D]
-                    dy = decoded_xy[timebin_is_valid_for_2D, 1] - interpolated_measured_y[timebin_is_valid_for_2D]
-                    sq_err_per_bin = dx ** 2 + dy ** 2
-                    test_decoded_measured_diff_2D: float = float(np.mean(sq_err_per_bin))
-                    diff_row['sq_err_2D'] = test_decoded_measured_diff_2D
-                    diff_row['err_cm_2D'] = float(np.sqrt(test_decoded_measured_diff_2D))
-            if should_compute_1D_lin_pos_comparison and is_native_1D_decode:
-                interpolated_measured_lin_pos = interpolated_measured_df['lin_pos'].to_numpy()
-                timebin_is_valid_for_both_1D: NDArray = np.logical_and(np.isfinite(decoded_positions), np.isfinite(interpolated_measured_lin_pos))
-                num_valid_timebins_1D = np.sum(timebin_is_valid_for_both_1D)
-                if num_valid_timebins_1D == 0:
-                    diff_row['sq_err_1D'] = np.nan
-                    diff_row['err_cm_1D'] = np.nan
-                else:
-                    a_valid_interpolated_measured_lin_pos = interpolated_measured_lin_pos[timebin_is_valid_for_both_1D]
-                    a_valid_decoded_positions_1D = decoded_positions[timebin_is_valid_for_both_1D]
-                    test_decoded_measured_diff_1D: float = mean_squared_error(a_valid_interpolated_measured_lin_pos, a_valid_decoded_positions_1D)
-                    diff_row['sq_err_1D'] = test_decoded_measured_diff_1D
-                    diff_row['err_cm_1D'] = np.sqrt(test_decoded_measured_diff_1D)
-            decoded_measured_diff_rows.append(diff_row)
+            decoded_measured_diff_df.append((center_epoch_time, test_decoded_measured_diff, test_decoded_measured_diff_cm))
+            # decoded_measured_diff_df['meas_pos_probability'] = np.nan # Initialize to NaN, this is to be added 2025-10-23 to be filled with the probability for the actual groundtruth measured position (how much the posterior overlaps with that bin).
 
             ## END FOR
-        decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_rows)
+        decoded_measured_diff_df: pd.DataFrame = pd.DataFrame(decoded_measured_diff_df, columns=['t', 'sq_err', 'err_cm']) # convert list of tuples to a single df
 
         # return measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df
-        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df)
+        return MeasuredDecodedPositionComparison(measured_positions_dfs_list, decoded_positions_df_list, decoded_measured_diff_df, None)
 
 
     @classmethod
@@ -5398,7 +4268,7 @@ class CustomDecodeEpochsResult(UnpackableMixin):
 
         measured_decoded_position_comparion: MeasuredDecodedPositionComparison = deepcopy(test_all_directional_laps_decoder_result.measured_decoded_position_comparion) ## provides actual measured positions at each of these bins
         
-        active_filter_epochs: pd.DataFrame = ensure_dataframe(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
+        active_filter_epochs: pd.DataFrame = deepcopy(all_directional_laps_filter_epochs_decoder_result.active_filter_epochs)
 
         Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.measured_positions_dfs_list)
         Assert.same_length(active_filter_epochs, measured_decoded_position_comparion.decoded_positions_df_list)
@@ -5595,7 +4465,7 @@ def _do_custom_decode_epochs(global_spikes_df: pd.DataFrame,  global_measured_po
     # Interpolated measured position DataFrame - looks good
     ## INPUTS: test_all_directional_decoder_result, all_directional_pf1D_Decoder
     test_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(decoder_result, global_measured_position_df=global_measured_position_df,
-                                                                                                                                                            pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
+                                                                                                                                                          pfND_Decoder=deepcopy(pfND_Decoder), debug_print=debug_print,
                                                                                                                                                           )
     # epochs_bin_by_bin_performance_analysis_df = test_all_directional_decoder_result.epochs_bin_by_bin_performance_analysis_df ## UNPACK WITH: 
     
@@ -5868,7 +4738,7 @@ class TrainTestSplitResult(ComputedResult):
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrainTestSplitResult
 
     """
-    _VersionedResultMixin_version: str = "2026.06.21_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2024.04.09_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     training_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=True)
     test_data_portion: float = serialized_attribute_field(default=None, is_computable=False, repr=False)
@@ -5876,17 +4746,14 @@ class TrainTestSplitResult(ComputedResult):
     test_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_epochs_dict: Dict[types.DecoderName, pd.DataFrame] = serialized_field(default=None)
     train_lap_specific_pf1D_Decoder_dict: Dict[types.DecoderName, BasePositionDecoder] = serialized_field(default=None)
-    train_lap_specific_lin_pos_Decoder_dict: Optional[Dict[types.DecoderName, BasePositionDecoder]] = serialized_field(default=None)
 
     def sliced_by_neuron_id(self, included_neuron_ids: NDArray) -> "TrainTestSplitResult":
         """ refactored out of `self.filtered_by_frate(...)` and `TrackTemplates.determine_decoder_aclus_filtered_by_frate(...)`
-        Only `self.train_lap_specific_pf1D_Decoder_dict` and `self.train_lap_specific_lin_pos_Decoder_dict` are affected
+        Only `self.train_lap_specific_pf1D_Decoder_dict` is affected
         
         """
         _obj = deepcopy(self) # temporary copy of the object
         _obj.train_lap_specific_pf1D_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_pf1D_Decoder_dict.items()}
-        if _obj.train_lap_specific_lin_pos_Decoder_dict is not None:
-            _obj.train_lap_specific_lin_pos_Decoder_dict = {k:v.get_by_id(included_neuron_ids) for k, v in _obj.train_lap_specific_lin_pos_Decoder_dict.items()}
         return _obj
     
 
@@ -5943,12 +4810,7 @@ class TrainTestLapsSplitting:
 
         """
         ## NOTE: they currently only decode the correct test epochs, as in the test epochs corresponding to their train epochs and not others:
-        from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import is_clusterless_position_decoder
-
-        test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {}
-        for k, v in train_lap_specific_pf1D_Decoder_dict.items():
-            active_spikes_df = None if is_clusterless_position_decoder(v) else deepcopy(global_spikes_df)
-            test_laps_decoder_results_dict[k] = v.decode_specific_epochs(spikes_df=active_spikes_df, filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False)
+        test_laps_decoder_results_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(global_spikes_df), filter_epochs=deepcopy(test_epochs_dict[k]), decoding_time_bin_size=laps_decoding_time_bin_size, debug_print=False) for k,v in train_lap_specific_pf1D_Decoder_dict.items()}
         return test_laps_decoder_results_dict
 
     @function_attributes(short_name=None, tags=['split', 'train-test'], input_requires=[], output_provides=[], uses=['split_laps_training_and_test'], used_by=['_split_train_test_laps_data'], creation_date='2024-03-29 22:14', related_items=[])
@@ -6146,7 +5008,7 @@ class TrainTestLapsSplitting:
         # return (train_epochs_dict, test_epochs_dict), train_lap_specific_pf1D_Decoder_dict, split_train_test_lap_specific_configs
 
     @classmethod
-    def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't', additional_interp_column_names: Optional[List[str]] = None) -> pd.DataFrame:
+    def interpolate_positions(cls, df: pd.DataFrame, sample_times: NDArray, time_column_name: str = 't') -> pd.DataFrame:
         """
         Interpolates position data to new sample times using SciPy's interp1d.
 
@@ -6154,7 +5016,6 @@ class TrainTestLapsSplitting:
         df (pd.DataFrame): Original DataFrame with position columns.
         sample_times (NDArray): Array of new sample times at which to interpolate.
         time_column_name (str): Name of the time column in df.
-        additional_interp_column_names (Optional[List[str]]): Extra columns to interpolate (e.g. 'lin_pos') when present in df.
 
         Returns:
         pd.DataFrame: New DataFrame with interpolated positional data.
@@ -6187,16 +5048,6 @@ class TrainTestLapsSplitting:
             'y': new_y_positions,
             # If you have z_positions, include 'z': new_z_positions
         })
-
-        for col_name in (additional_interp_column_names or []):
-            if col_name not in df.columns:
-                continue
-            col_df = df.dropna(subset=[time_column_name, col_name])
-            if len(col_df) == 0:
-                interpolated_df[col_name] = np.nan
-                continue
-            fcol = interp1d(col_df[time_column_name].values, col_df[col_name].values, kind='linear', bounds_error=False, fill_value='extrapolate')
-            interpolated_df[col_name] = fcol(sample_times)
 
         return interpolated_df
 
@@ -6816,188 +5667,6 @@ class TrialByTrialActivityResult(ComputedResult):
         return (stability_df, neuron_group_split_stability_dfs_tuple, neuron_group_split_stability_aclus_tuple)
 
 
-    # ==================================================================================================================================================================================================================================================================================== #
-    # Extra Computations                                                                                                                                                                                                                                                                   #
-    # ==================================================================================================================================================================================================================================================================================== #
-
-    def computing_smoothed_results(self, window_size: int = 3):
-        """ Smooths the results over trials
-
-        Usage:
-            import napari
-            from pyphoplacecellanalysis.GUI.Napari.napari_helpers import napari_from_layers_dict
-            
-            smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix = a_trial_by_trial_result.computing_smoothed_results(window_size=3)
-
-            ## Display the smoothed results
-            ## INPUTS: smoothed_z_scored_tuning_map_matrix_dict
-            include_trial_by_trial_correlation_matrix: bool = False
-            custom_direction_split_layers_dict = {}
-            layers_list_sort_order = ['long_LR_z_scored_tuning_maps', 'long_LR_C_trial_by_trial_correlation_matrix', 'long_RL_z_scored_tuning_maps', 'long_RL_C_trial_by_trial_correlation_matrix', 'short_LR_z_scored_tuning_maps', 'short_LR_C_trial_by_trial_correlation_matrix', 'short_RL_z_scored_tuning_maps', 'short_RL_C_trial_by_trial_correlation_matrix']
-
-            ## Build the image data layers for each
-            # for an_epoch_name, (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids) in directional_active_lap_pf_results_dicts.items():
-
-            for an_epoch_name, smoothed_z_scored_tuning_map_matrix in smoothed_z_scored_tuning_map_matrix_dict.items():
-                custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_smoothed_z_scored_tuning_maps', img_data=smoothed_z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
-                # if include_trial_by_trial_correlation_matrix:
-                #     C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
-                #     custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
-
-
-            # for an_epoch_name, active_trial_by_trial_activity_obj in directional_active_lap_pf_results_dicts.items():
-            #     # (active_laps_df, C_trial_by_trial_correlation_matrix, z_scored_tuning_map_matrix, aclu_to_matrix_IDX_map, neuron_ids)
-            #     z_scored_tuning_map_matrix = active_trial_by_trial_activity_obj.z_scored_tuning_map_matrix
-            #     custom_direction_split_layers_dict[f'{an_epoch_name}_z_scored_tuning_maps'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_z_scored_tuning_maps', img_data=z_scored_tuning_map_matrix.transpose(1, 0, 2)) # reshape to be compatibile with C_i's dimensions
-            #     if include_trial_by_trial_correlation_matrix:
-            #         C_trial_by_trial_correlation_matrix = active_trial_by_trial_activity_obj.C_trial_by_trial_correlation_matrix
-            #         custom_direction_split_layers_dict[f'{an_epoch_name}_C_trial_by_trial_correlation_matrix'] = dict(blending='translucent', colormap='viridis', name=f'{an_epoch_name}_C_trial_by_trial_correlation_matrix', img_data=C_trial_by_trial_correlation_matrix)
-
-            # custom_direction_split_layers_dict
-
-            # directional_viewer, directional_image_layer_dict = napari_trial_by_trial_activity_viz(None, None, layers_dict=custom_direction_split_layers_dict)
-
-            ## sort the layers dict:
-            custom_direction_split_layers_dict = {k:custom_direction_split_layers_dict[k] for k in reversed(layers_list_sort_order) if k in custom_direction_split_layers_dict}
-
-            directional_viewer, directional_image_layer_dict = napari_from_layers_dict(layers_dict=custom_direction_split_layers_dict, title='Directional Trial-by-Trial Activity', axis_labels=('aclu', 'lap', 'xbin'))
-            if include_trial_by_trial_correlation_matrix:
-                directional_viewer.grid.shape = (-1, 4)
-            else:
-                directional_viewer.grid.shape = (2, -1)
-
-
-        """
-        # window_size: int = 5
-        smoothed_z_scored_tuning_map_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any]] = {}
-        smoothed_C_trial_by_trial_correlation_matrix_dict: Dict[types.DecoderName, NDArray[ND.Shape["N_ACLUS, N_SMOOTHED_TRIALS, N_SMOOTHED_TRIALS"], Any]] = {}
-
-        for (a_decoder_name, a_result) in self.directional_active_lap_pf_results_dicts.items():
-            ## Find the point where the trial-to-trial correlation (stability) exceeds a requirement for 3 successive laps (allowing for LR/RL only firing)
-            C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = a_result.C_trial_by_trial_correlation_matrix
-            z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = a_result.z_scored_tuning_map_matrix
-            aclu_to_matrix_IDX_map = deepcopy(a_result.aclu_to_matrix_IDX_map)
-
-            # C_trial_by_trial_correlation_matrix
-            # z_scored_tuning_map_matrix
-
-            # smoothed_z_scored_tuning_map_matrix: NDArray[ND.Shape["N_SMOOTHED_TRIALS, N_ACLUS, N_XBINS"], Any] = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
-            # smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=C_trial_by_trial_correlation_matrix, window_size=window_size)
-            smoothed_z_scored_tuning_map_matrix, smoothed_C_trial_by_trial_correlation_matrix = TrialByTrialActivity.compute_sliding_window_tuning_map_matrix(z_scored_tuning_map_matrix=z_scored_tuning_map_matrix, C_trial_by_trial_correlation_matrix=None, window_size=window_size)
-
-            smoothed_z_scored_tuning_map_matrix_dict[a_decoder_name] = smoothed_z_scored_tuning_map_matrix
-            smoothed_C_trial_by_trial_correlation_matrix_dict[a_decoder_name] = smoothed_C_trial_by_trial_correlation_matrix
-
-        ## END for (a_decoder_name, a_result) in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
-
-        # smoothed_z_scored_tuning_map_matrix
-        ## OUTPUTS: smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
-        return smoothed_z_scored_tuning_map_matrix_dict, smoothed_C_trial_by_trial_correlation_matrix
-
-
-    @function_attributes(short_name=None, tags=['peak-promenence', 'peaks', 'pure'], input_requires=[], output_provides=[], uses=['PeakPromenence.compute_1d_posterior_peak_promenences', 'PeakPromenence.track_peaks_across_trials'], used_by=[], creation_date='2026-08-25 12:46', related_items=[])
-    def computing_trial_peak_promenences(self, max_peak_idx: Optional[int]=None, peak_prom_alpha: float = 0.9,
-                                max_match_n_xbins: Optional[int] = 10, translate_threshold_n_xbins: Optional[int] = 25,
-                                max_match_distance: Optional[float] = None, translate_threshold: Optional[float] = None,
-                                w_height: float = 0.0, w_prominence: float = 0.0):
-        """ computes the peak promenences (1D) for the trial-by-trial result 
-
-        max_peak_idx: `max_peak_idx=0` returns only the max peak, `max_peak_idx=1` returns only the the top 2 largest peaks, etc.
-
-        Usage:
-
-            from pyphoplacecellanalysis.Analysis.reliability import TrialByTrialActivity
-            from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrialByTrialActivityResult
-
-            ## INPUTS: a_trial_by_trial_result
-            all_decoders_peak_prominence_df, peak_prominence_df_dict, peak_transitions_df_dict = a_trial_by_trial_result.computing_trial_peak_promenences(max_peak_idx=2)
-            all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
-            # all_decoders_peak_transitions_df
-            all_decoders_peak_prominence_df
-
-        """
-        from pyphoplacecellanalysis.External.peak_prominence2d import PeakPromenence
-
-        peak_prominence_df_dict: Dict[types.DecoderName, pd.DataFrame] = {}
-        peak_transitions_df_dict: Dict[types.DecoderName, pd.DataFrame] = {}
-
-        # optional: set from active_pf_dt bin width
-        # xstep = float(directional_trial_by_trial_activity_result.active_pf_dt.bin_info['xstep'])
-        # max_match_distance = 2.0 * xstep
-
-        xstep: float = float(self.active_pf_dt.bin_info['xstep'])
-        # max_match_distance: float = 10.0 * xstep # 10 bins away to match
-        # translate_threshold: float = 25.0 * xstep # 25 bins away
-
-        if (max_match_distance is None) and (max_match_n_xbins is not None):
-            assert (xstep is not None)
-            max_match_distance = float(max_match_n_xbins) * xstep # 10 bins away to match
-
-        if (translate_threshold is None) and (translate_threshold_n_xbins is not None):
-            assert (xstep is not None)
-            translate_threshold = float(translate_threshold_n_xbins) * xstep # 25 bins away
-
-
-        for a_decoder_name, a_result in self.directional_active_lap_pf_results_dicts.items():
-            a_trial_epochs = ensure_dataframe(self.directional_lap_epochs_dict[a_decoder_name])
-            ## Find the point where the trial-to-trial correlation (stability) exceeds a requirement for 3 successive laps (allowing for LR/RL only firing)
-            C_trial_by_trial_correlation_matrix: NDArray[ND.Shape["N_ACLUS, N_EPOCHS, N_EPOCHS"], Any] = a_result.C_trial_by_trial_correlation_matrix
-            z_scored_tuning_map_matrix: NDArray[ND.Shape["N_TRIALS, N_ACLUS, N_XBINS"], Any] = a_result.z_scored_tuning_map_matrix
-            aclu_to_matrix_IDX_map = deepcopy(a_result.aclu_to_matrix_IDX_map)
-
-            ## INPUTS: a_trial_by_trial_result, z_scored_tuning_map_matrix
-            n_trials, n_aclus, n_xbins = np.shape(z_scored_tuning_map_matrix)
-            peak_prominence_df, all_epochs_all_t_bins_epoch_t_bin_idx_tuple_list, all_epochs_promenence_tuples_dict, all_epochs_masks = PeakPromenence.compute_1d_posterior_peak_promenences(
-                p_x_given_n_list=[np.squeeze(z_scored_tuning_map_matrix[:, neuron_IDX, :]).T for neuron_IDX in np.arange(n_aclus)],
-                alpha=peak_prom_alpha,
-                xbin_centers = self.active_pf_dt.xbin_centers,
-                neuron_IDs = deepcopy(self.active_pf_dt.included_neuron_IDs),
-            )
-            peak_prominence_df = peak_prominence_df.rename(columns={'time_bin_idx': 'trial_idx'}, inplace=False)    
-            rel_trial_to_lap_dict = dict(zip(list(a_trial_epochs.index.to_numpy()), a_trial_epochs['lap_id'].to_numpy().astype(int)))
-            peak_prominence_df['rel_trial_idx'] = deepcopy(peak_prominence_df['trial_idx'])
-            peak_prominence_df['trial_idx'] = peak_prominence_df['rel_trial_idx'].map(rel_trial_to_lap_dict)
-            peak_prominence_df['decoder_name'] = a_decoder_name
-
-            ## add absolute trial-to-trial unique peak indicies/transitions
-            peak_prominence_df, transitions_df = PeakPromenence.track_peaks_across_trials(
-                peak_prominence_df,
-                trial_order_col='rel_trial_idx',
-                max_match_distance=max_match_distance,   # or 2.0 * xstep
-                translate_threshold=translate_threshold,  # or 0.5 * xstep for "stable"
-                w_height=w_height,            # try 0.1–0.3 if peaks swap summit_idx often
-                w_prominence=w_prominence,
-            )
-            # tracked_peak_prominence_df_dict[a_decoder_name] = tracked_df
-            peak_transitions_df_dict[a_decoder_name] = transitions_df
-
-            if (max_peak_idx is None) or (max_peak_idx < 0):
-                peak_prominence_df_dict[a_decoder_name] = peak_prominence_df
-
-            else:
-                # max_peak_only_peak_prominence_df = deepcopy(peak_prominence_df[peak_prominence_df['summit_idx'] == 0])
-                max_peak_only_peak_prominence_df = deepcopy(peak_prominence_df[peak_prominence_df['summit_idx'] <= max_peak_idx])
-
-                peak_prominence_df_dict[a_decoder_name] = max_peak_only_peak_prominence_df
-
-        ## END for a_decoder_name, a_result in a_trial_by_trial_result.directional_active_lap_pf_results_dicts.items()...
-
-        # peak_prominence_df_dict
-        all_decoders_peak_prominence_df: pd.DataFrame = pd.concat(list(peak_prominence_df_dict.values()), ignore_index=True) # .sort_values(['aclu', 'trial_idx', 'peak_height', 'summit_idx'])
-        all_decoders_peak_prominence_df = all_decoders_peak_prominence_df.sort_values(['aclu', 'trial_idx', 'decoder_name', 'peak_height', 'summit_idx', 'aclu_field_peak_id'], ascending=[True, True, True, False, True, True]).reset_index(drop=True)
-
-        # all_decoders_peak_transitions_df = pd.concat(peak_transitions_df_dict.values(), ignore_index=True)
-        # all_decoders_peak_transitions_df
-
-        ## OUTPUTS: all_decoders_peak_prominence_df, peak_prominence_df_dict
-        return all_decoders_peak_prominence_df, peak_prominence_df_dict, peak_transitions_df_dict
-
-
-
-    # ==================================================================================================================================================================================================================================================================================== #
-    # Plotting/Figure/Display Functions                                                                                                                                                                                                                                                    #
-    # ==================================================================================================================================================================================================================================================================================== #
-
     @function_attributes(short_name=None, tags=['figure', 'napari', 'visualization'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-08-15 13:21', related_items=[])
     def plot_napari_trial_by_trial_correlation_matrix(self, include_trial_by_trial_correlation_matrix:bool=True):
         """ Produces 5 Napari windows to display the trial-by-trial correlation matricies for each of the decoders.
@@ -7489,10 +6158,7 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
 
     """
     # Get proper global_spikes_df:
-    # long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
-    global_epoch_name = owning_pipeline_reference.find_Global_epoch_name()
-    is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
-    
+    long_epoch_name, short_epoch_name, global_epoch_name = owning_pipeline_reference.find_LongShortGlobal_epoch_names()
     rank_order_results = owning_pipeline_reference.global_computation_results.computed_data.get('RankOrder', None) # "RankOrderComputationsContainer"
     if rank_order_results is not None:
         if minimum_inclusion_fr_Hz is None:	
@@ -7506,17 +6172,10 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
         if included_qclu_values is None:
             included_qclu_values: List[int] = owning_pipeline_reference.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
     
-
-    if is_kdiba_session:
-        directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
-        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
-    else:
-        any_list_neuron_IDs = None
-    
-    global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df) 
-    if any_list_neuron_IDs is not None:
-        global_spikes_df = global_spikes_df.spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:  
+    directional_laps_results: DirectionalLapsResult = owning_pipeline_reference.global_computation_results.computed_data['DirectionalLaps']
+    track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
+    any_list_neuron_IDs = track_templates.any_decoder_neuron_IDs # neuron_IDs as they appear in any list
+    global_spikes_df = deepcopy(owning_pipeline_reference.filtered_sessions[global_epoch_name].spikes_df).spikes.sliced_by_neuron_id(any_list_neuron_IDs) # Cut spikes_df down to only the neuron_IDs that appear at least in one decoder:        
     return global_spikes_df
 
 
@@ -7848,7 +6507,7 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 
     ## Convert from a Dict (decoder_laps_df_dict) to a merged dataframe with columns suffixed with the decoder name:
     laps_metric_merged_df = _build_merged_score_metric_df(decoder_laps_df_dict, columns=active_df_columns)
-    ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns)
+    ripple_metric_merged_df = _build_merged_score_metric_df(decoder_ripple_df_dict, columns=active_df_columns) # {'long_LR': 394, 'long_RL': 394, 'short_LR': 394, 'short_RL': 394}
     ## OUTPUTS: laps_metric_merged_df, ripple_metric_merged_df
     ## copy over the optional ['start'] epoch_start_t column for better alignment:
     for a_merged_df, a_dict in zip((laps_metric_merged_df, ripple_metric_merged_df), (decoder_laps_df_dict, decoder_ripple_df_dict)):
@@ -7861,18 +6520,18 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     ## why is this even needed? The `directional_merged_decoders_result.laps_all_epoch_bins_marginals_df` come in with the marginals but not the original non-marginalized P_decoder values. 
     ## Get the 1D decoder probabilities explicitly and add them as columns to the dfs:
     _laps_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.laps_all_epoch_bins_marginals_df)) # incomming df has columns: ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'lap_idx', 'lap_start_t']
-    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t']
+    _ripple_all_epoch_bins_marginals_df =  _compute_nonmarginalized_decoder_prob(deepcopy(directional_merged_decoders_result.ripple_all_epoch_bins_marginals_df)) # incomming ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'ripple_idx', 'ripple_start_t'] - #TODO 2025-11-12 07:06: - [ ] len(.ripple_all_ep.._marginals_df): 337 - small
     
     ## Merge in the RadonTransform df:
     # _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df)) #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
     # _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df)) # has ['ripple_idx', 'ripple_start_t'] to join on
     _mergev_laps_metric_merged_df: pd.DataFrame = deepcopy(_laps_all_epoch_bins_marginals_df).join(deepcopy(laps_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") #TODO 2025-01-02 13:12: - [ ] !!PITFALL!! `df.join(...)` always seems to mess things up, is this where the problems are happening?
     _mergev_ripple_metric_merged_df: pd.DataFrame = deepcopy(_ripple_all_epoch_bins_marginals_df).join(deepcopy(ripple_metric_merged_df).set_index('start'), on='epoch_start_t', how='inner', validate="1:1") # has ['ripple_idx', 'ripple_start_t'] to join on
-    # deepcopy(_laps_all_epoch_bins_marginals_df).set_index('epoch_start_t').join(deepcopy(laps_metric_merged_df).set_index('start')) ## Alternative?
+    # deepcopy(_laps_all_epoch_bins_marginals_df).set_index('epoch_start_t').join(deepcopy(laps_metric_merged_df).set_index('start')) ## Alternative? -- #TODO 2025-11-12 08:21: - [ ] The length is the minimum length of the two dfs: len(_mergev_ripple_metric_merged_df) := min(len(_ripple_all_epoch_bins_marginals_df), len(ripple_metric_merged_df))
     
     # from neuropy.utils.indexing_helpers import PandasHelpers
     laps_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_laps_all_epoch_bins_marginals_df, additional_cols_df=laps_metric_merged_df) # update the filter_epochs with the new columns
-    ripple_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_ripple_all_epoch_bins_marginals_df, additional_cols_df=ripple_metric_merged_df)
+    ripple_metric_merged_df = PandasHelpers.adding_additional_df_columns(original_df=_ripple_all_epoch_bins_marginals_df, additional_cols_df=ripple_metric_merged_df, require_same_num_rows=False) ## #TODO 2025-11-12 06:54: - [ ] Have more `_ripple_all_epoch_bins_marginals_df` than `ripple_metric_merged_df`, do have start times for both -- ?? is `_ripple_all_epoch_bins_marginals_df` being filtered?
 
     # assert _mergev_laps_metric_merged_df.equals(laps_metric_merged_df) # == does NOT work at all, and it doesn't even make sense. (_mergev_laps_metric_merged_df == laps_metric_merged_df)
     # assert _mergev_ripple_metric_merged_df.equals(ripple_metric_merged_df) # == does NOT work at all, and it doesn't even make sense.  (_mergev_ripple_metric_merged_df == ripple_metric_merged_df)
@@ -7880,6 +6539,9 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
     assert len(_mergev_laps_metric_merged_df) == len(laps_metric_merged_df) # this DOES make more sense -- they might at least have the same number of rows
     assert len(_mergev_ripple_metric_merged_df) == len(ripple_metric_merged_df) # this DOES make more sense -- they might at least have the same number of rows
 
+    ripple_metric_merged_df['is_valid'] = np.isin(ripple_metric_merged_df['start'].to_numpy(), _ripple_all_epoch_bins_marginals_df['epoch_start_t'].to_numpy())
+    
+    
     ## Extract the individual decoder probability into the .active_epochs:
     shared_index_column_names = ['ripple_idx', 'ripple_start_t']
     per_decoder_df_columns = ['P_decoder']
@@ -7905,6 +6567,9 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
         # Example Suppressing Exception:
         with ExceptionPrintingContext(suppress=suppress_exceptions):
             decoder_laps_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_laps_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_laps_decoder_prob_df, columns=per_decoder_df_columns)
+            
+
+
         with ExceptionPrintingContext(suppress=suppress_exceptions):
             decoder_ripple_filter_epochs_decoder_result_dict[a_name] = _update_decoder_result_active_filter_epoch_columns(a_result_obj=decoder_ripple_filter_epochs_decoder_result_dict[a_name], a_score_result_df=a_ripple_decoder_prob_df, columns=per_decoder_df_columns, index_column_names=['start']) # ripple_additional_column_names
 
@@ -8057,7 +6722,9 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
                                                                                                                                                                                                                                                                             a_directional_laps_filter_epochs_decoder_result=decoder_laps_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             a_directional_ripple_filter_epochs_decoder_result=decoder_ripple_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             nlines=8192, margin=4.0,
-                                                                                                                                                                                                                                                                            n_jobs=6)
+                                                                                                                                                                                                                                                                            # n_jobs=6,
+                                                                                                                                                                                                                                                                            n_jobs=1,
+                                                                                                                                                                                                                                                                            )
             
         # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
         # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
@@ -8187,8 +6854,8 @@ def _perform_compute_custom_epoch_decoding(curr_active_pipeline, directional_mer
         return decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
 
 
-@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
-def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame):
+@function_attributes(short_name=None, tags=['add_position_columns', 'decoded_df'], input_requires=[], output_provides=[], uses=['CustomDecodeEpochsResult'], used_by=[], creation_date='2025-05-03 17:14', related_items=[])
+def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, global_measured_position_df: pd.DataFrame, fail_on_exception: bool=False):
     """ adds the measured positions as columns in the decoded epochs/epoch_time_bins df
     
     
@@ -8201,11 +6868,20 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
         a_decoded_marginal_posterior_df: pd.DataFrame = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
     
     """
+    from pyphocorehelpers.assertion_helpers import Assert
     from neuropy.utils.indexing_helpers import PandasHelpers
+    from neuropy.core.position import PositionComputedDataMixin
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult
 
+    Assert.set_warn_only(True)
+    Assert._warn_only
+    
     ## add in measured position columns
     global_measured_position_df: pd.DataFrame = deepcopy(global_measured_position_df) # computation_result.sess.position.to_dataframe()
-    global_all_directional_decoder_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+    a_decoder_comparison_result: CustomDecodeEpochsResult = CustomDecodeEpochsResult.init_from_single_decoder_decoding_result_and_measured_pos_df(a_result, global_measured_position_df=global_measured_position_df)
+    decoded_measured_diff_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_measured_diff_df) # n_epochs rows
+    
 
     xbin_edges = deepcopy(a_decoder.xbin)
     # ybin_edges = deepcopy(a_decoder.ybin)
@@ -8214,25 +6890,152 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     active_computation_config = deepcopy(a_decoder.pf.config)
     # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
 
-    measured_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
-    measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-    measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
+    # measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    # measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    # measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-    decoded_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
-    decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
-    decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+    # decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    # decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+    # decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
     ## OUTPUTS: measured_positions_df, decoded_positions_df
+    
+    ## compute 2025-10-22 - posterior-based method
+    measured_position_probs_list = []
+    
+    a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df = [] ## set to a list to start
+    
+    
+    # an_epoch_idx = 0
+    for an_epoch_idx in np.arange(a_result.num_filter_epochs):
+        an_epoch_result: SingleEpochDecodedResult = a_result.get_result_for_epoch(an_epoch_idx)
+        p_x_given_n: NDArray[ND.Shape["N_POS_BINS, 4, N_TIME_BINS"], np.floating] = deepcopy(an_epoch_result.p_x_given_n)
+        # p_x_given_n[~np.isfinite(p_x_given_n)] = 0.0 ## fill with zeros
+        p_x_given_n = np.nan_to_num(p_x_given_n, nan=0.0) ## fill with zeros
+        
+        n_dim: int = np.ndim(p_x_given_n)
+        # an_epoch_result.num_time_windows
+        an_n_t_bins: int = an_epoch_result.nbins
+        # a_n_x_bins: int = an_epoch_result.n_xbins
+        
+        # an_epoch_result.nbins 84
+        # np.shape(p_x_given_n): (4, 84) - (n_t_bins, n_pos_bins)
+        
+        a_measured_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx])
+        if 'binned_x_meas' not in a_measured_positions_df:
+            a_measured_positions_df = a_measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
 
-    ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
-    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
-                                                                                additional_cols_df=measured_positions_df,
-                                                                                )
+        a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-    a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df,
-                                                                                additional_cols_df=decoded_positions_df,
-                                                                                )
-    return a_decoded_marginal_posterior_df
+        # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+            if (a_decoded_marginal_posterior_df is not None):
+                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_measured_positions_df)
+
+        except Exception as e:
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional position interpolated columns (for `a_measured_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            if fail_on_exception:
+                raise
+        
+        
+
+        # a_measured_binned_position = measured_positions_df[['binned_x_meas', 'binned_y_meas']].to_numpy() ## 2D
+        # np.shape(a_measured_binned_position) # (84, 2)
+
+        ## 1D:
+        a_measured_binned_position: NDArray[ND.Shape["N_TIME_BINS"], Any] = a_measured_positions_df['binned_x_meas'].to_numpy() ## -1 is to convert from bin_number to bin_index
+        # a_measured_binned_position = (a_measured_positions_df['binned_x_meas'].to_numpy() - 1) ## -1 is to convert from bin_number to bin_index
+        np.shape(a_measured_binned_position) # (84, 2)
+
+        ## start by collapsing over the four decoders (1st dimensions)
+        p_x_given_n_any_decoder: NDArray[ND.Shape["N_POS_BINS, N_TIME_BINS"], np.floating] = np.nan_to_num(deepcopy(an_epoch_result.marginal_x.p_x_given_n), nan=0.0) ## fill with zeros
+        # pos_marginalized_p_x_given_n = np.nansum(p_x_given_n, axis=0) / np.nansum(p_x_given_n)
+
+        # if n_dim < 3:
+        #     # pos_marginalized_p_x_given_n = np.nansum(p_x_given_n_any_decoder, axis=0) / np.nansum(p_x_given_n_any_decoder) ## collapse across first dimension
+        #     pos_marginalized_p_x_given_n = np.nansum(p_x_given_n_any_decoder, axis=0) / np.nansum(p_x_given_n_any_decoder) ## collapse across first dimension
+            
+        # else:
+        #     # np.arange(1, n_dim) - [1, 2]
+        #     # tuple(np.arange(0, (n_dim-1), dtype=int)) - (0, 1)
+        #     pos_marginalized_p_x_given_n = np.nansum(p_x_given_n_any_decoder, axis=tuple(np.arange(0, (n_dim-1), dtype=int))) / np.nansum(p_x_given_n_any_decoder) ## collapse over the non-temporal dimensions onto the x-axis (first dimension)
+        
+        assert len(a_measured_binned_position) == an_n_t_bins, f"len(a_measured_binned_position): {len(a_measured_binned_position)} is not equal to an_n_t_bins: {an_n_t_bins}"
+
+        # measured_pos_probabilities: NDArray[ND.Shape["N_TIME_BINS"], Any] = pos_marginalized_p_x_given_n[a_measured_binned_position] # (84,)
+        
+
+        measured_pos_probabilities: NDArray[ND.Shape["N_TIME_BINS"], Any] = [p_x_given_n_any_decoder[a_measured_binned_position[t_bin_idx]][t_bin_idx] for t_bin_idx in np.arange(an_n_t_bins)]
+
+        measured_position_probs_list.append(measured_pos_probabilities)
+        ## add column to the existing measured_pos_probabilities df
+        a_measured_positions_df['measured_pos_probabilities'] = measured_pos_probabilities
+        
+        a_decoder_comparison_result.measured_decoded_position_comparion.measured_positions_dfs_list[an_epoch_idx] = a_measured_positions_df ## apply back to input
+        
+
+        # Adding Interpolated df (older) _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        try:
+            a_decoded_positions_df: pd.DataFrame = deepcopy(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list[an_epoch_idx])
+            a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+            a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+            if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
+                # Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
+                a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
+        
+        except (Exception, AssertionError) as e:
+            print(f'WARN: epoch[{an_epoch_idx}]: failed to do optional position interpolated columns (for `a_decoded_positions_df`) for result df with error {e}\n\tskipping (this is okay 2025-10-23)')
+            if fail_on_exception:
+                    raise
+    
+
+    ## END for an_epoch_idx in np.arange(a_result.num_filter_epochs)....
+
+    ## assign the final result to the class:
+    a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df = deepcopy(measured_position_probs_list) ## this is not a dataframe!
+
+    ## are flattened across all time bins
+
+    # ## Add directly to `a_decoded_marginal_posterior_df` (concatenating columns to existing rows)
+    try:
+        measured_post_probs_list: List[float] = flatten(a_decoder_comparison_result.measured_decoded_position_comparion.measured_post_prob_df)
+        a_measured_positions_df: pd.DataFrame = pd.DataFrame(dict(x=measured_post_probs_list))
+        Assert.same_length(a_measured_positions_df, a_decoded_marginal_posterior_df)
+        if 'binned_x_meas' not in a_measured_positions_df:
+            a_measured_positions_df = PositionComputedDataMixin.perform_add_binned_position_columns(pos_df=a_measured_positions_df, xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        a_measured_positions_df = a_measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False, errors='ignore') ## measured
+        
+        if (a_measured_positions_df is not None) and (len(a_measured_positions_df) == len(a_decoded_marginal_posterior_df)):
+            a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_measured_positions_df)
+            Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_meas'])
+            
+    except (Exception, AssertionError) as e:
+        print(f'EXCEPTION: {e}. Skipping.')
+        if fail_on_exception:
+            raise
+
+    try:
+        a_decoded_positions_df: pd.DataFrame = pd.concat(a_decoder_comparison_result.measured_decoded_position_comparion.decoded_positions_df_list)
+        Assert.same_length(a_decoded_positions_df, a_decoded_marginal_posterior_df)
+        a_decoded_positions_df = a_decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
+        a_decoded_positions_df = a_decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
+
+        if (a_decoded_positions_df is not None) and (len(a_decoded_positions_df) == len(a_decoded_marginal_posterior_df)):
+            a_decoded_marginal_posterior_df = PandasHelpers.adding_additional_df_columns(original_df=a_decoded_marginal_posterior_df, additional_cols_df=a_decoded_positions_df)
+            Assert.require_columns(a_decoded_marginal_posterior_df, required_columns=['binned_x_decoded_most_likely', 'binned_x_meas'])
+        
+    except (Exception, AssertionError) as e:
+        print(f'EXCEPTION: {e}. Skipping.')
+        if fail_on_exception:
+            raise
+
+    
+    # len(a_decoded_marginal_posterior_df) == len(decoded_measured_diff_df)
+    # Assert.same_length(a_decoded_marginal_posterior_df, decoded_measured_diff_df)
+
+    return a_decoded_marginal_posterior_df, a_decoder_comparison_result
 
 
 
@@ -8272,11 +7075,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             print(f'WARN: _split_to_directional_laps(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
         # Set the global result:
-        is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
-        if is_kdiba_session:
-            global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsResult.init_from_pipeline_natural_epochs(owning_pipeline_reference) # Uses `curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)`
-        else:
-            global_computation_results.computed_data['DirectionalLaps'] = BaseDirectionalLapsResult.init_from_pipeline_natural_epochs(owning_pipeline_reference) # Uses `curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)`
+        global_computation_results.computed_data['DirectionalLaps'] = DirectionalLapsResult.init_from_pipeline_natural_epochs(owning_pipeline_reference) # Uses `curr_active_pipeline.computation_results[an_epoch_name].computed_data.get('pf1D_Decoder', None)`
+
         ## NOTE: Needs to call `owning_pipeline_reference.prepare_for_display()` before display functions can be used with new directional results
 
         """ Usage:
@@ -8450,8 +7250,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # validate_computation_test=DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs,
         validate_computation_test=_workaround_validate_has_directional_decoded_continuous_epochs,
         is_global=True, computation_precidence=(1002.0))
-    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None, slideby: Optional[float]=None, should_disable_cache: bool = False):
-        """ Using the for 'C' different contexts we have C 1D decoders, decodes continously streams of positions from the neural activity for each.
+    def _decode_continuous_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, time_bin_size: Optional[float]=None, should_disable_cache: bool = False):
+        """ Using the four 1D decoders, decodes continously streams of positions from the neural activity for each.
         
         should_disable_cache: bool = True # when True, always recomputes and does not attempt to use the cache.
         
@@ -8481,7 +7281,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 
         """
         from neuropy.utils.mixins.binning_helpers import find_minimum_time_bin_duration
-        from neuropy.core.epoch import Epoch, ensure_dataframe, ensure_Epoch, EpochsAccessor
+        from neuropy.core.epoch import Epoch
         from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import BasePositionDecoder, BayesianPlacemapPositionDecoder
                 
         # directional_decoders_decode_result = global_computation_results.computed_data.get('DirectionalDecodersDecoded', DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict))
@@ -8497,133 +7297,64 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             directional_decoders_decode_result = None # set to None
 
         did_update_computations: bool = False
-
-        active_data_mode_name: str = owning_pipeline_reference.active_sess_config.format_name.lower()
-
-        is_kdiba_session: bool = owning_pipeline_reference.is_kdiba_session()
-        if is_kdiba_session:
-            ## Currently used for both cases to decode:
-            t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-            # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
-            single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
-            single_global_epoch: Epoch = ensure_Epoch(single_global_epoch_df)
-
-        else:
-            
-            from neuropy.core.session.Formats.BaseDataSessionFormats import HardcodedProcessingParameters
-
-            active_data_mode_registered_class, active_data_mode_type_properties = owning_pipeline_reference.sess.config.get_format_data_session_type_class_info()
-
-            if (active_data_mode_name == 'bapun'):
-                from neuropy.core.session.Formats.Specific.BapunDataSessionFormat import BapunDataSessionFormatRegisteredClass
-                hardcoded_params: HardcodedProcessingParameters = BapunDataSessionFormatRegisteredClass._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
-            elif (active_data_mode_name == 'rachel'):
-                from neuropy.core.session.Formats.Specific.RachelDataSessionFormat import RachelDataSessionFormatRegisteredClass
-                hardcoded_params: HardcodedProcessingParameters = RachelDataSessionFormat._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
-            else:
-                hardcoded_params: HardcodedProcessingParameters = active_data_mode_registered_class._get_session_specific_parameters(session_context=owning_pipeline_reference.get_session_context())
-
-            global_epoch_name: str = owning_pipeline_reference.find_Global_epoch_name()
-            
-            ## activity_only_epochs_df:
-            epochs_df = ensure_dataframe(deepcopy(owning_pipeline_reference.sess.epochs))
-
-            activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin(hardcoded_params.non_global_activity_session_names)].epochs.get_non_overlapping_df()
-            activity_only_epochs: Epoch = ensure_Epoch(activity_only_epochs_df, metadata=owning_pipeline_reference.sess.epochs.metadata)
-            owning_pipeline_reference.sess.activity_only_epochs = deepcopy(activity_only_epochs)
-
-            ## GLobal only ('maze_GLOBAL')
-            epochs_df = ensure_dataframe(deepcopy(owning_pipeline_reference.sess.epochs))
-            global_activity_only_epochs_df: pd.DataFrame = epochs_df[epochs_df['label'].isin([hardcoded_params.global_session_name])].epochs.get_non_overlapping_df()
-            global_activity_only_epoch: Epoch = ensure_Epoch(global_activity_only_epochs_df, metadata=owning_pipeline_reference.sess.epochs.metadata)
-            owning_pipeline_reference.sess.global_activity_only_epoch = deepcopy(global_activity_only_epoch)
-            single_global_epoch: Epoch = global_activity_only_epoch
-
-
-        ## OUTPUTS: single_global_epoch
+        ## Currently used for both cases to decode:
+        t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+        # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session:
+        single_global_epoch_df: pd.DataFrame = pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})
         # single_global_epoch_df['label'] = single_global_epoch_df.index.to_numpy()
-        # single_global_epoch: Epoch = Epoch(single_global_epoch_df)
+        single_global_epoch: Epoch = Epoch(single_global_epoch_df)
         
         if (not had_existing_DirectionalDecodersDecoded_result):
             # Build a new result _________________________________________________________________________________________________ #
             print(f'\thad_existing_DirectionalDecodersDecoded_result == False. New DirectionalDecodersContinuouslyDecodedResult will be built...')
+            # # Unpack all directional variables:
+            long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
+            # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
+            (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
+            (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+
+            all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+            all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
+
+            # DirectionalMergedDecoders: Get the result after computation:
+            directional_merged_decoders_result = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
+
+            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict # This does not work, because the values in the returned dictionary are PfND, not 1D decoders
+            all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
+
+            pseudo2D_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_value
+            
+            ## Build Epoch object across whole sessions:
+            if time_bin_size is None:
+                # use default time_bin_size from the previous decoder
+                # first_decoder = list(all_directional_pf1D_Decoder_dict.values())[0]
+                # time_bin_size = first_decoder.time_bin_size
+                time_bin_size = directional_merged_decoders_result.ripple_decoding_time_bin_size
+
+
+            # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
+            # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
+            # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
+            print(f'\ttime_bin_size: {time_bin_size}')
 
             # Get proper global_spikes_df:
-            spikes_df = get_proper_global_spikes_df(owning_pipeline_reference)
-            spikes_df = deepcopy(spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-            
+            global_spikes_df = get_proper_global_spikes_df(owning_pipeline_reference)
 
-            if is_kdiba_session:
-                # # Unpack all directional variables:
-                long_LR_name, short_LR_name, global_LR_name, long_RL_name, short_RL_name, global_RL_name, long_any_name, short_any_name, global_any_name = ['maze1_odd', 'maze2_odd', 'maze_odd', 'maze1_even', 'maze2_even', 'maze_even', 'maze1_any', 'maze2_any', 'maze_any']
-                # Unpacking for `(long_LR_name, long_RL_name, short_LR_name, short_RL_name)`
-                (long_LR_context, long_RL_context, short_LR_context, short_RL_context) = [owning_pipeline_reference.filtered_contexts[a_name] for a_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-                (long_LR_results, long_RL_results, short_LR_results, short_RL_results) = [owning_pipeline_reference.computation_results[an_epoch_name].computed_data for an_epoch_name in (long_LR_name, long_RL_name, short_LR_name, short_RL_name)]
-                (long_LR_pf1D_Decoder, long_RL_pf1D_Decoder, short_LR_pf1D_Decoder, short_RL_pf1D_Decoder) = (long_LR_results.pf1D_Decoder, long_RL_results.pf1D_Decoder, short_LR_results.pf1D_Decoder, short_RL_results.pf1D_Decoder)
+            spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
 
-                all_directional_decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-                all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = dict(zip(all_directional_decoder_names, [deepcopy(long_LR_pf1D_Decoder), deepcopy(long_RL_pf1D_Decoder), deepcopy(short_LR_pf1D_Decoder), deepcopy(short_RL_pf1D_Decoder)]))
-
-                # DirectionalMergedDecoders: Get the result after computation:
-                directional_merged_decoders_result = owning_pipeline_reference.global_computation_results.computed_data['DirectionalMergedDecoders'] # uses `DirectionalMergedDecoders`.
-
-                # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_merged_decoders_result.all_directional_decoder_dict # This does not work, because the values in the returned dictionary are PfND, not 1D decoders
-                all_directional_pf1D_Decoder_value = directional_merged_decoders_result.all_directional_pf1D_Decoder
-
-                pseudo2D_decoder: BasePositionDecoder = all_directional_pf1D_Decoder_value
-                
-                ## Build Epoch object across whole sessions:
-                if time_bin_size is None:
-                    # use default time_bin_size from the previous decoder
-                    # first_decoder = list(all_directional_pf1D_Decoder_dict.values())[0]
-                    # time_bin_size = first_decoder.time_bin_size
-                    time_bin_size = directional_merged_decoders_result.ripple_decoding_time_bin_size
-
-
-                # time_binning_container: BinningContainer = deepcopy(long_LR_pf1D_Decoder.time_binning_container)
-                # time_binning_container.edges # array([31.8648, 31.8978, 31.9308, ..., 1203.56, 1203.6, 1203.63])
-                # time_binning_container.centers # array([31.8813, 31.9143, 31.9473, ..., 1203.55, 1203.58, 1203.61])
-                print(f'\ttime_bin_size: {time_bin_size}')
-
-                # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
-                # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
-                # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
-                # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
-                # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
-                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-                pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False)
-                all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
-                continuously_decoded_result_cache_dict = {decoding_continuous_cache_key(time_bin_size, slideby): all_directional_continuously_decoded_dict}
-                print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
-                directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
-                did_update_computations = True
-                
-            else:
-                ## non-kdiba session (like Bapun): create new result
-                from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_contextual_pf2D_decoder, decode_using_contextual_pf2D_decoder
-
-
-                if time_bin_size is None:
-                    # active_laps_decoding_time_bin_size = 0.75
-                    # active_laps_decoding_time_bin_size = 0.025 # 25ms
-                    time_bin_size = 0.250 # 250ms
-                    # active_laps_decoding_time_bin_size = 0.250 # 250ms
-                    # slideby = slideby  # None => non-overlapping; e.g. 0.05 with W=0.25 for sliding
-                    
-                
-                print(f'\ttime_bin_size: {time_bin_size}')
-                epochs_to_create_global_from_names = hardcoded_params.non_global_activity_session_names # ['roam', 'sprinkle']
-                ## Build the merged decoder `contextual_pf2D`
-                contextual_pf2D_dict, contextual_pf2D, contextual_pf2D_Decoder = build_contextual_pf2D_decoder(owning_pipeline_reference, epochs_to_create_global_from_names = epochs_to_create_global_from_names)
-                ## Use `contextual_pf2D` to decode specific epochs:
-                all_context_filter_epochs_decoder_result, global_only_epoch = decode_using_contextual_pf2D_decoder(owning_pipeline_reference, contextual_pf2D_Decoder=contextual_pf2D_Decoder,
-                                                                                                                    active_laps_decoding_time_bin_size=time_bin_size, slideby=slideby, epochs_to_merge_as_global_epoch_names=epochs_to_create_global_from_names)
-                print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
-                ## Build global result object
-                directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pf1D_Decoder_dict=contextual_pf2D_dict, pseudo2D_decoder=contextual_pf2D_Decoder, spikes_df=deepcopy(spikes_df),
-                                                                                                                                                continuously_decoded_result_cache_dict={decoding_continuous_cache_key(time_bin_size, slideby):{'pseudo2D': all_context_filter_epochs_decoder_result}})
-                did_update_computations = True
-
+            # print(f'add_directional_decoder_decoded_epochs(...): decoding continuous epochs for each directional decoder.')
+            # t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
+            # single_global_epoch: Epoch = Epoch(pd.DataFrame({'start': [t_start], 'stop': [t_end], 'label': [0]})) # Build an Epoch object containing a single epoch, corresponding to the global epoch for the entire session
+            # global_spikes_df, _, _ = RankOrderAnalyses.common_analysis_helper(curr_active_pipeline=owning_pipeline_reference, num_shuffles=0) # does not do shuffling
+            # spikes_df = deepcopy(global_spikes_df) #.spikes.sliced_by_neuron_id(track_templates.shared_aclus_only_neuron_IDs)
+            all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+            pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=deepcopy(single_global_epoch), decoding_time_bin_size=time_bin_size, debug_print=False)
+            all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
+            continuously_decoded_result_cache_dict = {time_bin_size:all_directional_continuously_decoded_dict} # result is a single time_bin_size
+            print(f'\t computation done. Creating new DirectionalDecodersContinuouslyDecodedResult....')
+            directional_decoders_decode_result = DirectionalDecodersContinuouslyDecodedResult(pseudo2D_decoder=pseudo2D_decoder, pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict, spikes_df=deepcopy(global_spikes_df), continuously_decoded_result_cache_dict=continuously_decoded_result_cache_dict)
+            did_update_computations = True
 
         else:
             # had_existing_DirectionalDecodersDecoded_result == True _____________________________________________________________ #
@@ -8633,7 +7364,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
             pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder # pseudo2D_decoder: missing .spikes_df (is None)
             spikes_df = directional_decoders_decode_result.spikes_df
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-            previously_decoded_keys: List[DecodingContinuousCacheKey] = list(continuously_decoded_result_cache_dict.keys())
+            previously_decoded_keys: List[float] = list(continuously_decoded_result_cache_dict.keys()) # [0.03333]
             # In future could extract `single_global_epoch` from the previously decoded result:
             # first_decoded_result = continuously_decoded_result_cache_dict[previously_decoded_keys[0]]
 
@@ -8644,19 +7375,20 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                 time_bin_size = first_decoder.time_bin_size
                 
             print(f'\ttime_bin_size: {time_bin_size}')
-            _cache_key = decoding_continuous_cache_key(time_bin_size, slideby)
-            needs_recompute: bool = (_cache_key not in previously_decoded_keys)
+            
+            needs_recompute: bool = (time_bin_size not in previously_decoded_keys)
             if needs_recompute:
-                print(f'\t\trecomputing for cache_key (W,H)={_cache_key}...')
+                print(f'\t\trecomputing for time_bin_size: {time_bin_size}...')
                 ## Recompute here only:
-                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
-                pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, slideby=slideby, debug_print=False)
+                all_directional_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = {k:v.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False) for k,v in all_directional_pf1D_Decoder_dict.items()}
+                pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = pseudo2D_decoder.decode_specific_epochs(spikes_df=deepcopy(spikes_df), filter_epochs=single_global_epoch, decoding_time_bin_size=time_bin_size, debug_print=False)
                 all_directional_continuously_decoded_dict['pseudo2D'] = pseudo2D_decoder_continuously_decoded_result
-                directional_decoders_decode_result.continuously_decoded_result_cache_dict[_cache_key] = all_directional_continuously_decoded_dict
+                # directional_decoders_decode_result.__dict__.update(pf1D_Decoder_dict=all_directional_pf1D_Decoder_dict)
+                directional_decoders_decode_result.continuously_decoded_result_cache_dict[time_bin_size] = all_directional_continuously_decoded_dict # update the entry for this time_bin_size
                 did_update_computations = True
-
+                
             else:
-                print(f'(cache_key == {_cache_key}) already found in cache. Not recomputing.')
+                print(f'(time_bin_size == {time_bin_size}) already found in cache. Not recomputing.')
 
         # Set the global result:
         global_computation_results.computed_data['DirectionalDecodersDecoded'] = directional_decoders_decode_result
@@ -8684,7 +7416,6 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         
         """
         return global_computation_results
-
 
     @function_attributes(short_name='directional_decoders_evaluate_epochs', tags=['directional-decoders', 'epochs', 'decode', 'score', 'weighted-correlation', 'radon-transform', 'multiple-decoders', 'main-computation-function'],
                           input_requires=['global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz'], output_provides=[], uses=['_perform_compute_custom_epoch_decoding', '_compute_all_df_score_metrics'], used_by=[], creation_date='2024-02-16 12:49', related_items=['DecoderDecodedEpochsResult'],
@@ -9156,8 +7887,8 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
 # ==================================================================================================================== #
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DisplayFunctionRegistryHolder import DisplayFunctionRegistryHolder
-from pyphoplacecellanalysis.External import pyqtgraph as pg
-import pyphoplacecellanalysis.External.pyqtgraph.exporters
+import pyqtgraph as pg
+import pyqtgraph.exporters
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
 from pyphocorehelpers.DataStructure.general_parameter_containers import VisualizationParameters, RenderPlotsData, RenderPlots
 from pyphocorehelpers.gui.PhoUIContainer import PhoUIContainer # for context_nested_docks/single_context_nested_docks
@@ -9485,7 +8216,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 else:
                     title_str = f'{a_decoder_name}_pf1Ds'
 
-                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True, axisOrder='row-major') # Sort to match first decoder (long_LR)
+                _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(sorted_pf_tuning_curves[i], title=title_str, show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Sort to match first decoder (long_LR)
                 # _out_pf1D_heatmaps[a_decoder_name] = visualize_heatmap_pyqtgraph(_get_decoder_sorted_pfs(a_decoder), title=f'{a_decoder_name}_pf1Ds', show_value_labels=False, show_xticks=False, show_yticks=False, show_colorbar=False, win=None, defer_show=True) # Individual Sort
 
                 # Adds aclu text labels with appropriate colors to y-axis: uses `sorted_shared_sort_neuron_IDs`:
@@ -9543,8 +8274,8 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
                 """ captures: epochs_editor, _out_pf1D_heatmaps
 
                 TODO: note output paths are currently hardcoded. Needs to add the animal's context at least. Probably needs to be integrated into pipeline.
-                from pyphoplacecellanalysis.External import pyqtgraph as pg
-                import pyphoplacecellanalysis.External.pyqtgraph.exporters
+                import pyqtgraph as pg
+                import pyqtgraph.exporters
                 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
                 """
                 ## Get main laps plotter:
@@ -10282,10 +9013,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
     @function_attributes(short_name='directional_decoded_stacked_epoch_slices', tags=['export', 'heatmaps', 'posterior', 'directional_merged_decoder_decoded_epochs','directional','marginal','NON-VISUAL','NO-DISPLAY'],
                           input_requires=['RankOrder', 'DirectionalLaps', 'DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations'], output_provides=[], uses=['PosteriorExporting.perform_export_all_decoded_posteriors_as_images'], used_by=[], creation_date='2024-09-27 17:08', related_items=[], is_global=True)
     def _display_directional_merged_pf_decoded_stacked_epoch_slices(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, included_any_context_neuron_ids=None,
-                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, **kwargs):
+                                                                    custom_export_formats: Dict[str, "HeatmapExportConfig"]=None, parent_output_folder: Optional[Path] = None, desired_height:int=1200, skip_lap_exports: bool=True, **kwargs):
         """ Exports all decoded epoch posteriors separately to a folder. NON-VISUAL, never displays.
          Effectively the entire stack of decoded epochs for both the long and short, including their Radon transformed lines if that information is available.
 
+         # !!! NON-VISUAL, never displays. ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+         
 
         # '_display_directional_merged_pf_decoded_stacked_epoch_slices' or  directional_decoded_stacked_epoch_slices
         curr_active_pipeline.reload_default_display_functions()
@@ -10333,8 +9066,11 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         pos_bin_size: float = directional_decoders_epochs_decode_result.pos_bin_size
         ripple_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size
+        
         laps_decoding_time_bin_size: float = directional_decoders_epochs_decode_result.laps_decoding_time_bin_size
         decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict
+        
+
         decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict
 
         print(f'pos_bin_size: {pos_bin_size}')
@@ -10347,7 +9083,9 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
 
-        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
+        if (not skip_lap_exports):
+            assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
+
         active_context = kwargs.pop('active_context', None)
         if active_context is not None:
             # Update the existing context:
@@ -10365,7 +9103,12 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
         session_name: str = owning_pipeline_reference.session_name
         t_start, t_delta, t_end = owning_pipeline_reference.find_LongShortDelta_times()
 
-        decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        
+        if (not skip_lap_exports):
+            decoder_laps_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_laps_filter_epochs_decoder_result_dict.items()}
+        else:
+            decoder_laps_filter_epochs_decoder_result_dict = {}
+
         decoder_ripple_filter_epochs_decoder_result_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, session_name=session_name, t_start=t_start, t_delta=t_delta, t_end=t_end) for k, a_result in decoder_ripple_filter_epochs_decoder_result_dict.items()}
 
         # parent_output_folder: Path = kwargs.pop('parent_output_folder', None)
@@ -10416,6 +9159,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             custom_export_formats: Dict[str, HeatmapExportConfig] = {
                 'greyscale': HeatmapExportConfig.init_greyscale(**common_export_config_kwargs),
+                'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, **common_export_config_kwargs),
                 'color': HeatmapExportConfig(colormap='Oranges', **common_export_config_kwargs), # #TODO 2025-05-30 03:45: - [ ] previous config
                 # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
                 # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),
@@ -10423,7 +9167,10 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
         out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                  _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats)
+                                                                                                                  desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6,
+                                                                                                                    #  combined_img_separator_color=(255, 255, 255, 255),
+                                                                                                                    combined_img_separator_color=(200, 46, 33, 10),
+                                                                                                                )
         # out_paths
         print(_specific_session_output_folder)
 
@@ -10743,30 +9490,40 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
         ## INPUTS: most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string
         
-        pseudo2D_raw = continuously_decoded_dict.get('pseudo2D', None)
-        single_epoch_result, time_window_centers, decoder_format = DirectionalPseudo2DDecodersResult._resolve_pseudo2D_continuous_result(pseudo2D_raw)
-        p_x_given_n = single_epoch_result.p_x_given_n
+        # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+        pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('pseudo2D', None)
+        assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+        p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+        time_window_centers = time_bin_containers.centers
+        # p_x_given_n.shape # (62, 4, 209389)
+
+        ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+        assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
+        split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
+
 
         showCloseButton = True
-        _common_dock_config_kwargs = {'dock_group_names': [cls._build_dock_group_id(extended_dock_title_info=info_string)], 'showCloseButton': showCloseButton}
+        _common_dock_config_kwargs = {'dock_group_names': [cls._build_dock_group_id(extended_dock_title_info=info_string)],
+                                                           'showCloseButton': showCloseButton,
+                                    }
+        
+
+        
+        dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs),
+                        CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
+
+
+        # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
-        if decoder_format == 'contextual_pf2D':
-            context_names = DirectionalPseudo2DDecodersResult._get_context_y_bin_labels(curr_active_pipeline, p_x_given_n.shape[2])
-            split_pseudo2D_posteriors_dict = {name: np.squeeze(p_x_given_n[:, :, i, :]) for i, name in enumerate(context_names)}
-            dock_configs = {name: CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey, dock_group_names=_common_dock_config_kwargs['dock_group_names']) for name in context_names}
-            for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
-                a_dock_config = dock_configs[a_decoder_name]
-                _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=a_pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
-                output_dict[a_decoder_name] = _out_tuple
-        else:
-            assert p_x_given_n.shape[1] == 4, f"expected the 4 pseudo-y bins for the decoder in p_x_given_n.shape[1]. but found p_x_given_n.shape: {p_x_given_n.shape}"
-            split_pseudo2D_posteriors_dict = {k: np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
-            dock_configs = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_LR_dock_colors, **_common_dock_config_kwargs), CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Laps.get_RL_dock_colors, **_common_dock_config_kwargs))))
-            for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
-                a_dock_config = dock_configs[a_decoder_name]
-                _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=a_pseudo2D_decoder, time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
-                output_dict[a_decoder_name] = _out_tuple
+        for a_decoder_name, a_1D_posterior in split_pseudo2D_posteriors_dict.items():
+            a_dock_config = dock_configs[a_decoder_name]
+            _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=a_pseudo2D_decoder,
+                                                                     time_window_centers=time_window_centers, a_1D_posterior=a_1D_posterior, extended_dock_title_info=info_string)
+            # identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = _out_tuple
+            output_dict[a_decoder_name] = _out_tuple
         
         # OUTPUTS: output_dict
         return output_dict
@@ -10786,21 +9543,8 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
             # time_bin_size_list = [str(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
-            # time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()] ## doesn't work for sliding window
-            # time_bin_size_list = [np.asarray(a_time_bin_size, dtype=np.float64) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
-            
-            ## had to generalize for sliding windows
-            time_bin_size_list = []
-            for a_time_bin_size in continuously_decoded_result_cache_dict.keys():
-                if isinstance(a_time_bin_size, (Tuple, List, np.array, Set)):
-                    a_time_bin_size = [float(v) for v in a_time_bin_size] ## turn the members into floats
-                else:
-                    ## single item
-                    a_time_bin_size = float(a_time_bin_size)
-                    
-                time_bin_size_list.append(a_time_bin_size)
-            ## END for a_time_bin_size in continuously_decoded_result_cache_dict.keys()....
-            
+            time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
+
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
             print(f'get_all_computed_time_bin_sizes(...) failed to add any tracks, perhaps because the pipeline is missing any computed "DirectionalDecodersDecoded" global results. Error: "{e}". Skipping.')
@@ -10922,57 +9666,21 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
             ## set the user-provided dock_group_name first:
             _common_dock_config_kwargs['dock_group_names'] = [*_common_dock_config_kwargs['dock_group_names'], override_dock_group_name]
         
-        dock_configs = None
-        session_format_name = str(getattr(curr_active_pipeline.active_sess_config, 'format_name', getattr(getattr(curr_active_pipeline.sess, 'config', None), 'format_name', ''))).lower()
-        if session_format_name == 'dandi_nwb':
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_NWB_all_epochs_df
-            curr_paradigm_df = build_NWB_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
-            # 'lap_color', 'lap_accent_color'
-            # curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
-            # curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
-
-
-
-        elif session_format_name == 'bapun':
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import build_bapun_all_epochs_df
-            curr_paradigm_df = build_bapun_all_epochs_df(curr_active_pipeline=curr_active_pipeline)
-            # 'lap_color', 'lap_accent_color'
-            # curr_paradigm_df['pen_color'] = [inline_mkColor(c, 0.8) for c in curr_paradigm_df['lap_accent_color'].tolist()]
-            # curr_paradigm_df['brush_color'] = [inline_mkColor(c, 0.5) for c in curr_paradigm_df['lap_color'].tolist()]
-            
-        else:
-            ## KDIBA:
-            dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
-                                                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
-                                                                CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_global_dock_colors, **_common_dock_config_kwargs))))
-
-
-        if dock_configs is None:
-            dock_configs = {a_label:CustomDockDisplayConfig(custom_get_colors_callback_fn=(lambda orientation, is_dim: DisplayColorsEnum.Epochs.get_custom_dock_colors(orientation, is_dim, bg_color=c)), **_common_dock_config_kwargs) for a_label, c in zip(curr_paradigm_df['label'].tolist(), curr_paradigm_df['lap_accent_color'].tolist())} 
-
-
-
+        dock_configs = dict(zip(('long', 'short', 'global'), (CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_long_dock_colors, **_common_dock_config_kwargs),
+                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_short_dock_colors, **_common_dock_config_kwargs),
+                                                              CustomDockDisplayConfig(custom_get_colors_callback_fn=DisplayColorsEnum.Epochs.get_global_dock_colors, **_common_dock_config_kwargs))))
 
         # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
 
         for a_decoder_name, a_decoded_result in continuously_decoded_dict.items():
-            a_dock_config = dock_configs.get(a_decoder_name, None)
-            if a_dock_config is None:
-                a_dock_config = CustomDockDisplayConfig(custom_get_colors_callback_fn=(lambda orientation, is_dim: DisplayColorsEnum.Epochs.get_custom_dock_colors(orientation, is_dim, bg_color='#000000', fg_color='#ffffff')), **_common_dock_config_kwargs)
-
-            if hasattr(a_decoded_result, 'p_x_given_n_list'): # not isinstance(a_decoded_result, SingleEpochDecodedResult):
-                assert len(a_decoded_result.p_x_given_n_list) == 1
-                p_x_given_n = a_decoded_result.p_x_given_n_list[0]
-                # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
-                time_bin_containers = a_decoded_result.time_bin_containers[0]
-                time_window_centers = time_bin_containers.centers
-            else:
-                # SingleEpochDecodedResult
-                p_x_given_n = a_decoded_result.p_x_given_n
-                # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
-                time_bin_container = a_decoded_result.time_bin_container
-                time_window_centers = time_bin_container.centers 
+            a_dock_config = dock_configs[a_decoder_name]
+            assert len(a_decoded_result.p_x_given_n_list) == 1
+            p_x_given_n = a_decoded_result.p_x_given_n_list[0]
+            # p_x_given_n = a_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+            time_bin_containers = a_decoded_result.time_bin_containers[0]
+            time_window_centers = time_bin_containers.centers
+                    
 
             _out_tuple = cls._perform_add_new_decoded_posterior_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=a_dock_config, a_decoder_name=a_decoder_name, a_position_decoder=SimpleDecoderDummy(xbin=xbin),
                                                                         time_window_centers=time_window_centers, a_1D_posterior=p_x_given_n, extended_dock_title_info=info_string)
@@ -11156,71 +9864,75 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
         ## INPUTS: most_recent_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult], info_string
         
-        pseudo2D_raw = continuously_decoded_dict.get('pseudo2D', None)
-        single_epoch_result, time_window_centers, decoder_format = DirectionalPseudo2DDecodersResult._resolve_pseudo2D_continuous_result(pseudo2D_raw)
 
+
+        # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
+        pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = continuously_decoded_dict.get('pseudo2D', None)
+        assert len(pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list) == 1
+        non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
+        # non_marginalized_raw_result.shape # (4, 128672)
+        # marginal_over_direction.shape # (2, 128672)
+        # marginal_over_track_ID.shape # (2, 128672)
+        ## WARN: note that it's typically .shape[1] that we check for the pseudo-y bins, but there's that quirk about the contents of ['p_x_given_n'] being transposed. Hope it's all okay.
+        
+
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]
+        # p_x_given_n = pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[0]['p_x_given_n']
+        time_bin_containers = pseudo2D_decoder_continuously_decoded_result.time_bin_containers[0]
+        time_window_centers = time_bin_containers.centers
+        # p_x_given_n.shape # (62, 4, 209389)
+        
+        ## Split across the 2nd axis to make 1D posteriors that can be displayed in separate dock rows:
+        
+        # split_pseudo2D_posteriors_dict = {k:np.squeeze(p_x_given_n[:, i, :]) for i, k in enumerate(('long_LR', 'long_RL', 'short_LR', 'short_RL'))}
+
+        # Need all_directional_pf1D_Decoder_dict
         output_dict = {}
+
         showCloseButton = True
         result_names = ('non_marginalized_raw_result', 'marginal_over_direction', 'marginal_over_track_ID')
-        dock_configs = dict(zip(result_names, (CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey), CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey), CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey))))
+        dock_configs = dict(zip(result_names, (CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey),
+                                               CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey),
+                                                CustomCyclicColorsDockDisplayConfig(showCloseButton=showCloseButton, named_color_scheme=NamedColorScheme.grey))))
 
-        if decoder_format == 'contextual_pf2D':
-            context_y_bin_labels = DirectionalPseudo2DDecodersResult._get_context_y_bin_labels(curr_active_pipeline, single_epoch_result.p_x_given_n.shape[2])
-            marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_contextual_marginal_over_track_ID(single_epoch_result, debug_print=debug_print)
-            non_marginalized_raw_result = marginal_over_track_ID
-            marginal_over_direction = None
-            n_context_bins = marginal_over_track_ID.shape[0]
-
-            if enable_non_marginalized_raw_result:
-                a_posterior_name: str = 'non_marginalized_raw_result'
-                assert non_marginalized_raw_result.shape[0] == n_context_bins, f"expected {n_context_bins} context bins but found non_marginalized_raw_result.shape: {non_marginalized_raw_result.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
-                if enable_marginal_labels:
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
-                    output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
-
-            if enable_marginal_over_track_ID:
-                a_posterior_name: str = 'marginal_over_track_ID'
-                assert marginal_over_track_ID.shape[0] == n_context_bins, f"expected {n_context_bins} context bins but found marginal_over_track_ID.shape: {marginal_over_track_ID.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(n_context_bins), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
-                if enable_marginal_labels:
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=context_y_bin_labels, enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
-                    output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
-        else:
-            pseudo2D_decoder_continuously_decoded_result = pseudo2D_raw
-            non_marginalized_raw_result = DirectionalPseudo2DDecodersResult.build_non_marginalized_raw_posteriors(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-            marginal_over_direction = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_direction(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-            marginal_over_track_ID = DirectionalPseudo2DDecodersResult.build_custom_marginal_over_long_short(pseudo2D_decoder_continuously_decoded_result)[0]['p_x_given_n']
-
-            if enable_non_marginalized_raw_result:
-                a_posterior_name: str = 'non_marginalized_raw_result'
-                assert non_marginalized_raw_result.shape[0] == 4, f"expected the 4 pseudo-y bins for the decoder in non_marginalized_raw_result.shape[1]. but found non_marginalized_raw_result.shape: {non_marginalized_raw_result.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(4), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
-                if enable_marginal_labels:
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
-                    output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
-
-            if enable_marginal_over_direction:
-                a_posterior_name: str = 'marginal_over_direction'
-                assert marginal_over_direction.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_direction.shape[1]. but found marginal_over_direction.shape: {marginal_over_direction.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_direction, extended_dock_title_info=info_string)
-                if enable_marginal_labels:
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
-                    output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
-
-            if enable_marginal_over_track_ID:
-                a_posterior_name: str = 'marginal_over_track_ID'
-                assert marginal_over_track_ID.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_track_ID.shape[1]. but found marginal_over_track_ID.shape: {marginal_over_track_ID.shape}"
-                output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name], a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
-                if enable_marginal_labels:
-                    identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
-                    label_artists_dict = {ax: PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False, enable_draw_separator_lines=True) for ax in matplotlib_fig_axes}
-                    output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
-
+        if enable_non_marginalized_raw_result:
+            a_posterior_name: str = 'non_marginalized_raw_result'
+            assert non_marginalized_raw_result.shape[0] == 4, f"expected the 4 pseudo-y bins for the decoder in non_marginalized_raw_result.shape[1]. but found non_marginalized_raw_result.shape: {non_marginalized_raw_result.shape}"
+            output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                                a_variable_name=a_posterior_name, xbin=np.arange(4), time_window_centers=time_window_centers, a_1D_posterior=non_marginalized_raw_result, extended_dock_title_info=info_string)
+            if enable_marginal_labels:
+                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                label_artists_dict = {}
+                for i, ax in enumerate(matplotlib_fig_axes):
+                    label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long_LR', 'long_RL', 'short_LR', 'short_RL'], enable_draw_decoder_colored_lines=False)
+                output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+            
+        if enable_marginal_over_direction:
+            a_posterior_name: str = 'marginal_over_direction'
+            assert marginal_over_direction.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_direction.shape[1]. but found marginal_over_direction.shape: {marginal_over_direction.shape}"
+            output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                                a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_direction, extended_dock_title_info=info_string)
+            if enable_marginal_labels:
+                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                label_artists_dict = {}
+                for i, ax in enumerate(matplotlib_fig_axes):
+                    label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['LR', 'RL'], enable_draw_decoder_colored_lines=False)
+                output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+                
+        if enable_marginal_over_track_ID:
+            a_posterior_name: str = 'marginal_over_track_ID'
+            assert marginal_over_track_ID.shape[0] == 2, f"expected the 2 marginalized pseudo-y bins for the decoder in marginal_over_track_ID.shape[1]. but found marginal_over_track_ID.shape: {marginal_over_track_ID.shape}"
+            output_dict[a_posterior_name] = cls._perform_add_new_decoded_posterior_marginal_row(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, a_dock_config=dock_configs[a_posterior_name],
+                                                                                                a_variable_name=a_posterior_name, xbin=np.arange(2), time_window_centers=time_window_centers, a_1D_posterior=marginal_over_track_ID, extended_dock_title_info=info_string)
+            if enable_marginal_labels:
+                identifier_name, widget, matplotlib_fig, matplotlib_fig_axes = output_dict[a_posterior_name]
+                label_artists_dict = {}
+                for i, ax in enumerate(matplotlib_fig_axes):
+                    label_artists_dict[ax] = PlottingHelpers.helper_matplotlib_add_pseudo2D_marginal_labels(ax, y_bin_labels=['long', 'short'], enable_draw_decoder_colored_lines=False)
+                output_dict[a_posterior_name] = (identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, label_artists_dict)
+            
         return output_dict
     
 
