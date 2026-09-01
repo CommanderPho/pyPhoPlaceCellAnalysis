@@ -30,7 +30,7 @@ def _get_directional_pseudo2d_decoders_result():
 
 
 def _build_synthetic_kdiba_posterior(n_pos: int = 10, n_time_bins: int = 5) -> np.ndarray:
-    """Posterior with distinct spatial peaks per context so grouped marginals are sensitive to summation order."""
+    """Posterior with distinct spatial peaks per context; normalized jointly over position+context per time bin (matches decode)."""
     rng = np.random.default_rng(42)
     p_x_given_n = np.zeros((n_pos, 4, n_time_bins), dtype=float)
     context_peak_positions = [1, 3, 6, 8]
@@ -38,10 +38,9 @@ def _build_synthetic_kdiba_posterior(n_pos: int = 10, n_time_bins: int = 5) -> n
         for time_bin_idx in range(n_time_bins):
             spatial_profile = np.exp(-0.5 * np.square(np.arange(n_pos) - (peak_pos + 0.3 * time_bin_idx)))
             p_x_given_n[:, context_idx, time_bin_idx] = spatial_profile * (1.0 + 0.2 * context_idx + 0.1 * rng.random())
-    for context_idx in range(4):
-        for time_bin_idx in range(n_time_bins):
-            col_sum = np.sum(p_x_given_n[:, context_idx, time_bin_idx])
-            p_x_given_n[:, context_idx, time_bin_idx] /= col_sum
+    for time_bin_idx in range(n_time_bins):
+        time_bin_sum = np.sum(p_x_given_n[:, :, time_bin_idx])
+        p_x_given_n[:, :, time_bin_idx] /= time_bin_sum
     return p_x_given_n
 
 
@@ -101,16 +100,26 @@ def test_direction_marginal_matches_old_kdiba_implementation(directional_cls, sy
     np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-12)
 
 
-def test_long_short_marginal_differs_from_broken_generalized_path(directional_cls, synthetic_posterior: np.ndarray):
+def test_long_short_marginal_matches_spatial_sum_then_group_path(directional_cls, synthetic_posterior: np.ndarray):
+    """The restored KDiba order matches the generalized spatial-sum-then-group path for valid posteriors."""
     fixed = directional_cls._marginalize_p_x_given_n_over_context_groups_in_position_space(synthetic_posterior, context_dim_idx=1, spatial_sum_axes=(0,), group_indices_list=[[0, 1], [2, 3]])
     broken = _broken_generalized_marginal(synthetic_posterior, [[0, 1], [2, 3]], directional_cls)
-    assert not np.allclose(fixed, broken, rtol=1e-6, atol=1e-6)
+    np.testing.assert_allclose(fixed, broken, rtol=1e-12, atol=1e-12)
 
 
-def test_direction_marginal_differs_from_broken_generalized_path(directional_cls, synthetic_posterior: np.ndarray):
+def test_direction_marginal_matches_spatial_sum_then_group_path(directional_cls, synthetic_posterior: np.ndarray):
+    """The restored KDiba order matches the generalized spatial-sum-then-group path for valid posteriors."""
     fixed = directional_cls._marginalize_p_x_given_n_over_context_groups_in_position_space(synthetic_posterior, context_dim_idx=1, spatial_sum_axes=(0,), group_indices_list=[[0, 2], [1, 3]])
     broken = _broken_generalized_marginal(synthetic_posterior, [[0, 2], [1, 3]], directional_cls)
-    assert not np.allclose(fixed, broken, rtol=1e-6, atol=1e-6)
+    np.testing.assert_allclose(fixed, broken, rtol=1e-12, atol=1e-12)
+
+
+def test_determine_long_short_likelihoods_epoch_marginals_vary_across_time_bins(directional_cls, synthetic_posterior: np.ndarray):
+    track_identity_marginals, track_identity_all_epoch_bins_marginal, _, _ = directional_cls.determine_long_short_likelihoods([synthetic_posterior])
+    per_time_bin_marginal = track_identity_marginals[0].p_x_given_n
+    assert per_time_bin_marginal.shape[0] == 2
+    assert np.std(per_time_bin_marginal[0]) > 1e-3
+    assert np.std(track_identity_all_epoch_bins_marginal[0]) >= 0.0
 
 
 def test_build_custom_marginal_over_long_short_integration(directional_cls, synthetic_posterior: np.ndarray):
