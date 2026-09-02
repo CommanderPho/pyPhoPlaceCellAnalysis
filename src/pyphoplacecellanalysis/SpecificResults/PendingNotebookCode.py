@@ -20968,7 +20968,7 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 
 
 @function_attributes(short_name='compare_historical_FAT_P_Short_across_exports', tags=['FAT', 'P_Short', 'historical', 'csv', 'drift', 'laps', 'diagnostic'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_most_recent_files'], used_by=[], creation_date='2026-09-02 09:30', related_items=[])
-def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: Optional[Union[Path, str]] = None, collected_outputs_directories: Optional[List[Union[Path, str]]] = None, all_parsed_csv_files_df: Optional[pd.DataFrame] = None, search_recursively: bool = True, atol: float = 1e-6, debug_print: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: Optional[Union[Path, str]] = None, collected_outputs_directories: Optional[List[Union[Path, str]]] = None, all_parsed_csv_files_df: Optional[pd.DataFrame] = None, search_recursively: bool = True, cutoff_date: Optional[datetime] = None, atol: float = 1e-6, debug_print: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """ Load all historical FAT CSVs and compare laps-only `P_Short` across consecutive same-settings exports.
 
     Groups exports by (session, _comparable_custom_replay_name, decoding_time_bin_size_str), keeps groups with
@@ -20977,11 +20977,13 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
 
     Supports multiple search folders (e.g. current collected_outputs plus archived history under `K:\\scratch\\pre-2026`).
     Nested dated archive folders are searched recursively when `search_recursively=True`.
+    When `cutoff_date` is provided, only exports with `export_datetime >= cutoff_date` are included.
 
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compare_historical_FAT_P_Short_across_exports
+
         pairwise_FAT_P_Short_compare_df, FAT_P_Short_break_candidates_df = compare_historical_FAT_P_Short_across_exports(
-            collected_outputs_directories=[collected_outputs_directory, r'K:\\scratch\\pre-2026'], atol=1e-6, debug_print=True)
+            collected_outputs_directories=[collected_outputs_directory, r'K:\\scratch\\pre-2026'], cutoff_date=cuttoff_date, atol=1e-6, debug_print=True)
         display(FAT_P_Short_break_candidates_df)
         display(pairwise_FAT_P_Short_compare_df)
 
@@ -21001,7 +21003,30 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         # Prefer a single time key: t_bin_center over t
         if ('t_bin_center' in shared) and ('t' in shared):
             shared = [c for c in shared if c != 't']
-        return shared
+        # Drop align candidates that are entirely NA in either frame (e.g. lap_idx on per_time_bin rows)
+        usable = [c for c in shared if (df_a[c].notna().any() and df_b[c].notna().any())]
+        if 't_bin_center' in usable:
+            cols = ['t_bin_center']
+            for extra in ['epoch_id', 'parent_epoch_id']:
+                if extra in usable:
+                    cols.append(extra)
+                    break
+            return cols
+        if 't' in usable:
+            return ['t']
+        if 'lap_idx' in usable and 'sub_epoch_time_bin_index' in usable:
+            return ['lap_idx', 'sub_epoch_time_bin_index']
+        if 'epoch_idx' in usable and 'sub_epoch_time_bin_index' in usable:
+            return ['epoch_idx', 'sub_epoch_time_bin_index']
+        return usable
+
+
+    def _subfn_normalize_content_settings(df: pd.DataFrame, content_cols: List[str]) -> pd.DataFrame:
+        out = df.copy()
+        for c in content_cols:
+            out[c] = out[c].fillna('__NA__').astype(str)
+        ## END for c in content_cols...
+        return out
 
 
     def _subfn_load_laps_P_Short(path: Path) -> Optional[pd.DataFrame]:
@@ -21056,11 +21081,18 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
                 'is_changed': False,
             }
         abs_diff = (merged['P_Short_a'] - merged['P_Short_b']).abs()
-        mean_abs_diff = float(np.nanmean(abs_diff.to_numpy()))
-        max_abs_diff = float(np.nanmax(abs_diff.to_numpy()))
-        corr = float(merged['P_Short_a'].corr(merged['P_Short_b'])) if n_aligned >= 2 else np.nan
-        frac_changed = float(np.nanmean((abs_diff > atol).to_numpy()))
-        is_changed = bool(max_abs_diff > atol) if np.isfinite(max_abs_diff) else False
+        if abs_diff.notna().sum() == 0:
+            mean_abs_diff = np.nan
+            max_abs_diff = np.nan
+            corr = np.nan
+            frac_changed = np.nan
+            is_changed = False
+        else:
+            mean_abs_diff = float(np.nanmean(abs_diff.to_numpy()))
+            max_abs_diff = float(np.nanmax(abs_diff.to_numpy()))
+            corr = float(merged['P_Short_a'].corr(merged['P_Short_b'])) if n_aligned >= 2 else np.nan
+            frac_changed = float(np.nanmean((abs_diff > atol).to_numpy()))
+            is_changed = bool(max_abs_diff > atol) if np.isfinite(max_abs_diff) else False
         return {
             **content_settings,
             'align_cols': ','.join(align_cols),
@@ -21146,6 +21178,12 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
     # Prefer resolved path string for stable identity across folders
     fat_files_df['path'] = fat_files_df['path'].map(lambda p: Path(p).resolve())
     fat_files_df = fat_files_df.drop_duplicates(subset=['path'], keep='first')
+    if cutoff_date is not None:
+        cutoff_date = pd.Timestamp(cutoff_date)
+        n_before_cutoff: int = len(fat_files_df)
+        fat_files_df = fat_files_df[fat_files_df['export_datetime'] >= cutoff_date].copy()
+        if debug_print:
+            print(f'Applied cutoff_date={cutoff_date}: kept {len(fat_files_df)}/{n_before_cutoff} FAT exports')
     fat_files_df = fat_files_df.sort_values(FILE_GROUP_COLS + ['export_datetime']).reset_index(drop=True)
 
     if debug_print:
@@ -21194,11 +21232,11 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
                 partitions_b = {'__all__': df_b}
                 partition_keys = ['__all__']
             else:
-                keys_a = df_a.groupby(present_content_cols, dropna=False).size().index
-                keys_b = df_b.groupby(present_content_cols, dropna=False).size().index
-                partition_keys = sorted(set(list(keys_a)) | set(list(keys_b)), key=lambda x: tuple(str(v) for v in (x if isinstance(x, tuple) else (x,))))
-                partitions_a = {k: g for k, g in df_a.groupby(present_content_cols, dropna=False)}
-                partitions_b = {k: g for k, g in df_b.groupby(present_content_cols, dropna=False)}
+                df_a_norm = _subfn_normalize_content_settings(df_a, present_content_cols)
+                df_b_norm = _subfn_normalize_content_settings(df_b, present_content_cols)
+                partitions_a = {k: g for k, g in df_a_norm.groupby(present_content_cols, dropna=False)}
+                partitions_b = {k: g for k, g in df_b_norm.groupby(present_content_cols, dropna=False)}
+                partition_keys = sorted(set(partitions_a.keys()) & set(partitions_b.keys()), key=lambda x: tuple(str(v) for v in (x if isinstance(x, tuple) else (x,))))
 
             for part_key in partition_keys:
                 part_a = partitions_a.get(part_key)
