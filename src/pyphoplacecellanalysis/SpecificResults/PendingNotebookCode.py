@@ -21153,12 +21153,6 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         ## END for col_name, val in file_filters.items()...
         return out
 
-
-    file_level_filters, content_filters, epochs_type = _subfn_resolve_data_context_filters(data_context)
-    if debug_print and (data_context is not None):
-        print(f'data_context filters: file={file_level_filters}, content={content_filters}, epochs_type={epochs_type}')
-
-
     def _subfn_resolve_align_cols(df_a: pd.DataFrame, df_b: pd.DataFrame) -> List[str]:
         shared = [c for c in CANDIDATE_ALIGN_COLS if (c in df_a.columns) and (c in df_b.columns)]
         # Prefer a single time key: t_bin_center over t
@@ -21270,6 +21264,11 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
     # ==================================================================================================================================================================================================================================================================================== #
     # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
     # ==================================================================================================================================================================================================================================================================================== #
+
+    file_level_filters, content_filters, epochs_type = _subfn_resolve_data_context_filters(data_context)
+    if debug_print and (data_context is not None):
+        print(f'data_context filters: file={file_level_filters}, content={content_filters}, epochs_type={epochs_type}')
+
     search_dirs: List[Path] = []
     if collected_outputs_directories is not None:
         search_dirs.extend([Path(p) for p in collected_outputs_directories])
@@ -21362,7 +21361,7 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
     if len(multi_export_groups) == 0:
         pairwise_compare_df = pd.DataFrame(columns=FILE_GROUP_COLS + CONTENT_SETTINGS_COLS + ['export_datetime_a', 'export_datetime_b', 'path_a', 'path_b', 'n_aligned', 'mean_abs_diff', 'max_abs_diff', 'corr', 'frac_changed', 'is_changed'])
         break_candidates_df = pairwise_compare_df.copy()
-        return pairwise_compare_df, break_candidates_df
+        return fat_files_df, pairwise_compare_df, break_candidates_df
 
     for group_key, group_df in fat_files_df.merge(multi_export_groups[FILE_GROUP_COLS], on=FILE_GROUP_COLS, how='inner').groupby(FILE_GROUP_COLS, dropna=False):
         group_df = group_df.sort_values('export_datetime').reset_index(drop=True)
@@ -21438,7 +21437,7 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         break_candidates_df = pairwise_compare_df.copy()
         if debug_print:
             print('No comparable consecutive FAT export pairs found for laps P_Short')
-        return pairwise_compare_df, break_candidates_df
+        return fat_files_df, pairwise_compare_df, break_candidates_df
 
     pairwise_compare_df = pd.DataFrame(pairwise_records).sort_values(['export_datetime_b', 'max_abs_diff'], ascending=[True, False]).reset_index(drop=True)
 
@@ -21458,6 +21457,6 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
             print(f'Break candidates (first changed pair per settings): {len(break_candidates_df)}')
             print(break_candidates_df[FILE_GROUP_COLS + ['export_datetime_a', 'export_datetime_b', 'max_abs_diff', 'frac_changed', 'data_grain']].to_string(index=False))
 
-    return pairwise_compare_df, break_candidates_df
+    return fat_files_df, pairwise_compare_df, break_candidates_df
 
 
