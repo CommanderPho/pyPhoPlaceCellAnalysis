@@ -234,6 +234,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.params._menu_action_history_list = []
         self.params.base_context_window_title = None
         self.params.dynamic_dock_window_title_suffix = None
+        self.params.launcher_display_suffix = None
         self.params.window_title = self.applicationName
 
         ## .params is needed before `self.ui.setupUi(self)` to allow titles to work
@@ -1983,17 +1984,20 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         else:
             win.setWindowTitle(desired_window_title)
 
-    def compose_window_title(self, base_context_title: Optional[str], dynamic_dock_title: Optional[str] = None) -> str:
+    def compose_window_title(self, base_context_title: Optional[str], dynamic_dock_title: Optional[str] = None, launcher_display_suffix: Optional[str] = None) -> str:
         """Composes final title as `<base> - <suffix>` when suffix exists."""
         active_base_context_title: str = (base_context_title or self.applicationName or "Spike Raster Window")
         active_dynamic_dock_title = (dynamic_dock_title or "").strip()
-        if len(active_dynamic_dock_title) == 0:
+        if len(active_dynamic_dock_title) > 0:
+            active_base_context_title = f"{active_base_context_title} - {active_dynamic_dock_title}"
+        active_launcher_display_suffix = (launcher_display_suffix or "").strip()
+        if len(active_launcher_display_suffix) == 0:
             return active_base_context_title
-        return f"{active_base_context_title} - {active_dynamic_dock_title}"
+        return f"{active_base_context_title} - {active_launcher_display_suffix}"
 
     def _apply_composed_window_title(self):
         """Rebuilds the window title from immutable base + optional dynamic suffix."""
-        active_composed_window_title: str = self.compose_window_title(self.params.base_context_window_title, self.params.dynamic_dock_window_title_suffix)
+        active_composed_window_title: str = self.compose_window_title(self.params.base_context_window_title, self.params.dynamic_dock_window_title_suffix, self.params.launcher_display_suffix)
         self.params.window_title = active_composed_window_title
         self._set_window_title_direct(active_composed_window_title)
         return active_composed_window_title
@@ -2008,6 +2012,11 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
     def set_dynamic_window_title_suffix(self, dynamic_dock_title: Optional[str]):
         """Sets dock/operation suffix while preserving base session context."""
         self.params.dynamic_dock_window_title_suffix = dynamic_dock_title
+        return self._apply_composed_window_title()
+
+    def set_launcher_display_suffix(self, launcher_display_suffix: Optional[str]):
+        """Sets launcher/notebook suffix while preserving base session context."""
+        self.params.launcher_display_suffix = (launcher_display_suffix.strip() or None) if (launcher_display_suffix is not None) else None
         return self._apply_composed_window_title()
 
     def setWindowTitle(self, desired_window_title: str):

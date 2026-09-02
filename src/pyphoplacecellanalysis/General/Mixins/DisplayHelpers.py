@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, Any
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
@@ -49,6 +50,96 @@ TODO: EXPLORE: REVIEW: thse debug_print_* functions seem very useful and I didn'
 # ==================================================================================================================== #
 # General                                                                                                              #
 # ==================================================================================================================== #
+def append_display_suffix_to_title(title: str, display_suffix: str) -> str:
+    """Appends `display_suffix` to a window title if not already present."""
+    active_title: str = (title or "").strip()
+    active_display_suffix: str = (display_suffix or "").strip()
+    if len(active_display_suffix) == 0:
+        return active_title
+    if len(active_title) == 0:
+        return active_display_suffix
+    suffix_suffix: str = f" - {active_display_suffix}"
+    if active_title.endswith(suffix_suffix) or (active_title == active_display_suffix):
+        return active_title
+    return f"{active_title}{suffix_suffix}"
+
+
+def apply_display_suffix_to_display_output(display_output: Any, display_suffix: str, _visited: Optional[set] = None) -> None:
+    """Recursively applies `display_suffix` to window titles in display function outputs."""
+    active_display_suffix: str = (display_suffix or "").strip()
+    if len(active_display_suffix) == 0:
+        return
+
+    if _visited is None:
+        _visited = set()
+
+    if display_output is None:
+        return
+
+    display_output_id = id(display_output)
+    if display_output_id in _visited:
+        return
+    _visited.add(display_output_id)
+
+    if isinstance(display_output, dict):
+        for a_value in display_output.values():
+            apply_display_suffix_to_display_output(a_value, active_display_suffix, _visited=_visited)
+        ## END for a_value in display_output.values()...
+
+        return
+
+    if isinstance(display_output, (list, tuple)):
+        for a_value in display_output:
+            apply_display_suffix_to_display_output(a_value, active_display_suffix, _visited=_visited)
+        ## END for a_value in display_output...
+
+        return
+
+    if isinstance(display_output, Figure):
+        active_figure_title: str = ""
+        if (display_output.canvas is not None) and (display_output.canvas.manager is not None):
+            active_figure_title = display_output.canvas.manager.get_window_title() or ""
+        if len(active_figure_title.strip()) == 0:
+            active_figure_title = display_output.get_label() or ""
+        updated_figure_title: str = append_display_suffix_to_title(active_figure_title, active_display_suffix)
+        display_output.set_label(updated_figure_title)
+        if (display_output.canvas is not None) and (display_output.canvas.manager is not None):
+            display_output.canvas.manager.set_window_title(updated_figure_title)
+
+        return
+
+    if hasattr(display_output, 'set_launcher_display_suffix'):
+        display_output.set_launcher_display_suffix(active_display_suffix)
+
+        return
+
+    try:
+        from PyQt5.QtWidgets import QApplication, QWidget
+    except ImportError:
+        return
+
+    if isinstance(display_output, QApplication):
+        return
+
+    if isinstance(display_output, QWidget):
+        if not display_output.isWindow():
+            return
+        active_qt_window = display_output.window()
+        if active_qt_window is None:
+            return
+        updated_qt_window_title: str = append_display_suffix_to_title(active_qt_window.windowTitle(), active_display_suffix)
+        active_qt_window.setWindowTitle(updated_qt_window_title)
+        if hasattr(display_output, 'params') and hasattr(display_output.params, 'window_title'):
+            display_output.params.window_title = updated_qt_window_title
+
+        return
+
+    if hasattr(display_output, 'params') and hasattr(display_output.params, 'window_title'):
+        display_output.params.window_title = append_display_suffix_to_title(display_output.params.window_title, active_display_suffix)
+        if hasattr(display_output, 'setWindowTitle'):
+            display_output.setWindowTitle(display_output.params.window_title)
+
+
 def debug_build_QRect_str(rect, prefix_string='rect: ', indent_string = '\t', include_edge_positions=False) -> str:
     """ Prints QRectF in a more readible format
     By default printing QRectF objects results in output like 'PyQt5.QtCore.QRectF(57.847549828567, -0.007193522045074202, 15.76451934295443, 1.0150365839255244)'

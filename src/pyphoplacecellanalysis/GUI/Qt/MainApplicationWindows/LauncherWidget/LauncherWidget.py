@@ -66,7 +66,7 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         from pyphoplacecellanalysis.External.pyqtgraph import QtWidgets, QtCore, QtGui
         from pyphoplacecellanalysis.GUI.Qt.MainApplicationWindows.LauncherWidget.LauncherWidget import LauncherWidget
 
-        widget = LauncherWidget()
+        widget = LauncherWidget(display_suffix='ReviewApr01')
         treeWidget = widget.mainTreeWidget # QTreeWidget
         widget.build_for_pipeline(curr_active_pipeline=curr_active_pipeline)
         widget.show()
@@ -132,12 +132,13 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
 
 
     # __init__ fcn _______________________________________________________________________________________________________ #
-    def __init__(self, debug_print=False, should_use_nice_display_names: bool = True, parent=None):
+    def __init__(self, debug_print=False, should_use_nice_display_names: bool = True, display_suffix: Optional[str] = None, parent=None):
         super().__init__(parent=parent) # Call the inherited classes __init__ method
         self.ui = uic.loadUi(uiFile, self) # Load the .ui file
         self._curr_active_pipeline_ref = None
         self.debug_print = debug_print
         self.should_use_nice_display_names = should_use_nice_display_names
+        self.display_suffix = (display_suffix.strip() or None) if (display_suffix is not None) else None
         if should_use_nice_display_names:
             self.best_display_name_to_function_name_map = {}
         else:
@@ -296,12 +297,19 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         
 
 
+    def _compose_launcher_window_title(self, session_id_str: str) -> str:
+        active_session_id_str: str = f'Spike3D Launcher: {session_id_str}'
+        if self.display_suffix is not None:
+            return f'{active_session_id_str} - {self.display_suffix}'
+        return active_session_id_str
+
+
     def build_for_pipeline(self, curr_active_pipeline):
         self._curr_active_pipeline_ref = curr_active_pipeline
         curr_active_pipeline.reload_default_display_functions()
         ## update window title/etc
         session_id_str: str = self._curr_active_pipeline_ref.get_complete_session_identifier_string()
-        self.setWindowTitle(f'Spike3D Launcher: {session_id_str}')
+        self.setWindowTitle(self._compose_launcher_window_title(session_id_str))
         self.displayContextSelectorWidget.build_for_pipeline(curr_active_pipeline) ## update the context list
         self._rebuild_tree() ## call self._rebuild_tree()
 
@@ -531,6 +539,8 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
         # kwargs = {}
         a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
         assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+        if self.display_suffix is not None:
+            kwargs['display_suffix'] = self.display_suffix
         if a_disp_fn_item.is_global:
             return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=None, *args, **kwargs)
         else:

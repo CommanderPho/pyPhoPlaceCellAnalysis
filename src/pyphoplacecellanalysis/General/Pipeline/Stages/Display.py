@@ -28,6 +28,7 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContex
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import LongShortTrackComparingDisplayFunctions
 
 from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode	
+from pyphoplacecellanalysis.General.Mixins.DisplayHelpers import apply_display_suffix_to_display_output
 
 
 def has_good_str_value(a_str_val) -> bool:
@@ -548,6 +549,9 @@ class PipelineWithDisplayPipelineStageMixin:
         
         assert self.can_display, "Current self.stage must already be a DisplayPipelineStage. Call self.prepare_for_display to reach this step."
         debug_print = kwargs.get('debug_print', False)
+        display_suffix = kwargs.pop('display_suffix', None)
+        if display_suffix is not None:
+            display_suffix = display_suffix.strip() or None
         
         if display_function is None:
             # Default display function is `._display_normal`
@@ -642,6 +646,8 @@ class PipelineWithDisplayPipelineStageMixin:
 
             curr_display_output = display_function(self.computation_results[active_session_configuration_name], self.active_configs[active_session_configuration_name], owning_pipeline=self, active_config_name=active_session_configuration_name, **kwargs)
             
+        if display_suffix is not None:
+            apply_display_suffix_to_display_output(curr_display_output, display_suffix)
     
         ## Build the final display context: 
         found_display_fcn_index = self.registered_display_functions.index(display_function)
