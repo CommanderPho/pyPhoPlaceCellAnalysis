@@ -20968,22 +20968,27 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 
 
 @function_attributes(short_name='compare_historical_FAT_P_Short_across_exports', tags=['FAT', 'P_Short', 'historical', 'csv', 'drift', 'laps', 'diagnostic'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_most_recent_files'], used_by=[], creation_date='2026-09-02 09:30', related_items=[])
-def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: Optional[Union[Path, str]] = None, collected_outputs_directories: Optional[List[Union[Path, str]]] = None, all_parsed_csv_files_df: Optional[pd.DataFrame] = None, search_recursively: bool = True, cutoff_date: Optional[datetime] = None, atol: float = 1e-6, debug_print: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: Optional[Union[Path, str]] = None, collected_outputs_directories: Optional[List[Union[Path, str]]] = None, all_parsed_csv_files_df: Optional[pd.DataFrame] = None, search_recursively: bool = True, cutoff_date: Optional[datetime] = None, data_context: Optional[IdentifyingContext] = None, atol: float = 1e-6, debug_print: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """ Load all historical FAT CSVs and compare laps-only `P_Short` across consecutive same-settings exports.
 
     Groups exports by (session, _comparable_custom_replay_name, decoding_time_bin_size_str), keeps groups with
-    >= 2 exports, filters each file to known_named_decoding_epochs_type == 'laps', partitions by content settings,
-    aligns rows, and diffs only `P_Short`.
+    >= 2 exports, filters each file to known_named_decoding_epochs_type == 'laps' (overridable via `data_context`),
+    partitions by content settings, aligns rows, and diffs only `P_Short`.
 
     Supports multiple search folders (e.g. current collected_outputs plus archived history under `K:\\scratch\\pre-2026`).
     Nested dated archive folders are searched recursively when `search_recursively=True`.
     When `cutoff_date` is provided, only exports with `export_datetime >= cutoff_date` are included.
+    When `data_context` is provided, only matching rows/exports are compared, e.g.:
+        data_context=IdentifyingContext(epochs_name='laps', data_grain='per_time_bin', animal='gor01', qclu=[1, 2, 4, 6, 7, 8, 9])
 
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compare_historical_FAT_P_Short_across_exports
 
         pairwise_FAT_P_Short_compare_df, FAT_P_Short_break_candidates_df = compare_historical_FAT_P_Short_across_exports(
-            collected_outputs_directories=[collected_outputs_directory, r'K:\\scratch\\pre-2026'], cutoff_date=cuttoff_date, atol=1e-6, debug_print=True)
+            collected_outputs_directories=[collected_outputs_directory, r'K:\\scratch\\pre-2026'],
+            cutoff_date=cuttoff_date,
+            data_context=IdentifyingContext(epochs_name='laps', data_grain='per_time_bin'),
+            atol=1e-6, debug_print=True)
         display(FAT_P_Short_break_candidates_df)
         display(pairwise_FAT_P_Short_compare_df)
 
@@ -20991,12 +20996,168 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
     -------
     pairwise_compare_df, break_candidates_df
     """
+    import ast
     from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_most_recent_files
 
     FILE_GROUP_COLS: List[str] = ['session', '_comparable_custom_replay_name', 'decoding_time_bin_size_str']
     CONTENT_SETTINGS_COLS: List[str] = ['data_grain', 'trained_compute_epochs', 'masked_time_bin_fill_type', 'decoder_identifier']
     CANDIDATE_ALIGN_COLS: List[str] = ['t_bin_center', 't', 'epoch_id', 'parent_epoch_id', 'lap_idx', 'epoch_idx', 'sub_epoch_time_bin_index', 'result_t_bin_idx']
+    # Map IdentifyingContext keys -> FAT / inventory column names
+    CONTEXT_KEY_TO_COLUMN: Dict[str, str] = {
+        'epochs_name': 'known_named_decoding_epochs_type',
+        'known_named_decoding_epochs_type': 'known_named_decoding_epochs_type',
+        'data_grain': 'data_grain',
+        'animal': 'animal',
+        'exper_name': 'exper_name',
+        'format_name': 'format_name',
+        'qclu': 'included_qclu_values',
+        'included_qclu_values': 'included_qclu_values',
+        'frateThresh': 'minimum_inclusion_fr_Hz',
+        'minimum_inclusion_fr_Hz': 'minimum_inclusion_fr_Hz',
+        'time_bin_size': 'time_bin_size',
+        'custom_replay_name': 'custom_replay_name',
+        'session': 'session_name',
+        'session_name': 'session_name',
+        'trained_compute_epochs': 'trained_compute_epochs',
+        'masked_time_bin_fill_type': 'masked_time_bin_fill_type',
+        'decoder_identifier': 'decoder_identifier',
+    }
+    IGNORE_CONTEXT_KEYS = {'title_prefix', 'dataframe_name', 'n_events', 'num_events', 'filter', 'display_dict', 'specific_purpose_display_dict'}
+    # Columns that can prune the file inventory before CSV loads
+    FILE_LEVEL_FILTER_COLS = {'session', 'session_name', 'custom_replay_name', 'time_bin_size', 'animal', 'exper_name', 'format_name', 'qclu', 'included_qclu_values', 'frateThresh', 'minimum_inclusion_fr_Hz'}
+
+    def _subfn_normalize_qclu_value(val: Any) -> Any:
+        if val is None or (isinstance(val, float) and np.isnan(val)):
+            return val
+        if isinstance(val, str):
+            try:
+                parsed = ast.literal_eval(val)
+                if isinstance(parsed, (list, tuple)):
+                    return str(list(parsed))
+            except Exception:
+                return val
+            return val
+        if isinstance(val, (list, tuple, set)):
+            return str(list(val))
+        return val
+
+
+    def _subfn_resolve_data_context_filters(a_data_context: Optional[IdentifyingContext]) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+        """ Returns (file_level_filters, content_filters, epochs_type) from an IdentifyingContext. """
+        content_filters: Dict[str, Any] = {}
+        file_level_filters: Dict[str, Any] = {}
+        epochs_type: str = 'laps'
+        if a_data_context is None:
+            content_filters['known_named_decoding_epochs_type'] = epochs_type
+            return file_level_filters, content_filters, epochs_type
+
+        context_dict = dict(a_data_context.to_dict())
+        for k, v in context_dict.items():
+            if k in IGNORE_CONTEXT_KEYS or v is None:
+                continue
+            col_name = CONTEXT_KEY_TO_COLUMN.get(k, k)
+            if col_name == 'included_qclu_values':
+                v = _subfn_normalize_qclu_value(v)
+            elif (col_name in ('minimum_inclusion_fr_Hz', 'time_bin_size')) and (not isinstance(v, (list, tuple, set))):
+                try:
+                    v = float(v)
+                except Exception:
+                    pass
+            content_filters[col_name] = v
+            if (k in FILE_LEVEL_FILTER_COLS) or (col_name in {'session_name', 'custom_replay_name', 'time_bin_size', 'animal', 'exper_name', 'format_name', 'included_qclu_values', 'minimum_inclusion_fr_Hz'}):
+                file_level_filters[col_name] = v
+        ## END for k, v in context_dict.items()...
+
+        if 'known_named_decoding_epochs_type' in content_filters:
+            epochs_type = content_filters['known_named_decoding_epochs_type']
+            if isinstance(epochs_type, (list, tuple, set)):
+                epochs_type = 'laps' if 'laps' in epochs_type else next(iter(epochs_type))
+        else:
+            content_filters['known_named_decoding_epochs_type'] = epochs_type
+        return file_level_filters, content_filters, str(epochs_type)
+
+
+    def _subfn_constrain_df(df: pd.DataFrame, constraining_kwargs: Dict[str, Any]) -> pd.DataFrame:
+        """ Filter df by column==value (or isin), without dropping constrained columns. """
+        out = df
+        for col_name, val in constraining_kwargs.items():
+            if col_name not in out.columns:
+                if debug_print:
+                    print(f'WARN: context filter column "{col_name}" missing from dataframe; skipping this constraint')
+                continue
+            series = out[col_name]
+            if col_name == 'included_qclu_values':
+                series = series.map(_subfn_normalize_qclu_value)
+                val = _subfn_normalize_qclu_value(val)
+            if col_name == 'session_name':
+                wanted_vals = list(val) if (isinstance(val, (list, tuple, set)) and (not isinstance(val, str))) else [val]
+                wanted_vals = [str(w) for w in wanted_vals]
+                out = out[series.astype(str).map(lambda s: any((s == w) or s.endswith(f'_{w}') or (w in s) for w in wanted_vals))]
+            elif isinstance(val, (list, tuple, set)) and (not isinstance(val, str)):
+                out = out[series.isin(list(val))]
+            else:
+                if (col_name in ('minimum_inclusion_fr_Hz', 'time_bin_size')) and pd.api.types.is_numeric_dtype(series):
+                    out = out[np.isclose(series.astype(float), float(val), equal_nan=False)]
+                else:
+                    out = out[series == val]
+        ## END for col_name, val in constraining_kwargs.items()...
+        return out
+
+
+    def _subfn_apply_file_level_filters(files_df: pd.DataFrame, file_filters: Dict[str, Any]) -> pd.DataFrame:
+        if len(file_filters) == 0:
+            return files_df
+        out = files_df.copy()
+        if any(k in file_filters for k in ('animal', 'exper_name', 'format_name')):
+            session_parts = out['session'].astype(str).str.split('_', n=3, expand=True)
+            if 'format_name' not in out.columns:
+                out['format_name'] = session_parts[0]
+            if 'animal' not in out.columns:
+                out['animal'] = session_parts[1]
+            if 'exper_name' not in out.columns:
+                out['exper_name'] = session_parts[2]
+        for col_name, val in file_filters.items():
+            if col_name == 'session_name':
+                def _session_matches(session_key: str, wanted) -> bool:
+                    wanted_vals = list(wanted) if (isinstance(wanted, (list, tuple, set)) and (not isinstance(wanted, str))) else [wanted]
+                    for w in wanted_vals:
+                        w = str(w)
+                        if (session_key == w) or session_key.endswith(f'_{w}') or (w in session_key):
+                            return True
+                    ## END for w in wanted_vals...
+                    return False
+                out = out[out['session'].astype(str).map(lambda s: _session_matches(s, val))]
+            elif col_name == 'custom_replay_name':
+                comparable_val = str(val).replace('_', '-')
+                out = out[out['_comparable_custom_replay_name'] == comparable_val]
+            elif col_name == 'time_bin_size':
+                out = out[out['decoding_time_bin_size_str'].astype(str) == str(val)]
+            elif col_name == 'included_qclu_values':
+                qclu_norm = _subfn_normalize_qclu_value(val)
+                needle = f"qclu_{qclu_norm}" if isinstance(qclu_norm, str) else f"qclu_{val}"
+                needle_comparable = needle.replace('_', '-')
+                out = out[out['custom_replay_name'].astype(str).str.contains(needle, regex=False) | out['_comparable_custom_replay_name'].astype(str).str.contains(needle_comparable, regex=False)]
+            elif col_name == 'minimum_inclusion_fr_Hz':
+                needle = f"frateThresh_{val}"
+                needle_comparable = str(needle).replace('_', '-')
+                out = out[out['custom_replay_name'].astype(str).str.contains(str(needle), regex=False) | out['_comparable_custom_replay_name'].astype(str).str.contains(needle_comparable, regex=False)]
+            elif col_name in out.columns:
+                if isinstance(val, (list, tuple, set)) and (not isinstance(val, str)):
+                    out = out[out[col_name].isin(list(val))]
+                else:
+                    out = out[out[col_name] == val]
+            else:
+                if debug_print:
+                    print(f'WARN: file-level filter column "{col_name}" unavailable; skipping')
+        ## END for col_name, val in file_filters.items()...
+        return out
+
+
+    file_level_filters, content_filters, epochs_type = _subfn_resolve_data_context_filters(data_context)
+    if debug_print and (data_context is not None):
+        print(f'data_context filters: file={file_level_filters}, content={content_filters}, epochs_type={epochs_type}')
+
 
     def _subfn_resolve_align_cols(df_a: pd.DataFrame, df_b: pd.DataFrame) -> List[str]:
         shared = [c for c in CANDIDATE_ALIGN_COLS if (c in df_a.columns) and (c in df_b.columns)]
@@ -21029,7 +21190,7 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         return out
 
 
-    def _subfn_load_laps_P_Short(path: Path) -> Optional[pd.DataFrame]:
+    def _subfn_load_filtered_P_Short(path: Path) -> Optional[pd.DataFrame]:
         try:
             df = pd.read_csv(path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False)
         except Exception as e:
@@ -21044,11 +21205,10 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
             if debug_print:
                 print(f'WARN: missing known_named_decoding_epochs_type in "{path.name}"; skipping')
             return None
-        laps_df = df[df['known_named_decoding_epochs_type'] == 'laps'].copy()
-        if laps_df.empty:
-            return laps_df
-        # Drop duplicate-named P_Short.1 style columns from bad concatenations if present — keep only P_Short
-        return laps_df
+        filtered_df = _subfn_constrain_df(df, content_filters)
+        if filtered_df.empty:
+            return filtered_df
+        return filtered_df
 
 
     def _subfn_compare_pair(df_a: pd.DataFrame, df_b: pd.DataFrame, content_settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -21184,6 +21344,10 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         fat_files_df = fat_files_df[fat_files_df['export_datetime'] >= cutoff_date].copy()
         if debug_print:
             print(f'Applied cutoff_date={cutoff_date}: kept {len(fat_files_df)}/{n_before_cutoff} FAT exports')
+    n_before_context: int = len(fat_files_df)
+    fat_files_df = _subfn_apply_file_level_filters(fat_files_df, file_level_filters)
+    if debug_print and (len(file_level_filters) > 0):
+        print(f'Applied data_context file filters: kept {len(fat_files_df)}/{n_before_context} FAT exports')
     fat_files_df = fat_files_df.sort_values(FILE_GROUP_COLS + ['export_datetime']).reset_index(drop=True)
 
     if debug_print:
@@ -21210,10 +21374,10 @@ def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: O
         loaded_laps: List[Tuple[pd.Timestamp, Path, pd.DataFrame]] = []
         for row in group_df.itertuples(index=False):
             a_path = Path(row.path)
-            laps_df = _subfn_load_laps_P_Short(a_path)
+            laps_df = _subfn_load_filtered_P_Short(a_path)
             if laps_df is None or laps_df.empty:
                 if debug_print:
-                    print(f'  skip empty/invalid laps FAT: {a_path.name}')
+                    print(f'  skip empty/invalid filtered FAT ({epochs_type}): {a_path.name}')
                 continue
             loaded_laps.append((pd.Timestamp(row.export_datetime), a_path, laps_df))
         ## END for row in group_df.itertuples(index=False)...
