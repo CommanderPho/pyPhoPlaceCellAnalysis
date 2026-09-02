@@ -20966,3 +20966,296 @@ def plot_single_heatmap_set_with_points(directional_active_lap_pf_results_dicts,
 # Usability/Conveninece Helpers                                                                                        #
 # ==================================================================================================================== #
 
+
+@function_attributes(short_name='compare_historical_FAT_P_Short_across_exports', tags=['FAT', 'P_Short', 'historical', 'csv', 'drift', 'laps', 'diagnostic'], input_requires=[], output_provides=[], uses=['find_csv_files', 'find_most_recent_files'], used_by=[], creation_date='2026-09-02 09:30', related_items=[])
+def compare_historical_FAT_P_Short_across_exports(collected_outputs_directory: Optional[Union[Path, str]] = None, collected_outputs_directories: Optional[List[Union[Path, str]]] = None, all_parsed_csv_files_df: Optional[pd.DataFrame] = None, search_recursively: bool = True, atol: float = 1e-6, debug_print: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """ Load all historical FAT CSVs and compare laps-only `P_Short` across consecutive same-settings exports.
+
+    Groups exports by (session, _comparable_custom_replay_name, decoding_time_bin_size_str), keeps groups with
+    >= 2 exports, filters each file to known_named_decoding_epochs_type == 'laps', partitions by content settings,
+    aligns rows, and diffs only `P_Short`.
+
+    Supports multiple search folders (e.g. current collected_outputs plus archived history under `K:\\scratch\\pre-2026`).
+    Nested dated archive folders are searched recursively when `search_recursively=True`.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import compare_historical_FAT_P_Short_across_exports
+        pairwise_FAT_P_Short_compare_df, FAT_P_Short_break_candidates_df = compare_historical_FAT_P_Short_across_exports(
+            collected_outputs_directories=[collected_outputs_directory, r'K:\\scratch\\pre-2026'], atol=1e-6, debug_print=True)
+        display(FAT_P_Short_break_candidates_df)
+        display(pairwise_FAT_P_Short_compare_df)
+
+    Returns
+    -------
+    pairwise_compare_df, break_candidates_df
+    """
+    from pyphocorehelpers.Filesystem.path_helpers import find_first_extant_path
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import find_csv_files, find_most_recent_files
+
+    FILE_GROUP_COLS: List[str] = ['session', '_comparable_custom_replay_name', 'decoding_time_bin_size_str']
+    CONTENT_SETTINGS_COLS: List[str] = ['data_grain', 'trained_compute_epochs', 'masked_time_bin_fill_type', 'decoder_identifier']
+    CANDIDATE_ALIGN_COLS: List[str] = ['t_bin_center', 't', 'epoch_id', 'parent_epoch_id', 'lap_idx', 'epoch_idx', 'sub_epoch_time_bin_index', 'result_t_bin_idx']
+
+    def _subfn_resolve_align_cols(df_a: pd.DataFrame, df_b: pd.DataFrame) -> List[str]:
+        shared = [c for c in CANDIDATE_ALIGN_COLS if (c in df_a.columns) and (c in df_b.columns)]
+        # Prefer a single time key: t_bin_center over t
+        if ('t_bin_center' in shared) and ('t' in shared):
+            shared = [c for c in shared if c != 't']
+        return shared
+
+
+    def _subfn_load_laps_P_Short(path: Path) -> Optional[pd.DataFrame]:
+        try:
+            df = pd.read_csv(path, na_values=['', 'nan', 'np.nan', '<NA>'], low_memory=False)
+        except Exception as e:
+            if debug_print:
+                print(f'WARN: failed to read "{path}": {e}')
+            return None
+        if 'P_Short' not in df.columns:
+            if debug_print:
+                print(f'WARN: missing P_Short in "{path.name}"; skipping')
+            return None
+        if 'known_named_decoding_epochs_type' not in df.columns:
+            if debug_print:
+                print(f'WARN: missing known_named_decoding_epochs_type in "{path.name}"; skipping')
+            return None
+        laps_df = df[df['known_named_decoding_epochs_type'] == 'laps'].copy()
+        if laps_df.empty:
+            return laps_df
+        # Drop duplicate-named P_Short.1 style columns from bad concatenations if present — keep only P_Short
+        return laps_df
+
+
+    def _subfn_compare_pair(df_a: pd.DataFrame, df_b: pd.DataFrame, content_settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        align_cols = _subfn_resolve_align_cols(df_a, df_b)
+        if len(align_cols) == 0:
+            return None
+        left = df_a[align_cols + ['P_Short']].copy()
+        right = df_b[align_cols + ['P_Short']].copy()
+        # Drop rows with NA align keys so merge is stable
+        left = left.dropna(subset=align_cols, how='any')
+        right = right.dropna(subset=align_cols, how='any')
+        # Deduplicate align keys (keep first) to avoid cartesian blowups from duplicated bins
+        left = left.drop_duplicates(subset=align_cols, keep='first')
+        right = right.drop_duplicates(subset=align_cols, keep='first')
+        if left.empty or right.empty:
+            return None
+        merged = left.merge(right, on=align_cols, how='inner', suffixes=('_a', '_b'))
+        n_aligned: int = len(merged)
+        if n_aligned == 0:
+            return {
+                **content_settings,
+                'align_cols': ','.join(align_cols),
+                'n_aligned': 0,
+                'n_left': len(left),
+                'n_right': len(right),
+                'mean_abs_diff': np.nan,
+                'max_abs_diff': np.nan,
+                'corr': np.nan,
+                'frac_changed': np.nan,
+                'is_changed': False,
+            }
+        abs_diff = (merged['P_Short_a'] - merged['P_Short_b']).abs()
+        mean_abs_diff = float(np.nanmean(abs_diff.to_numpy()))
+        max_abs_diff = float(np.nanmax(abs_diff.to_numpy()))
+        corr = float(merged['P_Short_a'].corr(merged['P_Short_b'])) if n_aligned >= 2 else np.nan
+        frac_changed = float(np.nanmean((abs_diff > atol).to_numpy()))
+        is_changed = bool(max_abs_diff > atol) if np.isfinite(max_abs_diff) else False
+        return {
+            **content_settings,
+            'align_cols': ','.join(align_cols),
+            'n_aligned': n_aligned,
+            'n_left': len(left),
+            'n_right': len(right),
+            'mean_abs_diff': mean_abs_diff,
+            'max_abs_diff': max_abs_diff,
+            'corr': corr,
+            'frac_changed': frac_changed,
+            'is_changed': is_changed,
+        }
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    search_dirs: List[Path] = []
+    if collected_outputs_directories is not None:
+        search_dirs.extend([Path(p) for p in collected_outputs_directories])
+    if collected_outputs_directory is not None:
+        search_dirs.append(Path(collected_outputs_directory))
+    # Deduplicate while preserving order
+    _seen_dirs = set()
+    unique_search_dirs: List[Path] = []
+    for a_dir in search_dirs:
+        a_resolved = a_dir.resolve() if a_dir.exists() else a_dir
+        a_key = str(a_resolved)
+        if a_key not in _seen_dirs:
+            _seen_dirs.add(a_key)
+            unique_search_dirs.append(a_dir)
+    ## END for a_dir in search_dirs...
+
+    search_dirs = unique_search_dirs
+
+    if all_parsed_csv_files_df is None:
+        if len(search_dirs) == 0:
+            known_collected_outputs_paths = [Path(v).resolve() for v in [r'K:/scratch/collected_outputs', r'K:/scratch/pre-2026', r'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs', '/home/halechr/FastData/collected_outputs/']]
+            extant_defaults = [p for p in known_collected_outputs_paths if p.exists()]
+            if len(extant_defaults) == 0:
+                collected_outputs_directory = find_first_extant_path(known_collected_outputs_paths)
+                search_dirs = [Path(collected_outputs_directory)]
+            else:
+                search_dirs = extant_defaults
+
+        assert len(search_dirs) > 0, 'No collected_outputs search directories provided/found'
+        csv_files: List[Path] = []
+        for a_dir in search_dirs:
+            assert a_dir.exists(), f'collected_outputs search directory does not exist: {a_dir}'
+            # Nested archive trees (e.g. K:/scratch/pre-2026/2025-06-11_GL/...) need recursive discovery
+            found_csvs = find_csv_files(a_dir, recurrsive=search_recursively)
+            if debug_print:
+                print(f'Discovered {len(found_csvs)} CSVs under "{a_dir}" (recursive={search_recursively})')
+            csv_files.extend(found_csvs)
+        ## END for a_dir in search_dirs...
+
+        # Deduplicate identical paths across folders
+        csv_files = list(dict.fromkeys([Path(p).resolve() for p in csv_files]))
+        if debug_print:
+            print(f'Total unique CSVs across {len(search_dirs)} search folders: {len(csv_files)}')
+        _sessions, _most_recent_df, all_parsed_csv_files_df = find_most_recent_files(found_session_export_paths=csv_files, cuttoff_date=None, should_print_unparsable_filenames=False)
+    elif len(search_dirs) > 0:
+        # Supplement an existing parsed inventory with additional search folders (e.g. pre-2026 archives)
+        csv_files = []
+        for a_dir in search_dirs:
+            assert a_dir.exists(), f'collected_outputs search directory does not exist: {a_dir}'
+            found_csvs = find_csv_files(a_dir, recurrsive=search_recursively)
+            if debug_print:
+                print(f'Supplementing with {len(found_csvs)} CSVs under "{a_dir}" (recursive={search_recursively})')
+            csv_files.extend(found_csvs)
+        ## END for a_dir in search_dirs...
+
+        csv_files = list(dict.fromkeys([Path(p).resolve() for p in csv_files]))
+        _sessions, _most_recent_df, supplemental_parsed_csv_files_df = find_most_recent_files(found_session_export_paths=csv_files, cuttoff_date=None, should_print_unparsable_filenames=False)
+        all_parsed_csv_files_df = pd.concat([deepcopy(all_parsed_csv_files_df), supplemental_parsed_csv_files_df], ignore_index=True)
+        all_parsed_csv_files_df = all_parsed_csv_files_df.drop_duplicates(subset=['path'], keep='first').reset_index(drop=True)
+
+    assert all_parsed_csv_files_df is not None and len(all_parsed_csv_files_df) > 0, 'all_parsed_csv_files_df is empty'
+    fat_files_df: pd.DataFrame = deepcopy(all_parsed_csv_files_df[all_parsed_csv_files_df['file_type'] == 'FAT']).copy()
+    if '_comparable_custom_replay_name' not in fat_files_df.columns:
+        fat_files_df['_comparable_custom_replay_name'] = fat_files_df['custom_replay_name'].astype(str).str.replace('_', '-', regex=False)
+    fat_files_df['export_datetime'] = pd.to_datetime(fat_files_df['export_datetime'])
+    # Prefer resolved path string for stable identity across folders
+    fat_files_df['path'] = fat_files_df['path'].map(lambda p: Path(p).resolve())
+    fat_files_df = fat_files_df.drop_duplicates(subset=['path'], keep='first')
+    fat_files_df = fat_files_df.sort_values(FILE_GROUP_COLS + ['export_datetime']).reset_index(drop=True)
+
+    if debug_print:
+        print(f'Found {len(fat_files_df)} historical FAT CSV exports')
+
+    group_sizes = fat_files_df.groupby(FILE_GROUP_COLS, dropna=False).size().reset_index(name='n_exports')
+    multi_export_groups = group_sizes[group_sizes['n_exports'] >= 2]
+    if debug_print:
+        print(f'Settings groups with >=2 exports: {len(multi_export_groups)} of {len(group_sizes)}')
+
+    pairwise_records: List[Dict[str, Any]] = []
+    if len(multi_export_groups) == 0:
+        pairwise_compare_df = pd.DataFrame(columns=FILE_GROUP_COLS + CONTENT_SETTINGS_COLS + ['export_datetime_a', 'export_datetime_b', 'path_a', 'path_b', 'n_aligned', 'mean_abs_diff', 'max_abs_diff', 'corr', 'frac_changed', 'is_changed'])
+        break_candidates_df = pairwise_compare_df.copy()
+        return pairwise_compare_df, break_candidates_df
+
+    for group_key, group_df in fat_files_df.merge(multi_export_groups[FILE_GROUP_COLS], on=FILE_GROUP_COLS, how='inner').groupby(FILE_GROUP_COLS, dropna=False):
+        group_df = group_df.sort_values('export_datetime').reset_index(drop=True)
+        if isinstance(group_key, tuple):
+            group_key_dict = dict(zip(FILE_GROUP_COLS, group_key))
+        else:
+            group_key_dict = {FILE_GROUP_COLS[0]: group_key}
+
+        loaded_laps: List[Tuple[pd.Timestamp, Path, pd.DataFrame]] = []
+        for row in group_df.itertuples(index=False):
+            a_path = Path(row.path)
+            laps_df = _subfn_load_laps_P_Short(a_path)
+            if laps_df is None or laps_df.empty:
+                if debug_print:
+                    print(f'  skip empty/invalid laps FAT: {a_path.name}')
+                continue
+            loaded_laps.append((pd.Timestamp(row.export_datetime), a_path, laps_df))
+        ## END for row in group_df.itertuples(index=False)...
+
+        if len(loaded_laps) < 2:
+            continue
+
+        for i in range(len(loaded_laps) - 1):
+            export_datetime_a, path_a, df_a = loaded_laps[i]
+            export_datetime_b, path_b, df_b = loaded_laps[i + 1]
+
+            present_content_cols = [c for c in CONTENT_SETTINGS_COLS if (c in df_a.columns) and (c in df_b.columns)]
+            if len(present_content_cols) == 0:
+                # Compare whole laps frames if content settings columns missing
+                partitions_a = {'__all__': df_a}
+                partitions_b = {'__all__': df_b}
+                partition_keys = ['__all__']
+            else:
+                keys_a = df_a.groupby(present_content_cols, dropna=False).size().index
+                keys_b = df_b.groupby(present_content_cols, dropna=False).size().index
+                partition_keys = sorted(set(list(keys_a)) | set(list(keys_b)), key=lambda x: tuple(str(v) for v in (x if isinstance(x, tuple) else (x,))))
+                partitions_a = {k: g for k, g in df_a.groupby(present_content_cols, dropna=False)}
+                partitions_b = {k: g for k, g in df_b.groupby(present_content_cols, dropna=False)}
+
+            for part_key in partition_keys:
+                part_a = partitions_a.get(part_key)
+                part_b = partitions_b.get(part_key)
+                if part_a is None or part_b is None or part_a.empty or part_b.empty:
+                    continue
+                if part_key == '__all__':
+                    content_settings = {c: None for c in CONTENT_SETTINGS_COLS}
+                elif isinstance(part_key, tuple):
+                    content_settings = dict(zip(present_content_cols, part_key))
+                    for c in CONTENT_SETTINGS_COLS:
+                        content_settings.setdefault(c, None)
+                else:
+                    content_settings = {present_content_cols[0]: part_key}
+                    for c in CONTENT_SETTINGS_COLS:
+                        content_settings.setdefault(c, None)
+
+                compare_result = _subfn_compare_pair(part_a, part_b, content_settings=content_settings)
+                if compare_result is None:
+                    continue
+                pairwise_records.append({
+                    **group_key_dict,
+                    'export_datetime_a': export_datetime_a,
+                    'export_datetime_b': export_datetime_b,
+                    'path_a': str(path_a),
+                    'path_b': str(path_b),
+                    **compare_result,
+                })
+            ## END for part_key in partition_keys...
+        ## END for i in range(len(loaded_laps) - 1)...
+    ## END for group_key, group_df in fat_files_df.merge(...)...
+
+    if len(pairwise_records) == 0:
+        pairwise_compare_df = pd.DataFrame(columns=FILE_GROUP_COLS + CONTENT_SETTINGS_COLS + ['export_datetime_a', 'export_datetime_b', 'path_a', 'path_b', 'n_aligned', 'mean_abs_diff', 'max_abs_diff', 'corr', 'frac_changed', 'is_changed'])
+        break_candidates_df = pairwise_compare_df.copy()
+        if debug_print:
+            print('No comparable consecutive FAT export pairs found for laps P_Short')
+        return pairwise_compare_df, break_candidates_df
+
+    pairwise_compare_df = pd.DataFrame(pairwise_records).sort_values(['export_datetime_b', 'max_abs_diff'], ascending=[True, False]).reset_index(drop=True)
+
+    # First changed pair per file-settings group (breakpoint window)
+    changed_df = pairwise_compare_df[pairwise_compare_df['is_changed'] == True].copy()
+    if len(changed_df) == 0:
+        break_candidates_df = pairwise_compare_df.iloc[0:0].copy()
+        if debug_print:
+            print('No P_Short changes detected above atol across consecutive same-settings FAT exports')
+    else:
+        break_candidates_df = (changed_df.sort_values('export_datetime_b')
+                               .groupby(FILE_GROUP_COLS + CONTENT_SETTINGS_COLS, dropna=False, as_index=False)
+                               .first()
+                               .sort_values('export_datetime_b')
+                               .reset_index(drop=True))
+        if debug_print:
+            print(f'Break candidates (first changed pair per settings): {len(break_candidates_df)}')
+            print(break_candidates_df[FILE_GROUP_COLS + ['export_datetime_a', 'export_datetime_b', 'max_abs_diff', 'frac_changed', 'data_grain']].to_string(index=False))
+
+    return pairwise_compare_df, break_candidates_df
+
+
