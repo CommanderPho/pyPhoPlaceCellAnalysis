@@ -93,6 +93,15 @@ class BatchScriptsCollection:
 from enum import Enum
 
 
+KDIBA_RELEASE_GIT_BRANCH: str = 'release/pho-diba-2025-paper'
+DEFAULT_KDIBA_GIT_CHECKOUT_REPO_NAMES: List[str] = ['NeuroPy', 'pyPhoCoreHelpers', 'pyPhoPlaceCellAnalysis']
+DEFAULT_KDIBA_WORKENV_REPOS_ROOT_PATHS: List[Path] = [
+    Path('/scratch/kdiba_root/kdiba99/halechr/repos/Spike3DEnv_KDibaVersion'),
+    Path(r'H:/TEMP/Spike3DEnv_ExploreUpgrade/Spike3DWorkEnv'),
+    Path('~/repos/Spike3DWorkEnv').expanduser(),
+]
+DEFAULT_KDIBA_VENV_ACTIVATE_PATH: str = '/scratch/kdiba_root/kdiba99/halechr/repos/Spike3DEnv_KDibaVersion/Spike3D/.venv/bin/activate'
+
 
 def get_batch_neptune_kwargs():
     from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
@@ -324,7 +333,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
-        batch_session_completion_handler_kwargs: Optional[Dict]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+        batch_session_completion_handler_kwargs: Optional[Dict]=None, venv_activate_path: Optional[str]=None, workenv_repos_root: Optional[str]=None, git_branch: Optional[str]=None, git_checkout_repo_names: Optional[List[str]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     output_directory
@@ -356,14 +365,14 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None):
         slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_context}.sh')
         with open(slurm_script_path, 'w') as script_file:
-            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, job_suffix=job_suffix)
+            script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, job_suffix=job_suffix, **_shell_template_kwargs)
             script_file.write(script_content)
         return slurm_script_path
     
     def _subfn_build_non_slurm_bash_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_bash_script_name_prefix:str='run'):
         bash_script_path = os.path.join(curr_batch_script_rundir, f'{a_bash_script_name_prefix}_{a_curr_session_context}.sh')
         with open(bash_script_path, 'w') as script_file:
-            script_content = bash_non_slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir)
+            script_content = bash_non_slurm_template.render(curr_session_context=f"{a_curr_session_context}", python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, **_shell_template_kwargs)
             script_file.write(script_content)
         return bash_script_path
 
@@ -409,6 +418,22 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     # python_template = env.get_template('slurm_python_template_NoRecompute.py.j2', parent='slurm_python_template_base.py.j2')
     slurm_template = env.get_template('slurm_template.sh.j2')
     bash_non_slurm_template = env.get_template('bash_template.sh.j2')
+
+    _resolved_venv_activate_path: str = resolve_venv_activate_path(venv_activate_path=venv_activate_path)
+    _resolved_workenv_repos_root: Optional[Path] = None
+    if git_branch is not None:
+        assert workenv_repos_root is not None, f"workenv_repos_root must be provided when git_branch is set (git_branch={git_branch!r})"
+        _resolved_workenv_repos_root = resolve_workenv_repos_root(workenv_repos_root=workenv_repos_root)
+        print(f'git_branch: "{git_branch}"')
+        print(f'workenv_repos_root: "{_resolved_workenv_repos_root}"')
+        print(f'git_checkout_repo_names: {git_checkout_repo_names or DEFAULT_KDIBA_GIT_CHECKOUT_REPO_NAMES}')
+    print(f'venv_activate_path: "{_resolved_venv_activate_path}"')
+    _shell_template_kwargs: Dict = dict(
+        venv_activate_path=_resolved_venv_activate_path,
+        git_branch=git_branch,
+        workenv_repos_root=str(_resolved_workenv_repos_root.as_posix()) if _resolved_workenv_repos_root is not None else None,
+        git_checkout_repo_names=(git_checkout_repo_names or DEFAULT_KDIBA_GIT_CHECKOUT_REPO_NAMES),
+    )
 
     output_python_scripts = []
     output_jupyter_notebooks = []
@@ -543,15 +568,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     ## Generate VSCode Workspace for it
     if should_create_vscode_workspace:
         output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        # Check if the current operating system is Windows
-        if os.name == 'nt':
-            # Put your Windows-specific code here
-            # python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
-            python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python').resolve()
-        else:
-            # Put your non-Windows-specific code here
-            python_executable = Path('~/repos/Spike3D/.venv/bin/python') # .resolve()
-
+        _, _vscode_python_executable, _ = get_running_python(debug_print=False)
+        python_executable = Path(_vscode_python_executable).resolve()
+        if not python_executable.exists():
+            _known_vscode_python_executables = [Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv/Scripts/python').resolve(), Path('~/repos/Spike3D/.venv/bin/python').expanduser(), Path(DEFAULT_KDIBA_VENV_ACTIVATE_PATH).parent.joinpath('python')]
+            python_executable = find_first_extant_path(_known_vscode_python_executables)
 
         vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable)
         print(f'vscode_workspace_path: {vscode_workspace_path}')
@@ -692,6 +713,43 @@ def get_python_environment(active_venv_path: Path, debug_print:bool=True):
     # activate_path = Path('. /home/halechr/repos/Spike3D/.venv/bin/activate')
     # python_path = Path('/home/halechr/repos/Spike3D/.venv/bin/python')
     return active_venv_path, python_executable, activate_script_path
+
+
+@function_attributes(short_name=None, tags=['python', 'virtualenv', 'environment', 'batch'], input_requires=[], output_provides=[], uses=['get_running_python'], used_by=['generate_batch_single_session_scripts'], creation_date='2026-09-01 18:00', related_items=[])
+def resolve_venv_activate_path(venv_activate_path: Optional[str] = None, debug_print: bool = True) -> str:
+    """Resolve the shell activate script path for batch Slurm/bash wrappers."""
+    if venv_activate_path is not None and len(str(venv_activate_path)) > 0:
+        _resolved_activate_path = Path(venv_activate_path).expanduser().resolve()
+        assert _resolved_activate_path.exists(), f'venv_activate_path: "{_resolved_activate_path}" must exist.'
+        if debug_print:
+            print(f'venv_activate_path (explicit): "{_resolved_activate_path}"')
+        return str(_resolved_activate_path)
+    try:
+        _, _, activate_script_path = get_running_python(debug_print=debug_print)
+        return str(activate_script_path)
+    except Exception:
+        _fallback_activate_path = Path(DEFAULT_KDIBA_VENV_ACTIVATE_PATH)
+        assert _fallback_activate_path.exists(), f'DEFAULT_KDIBA_VENV_ACTIVATE_PATH: "{_fallback_activate_path}" must exist.'
+        if debug_print:
+            print(f'venv_activate_path (fallback): "{_fallback_activate_path}"')
+        return str(_fallback_activate_path)
+
+
+@function_attributes(short_name=None, tags=['git', 'batch', 'environment'], input_requires=[], output_provides=[], uses=['find_first_extant_path'], used_by=['generate_batch_single_session_scripts'], creation_date='2026-09-01 18:00', related_items=[])
+def resolve_workenv_repos_root(workenv_repos_root: Optional[Union[str, Path]] = None, known_workenv_repos_root_paths: Optional[List[Union[str, Path]]] = None, debug_print: bool = True) -> Path:
+    """Resolve the parent directory containing Spike3D sibling repos for batch git checkout."""
+    if workenv_repos_root is not None and len(str(workenv_repos_root)) > 0:
+        _resolved_workenv_repos_root = Path(workenv_repos_root).expanduser().resolve()
+        assert _resolved_workenv_repos_root.exists(), f'workenv_repos_root: "{_resolved_workenv_repos_root}" must exist.'
+        if debug_print:
+            print(f'workenv_repos_root (explicit): "{_resolved_workenv_repos_root}"')
+        return _resolved_workenv_repos_root
+    _known_paths = known_workenv_repos_root_paths or DEFAULT_KDIBA_WORKENV_REPOS_ROOT_PATHS
+    _resolved_workenv_repos_root = find_first_extant_path([Path(a_path).expanduser().resolve() for a_path in _known_paths])
+    assert _resolved_workenv_repos_root.exists(), f'workenv_repos_root could not be resolved from known_workenv_repos_root_paths: {_known_paths}'
+    if debug_print:
+        print(f'workenv_repos_root (resolved): "{_resolved_workenv_repos_root}"')
+    return _resolved_workenv_repos_root
 
 
 @function_attributes(short_name=None, tags=['vscode_workspace', 'vscode'], input_requires=[], output_provides=[], uses=['get_running_python'], used_by=[], creation_date='2024-04-15 10:35', related_items=[])
