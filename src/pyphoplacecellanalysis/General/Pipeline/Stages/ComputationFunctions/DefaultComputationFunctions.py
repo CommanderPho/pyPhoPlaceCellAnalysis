@@ -699,7 +699,7 @@ def _subfn_compute_decoded_epochs(computation_result, active_config, filter_epoc
         raise NotImplementedError # dimensionality must be 1 or 2
    
     active_decoder = computation_result.computed_data[one_step_decoder_key]
-    filter_epochs_decoder_result = active_decoder.decode_specific_epochs(computation_result.sess.spikes_df, filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
+    filter_epochs_decoder_result = active_decoder.decode_specific_epochs(deepcopy(computation_result.sess.spikes_df), filter_epochs=active_filter_epochs, decoding_time_bin_size=decoding_time_bin_size, debug_print=False)
     filter_epochs_decoder_result.epoch_description_list = epoch_description_list
     return filter_epochs_decoder_result, active_filter_epochs, default_figure_name
 
