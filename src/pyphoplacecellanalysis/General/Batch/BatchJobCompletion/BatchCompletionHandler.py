@@ -663,12 +663,8 @@ class BatchSessionCompletionHandler:
         if self.global_computations_options.should_compute:
             if self.apply_track_body_aclu_filter:
                 from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_good_aclus_by_track_body_prop, apply_included_aclus_filter_to_pipeline
-                included_aclus = determine_good_aclus_by_track_body_prop(
-                    curr_active_pipeline,
-                    minimum_inclusion_fr_Hz=self.track_body_filter_minimum_inclusion_fr_Hz or 2.0,
-                    included_qclu_values=self.track_body_filter_included_qclu_values,
-                )
-                apply_included_aclus_filter_to_pipeline(curr_active_pipeline, included_aclus, debug_print=True)
+                included_aclus = determine_good_aclus_by_track_body_prop(curr_active_pipeline, minimum_inclusion_fr_Hz=self.track_body_filter_minimum_inclusion_fr_Hz, included_qclu_values=self.track_body_filter_included_qclu_values)
+                apply_included_aclus_filter_to_pipeline(curr_active_pipeline, included_aclus=included_aclus, debug_print=True)
 
             # build computation functions to compute list:
             active_extended_computations_include_includelist = deepcopy(self.extended_computations_include_includelist)
