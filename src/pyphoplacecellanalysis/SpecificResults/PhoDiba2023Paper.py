@@ -2783,6 +2783,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     
     debounce_timer: Optional[threading.Timer] = non_serialized_field(default=None) 
     debounce_delay_ms: int = non_serialized_field(default=300)  # milliseconds
+    _update_lock: threading.RLock = non_serialized_field(default=Factory(threading.RLock))
 
 
     # Begin Properties ___________________________________________________________________________________________________ #
@@ -3954,26 +3955,34 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         """
 
         predicate_operations_df_dict: Dict[str, pd.DataFrame] = {a_filtered_df_name:self._build_single_predicates_row_changed_df(a_dict=a_dict) for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
+
+        self.active_plot_df_name = self.active_plot_df_name_selector_widget.value
         
+        merged_predicate_operations_df: pd.DataFrame = predicate_operations_df_dict.get(self.active_plot_df_name, None)
+        assert (merged_predicate_operations_df is not None), f'self.active_plot_df_name: "{self.active_plot_df_name}" is not in predicate_operations_df_dict, predicate_operations_df_dict.keys(): {list(predicate_operations_df_dict.keys())}. Have to build weird merged dict!'
 
-        ## INPUTS: predicate_operations_df_dict
-        # print(list(predicate_operations_df_dict.keys())) # ['filtered_all_sessions_ripple_time_bin_df', 'filtered_all_sessions_laps_time_bin_df']
-        # [k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())] # ['ripple', 'laps']
-        predicate_operations_df_keys_to_shortkeys_dict: Dict[str, str] = {k:k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())} # ['ripple', 'laps']
-        predicate_operations_df_keys_to_shortkeys_dict
+        # if (merged_predicate_operations_df is None):
+        #     print(f'ERROR: self.active_plot_df_name: "{self.active_plot_df_name}" is not in predicate_operations_df_dict, predicate_operations_df_dict.keys(): {list(predicate_operations_df_dict.keys())}. Have to build weird merged dict!')
+        #     ## INPUTS: predicate_operations_df_dict
+        #     # print(list(predicate_operations_df_dict.keys())) # ['filtered_all_sessions_ripple_time_bin_df', 'filtered_all_sessions_laps_time_bin_df']
+        #     # [k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())] # ['ripple', 'laps']
+        #     predicate_operations_df_keys_to_shortkeys_dict: Dict[str, str] = {k:k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())} # ['ripple', 'laps']
+        #     predicate_operations_df_keys_to_shortkeys_dict
 
-        merged_predicate_operations_df = []
-        # predicate_operations_df = pd.concat([df for name, df in predicate_operations_df_dict.items()])
-        # predicate_operations_df
+        #     merged_predicate_operations_df = []
+        #     # predicate_operations_df = pd.concat([df for name, df in predicate_operations_df_dict.items()])
+        #     # predicate_operations_df
 
-        for a_df_name, df in predicate_operations_df_dict.items():
-            a_short_key: str = predicate_operations_df_keys_to_shortkeys_dict[a_df_name]
-            for a_row in df.itertuples():
-                # replacement_idx: str = f"{name}_{a_row[0]}" # "filtered_all_sessions_ripple_time_bin_df_time_bin_size"
-                replacement_idx: str = f"{a_short_key}|{a_row[0]}" # "ripple_time_bin_size"
-                merged_predicate_operations_df.append((replacement_idx, *a_row[1:]))
+        #     for a_df_name, df in predicate_operations_df_dict.items():
+        #         a_short_key: str = predicate_operations_df_keys_to_shortkeys_dict[a_df_name]
+        #         for a_row in df.itertuples():
+        #             # replacement_idx: str = f"{name}_{a_row[0]}" # "filtered_all_sessions_ripple_time_bin_df_time_bin_size"
+        #             replacement_idx: str = f"{a_short_key}|{a_row[0]}" # "ripple_time_bin_size"
+        #             merged_predicate_operations_df.append((replacement_idx, *a_row[1:]))
 
-        merged_predicate_operations_df: pd.DataFrame = pd.DataFrame.from_records(merged_predicate_operations_df, columns=['predicate_name', 'n_predicate_true_rows', 'n_remaining_rows', 'n_pred_filtered_rows', 'n_cum_filtered_rows'])
+        #     merged_predicate_operations_df: pd.DataFrame = pd.DataFrame.from_records(merged_predicate_operations_df, columns=['predicate_name', 'n_predicate_true_rows', 'n_remaining_rows', 'n_pred_filtered_rows', 'n_cum_filtered_rows'])
+        ## OUTPUTS: merged_predicate_operations_df
+
         return merged_predicate_operations_df
 
 
@@ -3999,121 +4008,121 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             print("Please select at least one Time Bin Size.")
             return
 
-        self.output_widget.clear_output()
-        with self.output_widget:
-            # Convert time_bin_sizes to a list if it's not already
-            if isinstance(time_bin_sizes, (float, int)):
-                time_bin_sizes = [time_bin_sizes]
-            elif isinstance(time_bin_sizes, tuple):
-                time_bin_sizes = list(time_bin_sizes)
+        with self._update_lock:
+            self.output_widget.clear_output()
+            with self.output_widget:
+                # Convert time_bin_sizes to a list if it's not already
+                if isinstance(time_bin_sizes, (float, int)):
+                    time_bin_sizes = [time_bin_sizes]
+                elif isinstance(time_bin_sizes, tuple):
+                    time_bin_sizes = list(time_bin_sizes)
+
+
+                enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
+                did_applying_predicate_fail_for_df_dict = {}
+                new_step_by_step: Dict[str, Dict[str, int]] = {}  # local accumulator; publish once after the loop
+
+
+                ## Update the 'is_filter_included' column on the original dataframes
+                for name, df in self.original_df_dict.items():
+                    filtered_name: str = f"filtered_{name}"
+                    did_applying_predicate_fail_for_df_dict[filtered_name] = False ## start false
+
+                    counts: Dict[str, int] = {'META_n_unfiltered': len(df)} ## number of rows prior to any filtering
+
+                    if enable_overwrite_is_filter_included_column or ('is_filter_included' not in df.columns):
+                        df['is_filter_included'] = True  # Initialize with default value
+
+                    # Update based on conditions
+                    # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+
+                    # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+                    # # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name': len(df[(df['custom_replay_name'] == replay_name)])})
+                    # df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                    # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'time_bin_size': len(df[(df['time_bin_size'].isin(time_bin_sizes))])})
+
+                    a_predicate_name = 'replay_name'
+                    is_predicate_true = (df['custom_replay_name'] == replay_name)
+                    df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                    counts[a_predicate_name] = int(np.sum(is_predicate_true)) ## just predicate alone
+                    counts[f"CUM_{a_predicate_name}"] = int(df['is_filter_included'].sum()) ## CUM (cummulative)
+
+
+                    a_predicate_name = 'time_bin_size'
+                    is_predicate_true = (df['time_bin_size'].isin(time_bin_sizes))
+                    df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                    counts[a_predicate_name] = int(np.sum(is_predicate_true)) ## just predicate alone
+                    counts[f"CUM_{a_predicate_name}"] = int(df['is_filter_included'].sum()) ## CUM (cummulative)
+
+
+                    # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name_AND_time_bin_size': len(df[df['is_filter_included']])})
+                    # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_replay_name_AND_time_bin_size": len(df[df['is_filter_included']])}) ## CUM (cummulative)
+
+                    ## Apply predicates
+                    active_predicate_filter_name_modifier = []
+
+                    for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+                        if a_predicate_name in enabled_filter_predicate_list:
+                            did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
+                            try:
+                                is_predicate_true = a_predicate_fn(df)
+                                did_predicate_fail = False
+                            except KeyError as e:
+                                if debug_print:
+                                    print(f'NOTE: failed to apply predicate "{a_predicate_name}" to df: {name}')                            
+                                is_predicate_true = False
+                                did_predicate_fail = True
+                            except Exception as e:
+                                did_predicate_fail = True
+                                raise
+                            if did_predicate_fail:
+                                did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
+
+                            df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                            if not did_predicate_fail:
+                                active_predicate_filter_name_modifier.append(a_predicate_name)
+
+                                # step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: len(df[df['is_filter_included']])})
+                                counts[a_predicate_name] = int(np.sum(is_predicate_true)) ## just predicate alone
+                                counts[f"CUM_{a_predicate_name}"] = int(df['is_filter_included'].sum()) ## CUM (cummulative)
+
+
+                                # {a_filtered_df_name:{k:v for k, v in a_dict.items() if k.starts_with('CUM_')} for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
+
+
+                    ## END for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items()...
+
+                    filtered_df = deepcopy(df[df['is_filter_included']])
+                    counts['META_post_filters'] = len(filtered_df)
+                    ## Individual predicates have no suffix, while cummulative (sequentially applied) predicate filters have a "CUM_" prefix, while overall/high-level total filters have a "META_" prefix.
+
+
+                    ## update df metadata to indicate that it is filtered
+                    df_context_dict = filtered_df.attrs['data_context'].to_dict() #  ## benedict dict
+                    df_context_dict.pop('filter', None) ## remove old filter
+                    if len(active_predicate_filter_name_modifier) > 0:
+                        active_predicate_filter_name_modifier = '_'.join(active_predicate_filter_name_modifier) ## build string
+                        df_context_dict['filter'] = active_predicate_filter_name_modifier
+                    filtered_df.attrs['data_context'] = IdentifyingContext.init_from_dict(df_context_dict) ## update
+                    filtered_df.attrs['did_filter_predicate_fail'] = did_applying_predicate_fail_for_df_dict[filtered_name]
+                    # setattr(self, filtered_name, filtered_df) # instance-attributes method
+                    self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
+                    new_step_by_step[filtered_name] = counts
+
+                ## END for name, df in self.original_df_dict.items()...
+
+                # single publish — no mid-loop self.step_by_step...[...] lookups
+                self.step_by_step_predicate_filtered_row_counts_dict = new_step_by_step
+
+                ## Update sizes table:
+                merged_predicate_operations_df = self._build_merged_predicates_row_changed_df()
+                self.table_widget.data = merged_predicate_operations_df ## since self.filtered_size_info_df cannot be updated
+                # self.table_widget.auto_fit_columns = True
                 
-
-            enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
-            did_applying_predicate_fail_for_df_dict = {}
-            self.step_by_step_predicate_filtered_row_counts_dict = {}
-
-
-            ## Update the 'is_filter_included' column on the original dataframes
-            for name, df in self.original_df_dict.items():
-                filtered_name: str = f"filtered_{name}"
-                did_applying_predicate_fail_for_df_dict[filtered_name] = False ## start false
-
-                if filtered_name not in self.step_by_step_predicate_filtered_row_counts_dict:
-                    self.step_by_step_predicate_filtered_row_counts_dict[filtered_name] = {} ## initialize
-
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name] = {'META_n_unfiltered': len(df)} ## initilize to dict containing the number of rows prior to any filtering
-                
-                if enable_overwrite_is_filter_included_column or ('is_filter_included' not in df.columns):
-                    df['is_filter_included'] = True  # Initialize with default value
-
-                # Update based on conditions
-                # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
-
-                # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
-                # # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name': len(df[(df['custom_replay_name'] == replay_name)])})
-                # df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
-                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'time_bin_size': len(df[(df['time_bin_size'].isin(time_bin_sizes))])})
-
-                a_predicate_name = 'replay_name'
-                is_predicate_true = (df['custom_replay_name'] == replay_name)
-                df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
-
-
-                a_predicate_name = 'time_bin_size'
-                is_predicate_true = (df['time_bin_size'].isin(time_bin_sizes))
-                df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
-
-
-                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name_AND_time_bin_size': len(df[df['is_filter_included']])})
-                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_replay_name_AND_time_bin_size": len(df[df['is_filter_included']])}) ## CUM (cummulative)
-
-                ## Apply predicates
-                active_predicate_filter_name_modifier = []
-
-                for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
-                    if a_predicate_name in enabled_filter_predicate_list:
-                        did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
-                        try:
-                            is_predicate_true = a_predicate_fn(df)
-                            did_predicate_fail = False
-                        except KeyError as e:
-                            if debug_print:
-                                print(f'NOTE: failed to apply predicate "{a_predicate_name}" to df: {name}')                            
-                            is_predicate_true = False
-                            did_predicate_fail = True
-                        except Exception as e:
-                            did_predicate_fail = True
-                            raise
-                        if did_predicate_fail:
-                            did_applying_predicate_fail_for_df_dict[filtered_name] = (did_applying_predicate_fail_for_df_dict[filtered_name] or did_predicate_fail)
-
-                        df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
-                        if not did_predicate_fail:
-                            active_predicate_filter_name_modifier.append(a_predicate_name)
-
-                            # step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: len(df[df['is_filter_included']])})
-                            self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
-                            self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
-
-
-                            # {a_filtered_df_name:{k:v for k, v in a_dict.items() if k.starts_with('CUM_')} for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
-
-
-                # END for a_predicate_name, a_predicate_fn
-
-                
-                filtered_df = deepcopy(df[df['is_filter_included']])
-                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'META_post_filters': len(filtered_df)})
-                ## Individual predicates have no suffix, while cummulative (sequentially applied) predicate filters have a "CUM_" prefix, while overall/high-level total filters have a "META_" prefix.
-
-
-                ## update df metadata to indicate that it is filtered
-                df_context_dict = filtered_df.attrs['data_context'].to_dict() #  ## benedict dict
-                df_context_dict.pop('filter', None) ## remove old filter
-                if len(active_predicate_filter_name_modifier) > 0:
-                    active_predicate_filter_name_modifier = '_'.join(active_predicate_filter_name_modifier) ## build string
-                    df_context_dict['filter'] = active_predicate_filter_name_modifier
-                filtered_df.attrs['data_context'] = IdentifyingContext.init_from_dict(df_context_dict) ## update
-                filtered_df.attrs['did_filter_predicate_fail'] = did_applying_predicate_fail_for_df_dict[filtered_name]
-                # setattr(self, filtered_name, filtered_df) # instance-attributes method
-                self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
-                                
-
-            # END for name, df
-
-            ## Update sizes table:
-            self.filtered_size_info_df = self._build_merged_predicates_row_changed_df() # #TODO 2026-09-14 11:35: - [ ] Overwrite `self.filtered_size_info_df` using `self._build_merged_predicates_row_changed_df()`
-
-            self.table_widget.data = self.filtered_size_info_df
-            # self.table_widget.auto_fit_columns = True
-            
-            if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
-                print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
-        ## END with self.output_widget
+                if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
+                    print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
+            ## END with self.output_widget
+        ## END with self._update_lock
         
         for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
             # print(f'k: {k}')
@@ -4123,7 +4132,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 print(f'WARNING: callback_fn[{k}] failed with error: {e}, skipping.')
                 raise
             
-        ## END for k, a_callback_fn in self.on_filtered_data...
+        ## END for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items()...
 
         ## Update the preferred_filename from the dataframe metadata:
         self.on_widget_update_filename()
@@ -4133,7 +4142,15 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
     
 
+    def _cancel_pending_debounce(self):
+        """Cancel any pending debounce timer so a sync update does not race a Timer callback."""
+        if self.debounce_timer is not None:
+            self.debounce_timer.cancel()
+            self.debounce_timer = None
+
+
     def update_filters(self):
+        self._cancel_pending_debounce()
         self.update_filtered_dataframes(replay_name=self.replay_name, time_bin_sizes=self.time_bin_size)
 
 
