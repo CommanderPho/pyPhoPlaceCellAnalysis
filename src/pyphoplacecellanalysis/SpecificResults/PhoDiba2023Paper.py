@@ -3145,7 +3145,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         if self.is_figure_widget_mode:
             # If true, the interative plotly figure is rendered in a widget, otherwise only the filter selections are allowed.
 
-            self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title='test', figure_class=go.FigureWidget)
+            self.figure_widget, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=None, use_latex_labels=False, main_title=self.active_plot_df_name.removeprefix('filtered_'), figure_class=go.FigureWidget)
             self.figure_widget.layout.dragmode = 'select'
             # self.figure_widget.layout.dragmode = 'lasso'
             
@@ -3171,6 +3171,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## the table at the bottom that shows the active number of filtered points
         self.table_widget = DataGrid(self.filtered_size_info_df,
                                 base_row_size=15, base_column_size=300, horizontal_stripes=True,
+                                auto_fit_columns=True,
+                                auto_fit_params={"area": "all", "padding": 30, "numCols": None},  # use "row-header" to target only the key/index column
                                 #  renderers=renderers,
                                 )
 
@@ -3743,10 +3745,23 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             ## END def _plot_hoverred_heatmap_preview_post....
 
             # df_filter.output_widget.clear_output(wait=True)
+            from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
             active_plot_df_name: str = df_filter.active_plot_df_name
             active_plot_df: pd.DataFrame = df_filter.active_plot_df
             plot_variable_name: str = df_filter.active_plot_variable_name
             n_filtered: int = len(active_plot_df)
+
+            ## Keep center subplot title in sync with the Plot df Name selector (do not keep construction-time main_title)
+            active_main_title: str = active_plot_df_name.removeprefix('filtered_')
+            try:
+                data_context = active_plot_df.attrs.get('data_context', None)
+                if data_context is not None:
+                    title_prefix: str = data_context.get_description(subset_includelist=['title_prefix'])
+                    if title_prefix:
+                        active_main_title = title_prefix
+            except Exception:
+                pass
 
             ## Empty-filter display mode: show a centered label instead of attempting a broken scatter redraw
             if df_filter.is_figure_widget_mode and (n_filtered == 0):
@@ -3757,6 +3772,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 fig.layout.annotations = fig.layout.annotations[:3]  # keep subplot titles
                 fig.layout.shapes = []
                 fig.data = []
+                PlotlyFigureContainer.update_subplot_title(fig, row=1, col=2, new_title=active_main_title)
                 fig.add_annotation(
                     text=f"<Filter excludes all {n_total}>",
                     xref="x2", yref="y2", x=0.5, y=0.5,
@@ -3779,7 +3795,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
                 # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
                 # active_plot_kwargs = active_plot_kwargs | kwargs
-                active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
+                active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide, 'main_title': active_main_title} | kwargs) 
                 fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                         variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
                 
@@ -4117,8 +4133,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 ## Update sizes table:
                 merged_predicate_operations_df = self._build_merged_predicates_row_changed_df()
                 self.table_widget.data = merged_predicate_operations_df ## since self.filtered_size_info_df cannot be updated
-                # self.table_widget.auto_fit_columns = True
-                
+                ## resize table widget's columns to auto-fit
+                self.table_widget.auto_fit_columns = False
+                self.table_widget.auto_fit_columns = True
+
                 if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                     print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
             ## END with self.output_widget
