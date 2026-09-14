@@ -2621,10 +2621,10 @@ def _build_solera_file_download_widget(fig, filename="figure-image.png", label="
     _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
     
     """
-    png_bytes = pio.to_image(fig, format='png')
-    mime_type="image/png"
-    data = deepcopy(png_bytes)
-    return solara.FileDownload.widget(data=data, filename=filename, label=label, mime_type=mime_type, )
+    mime_type = "image/png"
+    def _get_png_bytes():
+        return pio.to_image(fig, format='png')
+    return solara.FileDownload.widget(data=_get_png_bytes, filename=filename, label=label, mime_type=mime_type, )
 
 @custom_define(slots=False, eq=False)
 class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -3262,8 +3262,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 self.filename = f"{title.replace(' ', '_')}.png"
                 self.filename_label.value = title
 
-            ## rebuild the download widget with the current figure
-            # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
+            ## Sync the live Solara download widget filename trait
+            if self.button_download is not None:
+                self.button_download.filename = self.filename
         
     def on_fig_layout_change(self, layout, *args):
         """Callback for when the figure's layout changes."""
@@ -4155,9 +4156,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## Update the preferred_filename from the dataframe metadata:
         self.on_widget_update_filename()
 
-
-        # ## rebuild the download widget with the current figure
-        # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
     
 
     def _cancel_pending_debounce(self):
