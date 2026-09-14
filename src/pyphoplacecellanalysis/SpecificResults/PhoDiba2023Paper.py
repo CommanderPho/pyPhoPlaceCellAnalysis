@@ -3727,22 +3727,40 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             active_plot_df_name: str = df_filter.active_plot_df_name
             active_plot_df: pd.DataFrame = df_filter.active_plot_df
             plot_variable_name: str = df_filter.active_plot_variable_name
-            
-            assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
-            
-            if len(df_filter.time_bin_size) > 2:
-                non_selected_options = df_filter.time_bin_size[1:] # all but the first
-                legend_groups_to_hide = (deepcopy(non_selected_options))
-            else:
-                legend_groups_to_hide = [] # Hide none. df_filter.time_bin_size # [0.05]
-                
-            #TODO 2025-04-09 14:00: - [ ] Customization here -- which are enabled by default            
+            n_filtered: int = len(active_plot_df)
 
-            # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
-            # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
-            # active_plot_kwargs = active_plot_kwargs | kwargs
-            active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
-            if df_filter.is_figure_widget_mode:
+            ## Empty-filter display mode: show a centered label instead of attempting a broken scatter redraw
+            if df_filter.is_figure_widget_mode and (n_filtered == 0):
+                original_name: str = active_plot_df_name.removeprefix('filtered_')
+                n_total: int = len(df_filter.original_df_dict.get(original_name, active_plot_df))
+                fig = df_filter.figure_widget
+                # Mirror plotly_pre_post_delta_scatter reuse clear (plotly_helpers.py ~635-641):
+                fig.layout.annotations = fig.layout.annotations[:3]  # keep subplot titles
+                fig.layout.shapes = []
+                fig.data = []
+                fig.add_annotation(
+                    text=f"<Filter excludes all {n_total}>",
+                    xref="x2", yref="y2", x=0.5, y=0.5,
+                    xanchor="center", yanchor="middle",
+                    showarrow=False,
+                    name="empty_filter_excludes_all_annotation",
+                )
+                df_filter.figure_widget = fig
+            elif df_filter.is_figure_widget_mode:
+                assert plot_variable_name in active_plot_df.columns, f"plot_variable_name: '{plot_variable_name}' is not present in active_plot_df.columns! Cannot plot!"
+
+                if len(df_filter.time_bin_size) > 2:
+                    non_selected_options = df_filter.time_bin_size[1:] # all but the first
+                    legend_groups_to_hide = (deepcopy(non_selected_options))
+                else:
+                    legend_groups_to_hide = [] # Hide none. df_filter.time_bin_size # [0.05]
+                    
+                #TODO 2025-04-09 14:00: - [ ] Customization here -- which are enabled by default            
+
+                # extra_plot_kwargs = deepcopy(extra_plot_kwargs)
+                # active_plot_kwargs = extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide}
+                # active_plot_kwargs = active_plot_kwargs | kwargs
+                active_plot_kwargs = (extra_plot_kwargs | {'legend_groups_to_hide': legend_groups_to_hide} | kwargs) 
                 fig, new_fig_context, _extras_output_dict, figure_out_paths = _new_perform_plot_pre_post_delta_scatter_with_embedded_context(concatenated_ripple_df=deepcopy(active_plot_df), is_dark_mode=False, should_save=should_save, extant_figure=df_filter.figure_widget,
                                                                                                                                         variable_name=plot_variable_name, **active_plot_kwargs) # , enable_custom_widget_buttons=True
                 

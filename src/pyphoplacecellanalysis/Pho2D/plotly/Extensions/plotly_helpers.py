@@ -220,25 +220,154 @@ class PlotlyFigureContainer:
 
     @classmethod
     def add_or_update_trace_with_legend_handling(cls, fig, trace, row, col, already_added_legend_entries, trace_name_prefix):
-        """ Adds a trace to the figure while managing legend entries to avoid duplicates. """
-        a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
-        # fig.update_trace(
-        fig.update_traces(patch=trace, selector={'name': a_full_trace_name}, row=row, col=col)
-        trace_name = trace.name
-        trace.legendgroup = trace_name  # Set the legend group so all related traces can be toggled together
-        if trace_name in already_added_legend_entries:
-            # For already added trace categories, set showlegend to False
-            trace.showlegend = False
+        """Deprecated stub: use `restyle_pre_post_delta_scatter_from_df` for in-place updates, or `add_trace_with_legend_handling` for rebuilds."""
+        cls.add_trace_with_legend_handling(fig=fig, trace=trace, row=row, col=col, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix)
+
+
+    @classmethod
+    def _classify_pre_post_delta_trace_kind(cls, trace) -> Optional[str]:
+        """Classify a pre/post-delta figure trace as 'scatter', 'pre_hist', or 'post_hist'."""
+        name: str = getattr(trace, 'name', None) or ''
+        ttype: str = getattr(trace, 'type', None) or ''
+        if (ttype == 'scatter') or name.startswith('trace_scatter'):
+            return 'scatter'
+        if name.startswith('trace_post_delta_hist'):
+            return 'post_hist'
+        if ttype == 'histogram':
+            return 'pre_hist'
+        return None
+
+
+    @classmethod
+    def _legend_group_key_for_trace(cls, trace) -> str:
+        legendgroup = getattr(trace, 'legendgroup', None)
+        if legendgroup is not None and legendgroup != '':
+            return str(legendgroup)
+        name: str = getattr(trace, 'name', None) or ''
+        for prefix in ('trace_scatter_', 'trace_post_delta_hist_'):
+            if name.startswith(prefix):
+                return name[len(prefix):]
+        return name
+
+
+    @classmethod
+    def restyle_pre_post_delta_scatter_from_df(cls, fig, data_results_df: pd.DataFrame, histogram_variable_name: str,
+                                               px_scatter_kwargs: Optional[Dict] = None, color_column: Optional[str] = None,
+                                               legend_groups_to_hide: Optional[List] = None, main_title: Optional[str] = None,
+                                               forced_range_y: Optional[List[float]] = None) -> bool:
+        """In-place SVG restyle of an existing pre/post-delta scatter+hist figure.
+
+        Updates existing scatter/histogram traces by legend group without clearing `fig.data`.
+        Returns True on success, False if the figure's trace structure cannot represent the new data (caller should full-rebuild).
+        """
+        import contextlib
+
+        if fig is None or (not hasattr(fig, 'data')) or (len(fig.data) == 0):
+            return False
+
+        px_scatter_kwargs = px_scatter_kwargs or {}
+        x_col: str = px_scatter_kwargs.get('x', 'delta_aligned_start_t')
+        y_col: str = px_scatter_kwargs.get('y', histogram_variable_name)
+        size_col: Optional[str] = px_scatter_kwargs.get('size', None)
+
+        if (x_col not in data_results_df.columns) or (y_col not in data_results_df.columns) or (histogram_variable_name not in data_results_df.columns):
+            return False
+
+        # Index existing traces by (kind, legend_group)
+        traces_by_kind_group: Dict[Tuple[str, str], Any] = {}
+        figure_groups = set()
+        for trace in fig.data:
+            kind = cls._classify_pre_post_delta_trace_kind(trace)
+            if kind is None:
+                continue
+            group_key = cls._legend_group_key_for_trace(trace)
+            traces_by_kind_group[(kind, group_key)] = trace
+            figure_groups.add(group_key)
+        ## END for trace in fig.data...
+
+        if len(traces_by_kind_group) == 0:
+            return False
+
+        if color_column is not None and color_column in data_results_df.columns and len(data_results_df) > 0:
+            data_groups = set(data_results_df[color_column].map(lambda x: f'{x}').astype(str).unique())
+        elif len(figure_groups) == 1:
+            data_groups = set(figure_groups)
+        elif len(data_results_df) == 0:
+            data_groups = set()
         else:
-            # For the first trace of each category, keep showlegend as True
-            already_added_legend_entries.add(trace_name)
-            trace.showlegend = True  # This is usually true by default, can be omitted
-            
-        trace.name = '_'.join([v for v in [trace_name_prefix, trace.name] if (len(v)>0)]) ## build new trace name
-        fig.add_trace(trace, row=row, col=col) # , name=trace_name
-        
-        
-        
+            # Multi-group figure but no usable color column to split rows — cannot restyle safely
+            return False
+
+        # New groups with no existing traces require a full rebuild
+        if len(data_groups - figure_groups) > 0:
+            return False
+
+        pre_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] <= 0]
+        post_delta_df = data_results_df[data_results_df['delta_aligned_start_t'] > 0]
+
+        def _group_mask(df: pd.DataFrame, group_key: str) -> pd.Series:
+            if color_column is not None and color_column in df.columns:
+                return df[color_column].map(lambda x: f'{x}').astype(str) == str(group_key)
+            return pd.Series(True, index=df.index)
+        ## END def _group_mask...
+
+        hidden_groups = set(str(g) for g in (legend_groups_to_hide or []))
+
+        batch_cm = fig.batch_update() if hasattr(fig, 'batch_update') else contextlib.nullcontext()
+        with batch_cm:
+            if main_title is not None:
+                cls.update_subplot_title(fig, row=1, col=2, new_title=main_title)
+
+            for group_key in figure_groups:
+                scatter_trace = traces_by_kind_group.get(('scatter', group_key))
+                pre_hist_trace = traces_by_kind_group.get(('pre_hist', group_key))
+                post_hist_trace = traces_by_kind_group.get(('post_hist', group_key))
+
+                if group_key in data_groups:
+                    group_df = data_results_df.loc[_group_mask(data_results_df, group_key)]
+                    pre_group_df = pre_delta_df.loc[_group_mask(pre_delta_df, group_key)]
+                    post_group_df = post_delta_df.loc[_group_mask(post_delta_df, group_key)]
+                else:
+                    group_df = data_results_df.iloc[0:0]
+                    pre_group_df = pre_delta_df.iloc[0:0]
+                    post_group_df = post_delta_df.iloc[0:0]
+
+                if scatter_trace is not None:
+                    scatter_trace.x = group_df[x_col].to_numpy()
+                    scatter_trace.y = group_df[y_col].to_numpy()
+                    if size_col is not None and size_col in group_df.columns:
+                        scatter_trace.marker.size = group_df[size_col].to_numpy()
+                    if group_key in hidden_groups:
+                        scatter_trace.visible = 'legendonly'
+                    elif scatter_trace.visible == 'legendonly' and group_key not in hidden_groups:
+                        scatter_trace.visible = True
+                ## END if scatter_trace is not None...
+
+                if pre_hist_trace is not None:
+                    # Horizontal histogram: samples live on y; Plotly recomputes bins client-side
+                    pre_hist_trace.y = pre_group_df[histogram_variable_name].to_numpy()
+                    if group_key in hidden_groups:
+                        pre_hist_trace.visible = 'legendonly'
+                    elif pre_hist_trace.visible == 'legendonly' and group_key not in hidden_groups:
+                        pre_hist_trace.visible = True
+                ## END if pre_hist_trace is not None...
+
+                if post_hist_trace is not None:
+                    post_hist_trace.y = post_group_df[histogram_variable_name].to_numpy()
+                    if group_key in hidden_groups:
+                        post_hist_trace.visible = 'legendonly'
+                    elif post_hist_trace.visible == 'legendonly' and group_key not in hidden_groups:
+                        post_hist_trace.visible = True
+                ## END if post_hist_trace is not None...
+            ## END for group_key in figure_groups...
+
+            if forced_range_y is not None:
+                fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
+            fig.update_yaxes(row=1, range=[-0.05, 1.05], autorange=False, fixedrange=True)
+        ## END with batch_cm...
+
+        return True
+
 
     @classmethod
     def _helper_build_pre_post_delta_figure_if_needed(cls, extant_figure=None, main_title: str='', use_latex_labels: bool = False, figure_class=go.Figure):
