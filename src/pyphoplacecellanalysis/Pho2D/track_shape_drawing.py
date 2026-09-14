@@ -906,6 +906,8 @@ class LinearTrackInstance:
         assert 'P_Short' in a_df.columns
         assert 'is_decoded_pos_long_track_body' in a_df.columns
         assert 'is_decoded_pos_short_track_body' in a_df.columns
+        ## Adds 'is_decoded_pos_EITHER_track_body' to `all_sessions_ripple_time_bin_df`
+        decoded_pos_track_body_column_names = ['is_decoded_pos_long_track_body', 'is_decoded_pos_short_track_body']
 
         a_df['is_most_likely_decoder_Long'] = a_df['P_Short'].apply(lambda x: (x < 0.5))
 
@@ -915,6 +917,10 @@ class LinearTrackInstance:
             a_df['is_decoded_pos_long_track_body'],
             a_df['is_decoded_pos_short_track_body']
         )
+
+        ## true if it at least decodes to one track body:
+        a_df['is_decoded_pos_either_track_body'] = np.logical_or(*[a_df[k] for k in decoded_pos_track_body_column_names])
+
         return a_df
 
 
