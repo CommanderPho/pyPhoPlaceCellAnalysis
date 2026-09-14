@@ -2856,8 +2856,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     @property
     def filtered_size_info_df(self) -> pd.DataFrame:
         """The size of the filtered dataframes with the current filters."""
-        n_records_tuples = [(name, len(df)) for name, df in self.filtered_df_dict.items() if (df is not None)]
-        return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements'])
+        n_records_tuples = [(name, len(df), len(self.original_df_dict.get(name.removeprefix('filtered_'), df))) for name, df in self.filtered_df_dict.items() if (df is not None)]
+        return pd.DataFrame(n_records_tuples, columns=['df_name', 'n_elements', 'n_total'])
 
 
     @property
@@ -3071,6 +3071,15 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['private', 'widget'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-27 12:18', related_items=[])
     def _setup_widgets(self):
+        """ builds the interactive widgets
+
+        When a predicate control is changed, `self._on_widget_change` is called to update the plot and other widgets
+        Only in `self.is_figure_widget_mode` == True (default), the main plotly figure widget `self.figure_widget` is built by calling `PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(...)`
+
+        The number of rows information in each df is stored in `self.filtered_size_info_df` and displayed in `self.table_widget`
+
+
+        """
         import plotly.subplots as sp
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
         
@@ -3089,7 +3098,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             options=replay_name_options,
             description='Replay Name:',
             disabled=False,
-            layout=widgets.Layout(width='500px'),
+            layout=widgets.Layout(width='600px'),
             style={'description_width': 'initial'}
         )
         
@@ -3122,7 +3131,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             options=time_bin_size_options,
             description='Time Bin Size:',
             disabled=False,
-            layout=widgets.Layout(width='300px', height='100px'),
+            layout=widgets.Layout(width='220px', height='100px'),
             style={'description_width': 'initial'},
         )
         
@@ -3180,7 +3189,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         self.filename_label = widgets.Label()
 
-        def on_copy_button_click(b):
+        def _subfn_on_copy_button_click(b):
             # Convert the figure to a PNG image
             # Retrieve width and height if set
             width = self.figure_widget.layout.width
@@ -3218,7 +3227,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             display(Javascript(js_code))
 
-        self.button_copy.on_click(on_copy_button_click)
+        self.button_copy.on_click(_subfn_on_copy_button_click)
 
         ## Finish setup:
         self.on_widget_update_filename()  # Initialize filename and label
@@ -3228,7 +3237,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # self.js_output = widgets.Output()
 
 
-        # self.button_copy.on_click(self.on_copy_button_click)
+        # self.button_copy.on_click(self._subfn_on_copy_button_click)
         # self.button_download.on_click(self.on_download_button_click)
 
     # ==================================================================================================================== #
@@ -3259,6 +3268,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     def _on_widget_change(self, change):
         """ this is the main update function that is called whenever an observed widget's value changes to update the filtered dataframe.
         Updates the bound variables from the widget's new value!
+
+        Calls `self._debounced_update` after debounce timer fires to actually perform the update
+
         """
         import threading
         
@@ -3281,7 +3293,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['update', 'debounce', 'efficiency'], input_requires=[], output_provides=[], uses=['.update_filtered_dataframes', '.on_widget_update_filename'], used_by=['_on_widget_change'], creation_date='2025-05-02 06:23', related_items=[])
     def _debounced_update(self, replay_name, time_bin_sizes, active_plot_df_name, active_plot_variable_name):
-        """Called after debounce delay"""
+        """Called after debounce delay
+        To actually perform the main updates via: [`self.update_filtered_dataframes(...)`, `self.on_widget_update_filename()`]
+        """
         ## do simple updates:
         # active_plot_df_name = self.active_plot_df_name_selector_widget.value
         self.active_plot_df_name = active_plot_df_name # self.active_plot_df_name_selector_widget.value
@@ -3435,7 +3449,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             out_list.append(widgets.HBox([self.button_copy, self.button_download, self.filename_label],
                         #   layout=widgets.Layout(width='100%'),
                           ))
-    
+        ## END if self.figure_widget is not None...
+
         out_list.extend([
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
             widgets.HBox([self.output_widget, ],
@@ -3878,10 +3893,11 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
     @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
     def update_filtered_dataframes(self, replay_name, time_bin_sizes=None, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
-        """ Perform filtering on each DataFrame. Called by `self._on_widget_change` when a widget's value is changed
+        """ Perform filtering on each DataFrame. Called after debounce delay scheduled by `self._on_widget_change` when a widget's value is changed
         
         
-        Uses: self.additional_filter_predicates, .original_df_dict, 
+        Uses: `self.additional_filter_predicates`, .original_df_dict, 
+            `self.on_filtered_dataframes_changed_callback_fns`
         """
         # if time_bin_sizes is None:
         #     print("WARN: time_bin_sizes is None, falling back to widget's values.")
@@ -3961,7 +3977,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             
             if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                 print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
-        ## end with self.output_widget
+        ## END with self.output_widget
         
         for k, a_callback_fn in self.on_filtered_dataframes_changed_callback_fns.items():
             # print(f'k: {k}')
@@ -3971,6 +3987,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 print(f'WARNING: callback_fn[{k}] failed with error: {e}, skipping.')
                 raise
             
+        ## END for k, a_callback_fn in self.on_filtered_data...
+
         ## Update the preferred_filename from the dataframe metadata:
         self.on_widget_update_filename()
 
@@ -3978,8 +3996,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         # ## rebuild the download widget with the current figure
         # self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename=Path(self.filename).with_suffix('.png').as_posix())
     
+
     def update_filters(self):
         self.update_filtered_dataframes(replay_name=self.replay_name, time_bin_sizes=self.time_bin_size)
+
 
     def update_calling_namespace_locals(self):
         """ dangerous!! Updates the calling namespace (such as a jupyter notebook cell) """

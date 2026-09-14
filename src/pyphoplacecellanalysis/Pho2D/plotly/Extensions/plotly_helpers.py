@@ -372,6 +372,9 @@ class PlotlyFigureContainer:
     @classmethod
     def _helper_build_pre_post_delta_figure_if_needed(cls, extant_figure=None, main_title: str='', use_latex_labels: bool = False, figure_class=go.Figure):
         """ 
+        Called by `DataFrameFilter._setup_widgets(...)` to build the main interactive plotly figure showing the scatterplot flanked by the two (long/short) histograms
+
+
         Usage:
             from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
             fig, did_create_new_figure = PlotlyFigureContainer._helper_build_pre_post_delta_figure_if_needed(extant_figure=extant_figure, use_latex_labels=use_latex_labels, main_title=main_title)
