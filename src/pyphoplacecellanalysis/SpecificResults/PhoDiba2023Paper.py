@@ -2754,6 +2754,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     
     selected_points = non_serialized_field(default=Factory(dict))
 
+    step_by_step_predicate_filtered_row_counts_dict: Dict[str, Dict[str, int]] = non_serialized_field(default=Factory(dict)) # a Dict of Dict showing the number of entries after each update
+
+
     # Widgets (will be initialized in __attrs_post_init__) _______________________________________________________________ #
     replay_name_widget = non_serialized_field(init=False)
     time_bin_size_widget = non_serialized_field(init=False)
@@ -3891,6 +3894,92 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             self._filtered_df_dict[filtered_name] = filtered_df # instance-dict method
 
 
+    def _build_single_predicates_row_changed_df(self, a_dict) -> pd.DataFrame:
+        """ 
+        builds counts for debugging the effect of applying each predicate sequentially
+        Called by: `self._build_merged_predicates_row_changed_df()`
+
+        PURE: (does not modify self)
+
+        Usage:
+
+            predicate_operations_df_dict: Dict[str, pd.DataFrame] = {a_filtered_df_name:df_filter._build_predicates_row_changed_df(a_dict=a_dict) for a_filtered_df_name, a_dict in df_filter.step_by_step_predicate_filtered_row_counts_dict.items()}
+            predicate_operations_df_dict
+
+        """
+        cummulative_only = {k:v for k, v in a_dict.items() if k.startswith('CUM_')}
+        # META_only = {k:v for k, v in a_dict.items() if k.startswith('META_')}
+        individual_predicates_only = {k:v for k, v in a_dict.items() if ((not k.startswith('META_')) and (not k.startswith('CUM_')))}
+
+        individual_predicates_only_df: pd.DataFrame = pd.DataFrame({k:[v] for k, v in individual_predicates_only.items()}).T
+        individual_predicates_only_df.columns = ['n_predicate_true_rows']
+        # individual_predicates_only_df
+
+        n_unfiltered: int = a_dict['META_n_unfiltered']
+        n_post_filtered: int = a_dict['META_post_filters']
+
+        (n_unfiltered, n_post_filtered)
+        ## OUTPUTS: n_unfiltered, n_post_filtered
+
+
+        individual_predicates_only_df['n_remaining_rows'] = cummulative_only.values()
+        cum_num_rows = [n_unfiltered, *individual_predicates_only_df['n_remaining_rows'].to_numpy().tolist()] # .cumsum()
+        cum_num_rows # [245837, 22846, 18632, 18632, 5228]
+        assert cum_num_rows[-1] == n_post_filtered, f"cum_num_rows[-1]: {cum_num_rows[-1]} should equal n_post_filtered: {n_post_filtered}, but it does not!"
+        cum_num_rows_diff = np.diff(cum_num_rows) ## number of rows each predicate was responsible for removing: array([-222991,   -4214,       0,  -13404])
+        cum_num_rows_diff
+        assert len(cum_num_rows_diff) == len(individual_predicates_only_df)
+        individual_predicates_only_df['n_pred_filtered_rows'] = cum_num_rows_diff
+        # cummulative_only_df
+        individual_predicates_only_df['n_cum_filtered_rows'] = individual_predicates_only_df['n_pred_filtered_rows'].cumsum()
+
+        return individual_predicates_only_df
+
+
+    def _build_merged_predicates_row_changed_df(self) -> pd.DataFrame:
+        """ 
+        builds counts for debugging the effect of applying each predicate sequentially
+        Calls `self._build_single_predicates_row_changed_df(...)` for each df type to filter before building a merged dataframe.
+        Called By: `self.update_filtered_dataframes(...)`
+
+        PURE: (does not modify self)
+
+        Uses:
+            `self.step_by_step_predicate_filtered_row_counts_dict`
+
+        Usage:
+            merged_predicate_operations_df: pd.DataFrame = df_filter._build_merged_predicates_row_changed_df()
+            merged_predicate_operations_df
+
+        """
+
+        predicate_operations_df_dict: Dict[str, pd.DataFrame] = {a_filtered_df_name:self._build_single_predicates_row_changed_df(a_dict=a_dict) for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
+        
+
+        ## INPUTS: predicate_operations_df_dict
+        # print(list(predicate_operations_df_dict.keys())) # ['filtered_all_sessions_ripple_time_bin_df', 'filtered_all_sessions_laps_time_bin_df']
+        # [k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())] # ['ripple', 'laps']
+        predicate_operations_df_keys_to_shortkeys_dict: Dict[str, str] = {k:k.removeprefix('filtered_all_sessions_').removesuffix('_time_bin_df') for k in list(predicate_operations_df_dict.keys())} # ['ripple', 'laps']
+        predicate_operations_df_keys_to_shortkeys_dict
+
+        merged_predicate_operations_df = []
+        # predicate_operations_df = pd.concat([df for name, df in predicate_operations_df_dict.items()])
+        # predicate_operations_df
+
+        for a_df_name, df in predicate_operations_df_dict.items():
+            a_short_key: str = predicate_operations_df_keys_to_shortkeys_dict[a_df_name]
+            for a_row in df.itertuples():
+                # replacement_idx: str = f"{name}_{a_row[0]}" # "filtered_all_sessions_ripple_time_bin_df_time_bin_size"
+                replacement_idx: str = f"{a_short_key}|{a_row[0]}" # "ripple_time_bin_size"
+                merged_predicate_operations_df.append((replacement_idx, *a_row[1:]))
+
+        merged_predicate_operations_df: pd.DataFrame = pd.DataFrame.from_records(merged_predicate_operations_df, columns=['predicate_name', 'n_predicate_true_rows', 'n_remaining_rows', 'n_pred_filtered_rows', 'n_cum_filtered_rows'])
+        return merged_predicate_operations_df
+
+
+
+
+
     @function_attributes(short_name=None, tags=['update', 'MAIN', 'callback'], input_requires=['self.additional_filter_predicates'], output_provides=[], uses=[], used_by=['self._on_widget_change'], creation_date='2025-03-27 12:49', related_items=[])
     def update_filtered_dataframes(self, replay_name, time_bin_sizes=None, debug_print=True, enable_overwrite_is_filter_included_column: bool=True):
         """ Perform filtering on each DataFrame. Called after debounce delay scheduled by `self._on_widget_change` when a widget's value is changed
@@ -3898,6 +3987,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         
         Uses: `self.additional_filter_predicates`, .original_df_dict, 
             `self.on_filtered_dataframes_changed_callback_fns`
+
+        Updates: `self.step_by_step_predicate_filtered_row_counts_dict`
+
         """
         # if time_bin_sizes is None:
         #     print("WARN: time_bin_sizes is None, falling back to widget's values.")
@@ -3918,20 +4010,50 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
             enabled_filter_predicate_list = self.active_filter_predicate_selector_widget.value
             did_applying_predicate_fail_for_df_dict = {}
-            
+            self.step_by_step_predicate_filtered_row_counts_dict = {}
+
+
             ## Update the 'is_filter_included' column on the original dataframes
             for name, df in self.original_df_dict.items():
                 filtered_name: str = f"filtered_{name}"
                 did_applying_predicate_fail_for_df_dict[filtered_name] = False ## start false
+
+                if filtered_name not in self.step_by_step_predicate_filtered_row_counts_dict:
+                    self.step_by_step_predicate_filtered_row_counts_dict[filtered_name] = {} ## initialize
+
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name] = {'META_n_unfiltered': len(df)} ## initilize to dict containing the number of rows prior to any filtering
                 
                 if enable_overwrite_is_filter_included_column or ('is_filter_included' not in df.columns):
                     df['is_filter_included'] = True  # Initialize with default value
 
                 # Update based on conditions
-                df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+                # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+
+                # df['is_filter_included'] = (df['custom_replay_name'] == replay_name) & (df['time_bin_size'].isin(time_bin_sizes))
+                # # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name': len(df[(df['custom_replay_name'] == replay_name)])})
+                # df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'time_bin_size': len(df[(df['time_bin_size'].isin(time_bin_sizes))])})
+
+                a_predicate_name = 'replay_name'
+                is_predicate_true = (df['custom_replay_name'] == replay_name)
+                df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
+
+
+                a_predicate_name = 'time_bin_size'
+                is_predicate_true = (df['time_bin_size'].isin(time_bin_sizes))
+                df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
+
+
+                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'replay_name_AND_time_bin_size': len(df[df['is_filter_included']])})
+                # self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_replay_name_AND_time_bin_size": len(df[df['is_filter_included']])}) ## CUM (cummulative)
 
                 ## Apply predicates
                 active_predicate_filter_name_modifier = []
+
                 for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
                     if a_predicate_name in enabled_filter_predicate_list:
                         did_predicate_fail: bool = False # whether an error was encountered when trying to evaluate this predicate for this df
@@ -3952,11 +4074,23 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         df['is_filter_included'] = np.logical_and(df['is_filter_included'], is_predicate_true)
                         if not did_predicate_fail:
                             active_predicate_filter_name_modifier.append(a_predicate_name)
+
+                            # step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: len(df[df['is_filter_included']])})
+                            self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({a_predicate_name: np.sum(is_predicate_true)}) ## just predicate alone
+                            self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({f"CUM_{a_predicate_name}": len(df[df['is_filter_included']])}) ## CUM (cummulative)
+
+
+                            # {a_filtered_df_name:{k:v for k, v in a_dict.items() if k.starts_with('CUM_')} for a_filtered_df_name, a_dict in self.step_by_step_predicate_filtered_row_counts_dict.items()}
+
+
                 # END for a_predicate_name, a_predicate_fn
 
                 
                 filtered_df = deepcopy(df[df['is_filter_included']])
-                
+                self.step_by_step_predicate_filtered_row_counts_dict[filtered_name].update({'META_post_filters': len(filtered_df)})
+                ## Individual predicates have no suffix, while cummulative (sequentially applied) predicate filters have a "CUM_" prefix, while overall/high-level total filters have a "META_" prefix.
+
+
                 ## update df metadata to indicate that it is filtered
                 df_context_dict = filtered_df.attrs['data_context'].to_dict() #  ## benedict dict
                 df_context_dict.pop('filter', None) ## remove old filter
@@ -3972,6 +4106,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # END for name, df
 
             ## Update sizes table:
+            self.filtered_size_info_df = self._build_merged_predicates_row_changed_df() # #TODO 2026-09-14 11:35: - [ ] Overwrite `self.filtered_size_info_df` using `self._build_merged_predicates_row_changed_df()`
+
             self.table_widget.data = self.filtered_size_info_df
             # self.table_widget.auto_fit_columns = True
             
