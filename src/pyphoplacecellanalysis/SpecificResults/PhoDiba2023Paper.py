@@ -1,6 +1,7 @@
 from copy import deepcopy
+from datetime import date
 from pathlib import Path
-from typing import Dict, Callable, List, Optional, Tuple, Union, Any
+from typing import Dict, Callable, List, Optional, Tuple, Union, Any, Sequence, Literal, Set
 from attrs import define, field
 import nptyping as ND
 from nptyping import NDArray
@@ -2747,7 +2748,8 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     active_plot_fn_kwargs: Dict = serialized_field(default=Factory(dict))
     # Add filename attribute
     filename: str = serialized_attribute_field(init=False, default='figure.png')
-    
+    default_output_folder: Optional[Path] = non_serialized_field(default=None) # preferred folder for later programmatic saves; browser download uses basename only
+    include_date_prefix: bool = non_serialized_field(default=True) # when True, prefix download basename with YYYY-MM-DD_
 
     additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
@@ -2787,6 +2789,14 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
     # Begin Properties ___________________________________________________________________________________________________ #
+    @property
+    def preferred_output_path(self) -> Optional[Path]:
+        """Folder + constructed basename when default_output_folder is set; else None."""
+        if self.default_output_folder is None:
+            return None
+        return Path(self.default_output_folder) / self.filename
+
+
     @property
     def replay_name(self) -> str:
         """The replay_name property."""
@@ -3255,12 +3265,21 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         if fig is not None:
             preferred_filename = fig.layout.meta.get('preferred_filename') if fig.layout.meta else None
             if preferred_filename:
-                self.filename = f"{preferred_filename}.png"
-                self.filename_label.value = preferred_filename
+                stem = preferred_filename
             else:
                 title = fig.layout.title.text if fig.layout.title and fig.layout.title.text else "figure"
-                self.filename = f"{title.replace(' ', '_')}.png"
-                self.filename_label.value = title
+                stem = title.replace(' ', '_')
+
+            if self.include_date_prefix:
+                date_prefix = f"{date.today().strftime('%Y-%m-%d')}_"
+                # Avoid double-prefixing if stem already starts with YYYY-MM-DD_
+                already_prefixed = (len(stem) >= 11 and stem[4] == '-' and stem[7] == '-' and stem[10] == '_'
+                                    and stem[:4].isdigit() and stem[5:7].isdigit() and stem[8:10].isdigit())
+                if not already_prefixed:
+                    stem = f"{date_prefix}{stem}"
+
+            self.filename = f"{stem}.png"
+            self.filename_label.value = stem
 
             ## Sync the live Solara download widget filename trait
             if self.button_download is not None:
@@ -3421,11 +3440,254 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             # 'masked_time_bin_fill_type': ('nan_filled',)}
 
         return filter_widget_constrain_dict
-    
 
 
+    def _iter_column_filter_dimensions(self) -> List[Dict[str, Any]]:
+        """Ordered column-filter dimensions from replay/time_bin/custom widgets.
 
-        
+        Returns list of dicts with keys: name, df_col_name, options, active_value, is_multi, widget_predicate_name
+        """
+        from traitlets import Dict as TraitDict  # Import the Dict traitlet
+
+        # Ensure built-in widgets have metadata (same as get_df_filter_active_constraint_dict)
+        builtin_widgets_meta = {
+            self.replay_name_widget: {'df_col_name': 'custom_replay_name'},
+            self.time_bin_size_widget: {'df_col_name': 'time_bin_size'},
+        }
+        for a_widget, a_widget_metadata_dict in builtin_widgets_meta.items():
+            if (not hasattr(a_widget, 'metadata')) or (a_widget.metadata is None):
+                a_widget.metadata = TraitDict(a_widget_metadata_dict)
+        ## END for a_widget, a_widget_metadata_dict in builtin_widgets_meta.items()...
+
+        ordered_widgets: List[Any] = [self.replay_name_widget, self.time_bin_size_widget, *list(self.custom_dynamic_filter_widgets_list)]
+        dims: List[Dict[str, Any]] = []
+        for a_widget in ordered_widgets:
+            meta = self._extract_widget_metadata(a_widget)
+            df_col_name: str = meta['df_col_name']
+            is_multi: bool = isinstance(getattr(a_widget, 'value', None), (tuple, list))
+            options = list(getattr(a_widget, 'options', []) or [])
+            widget_name: Optional[str] = meta.get('widget_name', None)
+            if widget_name is None:
+                # Built-ins: map to the predicate names used in update_filtered_dataframes
+                if df_col_name == 'custom_replay_name':
+                    widget_predicate_name = 'replay_name'
+                elif df_col_name == 'time_bin_size':
+                    widget_predicate_name = 'time_bin_size'
+                else:
+                    widget_predicate_name = f'{df_col_name}_widget'
+            else:
+                widget_predicate_name = widget_name
+
+            dims.append({
+                'name': df_col_name,
+                'df_col_name': df_col_name,
+                'options': options,
+                'active_value': a_widget.value,
+                'is_multi': is_multi,
+                'widget_predicate_name': widget_predicate_name,
+                'always_applied': df_col_name in ('custom_replay_name', 'time_bin_size'),
+            })
+        ## END for a_widget in ordered_widgets...
+
+        return dims
+
+
+    @classmethod
+    def _resolve_expand_fixed_vars(cls, expand_vars: Optional[Sequence[str]], fixed_vars: Optional[Sequence[str]], all_dim_names: Sequence[str]) -> Tuple[Set[str], Set[str]]:
+        """Resolve which column dims branch vs stay pinned. Raises if both lists are provided or names are unknown."""
+        all_dim_set: Set[str] = set(all_dim_names)
+        has_expand = expand_vars is not None
+        has_fixed = fixed_vars is not None
+        if has_expand and has_fixed:
+            raise ValueError('Pass only one of expand_vars or fixed_vars (not both).')
+
+        def _validate_names(names: Sequence[str], arg_name: str) -> Set[str]:
+            name_set = set(names)
+            unknown = name_set - all_dim_set
+            if len(unknown) > 0:
+                raise ValueError(f'Unknown {arg_name} names: {sorted(unknown)}. Known dimensions: {list(all_dim_names)}')
+            return name_set
+
+        if has_expand:
+            assert expand_vars is not None
+            expand_set = _validate_names(list(expand_vars), 'expand_vars')
+            fixed_set = all_dim_set - expand_set
+        elif has_fixed:
+            assert fixed_vars is not None
+            fixed_set = _validate_names(list(fixed_vars), 'fixed_vars')
+            expand_set = all_dim_set - fixed_set
+        else:
+            expand_set = set()
+            fixed_set = set(all_dim_set)
+
+        return expand_set, fixed_set
+
+
+    @classmethod
+    def _column_value_mask(cls, df: pd.DataFrame, df_col_name: str, value: Any, is_multi_active: bool = False) -> NDArray:
+        """Boolean mask for rows matching a column filter value (widget-compatible str compare / isin)."""
+        col_as_str = df[df_col_name].astype(str)
+        if is_multi_active or isinstance(value, (list, tuple, set)):
+            return col_as_str.isin([str(v) for v in value]).to_numpy()
+        return (col_as_str == str(value)).to_numpy()
+
+
+    def _build_filter_impact_flow_graph(self, df: pd.DataFrame, expand_set: Set[str], include_boolean_predicates: bool = True) -> Dict[str, Any]:
+        """Walk filter dims with mask-based counts; returns nodes/links (and funnel stages when single-path).
+
+        PURE w.r.t. filter widget / original_df_dict state (does not mutate live frames).
+        """
+        dims = self._iter_column_filter_dimensions()
+        enabled_filter_predicate_list = list(getattr(self.active_filter_predicate_selector_widget, 'value', ()) or ())
+        n_unfiltered: int = len(df)
+        root_mask = np.ones(n_unfiltered, dtype=bool)
+
+        node_labels: List[str] = [f'unfiltered ({n_unfiltered})']
+        node_masks: List[NDArray] = [root_mask]
+        link_sources: List[int] = []
+        link_targets: List[int] = []
+        link_values: List[int] = []
+        # Funnel / active-path stages: only meaningful when expand_set is empty
+        stage_labels: List[str] = [node_labels[0]]
+        stage_counts: List[int] = [n_unfiltered]
+        frontier: List[int] = [0]
+
+        for dim in dims:
+            # Custom column widgets only apply when their predicate is enabled; builtins always apply
+            if (not dim.get('always_applied', False)) and (dim['widget_predicate_name'] not in enabled_filter_predicate_list):
+                continue
+            dim_name: str = dim['name']
+            df_col_name: str = dim['df_col_name']
+            is_expand: bool = dim_name in expand_set
+            if is_expand:
+                branch_values: List[Any] = list(dim['options'])
+                use_multi_match = False
+            else:
+                branch_values = [dim['active_value']]
+                use_multi_match = bool(dim['is_multi'])
+
+            new_frontier: List[int] = []
+            for parent_idx in frontier:
+                parent_mask = node_masks[parent_idx]
+                for v in branch_values:
+                    child_mask = parent_mask & self._column_value_mask(df, df_col_name, v, is_multi_active=use_multi_match)
+                    n_remaining: int = int(np.sum(child_mask))
+                    if n_remaining == 0:
+                        continue
+                    if use_multi_match or isinstance(v, (list, tuple, set)):
+                        value_label = ','.join([str(x) for x in v])
+                    else:
+                        value_label = str(v)
+                    child_label = f'{dim_name}={value_label} ({n_remaining})'
+                    child_idx = len(node_labels)
+                    node_labels.append(child_label)
+                    node_masks.append(child_mask)
+                    link_sources.append(parent_idx)
+                    link_targets.append(child_idx)
+                    link_values.append(n_remaining)
+                    new_frontier.append(child_idx)
+                    if (not is_expand) and (len(expand_set) == 0):
+                        stage_labels.append(child_label)
+                        stage_counts.append(n_remaining)
+                ## END for v in branch_values...
+            ## END for parent_idx in frontier...
+
+            frontier = new_frontier
+        ## END for dim in dims...
+
+        if include_boolean_predicates:
+            widget_predicate_names = {d['widget_predicate_name'] for d in dims}
+            for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items():
+                if a_predicate_name not in enabled_filter_predicate_list:
+                    continue
+                if a_predicate_name in widget_predicate_names:
+                    continue
+                if a_predicate_name.endswith('_widget'):
+                    continue
+
+                new_frontier = []
+                for parent_idx in frontier:
+                    parent_mask = node_masks[parent_idx]
+                    try:
+                        is_predicate_true = np.asarray(a_predicate_fn(df)).astype(bool)
+                    except Exception:
+                        continue
+                    child_mask = parent_mask & is_predicate_true
+                    n_remaining = int(np.sum(child_mask))
+                    if n_remaining == 0:
+                        continue
+                    child_label = f'{a_predicate_name} ({n_remaining})'
+                    child_idx = len(node_labels)
+                    node_labels.append(child_label)
+                    node_masks.append(child_mask)
+                    link_sources.append(parent_idx)
+                    link_targets.append(child_idx)
+                    link_values.append(n_remaining)
+                    new_frontier.append(child_idx)
+                    if len(expand_set) == 0:
+                        stage_labels.append(child_label)
+                        stage_counts.append(n_remaining)
+                ## END for parent_idx in frontier...
+
+                frontier = new_frontier
+            ## END for a_predicate_name, a_predicate_fn in self.additional_filter_predicates.items()...
+
+        return {
+            'node_labels': node_labels,
+            'link_sources': link_sources,
+            'link_targets': link_targets,
+            'link_values': link_values,
+            'stage_labels': stage_labels,
+            'stage_counts': stage_counts,
+            'expand_set': expand_set,
+            'n_unfiltered': n_unfiltered,
+        }
+
+
+    @function_attributes(short_name=None, tags=['filter', 'sankey', 'funnel', 'visualization'], input_requires=[], output_provides=[], uses=['_iter_column_filter_dimensions', '_resolve_expand_fixed_vars', '_build_filter_impact_flow_graph'], used_by=[], creation_date='2026-09-14 13:50', related_items=[])
+    def build_filter_impact_flow_figure(self, df_name: Optional[str] = None, expand_vars: Optional[Sequence[str]] = None, fixed_vars: Optional[Sequence[str]] = None, chart: Literal['sankey', 'funnel'] = 'sankey', include_boolean_predicates: bool = True) -> go.Figure:
+        """Build a Plotly Sankey (branching) or funnel (active path) of remaining row counts across filter dimensions.
+
+        - expand_vars: those column dims branch over all options; others fixed to active widget values.
+        - fixed_vars: those stay fixed; all other column dims expand.
+        - neither: all column dims fixed (single active path).
+        - both: ValueError.
+
+        Usage:
+            fig = df_filter.build_filter_impact_flow_figure(expand_vars=['trained_compute_epochs'], chart='sankey')
+            fig.show()
+            fig = df_filter.build_filter_impact_flow_figure(chart='funnel')
+        """
+        if df_name is None:
+            df_name = self.active_plot_df_name.removeprefix('filtered_')
+        df = self.original_df_dict.get(df_name, None)
+        if df is None:
+            raise KeyError(f'df_name="{df_name}" not in original_df_dict keys: {list(self.original_df_dict.keys())}')
+
+        dims = self._iter_column_filter_dimensions()
+        all_dim_names = [d['name'] for d in dims]
+        expand_set, _fixed_set = self._resolve_expand_fixed_vars(expand_vars=expand_vars, fixed_vars=fixed_vars, all_dim_names=all_dim_names)
+
+        if (chart == 'funnel') and (len(expand_set) > 0):
+            raise ValueError(f"chart='funnel' requires an empty expand set (active path only). Got expand_set={sorted(expand_set)}. Use chart='sankey' or omit expand_vars / pass all dims via fixed_vars.")
+
+        graph = self._build_filter_impact_flow_graph(df=df, expand_set=expand_set, include_boolean_predicates=include_boolean_predicates)
+
+        if chart == 'funnel':
+            fig = go.Figure(go.Funnel(y=graph['stage_labels'], x=graph['stage_counts'], textinfo='value+percent initial'))
+            fig.update_layout(title=f'Filter impact funnel — {df_name}')
+            return fig
+
+        if chart != 'sankey':
+            raise ValueError(f"chart must be 'sankey' or 'funnel', got {chart!r}")
+
+        fig = go.Figure(data=[go.Sankey(
+            node=dict(label=graph['node_labels'], pad=15, thickness=18),
+            link=dict(source=graph['link_sources'], target=graph['link_targets'], value=graph['link_values']),
+        )])
+        fig.update_layout(title=f'Filter impact Sankey — {df_name}', font=dict(size=11))
+        return fig
+
 
     def display(self):
         """Displays the widgets."""
