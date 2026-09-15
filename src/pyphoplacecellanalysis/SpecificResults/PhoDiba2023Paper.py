@@ -3181,10 +3181,30 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         ## the table at the bottom that shows the active number of filtered points
         self.table_widget = DataGrid(self.filtered_size_info_df,
                                 base_row_size=15, base_column_size=300, horizontal_stripes=True,
-                                auto_fit_columns=True,
-                                auto_fit_params={"area": "all", "padding": 30, "numCols": None},  # use "row-header" to target only the key/index column
+                                auto_fit_columns=False,
+                                # auto_fit_columns=True,
+                                # auto_fit_params={"area": "all", "padding": 30, "numCols": None},  # use "row-header" to target only the key/index column
                                 #  renderers=renderers,
                                 )
+        self._update_table_widget_column_widths()
+
+
+    def _update_table_widget_column_widths(self, non_index_col_default_width: int = 160, index_col_default_width: int = 200):
+        """
+        Updates (overwrites) `self.table_widget.column_widths` to update the displayed widths of the df column
+
+        """
+        table_widget_col_names: List[str] = list(set(['key', *self.table_widget.data.columns.tolist()]))
+        # print(table_widget_col_names) # ['key', 'n_predicate_true_rows', 'n_remaining_rows', 'n_pred_filtered_rows', 'n_cum_filtered_rows']
+        original_col_widths_dict = {}
+        if (self.table_widget.column_widths is not None):
+            original_col_widths_dict = deepcopy(self.table_widget.column_widths)
+
+        table_widget_col_widths_dict: Dict[str, int] = dict(zip(table_widget_col_names, (len(table_widget_col_names) * [non_index_col_default_width])))
+        table_widget_col_widths_dict['key'] = index_col_default_width ## good size for the key column
+        # OUTPUTS: table_widget_col_widths_dict
+        self.table_widget.column_widths = table_widget_col_widths_dict ## need to update the dict next
+
 
 
     def _setup_widgets_buttons(self):
@@ -4397,8 +4417,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                 merged_predicate_operations_df = self._build_merged_predicates_row_changed_df()
                 self.table_widget.data = merged_predicate_operations_df ## since self.filtered_size_info_df cannot be updated
                 ## resize table widget's columns to auto-fit
-                self.table_widget.auto_fit_columns = False
-                self.table_widget.auto_fit_columns = True
+                # self.table_widget.auto_fit_columns = False
+                # self.table_widget.auto_fit_columns = True
+                self._update_table_widget_column_widths()
+
 
                 if did_applying_predicate_fail_for_df_dict[self.active_plot_df_name]:
                     print(f'!!! Warning!!! applying predicates failed for the current active plot df (self.active_plot_df_name: {self.active_plot_df_name})!\n\tthe plotted output has NOT been filtered!')
