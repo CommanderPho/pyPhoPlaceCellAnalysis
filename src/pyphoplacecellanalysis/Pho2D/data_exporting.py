@@ -1377,8 +1377,10 @@ class PosteriorExporting:
             """
             active_found_export_format_name: str = None
             a_decoder_name = 'long_LR' ## temp
-            _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
-            
+            try:
+                _a_partial_dict = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}']
+            except (KeyError, TypeError):
+                return None, 0
 
             ## find the appropriate `active_found_export_format_name`
             for an_export_format_name in export_format_name_options:
@@ -1392,6 +1394,23 @@ class PosteriorExporting:
             
             return active_found_export_format_name, num_epochs
 
+
+        def _subfn_resolve_layout_format_name(requested_format_name: str, out_custom_formats_dict, a_decoding_epoch_name: str, export_format_name_options: List[str]) -> Optional[str]:
+            """ Use requested layout format if present on long_LR; otherwise fall back through export_format_name_options. """
+            active_config_key: str = f'{a_decoding_epoch_name}.long_LR'
+            try:
+                _a_partial_dict = out_custom_formats_dict[active_config_key]
+            except (KeyError, TypeError):
+                return None
+            if requested_format_name in _a_partial_dict:
+                return requested_format_name
+            for an_export_format_name in export_format_name_options:
+                if an_export_format_name in _a_partial_dict:
+                    if progress_print and (an_export_format_name != requested_format_name):
+                        print(f'\tpost_export_build_combined_images: falling back from requested format "{requested_format_name}" to "{an_export_format_name}" for {a_decoding_epoch_name}', flush=True)
+                    return an_export_format_name
+            ## END for an_export_format_name in export_format_name_options...
+            return None
 
 
         if custom_merge_layout_dict is None:
@@ -1410,253 +1429,264 @@ class PosteriorExporting:
                 ## find the appropriate `active_found_export_format_name`
                 active_found_export_format_name, num_epochs = _subfn_try_find_existing_format(out_custom_formats_dict=out_custom_formats_dict, export_format_name_options=export_format_name_options)
                 if active_found_export_format_name is None:
-                    raise KeyError('skipping')
+                    print(f'\tpost_export_build_combined_images: no usable 1D export format for a_decoding_epoch_name="{a_decoding_epoch_name}" (searched {export_format_name_options}); skipping.', flush=True)
+                    continue
 
                 ## Iterate through each epoch:
                 for epoch_IDX in np.arange(num_epochs):
                     if (included_epoch_idxs is None) or ((included_epoch_idxs is not None) and (epoch_IDX in included_epoch_idxs)):
                         if progress_print:
-                            print(f'{a_decoding_epoch_name}[{epoch_IDX}]: processing...')
-                            
-                        _tmp_curr_merge_layout_raster_imgs = []
-                        for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict):
-                            ## row_idx is actually the column index...
-                            
-                            ## Doing a single row
-                            _tmp_curr_col_raster_imgs = []
-                            if (debug_print and progress_print):
-                                print(f'epoch_IDX: {epoch_IDX}')
-                        
-                            if (debug_print and progress_print):
-                                print(f'\trow_idx: {row_idx}')
-                            for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row):
-                                ## col_idx is actually the decoder index and is redundant
+                            print(f'{a_decoding_epoch_name}[{epoch_IDX}]: processing...', flush=True)
+                        try:
+                            _tmp_curr_merge_layout_raster_imgs = []
+                            for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict):
+                                ## row_idx is actually the column index...
                                 
-                                # vertical stack
+                                ## Doing a single row
+                                _tmp_curr_col_raster_imgs = []
                                 if (debug_print and progress_print):
-                                    print(f'\t\tcol_idx: {col_idx}')
-                                # _tmp_curr_raster_imgs = []
-                                #TODO 2025-09-03 18:58: - [ ] This is excessively nested and iterates incorreclty
-                                for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
-                                    ## get the single decoder image for this format:
-                                    # a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
-                                    if (debug_print and progress_print):
-                                        print(f'\t\t\tdecoder[{decoder_IDX}]:', end='\t')
-                                        
-                                    active_config_key: str = f'{a_decoding_epoch_name}.{a_decoder_name}'
-                                    active_config_full_specifier: str = f'{active_config_key}["{a_merge_layout_col}"][epoch_IDX: {epoch_IDX}]'
-                                    a_config: HeatmapExportConfig = out_custom_formats_dict[active_config_key][a_merge_layout_col][epoch_IDX] # a HeatmapExportConfig
-                                    # a_config.posterior_saved_path ## the saved image file
-                                    an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
-                                    if (debug_print and progress_print):
-                                        print(f'{active_config_full_specifier}', end=':\t')
-                                        print(f' .size (w, h): original {an_active_img.size}', end='\t')   
-
-                                    an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
-                                    # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
-                                    curr_img_size = deepcopy(an_active_img.size)
+                                    print(f'epoch_IDX: {epoch_IDX}', flush=True)
+                            
+                                if (debug_print and progress_print):
+                                    print(f'\trow_idx: {row_idx}', flush=True)
+                                for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row):
+                                    ## col_idx is actually the decoder index and is redundant
+                                    resolved_format_name: Optional[str] = _subfn_resolve_layout_format_name(requested_format_name=a_merge_layout_col, out_custom_formats_dict=out_custom_formats_dict, a_decoding_epoch_name=a_decoding_epoch_name, export_format_name_options=export_format_name_options)
+                                    if resolved_format_name is None:
+                                        raise KeyError(f'no layout format available for requested "{a_merge_layout_col}" under {a_decoding_epoch_name} (options={export_format_name_options})')
                                     
+                                    # vertical stack
                                     if (debug_print and progress_print):
-                                        print(f'scaled {an_active_img.size}')
-                                        
-                                    ## Add overlay text
-                                    # an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
-                                    #                                                                     #  inverse_scale_factor=(2, 1),
-                                    #                                                                     stroke_width=1, stroke_fill="#000000",
-                                    #                                                                      )
-                                    ## Decoder label to the left, and only on the first col
-                                    if should_add_col_row_labels and (col_idx == 0) and (row_idx == 0):
-                                        ## note, these aren't really the row/col index because they're kinda hardcoded rn.
-                                        a_decoder_name_label: str = active_1D_decoder_name_to_label_dict[a_decoder_name] ## a_decoder_name: just the name like 'long_LR'
-                                        an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name_label, image_edge='left', font_size=48, text_color="#000000",
-                                                                                                            background_color=(255, 255, 255, 0),
-                                                                                                            # fixed_label_region_size = [_out_row_stack.width, 62]
-                                                                                                            ) ## why is this size unchanged from before adding the label?
+                                        print(f'\t\tcol_idx: {col_idx}', flush=True)
+                                    # _tmp_curr_raster_imgs = []
+                                    #TODO 2025-09-03 18:58: - [ ] This is excessively nested and iterates incorreclty
+                                    for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names):
+                                        ## get the single decoder image for this format:
+                                        # a_config = out_custom_formats_dict[f'{a_decoding_epoch_name}.{a_decoder_name}'][active_found_export_format_name][epoch_IDX] # a HeatmapExportConfig
+                                        if (debug_print and progress_print):
+                                            print(f'\t\t\tdecoder[{decoder_IDX}]:', end='\t', flush=True)
+                                            
+                                        active_config_key: str = f'{a_decoding_epoch_name}.{a_decoder_name}'
+                                        active_config_full_specifier: str = f'{active_config_key}["{resolved_format_name}"][epoch_IDX: {epoch_IDX}]'
+                                        a_config: HeatmapExportConfig = out_custom_formats_dict[active_config_key][resolved_format_name][epoch_IDX] # a HeatmapExportConfig
+                                        # a_config.posterior_saved_path ## the saved image file
+                                        an_active_img = deepcopy(a_config.posterior_saved_image) ## the actual image object
+                                        if (debug_print and progress_print):
+                                            print(f'{active_config_full_specifier}', end=':\t', flush=True)
+                                            print(f' .size (w, h): original {an_active_img.size}', end='\t', flush=True)   
+
+                                        an_active_img = an_active_img.reduce(factor=(1, 4)) ## scale image down by 1/4 in height but leave the original width
+                                        # an_active_img = an_active_img.reduce(factor=(4, 1)) ## scale image down by 1/4 in width but leave the original height
                                         curr_img_size = deepcopy(an_active_img.size)
                                         
-                                    if (debug_print and progress_print):
-                                        print(f'\t\t\t\tpre-append img_size: {an_active_img.size}')
-                                    _tmp_curr_col_raster_imgs.append(an_active_img)
-                                ## END for decoder_IDX, a_d...
-                            ## Build merged row image:
-                            # separator_color=f'#ff0000'
-                            _out_single_col_stack = vertical_image_stack(_tmp_curr_col_raster_imgs, padding=5, separator_color=separator_color)
-                            
-                            # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
-                            if (debug_print and progress_print):
-                                print(f'\t_out_single_col_stack .size - {_out_single_col_stack.size}')
+                                        if (debug_print and progress_print):
+                                            print(f'scaled {an_active_img.size}', flush=True)
+                                            
+                                        ## Add overlay text
+                                        # an_active_img = ImageOperationsAndEffects.add_overlayed_text(an_active_img, a_decoder_name, font_size=48, text_color="#FF00EACA",
+                                        #                                                                     #  inverse_scale_factor=(2, 1),
+                                        #                                                                     stroke_width=1, stroke_fill="#000000",
+                                        #                                                                      )
+                                        ## Decoder label to the left, and only on the first col
+                                        if should_add_col_row_labels and (col_idx == 0) and (row_idx == 0):
+                                            ## note, these aren't really the row/col index because they're kinda hardcoded rn.
+                                            a_decoder_name_label: str = active_1D_decoder_name_to_label_dict[a_decoder_name] ## a_decoder_name: just the name like 'long_LR'
+                                            an_active_img = ImageOperationsAndEffects.add_boxed_adjacent_label(an_active_img, a_decoder_name_label, image_edge='left', font_size=48, text_color="#000000",
+                                                                                                                background_color=(255, 255, 255, 0),
+                                                                                                                # fixed_label_region_size = [_out_row_stack.width, 62]
+                                                                                                                ) ## why is this size unchanged from before adding the label?
+                                            curr_img_size = deepcopy(an_active_img.size)
+                                            
+                                        if (debug_print and progress_print):
+                                            print(f'\t\t\t\tpre-append img_size: {an_active_img.size}', flush=True)
+                                        _tmp_curr_col_raster_imgs.append(an_active_img)
+                                    ## END for decoder_IDX, a_decoder_name in enumerate(active_1D_decoder_names)...
+                                ## END for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row)...
+                                ## Build merged row image:
+                                # separator_color=f'#ff0000'
+                                _out_single_col_stack = vertical_image_stack(_tmp_curr_col_raster_imgs, padding=5, separator_color=separator_color)
                                 
-                            ## Add top normalization labels:
-                            # [row_idx]
-                            
-                            if should_add_col_row_labels and (row_idx < len(normalization_column_labels)):
-                                normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
-                                _out_single_col_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_single_col_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
-                                                                                                    background_color=(255, 255, 255, 0),
-                                                                                                    fixed_label_region_size = [_out_single_col_stack.width, 62]
-                                                                                                    )
+                                # _out_row_stack = horizontal_image_stack(_tmp_curr_row_raster_imgs, padding=5, separator_color=separator_color)
                                 if (debug_print and progress_print):
-                                    print(f'\t\t post normalization label text added: _out_single_col_stack .size - {_out_single_col_stack.size}')
+                                    print(f'\t_out_single_col_stack .size - {_out_single_col_stack.size}', flush=True)
                                     
-                            _tmp_curr_merge_layout_raster_imgs.append(_out_single_col_stack)
+                                ## Add top normalization labels:
+                                # [row_idx]
+                                
+                                if should_add_col_row_labels and (row_idx < len(normalization_column_labels)):
+                                    normalization_label_text: str = normalization_column_labels[row_idx] # 'global'      
+                                    _out_single_col_stack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_single_col_stack, normalization_label_text, image_edge='top', font_size=48, text_color="#000000",
+                                                                                                        background_color=(255, 255, 255, 0),
+                                                                                                        fixed_label_region_size = [_out_single_col_stack.width, 62]
+                                                                                                        )
+                                    if (debug_print and progress_print):
+                                        print(f'\t\t post normalization label text added: _out_single_col_stack .size - {_out_single_col_stack.size}', flush=True)
+                                        
+                                _tmp_curr_merge_layout_raster_imgs.append(_out_single_col_stack)
 
-                        ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)
+                            ## END for row_idx, a_merge_layout_row in enumerate(custom_merge_layout_dict)...
                         
 
-                        ## Build merged all rows image:
-                        # separator_color=f'#66ff00' 
-                        _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
-                        # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
-                        if (debug_print and progress_print):
-                            print(f'\t_out_vstack - ALL MERGED ROWS .size - {_out_vstack.size} (w, h)', end='\t')
-                                                    
-                        _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
-                        if (debug_print and progress_print):
-                            print(f'scaled .size - {_out_vstack.size}')
-
-                        _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
-                        # if progress_print:
-                        #     print(f'_out_vstack.size: {_out_vstack.size}')
-                            
-                        ## get the multicolor iamge last:
-                        if should_use_raw_rgba_export_image:
-                            try:
-                                a_config: HeatmapExportConfig = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
-                                _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
-                                if (debug_print and progress_print):
-                                    print(f'\t\traw_RGBA a_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
-                            except KeyError as e:
-                                # KeyError: "Invalid keys: '['laps', 'long_LR']'"
-                                print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
-                                pass
-                            except Exception as e:
-                                raise
-
-                        else:
-                            ## GET Text
-                            # post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
-                            epoch_id_text: str = f"{a_decoding_epoch_name}[{epoch_IDX}] r{row_idx}" # normalization_column_labels[row_idx] # 'global'      
-                            _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
-                            
-                            ## INPUTS: a_config
-                            active_epoch_info: Dict = a_config.posterior_epoch_info
-                            assert active_epoch_info is not None
-                            active_epoch_info_dict = active_epoch_info['epoch_info_dict']
-                            assert active_epoch_info_dict is not None
-                            active_captured_single_epoch_result: SingleEpochDecodedResult = active_epoch_info['active_captured_single_epoch_result']
-                            # curr_post_render_image_functions_dict = active_epoch_info['curr_post_render_image_functions_dict'] ## pre-built functions to call
-                            # active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
-                            
-                            # active_captured_single_epoch_result.start_t
-
-                            # epoch_id_text: str = f"{active_epoch_info_dict['delta_aligned_start_t']}"
-
-                            # ==================================================================================================================================================================================================================================================================================== #
-                            # From `_build_mergedColorDecoders_image_export_functions_dict` 2025-09-04 08:31                                                                                                                                                                                                       #
-                            # ==================================================================================================================================================================================================================================================================================== #
-                            # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-                            complete_epoch_identifier_str = ''
-                            active_epoch_id: int = active_epoch_info_dict.get('label', None)
-                            if active_epoch_id is not None:
-                                active_epoch_id = int(active_epoch_id)
-                                # complete_epoch_identifier_str = f"{complete_epoch_identifier_str}lbl[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
-                                complete_epoch_identifier_str = f"{complete_epoch_identifier_str}L{active_epoch_id:03d}"
-                            else:
-                                print(f'falling back to plain epoch IDXs because label was not found!')
-                                active_epoch_data_IDX: int = active_captured_single_epoch_result.epoch_data_index
-                                if active_epoch_data_IDX is not None:
-                                    complete_epoch_identifier_str = f'{complete_epoch_identifier_str}IDX{active_epoch_data_IDX:03d}'
-
-                            ## OUTPUTS: complete_epoch_identifier_str
-                            is_post_delta: bool = (active_epoch_info_dict['pre_post_delta_category'] != 'pre-delta')
-
-                            ## get pre/post delta label:
-                            # earliest_t = active_captured_single_epoch_result.time_bin_edges[0] # as in `_build_mergedColorDecoders_image_export_functions_dict`
-                            earliest_t = active_epoch_info_dict['delta_aligned_start_t']
-                            # earliest_t_ms = earliest_t * 1e-3
-                            earliest_t_str: str = "{:08.4f}".format(earliest_t)
-
-                            # earliest_t_str: str = f"{earliest_t:.4f}"
-
-                            curr_x_axis_label_str: str = f''
-                            if not is_post_delta:
-                                #  curr_x_axis_label_str = f'PRE'
-                                    side = 'left'
-                                    epoch_rect_color = '#4169E1'
-
-                            else:
-                                # curr_x_axis_label_str = f'POST'
-                                side = 'right'
-                                epoch_rect_color = '#DC143C'
-
-                            if len(complete_epoch_identifier_str) > 0:
-                                curr_x_axis_label_str = f"{complete_epoch_identifier_str}: {earliest_t_str}" ## add separator if needed for time
-                            else:
-                                curr_x_axis_label_str = f"{earliest_t_str}" # // 2025-06-03 09:10 working
-
-
-
-
-                            ## INPUTS: _label_kwargs
-                            # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
-                            #                                         background_color=(255, 255, 255, 0),
-                            #                                         fixed_label_region_size = [_out_vstack.width, _label_kwargs['fixed_label_region_height']]
-                            #                                         )
-
+                            ## Build merged all rows image:
+                            # separator_color=f'#66ff00' 
+                            _out_vstack = horizontal_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=25, separator_color=separator_color) # , separator_color=separator_color
+                            # _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=35, separator_color=separator_color)
                             if (debug_print and progress_print):
-                                print(f'\t\t\tactive_epoch_info_dict: {active_epoch_info_dict}')
-                                print(f'\t\t\tcurr_x_axis_label_str: "{curr_x_axis_label_str}"')
+                                print(f'\t_out_vstack - ALL MERGED ROWS .size - {_out_vstack.size} (w, h)', end='\t')
+                                                        
+                            _out_vstack = _out_vstack.reduce(factor=(2, 1)) ## scale image down by 1/2 in width but leave the original height
+                            if (debug_print and progress_print):
+                                print(f'scaled .size - {_out_vstack.size}')
 
-                            # ==================================================================================================================================================================================================================================================================================== #
-                            # Call the post-render functions, which do things like: Add bottom time label, adding colored border, etc                                                                                                                                                                                                                                                                #
-                            # ==================================================================================================================================================================================================================================================================================== #    
-                            # if curr_post_render_image_functions_dict is not None:
-                            #     for a_render_fn_name, a_render_fn in curr_post_render_image_functions_dict.items():
-                            #         if (debug_print and progress_print):
-                            #             print(f'\t\t\tperforming: {a_render_fn_name}')
-                            #         _out_vstack = a_render_fn(_out_vstack)
+                            _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ] # combined image with both columns concatenated is back
+                            # if progress_print:
+                            #     print(f'_out_vstack.size: {_out_vstack.size}')
+                                
+                            ## get the multicolor iamge last:
+                            if should_use_raw_rgba_export_image:
+                                try:
+                                    a_config: HeatmapExportConfig = out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][epoch_IDX] # a HeatmapExportConfig
+                                    _tmp_curr_merge_layout_raster_imgs.append(a_config.posterior_saved_image)
+                                    if (debug_print and progress_print):
+                                        print(f'\t\traw_RGBA a_config.posterior_saved_image.size: {a_config.posterior_saved_image.size}')
+                                except KeyError as e:
+                                    # KeyError: "Invalid keys: '['laps', 'long_LR']'"
+                                    print(f"\tcould not get multicolor image data for out_custom_formats_dict[f'{a_decoding_epoch_name}.{pseudo_2D_decoder_name}']['raw_rgba'][{epoch_IDX}], key error: {e}\n\tskipping.")    
+                                    pass
+                                except Exception as e:
+                                    raise
 
-                            # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
-                            _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=curr_x_axis_label_str, **(_label_kwargs | dict(text_color=epoch_rect_color)))
-                            # _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
-                            # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
-                            # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+                            else:
+                                ## GET Text
+                                # post_render_image_functions_dict_list: List[Dict[str, Callable]] = _build_image_export_functions_dict(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result)
+                                epoch_id_text: str = f"{a_decoding_epoch_name}[{epoch_IDX}] r{row_idx}" # normalization_column_labels[row_idx] # 'global'      
+                                _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                                
+                                ## INPUTS: a_config
+                                active_epoch_info: Dict = a_config.posterior_epoch_info
+                                assert active_epoch_info is not None
+                                active_epoch_info_dict = active_epoch_info['epoch_info_dict']
+                                assert active_epoch_info_dict is not None
+                                active_captured_single_epoch_result: SingleEpochDecodedResult = active_epoch_info['active_captured_single_epoch_result']
+                                # curr_post_render_image_functions_dict = active_epoch_info['curr_post_render_image_functions_dict'] ## pre-built functions to call
+                                # active_save_posterior_as_image_export_format_kwargs = active_epoch_info.get('active_save_posterior_as_image_export_format_kwargs', None)
+                                
+                                # active_captured_single_epoch_result.start_t
+
+                                # epoch_id_text: str = f"{active_epoch_info_dict['delta_aligned_start_t']}"
+
+                                # ==================================================================================================================================================================================================================================================================================== #
+                                # From `_build_mergedColorDecoders_image_export_functions_dict` 2025-09-04 08:31                                                                                                                                                                                                       #
+                                # ==================================================================================================================================================================================================================================================================================== #
+                                # Prepare a multi-line, sideways label _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+                                complete_epoch_identifier_str = ''
+                                active_epoch_id: int = active_epoch_info_dict.get('label', None)
+                                if active_epoch_id is not None:
+                                    active_epoch_id = int(active_epoch_id)
+                                    # complete_epoch_identifier_str = f"{complete_epoch_identifier_str}lbl[{active_epoch_id:03d}]" # 2025-06-03 - 'p_x_given_n[067]'
+                                    complete_epoch_identifier_str = f"{complete_epoch_identifier_str}L{active_epoch_id:03d}"
+                                else:
+                                    print(f'falling back to plain epoch IDXs because label was not found!')
+                                    active_epoch_data_IDX: int = active_captured_single_epoch_result.epoch_data_index
+                                    if active_epoch_data_IDX is not None:
+                                        complete_epoch_identifier_str = f'{complete_epoch_identifier_str}IDX{active_epoch_data_IDX:03d}'
+
+                                ## OUTPUTS: complete_epoch_identifier_str
+                                is_post_delta: bool = (active_epoch_info_dict['pre_post_delta_category'] != 'pre-delta')
+
+                                ## get pre/post delta label:
+                                # earliest_t = active_captured_single_epoch_result.time_bin_edges[0] # as in `_build_mergedColorDecoders_image_export_functions_dict`
+                                earliest_t = active_epoch_info_dict['delta_aligned_start_t']
+                                # earliest_t_ms = earliest_t * 1e-3
+                                earliest_t_str: str = "{:08.4f}".format(earliest_t)
+
+                                # earliest_t_str: str = f"{earliest_t:.4f}"
+
+                                curr_x_axis_label_str: str = f''
+                                if not is_post_delta:
+                                    #  curr_x_axis_label_str = f'PRE'
+                                        side = 'left'
+                                        epoch_rect_color = '#4169E1'
+
+                                else:
+                                    # curr_x_axis_label_str = f'POST'
+                                    side = 'right'
+                                    epoch_rect_color = '#DC143C'
+
+                                if len(complete_epoch_identifier_str) > 0:
+                                    curr_x_axis_label_str = f"{complete_epoch_identifier_str}: {earliest_t_str}" ## add separator if needed for time
+                                else:
+                                    curr_x_axis_label_str = f"{earliest_t_str}" # // 2025-06-03 09:10 working
+
+
+
+
+                                ## INPUTS: _label_kwargs
+                                # _out_vstack = ImageOperationsAndEffects.add_boxed_adjacent_label(_out_vstack, epoch_id_text, image_edge='bottom', font_size=24, text_color="#000000",
+                                #                                         background_color=(255, 255, 255, 0),
+                                #                                         fixed_label_region_size = [_out_vstack.width, _label_kwargs['fixed_label_region_height']]
+                                #                                         )
+
+                                if (debug_print and progress_print):
+                                    print(f'\t\t\tactive_epoch_info_dict: {active_epoch_info_dict}')
+                                    print(f'\t\t\tcurr_x_axis_label_str: "{curr_x_axis_label_str}"')
+
+                                # ==================================================================================================================================================================================================================================================================================== #
+                                # Call the post-render functions, which do things like: Add bottom time label, adding colored border, etc                                                                                                                                                                                                                                                                #
+                                # ==================================================================================================================================================================================================================================================================================== #    
+                                # if curr_post_render_image_functions_dict is not None:
+                                #     for a_render_fn_name, a_render_fn in curr_post_render_image_functions_dict.items():
+                                #         if (debug_print and progress_print):
+                                #             print(f'\t\t\tperforming: {a_render_fn_name}')
+                                #         _out_vstack = a_render_fn(_out_vstack)
+
+                                # _label_kwargs = ImagePostRenderFunctionSets._get_export_color_scheme_kwargs(is_prepare_for_publication=True)
+                                _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=curr_x_axis_label_str, **(_label_kwargs | dict(text_color=epoch_rect_color)))
+                                # _out_vstack = ImageOperationsAndEffects.add_bottom_label(_out_vstack, label_text=epoch_id_text, **_label_kwargs)
+                                # create_label_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_bottom_label, **_label_kwargs) #  text_color=(255, 255, 255), background_color=(66, 66, 66), font_size=font_size, fixed_label_region_height=fixed_label_region_height
+                                # create_half_width_rectangle_function = ImageOperationsAndEffects.create_fn_builder(ImageOperationsAndEffects.add_half_width_rectangle, height_fraction = 0.1)
+                                
+                                _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
+                                
+
+                            # a_config.posterior_saved_image ## the actual image object
+                            a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
+                            merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
+                            merged_dir.mkdir(exist_ok=True, parents=True)
+                            a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
                             
-                            _tmp_curr_merge_layout_raster_imgs = [_out_vstack, ]
-                            
+                            ## Build merged all rows image:
+                            # separator_color=f'#006eff' 
+                            # if len(_tmp_curr_merge_layout_raster_imgs) > 1:
+                            _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
+                            # else:
+                            #     _out_vstack = _tmp_curr_merge_layout_raster_imgs[0] ## just get the only real image
+                            if (debug_print and progress_print):
+                                print(f'final _out_vstack.size: {_out_vstack.size}')
+                            _out_final_merged_images.append(_out_vstack)
 
-                        # a_config.posterior_saved_image ## the actual image object
-                        a_posterior_saved_path: Path = a_config.posterior_saved_path ## the saved image file
-                        merged_dir = a_posterior_saved_path.parent.parent.parent.joinpath('combined', 'multi')
-                        merged_dir.mkdir(exist_ok=True, parents=True)
-                        a_merged_posterior_export_path: Path = merged_dir.joinpath(a_posterior_saved_path.name) # '_temp_individual_posteriors/2025-05-30/gor01_one_2006-6-12_15-55-31/ripple/combined/multi/p_x_given_n[2].png'
-                        
-                        ## Build merged all rows image:
-                        # separator_color=f'#006eff' 
-                        # if len(_tmp_curr_merge_layout_raster_imgs) > 1:
-                        _out_vstack = vertical_image_stack(_tmp_curr_merge_layout_raster_imgs, padding=10, separator_color=separator_color)
-                        # else:
-                        #     _out_vstack = _tmp_curr_merge_layout_raster_imgs[0] ## just get the only real image
-                        if (debug_print and progress_print):
-                            print(f'final _out_vstack.size: {_out_vstack.size}')
-                        _out_final_merged_images.append(_out_vstack)
-
-                        ## save it
-                        ## a_merged_posterior_export_path, _out_vstack
-                        _out_vstack.save(a_merged_posterior_export_path) # Save image to file
-                        _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
+                            ## save it
+                            ## a_merged_posterior_export_path, _out_vstack
+                            _out_vstack.save(a_merged_posterior_export_path) # Save image to file
+                            _out_final_merged_image_save_paths.append(a_merged_posterior_export_path)
+                            if progress_print:
+                                print(f'\tsaved combined/multi: "{a_merged_posterior_export_path}"', flush=True)
 
                         ## END for col_idx, a_merge_layout_col in enumerate(a_merge_layout_row)...
                         
+                        except (KeyError, AssertionError, TypeError, IndexError, ValueError) as e:
+                            print(f'\tpost_export_build_combined_images: {a_decoding_epoch_name}[{epoch_IDX}] failed with {type(e).__name__}: {e}\n\tskipping epoch.', flush=True)
+                            continue
+
                 ## END for epoch_IDX in np.arange(num_epochs)...
             except KeyError as e:
                 # KeyError: "Invalid keys: '['laps', 'long_LR']'"
-                print(f'\tcould not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.')    
-                # continue
-                raise
+                print(f'\tpost_export_build_combined_images: could not get export data for a_decoding_epoch_name: "{a_decoding_epoch_name}", key error: {e}\n\tskipping.', flush=True)
+                continue
             
             except Exception as e:
-                raise
+                print(f'\tpost_export_build_combined_images: unexpected error for a_decoding_epoch_name: "{a_decoding_epoch_name}": {e}\n\tskipping.', flush=True)
+                continue
             
         ## END for a_decoding_epoch_name in epoch_name_list
 

@@ -10436,6 +10436,7 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
             custom_export_formats: Dict[str, HeatmapExportConfig] = {
                 'greyscale': HeatmapExportConfig.init_greyscale(**common_export_config_kwargs),
+                'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, **common_export_config_kwargs),
                 'color': HeatmapExportConfig(colormap='Oranges', **common_export_config_kwargs), # #TODO 2025-05-30 03:45: - [ ] previous config
                 # 'color': HeatmapExportConfig(colormap=additional_cmaps['long_LR']),
                 # 'color': HeatmapExportConfig(colormap=cmap1, desired_height=200),

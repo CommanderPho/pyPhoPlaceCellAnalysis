@@ -4629,6 +4629,17 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_directional_merged_pf_decoded_stacked_epoch_slices': _out,
             })
+
+            ## Build combined/multi as soon as directional 1D exports exist (do not wait for MultiColor):
+            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | deepcopy(additional_marginal_overlaying_measured_position_kwargs.get('post_export_build_combined_images_kwargs', {}))
+            out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
+            if out_custom_formats_dict is not None:
+                print(f'\t post_export_build_combined_images after directional (layout=greyscale_shared_norm)...', flush=True)
+                custom_merge_layout_dict = [['greyscale_shared_norm']]
+                _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict, **post_export_build_combined_kwargs)
+                _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function']['_display_directional_merged_pf_decoded_stacked_epoch_slices'] = _out
+                print(f'\t post_export_build_combined_images after directional: wrote {len(_out_final_merged_image_save_paths)} combined/multi images', flush=True)
             
 
         except Exception as e:
@@ -4736,6 +4747,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
+                print(f'\t post_export_build_combined_images after MultiColor (optional refresh, layout=greyscale_shared_norm)...', flush=True)
                 custom_merge_layout_dict = [
                     # ['greyscale'],
                     ['greyscale_shared_norm'],
@@ -4743,6 +4755,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 ]
                 _out_final_merged_image_save_paths, _out_final_merged_images = PosteriorExporting.post_export_build_combined_images(out_custom_formats_dict=out_custom_formats_dict, custom_merge_layout_dict=custom_merge_layout_dict, **post_export_build_combined_kwargs) ## currently skip laps, just do ripples
                 _out['final_merged_image_save_paths'] = deepcopy(_out_final_merged_image_save_paths)
+                print(f'\t post_export_build_combined_images after MultiColor: wrote {len(_out_final_merged_image_save_paths)} combined/multi images', flush=True)
                 
                 # across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 #     '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
