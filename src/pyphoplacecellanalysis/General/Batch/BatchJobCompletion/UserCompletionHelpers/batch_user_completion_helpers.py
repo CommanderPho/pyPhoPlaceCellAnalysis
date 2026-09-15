@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import time
 import shutil
+import traceback
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from neuropy.core.epoch import Epoch, ensure_Epoch, TimeColumnAliasesProtocol, ensure_dataframe
 from typing_extensions import TypeAlias
@@ -4588,10 +4589,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     assert self.collected_outputs_path.exists()
     curr_session_name: str = curr_active_pipeline.session_name # '2006-6-08_14-26-15'
     CURR_BATCH_OUTPUT_PREFIX: str = f"{self.BATCH_DATE_TO_USE}-{curr_session_name}"
-    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}')
+    print(f'CURR_BATCH_OUTPUT_PREFIX: {CURR_BATCH_OUTPUT_PREFIX}', flush=True)
     
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<', flush=True)
+    print(f'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)', flush=True)
     custom_figure_output_path = self.collected_outputs_path
     assert custom_figure_output_path.exists(), f"custom_figure_output_path: '{custom_figure_output_path}' does not exist!"
     
@@ -4600,7 +4601,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # print(f'custom_figure_output_path: "{custom_figure_output_path}"')
     # test_context = IdentifyingContext(format_name='kdiba',animal='gor01',exper_name='one',session_name='2006-6-08_14-26-15',display_fn_name='display_long_short_laps')
     test_display_output_path = custom_fig_man.get_figure_save_file_path(curr_active_pipeline.get_session_context(), make_folder_if_needed=False)
-    print(f'\ttest_display_output_path: "{test_display_output_path}"')
+    print(f'\ttest_display_output_path: "{test_display_output_path}"', flush=True)
 
     curr_active_pipeline.reload_default_display_functions()
 
@@ -4613,7 +4614,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
 
         try:
-            print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"')
+            print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"', flush=True)
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
             _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
@@ -4631,8 +4632,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.')
-            raise
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_directional_merged_pf_decoded_stacked_epoch_slices" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
         
 
 
@@ -4644,14 +4647,17 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     if '_display_generalized_decoded_yellow_blue_marginal_epochs' in included_figures_names:
         # _display_generalized_decoded_yellow_blue_marginal_epochs ___________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         try:
-            print(f'\t trying "_display_generalized_decoded_yellow_blue_marginal_epochs"')
+            print(f'\t trying "_display_generalized_decoded_yellow_blue_marginal_epochs"', flush=True)
             _out = curr_active_pipeline.display('_display_generalized_decoded_yellow_blue_marginal_epochs', curr_active_pipeline.get_session_context(), defer_render=True, save_figure=True, is_dark_mode=False, override_fig_man=custom_fig_man)
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_generalized_decoded_yellow_blue_marginal_epochs': _out,
             })
 
         except Exception as e:
-            print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.')
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_generalized_decoded_yellow_blue_marginal_epochs" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
     ## END if '_display_generalized_decoded_yellow...
 
 
@@ -4659,7 +4665,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # '_display_decoded_trackID_marginal_hairy_position'                                                                                                                                                                                                                                   #
     # ==================================================================================================================================================================================================================================================================================== #
     if '_display_decoded_trackID_marginal_hairy_position' in included_figures_names:
-        print(f'\t trying "_display_decoded_trackID_marginal_hairy_position"')
+        print(f'\t trying "_display_decoded_trackID_marginal_hairy_position"', flush=True)
         interesting_hair_parameter_kwarg_dict = {
             # 'defaults': dict(extreme_threshold=0.8, opacity_max=0.7, thickness_ramping_multiplier=35),
             'overrides': dict(extreme_threshold=extreme_threshold, opacity_max=opacity_max, thickness_ramping_multiplier=thickness_ramping_multiplier),
@@ -4690,7 +4696,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 # })
                                 
             except Exception as e:
-                print(f'\tgeneralized_export_figures_customizazble_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.')
+                print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_marginal_hairy_position" failed with error: {e}\n skipping.', flush=True)
+                print(traceback.format_exc(), flush=True)
+                if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                    raise
     ## END if '_display_decoded_trackID_marginal_hairy_position...
 
 
@@ -4699,7 +4708,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # ==================================================================================================================================================================================================================================================================================== #
 
     if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
-        print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"')
+        print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"', flush=True)
         try:
             a_params_kwargs = {}
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
@@ -4740,8 +4749,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 # })
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.')
-            raise
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
 
 
 
@@ -4749,7 +4760,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # `_display_placefield_stable_formation_time_distribution`                                                                                                                                                                                                                             #
     # ==================================================================================================================================================================================================================================================================================== #
     if ('_display_placefield_stable_formation_time_distribution' in included_figures_names) or ('pf_stable_formation_time' in included_figures_names):
-        print(f'\t trying "_display_placefield_stable_formation_time_distribution"')
+        print(f'\t trying "_display_placefield_stable_formation_time_distribution"', flush=True)
         try:
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='pf_stable_formation_time')
             _out = curr_active_pipeline.display('_display_placefield_stable_formation_time_distribution', display_context, defer_render=True, save_figure=True,
@@ -4763,15 +4774,17 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_placefield_stable_formation_time_distribution" failed with error: {e}\n skipping.')
-            raise
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_placefield_stable_formation_time_distribution" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
 
 
     # ==================================================================================================================================================================================================================================================================================== #
     # `_display_measured_vs_decoded_occupancy_distributions`                                                                                                                                                                                                                             #
     # ==================================================================================================================================================================================================================================================================================== #
     if ('_display_measured_vs_decoded_occupancy_distributions' in included_figures_names) or ('meas_v_decoded_occupancy' in included_figures_names):
-        print(f'\t trying "_display_measured_vs_decoded_occupancy_distributions"')
+        print(f'\t trying "_display_measured_vs_decoded_occupancy_distributions"', flush=True)
         try:
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='meas_v_decoded_occupancy')
             _out = curr_active_pipeline.display('_display_measured_vs_decoded_occupancy_distributions', display_context, defer_render=True, save_figure=True,
@@ -4798,8 +4811,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_measured_vs_decoded_occupancy_distributions" failed with error: {e}\n skipping.')
-            raise
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_measured_vs_decoded_occupancy_distributions" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
 
 
 
@@ -4809,7 +4824,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
 
     if ('_display_trial_to_trial_reliability' in included_figures_names) or ('trial_to_trial_reliability' in included_figures_names):
-        print(f'\t trying "_display_trial_to_trial_reliability"')
+        print(f'\t trying "_display_trial_to_trial_reliability"', flush=True)
         try:
             import pyphoplacecellanalysis.External.pyqtgraph as pg
             from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
@@ -4840,8 +4855,10 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.')
-            raise
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_display_trial_to_trial_reliability" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
+                raise
         
 
 
@@ -4851,7 +4868,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # ==================================================================================================================================================================================================================================================================================== #
     
     if ('_render_export_all_time_tracks' in included_figures_names) or ('export_all_time_tracks' in included_figures_names):
-        print(f'\t trying "_render_export_all_time_tracks"')
+        print(f'\t trying "_render_export_all_time_tracks"', flush=True)
         try:
             import pyphoplacecellanalysis.External.pyqtgraph as pg
             from pyphocorehelpers.gui.Qt.color_helpers import ColormapHelpers
@@ -4945,18 +4962,17 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             # export_pyqtgraph_plot(_out['_render_export_all_time_tracks'].plots['root_render_widget'], savepath=export_all_time_tracks_save_path) # works
 
         except Exception as e:
-            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.')
-            if fail_on_exception_for_debugging:
+            print(f'\tfigures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(...): "_render_export_all_time_tracks" failed with error: {e}\n skipping.', flush=True)
+            print(traceback.format_exc(), flush=True)
+            if fail_on_exception_for_debugging or getattr(self, 'fail_on_exception', False):
                 raise
-            else:
-                pass
         
 
 
 
-    print(f'>>\t done with {curr_session_context}')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(f'>>\t done with {curr_session_context}', flush=True)
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>', flush=True)
+    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>', flush=True)
 
     # return True
     return across_session_results_extended_dict
