@@ -2753,6 +2753,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     filename: str = serialized_attribute_field(init=False, default='figure.png')
     default_output_folder: Optional[Path] = non_serialized_field(default=None) # preferred folder for later programmatic saves; browser download uses basename only
     include_date_prefix: bool = non_serialized_field(default=True) # when True, prefix download basename with YYYY-MM-DD_
+    include_export_controls_and_table: bool = non_serialized_field(default=False) # when True, Copy/Save PNG includes filter-control + stats-table bands around the figure
 
     additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
@@ -3209,9 +3210,32 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.table_widget.column_widths = table_widget_col_widths_dict ## need to update the dict next
 
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Figure/Table/Controls Export to Clipboard and Image                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @staticmethod
+    def _format_export_control_value(value) -> str:
+        """Human-readable widget/constraint values for export bands (unwrap single-item sequences)."""
+        if isinstance(value, (tuple, list)):
+            if len(value) == 1:
+                return str(value[0])
+            return ", ".join([str(v) for v in value])
+        return str(value)
+
+
+    @staticmethod
+    def _resolve_export_controls_font() -> str:
+        """Prefer system Arial (matches Plotly); else bundled DejaVuSans."""
+        from pathlib import Path
+        for candidate in (Path('C:/Windows/Fonts/arial.ttf'), Path('C:/Windows/Fonts/Arial.ttf'), Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')):
+            if candidate.is_file():
+                return str(candidate)
+        ## END for candidate in (Path('C:/Windows/Fonts/arial.ttf'), Path('C:/Windows/Fonts/Arial.ttf'), Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))....
+        return 'DejaVuSans.ttf'
+
 
     def _get_export_png_bytes(self) -> bytes:
-        """Composite PNG: filter controls (top) + Plotly figure + filter-stats table (bottom)."""
+        """PNG of the Plotly figure; optionally composite filter controls (top) + stats table (bottom) when `include_export_controls_and_table` is True."""
         import io
         from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, ImageOperationsAndEffects
 
@@ -3228,24 +3252,27 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         if img.mode != 'RGBA':
             img = img.convert('RGBA')
 
-        # Control summary from extant filter constraint dict + plot/predicate widgets
-        control_rows = [f"{k}: {v}" for k, v in self.get_df_filter_active_constraint_dict().items()]
-        if getattr(self, 'active_filter_predicate_selector_widget', None) is not None:
-            control_rows.append(f"filter_predicates: {self.active_filter_predicate_selector_widget.value}")
-        if getattr(self, 'active_plot_df_name_selector_widget', None) is not None:
-            control_rows.append(f"plot_df: {self.active_plot_df_name_selector_widget.value}")
-        if getattr(self, 'active_plot_variable_name_widget', None) is not None:
-            control_rows.append(f"plot_variable: {self.active_plot_variable_name_widget.value}")
-        controls_text = "\n".join(control_rows) if control_rows else "(no filter controls)"
+        if self.include_export_controls_and_table:
+            # Control summary from extant filter constraint dict + plot/predicate widgets
+            _fmt = self._format_export_control_value
+            control_rows = [f"{k}: {_fmt(v)}" for k, v in self.get_df_filter_active_constraint_dict().items()]
+            if getattr(self, 'active_filter_predicate_selector_widget', None) is not None:
+                control_rows.append(f"filter_predicates: {_fmt(self.active_filter_predicate_selector_widget.value)}")
+            if getattr(self, 'active_plot_df_name_selector_widget', None) is not None:
+                control_rows.append(f"plot_df: {_fmt(self.active_plot_df_name_selector_widget.value)}")
+            if getattr(self, 'active_plot_variable_name_widget', None) is not None:
+                control_rows.append(f"plot_variable: {_fmt(self.active_plot_variable_name_widget.value)}")
+            controls_text = "\n".join(control_rows) if control_rows else "(no filter controls)"
 
-        img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, controls_text, image_edge='top', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), relative_font_size=0.012, relative_padding=0.008)
+            controls_font = self._resolve_export_controls_font()
+            img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, controls_text, image_edge='top', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), font=controls_font, font_size=14, relative_padding=0.008, spacing=4)
 
-        if (self.table_widget is not None) and (getattr(self.table_widget, 'data', None) is not None):
-            table_df = self.table_widget.data
-        else:
-            table_df = self.filtered_size_info_df
-        table_text = table_df.to_string() if table_df is not None else "(no table)"
-        img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, table_text, image_edge='bottom', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), relative_font_size=0.012, relative_padding=0.008)
+            if (self.table_widget is not None) and (getattr(self.table_widget, 'data', None) is not None):
+                table_df = self.table_widget.data
+            else:
+                table_df = self.filtered_size_info_df
+            table_text = table_df.to_string() if table_df is not None else "(no table)"
+            img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, table_text, image_edge='bottom', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), font='FreeMono.ttf', font_size=12, relative_padding=0.008, spacing=4)
 
         with io.BytesIO() as buf:
             img.save(buf, format='PNG')
