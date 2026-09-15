@@ -2617,15 +2617,18 @@ from attrs import define, field, Factory
 from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorPlottingDatasource, LoadedPosteriorContainer
 import threading
 
-def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure"):
+def _build_solera_file_download_widget(fig, filename="figure-image.png", label="Save Figure", get_png_bytes=None):
     """ 
     _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+    _file_download_widget = _build_solera_file_download_widget(fig=self.figure_widget, get_png_bytes=self._get_export_png_bytes)
     
     """
     mime_type = "image/png"
-    def _get_png_bytes():
-        return pio.to_image(fig, format='png')
-    return solara.FileDownload.widget(data=_get_png_bytes, filename=filename, label=label, mime_type=mime_type, )
+    if get_png_bytes is None:
+        def _default_get_png_bytes():
+            return pio.to_image(fig, format='png')
+        get_png_bytes = _default_get_png_bytes
+    return solara.FileDownload.widget(data=get_png_bytes, filename=filename, label=label, mime_type=mime_type, )
 
 @custom_define(slots=False, eq=False)
 class DataframeFilterPredicates(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
@@ -3207,11 +3210,53 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
 
 
+    def _get_export_png_bytes(self) -> bytes:
+        """Composite PNG: filter controls (top) + Plotly figure + filter-stats table (bottom)."""
+        import io
+        from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, ImageOperationsAndEffects
+
+        width = self.figure_widget.layout.width
+        height = self.figure_widget.layout.height
+        to_image_kwargs = {}
+        if width is not None:
+            to_image_kwargs['width'] = width
+        if height is not None:
+            to_image_kwargs['height'] = height
+
+        img = figure_to_pil_image(self.figure_widget, format='png', **to_image_kwargs)
+        assert img is not None, "figure_to_pil_image returned None"
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+
+        # Control summary from extant filter constraint dict + plot/predicate widgets
+        control_rows = [f"{k}: {v}" for k, v in self.get_df_filter_active_constraint_dict().items()]
+        if getattr(self, 'active_filter_predicate_selector_widget', None) is not None:
+            control_rows.append(f"filter_predicates: {self.active_filter_predicate_selector_widget.value}")
+        if getattr(self, 'active_plot_df_name_selector_widget', None) is not None:
+            control_rows.append(f"plot_df: {self.active_plot_df_name_selector_widget.value}")
+        if getattr(self, 'active_plot_variable_name_widget', None) is not None:
+            control_rows.append(f"plot_variable: {self.active_plot_variable_name_widget.value}")
+        controls_text = "\n".join(control_rows) if control_rows else "(no filter controls)"
+
+        img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, controls_text, image_edge='top', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), relative_font_size=0.012, relative_padding=0.008)
+
+        if (self.table_widget is not None) and (getattr(self.table_widget, 'data', None) is not None):
+            table_df = self.table_widget.data
+        else:
+            table_df = self.filtered_size_info_df
+        table_text = table_df.to_string() if table_df is not None else "(no table)"
+        img = ImageOperationsAndEffects.add_boxed_adjacent_label(img, table_text, image_edge='bottom', text_color=(0, 0, 0), background_color=(255, 255, 255, 255), relative_font_size=0.012, relative_padding=0.008)
+
+        with io.BytesIO() as buf:
+            img.save(buf, format='PNG')
+            return buf.getvalue()
+
+
     def _setup_widgets_buttons(self):
         """Sets up the copy and download buttons."""
         self.button_copy = widgets.Button(description="Copy to Clipboard", icon='copy')
         # self.button_download = widgets.Button(description="Download Image", icon='save')
-        self.button_download =  _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png")
+        self.button_download = _build_solera_file_download_widget(fig=self.figure_widget, filename="figure-image.png", get_png_bytes=self._get_export_png_bytes)
         
         # @solara.component
         # def Page():
@@ -3226,18 +3271,12 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         self.filename_label = widgets.Label()
 
         def _subfn_on_copy_button_click(b):
-            # Convert the figure to a PNG image
-            # Retrieve width and height if set
+            # Convert the dashboard composite (controls + figure + table) to a PNG image
             width = self.figure_widget.layout.width
             height = self.figure_widget.layout.height
-            to_image_kwargs = {}
             print(f"Width: {width}, Height: {height}")
-            if width is not None:
-                to_image_kwargs['width'] = width
-            if height is not None:
-                to_image_kwargs['height'] = height
 
-            png_bytes = pio.to_image(self.figure_widget, format='png', **to_image_kwargs)
+            png_bytes = self._get_export_png_bytes()
             encoded_image = base64.b64encode(png_bytes).decode('utf-8')
 
             # JavaScript code to copy the image to the clipboard using the canvas element
