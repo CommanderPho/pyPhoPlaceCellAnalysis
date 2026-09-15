@@ -3742,9 +3742,6 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
 
         out_list.extend([
             # self.js_output,  # Include the Output widget to allow the buttons to perform their actions
-            widgets.HBox([self.output_widget, ],
-                          layout=widgets.Layout(height='300px', width='100%'),
-                          ),              
             widgets.HBox(
                         #   [self.table_widget,
                         #   self.hover_posterior_preview_figure_widget,
@@ -3752,6 +3749,9 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
                         #   ],
                           [v for v in (self.table_widget, self.hover_posterior_preview_figure_widget) if v is not None],
                           layout=widgets.Layout(height='300px', width='100%', display='flex', justify_content='space-between'),
+                          ),
+            widgets.HBox([self.output_widget, ],
+                          layout=widgets.Layout(height='300px', width='100%'),
                           ),
         ])
         out = widgets.VBox(out_list)
