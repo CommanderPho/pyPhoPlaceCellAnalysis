@@ -5005,6 +5005,7 @@ _pre_user_completion_functions_header_template_str: str = f"""
 # BEGIN USER COMPLETION FUNCTIONS                                                                                      #
 # ==================================================================================================================== #
 from copy import deepcopy
+import traceback
 
 
 custom_user_completion_functions = []
