@@ -518,6 +518,64 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         # Perform the computations:
         # return ComputedPipelineStage._execute_computation_functions(potentially_updated_failed_functions, previous_computation_result=previous_computation_result, are_global=are_global, fail_on_exception=fail_on_exception, debug_print=debug_print)
 
+
+    @function_attributes(short_name=None, tags=['computation', 'kwargs', 'dependencies'], input_requires=[], output_provides=[], uses=['self.get_merged_computation_function_validators'], used_by=['resolve_and_execute_full_required_computation_plan'], creation_date='2026-09-16 12:25', related_items=[])
+    def build_computation_kwargs_list_for_function_names(self, computation_functions_name_includelist: List[str], requested_computation_functions_name_includelist: Optional[List[str]] = None, requested_computation_kwargs_list: Optional[List[Dict]] = None, optional_computation_kwargs_dict: Optional[Dict[str, Dict]] = None) -> List[Dict]:
+        """ Align kwargs to an expanded/dependency-ordered function list.
+
+        Kwargs apply to named targets in `requested_computation_functions_name_includelist` (and/or `optional_computation_kwargs_dict`).
+        Resolved dependencies get `{}` unless also present in the lookup/dict.
+
+        Matches via literal name, `short_name`, or `computation_fn_name` / registered `__name__`.
+        """
+        requested_computation_functions_name_includelist = list(requested_computation_functions_name_includelist or [])
+        if requested_computation_kwargs_list is None:
+            requested_computation_kwargs_list = [{} for _ in requested_computation_functions_name_includelist]
+        else:
+            requested_computation_kwargs_list = list(requested_computation_kwargs_list)
+        optional_computation_kwargs_dict = dict(optional_computation_kwargs_dict or {})
+
+        assert len(requested_computation_kwargs_list) == len(requested_computation_functions_name_includelist), f"requested_computation_kwargs_list length ({len(requested_computation_kwargs_list)}) must match requested_computation_functions_name_includelist ({len(requested_computation_functions_name_includelist)})"
+
+        requested_kwargs_lookup: Dict[str, Dict] = {k: (deepcopy(v) if v is not None else {}) for k, v in zip(requested_computation_functions_name_includelist, requested_computation_kwargs_list)}
+        for k, v in optional_computation_kwargs_dict.items():
+            if v is not None:
+                requested_kwargs_lookup[k] = deepcopy(v)
+
+        all_validators_dict = self.get_merged_computation_function_validators()
+
+        def _names_equivalent(a: str, b: str) -> bool:
+            if a == b:
+                return True
+            for validator in all_validators_dict.values():
+                if validator.does_name_match(a) and validator.does_name_match(b):
+                    return True
+            ## END for validator in all_validators_dict.values()...
+            for reg_name, a_fn in self.registered_merged_computation_function_dict.items():
+                short = getattr(a_fn, 'short_name', None)
+                names = {reg_name, a_fn.__name__}
+                if short is not None:
+                    names.add(short)
+                if (a in names) and (b in names):
+                    return True
+            ## END for reg_name, a_fn in self.registered_merged_computation_function_dict.items()...
+            return False
+
+
+        def _lookup_kwargs_for_name(fn_name: str) -> Dict:
+            if fn_name in requested_kwargs_lookup:
+                return deepcopy(requested_kwargs_lookup[fn_name])
+            for req_name, kwargs in requested_kwargs_lookup.items():
+                if _names_equivalent(fn_name, req_name):
+                    return deepcopy(kwargs) if kwargs is not None else {}
+            ## END for req_name, kwargs in requested_kwargs_lookup.items()...
+            return {}
+
+
+        return [_lookup_kwargs_for_name(fn_name) for fn_name in computation_functions_name_includelist]
+
+
+
     @function_attributes(short_name=None, tags=['computation', 'specific'], input_requires=[], output_provides=[], uses=['ComputedPipelineStage._execute_computation_functions'], used_by=[], creation_date='2023-07-21 18:25', related_items=[])
     def run_specific_computations_single_context(self, previous_computation_result, computation_functions_name_includelist, computation_kwargs_list=None, fail_on_exception:bool=False, progress_logger_callback=None, are_global:bool=False, debug_print=False):
         """ re-runs just a specific computation provided by computation_functions_name_includelist """
@@ -1075,16 +1133,19 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
-    @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
-    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+    @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.build_computation_kwargs_list_for_function_names', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
+    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, computation_kwargs_dict: Optional[Dict[str, Dict]]=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
 
         """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
+
+        computation_kwargs_list: Optional[List[dict]] — kwargs for each name in `computation_functions_name_includelist` (same length).
+            Applied to matching named targets only; resolved dependency functions get `{}` unless also listed / present in `computation_kwargs_dict`.
+        computation_kwargs_dict: Optional[Dict[str, dict]] — optional name→kwargs map (short_name or computation_fn_name), merged with the list lookup.
 
         Updates:
             curr_active_pipeline.computation_results
             curr_active_pipeline.global_computation_results
         """
-        from pyphoplacecellanalysis.General.Model.SpecificComputationValidation import DependencyGraph
         from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_evaluate_required_computations #, batch_extended_computations
 
         if progress_logger_callback is None:
@@ -1109,16 +1170,36 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         if debug_print:
             progress_logger_callback(f'\tordered_required_dependent_computation_fn_names: {ordered_required_dependent_computation_fn_names}')
 
+        needs_computation_output_dict = {}
         if len(ordered_required_dependent_computation_fn_names) > 0:
-            needs_computation_output_dict, valid_computed_results_output_list, remaining_required_dep_comp_fn_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
+            needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
                                                                 force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=False)
+            if len(remaining_include_function_names) > 0:
+                progress_logger_callback(f'\tWARNING: unresolved/unmatched computation names after evaluate: {remaining_include_function_names}')
 
-        ## OUTPUTS: needs_computation_output_dict
-        if len(remaining_required_dep_comp_fn_names) > 0:
-            if debug_print:
-                progress_logger_callback(f'\thave {len(remaining_required_dep_comp_fn_names)} functions to compute: {remaining_required_dep_comp_fn_names}. Performing specific computations: ....')
+        ## Match needs_computation_output_dict keys (usually short_name) to dependency-ordered registered names (__name__)
+        all_validators_dict = self.get_merged_computation_function_validators()
+        needs_keys = set(needs_computation_output_dict.keys())
 
-            self.perform_specific_computation(computation_functions_name_includelist=remaining_required_dep_comp_fn_names, computation_kwargs_list=computation_kwargs_list, enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        def _fn_needs_run(fn_name: str) -> bool:
+            if fn_name in needs_keys:
+                return True
+            for validator in all_validators_dict.values():
+                if validator.does_name_match(fn_name) and ((validator.short_name in needs_keys) or (validator.computation_fn_name in needs_keys)):
+                    return True
+            ## END for validator in all_validators_dict.values()...
+            return False
+
+
+        functions_to_run: List[str] = [fn for fn in ordered_required_dependent_computation_fn_names if _fn_needs_run(fn)]
+
+        ## OUTPUTS: needs_computation_output_dict, functions_to_run
+        if len(functions_to_run) > 0:
+            if debug_print or has_custom_kwargs_list:
+                progress_logger_callback(f'\thave {len(functions_to_run)} functions to compute: {functions_to_run}. Performing specific computations: ....')
+
+            aligned_kwargs_list = self.build_computation_kwargs_list_for_function_names(functions_to_run, requested_computation_functions_name_includelist=computation_functions_name_includelist, requested_computation_kwargs_list=computation_kwargs_list, optional_computation_kwargs_dict=computation_kwargs_dict)
+            self.perform_specific_computation(computation_functions_name_includelist=functions_to_run, computation_kwargs_list=aligned_kwargs_list, enabled_filter_names=enabled_filter_names, fail_on_exception=fail_on_exception, debug_print=debug_print)
             if debug_print:
                 progress_logger_callback(f'done.')
 

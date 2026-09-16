@@ -725,7 +725,7 @@ class PosteriorExporting:
             posterior_out_folder.mkdir(parents=True, exist_ok=True)
             # print(f'a_decoder_name: {a_decoder_name}, _specific_save_context: {_specific_save_context}, posterior_out_folder: {posterior_out_folder}')
             (an_out_posterior_out_folder, a_custom_export_format_results), an_out_flat_save_out_paths = cls.export_decoded_posteriors_as_images(a_decoder_decoded_epochs_result=a_decoder_decoded_epochs_result, posterior_out_folder=posterior_out_folder,
-                                                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, **kwargs) #TODO 2025-05-14 08:55: - [ ] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once?
+                                                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, **kwargs) #TODO 2025-05-14 08:55: - [X] BUG?!? Is it possible to plot the overlaid color image when iterating through the decoders 1-by-1? Don't I need all 4 at once? RESOLVED: no, this is the single context export which creates images in the 'long_LR', 'long_RL', etc folders that are used after the loop to build the concatenated images
             
             out_paths[a_decoder_name] = an_out_posterior_out_folder
             out_custom_export_formats_results_dict[a_decoder_name] = a_custom_export_format_results

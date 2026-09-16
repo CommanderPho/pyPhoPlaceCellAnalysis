@@ -2814,16 +2814,18 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
 
-            ## Does this not perform the required pre-req computations if they're missing? For example this function requires: `requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders']`, so does it do those if they're missing, or not because they aren't in the computations list?
+            ## resolve_and_execute expands prereqs (e.g. DirectionalLaps / DirectionalMergedDecoders) and maps computation_kwargs_list onto matching target names only.
             # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
             #                                       computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
             #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
             
 
+            print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...')
             owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
-                                                  computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
+                                                #   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': False}], ## cache enabled (reusing results)
+                                                  computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': True}], ## disable cache (which might waste some time) 
                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-
+            print(f'\t\tdone computing.')
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
             DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
@@ -2861,7 +2863,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             if a_new_fully_generic_result is None:
                 ## need to recompute 'generalized_specific_epochs_decoding'
                 owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['generalized_specific_epochs_decoding'],
-                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh':False, 'force_recompute': False}], 
+                                        # computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': False}],
+                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': True}],
                                         enabled_filter_names=None, fail_on_exception=True, debug_print=False)
 
                 a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
@@ -3144,7 +3147,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 'greyscale': HeatmapExportConfig.init_greyscale(desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
                 'greyscale_shared_norm': HeatmapExportConfig.init_greyscale(vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
                 # 'cleaned_greyscale_shared_norm': HeatmapExportConfig(colormap=FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.4, grey_value=0.1), export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
-                'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), # 2025-07-24 - The format Kamran likes where they are globally normalized
+                # 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), # 2025-07-24 - The format Kamran likes where they are globally normalized
             }
             pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict.get('laps', None),
                                                                                                                         decoder_ripple_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict.get('ripple', None), ## just the ripples
