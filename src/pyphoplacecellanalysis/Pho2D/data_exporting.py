@@ -655,7 +655,7 @@ class PosteriorExporting:
     @function_attributes(short_name=None, tags=['private', 'helper'], input_requires=[], output_provides=[], uses=[], used_by=['._subfn_perform_export_single_epochs'], creation_date='2025-05-14 11:00', related_items=[])
     @classmethod
     def _subfn_build_combined_output_images(cls, single_known_epoch_type_dict: Dict[DecoderName, Dict[str, List[HeatmapExportConfig]]], specific_epochs_posterior_out_folder: Path, known_epoch_type_name: str = 'laps', custom_export_format_series_name: str = 'color', joined_export_folder_name: str = 'combined', combined_img_padding=4, combined_img_separator_color=None,
-                                            stack_orientations: List[ImageStackOrientation] = [ImageStackOrientation.GRID]):
+                                            stack_orientations: List[ImageStackOrientation] = [ImageStackOrientation.VERTICAL]):
         """ exports combined images stiched across the seperate decoder's images
         
         """
