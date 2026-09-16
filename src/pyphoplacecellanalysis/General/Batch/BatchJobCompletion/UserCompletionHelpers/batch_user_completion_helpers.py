@@ -4542,7 +4542,7 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
 
 @function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                        included_figures_names=['_display_directional_merged_pf_decoded_stacked_epoch_slices', '_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
+                                                                                        included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         fail_on_exception_for_debugging:bool=False, export_filename_extra_suffix_parts: Optional[List[str]]=None,
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
@@ -4605,13 +4605,18 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
     curr_active_pipeline.reload_default_display_functions()
 
+    wants_multicolor: bool = ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names)
+    wants_directional: bool = ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names)
 
 
     # ==================================================================================================================================================================================================================================================================================== #
     # '_display_directional_merged_pf_decoded_stacked_epoch_slices'                                                                                                                                                                                                         #
     # ==================================================================================================================================================================================================================================================================================== #
     ## this is the export of the separate 1D decoder posteriors to images
-    if ('_display_directional_merged_pf_decoded_stacked_epoch_slices' in included_figures_names) or ('directional_decoded_stacked_epoch_slices' in included_figures_names):
+    ## Skip when MultiColor is also requested: both write the same long_*/greyscale_shared_norm (+ mergedV/multi) paths; MultiColor competition-normalized export is the sole source of truth.
+    if wants_directional and wants_multicolor:
+        print(f'\t skipping "_display_directional_merged_pf_decoded_stacked_epoch_slices" because MultiColor is also requested (avoids overwriting greyscale_shared_norm / mergedV / combined/multi).', flush=True)
+    elif wants_directional and (not wants_multicolor):
 
         try:
             print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"', flush=True)
@@ -4630,7 +4635,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
                 '_display_directional_merged_pf_decoded_stacked_epoch_slices': _out,
             })
 
-            ## Build combined/multi as soon as directional 1D exports exist (do not wait for MultiColor):
+            ## Directional-only: build combined/multi once from independent 1D greyscale_shared_norm exports:
             post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | deepcopy(additional_marginal_overlaying_measured_position_kwargs.get('post_export_build_combined_images_kwargs', {}))
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
@@ -4718,7 +4723,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' -- NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.             #
     # ==================================================================================================================================================================================================================================================================================== #
 
-    if ('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' in included_figures_names) or ('trackID_weighted_position_posterior' in included_figures_names):
+    if wants_multicolor:
         print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"', flush=True)
         try:
             a_params_kwargs = {}
@@ -4732,11 +4737,6 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             keys_to_convert_to_benedict = ['out_paths', 'out_custom_formats_dict']
             _out = {k:benedict(v) if (k in keys_to_convert_to_benedict) else v for k, v in _out.items()}
 
-            ## merge if we can:
-            _prev_out_dict = across_session_results_extended_dict.get('figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function', {}).get('_display_directional_merged_pf_decoded_stacked_epoch_slices', {}) 
-            _out['out_paths'].merge(_prev_out_dict.get('export_paths', {}))
-            _out['out_custom_formats_dict'].merge(_prev_out_dict.get('out_custom_formats_dict', {}))
-
             across_session_results_extended_dict['figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function'].update({
                 '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': _out,
             })
@@ -4747,7 +4747,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
-                print(f'\t post_export_build_combined_images after MultiColor (optional refresh, layout=greyscale_shared_norm)...', flush=True)
+                print(f'\t post_export_build_combined_images after MultiColor (layout=greyscale_shared_norm)...', flush=True)
                 custom_merge_layout_dict = [
                     # ['greyscale'],
                     ['greyscale_shared_norm'],
