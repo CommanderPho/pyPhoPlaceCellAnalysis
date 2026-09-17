@@ -348,11 +348,47 @@ class ProcessingScriptPhases(Enum):
         return _out_run_config
 
 
-def build_slurm_job_name(curr_session_context: str, job_suffix: Optional[str] = None, max_length: int = 64) -> str:
-    """Build a Slurm-safe job name. Unquoted #SBATCH --job-name values are split on commas (e.g. qclu_[1, 2, 4])."""
-    raw_name = f"job_{curr_session_context}"
-    if job_suffix:
-        raw_name = f"{raw_name}_{job_suffix}"
+def _compact_slurm_session_part(curr_session_context: Union[IdentifyingContext, str]) -> str:
+    """animal + session_name only (drop format_name / exper_name / job_ prefix)."""
+    ctx: Optional[IdentifyingContext] = None
+    if isinstance(curr_session_context, IdentifyingContext):
+        ctx = curr_session_context
+    else:
+        session_key = str(curr_session_context).strip()
+        try:
+            ctx = IdentifyingContext.try_init_from_session_key(session_key)
+        except Exception:
+            # fallback: strip known format_name prefix only
+            return re.sub(r'^kdiba_', '', session_key, flags=re.IGNORECASE)
+    if all(ctx.has_keys(['animal', 'session_name'])):
+        return ctx.get_description(subset_includelist=['animal', 'session_name'])
+    return re.sub(r'^kdiba_', '', str(curr_session_context).strip(), flags=re.IGNORECASE)
+
+
+def _compact_slurm_job_suffix(job_suffix: Optional[str]) -> str:
+    """Drop default withNormalComputedReplays; qclu_→q; frateThresh_2.0→fr_2."""
+    if not job_suffix:
+        return ''
+    s = str(job_suffix)
+    s = re.sub(r'_?withNormalComputedReplays_?', '_', s, flags=re.IGNORECASE)
+    s = re.sub(r'qclu_', 'q', s, flags=re.IGNORECASE)
+
+    def _frate_repl(m: re.Match) -> str:
+        num = m.group(1)
+        if re.fullmatch(r'\d+\.0+', num):
+            num = num.split('.', 1)[0]
+        return f'fr_{num}'
+
+    s = re.sub(r'frateThresh_(\d+(?:\.\d+)?)', _frate_repl, s, flags=re.IGNORECASE)
+    s = re.sub(r'[_-]+', '_', s).strip('_-')
+    return s
+
+
+def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], job_suffix: Optional[str] = None, max_length: int = 64) -> str:
+    """Build a short Slurm-safe job name (animal_session + compact suffix). Unquoted #SBATCH --job-name values are split on commas (e.g. qclu_[1, 2, 4])."""
+    short_session = _compact_slurm_session_part(curr_session_context)
+    compact_suffix = _compact_slurm_job_suffix(job_suffix)
+    raw_name = short_session if not compact_suffix else f"{short_session}_{compact_suffix}"
     safe_name = re.sub(r'[\[\],\s]+', '-', raw_name).strip('-')
     return safe_name[:max_length]
 
@@ -395,7 +431,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
     """
     def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_curr_session_complete_identifier, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None, a_venv_activate_path: Optional[str]=None):
         slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_complete_identifier}.sh')
-        slurm_job_name = build_slurm_job_name(curr_session_context=f"{a_curr_session_context}", job_suffix=job_suffix)
+        slurm_job_name = build_slurm_job_name(curr_session_context=a_curr_session_context, job_suffix=job_suffix)
         with open(slurm_script_path, 'w') as script_file:
             script_content = slurm_template.render(curr_session_context=f"{a_curr_session_context}", slurm_job_name=slurm_job_name, python_script_path=a_python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, should_use_largemem=should_use_largemem, should_use_virtual_framebuffer=should_use_virtual_framebuffer, venv_activate_path=a_venv_activate_path)
             script_file.write(script_content)
