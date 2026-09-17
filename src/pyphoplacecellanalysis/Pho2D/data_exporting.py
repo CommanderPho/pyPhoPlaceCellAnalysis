@@ -627,7 +627,7 @@ class PosteriorExporting:
                 assert complete_epoch_identifier_str is not None
                 _an_active_export_format_config: Dict = (kwargs|export_format_config.to_dict())
                 _posterior_image, posterior_save_path = active_captured_single_epoch_result.save_posterior_as_image(parent_array_as_image_output_folder=export_format_config.export_folder, complete_epoch_identifier_str=complete_epoch_identifier_str, **_an_active_export_format_config, post_render_image_functions=curr_post_render_image_functions_dict)
-            
+                
                 _output_export_format_config: HeatmapExportConfig = deepcopy(export_format_config)
                 _output_export_format_config.posterior_saved_path = posterior_save_path
                 _output_export_format_config.posterior_saved_image = _posterior_image
@@ -717,7 +717,7 @@ class PosteriorExporting:
 
         specific_epochs_posterior_out_folder = a_parent_output_folder.joinpath(epochs_name).resolve() # 'K:/scratch/collected_outputs/figures/_temp_individual_posteriors/2024-09-30/gor01_one_2006-6-09_1-22-43/ripple/'
         specific_epochs_posterior_out_folder.mkdir(parents=True, exist_ok=True)
-
+        ## Exports each 1D decoder separately:
         for a_decoder_name, a_decoder_decoded_epochs_result in _active_filter_epochs_decoder_result_dict.items():
             # _save_context: IdentifyingContext = curr_active_pipeline.build_display_context_for_session('save_decoded_posteriors_to_HDF5', decoder_name=a_decoder_name, epochs_name=epochs_name)
             # _specific_save_context = deepcopy(a_save_context).overwriting_context(decoder_name=a_decoder_name, epochs_name=epochs_name)

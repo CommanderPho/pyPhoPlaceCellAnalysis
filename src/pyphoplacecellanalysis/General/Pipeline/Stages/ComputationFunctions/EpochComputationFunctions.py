@@ -2717,7 +2717,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
                                                                                     custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, 
-                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, **kwargs):
+                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, force_recompute: bool = True, **kwargs):
             """ Exports individual posteriors to file in many posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
             
             NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
@@ -2794,8 +2794,6 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 flat_merged_images
 
 
-                
-
             """
             from neuropy.utils.result_context import IdentifyingContext
             from pyphoplacecellanalysis.Pho2D.data_exporting import HeatmapExportConfig, PosteriorExporting, HeatmapExportKind
@@ -2812,18 +2810,25 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
 
-            # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
+            if force_recompute:
+                computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': True}] ## disable cache (which might waste some time) 
+            else:
+                computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': False}] 
 
-            ## resolve_and_execute expands prereqs (e.g. DirectionalLaps / DirectionalMergedDecoders) and maps computation_kwargs_list onto matching target names only.
-            # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
-            #                                       computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
-            #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-            
+
+                # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
+
+                ## resolve_and_execute expands prereqs (e.g. DirectionalLaps / DirectionalMergedDecoders) and maps computation_kwargs_list onto matching target names only.
+                # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
+                #                                       computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache':False}], 
+                #                                       enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+
+
 
             print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...')
             owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
                                                 #   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': False}], ## cache enabled (reusing results)
-                                                  computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': True}], ## disable cache (which might waste some time) 
+                                                  computation_kwargs_list=computation_kwargs_list, ## disable cache (which might waste some time) 
                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=False)
             print(f'\t\tdone computing.')
 
@@ -3127,7 +3132,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     # From `General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs`
                     # all_directional_continuously_decoded_dict = most_recent_continuously_decoded_dict or {}
                     # a_pseudo2D_decoder_continuously_decoded_result: DecodedFilterEpochsResult = deepcopy(decoder_ripple_filter_epochs_decoder_result_dict[f'psuedo2D_{masked_time_bin_fill_type}']) ## only the ignore result
-
+                    # epoch_idx: int = 4
+                    # a_pseudo2D_decoder_continuously_decoded_result.p_x_given_n_list[epoch_idx].shape # (59, 4, 9) - (n_x_bins, n_contexts, n_epoch_t_bins[epoch_idx])
 
                     ## INPUTS: laps_pseudo2D_continuous_specific_decoded_result: DecodedFilterEpochsResult
                     # unique_decoder_names = ('long', 'short')
@@ -3139,7 +3145,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     a_pseudo2D_split_to_1D_continuous_results_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in a_pseudo2D_split_to_1D_continuous_results_dict.items()} ## add the extra columns if needed
                     # OUTPUTS: a_pseudo2D_split_to_1D_continuous_results_dict, a_masked_pseudo2D_split_to_1D_continuous_results_dict
                     _pseudo2D_split_to_1D_continuous_results_dict_dict[a_decoded_epoch_name] = deepcopy(a_pseudo2D_split_to_1D_continuous_results_dict)
-
+                    ## NOTE: the results pulled out are NOT normalized because they're extracted directly
 
             # Run an export function again _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         
