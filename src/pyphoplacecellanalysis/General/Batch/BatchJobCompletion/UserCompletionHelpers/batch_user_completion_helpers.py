@@ -4736,7 +4736,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
         try:
             ## INPUTS: a_params_kwargs
             # display_function_kwargs_dict = {'_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': dict(time_bin_size = 0.02), },
-            a_params_kwargs = {time_bin_size = 0.02} | display_function_kwargs_dict.get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {})
+            a_params_kwargs = dict(time_bin_size = 0.02) | display_function_kwargs_dict.get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {})
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
             _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True,
                                                 # override_fig_man=custom_fig_man, 
