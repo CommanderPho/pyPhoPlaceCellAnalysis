@@ -1134,7 +1134,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
     @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.build_computation_kwargs_list_for_function_names', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
-    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, computation_kwargs_dict: Optional[Dict[str, Dict]]=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
+    def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, computation_kwargs_dict: Optional[Dict[str, Dict]]=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None, force_recompute: bool=False, **kwargs):
         """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
 
         computation_kwargs_list: Optional[List[dict]] — kwargs for each name in `computation_functions_name_includelist` (same length).
@@ -1172,7 +1172,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         needs_computation_output_dict = {}
         if len(ordered_required_dependent_computation_fn_names) > 0:
             needs_computation_output_dict, valid_computed_results_output_list, remaining_include_function_names = batch_evaluate_required_computations(self, include_includelist=ordered_required_dependent_computation_fn_names, include_global_functions=True, fail_on_exception=fail_on_exception, progress_print=True,
-                                                                force_recompute=False, force_recompute_override_computations_includelist=[], debug_print=False)
+                                                                force_recompute=force_recompute, force_recompute_override_computations_includelist=[], debug_print=debug_print)
             if len(remaining_include_function_names) > 0:
                 progress_logger_callback(f'\tWARNING: unresolved/unmatched computation names after evaluate: {remaining_include_function_names}')
 
