@@ -4553,6 +4553,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     
     This is the global across-session marginal over trackID
     
+
+    #TODO 2026-09-18 13:32: - [ ] NOTE: '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' NEEDS RECENTLY RAN 'generalized_decode_epochs_dict_and_export_results_completion_function' THAT WAS RAN WITH THE RIGHT TIME BINS FOR THE FIGURES GENERATED TO BE ACCURATE!
+
     ## Getting outputs    
         _flattened_paths_dict = {} ## Outputs:
 
