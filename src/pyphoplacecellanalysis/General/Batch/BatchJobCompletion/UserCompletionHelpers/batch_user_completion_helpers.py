@@ -4543,8 +4543,10 @@ def figures_export_nwb_wmaze_display_completion_function(self, global_data_root_
 @function_attributes(short_name=None, tags=['figure', 'batch', 'fig-export', 'hairly-plot'], input_requires=[], output_provides=[], uses=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay'], used_by=[], creation_date='2025-05-16 15:17', related_items=['generalized_decode_epochs_dict_and_export_results_completion_function'])
 def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                                                         included_figures_names=['_display_generalized_decoded_yellow_blue_marginal_epochs', '_display_decoded_trackID_marginal_hairy_position', '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', '_display_placefield_stable_formation_time_distribution', '_display_measured_vs_decoded_occupancy_distributions', '_display_trial_to_trial_reliability'],
+                                                                                        display_function_kwargs_dict: Optional[Dict]=None, ## custom KWARGS to be passed to each function                                                                                        
                                                                                         extreme_threshold: float=0.8, opacity_max:float=0.7, thickness_ramping_multiplier:float=35.0,
                                                                                         fail_on_exception_for_debugging:bool=False, export_filename_extra_suffix_parts: Optional[List[str]]=None,
+                                                                                        
                                                                                         **additional_marginal_overlaying_measured_position_kwargs) -> dict:
     """ Multi-purpose batch display function that just plots the figures so we don't have to wait for the entire batch_figures_plotting on 2025-04-16 15:22.
     corresponding to by `generalized_decode_epochs_dict_and_export_results_completion_function` 
@@ -4577,6 +4579,9 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
 
     apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly'); note figure filenames built from display contexts are unaffected
+
+    if display_function_kwargs_dict is None:
+        display_function_kwargs_dict = {}
 
     # 'trackID_weighted_position_posterior'
     if across_session_results_extended_dict is None:
@@ -4620,11 +4625,12 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
 
         try:
             print(f'\t trying "_display_directional_merged_pf_decoded_stacked_epoch_slices"', flush=True)
-            a_params_kwargs = {}
+            a_params_kwargs = {} | display_function_kwargs_dict.get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {})
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='directional_decoded_stacked_epoch_slices')
             _out = curr_active_pipeline.display('_display_directional_merged_pf_decoded_stacked_epoch_slices', display_context, defer_render=True, save_figure=True,
                                                 # override_fig_man=custom_fig_man, 
                                                 parent_output_folder=custom_figure_output_path,
+                                                **a_params_kwargs,
                                             )
             
             # _out = EpochComputationDisplayFunctions._display_directional_merged_pf_decoded_stacked_epoch_slices(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
@@ -4636,7 +4642,7 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
             })
 
             ## Directional-only: build combined/multi once from independent 1D greyscale_shared_norm exports:
-            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | deepcopy(additional_marginal_overlaying_measured_position_kwargs.get('post_export_build_combined_images_kwargs', {}))
+            post_export_build_combined_kwargs = dict(epoch_name_list=['ripple'], included_epoch_idxs=None, progress_print=True, should_use_raw_rgba_export_image=False, should_add_col_row_labels=False) | deepcopy(additional_marginal_overlaying_measured_position_kwargs.get('post_export_build_combined_images_kwargs', {})) #TODO [ ] Update to pop from `a_params_kwargs` first
             out_custom_formats_dict = _out.get('out_custom_formats_dict', None)
             if out_custom_formats_dict is not None:
                 print(f'\t post_export_build_combined_images after directional (layout=greyscale_shared_norm)...', flush=True)
@@ -4723,14 +4729,19 @@ def figures_plot_generalized_decode_epochs_dict_and_export_results_completion_fu
     # '_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay' -- NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.             #
     # ==================================================================================================================================================================================================================================================================================== #
 
+    
+
     if wants_multicolor:
         print(f'\t trying "_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay"', flush=True)
         try:
-            a_params_kwargs = {}
+            ## INPUTS: a_params_kwargs
+            # display_function_kwargs_dict = {'_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay': dict(time_bin_size = 0.02), },
+            a_params_kwargs = {time_bin_size = 0.02} | display_function_kwargs_dict.get('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', {})
             display_context = curr_active_pipeline.build_display_context_for_session(display_fn_name='trackID_weighted_position_posterior')
             _out = curr_active_pipeline.display('_display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay', display_context, defer_render=True, save_figure=True,
                                                 # override_fig_man=custom_fig_man, 
                                                 parent_output_folder=custom_figure_output_path,
+                                                **a_params_kwargs,
                                             )
             
             # _out = EpochComputationDisplayFunctions._display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(curr_active_pipeline, None, None, None, include_includelist=None, save_figure=True)
