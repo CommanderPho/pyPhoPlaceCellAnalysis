@@ -2126,7 +2126,10 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                           requires_global_keys=['EpochComputations'], provides_global_keys=[], # 'EpochComputations'
                           uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult', 'GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn'], used_by=[], creation_date='2025-04-14 12:40',
         validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
-    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False):
+    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, 
+            epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False,
+
+        ):
         """ Computes the most-general epoch decoding imaginable, creating several dictionaries of IdentifyingContext objects that identify the parameters undewr which decoding was performed.
 
 
@@ -2809,13 +2812,14 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
-            computation_functions_name_includelist = ['directional_decoders_decode_continuous', 'perform_compute_non_PBE_epochs', 'generalized_specific_epochs_decoding']
+            computation_functions_name_includelist = ['directional_decoders_decode_continuous', 'perform_compute_non_PBE_epochs', 'generalized_specific_epochs_decoding'] # 'split_to_directional_laps', 
             if force_recompute:
                 ## disable cache (which might waste some time):
                 # computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': True}] ## disable cache (which might waste some time)
-                computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': True},
+                computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': False},
                                             'perform_compute_non_PBE_epochs': {'epochs_decoding_time_bin_size': time_bin_size, 'compute_2D': False},
-                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': True, 'force_recompute': True},
+                                            # 'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': True, 'force_recompute': True}, # #TODO 2026-09-18 10:18: - [ ] Very slow due to complete drop
+                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': True},
                                           }
             else:
                 ## cache enabled (reusing results):
@@ -2836,7 +2840,12 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...')
             owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=computation_functions_name_includelist,
                                                   computation_kwargs_dict=computation_kwargs_dict,
-                                                  enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
+                                                  enabled_filter_names=None, fail_on_exception=True, force_recompute=force_recompute, debug_print=debug_print)
+
+
+            # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_dict=computation_kwargs_dict,
+            #                                 enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
+
             print(f'\t\tdone computing.')
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
