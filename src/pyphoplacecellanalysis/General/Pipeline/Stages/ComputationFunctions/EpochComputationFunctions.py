@@ -2126,10 +2126,9 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                           requires_global_keys=['EpochComputations'], provides_global_keys=[], # 'EpochComputations'
                           uses=['GeneralizedDecodedEpochsComputationsContainer', 'GenericDecoderDictDecodedEpochsDictResult', 'GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn'], used_by=[], creation_date='2025-04-14 12:40',
         validate_computation_test=validate_has_generalized_specific_epochs_decoding, is_global=True)
-    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, 
-            epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh:bool=False, force_recompute:bool=False,
-
-        ):
+    def perform_generalized_specific_epochs_decoding(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False,
+                                                     epochs_decoding_time_bin_size: float = 0.050, drop_previous_result_and_compute_fresh: bool = False, force_recompute: bool = False, compute_2D: bool = False,
+                                                     computation_functions_name_includelist: Optional[List[str]] = None, computation_kwargs_dict: Optional[Dict[str, Dict]] = None):
         """ Computes the most-general epoch decoding imaginable, creating several dictionaries of IdentifyingContext objects that identify the parameters undewr which decoding was performed.
 
 
@@ -2180,8 +2179,11 @@ class EpochComputationFunctions(AllFunctionEnumeratingMixin, metaclass=Computati
                 print(f'removed previous "EpochComputations.a_generic_decoder_dict_decoded_epochs_dict_result" result and computing fresh since `drop_previous_result_and_compute_fresh == True`')
 
         if (not hasattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result')) or (getattr(valid_EpochComputations_result, 'a_generic_decoder_dict_decoded_epochs_dict_result', None) is None):
-            # initialize
-            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=owning_pipeline_reference, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print)
+            # initialize — forward compute_2D / includelist / kwargs into batch_user_compute_fn (user dict wins over compute_2D convenience)
+            merged_computation_kwargs_dict: Dict[str, Dict] = dict(computation_kwargs_dict or {})
+            merged_computation_kwargs_dict['non_PBE_epochs_results'] = {'compute_2D': compute_2D, **(merged_computation_kwargs_dict.get('non_PBE_epochs_results') or {})}
+            a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=owning_pipeline_reference, force_recompute=force_recompute, time_bin_size=epochs_decoding_time_bin_size, debug_print=debug_print,
+                                                                                                                                                    computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_dict=merged_computation_kwargs_dict)
             valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
             global_computation_results.computed_data['EpochComputations'].a_generic_decoder_dict_decoded_epochs_dict_result = a_new_fully_generic_result
 
@@ -2819,13 +2821,13 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': False},
                                             'perform_compute_non_PBE_epochs': {'epochs_decoding_time_bin_size': time_bin_size, 'compute_2D': False},
                                             # 'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': True, 'force_recompute': True}, # #TODO 2026-09-18 10:18: - [ ] Very slow due to complete drop
-                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': True},
+                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': True, 'compute_2D': False},
                                           }
             else:
                 ## cache enabled (reusing results):
                 computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': False},
                                             'perform_compute_non_PBE_epochs': {'epochs_decoding_time_bin_size': time_bin_size, 'compute_2D': False},
-                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': False},
+                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': False, 'compute_2D': False},
                                           }
 
                 # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
@@ -2884,7 +2886,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             if a_new_fully_generic_result is None:
                 ## need to recompute 'generalized_specific_epochs_decoding'
                 owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['generalized_specific_epochs_decoding'],
-                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': force_recompute}],
+                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': force_recompute, 'compute_2D': False}],
                                         enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
 
                 a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
