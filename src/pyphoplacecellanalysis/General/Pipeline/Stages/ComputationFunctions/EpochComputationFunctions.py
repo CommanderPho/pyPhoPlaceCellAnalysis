@@ -2883,7 +2883,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
             epochs_decoding_time_bin_size: float = best_matching_context.get('time_bin_size', None)
             assert epochs_decoding_time_bin_size is not None
-
+            print(f'MATCHING epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
             ## OUTPUTS: a_decoded_marginal_posterior_df
 
             complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
