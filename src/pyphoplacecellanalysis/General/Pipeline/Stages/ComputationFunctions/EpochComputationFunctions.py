@@ -2717,7 +2717,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
                                                                                     custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, 
-                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, force_recompute: bool = True, **kwargs):
+                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, force_recompute: bool = True, debug_print: bool = True, **kwargs):
             """ Exports individual posteriors to file in many posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
             
             NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
@@ -2829,16 +2829,16 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
                                                 #   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': False}], ## cache enabled (reusing results)
                                                   computation_kwargs_list=computation_kwargs_list, ## disable cache (which might waste some time) 
-                                                  enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                                                  enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
             print(f'\t\tdone computing.')
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
             DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
-            print(f'DAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
+            print(f'\tDAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
 
             NOW_DATETIME: str = get_now_rounded_time_str()
             NOW_DATETIME_TO_USE = f'{NOW_DATETIME}' # used for filenames throught the notebook
-            print(f'NOW_DATETIME: {NOW_DATETIME}, NOW_DATETIME_TO_USE: {NOW_DATETIME_TO_USE}')
+            print(f'\tNOW_DATETIME: {NOW_DATETIME}, NOW_DATETIME_TO_USE: {NOW_DATETIME_TO_USE}')
 
             # export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
             # dpi = kwargs.pop('dpi', 100)
@@ -2868,9 +2868,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             if a_new_fully_generic_result is None:
                 ## need to recompute 'generalized_specific_epochs_decoding'
                 owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=['generalized_specific_epochs_decoding'],
-                                        # computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': False}],
-                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': True}],
-                                        enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                                        computation_kwargs_list=[{'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': force_recompute}],
+                                        enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
 
                 a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
 
@@ -2880,10 +2879,10 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             ## INPUTS: a_new_fully_generic_result
             # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
             a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
-            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+            best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=debug_print)
             epochs_decoding_time_bin_size: float = best_matching_context.get('time_bin_size', None)
             assert epochs_decoding_time_bin_size is not None
-            print(f'MATCHING epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            print(f'\tMATCHING epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
             ## OUTPUTS: a_decoded_marginal_posterior_df
 
             complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
