@@ -1098,11 +1098,22 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['batch', 'compute'], input_requires=[], output_provides=[], uses=[], used_by=['generalized_decode_epochs_dict_and_export_results_completion_function'], creation_date='2025-03-21 00:00', related_items=[])
     @classmethod
-    def batch_user_compute_fn(cls, curr_active_pipeline, force_recompute:bool=True, time_bin_size: float = 0.025, debug_print:bool=True) -> 'GenericDecoderDictDecodedEpochsDictResult':
+    def batch_user_compute_fn(cls, curr_active_pipeline, force_recompute: bool = True, time_bin_size: float = 0.025, debug_print: bool = True, computation_functions_name_includelist: Optional[List[str]] = None, computation_kwargs_dict: Optional[Dict[str, Dict]] = None) -> 'GenericDecoderDictDecodedEpochsDictResult':
         """ Uses the context to extract proper values from the pipeline, and performs a fresh computation
         
         Usage:
             a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, debug_print=debug_print)
+
+            # skip heuristic scoring:
+            a_new_fully_generic_result = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(
+                curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=time_bin_size,
+                computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous',
+                                                        'directional_decoders_evaluate_epochs', 'non_PBE_epochs_results'])
+
+            # enable 2D non-PBE:
+            a_new_fully_generic_result = GenericDecoderDictDecodedEpochsDictResult.batch_user_compute_fn(
+                curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, time_bin_size=time_bin_size,
+                computation_kwargs_dict={'non_PBE_epochs_results': {'compute_2D': True}})
             
         History:
             from `generalized_decode_epochs_dict_and_export_results_completion_function`
@@ -1136,16 +1147,24 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         else:
             _perform_comp_kwargs = dict(fail_on_exception=True)
 
+        ## Default computation plan (includelist + per-name kwargs); callers may override via computation_functions_name_includelist / computation_kwargs_dict
+        default_includelist: List[str] = ['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring', 'non_PBE_epochs_results']
+        default_kwargs: Dict[str, Dict] = {
+            'merged_directional_placefields': {'ripple_decoding_time_bin_size': time_bin_size, 'laps_decoding_time_bin_size': time_bin_size},
+            'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size},
+            'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': True},
+            'directional_decoders_epoch_heuristic_scoring': {'same_thresh_fraction_of_track': 0.05, 'max_ignore_bins': 2, 'use_bin_units_instead_of_realworld': False, 'max_jump_distance_cm': 60.0},
+            # 'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=True, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
+            'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=True, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
+        }
+        includelist: List[str] = computation_functions_name_includelist or default_includelist
+        user_kwargs_dict: Dict[str, Dict] = computation_kwargs_dict or {}
+        merged_kwargs: Dict[str, Dict] = {name: {**default_kwargs.get(name, {}), **user_kwargs_dict.get(name, {})} for name in includelist}
+        computation_kwargs_list: List[Dict] = [merged_kwargs.get(name, {}) for name in includelist]
+
         ## perform the computation either way:
         # curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['non_PBE_epochs_results'], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['merged_directional_placefields', 'directional_decoders_decode_continuous', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring', 'non_PBE_epochs_results'],
-                                                        computation_kwargs_dict={'merged_directional_placefields': {'ripple_decoding_time_bin_size': time_bin_size, 'laps_decoding_time_bin_size': time_bin_size}, 
-                                                            'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size},
-                                                            'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': True},
-                                                            'directional_decoders_epoch_heuristic_scoring': {'same_thresh_fraction_of_track': 0.05, 'max_ignore_bins': 2, 'use_bin_units_instead_of_realworld': False, 'max_jump_distance_cm': 60.0},
-                                                        #  'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=True, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
-                                                            'non_PBE_epochs_results': dict(epochs_decoding_time_bin_size=time_bin_size, frame_divide_bin_size=10.0, compute_1D=True, compute_2D=False, drop_previous_result_and_compute_fresh=force_recompute, skip_training_test_split=True, debug_print_memory_breakdown=False),
-                                                        }, ## END KWARGS DICT
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=includelist, computation_kwargs_list=computation_kwargs_list,
                                                         enabled_filter_names=None, debug_print=False, **_perform_comp_kwargs)
         curr_active_pipeline.batch_extended_computations(include_includelist=['non_PBE_epochs_results'], include_global_functions=True, included_computation_filter_names=None, fail_on_exception=True, debug_print=False) ## just checking
 
