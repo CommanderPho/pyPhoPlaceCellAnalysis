@@ -1135,7 +1135,6 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
     @function_attributes(short_name=None, tags=['dependencies', 'computation', 'specific', 'validation'], input_requires=[], output_provides=[], uses=['self.resolve_full_required_computation_plan', 'batch_evaluate_required_computations', 'self.build_computation_kwargs_list_for_function_names', 'self.perform_specific_computation'], used_by=[], creation_date='2025-06-04 07:45', related_items=[])
     def resolve_and_execute_full_required_computation_plan(self, active_computation_params=None, enabled_filter_names=None, computation_functions_name_includelist=None, computation_kwargs_list=None, computation_kwargs_dict: Optional[Dict[str, Dict]]=None, fail_on_exception:bool=False, debug_print=False, progress_logger_callback=None):
-
         """ determines the full list of specific computations required to perform a desired specific computation (specified in computation_functions_name_includelist) AND THEN PERFORMS all the required functions in a minimally destructive manner using the previously recomputed results 
 
         computation_kwargs_list: Optional[List[dict]] — kwargs for each name in `computation_functions_name_includelist` (same length).

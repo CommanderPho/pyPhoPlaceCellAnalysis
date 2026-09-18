@@ -2809,12 +2809,20 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
-
+            computation_functions_name_includelist = ['directional_decoders_decode_continuous', 'perform_compute_non_PBE_epochs', 'generalized_specific_epochs_decoding']
             if force_recompute:
-                computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': True}] ## disable cache (which might waste some time) 
+                ## disable cache (which might waste some time):
+                # computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': True}] ## disable cache (which might waste some time)
+                computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': True},
+                                            'perform_compute_non_PBE_epochs': {'epochs_decoding_time_bin_size': time_bin_size, 'compute_2D': False},
+                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': True, 'force_recompute': True},
+                                          }
             else:
-                computation_kwargs_list = [{'time_bin_size': time_bin_size, 'should_disable_cache': False}] 
-
+                ## cache enabled (reusing results):
+                computation_kwargs_dict = {'directional_decoders_decode_continuous': {'time_bin_size': time_bin_size, 'should_disable_cache': False},
+                                            'perform_compute_non_PBE_epochs': {'epochs_decoding_time_bin_size': time_bin_size, 'compute_2D': False},
+                                            'generalized_specific_epochs_decoding': {'epochs_decoding_time_bin_size': time_bin_size, 'drop_previous_result_and_compute_fresh': False, 'force_recompute': False},
+                                          }
 
                 # global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop = ['DirectionalDecodersDecoded'], debug_print=True)
 
@@ -2826,9 +2834,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
             print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...')
-            owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=['directional_decoders_decode_continuous'],
-                                                #   computation_kwargs_list=[{'time_bin_size': time_bin_size, 'should_disable_cache': False}], ## cache enabled (reusing results)
-                                                  computation_kwargs_list=computation_kwargs_list, ## disable cache (which might waste some time) 
+            owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=computation_functions_name_includelist,
+                                                  computation_kwargs_dict=computation_kwargs_dict,
                                                   enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
             print(f'\t\tdone computing.')
 
