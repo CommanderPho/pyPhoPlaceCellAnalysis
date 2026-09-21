@@ -4588,6 +4588,30 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             return False
 
 
+    @function_attributes(short_name=None, tags=['filtered_df', 'programmatic', 'df'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-09-21 12:54', related_items=[])
+    def get_specific_filtered_df(self, a_name: str, debug_print: bool=False) -> Optional[pd.DataFrame]:
+        """ returns the current filtered_df dataframe corresponding to the variable name `a_name`.
+
+            concatenated_ripple_df =_subfn_get_filtered_df_variable(df_filter, a_name='filtered_all_sessions_laps_df')
+
+
+            concatenated_ripple_df = df_filter.get_specific_filtered_df(a_name='filtered_all_sessions_laps_df')
+
+
+        HISTORY: renamed from `_subfn_get_filtered_df_variable`
+
+        """
+        if getattr(self, a_name, None) is not None:
+            return getattr(self, a_name)
+        elif (self.filtered_df_dict.get(a_name, None) is not None):
+            return self.filtered_df_dict[a_name]
+        else:
+            if debug_print:
+                print(f'WARNING: could not find "{a_name}" in df_filter using either method.')
+            return None ## return None, not found
+    
+
+
     # ==================================================================================================================== #
     # Serialization                                                                                                        #
     # ==================================================================================================================== #
