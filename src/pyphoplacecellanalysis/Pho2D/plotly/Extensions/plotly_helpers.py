@@ -555,6 +555,151 @@ class PlotlyFigureContainer:
             print(f"No subplot at row {row}, col {col}")
 
 
+    @classmethod
+    def subplot_box_paper(cls, fig, row=1, col=1):
+        """
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
+            fig = deepcopy(new_fig)
+            boxes_paper = [PlotlyFigureContainer.subplot_box_paper(fig, 1, c) for c in (1, 2, 3)]
+            boxes_paper
+            pixel_rects = [PlotlyFigureContainer.subplot_box_pixels(fig, 1, c, scale=1) for c in (1, 2, 3)]
+            pixel_rects
+
+        """
+        sp = fig.get_subplot(row, col)  # SubplotXY
+        x0, x1 = sp.xaxis.domain
+        y0, y1 = sp.yaxis.domain
+        return dict(x0=x0, x1=x1, y0=y0, y1=y1)  # plot-fraction rect
+
+
+    @classmethod
+    def subplot_box_pixels(cls, fig, row=1, col=1, scale: float = 1.0):
+        """
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
+            fig = deepcopy(new_fig)
+            boxes_paper = [PlotlyFigureContainer.subplot_box_paper(fig, 1, c) for c in (1, 2, 3)]
+            boxes_paper
+            pixel_rects = [PlotlyFigureContainer.subplot_box_pixels(fig, 1, c, scale=1) for c in (1, 2, 3)]
+            pixel_rects
+
+        """
+        layout = fig.layout
+        W, H = layout.width, layout.height
+        ml, mr = layout.margin.l or 0, layout.margin.r or 0
+        mt, mb = layout.margin.t or 0, layout.margin.b or 0
+        plot_w, plot_h = W - ml - mr, H - mt - mb
+
+        box = cls.subplot_box_paper(fig, row, col)
+        left   = ml + box["x0"] * plot_w
+        right  = ml + box["x1"] * plot_w
+        # PNG y grows downward:
+        top    = mt + (1.0 - box["y1"]) * plot_h
+        bottom = mt + (1.0 - box["y0"]) * plot_h
+
+        return dict(
+            # ltrb (PIL crop)
+            left=left*scale, top=top*scale, right=right*scale, bottom=bottom*scale,
+            # xywh (your crop_box convention)
+            x=left*scale, y=top*scale,
+            width=(right-left)*scale, height=(bottom-top)*scale,
+        )
+
+
+    @classmethod
+    def shape_to_pixels(cls, shape, fig, scale: float = 1.0):
+        """
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+
+            fig = deepcopy(new_fig)
+            pixel_shapes = [PlotlyFigureContainer.shape_to_pixels(s, fig) for s in fig.layout.shapes]
+            # pixel_shapes
+            x_values = [v['x'] for v in pixel_shapes if (v['name'] is None) and (v['type'] == 'line')] ## list of the horizontal lines # [(80.0, 240.72), (257.12, 1542.88), (1559.28, 1720.0)]
+            y_values = [v['y'] for v in pixel_shapes] ## list of the horizontal lines # [(80.0, 240.72), (257.12, 1542.88), (1559.28, 1720.0)]
+            x_values
+            y_values
+
+        """
+        def _subfn_margins(layout, default=dict(l=80, r=80, t=100, b=80)):
+            m = layout.margin
+            return {k: (default[k] if getattr(m, k) is None else getattr(m, k)) for k in "lrtb"}
+
+        def _subfn_to_plot_fraction(val, ref: str, layout) -> float:
+            """Map a shape coord + ref → plot-fraction in [~0,1] (full inner plot area)."""
+            def _subfn_axis(layout, name: str):
+                # name like 'x2', 'y2' -> layout.xaxis2 / layout.yaxis2
+                key = ("xaxis" if name.startswith("x") else "yaxis") + name[1:]
+                return layout[key]
+
+            if ref == "paper":
+                return float(val)
+
+            if ref.endswith(" domain"):
+                axis_id = ref.replace(" domain", "")          # 'x2' / 'y2'
+                dom = _subfn_axis(layout, axis_id).domain
+                return dom[0] + float(val) * (dom[1] - dom[0])
+
+            # data ref: 'x', 'x2', 'y', 'y2', ...
+            ax = _subfn_axis(layout, ref)
+            r0, r1 = ax.range
+            frac = (float(val) - r0) / (r1 - r0)              # linear axes
+            dom = ax.domain
+            return dom[0] + frac * (dom[1] - dom[0])
+
+        def _subfn_xy_px(x, xref, y, yref, layout, scale, plot_w, plot_h):
+            """ Captures: _subfn_to_plot_fraction
+            """
+            xf = _subfn_to_plot_fraction(x, xref, layout)
+            yf = _subfn_to_plot_fraction(y, yref, layout)       # 0=bottom in Plotly
+            px = m["l"] + xf * plot_w
+            py = m["t"] + (1.0 - yf) * plot_h             # PNG y downward
+            return px * scale, py * scale
+
+
+        # BEGIN FUNCTION BODY ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        full = fig.full_figure_for_development(warn=False)
+        layout = full.layout
+        W, H = layout.width, layout.height
+        m = _subfn_margins(layout)
+        plot_w, plot_h = W - m["l"] - m["r"], H - m["t"] - m["b"]
+
+        xref, yref = shape.xref, shape.yref
+        x0, y0 = _subfn_xy_px(shape.x0, xref, shape.y0, yref, layout=layout, scale=scale, plot_w=plot_w, plot_h=plot_h)
+        x1, y1 = _subfn_xy_px(shape.x1, xref, shape.y1, yref, layout=layout, scale=scale, plot_w=plot_w, plot_h=plot_h)
+
+        left, right = sorted([x0, x1])
+        top, bottom = sorted([y0, y1])
+        width = right - left
+        height = bottom - top
+        _out_dict = {"x": (left, right), "y": (bottom, top)}
+
+        if shape.type == "rect":
+            return {
+                "name": shape.name,
+                "type": "rect",
+                "ltrb": (left, top, right, bottom),
+                "xywh": (left, top, width, height),
+                **_out_dict,
+            }
+        # line
+        elif shape.type == 'line':
+            return {
+                "name": getattr(shape, "name", None),
+                "type": "line",
+                "p0": (x0, y0),
+                "p1": (x1, y1),
+                **_out_dict,
+            }
+        else:
+            raise ValueError(f'Expected either a "line" or "rect" but got type: shape.type: "{shape.type}". shape: {shape}')
+
+        return shape
+
+
 
 
 @function_attributes(short_name=None, tags=['plotly', 'scatter'], input_requires=[], output_provides=[], uses=['PlotlyFigureContainer'], used_by=[], creation_date='2024-05-27 09:07', related_items=[])

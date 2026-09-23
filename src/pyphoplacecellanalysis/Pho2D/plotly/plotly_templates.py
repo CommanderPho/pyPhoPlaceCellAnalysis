@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, ClassVar
 import plotly.graph_objects as go
 import plotly.io as pio
 from copy import deepcopy
-
+from IPython.display import display
+from attrs import field, define, Factory
 from pyphocorehelpers.plotting.media_output_helpers import fig_to_clipboard
 from pyphocorehelpers.Filesystem.path_helpers import file_uri_from_path, sanitize_filename_for_Windows
 from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget
@@ -174,13 +175,132 @@ _template_dict["pho_diba_publication"] = dict(
 
 
 
-
+@define(slots=False)
 class PlotlyHelpers:
     """
     from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers
 
+    plotly_helpers: PlotlyHelpers = PlotlyHelpers(TODAY_DAY_DATE=TODAY_DAY_DATE, figures_folder=figures_folder, neptuner_run=neptuner_run)
+
     """
-    template_dict: Dict[str, Dict] = deepcopy(_template_dict)
+    TODAY_DAY_DATE: str = field()
+    figures_folder: Path = field()
+    
+    _is_dark_mode: bool = field(default=False)
+    neptuner_run: bool = field(default=False)
+
+    should_save: bool = field(default=False)
+    export_html: bool = field(default=False)
+    export_png: bool = field(default=True)
+
+    resolution_multiplier: float = field(default=1.0)
+    # fig_size_kwargs: Dict = field(default=Factory(dict))
+
+    earliest_delta_aligned_t_start: Optional[float] = field(default=None)
+    latest_delta_aligned_t_end: Optional[float] = field(default=None)
+    legend_groups_to_hide: Optional[List[float]] = field(default=Factory(lambda: ['0.03', '0.044',]))
+
+    active_template: Optional[str] = field(default=None)
+
+
+    template_dict: ClassVar[Dict[str, Dict]] = deepcopy(_template_dict)  ## NOT AN INSTANCE PROPERTY, a class property
+
+    @property
+    def fig_size_kwargs(self) -> Dict:
+        """The fig_size_kwargs property."""
+        return {'width': (self.resolution_multiplier * 1800), 'height': (self.resolution_multiplier*480)}
+
+    @property
+    def time_delta_tuple(self) -> Tuple[float, float, float]:
+        """The time_delta_tuple property."""
+        return (self.earliest_delta_aligned_t_start, 0.0, self.latest_delta_aligned_t_end)
+
+    @property
+    def is_dark_mode(self) -> bool:
+        """The is_dark_mode property."""
+        return self._is_dark_mode
+    @is_dark_mode.setter
+    def is_dark_mode(self, value: bool):
+        self._is_dark_mode = value
+        self.is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self._is_dark_mode)
+        pio.templates.default = self.active_template
+
+    # ==================================================================================================================== #
+    # Initialization                                                                                                       #
+    # ==================================================================================================================== #
+    def __attrs_post_init__(self):
+        """ called after initializer built by `attrs` library. """
+        # if getattr(cls, 'template_dict', None) is None:
+        #     cls.template_dict = deepcopy(_template_dict)
+
+        self.is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self.is_dark_mode)
+        pio.templates.default = self.active_template
+        # self.fig_size_kwargs = {'width': (self.resolution_multiplier * 1800), 'height': (self.resolution_multiplier*480)}
+
+
+    def save_plotly(self, a_fig, a_fig_context, *, figures_folder: Optional[Path]=None, date_prefix: Optional[str]=None, export_html: Optional[bool] = None, export_png: Optional[bool] = None, **kwargs) -> Dict[str, Path]:
+        """Save a Plotly figure under `figures_folder` using an IdentifyingContext-derived basename.
+
+        Defaults write both `.html` and `.png` (legacy notebook behavior). Pass `export_html=False`
+        for PNG-only exports.
+
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import save_plotly
+
+            figure_out_paths = save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=TODAY_DAY_DATE, export_html=False, export_png=True)
+        """
+        if figures_folder is None:
+            figures_folder = self.figures_folder
+        if date_prefix is None:
+            date_prefix = self.TODAY_DAY_DATE
+        if export_html is None:
+            export_html = self.export_html
+        if export_png is None:
+            export_png = self.export_png
+        return self._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=date_prefix, export_html=export_html, export_png=export_png, **kwargs)
+
+
+    def _perform_plot_pre_post_delta_scatter(self, **kwargs):
+        """
+
+        History:
+            replaces:
+                ## captures: earliest_delta_aligned_t_start, latest_delta_aligned_t_end, fig_size_kwargs, is_dark_mode, save_plotly
+                _perform_plot_pre_post_delta_scatter = partial(
+                    _helper_perform_plot_pre_post_delta_scatter,
+                    time_delta_tuple=(earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end),
+                    fig_size_kwargs=plotly_helpers.fig_size_kwargs,
+                    is_dark_mode=plotly_helpers.is_dark_mode,
+                    save_plotly=plotly_helpers.save_plotly,
+                    legend_groups_to_hide=['0.03', '0.044',],
+                )
+        """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _helper_perform_plot_pre_post_delta_scatter
+
+        return _helper_perform_plot_pre_post_delta_scatter(
+                time_delta_tuple=kwargs.pop('time_delta_tuple', (kwargs.pop('earliest_delta_aligned_t_start', self.earliest_delta_aligned_t_start), 0.0, kwargs.pop('latest_delta_aligned_t_end', self.latest_delta_aligned_t_end))),
+                fig_size_kwargs=self.fig_size_kwargs,
+                is_dark_mode=self.is_dark_mode,
+                save_plotly=self.save_plotly,
+                legend_groups_to_hide=kwargs.pop('legend_groups_to_hide', self.legend_groups_to_hide),
+                **kwargs,
+            )
+
+    def _perform_plot_pre_post_delta_scatter_with_embedded_context(self, **kwargs):
+        """ overrides `data_context=None` to enforce that df internal data_context is used.
+
+        History:
+            replaces: 
+            _perform_plot_pre_post_delta_scatter_with_embedded_context = partial(
+                _perform_plot_pre_post_delta_scatter,
+                data_context=None,
+            )
+
+        """
+        _discarded_data_context = kwargs.pop('data_context', None)
+
+        return self._perform_plot_pre_post_delta_scatter(data_context=None, **kwargs)
+
 
     @classmethod
     def get_plotly_template(cls, is_dark_mode:bool=False, is_publication: bool=True):
@@ -194,7 +314,6 @@ class PlotlyHelpers:
         # template: str = 'plotly_dark' # set plotl template
         # is_dark_mode = False
         # template: str = 'plotly_white'
-
         for k, v in cls.template_dict.items():
             pio.templates[k] = go.layout.Template(**v)
             
@@ -216,21 +335,57 @@ class PlotlyHelpers:
         return is_dark_mode, template
 
 
+    @classmethod
+    def _perform_save_plotly(cls, a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, neptuner_run=None, show_path_widgets: bool = True) -> Dict[str, Path]:
+        """Save a Plotly figure under `figures_folder` using an IdentifyingContext-derived basename.
+
+        Defaults write both `.html` and `.png` (legacy notebook behavior). Pass `export_html=False`
+        for PNG-only exports.
+
+        Usage:
+            from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import save_plotly
+
+            figure_out_paths = PlotlyHelpers._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=TODAY_DAY_DATE, export_html=False, export_png=True)
+        """
+        fig_save_path: Path = figures_folder.joinpath('_'.join([date_prefix, sanitize_filename_for_Windows(a_fig_context.get_description())])).resolve()
+        figure_out_paths: Dict[str, Path] = {}
+
+        if export_html:
+            figure_out_paths['.html'] = fig_save_path.with_suffix('.html')
+            a_fig.write_html(figure_out_paths['.html'])
+            if show_path_widgets:
+                display(fullwidth_path_widget(figure_out_paths['.html'], file_name_label='.html'))
+
+        if export_png:
+            figure_out_paths['.png'] = fig_save_path.with_suffix('.png')
+            a_fig.write_image(figure_out_paths['.png'])
+            if show_path_widgets:
+                display(fullwidth_path_widget(figure_out_paths['.png'], file_name_label='.png'))
+
+        if neptuner_run is not None:
+            a_full_figure_path_key: str = a_fig_context.get_description(separator='/', include_property_names=True, key_value_separator=':')
+            print(f'a_full_figure_path_key: "{a_full_figure_path_key}"')
+            upload_path: Optional[Path] = figure_out_paths.get('.html') or figure_out_paths.get('.png')
+            if upload_path is not None:
+                neptuner_run['outputs']['figures'][f"{a_full_figure_path_key}"].upload(upload_path.as_posix())
+
+        return figure_out_paths
 
 
 
 
-# def save_plotly(a_fig, a_fig_context):
-#     """ 
-#     captures: TODAY_DAY_DATE
-#     """
-#     fig_save_path: Path = figures_folder.joinpath('_'.join([TODAY_DAY_DATE, sanitize_filename_for_Windows(a_fig_context.get_description())])).resolve()
-#     figure_out_paths = {'.html': fig_save_path.with_suffix('.html'), '.png': fig_save_path.with_suffix('.png')}
-#     a_fig.write_html(figure_out_paths['.html'])
-#     display(fullwidth_path_widget(figure_out_paths['.html'], file_name_label='.html'))
-#     # print(file_uri_from_path(figure_out_paths['.html']))
-#     a_fig.write_image(figure_out_paths['.png'])
-#     # print(file_uri_from_path(figure_out_paths['.png']))
-#     display(fullwidth_path_widget(figure_out_paths['.png'], file_name_label='.png'))
-#     return figure_out_paths
+
+
+def save_plotly(a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, neptuner_run=None, show_path_widgets: bool = True, **kwargs) -> Dict[str, Path]:
+    """Save a Plotly figure under `figures_folder` using an IdentifyingContext-derived basename.
+
+    Defaults write both `.html` and `.png` (legacy notebook behavior). Pass `export_html=False`
+    for PNG-only exports.
+
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import save_plotly
+
+        figure_out_paths = save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=TODAY_DAY_DATE, export_html=False, export_png=True)
+    """
+    return PlotlyHelpers._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=date_prefix, export_html=export_html, export_png=export_png, neptuner_run=neptuner_run, show_path_widgets=show_path_widgets, **kwargs)
 

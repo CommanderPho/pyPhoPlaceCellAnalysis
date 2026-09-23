@@ -2355,7 +2355,8 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
         px_scatter_kwargs.setdefault('size_max', 5) # don't override tho
         
     else:
-        concatenated_ripple_df['dummy_column_for_size'] = 0.5
+        # concatenated_ripple_df['dummy_column_for_size'] = 0.5 ## These points are TINY
+        concatenated_ripple_df['dummy_column_for_size'] = 0.9 ## These points are TINY
         px_scatter_kwargs['size'] = "dummy_column_for_size"
         px_scatter_kwargs.setdefault('size_max', 1) # don't override tho
         # px_scatter_kwargs
@@ -4896,3 +4897,197 @@ class PhoPublicationFigureHelper:
             ## OVERRIDE in the case of publications:
             _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False, 'axes.linewidth': 0.8})
         return _out_rcparams # 'figure.dpi': '220', 
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-09-22 Figure Testing                                                                                                                                                                                                                                                            #
+# ==================================================================================================================================================================================================================================================================================== #
+
+def _plot_recreated_figure():
+    """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _plot_recreated_figure
+
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import numpy as np
+
+    # --- FORMATTING PARAMETERS (Adjust these based on exact PDF measurements) ---
+    FONT_FAMILY = "Arial, sans-serif"
+    TITLE_FONT_SIZE = 18
+    AXIS_TITLE_FONT_SIZE = 14
+    TICK_FONT_SIZE = 12
+    ANNOTATION_FONT_SIZE = 14
+
+    COLOR_LONG = "#1f77b4"  # Muted Blue
+    COLOR_SHORT = "#ff7f0e" # Safety Orange
+
+    # --- DUMMY DATA GENERATION (Replace with your actual data) ---
+    np.random.seed(42)
+    n_points = 2000
+
+    # Generating "Delta-aligned Event Time" (-1000 to 1000)
+    x_time = np.random.normal(loc=0, scale=400, size=n_points)
+    x_time = np.clip(x_time, -1000, 1000)
+
+    # Generating "Probability of Short Track" (0 to 1)
+    y_prob = np.random.uniform(0, 1, size=n_points)
+
+    # Simulating categories based on legend "Long Short"
+    categories = np.where(np.random.rand(n_points) > 0.5, 'Long', 'Short')
+
+    # Separate data for plotting
+    x_long = x_time[categories == 'Long']
+    y_long = y_prob[categories == 'Long']
+    x_short = x_time[categories == 'Short']
+    y_short = y_prob[categories == 'Short']
+
+    # --- FIGURE INITIALIZATION ---
+    # Creating a Joint Plot layout (Main scatter, Top Histogram, Right Histogram)
+    fig = make_subplots(
+        rows=2, cols=2,
+        row_heights=[0.2, 0.8], # Top histogram takes 20% height, main plot 80%
+        column_widths=[0.8, 0.2], # Main plot takes 80% width, right histogram 20%
+        horizontal_spacing=0.02,
+        vertical_spacing=0.02,
+        shared_xaxes=True,
+        shared_yaxes=True
+    )
+
+    # --- ADDING TRACES ---
+
+    # 1. Main Scatter Plot (Row 2, Col 1)
+    fig.add_trace(
+        go.Scatter(
+            x=x_long, y=y_long, mode='markers',
+            name='Long', marker=dict(color=COLOR_LONG, size=4, opacity=0.6),
+            showlegend=True
+        ),
+        row=2, col=1
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=x_short, y=y_short, mode='markers',
+            name='Short', marker=dict(color=COLOR_SHORT, size=4, opacity=0.6),
+            showlegend=True
+        ),
+        row=2, col=1
+    )
+
+    # 2. Top Marginal Histogram (Row 1, Col 1)
+    fig.add_trace(
+        go.Histogram(
+            x=x_time,
+            marker_color='gray',
+            showlegend=False,
+            xbins=dict(start=-1000, end=1000, size=50)
+        ),
+        row=1, col=1
+    )
+
+    # 3. Right Marginal Histogram (Row 2, Col 2)
+    fig.add_trace(
+        go.Histogram(
+            y=y_prob,
+            marker_color='gray',
+            showlegend=False,
+            ybins=dict(start=0, end=1, size=0.05)
+        ),
+        row=2, col=2
+    )
+
+    # --- AXIS FORMATTING ---
+
+    # Main X-Axis (Delta-aligned Event Time)
+    fig.update_xaxes(
+        title_text="Delta-aligned Event Time (seconds)",
+        title_font=dict(size=AXIS_TITLE_FONT_SIZE, family=FONT_FAMILY),
+        tickvals=[-1000, -500, 0, 500, 1000],
+        tickfont=dict(size=TICK_FONT_SIZE, family=FONT_FAMILY),
+        range=[-1050, 1050],
+        showgrid=True, gridcolor='lightgray',
+        row=2, col=1
+    )
+
+    # Main Y-Axis (Probability of Short Track)
+    fig.update_yaxes(
+        title_text="Probability of Short Track",
+        title_font=dict(size=AXIS_TITLE_FONT_SIZE, family=FONT_FAMILY),
+        tickvals=[0, 0.5, 1],
+        tickfont=dict(size=TICK_FONT_SIZE, family=FONT_FAMILY),
+        range=[-0.05, 1.05],
+        showgrid=True, gridcolor='lightgray',
+        row=2, col=1
+    )
+
+    # Top Histogram Y-Axis (# Events: 0, 500, 1000, 1500)
+    fig.update_yaxes(
+        title_text="# Events",
+        title_font=dict(size=AXIS_TITLE_FONT_SIZE, family=FONT_FAMILY),
+        tickvals=[0, 500, 1000, 1500],
+        tickfont=dict(size=TICK_FONT_SIZE, family=FONT_FAMILY),
+        range=[0, 1600],
+        row=1, col=1
+    )
+
+    # Right Histogram X-Axis (# Events: 0, 200, 400, 600, 800)
+    fig.update_xaxes(
+        title_text="# Events",
+        title_font=dict(size=AXIS_TITLE_FONT_SIZE, family=FONT_FAMILY),
+        tickvals=[0, 200, 400, 600, 800],
+        tickfont=dict(size=TICK_FONT_SIZE, family=FONT_FAMILY),
+        range=[0, 850],
+        row=2, col=2
+    )
+
+    # --- ANNOTATIONS & LAYOUT ---
+
+    # Add a vertical line at delta time = 0
+    fig.add_vline(x=0, line_width=1.5, line_dash="dash", line_color="black", row=2, col=1)
+    fig.add_vline(x=0, line_width=1.5, line_dash="dash", line_color="black", row=1, col=1)
+
+    # Annotations for "Pre-delta" and "Post-delta"
+    fig.add_annotation(
+        x=-500, y=1.02, xref="x", yref="y domain",
+        text="Pre-delta", showarrow=False,
+        font=dict(size=ANNOTATION_FONT_SIZE, family=FONT_FAMILY, color="black")
+    )
+    fig.add_annotation(
+        x=500, y=1.02, xref="x", yref="y domain",
+        text="Post-delta", showarrow=False,
+        font=dict(size=ANNOTATION_FONT_SIZE, family=FONT_FAMILY, color="black")
+    )
+
+    # Final Layout Updates
+    fig.update_layout(
+        title=dict(
+            text="Short-track Decoded Likelihood during PBEs",
+            font=dict(size=TITLE_FONT_SIZE, family=FONT_FAMILY),
+            x=0.5, # Center the title
+            y=0.98
+        ),
+        legend=dict(
+            title=dict(text="Track Type", font=dict(family=FONT_FAMILY)),
+            font=dict(size=TICK_FONT_SIZE, family=FONT_FAMILY),
+            x=0.85, y=0.85, # Position legend inside the top right of main plot
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="black",
+            borderwidth=1
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        width=900,
+        height=700,
+        margin=dict(l=80, r=40, t=80, b=80)
+    )
+
+    return fig
+
