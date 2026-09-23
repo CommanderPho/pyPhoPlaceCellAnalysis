@@ -2018,15 +2018,20 @@ def _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc: str, e
         
     def _subfn_update_stacked_post_plot(histogram_out):
         """ captures: y_baseline_level, y_ylims """
+        # a_fig = histogram_out.figures[0]
+        a_fig = histogram_out.fig
         # for k, ax in histogram_out.axes.items():
         for k, ax in histogram_out.ax_dict.items():
             ## this works for scatter as well
             _tmp_line = ax.axhline(y_baseline_level, **baseline_kwargs) # draw baseline line (horizontally)
             ax.set_ylim(*y_ylims)
             
+            if a_fig is None:
+                a_fig = ax.get_figure() # recover figure from axes when container.fig is unset
+                assert a_fig is not None
+                histogram_out.fig = a_fig ## assign a_fig
+
         ## add flexitext text:
-        # a_fig = histogram_out.figures[0]
-        a_fig = histogram_out.fig
         extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
         suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
         subtitle_string = None
@@ -2146,17 +2151,24 @@ def _perform_matplotlib_pre_post_scatter(grainularity_desc: str, laps_df: pd.Dat
     else:
         baseline_kwargs = dict(color=(0.2,0.2,0.2,.75), linewidth=2)
         
-    def _update_stacked_hist_post_plot(histogram_out):
+    def _subfn_update_stacked_hist_post_plot(histogram_out):
         """ captures: y_baseline_level, y_ylims """
+        # a_fig = histogram_out.figures[0]
+        a_fig = histogram_out.fig
+
         # for k, ax in histogram_out.axes.items():
         for k, ax in histogram_out.ax_dict.items():
             ## this works for scatter as well
             _tmp_line = ax.axhline(y_baseline_level, **baseline_kwargs) # draw baseline line (horizontally)
             ax.set_ylim(*y_ylims)
             
+            if a_fig is None:
+                a_fig = ax.get_figure() # recover figure from axes when container.fig is unset
+                assert a_fig is not None
+                histogram_out.fig = a_fig ## assign a_fig
+        ## END for k, ax in histogram_out.ax_dict...
+
         ## add flexitext text:
-        # a_fig = histogram_out.figures[0]
-        a_fig = histogram_out.fig
         extracted_fig_titles_dict = MatplotlibFigureExtractors.extract_titles(fig=a_fig)
         suptitle: str = extracted_fig_titles_dict.get('suptitle', None) # 'Laps (by-time-bin)|2 Sessions|5 tbin sizes'
         subtitle_string = None
@@ -2214,13 +2226,13 @@ def _perform_matplotlib_pre_post_scatter(grainularity_desc: str, laps_df: pd.Dat
     num_unique_sessions: int = laps_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = laps_df.time_bin_size.nunique(dropna=True)
     _laps_histogram_out = _active_plot_fn(laps_df, data_type=f'Laps ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
-    _laps_flexitext_dict = _update_stacked_hist_post_plot(_laps_histogram_out)
+    _laps_flexitext_dict = _subfn_update_stacked_hist_post_plot(_laps_histogram_out)
     # fig_to_clipboard(_laps_histogram_out.figures[0], bbox_inches='tight')
 
     num_unique_sessions: int = ripple_df.session_name.nunique(dropna=True) # number of unique sessions, ignoring the NA entries
     num_unique_time_bins: int = ripple_df.time_bin_size.nunique(dropna=True)
     _ripple_histogram_out = _active_plot_fn(ripple_df, data_type=f'PBEs ({grainularity_desc})', session_spec=f'{num_unique_sessions} Sessions', time_bin_duration_str=f"{num_unique_time_bins} tbin sizes", **common_stacked_hist_kwargs)
-    _ripple_flexitext_dict = _update_stacked_hist_post_plot(_ripple_histogram_out)
+    _ripple_flexitext_dict = _subfn_update_stacked_hist_post_plot(_ripple_histogram_out)
     # fig_to_clipboard(_ripple_histogram_out.figures[0], bbox_inches='tight')
 
     # Add scatterplot if requested
