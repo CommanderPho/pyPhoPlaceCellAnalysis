@@ -187,6 +187,7 @@ class PlotlyHelpers:
     figures_folder: Path = field()
     
     _is_dark_mode: bool = field(default=False)
+    _is_publication: bool = field(default=False)
     neptuner_run: bool = field(default=False)
 
     should_save: bool = field(default=False)
@@ -221,9 +222,21 @@ class PlotlyHelpers:
         return self._is_dark_mode
     @is_dark_mode.setter
     def is_dark_mode(self, value: bool):
-        self._is_dark_mode = value
-        self.is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self._is_dark_mode)
-        pio.templates.default = self.active_template
+        # self._is_dark_mode = value
+        # self._is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self._is_dark_mode)
+        self.active_template = self.update_plotly_template(is_dark_mode=value)
+        # pio.templates.default = self.active_template
+
+    @property
+    def is_publication(self) -> bool:
+        """The is_publication property."""
+        return self._is_publication
+    @is_publication.setter
+    def is_publication(self, value: bool):
+        # self._is_publication = value
+        # self._is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self._is_dark_mode)
+        self.active_template = self.update_plotly_template(is_publication=value)
+        # pio.templates.default = self.active_template
 
     # ==================================================================================================================== #
     # Initialization                                                                                                       #
@@ -233,7 +246,7 @@ class PlotlyHelpers:
         # if getattr(cls, 'template_dict', None) is None:
         #     cls.template_dict = deepcopy(_template_dict)
 
-        self.is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self.is_dark_mode)
+        self._is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self.is_dark_mode, is_publication=self.is_publication)
         pio.templates.default = self.active_template
         # self.fig_size_kwargs = {'width': (self.resolution_multiplier * 1800), 'height': (self.resolution_multiplier*480)}
 
@@ -300,6 +313,29 @@ class PlotlyHelpers:
         _discarded_data_context = kwargs.pop('data_context', None)
 
         return self._perform_plot_pre_post_delta_scatter(data_context=None, **kwargs)
+
+
+    def update_plotly_template(self, is_dark_mode:Optional[bool]=None, is_publication: Optional[bool]=None):
+        """
+        
+        from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers
+
+        is_dark_mode, template = PlotlyHelpers.update_plotly_template(is_dark_mode=False)
+        
+        """
+        did_change: bool = False
+        if (is_dark_mode is not None) and (is_dark_mode != self._is_dark_mode):
+            self._is_dark_mode = is_dark_mode
+            did_change = True
+
+        if (is_publication is not None) and (is_publication != self._is_publication):
+            self._is_publication = is_publication
+            did_change = True
+
+        if did_change:
+            self._is_dark_mode, self.active_template = self.get_plotly_template(is_dark_mode=self._is_dark_mode, is_publication=self._is_publication)
+
+        return self.active_template
 
 
     @classmethod
