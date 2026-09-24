@@ -934,47 +934,32 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
     # print(f'already_added_legend_entries: {already_added_legend_entries}')
     
-    # Horizontal hist (y=variable): data bins along Y (`ybins`), bar length / count along X.
-    # Shared "histogram height" == shared x-axis (# Events) range across pre/post hist panels.
+    # Shared hist count magnitude: horizontal hist (y=variable) puts # Events on x — share that x-range only.
+    # Does not touch figure y-limits (those stay at the existing update_yaxes(... [-0.05, 1.05] ...) below).
     hist_count_max: Optional[int] = None
-    _hist_range_y = hist_kwargs.get('range_y', forced_range_y) or [0.0, 1.0]
-    _hist_nbins: int = int(hist_kwargs.get('nbins', histogram_bins))
-    _hist_fallback_bin_edges = np.linspace(float(_hist_range_y[0]), float(_hist_range_y[1]), _hist_nbins + 1)
+    if should_set_hist_same_magnitude_axes:
+        _hist_range_y = hist_kwargs.get('range_y', forced_range_y) or [0.0, 1.0]
+        _hist_nbins: int = int(hist_kwargs.get('nbins', histogram_bins))
+        _hist_count_bin_edges = np.linspace(float(_hist_range_y[0]), float(_hist_range_y[1]), _hist_nbins + 1)
 
-    def _subfn_horizontal_hist_count_max(a_trace) -> int:
-        """Max bin count for a horizontal Histogram trace (raw values in `y`, counts on x)."""
-        y_vals = np.asarray(a_trace.y, dtype=float)
-        y_vals = y_vals[np.isfinite(y_vals)]
-        if y_vals.size == 0:
-            return 0
-        bins_obj = a_trace.ybins
-        if (bins_obj is not None) and (getattr(bins_obj, 'start', None) is not None) and (getattr(bins_obj, 'size', None) is not None) and (getattr(bins_obj, 'end', None) is not None):
-            bin_edges = np.arange(float(bins_obj.start), float(bins_obj.end) + float(bins_obj.size) * 0.5, float(bins_obj.size))
-        else:
-            bin_edges = _hist_fallback_bin_edges
-        counts, _ = np.histogram(y_vals, bins=bin_edges)
-        return int(np.max(counts)) if counts.size > 0 else 0
+        def _subfn_horizontal_hist_count_max(a_trace) -> int:
+            """Max bin count for a horizontal Histogram trace (raw values in `y`, counts on x)."""
+            y_vals = np.asarray(a_trace.y, dtype=float)
+            y_vals = y_vals[np.isfinite(y_vals)]
+            if y_vals.size == 0:
+                return 0
+            counts, _ = np.histogram(y_vals, bins=_hist_count_bin_edges)
+            return int(np.max(counts)) if counts.size > 0 else 0
 
 
     # Pre-Delta Histogram
     # trace_name_prefix:str = 'trace_pre_delta_hist'
     trace_name_prefix:str = ''
-    # Shared y-variable bin edges for both horizontal hists (must match; edge bars clip if start/end sit inside [0,1] while y-axis is locked).
-    # size=0.1 with [0, 1] → bins [0,0.1), …, [0.9,1.0]; y-axis padding [-0.05, 1.05] keeps extrema bar thickness fully visible.
-    _shared_hist_ybins_start: float = float(_hist_range_y[0])
-    _shared_hist_ybins_end: float = float(_hist_range_y[1])
-    _shared_hist_ybins_size: float = (_shared_hist_ybins_end - _shared_hist_ybins_start) / float(_hist_nbins)
-
-    def _subfn_apply_shared_hist_ybins(a_trace) -> None:
-        """Horizontal hist bins the y-variable via ybins (xbins only applies to vertical / orientation='v')."""
-        a_trace.ybins.start = _shared_hist_ybins_start
-        a_trace.ybins.end = _shared_hist_ybins_end
-        a_trace.ybins.size = _shared_hist_ybins_size
-
-
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
-        _subfn_apply_shared_hist_ybins(a_trace)
+        a_trace.xbins.start = 0.05
+        a_trace.xbins.end = 0.95
+        a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         
         PlotlyFigureContainer.add_trace_with_legend_handling(
@@ -1016,8 +1001,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # range_y
 
     for a_trace in _tmp_post_delta_fig.data:
-        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?
-        _subfn_apply_shared_hist_ybins(a_trace)
+        # a_trace.xbins.start = 0.05
+        # a_trace.xbins.end = 0.95
+        # a_trace.xbins.size = 0.1
+        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?   
+        a_trace.xbins.start = 0.0
+        a_trace.xbins.end = 1.0
+        a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
             fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
@@ -1040,7 +1030,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # fig = fig.update_yaxes(col=2, range=[0.0, 5.0])
 
     if should_set_hist_same_magnitude_axes:
-        # Shared count axis (# Events) for both horizontal histograms — not the scatter time axis (col=2)
+        # Shared # Events (x) range for both horizontal histograms — leave scatter time axis (col=2) alone
         if (hist_count_max is not None) and (hist_count_max > 0):
             shared_hist_x_range = [0, hist_count_max]
             if debug_print:
