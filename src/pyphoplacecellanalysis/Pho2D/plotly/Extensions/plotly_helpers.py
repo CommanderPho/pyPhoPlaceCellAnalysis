@@ -957,9 +957,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     trace_name_prefix:str = ''
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
-        a_trace.xbins.start = 0.05
-        a_trace.xbins.end = 0.95
-        a_trace.xbins.size = 0.1
+        # a_trace.xbins.start = 0.05
+        # a_trace.xbins.end = 0.95
+        # a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         
         PlotlyFigureContainer.add_trace_with_legend_handling(
@@ -1004,10 +1004,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         # a_trace.xbins.start = 0.05
         # a_trace.xbins.end = 0.95
         # a_trace.xbins.size = 0.1
-        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this?   
-        a_trace.xbins.start = 0.0
-        a_trace.xbins.end = 1.0
-        a_trace.xbins.size = 0.1
+        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this? 
+        #TODO 2026-09-24 10:55: - [ ] Does this affect the actual counts or just the display of the bars? There's fixed 11 bins in the hist, and the data can only possibly take on values from (0.0, 1.0) so the ranges
+            # ((-0.5, 0.0) and (1.0, 1.05) are guaranteed to have no points in them. Does the above binning artificially reduce the counts in these extrema bins by only allowing for half the possible points?
+
+        # a_trace.xbins.start = 0.0
+        # a_trace.xbins.end = 1.0
+        # a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
             fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
