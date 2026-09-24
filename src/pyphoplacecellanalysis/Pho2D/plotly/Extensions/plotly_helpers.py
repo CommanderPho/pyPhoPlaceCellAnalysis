@@ -709,7 +709,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
                                    figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
-                                    curr_fig_width=1800, should_set_hist_same_magnitude_axes: bool = True, 
+                                    curr_fig_width=1800, should_set_hist_same_magnitude_axes: bool = True, position_hist_bars_inside_data_range: bool = False,
                                     **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
@@ -717,7 +717,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     time_delta_tuple=(earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end)
 
     `curr_fig_width` is only used to get the properly sized annotations/titles
-    
+    `should_set_hist_same_magnitude_axes`: bool = True -- If True, the counts/magnitude axes of each histogram are set the the same limits (determined by the highest count amongst both of the hists) so they can be directly compared instead of auto-scaled.
+    `position_hist_bars_inside_data_range`: bool = False -- If True, the entirety of the histogram's outermost bars have their outer edges aligned with 0.0 and 1.0 respectively, meaning no portion of this goes outside the (0.0, 1.0) range. Otherwise they are centered.
+        ## NOTE: this option does NOT affect the counts at all, only the display/formatting of the bars.
 
     Usage:
 
@@ -957,9 +959,14 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     trace_name_prefix:str = ''
     _tmp_pre_delta_fig = px.histogram(pre_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=pre_delta_label)
     for a_trace in _tmp_pre_delta_fig.data:
-        # a_trace.xbins.start = 0.05
-        # a_trace.xbins.end = 0.95
-        # a_trace.xbins.size = 0.1
+        # a_trace.ybins.start = 0.05
+        # a_trace.ybins.end = 0.95
+        # a_trace.ybins.size = 0.1
+        if position_hist_bars_inside_data_range:
+            a_trace.ybins.start = 0.0
+            a_trace.ybins.end = 1.0
+            a_trace.ybins.size = 1.0/float(histogram_bins) # 0.09090909090909091
+        
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         
         PlotlyFigureContainer.add_trace_with_legend_handling(
@@ -998,19 +1005,20 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     trace_name_prefix:str = 'trace_post_delta_hist'
     _tmp_post_delta_fig = px.histogram(post_delta_df, y=histogram_variable_name, **(common_plot_kwargs | hist_kwargs), title=post_delta_label)
     
-    # range_y
-
     for a_trace in _tmp_post_delta_fig.data:
-        # a_trace.xbins.start = 0.05
-        # a_trace.xbins.end = 0.95
-        # a_trace.xbins.size = 0.1
-        ## #TODO 2025-07-03 21:42: - [ ] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this? 
-        #TODO 2026-09-24 10:55: - [ ] Does this affect the actual counts or just the display of the bars? There's fixed 11 bins in the hist, and the data can only possibly take on values from (0.0, 1.0) so the ranges
+        # a_trace.ybins.start = 0.05
+        # a_trace.ybins.end = 0.95
+        # a_trace.ybins.size = 0.1
+        ## #TODO 2025-07-03 21:42: - [X] plotly histogram for data strictly between 0.0-1.0 has its outermost bins from -[0.5-0.5], ... [0.95, 1.05]. How can I fix this? 
+        #TODO 2026-09-24 10:55: - [X] Does this affect the actual counts or just the display of the bars? There's fixed 11 bins in the hist, and the data can only possibly take on values from (0.0, 1.0) so the ranges
             # ((-0.5, 0.0) and (1.0, 1.05) are guaranteed to have no points in them. Does the above binning artificially reduce the counts in these extrema bins by only allowing for half the possible points?
+                ### CONCLUSION: No, this doesn't affect the actual counts, that comes from above.
+        if position_hist_bars_inside_data_range:
+            a_trace.ybins.start = 0.0
+            a_trace.ybins.end = 1.0
+            a_trace.ybins.size = 1.0/float(histogram_bins) # 0.09090909090909091
+            # print(f'a_trace.ybins: {a_trace.ybins}') # 0.09090909090909091
 
-        # a_trace.xbins.start = 0.0
-        # a_trace.xbins.end = 1.0
-        # a_trace.xbins.size = 0.1
         a_full_trace_name: str = '_'.join([v for v in [trace_name_prefix, a_trace.name] if (len(v)>0)]) ## build new trace name
         PlotlyFigureContainer.add_trace_with_legend_handling(
             fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
