@@ -210,6 +210,7 @@ class PlotlyHelpers:
     def fig_size_kwargs(self) -> Dict:
         """The fig_size_kwargs property."""
         return {'width': (self.resolution_multiplier * 1800), 'height': (self.resolution_multiplier*480)}
+        # return {'width': (self.resolution_multiplier * 1650), 'height': (self.resolution_multiplier*480)}
 
     @property
     def time_delta_tuple(self) -> Tuple[float, float, float]:
@@ -270,6 +271,10 @@ class PlotlyHelpers:
             export_html = self.export_html
         if export_png is None:
             export_png = self.export_png
+
+        # fig_size_kwargs = kwargs.pop('fig_size_kwargs', self.fig_size_kwargs)
+        # a_fig = a_fig.update_layout(fig_size_kwargs) ## update size
+
         return self._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=date_prefix, export_html=export_html, export_png=export_png, **kwargs)
 
 

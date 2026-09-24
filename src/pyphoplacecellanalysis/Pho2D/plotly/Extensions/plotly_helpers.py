@@ -709,7 +709,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    forced_range_y=[0.0, 1.0], time_delta_tuple=None, is_dark_mode: bool = True,
                                    figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
-                                    curr_fig_width=1800,
+                                    curr_fig_width=1800, should_set_hist_same_magnitude_axes: bool = True, 
                                     **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
@@ -934,6 +934,10 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
     # print(f'already_added_legend_entries: {already_added_legend_entries}')
     
+    if should_set_hist_same_magnitude_axes:
+        hist_y_min = None
+        hist_y_max = None
+
     # Pre-Delta Histogram
     # trace_name_prefix:str = 'trace_pre_delta_hist'
     trace_name_prefix:str = ''
@@ -947,6 +951,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         PlotlyFigureContainer.add_trace_with_legend_handling(
             fig=fig, trace=a_trace, row=1, col=1, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
         )
+
+        if should_set_hist_same_magnitude_axes:
+            if (hist_y_min is None) or (a_trace.ybins.start < hist_y_min):
+                hist_y_min = a_trace.ybins.start
+            if (hist_y_max is None) or (hist_y_max > a_trace.ybins.end):
+                hist_y_max = a_trace.ybins.end
+
 
     # Scatter Plot
     trace_name_prefix:str = 'trace_scatter'
@@ -989,6 +1000,13 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             fig=fig, trace=a_trace, row=1, col=3, already_added_legend_entries=already_added_legend_entries, trace_name_prefix=trace_name_prefix
         )
 
+        if should_set_hist_same_magnitude_axes:
+            if (hist_y_min is None) or (a_trace.ybins.start < hist_y_min):
+                hist_y_min = a_trace.ybins.start
+            if (hist_y_max is None) or (hist_y_max > a_trace.ybins.end):
+                hist_y_max = a_trace.ybins.end
+
+
     # Update layouts and axes
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
@@ -998,6 +1016,14 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # fig = fig.update_yaxes(col=3, range=[-0.05, 1.05])
     # # df_filter.figure_widget = df_filter.figure_widget.update_yaxes(col=2, range=[0.0, 1.0])
     # fig = fig.update_yaxes(col=2, range=[0.0, 5.0])
+
+    if should_set_hist_same_magnitude_axes:
+        print(f'should_set_hist_same_magnitude_axes: True, constrained axes sizes:')
+        if (hist_y_min is not None):
+            print(f'\thist_y_min: {hist_y_min}')
+        if (hist_y_max is not None):
+            print(f'\thist_y_max: {hist_y_max}')
+
 
     # Add epoch shapes if provided
     if time_delta_tuple is not None:

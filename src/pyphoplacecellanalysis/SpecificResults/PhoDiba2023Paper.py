@@ -2292,11 +2292,13 @@ def _perform_dual_hist_plot(grainularity_desc: str, laps_df: pd.DataFrame, rippl
 
 @function_attributes(short_name=None, tags=['MAIN', 'CRITICAL', 'FINAL', 'plotly', 'scatter', 'histogram', 'publication'], input_requires=[], output_provides=[], uses=['plotly_pre_post_delta_scatter'], used_by=[], creation_date='2024-10-23 20:04', related_items=['_perform_matplotlib_pre_post_scatter'])
 def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext, concatenated_ripple_df: pd.DataFrame, time_delta_tuple: Tuple[float, float, float], fig_size_kwargs: Dict, save_plotly: Callable, is_dark_mode: bool=False, enable_custom_widget_buttons:bool=True,
-                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, histogram_bins: int = 11, **kwargs):
+                                          extant_figure=None, custom_output_widget=None, legend_groups_to_hide: Optional[List[str]]=None, should_save: bool = True, variable_name = 'P_Short', y_baseline_level: float = 0.5, additional_fig_layout_kwargs: Dict=None, is_publication_ready_figure: bool=False, histogram_bins: int = 11, should_set_hist_same_magnitude_axes: bool = True, **kwargs):
     """ plots the stacked histograms for both laps and ripples
     2025-07-29 - Created ALTERNATIVE <MATPLOTLIB> function: `_perform_matplotlib_pre_post_scatter` for publication to avoid the Plotly exporting headaches
     
-    
+    should_set_hist_same_magnitude_axes: normalize height/magnitude of both histograms to the same value
+
+
     Usage:
         from functools import partial
         from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import plotly_pre_post_delta_scatter
@@ -2424,6 +2426,7 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
                             # figure_sup_huge_title_text=data_context.get_description(subset_excludelist=['title_prefix'], separator=' | '),
                             figure_sup_huge_title_text=figure_sup_huge_title_text, figure_footer_text=figure_footer_text,
                             is_publication_ready_figure=is_publication_ready_figure,
+                            should_set_hist_same_magnitude_axes=should_set_hist_same_magnitude_axes,
                             **kwargs,
     )
 
