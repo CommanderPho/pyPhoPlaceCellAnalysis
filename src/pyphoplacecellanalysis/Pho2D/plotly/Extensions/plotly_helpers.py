@@ -1081,6 +1081,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             fig, scatter_column_index=2, t_start=delta_relative_t_start,
             t_split=delta_relative_t_delta, t_end=delta_relative_t_end, is_dark_mode=is_dark_mode
         )
+        # Pin scatter x to the same bounds as the epoch vrects (avoids white flanks from autorange/stale range)
+        fig.update_xaxes(range=[delta_relative_t_start, delta_relative_t_end], autorange=False, row=1, col=2)
     else:
         _extras_output_dict = {}
 

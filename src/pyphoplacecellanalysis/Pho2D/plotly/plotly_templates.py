@@ -213,8 +213,10 @@ class PlotlyHelpers:
         # return {'width': (self.resolution_multiplier * 1650), 'height': (self.resolution_multiplier*480)}
 
     @property
-    def time_delta_tuple(self) -> Tuple[float, float, float]:
-        """The time_delta_tuple property."""
+    def time_delta_tuple(self) -> Optional[Tuple[float, float, float]]:
+        """(earliest_delta_aligned_t_start, t_delta, latest_delta_aligned_t_end), or None if either bound is missing."""
+        if (self.earliest_delta_aligned_t_start is None) or (self.latest_delta_aligned_t_end is None):
+            return None
         return (self.earliest_delta_aligned_t_start, 0.0, self.latest_delta_aligned_t_end)
 
     @property
@@ -295,8 +297,17 @@ class PlotlyHelpers:
         """
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _helper_perform_plot_pre_post_delta_scatter
 
+        time_delta_tuple = kwargs.pop('time_delta_tuple', None)
+        earliest_delta_aligned_t_start = kwargs.pop('earliest_delta_aligned_t_start', self.earliest_delta_aligned_t_start)
+        latest_delta_aligned_t_end = kwargs.pop('latest_delta_aligned_t_end', self.latest_delta_aligned_t_end)
+        if time_delta_tuple is None:
+            if (earliest_delta_aligned_t_start is not None) and (latest_delta_aligned_t_end is not None):
+                time_delta_tuple = (earliest_delta_aligned_t_start, 0.0, latest_delta_aligned_t_end)
+            ## END if (earliest_delta_aligned_t_start is not None) and (latest_delta_aligned_t_end is not None)...
+        ## END if time_delta_tuple is None...
+
         return _helper_perform_plot_pre_post_delta_scatter(
-                time_delta_tuple=kwargs.pop('time_delta_tuple', (kwargs.pop('earliest_delta_aligned_t_start', self.earliest_delta_aligned_t_start), 0.0, kwargs.pop('latest_delta_aligned_t_end', self.latest_delta_aligned_t_end))),
+                time_delta_tuple=time_delta_tuple,
                 fig_size_kwargs=self.fig_size_kwargs,
                 is_dark_mode=self.is_dark_mode,
                 save_plotly=self.save_plotly,
