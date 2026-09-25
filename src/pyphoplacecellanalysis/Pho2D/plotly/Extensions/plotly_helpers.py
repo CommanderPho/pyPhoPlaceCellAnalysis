@@ -1066,8 +1066,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             hist_count_tickvals = [0, nice_hist_count_mid, nice_hist_count_max]
             if debug_print:
                 print(f'should_set_hist_same_magnitude_axes: True, shared hist count (x) range: {shared_hist_x_range} (raw max={hist_count_max})')
-            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=-45, row=1, col=1)
-            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=-45, row=1, col=3)
+            # tickangle = 0 ## horizontal
+            # tickangle = -45
+            tickangle = 90
+
+            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=1)
+            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=3)
 
 
     # Add epoch shapes if provided
