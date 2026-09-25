@@ -2743,6 +2743,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
             all_sessions_laps_time_bin_df=all_sessions_laps_time_bin_df,
             all_sessions_MultiMeasure_laps_df=all_sessions_MultiMeasure_laps_df,
             additional_filter_predicates=additional_filter_predicates,
+            initially_is_checked={'high_wcorr': True, 'user_selected': True},
             on_filtered_dataframes_changed_callback_fns={'build_filter_changed_plotly_plotting_callback_fn': _build_filter_changed_plotly_plotting_callback_fn},
             active_plot_df_name='filtered_all_sessions_all_scores_ripple_df',
         )
@@ -2772,6 +2773,7 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
     include_export_controls_and_table: bool = non_serialized_field(default=False) # when True, Copy/Save PNG includes filter-control + stats-table bands around the figure
 
     additional_filter_predicates = non_serialized_field(default=Factory(dict)) # a list of boolean predicates to be applied as filters
+    initially_is_checked: Optional[Dict[str, bool]] = non_serialized_field(default=None) # optional {predicate_name: True/False} to pre-check predicate checkboxes at init; unknown keys ignored
     on_filtered_dataframes_changed_callback_fns = non_serialized_field(default=Factory(dict)) # a list of callables that will be called when the filters are changed. 
     
     selected_points = non_serialized_field(default=Factory(dict))
@@ -3154,7 +3156,10 @@ class DataFrameFilter(HDF_SerializationMixin, AttrsBasedClassHelperMixin):
         )
         self.active_plot_variable_name_widget.value = self.active_plot_variable_name
         
-        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=list(self.additional_filter_predicates.keys()))
+        predicate_keys = list(self.additional_filter_predicates.keys())
+        initial_checked = self.initially_is_checked or {}
+        options_dict = {k: bool(initial_checked.get(k, False)) for k in predicate_keys}
+        self.active_filter_predicate_selector_widget = CheckBoxListWidget(options_list=options_dict)
             # description='Filter Predicates:',
             # disabled=False,
         # )
