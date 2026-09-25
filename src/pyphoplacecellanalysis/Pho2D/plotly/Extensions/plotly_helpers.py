@@ -710,6 +710,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
                                    figure_sup_huge_title_text: str=None, is_top_supertitle: bool = False, main_title: Optional[str]=None, figure_footer_text: Optional[str]=None, is_publication_ready_figure: bool=False,
                                    extant_figure=None, # an existing plotly figure
                                     curr_fig_width=1800, should_set_hist_same_magnitude_axes: bool = True, position_hist_bars_inside_data_range: bool = False,
+                                    epoch_label_mode: str = 'none',
                                     **kwargs):
     """ Plots a scatter plot of a variable pre/post delta, with a histogram on each end corresponding to the pre/post delta distribution
 
@@ -720,6 +721,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     `should_set_hist_same_magnitude_axes`: bool = True -- If True, the counts/magnitude axes of each histogram are set the the same limits (determined by the highest count amongst both of the hists) so they can be directly compared instead of auto-scaled.
     `position_hist_bars_inside_data_range`: bool = False -- If True, the entirety of the histogram's outermost bars have their outer edges aligned with 0.0 and 1.0 respectively, meaning no portion of this goes outside the (0.0, 1.0) range. Otherwise they are centered.
         ## NOTE: this option does NOT affect the counts at all, only the display/formatting of the bars.
+    `epoch_label_mode`: str = 'none' -- no Long/Short text (default); 'annotation_above' draws readable labels above the scatter; 'vrect' keeps tiny inset labels.
 
     Usage:
 
@@ -743,6 +745,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     data_results_df = data_results_df.copy()
     use_latex_labels: bool = False
     debug_print = kwargs.get('debug_print', False)
+    epoch_text_labels_kwargs = kwargs.pop('epoch_text_labels_kwargs', None)
     
     if use_latex_labels:
         pre_delta_label: str = r'"$\\text{Pre-}\Delta$"'
@@ -1072,9 +1075,9 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
             # fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=1) ## normal left hist orientation
             # Left: FLIPPED ORIENTATION, max on outside, 0 next to scatter (avoids max vs -2000 collision)
-            fig.update_xaxes(range=[nice_hist_count_max, 0], autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=1)
+            fig.update_xaxes(range=[nice_hist_count_max, 0], autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, ticks='outside', ticklen=5, tickwidth=1, row=1, col=1)
             # Right: unchanged orientation
-            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=3)
+            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, ticks='outside', ticklen=5, tickwidth=1, row=1, col=3)
 
 
     # Add epoch shapes if provided
@@ -1086,7 +1089,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         )
         _extras_output_dict = plotly_helper_add_epoch_shapes(
             fig, scatter_column_index=2, t_start=delta_relative_t_start,
-            t_split=delta_relative_t_delta, t_end=delta_relative_t_end, is_dark_mode=is_dark_mode
+            t_split=delta_relative_t_delta, t_end=delta_relative_t_end, is_dark_mode=is_dark_mode,
+            epoch_text_labels_kwargs=epoch_text_labels_kwargs, epoch_label_mode=epoch_label_mode,
         )
         # Pin scatter x to the same bounds as the epoch vrects (avoids white flanks from autorange/stale range)
         fig.update_xaxes(range=[delta_relative_t_start, delta_relative_t_end], autorange=False, row=1, col=2)
@@ -1234,18 +1238,25 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
 
 
 @function_attributes(short_name=None, tags=['plotly', 'helper', 'epoch', 'track'], input_requires=[], output_provides=[], uses=[], used_by=['_helper_build_figure'], creation_date='2024-03-01 13:58', related_items=[])
-def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1, epoch_text_labels_kwargs=None):
+def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: float, t_split:float, t_end: float, is_dark_mode: bool = True, total_rows:int=1, epoch_text_labels_kwargs=None, epoch_label_mode: str = 'none'):
     """ adds shapes representing the epochs to the scatter plot at index scatter_column_index
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plotly_helper_add_epoch_shapes
         _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end)
 
-
+    epoch_label_mode: 'none' (default) — shaded regions only, no Long/Short text;
+        'annotation_above' — readable annotations just above y=1 with a light halo;
+        'vrect' — tiny inset labels on the vrects.
     """
     from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import LongShortDisplayConfigManager
 
-    # epoch_text_labels_kwargs = dict(size=9, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 6.75pt
-    epoch_text_labels_kwargs = dict(size=6.666666666666666, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 5pt
+    assert epoch_label_mode in ('none', 'vrect', 'annotation_above'), f"epoch_label_mode must be 'none', 'vrect', or 'annotation_above', got {epoch_label_mode!r}"
+
+    if epoch_label_mode == 'annotation_above':
+        epoch_text_labels_kwargs = dict(size=12, family="Arial") | (epoch_text_labels_kwargs or {})
+    else:
+        # epoch_text_labels_kwargs = dict(size=9, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 6.75pt
+        epoch_text_labels_kwargs = dict(size=6.666666666666666, family="Arial") | (epoch_text_labels_kwargs or {}) #TODO 2025-07-03 19:05: - [ ] Corresponding to an exported size of 5pt
 
     _extras_output_dict = {}
     ## Get the track configs for the colors:
@@ -1256,11 +1267,13 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
         short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config.mpl_color)
         y_zero_line_color = "rgba(0.2,0.2,0.2,.25)" # very dark grey
         vertical_epoch_divider_line_color = "rgba(0,0,0,.25)"
+        annotation_bgcolor = "rgba(0,0,0,0.55)"
     else:
         long_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.long_epoch_config_light_mode.mpl_color)
         short_epoch_kwargs = dict(fillcolor=long_short_display_config_manager.short_epoch_config_light_mode.mpl_color)
         y_zero_line_color = "rgba(0.8,0.8,0.8,.25)" # very light grey
         vertical_epoch_divider_line_color = "rgba(1,1,1,.25)" # white
+        annotation_bgcolor = "rgba(255,255,255,0.75)"
 
     # row_column_kwargs = dict(row='all', col=scatter_column_index)
     for row in range(1, total_rows + 1):
@@ -1276,8 +1289,21 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
         
         # fig.add_hrect(y0=0.9, y1=2.6, line_width=0, fillcolor="red", opacity=0.2)
 
-        fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
-        fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+        if epoch_label_mode == 'vrect':
+            fig.add_vrect(x0=t_start, x1=t_split, label=dict(text="Long", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}") # , fillcolor="green", opacity=0.25
+            fig.add_vrect(x0=t_split, x1=t_end, label=dict(text="Short", textposition="top center", font=epoch_text_labels_kwargs, ), layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+        else:
+            # 'none' or 'annotation_above': shapes without vrect labels
+            fig.add_vrect(x0=t_start, x1=t_split, layer="below", opacity=0.5, line_width=1, **long_epoch_kwargs, **row_column_kwargs, name=f"long_region_{row}")
+            fig.add_vrect(x0=t_split, x1=t_end, layer="below", opacity=0.5, line_width=1, **short_epoch_kwargs, **row_column_kwargs, name=f"short_region_{row}")
+            if epoch_label_mode == 'annotation_above':
+                long_mid_x = (t_start + t_split) / 2.0
+                short_mid_x = (t_split + t_end) / 2.0
+                annotation_common = dict(y=1.0, yanchor='bottom', yshift=5, showarrow=False, font=epoch_text_labels_kwargs, bgcolor=annotation_bgcolor, borderpad=2)
+                fig.add_annotation(x=long_mid_x, text="Long", name=f"long_epoch_label_{row}", **annotation_common, **row_column_kwargs)
+                fig.add_annotation(x=short_mid_x, text="Short", name=f"short_epoch_label_{row}", **annotation_common, **row_column_kwargs)
+                _extras_output_dict[f"long_epoch_label_{row}"] = 'annotation'
+                _extras_output_dict[f"short_epoch_label_{row}"] = 'annotation'
         
         # _extras_output_dict[f"long_region_{row}"] = blue_shape
         # _extras_output_dict[f"short_region_{row}"] = red_shape
@@ -1287,7 +1313,8 @@ def plotly_helper_add_epoch_shapes(fig, scatter_column_index: int, t_start: floa
         _extras_output_dict[f"short_region_{row}"] = 'shape'
 
         # _extras_output_dict[f"y_zero_line_{row}"] = 
-    
+    ## END for row in range(1, total_rows + 1)...
+
     return _extras_output_dict
 
 
@@ -1314,6 +1341,8 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
     # px_histogram_kwargs = dict(nbins=histogram_bins, barmode='stack', opacity=0.5, range_y=[0.0, 1.0])
     scatter_title = build_fig_kwargs.pop('title', None)
     debug_print: bool = build_fig_kwargs.pop('debug_print', False)
+    epoch_label_mode: str = build_fig_kwargs.pop('epoch_label_mode', 'none')
+    epoch_text_labels_kwargs = build_fig_kwargs.pop('epoch_text_labels_kwargs', None)
 
     if scatter_title is not None:
         figure_context_dict['title'] = scatter_title
@@ -1527,7 +1556,7 @@ def _helper_build_figure(data_results_df: pd.DataFrame, histogram_bins:int=25, e
         #         fig.add_shape(a_shape, name=a_shape_name, row=1, col=scatter_column)
 
         ## Inputs: fig, t_start: float, t_end: float
-        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end, is_dark_mode=is_dark_mode)
+        _extras_output_dict = plotly_helper_add_epoch_shapes(fig, scatter_column_index=scatter_column, t_start=earliest_delta_aligned_t_start, t_split=t_split, t_end=latest_delta_aligned_t_end, is_dark_mode=is_dark_mode, epoch_text_labels_kwargs=epoch_text_labels_kwargs, epoch_label_mode=epoch_label_mode)
 
 
     # Update title and height
