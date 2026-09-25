@@ -404,9 +404,9 @@ class PlotlyFigureContainer:
         if not has_valid_extant_figure:	
             ## create a new figure if needed:
             if figure_class == go.Figure:
-                fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.025, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label]) ## figure created here, using `go.FigureWidget`
+                fig = sp.make_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.02, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label]) ## figure created here, using `go.FigureWidget`
             elif figure_class == go.FigureWidget:
-                fig = go.FigureWidget().set_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.025, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
+                fig = go.FigureWidget().set_subplots(rows=1, cols=3, column_widths=[0.10, 0.80, 0.10], horizontal_spacing=0.02, shared_yaxes=True, column_titles=[pre_delta_label, main_title, post_delta_label])
             else:
                 raise NotImplementedError(f'Unknown figure_class: {figure_class}')
                 
@@ -1067,10 +1067,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             if debug_print:
                 print(f'should_set_hist_same_magnitude_axes: True, shared hist count (x) range: {shared_hist_x_range} (raw max={hist_count_max})')
             # tickangle = 0 ## horizontal
-            # tickangle = -45
-            tickangle = 90
+            tickangle = -45
+            # tickangle = 90
 
-            # Left: max on outside, 0 next to scatter (avoids max vs -2000 collision)
+            # fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=1) ## normal left hist orientation
+            # Left: FLIPPED ORIENTATION, max on outside, 0 next to scatter (avoids max vs -2000 collision)
             fig.update_xaxes(range=[nice_hist_count_max, 0], autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=1)
             # Right: unchanged orientation
             fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=tickangle, row=1, col=3)
