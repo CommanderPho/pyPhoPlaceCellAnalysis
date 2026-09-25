@@ -4926,9 +4926,14 @@ class PhoPublicationFigureHelper:
 # 2026-09-22 Figure Testing                                                                                                                                                                                                                                                            #
 # ==================================================================================================================================================================================================================================================================================== #
 
+@function_attributes(short_name=None, tags=['UNFINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-09-24 16:44', related_items=[])
 def _plot_recreated_figure():
-    """
+    """ aimed to set the Plotly figure fonts/export sizes to match those of a reference .pdf
+
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _plot_recreated_figure
+
+        new_fig = _plot_recreated_figure()
+        new_fig
 
     """
     import plotly.graph_objects as go

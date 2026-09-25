@@ -1043,11 +1043,31 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     if should_set_hist_same_magnitude_axes:
         # Shared # Events (x) range for both horizontal histograms — leave scatter time axis (col=2) alone
         if (hist_count_max is not None) and (hist_count_max > 0):
-            shared_hist_x_range = [0, hist_count_max]
+            # Nice-ceil the midpoint (dense 1–10 steps), then max = 2*mid so ticks [0, mid, max] stay tight
+            # and round (e.g. 10500 → mid 6000 → [0, 6000, 12000], not [0, 10k, 20k]).
+            _mid_raw = float(hist_count_max) / 2.0
+            _exp = int(np.floor(np.log10(max(_mid_raw, 1.0))))
+            nice_hist_count_mid: Optional[int] = None
+            for _e in (_exp, _exp + 1):
+                for _candidate in (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0):
+                    _mid = int(np.round(_candidate * (10 ** _e)))
+                    if (2 * _mid) >= hist_count_max:
+                        nice_hist_count_mid = _mid
+                        break
+                ## END for _candidate in (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)...
+                if nice_hist_count_mid is not None:
+                    break
+            ## END for _e in (_exp, _exp + 1)...
+
+            if nice_hist_count_mid is None:
+                nice_hist_count_mid = int(np.ceil(_mid_raw))
+            nice_hist_count_max: int = int(2 * nice_hist_count_mid)
+            shared_hist_x_range = [0, nice_hist_count_max]
+            hist_count_tickvals = [0, nice_hist_count_mid, nice_hist_count_max]
             if debug_print:
-                print(f'should_set_hist_same_magnitude_axes: True, shared hist count (x) range: {shared_hist_x_range}')
-            fig.update_xaxes(range=shared_hist_x_range, autorange=False, row=1, col=1)
-            fig.update_xaxes(range=shared_hist_x_range, autorange=False, row=1, col=3)
+                print(f'should_set_hist_same_magnitude_axes: True, shared hist count (x) range: {shared_hist_x_range} (raw max={hist_count_max})')
+            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=-45, row=1, col=1)
+            fig.update_xaxes(range=shared_hist_x_range, autorange=False, tickmode='array', tickvals=hist_count_tickvals, tickangle=-45, row=1, col=3)
 
 
     # Add epoch shapes if provided
@@ -1089,9 +1109,11 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         ),
     )
 
-    fig.update_xaxes(title_text="# Events", row=1, col=1)
+    data_grain = data_context.to_dict().get('data_grain', None)
+    hist_count_axis_title: str = "# t_bins" if (data_grain == 'per_time_bin') else "# Events"
+    fig.update_xaxes(title_text=hist_count_axis_title, row=1, col=1)
     fig.update_xaxes(title_text="Delta-aligned Event Time (seconds)", row=1, col=2)
-    fig.update_xaxes(title_text="# Events", row=1, col=3)
+    fig.update_xaxes(title_text=hist_count_axis_title, row=1, col=3)
 
     ## #TODO 2024-11-18 08:52: - [ ] Needs updated based on the plotted variable name:
     fig.update_yaxes(
