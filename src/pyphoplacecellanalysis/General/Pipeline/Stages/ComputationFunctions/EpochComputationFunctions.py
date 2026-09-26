@@ -2722,7 +2722,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
     @function_attributes(short_name='trackID_weighted_position_posterior', tags=['context-decoder-comparison', 'decoded_position', 'directional'], conforms_to=['output_registering', 'figure_saving'], input_requires=[], output_provides=[], requires_global_keys=["global_computation_results.computed_data['EpochComputations']"], uses=['FigureCollector'], used_by=[], creation_date='2025-05-03 00:00', related_items=[], is_global=True)
     def _display_decoded_trackID_weighted_position_posterior_withMultiColorOverlay(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, save_figure=True, override_fig_man: Optional[FileOutputManager]=None, ax=None,
                                                                                     custom_export_formats: Optional[Dict[str, Any]]=None, parent_output_folder: Optional[Path] = None, time_bin_size: float=0.025, delete_previous_outputs_folder:bool=True, desired_height:int=1200, 
-                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, force_recompute: bool = True, debug_print: bool = True, **kwargs):
+                                                                                    masked_time_bin_fill_type='ignore', enable_ripple_merged_export: bool = True, enable_laps_merged_export: bool = True, enable_flat_merged_across_epochs_export: bool = False, force_recompute: bool = True, debug_print: bool = True, **kwargs):
             """ Exports individual posteriors to file in many posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
             
             NOTE: this does all posterior export formats, not just the MultiColorCoverlay (e.g. 'greyscale', 'greyscale_shared_norm', 'viridis_shared_norm', etc.
@@ -2814,6 +2814,26 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             from pyphocorehelpers.plotting.media_output_helpers import ImagePostRenderFunctionSets, ImageOperationsAndEffects
             from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecodedFilterEpochsResult, DirectionalPseudo2DDecodersResult
 
+            def _trace(msg: str):
+                """Flushed stage checkpoint for OOM diagnosis; optional process RSS when psutil is available."""
+                if not debug_print:
+                    return
+                rss_suffix: str = ''
+                try:
+                    import psutil
+                    rss_gb: float = psutil.Process().memory_info().rss / (1024 ** 3)
+                    rss_suffix = f' | RSS={rss_gb:.2f}GB'
+                except Exception:
+                    pass
+                print(f'\t[MultiColorOverlay] {msg}{rss_suffix}', flush=True)
+
+
+            def _epoch_counts_str(result_dict) -> str:
+                if result_dict is None:
+                    return 'None'
+                return str({k: getattr(v, 'num_filter_epochs', '?') for k, v in result_dict.items()})
+
+
             computation_functions_name_includelist = ['directional_decoders_decode_continuous', 'perform_compute_non_PBE_epochs', 'generalized_specific_epochs_decoding'] # 'split_to_directional_laps', 
             if force_recompute:
                 ## disable cache (which might waste some time):
@@ -2839,7 +2859,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
 
 
-            print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...')
+            print(f'\tcomputing required decoded results at time_bin_size: {time_bin_size} before plotting...', flush=True)
+            _trace(f'01_prereq_compute ENTER force_recompute={force_recompute} time_bin_size={time_bin_size}')
             owning_pipeline_reference.resolve_and_execute_full_required_computation_plan(computation_functions_name_includelist=computation_functions_name_includelist,
                                                   computation_kwargs_dict=computation_kwargs_dict,
                                                   enabled_filter_names=None, fail_on_exception=True, force_recompute=force_recompute, debug_print=debug_print)
@@ -2848,15 +2869,16 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             # owning_pipeline_reference.perform_specific_computation(computation_functions_name_includelist=computation_functions_name_includelist, computation_kwargs_dict=computation_kwargs_dict,
             #                                 enabled_filter_names=None, fail_on_exception=True, debug_print=debug_print)
 
-            print(f'\t\tdone computing.')
+            print(f'\t\tdone computing.', flush=True)
+            _trace(f'01_prereq_compute EXIT force_recompute={force_recompute} time_bin_size={time_bin_size}')
 
             DAY_DATE_STR: str = date.today().strftime("%Y-%m-%d")
             DAY_DATE_TO_USE = f'{DAY_DATE_STR}' # used for filenames throught the notebook
-            print(f'\tDAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}')
+            print(f'\tDAY_DATE_STR: {DAY_DATE_STR}, DAY_DATE_TO_USE: {DAY_DATE_TO_USE}', flush=True)
 
             NOW_DATETIME: str = get_now_rounded_time_str()
             NOW_DATETIME_TO_USE = f'{NOW_DATETIME}' # used for filenames throught the notebook
-            print(f'\tNOW_DATETIME: {NOW_DATETIME}, NOW_DATETIME_TO_USE: {NOW_DATETIME_TO_USE}')
+            print(f'\tNOW_DATETIME: {NOW_DATETIME}, NOW_DATETIME_TO_USE: {NOW_DATETIME_TO_USE}', flush=True)
 
             # export_dpi_multiplier: float = kwargs.pop('export_dpi_multiplier', 2.0)
             # dpi = kwargs.pop('dpi', 100)
@@ -2879,7 +2901,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             valid_EpochComputations_result: EpochComputationsComputationsContainer = owning_pipeline_reference.global_computation_results.computed_data['EpochComputations'] # owning_pipeline_reference.global_computation_results.computed_data['EpochComputations']
             assert valid_EpochComputations_result is not None
             epochs_decoding_time_bin_size: float = valid_EpochComputations_result.epochs_decoding_time_bin_size ## just get the standard size. Currently assuming all things are the same size!
-            print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            print(f'\tepochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}', flush=True)
             assert epochs_decoding_time_bin_size == valid_EpochComputations_result.epochs_decoding_time_bin_size, f"\tERROR: nonPBE_results.epochs_decoding_time_bin_size: {valid_EpochComputations_result.epochs_decoding_time_bin_size} != epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}"
             a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result ## get existing
             
@@ -2893,6 +2915,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             
             assert a_new_fully_generic_result is not None, f"Missing valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result (valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result == None)"
+            _trace('02_unpack_generic EXIT')
 
             ## INPUTS: a_new_fully_generic_result
             # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')
@@ -2900,7 +2923,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=debug_print)
             epochs_decoding_time_bin_size: float = best_matching_context.get('time_bin_size', None)
             assert epochs_decoding_time_bin_size is not None
-            print(f'\tMATCHING epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}')
+            print(f'\tMATCHING epochs_decoding_time_bin_size: {epochs_decoding_time_bin_size}', flush=True)
             if (epochs_decoding_time_bin_size != time_bin_size):
                 raise ValueError(f'computed result time_bin_size: {epochs_decoding_time_bin_size} != desired_time_bin_size: {time_bin_size}')
             ## OUTPUTS: a_decoded_marginal_posterior_df
@@ -2963,7 +2986,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             _specific_session_output_folder = save_path.joinpath(active_context.get_description(subset_excludelist=['format_name', 'display_fn_name', 'time_bin_size'])).resolve()
 
             _specific_session_output_folder.mkdir(parents=True, exist_ok=True)
-            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"')
+            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder}"', flush=True)
 
             ## OUTPUTS: _parent_save_context, _specific_session_output_folder
             graphics_output_dict['parent_output_folder'] = parent_output_folder
@@ -2995,6 +3018,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 # decoder_laps_filter_epochs_decoder_result_dict = deepcopy(flat_result_context_dict)
                 decoder_laps_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
                 decoder_laps_filter_epochs_decoder_result_dict
+                _trace(f'03_build_laps_dict EXIT n_epochs={_epoch_counts_str(decoder_laps_filter_epochs_decoder_result_dict)}')
                 
             except Exception as e:
                 raise e
@@ -3019,6 +3043,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             flat_result_context_dict = {k:v for k, v in flat_result_context_dict.items() if k in active_ctxts}
             decoder_ripple_filter_epochs_decoder_result_dict = {f"psuedo2D_{k.get('masked_time_bin_fill_type')}":deepcopy(v) for k, v in flat_result_context_dict.items()}
+            _trace(f'04_build_pbe_dict EXIT n_epochs={_epoch_counts_str(decoder_ripple_filter_epochs_decoder_result_dict)}')
             
 
             filter_epochs_ripple_df: Optional[pd.DataFrame] = kwargs.pop('filter_epochs_ripple_df', None)
@@ -3037,20 +3062,23 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     # included_filter_epoch_times = filter_epochs_ripple_df[['start', 'stop']].to_numpy() # Both 'start', 'stop' column matching
                     included_filter_epoch_times = filter_epochs_ripple_df['start'].to_numpy() # Both 'start', 'stop' column matching
                     included_decoder_ripple_filter_epochs_decoder_result_dict[k] = included_filter_epoch_result.filtered_by_epoch_times(included_epoch_start_times=included_filter_epoch_times) ## returns a modified result
+                ## END for k, all_epoch_result in decoder_ripple_filter_epochs_decoder_result_dict.items()...
 
 
                 # decoder_ripple_filter_epochs_decoder_result_dict = {k:v for k, v in decoder_ripple_filter_epochs_decoder_result_dict.items()}
                 
-                print(f'filtering down to {len(included_filter_epoch_times)} filter epochs.')
+                print(f'filtering down to {len(included_filter_epoch_times)} filter epochs.', flush=True)
                 # decoder_ripple_filter_epochs_decoder_result_dict = {k:included_decoder_ripple_filter_epochs_decoder_result_dict[k] for k, v in included_decoder_ripple_filter_epochs_decoder_result_dict.items()} ## replace with the filtered version
                 decoder_ripple_filter_epochs_decoder_result_dict = included_decoder_ripple_filter_epochs_decoder_result_dict
                 
-                print(f'\tdone.')
+                print(f'\tdone.', flush=True)
+                _trace(f'05_filter_pbe EXIT filtered_n={len(included_filter_epoch_times)} n_epochs={_epoch_counts_str(decoder_ripple_filter_epochs_decoder_result_dict)}')
 
                 ## OUTPUTS: all_filter_epochs_df, all_filter_epochs_df
                 ## OUTPUTS: included_filter_epoch_times_to_all_epoch_index_arr
             else:
-                print(f'no filter epochs provided.')
+                print(f'no filter epochs provided.', flush=True)
+                _trace('05_filter_pbe EXIT no filter')
 
 
             ## OUTPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
@@ -3083,7 +3111,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
 
             ## INPUTS: active_epochs_decoder_result_dict
 
-            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder.as_posix()}"')
+            print(f'\tspecific_session_output_folder: "{_specific_session_output_folder.as_posix()}"', flush=True)
 
             if custom_export_formats is None:
 
@@ -3109,32 +3137,36 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     _an_export_format_output_folder = _specific_session_output_folder.joinpath(a_format_name)                    
                     try:
                         if _an_export_format_output_folder.exists():
-                            print(f'\tdeleting previous outputs folder at "{_an_export_format_output_folder.as_posix()}"...')
+                            print(f'\tdeleting previous outputs folder at "{_an_export_format_output_folder.as_posix()}"...', flush=True)
                             shutil.rmtree(_an_export_format_output_folder)
-                            print(f'\t\tsuccessfully deleted extant folder.')
+                            print(f'\t\tsuccessfully deleted extant folder.', flush=True)
                             _an_export_format_output_folder.mkdir(parents=True, exist_ok=True) # re-make the folder
                             
                     except Exception as e:
-                        print(f'\tError deleting folder "{_an_export_format_output_folder.as_posix()}": {e}')
+                        print(f'\tError deleting folder "{_an_export_format_output_folder.as_posix()}": {e}', flush=True)
                         continue
 
             # Main export function _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+            _trace(f'06_stage1_raw_rgba_export ENTER formats={list(custom_export_formats.keys())} desired_height={desired_height} laps={_epoch_counts_str(decoder_laps_filter_epochs_decoder_result_dict)} pbe={_epoch_counts_str(decoder_ripple_filter_epochs_decoder_result_dict)}')
             out_paths, out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=decoder_laps_filter_epochs_decoder_result_dict,
                                                                                                                      decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
-                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255))
+                                                                                                                    desired_height=desired_height, custom_export_formats=custom_export_formats, combined_img_padding=6, combined_img_separator_color=(0, 0, 0, 255),
+                                                                                                                    progress_print=True)
 
-            graphics_output_dict['out_paths'] = deepcopy(out_paths) # 'out_paths': out_paths
-            graphics_output_dict['out_custom_formats_dict'] = deepcopy(out_custom_formats_dict)
-            print(f'\tout_paths: {out_paths}')
-            print(f'done.')
+            graphics_output_dict['out_paths'] = out_paths
+            graphics_output_dict['out_custom_formats_dict'] = out_custom_formats_dict
+            print(f'\tout_paths: {out_paths}', flush=True)
+            print(f'done.', flush=True)
+            _trace('06_stage1_raw_rgba_export EXIT')
 
 
             # ==================================================================================================================================================================================================================================================================================== #
             # TODO 2025-05-30 17:54: - [ ] Export 1D results in the "competition normalized" way that Kamran likes                                                                                                                                                                                 #
             # ==================================================================================================================================================================================================================================================================================== #
 
-            print(f'beginning export of 1D results in the normalizations style Kamran likes...')
+            print(f'beginning export of 1D results in the normalizations style Kamran likes...', flush=True)
+            _trace(f'07_split_1d ENTER enable_laps={enable_laps_merged_export} enable_ripple={enable_ripple_merged_export}')
 
             _in_pseudo2D_dict = {'laps': None, 'ripple': None}
             ## INPUTS: decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict
@@ -3163,8 +3195,11 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                     # a_masked_pseudo2D_split_to_1D_continuous_results_dict: Dict[types.DecoderName, DecodedFilterEpochsResult] = a_masked_pseudo2D_decoder_continuously_decoded_result.split_pseudo2D_result_to_1D_result(pseudo2D_decoder_names_list=unique_decoder_names)
                     a_pseudo2D_split_to_1D_continuous_results_dict = {k:DecodedFilterEpochsResult.perform_add_additional_epochs_columns(a_result=a_result, **_common_add_columns_kwargs) for k, a_result in a_pseudo2D_split_to_1D_continuous_results_dict.items()} ## add the extra columns if needed
                     # OUTPUTS: a_pseudo2D_split_to_1D_continuous_results_dict, a_masked_pseudo2D_split_to_1D_continuous_results_dict
-                    _pseudo2D_split_to_1D_continuous_results_dict_dict[a_decoded_epoch_name] = deepcopy(a_pseudo2D_split_to_1D_continuous_results_dict)
+                    _pseudo2D_split_to_1D_continuous_results_dict_dict[a_decoded_epoch_name] = a_pseudo2D_split_to_1D_continuous_results_dict
                     ## NOTE: the results pulled out are NOT normalized because they're extracted directly
+            ## END for a_decoded_epoch_name, a_pseudo2D_decoder_continuously_decoded_result in _in_pseudo2D_dict.items()...
+
+            _trace(f'07_split_1d EXIT keys={list(_pseudo2D_split_to_1D_continuous_results_dict_dict.keys())}')
 
             # Run an export function again _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         
@@ -3174,12 +3209,14 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
                 # 'cleaned_greyscale_shared_norm': HeatmapExportConfig(colormap=FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.4, grey_value=0.1), export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict),
                 # 'viridis_shared_norm': HeatmapExportConfig(colormap='viridis', export_kind=HeatmapExportKind.COLORMAPPED, vmin=0.0, vmax=1.0, desired_height=desired_height, post_render_image_functions_builder_fn=ImagePostRenderFunctionSets._build_no_op_image_export_functions_dict), # 2025-07-24 - The format Kamran likes where they are globally normalized
             }
+            _trace(f'08_stage2_greyscale_export ENTER formats={list(pseudo2D_split_to_1D_custom_export_formats.keys())}')
             pseudo2D_split_to_1D_out_paths, pseudo2D_split_to_1D_out_custom_formats_dict = PosteriorExporting.perform_export_all_decoded_posteriors_as_images(decoder_laps_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict.get('laps', None),
                                                                                                                         decoder_ripple_filter_epochs_decoder_result_dict=_pseudo2D_split_to_1D_continuous_results_dict_dict.get('ripple', None), ## just the ripples
                                                                                                                     _save_context=_parent_save_context, parent_output_folder=_specific_session_output_folder,
                                                                                                                     desired_height=desired_height, custom_export_formats=pseudo2D_split_to_1D_custom_export_formats, combined_img_padding=6,
                                                                                                                     #  combined_img_separator_color=(255, 255, 255, 255),
                                                                                                                     combined_img_separator_color=(200, 46, 33, 10),
+                                                                                                                    progress_print=True,
                                                                                                                      )
             if not isinstance(graphics_output_dict['out_paths'], benedict):
                 graphics_output_dict['out_paths'] = benedict(graphics_output_dict['out_paths']) # 'out_paths': out_paths
@@ -3192,7 +3229,8 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             graphics_output_dict['out_custom_formats_dict'].merge({k:v for k, v in pseudo2D_split_to_1D_out_custom_formats_dict.items() if (v is not None)})
 
             # print(f'\tout_paths: {pseudo2D_split_to_1D_out_paths}')
-            print(f'done.')
+            print(f'done.', flush=True)
+            _trace('08_stage2_greyscale_export EXIT')
 
 
             # ==================================================================================================================================================================================================================================================================================== #
@@ -3211,47 +3249,54 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             flat_merged_images = {}
             flat_merged_image_paths = {}
 
-            for a_known_epoch_type_name, v_dict in out_custom_formats_dict.items():
-                # a_known_epoch_type_name: ['laps', 'ripple']
-                for a_decoder_name, a_rendered_configs_dict in v_dict.items():
-                    
-                    for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items():
-                        # 'raw_rgba'
-                        # print(a_rendered_config_list)
-                        # len(a_rendered_config_list)
+            if not enable_flat_merged_across_epochs_export:
+                _trace('09_flat_merge_stack SKIPPED enable_flat_merged_across_epochs_export=False')
+            else:
+                _trace('09_flat_merge_stack ENTER')
+                for a_known_epoch_type_name, v_dict in out_custom_formats_dict.items():
+                    # a_known_epoch_type_name: ['laps', 'ripple']
+                    for a_decoder_name, a_rendered_configs_dict in v_dict.items():
                         
-                        a_ctxt = IdentifyingContext(known_epoch_type_name=a_known_epoch_type_name, decoder=a_decoder_name, config=a_config_name)
-                        flat_imgs = []
-                        
-                        parent_save_path = None
-                        for i, a_config in enumerate(a_rendered_config_list):                                  
-                            if parent_save_path is None:
-                                posterior_save_path = a_config.posterior_saved_path
-                                parent_save_path = posterior_save_path.parent.resolve()
-                                graphics_output_dict['flat_parent_save_paths'].append(parent_save_path)
+                        for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items():
+                            # 'raw_rgba'
+                            # print(a_rendered_config_list)
+                            # len(a_rendered_config_list)
+                            
+                            a_ctxt = IdentifyingContext(known_epoch_type_name=a_known_epoch_type_name, decoder=a_decoder_name, config=a_config_name)
+                            flat_imgs = []
+                            
+                            parent_save_path = None
+                            for i, a_config in enumerate(a_rendered_config_list):                                  
+                                if parent_save_path is None:
+                                    posterior_save_path = a_config.posterior_saved_path
+                                    parent_save_path = posterior_save_path.parent.resolve()
+                                    graphics_output_dict['flat_parent_save_paths'].append(parent_save_path)
 
-                            _posterior_image = a_config.posterior_saved_image
-                            flat_imgs.append(_posterior_image)                            
-                            # print(F'a_rendered_config: {type(a_rendered_config)}')
-                        ## END  for i, a_config in enum...
-                        ## OUTPUTS: flat_imgs
-                        # _merged_img = horizontal_image_stack(flat_imgs, padding=10, separator_color='white')
-                        _merged_img = vertical_image_stack(flat_imgs, padding=10, separator_color='white')
-                        flat_merged_images[a_known_epoch_type_name] = _merged_img
-                        flat_imgs_dict[a_ctxt] = flat_imgs
-                        
-                        ## Save the image to disk if we want
-                        # _merged_img.save
-                        if (_merged_img is not None) and (parent_save_path is not None):
-                            ## Save the image:
-                            _img_path = parent_save_path.joinpath(f'merged_{a_known_epoch_type_name}[{i}].png').resolve()
-                            try:
-                                _merged_img.save(_img_path)
-                                flat_merged_image_paths[a_ctxt] = _img_path
-                            except Exception as e:
-                                raise e
-                        
-                        
+                                _posterior_image = a_config.get_posterior_image()
+                                flat_imgs.append(_posterior_image)                            
+                                # print(F'a_rendered_config: {type(a_rendered_config)}')
+                            ## END for i, a_config in enumerate(a_rendered_config_list)...
+                            ## OUTPUTS: flat_imgs
+                            # _merged_img = horizontal_image_stack(flat_imgs, padding=10, separator_color='white')
+                            _merged_img = vertical_image_stack(flat_imgs, padding=10, separator_color='white')
+                            flat_merged_images[a_known_epoch_type_name] = _merged_img
+                            flat_imgs_dict[a_ctxt] = flat_imgs
+                            
+                            ## Save the image to disk if we want
+                            # _merged_img.save
+                            if (_merged_img is not None) and (parent_save_path is not None):
+                                ## Save the image:
+                                _img_path = parent_save_path.joinpath(f'merged_{a_known_epoch_type_name}[{i}].png').resolve()
+                                try:
+                                    _merged_img.save(_img_path)
+                                    flat_merged_image_paths[a_ctxt] = _img_path
+                                except Exception as e:
+                                    raise e
+                        ## END for a_config_name, a_rendered_config_list in a_rendered_configs_dict.items()...
+                    ## END for a_decoder_name, a_rendered_configs_dict in v_dict.items()...
+                ## END for a_known_epoch_type_name, v_dict in out_custom_formats_dict.items()...
+                _trace(f'09_flat_merge_stack EXIT n_merged={len(flat_merged_images)} n_flat_lists={len(flat_imgs_dict)}')
+
 
             # flat_img_out_paths
             # flat_merged_images
@@ -3265,6 +3310,7 @@ class EpochComputationDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Di
             
             
             ImageHelpers.clear_cached_fonts()
+            _trace('10_done')
             
             return graphics_output_dict
 
