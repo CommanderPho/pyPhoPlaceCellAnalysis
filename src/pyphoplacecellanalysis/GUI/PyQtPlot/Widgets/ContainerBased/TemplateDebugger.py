@@ -765,14 +765,23 @@ class TemplateDebugger:
     # Saving/Exporting to file ___________________________________________________________________________________________ #
     #TODO 2023-11-16 22:16: - [ ] Figure out how to save
 
-    def save_figure(self, shared_output_file_prefix = f'output/2025-07-21', export_format: str='.svg', export_merged:bool=True) -> Dict[str, Path]: # export_file_base_path: Path = Path(f'output').resolve()
+    def save_figure(self, shared_output_file_prefix = f'output/2025-07-21', export_format: str='.svg', export_merged:bool=True, export_dimensions_px: Optional[Tuple[float, float]]=None) -> Dict[str, Path]: # export_file_base_path: Path = Path(f'output').resolve()
         """ Exports the four decoder's pf1D heatmaps and a horizontally merged version if desired.
                 
         export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-22')
+        export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-23', export_dimensions_px=(114.6818, 156.474))
         
         """
         if not export_format.startswith('.'):
             export_format = f'.{export_format}'
+
+        export_size_kwargs = {}
+        target_widget_size = None
+        if export_dimensions_px is not None:
+            assert len(export_dimensions_px) == 2, f"export_dimensions_px must be (width, height); got {export_dimensions_px}"
+            w_px, h_px = float(export_dimensions_px[0]), float(export_dimensions_px[1])
+            export_size_kwargs = dict(width=w_px, height=h_px)
+            target_widget_size = (int(round(w_px)), int(round(h_px)))
 
         export_dict = {}    
         _out_pf1D_heatmaps = self.plots.pf1D_heatmaps
@@ -783,14 +792,27 @@ class TemplateDebugger:
             print(f'a_win: {type(a_win)}')
             # save to file
             export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix(export_format).resolve() # '.svg' # .resolve()
+            old_size = None
             try:
-                export_pyqtgraph_plot(a_win.plotItem, savepath=export_file_path) # works
+                if target_widget_size is not None:
+                    old_size = a_win.size()
+                    a_win.setFixedSize(target_widget_size[0], target_widget_size[1])
+                    pg.QtWidgets.QApplication.processEvents()
+                export_pyqtgraph_plot(a_win.plotItem, savepath=export_file_path, **export_size_kwargs) # works
                 export_dict[a_decoder_name] = export_file_path
             except Exception as e:
                 raise
+            finally:
+                if (target_widget_size is not None) and (old_size is not None):
+                    a_win.setMinimumSize(0, 0)
+                    a_win.setMaximumSize(16777215, 16777215)  # QWIDGETSIZE_MAX
+                    a_win.resize(old_size)
+                    pg.QtWidgets.QApplication.processEvents()
             
             print(f'exporting to {export_file_path}')
             # .scene()
+        ## END for a_decoder_name, a_decoder_heatmap_tuple in _out_pf1D_heatmaps.items()...
+
         if export_merged:
             from pyphocorehelpers.plotting.media_output_helpers import SVGHelpers
 

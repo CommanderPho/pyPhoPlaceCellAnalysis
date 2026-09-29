@@ -103,6 +103,10 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
     Args:
         graphics_item (_type_): _description_
         savepath (str, optional): _description_. Defaults to 'fileName.png'.
+        width / height (via kwargs): optional absolute export size in px.
+            If both are provided, both are applied with blockSignal so the exporter's
+            linked aspect-ratio callbacks do not overwrite a custom AR.
+            PNG coerces to int; SVG keeps float.
 
     Usage:
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import export_pyqtgraph_plot
@@ -116,6 +120,7 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
         export_pyqtgraph_plot(background_static_scroll_plot_widget, savepath='background_static_scroll_plot_widget_HUGE.png') # works
 
         export_pyqtgraph_plot(background_static_scroll_plot_widget, savepath='background_static_scroll_plot_widget_VECTOR.svg') # works
+        export_pyqtgraph_plot(main_plot_widget, savepath='sized.svg', width=114.6818, height=156.474)
 
     """
     if not isinstance(savepath, Path):
@@ -136,20 +141,41 @@ def export_pyqtgraph_plot(graphics_item, savepath='fileName.png', progress_print
         exporter = ImageExporter(graphics_item)
         bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
         kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
-        kwargs = ({'width': 4096} | kwargs) # add 'width' to kwargs if not specified
+        # Default width only when neither absolute dimension was requested
+        if ('width' not in kwargs) and ('height' not in kwargs):
+            kwargs = ({'width': 4096} | kwargs)
+        coerce_size_to_int: bool = True
     elif file_extension == ExportFiletype.SVG.value:
         from pyphoplacecellanalysis.External.pyqtgraph.exporters.SVGExporter import SVGExporter
         bg = pg.mkColor(0,0,0,0.0) # clear color unless a different one is specified
         kwargs = ({'background': bg} | kwargs) # add 'width' to kwargs if not specified
         exporter = SVGExporter(graphics_item)
+        coerce_size_to_int: bool = False
     else:
         print(f'Unknown file_extension: {file_extension}')
         raise NotImplementedError
 
-    ## set export parameters if needed
+    ## Apply width/height specially so both can stick without linked-AR overwrite
+    requested_width = kwargs.pop('width', None)
+    requested_height = kwargs.pop('height', None)
+    params = exporter.parameters()
+
+    if (requested_width is not None) and (requested_height is not None):
+        w = int(round(float(requested_width))) if coerce_size_to_int else float(requested_width)
+        h = int(round(float(requested_height))) if coerce_size_to_int else float(requested_height)
+        params.param('width').setValue(w, blockSignal=exporter.widthChanged)
+        params.param('height').setValue(h, blockSignal=exporter.heightChanged)
+    elif requested_width is not None:
+        w = int(round(float(requested_width))) if coerce_size_to_int else float(requested_width)
+        params['width'] = w  # height follows via widthChanged linked AR
+    elif requested_height is not None:
+        h = int(round(float(requested_height))) if coerce_size_to_int else float(requested_height)
+        params['height'] = h  # width follows via heightChanged linked AR
+
+    ## set remaining export parameters if needed
     for k, v in kwargs.items():
         # exporter.parameters()['width'] = 4096*4   # (note this also affects height parameter)   
-        exporter.parameters()[k] = v
+        params[k] = v
     ## save to file
     exporter.export(str(savepath))
     if progress_print:
