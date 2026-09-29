@@ -1121,7 +1121,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         Laps_fr_label: str = '\\text{Laps}'
 
         x_labels = [f'$L d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${Laps_fr_label}' + '_{' + delta_plus_str + '}$']
-        all_data_points = np.array([v.values for v in Fig2_Laps_FR])
+        # LxC vs SxC bars have different n cells — keep a list (np.array would raise on inhomogeneous shapes)
+        all_data_points = [np.asarray(v.values) for v in Fig2_Laps_FR]
         # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
 
         if Fig2_Laps_FR[0].LxC_scatter_props is not None:
@@ -1155,8 +1156,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         x_labels = [f'$L d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$L d C$\t${PBE_fr_label}' + '_{' + delta_plus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' + delta_minus_str + '}$', f'$S d C$\t${PBE_fr_label}' + '_{' +  delta_plus_str + '}$']
         assert len(Fig2_Replay_FR) == 4
-        all_data_points = np.array([v.values for v in Fig2_Replay_FR])
-        # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
+        # LxC vs SxC bars have different n cells — keep a list (np.array would raise on inhomogeneous shapes)
+        all_data_points = [np.asarray(v.values) for v in Fig2_Replay_FR]
+        # all_scatter_props = Fig2_Replay_FR[0].LxC_scatter_props + Fig2_Replay_FR[1].LxC_scatter_props + Fig2_Replay_FR[2].SxC_scatter_props + Fig2_Replay_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway.
 
         if Fig2_Replay_FR[0].LxC_scatter_props is not None:
             # all_scatter_props =  Fig2_Laps_FR[0].LxC_scatter_props + Fig2_Laps_FR[1].LxC_scatter_props + Fig2_Laps_FR[2].SxC_scatter_props + Fig2_Laps_FR[3].SxC_scatter_props # the LxC_scatter_props and SxC_scatter_props are actually the same for all entries in this list, but get em like this anyway. 
@@ -1170,7 +1172,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -1188,19 +1190,19 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
                                                         left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+                                                        title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **kwargs)
 
         _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+                                                            title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **kwargs)
 
 
         if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
             LxC_aclus = self.computation_result.LxC_aclus
             SxC_aclus = self.computation_result.SxC_aclus
-            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
-            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines)
+            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
+            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
         
 
 
@@ -1269,7 +1271,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return self._pipeline_file_callback_fn(*args, **kwargs) # call the saved callback
 
     @classmethod
-    def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True, enabled_point_connection_lines=True):
+    def add_optional_aclu_labels(cls, a_fig_container, LxC_aclus, SxC_aclus, enable_hover_labels=True, enable_tiny_point_labels=True, enabled_point_connection_lines=True, debug_print: bool = False, **kwargs):
         """ Adds disambiguating labels to each of the scatterplot points. Important for specifying which ACLU is plotted.
 
 
@@ -1348,7 +1350,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         if enabled_point_connection_lines:
             for a_label, a_point_list in a_fig_container['plot_objects']['point_connection_lines'].items():
-                print(f'a_label: {a_label}, a_point_list: {a_point_list}')
+                if debug_print:
+                    print(f'a_label: {a_label}, a_point_list: {a_point_list}')
                 assert len(a_point_list) == 2,f"len(a_point_list) should be 2, but it is {len(a_point_list)}"
                 (start_x, start_y), (end_x, end_y) = a_point_list
                 a_fig_container['plot_objects']['long_to_short_arrow'][a_label] = ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y), arrowprops=dict(**arrowprops_kwargs, color='black'), label=str(label))

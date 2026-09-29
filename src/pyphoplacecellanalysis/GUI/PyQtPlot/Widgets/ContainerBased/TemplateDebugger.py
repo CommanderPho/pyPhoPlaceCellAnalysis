@@ -648,7 +648,7 @@ class TemplateDebugger:
     
     @function_attributes(short_name=None, tags=['init', 'buildUI'], input_requires=[], output_provides=[], uses=['buildUI_directional_template_debugger_data'], used_by=[], creation_date='2024-10-21 19:22', related_items=[])
     @classmethod
-    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, prepare_for_publication: bool=False, **kwargs):
+    def init_templates_debugger(cls, track_templates: TrackTemplates, included_any_context_neuron_ids=None, use_incremental_sorting:bool=False, enable_pf_peak_indicator_lines:bool=True, prepare_for_publication: bool=False, enable_track_boundary_lines: bool=True, **kwargs):
         """
         long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
         global_spikes_df = deepcopy(curr_active_pipeline.computation_results[global_epoch_name]['computed_data'].pf1D.spikes_df)
@@ -669,6 +669,8 @@ class TemplateDebugger:
             track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only
 
         """
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import resolve_1D_track_boundary_x_positions
+
         fignum = kwargs.pop('fignum', None)
         if fignum is not None:
             print(f'WARNING: fignum will be ignored but it was specified as fignum="{fignum}"!')
@@ -680,6 +682,12 @@ class TemplateDebugger:
         enable_cell_colored_heatmap_rows: bool = kwargs.pop('enable_cell_colored_heatmap_rows', True)
         use_shared_aclus_only_templates: bool = kwargs.pop('use_shared_aclus_only_templates', False)
 
+        # Optional track-bound position sources (prefer sess_config / loaded_track_limits; fall back to decoder grid_bin_bounds)
+        sess_config = kwargs.pop('sess_config', None)
+        loaded_track_limits = kwargs.pop('loaded_track_limits', None)
+        long_notable_x_platform_positions = kwargs.pop('long_notable_x_platform_positions', None)
+        short_notable_x_platform_positions = kwargs.pop('short_notable_x_platform_positions', None)
+
         if enable_pf_peak_indicator_lines:
             print(f'WARN: 2023-12-11 - enable_pf_peak_indicator_lines is not yet implemented and the lines are not correctly aligned.')  
                   
@@ -690,11 +698,26 @@ class TemplateDebugger:
         _out_params = VisualizationParameters(name=figure_name, enable_cell_colored_heatmap_rows=enable_cell_colored_heatmap_rows, use_shared_aclus_only_templates=use_shared_aclus_only_templates,
                                              debug_print=debug_print, debug_draw=debug_draw, use_incremental_sorting=use_incremental_sorting, enable_pf_peak_indicator_lines=enable_pf_peak_indicator_lines, included_any_context_neuron_ids=included_any_context_neuron_ids,
                                              solo_emphasized_aclus=None, prepare_for_publication=prepare_for_publication, enable_cell_text_labels=True,
+                                             enable_track_boundary_lines=enable_track_boundary_lines,
                                              publication_titles = dict(zip(('long_LR', 'long_RL', 'short_LR', 'short_RL'), [html.escape(v) for v in ('Long <', 'Long >', 'Short <', 'Short >')])), 
                                              **kwargs)
 
         ## #TODO 2025-07-22 08:33: - [ ] Currently disable cell labels for publication because they'll be too small when scaled down:
         _out_params.enable_cell_text_labels = (not prepare_for_publication)
+
+        ## Resolve 1D track boundary x positions once (static geometry)
+        if enable_track_boundary_lines and ((long_notable_x_platform_positions is None) or (short_notable_x_platform_positions is None)):
+            grid_bin_bounds = None
+            try:
+                _first_decoder = list(track_templates.get_decoders_dict().values())[0]
+                grid_bin_bounds = deepcopy(_first_decoder.pf.config.grid_bin_bounds)
+            except Exception:
+                grid_bin_bounds = None
+            long_notable_x_platform_positions, short_notable_x_platform_positions = resolve_1D_track_boundary_x_positions(sess_config=sess_config, loaded_track_limits=loaded_track_limits, grid_bin_bounds=grid_bin_bounds)
+        _out_params.long_notable_x_platform_positions = long_notable_x_platform_positions
+        _out_params.short_notable_x_platform_positions = short_notable_x_platform_positions
+        _out_data.long_notable_x_platform_positions = long_notable_x_platform_positions
+        _out_data.short_notable_x_platform_positions = short_notable_x_platform_positions
         
         # build the window with the dock widget in it:
         root_dockAreaWindow, app = DockAreaWrapper.build_default_dockAreaWindow(title=f'Pho Directional Template Debugger: {figure_name}', defer_show=False)
@@ -704,7 +727,7 @@ class TemplateDebugger:
         # icon_path=":/Icons/Icons/visualizations/template_1D_debugger.ico"
         # root_dockAreaWindow.setWindowIcon(pg.QtGui.QIcon(icon_path))
 
-        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
+        _out_ui = PhoUIContainer(name=figure_name, app=app, root_dockAreaWindow=root_dockAreaWindow, text_items_dict=None, order_location_lines_dict=None, track_boundary_lines_dict=None, dock_widgets=None, dock_configs=None, on_update_callback=None)
         
         if prepare_for_publication:
             root_dockAreaWindow.resize(1800, 700)
@@ -913,10 +936,12 @@ class TemplateDebugger:
 
 
     # 2023-11-28 - New Sorting using `paired_incremental_sort_neurons` via `paired_incremental_sorting`
-    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph', 'cls._subfn_rebuild_sort_idxs'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
+    @function_attributes(short_name=None, tags=['buildUI'], input_requires=[], output_provides=[], uses=['visualize_heatmap_pyqtgraph', 'cls._subfn_rebuild_sort_idxs', 'perform_add_pyqtgraph_1D_track_bounds_lines'], used_by=[], creation_date='2024-10-21 19:20', related_items=[])
     @classmethod
     def _subfn_buildUI_directional_template_debugger_data(cls, included_any_context_neuron_ids, use_incremental_sorting: bool, debug_print: bool, enable_cell_colored_heatmap_rows: bool, _out_data: RenderPlotsData, _out_plots: RenderPlots, _out_ui: PhoUIContainer, _out_params: VisualizationParameters, decoders_dict: Dict, line_height: float = 1.0):
         """ Builds UI """
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_pyqtgraph_1D_track_bounds_lines
+
         print(f'._subfn_buildUI_directional_template_debugger_data(...)')
         _out_data = cls._subfn_rebuild_sort_idxs(decoders_dict, _out_data, use_incremental_sorting=use_incremental_sorting, included_any_context_neuron_ids=included_any_context_neuron_ids)
         # Unpack the updated _out_data:
@@ -928,6 +953,11 @@ class TemplateDebugger:
         _out_plots.pf1D_heatmaps = {}
         _out_ui.text_items_dict = {}
         _out_ui.order_location_lines_dict = {}
+        _out_ui.track_boundary_lines_dict = {}
+
+        enable_track_boundary_lines: bool = getattr(_out_params, 'enable_track_boundary_lines', True)
+        long_notable_x_platform_positions = getattr(_out_params, 'long_notable_x_platform_positions', None)
+        short_notable_x_platform_positions = getattr(_out_params, 'short_notable_x_platform_positions', None)
         
         for i, (a_decoder_name, a_decoder) in enumerate(decoders_dict.items()):
             if _out_params.prepare_for_publication:
@@ -1026,6 +1056,12 @@ class TemplateDebugger:
 
             # Set the extent to map pixels to x-locations
             curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
+
+            ## 1D track platform boundary lines (full-height InfiniteLines; static geometry, not recreated on update)
+            if enable_track_boundary_lines and (int(a_decoder.ndim) < 2) and ((long_notable_x_platform_positions is not None) or (short_notable_x_platform_positions is not None)):
+                _out_ui.track_boundary_lines_dict[a_decoder_name] = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, include_long=True, include_short=True)
+            else:
+                _out_ui.track_boundary_lines_dict[a_decoder_name] = {'long': [], 'short': []}
     
         # end `for i, (a_decoder_name, a_decoder)`
 

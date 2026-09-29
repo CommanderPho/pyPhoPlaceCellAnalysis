@@ -1167,6 +1167,99 @@ def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, sh
     return long_track_line_collection, short_track_line_collection
 
 
+@function_attributes(short_name=None, tags=['pyqtgraph', 'grid_bin_bounds', 'track_bounds'], input_requires=[], output_provides=[], uses=['pg.InfiniteLine', 'LongShortDisplayConfigManager'], used_by=['TemplateDebugger'], creation_date='2026-09-29 09:50', related_items=['perform_add_1D_track_bounds_lines'])
+def perform_add_pyqtgraph_1D_track_bounds_lines(plot_item, long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, include_long: bool=True, include_short: bool=True, long_pen=None, short_pen=None) -> Dict[str, List[pg.InfiniteLine]]:
+    """ Plots eight full-height vertical dashed InfiniteLines on a pyqtgraph PlotItem/PlotWidget for long/short platform bounds.
+
+    Usage:
+        from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_pyqtgraph_1D_track_bounds_lines, resolve_1D_track_boundary_x_positions
+
+        long_xs, short_xs = resolve_1D_track_boundary_x_positions(sess_config=curr_active_pipeline.sess.config)
+        track_lines = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_xs, short_notable_x_platform_positions=short_xs)
+
+    Returns:
+        Dict[str, List[pg.InfiniteLine]]: {'long': [...], 'short': [...]} (empty lists when a track set is omitted)
+    """
+    from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
+
+    if hasattr(plot_item, 'plotItem') and (not isinstance(plot_item, PlotItem)):
+        # CustomPlotWidget / PlotWidget — add to the underlying PlotItem
+        target = plot_item.plotItem
+    else:
+        target = plot_item
+
+    long_short_display_config_manager = LongShortDisplayConfigManager()
+    if long_pen is None:
+        long_pg_kwargs = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
+        long_pen = pg.mkPen(long_pg_kwargs['pen'].color(), width=1.0, style=QtCore.Qt.DashLine)
+    if short_pen is None:
+        short_pg_kwargs = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
+        short_pen = pg.mkPen(short_pg_kwargs['pen'].color(), width=1.0, style=QtCore.Qt.DashLine)
+
+    out_lines: Dict[str, List[pg.InfiniteLine]] = {'long': [], 'short': []}
+
+    if include_long and (long_notable_x_platform_positions is not None):
+        for x in long_notable_x_platform_positions:
+            line = pg.InfiniteLine(pos=float(x), angle=90, movable=False, pen=long_pen)
+            target.addItem(line)
+            out_lines['long'].append(line)
+        ## END for x in long_notable_x_platform_positions...
+
+    if include_short and (short_notable_x_platform_positions is not None):
+        for x in short_notable_x_platform_positions:
+            line = pg.InfiniteLine(pos=float(x), angle=90, movable=False, pen=short_pen)
+            target.addItem(line)
+            out_lines['short'].append(line)
+        ## END for x in short_notable_x_platform_positions...
+
+    return out_lines
+
+
+@function_attributes(short_name=None, tags=['track_bounds', 'positions'], input_requires=[], output_provides=[], uses=['NotableTrackPositions', 'LinearTrackDimensions'], used_by=['TemplateDebugger', 'perform_add_pyqtgraph_1D_track_bounds_lines'], creation_date='2026-09-29 09:50', related_items=['add_vertical_track_bounds_lines'])
+def resolve_1D_track_boundary_x_positions(sess_config=None, loaded_track_limits: Optional[Dict]=None, grid_bin_bounds=None, platform_side_length: float=22.0) -> Tuple[Optional[Tuple[float, float, float, float]], Optional[Tuple[float, float, float, float]]]:
+    """ Resolve long/short notable platform x positions for 1D track boundary lines.
+
+    Preference order:
+      1. `sess_config` / `loaded_track_limits` via NotableTrackPositions
+      2. Idealized LinearTrackDimensions geometry from `grid_bin_bounds`
+      3. (None, None) if neither is available
+
+    Returns:
+        (long_notable_x_platform_positions, short_notable_x_platform_positions) each a 4-tuple or None
+    """
+    if sess_config is not None:
+        try:
+            (long_notable_x, short_notable_x), _ = NotableTrackPositions.init_notable_track_points_from_session_config(sess_config, platform_side_length=platform_side_length)
+            return tuple(long_notable_x), tuple(short_notable_x)
+        except Exception:
+            pass
+
+    if loaded_track_limits is not None:
+        try:
+            long_xlim = loaded_track_limits['long_xlim']
+            short_xlim = loaded_track_limits['short_xlim']
+            long_ylim = loaded_track_limits.get('long_ylim', (0.0, 0.0))
+            short_ylim = loaded_track_limits.get('short_ylim', (0.0, 0.0))
+            (long_notable_x, short_notable_x), _ = NotableTrackPositions.init_x_and_y_notable_positions(long_xlim=long_xlim, long_ylim=long_ylim, short_xlim=short_xlim, short_ylim=short_ylim, platform_side_length=platform_side_length)
+            return tuple(long_notable_x), tuple(short_notable_x)
+        except Exception:
+            pass
+
+    if grid_bin_bounds is not None:
+        try:
+            long_track_dims = LinearTrackDimensions(track_length=170.0)
+            short_track_dims = LinearTrackDimensions(track_length=100.0)
+            x_midpoint, y_midpoint = (point_tuple_mid_point(grid_bin_bounds[0]), point_tuple_mid_point(grid_bin_bounds[1]))
+            long_notable_x_positions, _ = long_track_dims._build_component_notable_positions(offset_point=(x_midpoint, y_midpoint))
+            short_notable_x_positions, _ = short_track_dims._build_component_notable_positions(offset_point=(x_midpoint, y_midpoint))
+            long_notable_x_platform_positions = tuple(float(v) for v in long_notable_x_positions[[0, 1, 3, 4]])
+            short_notable_x_platform_positions = tuple(float(v) for v in short_notable_x_positions[[0, 1, 3, 4]])
+            return long_notable_x_platform_positions, short_notable_x_platform_positions
+        except Exception:
+            pass
+
+    return None, None
+
 
 def add_vertical_track_bounds_lines(grid_bin_bounds, ax=None, include_long:bool=True, include_short:bool=True):
     """ Plots eight vertical lines across ax representing the (start, stop) of each platform (long_left, short_left, short_right, long_right)
