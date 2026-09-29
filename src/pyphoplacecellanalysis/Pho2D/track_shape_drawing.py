@@ -1167,18 +1167,20 @@ def perform_add_1D_track_bounds_lines(long_notable_x_platform_positions=None, sh
     return long_track_line_collection, short_track_line_collection
 
 
-@function_attributes(short_name=None, tags=['pyqtgraph', 'grid_bin_bounds', 'track_bounds'], input_requires=[], output_provides=[], uses=['pg.InfiniteLine', 'LongShortDisplayConfigManager'], used_by=['TemplateDebugger'], creation_date='2026-09-29 09:50', related_items=['perform_add_1D_track_bounds_lines'])
-def perform_add_pyqtgraph_1D_track_bounds_lines(plot_item, long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, include_long: bool=True, include_short: bool=True, long_pen=None, short_pen=None) -> Dict[str, List[pg.InfiniteLine]]:
-    """ Plots eight full-height vertical dashed InfiniteLines on a pyqtgraph PlotItem/PlotWidget for long/short platform bounds.
+@function_attributes(short_name=None, tags=['pyqtgraph', 'grid_bin_bounds', 'track_bounds'], input_requires=[], output_provides=[], uses=['pg.PlotDataItem', 'LongShortDisplayConfigManager'], used_by=['TemplateDebugger'], creation_date='2026-09-29 09:50', related_items=['perform_add_1D_track_bounds_lines'])
+def perform_add_pyqtgraph_1D_track_bounds_lines(plot_item, long_notable_x_platform_positions=None, short_notable_x_platform_positions=None, include_long: bool=True, include_short: bool=True, long_pen=None, short_pen=None, y_range: Tuple[float, float]=(0.0, 1.0)) -> Dict[str, List]:
+    """ Plots eight full-height vertical dashed lines on a pyqtgraph PlotItem/PlotWidget for long/short platform bounds.
+
+    Uses finite `pg.PlotDataItem([x,x],[y0,y1])` (not InfiniteLine) so SVGExporter includes them.
 
     Usage:
         from pyphoplacecellanalysis.Pho2D.track_shape_drawing import perform_add_pyqtgraph_1D_track_bounds_lines, resolve_1D_track_boundary_x_positions
 
         long_xs, short_xs = resolve_1D_track_boundary_x_positions(sess_config=curr_active_pipeline.sess.config)
-        track_lines = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_xs, short_notable_x_platform_positions=short_xs)
+        track_lines = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_xs, short_notable_x_platform_positions=short_xs, y_range=(0.0, float(n_cells)))
 
     Returns:
-        Dict[str, List[pg.InfiniteLine]]: {'long': [...], 'short': [...]} (empty lists when a track set is omitted)
+        Dict[str, List]: {'long': [...], 'short': [...]} of PlotDataItem (empty lists when a track set is omitted)
     """
     from pyphoplacecellanalysis.External.pyqtgraph.Qt import QtCore
 
@@ -1188,26 +1190,28 @@ def perform_add_pyqtgraph_1D_track_bounds_lines(plot_item, long_notable_x_platfo
     else:
         target = plot_item
 
+    y0, y1 = float(y_range[0]), float(y_range[1])
     long_short_display_config_manager = LongShortDisplayConfigManager()
     if long_pen is None:
+        # Prefer brush color (visible on black) over near-black pen '#0b0049'
         long_pg_kwargs = long_short_display_config_manager.long_epoch_config.as_pyqtgraph_kwargs()
-        long_pen = pg.mkPen(long_pg_kwargs['pen'].color(), width=1.0, style=QtCore.Qt.DashLine)
+        long_pen = pg.mkPen(long_pg_kwargs['brush'].color(), width=1.0, style=QtCore.Qt.DashLine)
     if short_pen is None:
         short_pg_kwargs = long_short_display_config_manager.short_epoch_config.as_pyqtgraph_kwargs()
-        short_pen = pg.mkPen(short_pg_kwargs['pen'].color(), width=1.0, style=QtCore.Qt.DashLine)
+        short_pen = pg.mkPen(short_pg_kwargs['brush'].color(), width=1.0, style=QtCore.Qt.DashLine)
 
-    out_lines: Dict[str, List[pg.InfiniteLine]] = {'long': [], 'short': []}
+    out_lines: Dict[str, List] = {'long': [], 'short': []}
 
     if include_long and (long_notable_x_platform_positions is not None):
         for x in long_notable_x_platform_positions:
-            line = pg.InfiniteLine(pos=float(x), angle=90, movable=False, pen=long_pen)
+            line = pg.PlotDataItem([float(x), float(x)], [y0, y1], pen=long_pen)
             target.addItem(line)
             out_lines['long'].append(line)
         ## END for x in long_notable_x_platform_positions...
 
     if include_short and (short_notable_x_platform_positions is not None):
         for x in short_notable_x_platform_positions:
-            line = pg.InfiniteLine(pos=float(x), angle=90, movable=False, pen=short_pen)
+            line = pg.PlotDataItem([float(x), float(x)], [y0, y1], pen=short_pen)
             target.addItem(line)
             out_lines['short'].append(line)
         ## END for x in short_notable_x_platform_positions...

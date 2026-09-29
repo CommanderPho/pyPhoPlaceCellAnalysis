@@ -1079,9 +1079,11 @@ class TemplateDebugger:
             # Set the extent to map pixels to x-locations
             curr_img.setRect(_out_data.active_pfs_img_extents_dict[a_decoder_name])
 
-            ## 1D track platform boundary lines (full-height InfiniteLines; static geometry, not recreated on update)
+            ## 1D track platform boundary lines (finite PlotDataItems for SVG export; static geometry, not recreated on update)
             if enable_track_boundary_lines and (int(a_decoder.ndim) < 2) and ((long_notable_x_platform_positions is not None) or (short_notable_x_platform_positions is not None)):
-                _out_ui.track_boundary_lines_dict[a_decoder_name] = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, include_long=True, include_short=True)
+                _ext = _out_data.active_pfs_img_extents_dict[a_decoder_name]  # [x, y, w, h]
+                y_range = (float(_ext[1]), float(_ext[1] + _ext[3]))  # typically (0, n_cells)
+                _out_ui.track_boundary_lines_dict[a_decoder_name] = perform_add_pyqtgraph_1D_track_bounds_lines(curr_win, long_notable_x_platform_positions=long_notable_x_platform_positions, short_notable_x_platform_positions=short_notable_x_platform_positions, include_long=True, include_short=True, y_range=y_range)
             else:
                 _out_ui.track_boundary_lines_dict[a_decoder_name] = {'long': [], 'short': []}
     
