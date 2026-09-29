@@ -286,7 +286,8 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
                     epoch_value_counts.append(epoch_spike_counts_dict.get(aclu, 0))
                     # epoch_value_counts.append({k:v.get(aclu, 0) for k, v in epoch_spike_counts_dict.items()})
                     
-                epoch_units_total_num_spikes_df: pd.DataFrame = pd.DataFrame(epoch_value_counts, index=deepcopy(included_neuron_ids))
+                # Match non-instantaneous layout: one row (whole-epoch "bin"), one column per aclu — (1, n_aclus)
+                epoch_units_total_num_spikes_df: pd.DataFrame = pd.DataFrame([epoch_value_counts], columns=deepcopy(list(included_neuron_ids)))
                 # unit_specific_binned_spike_counts = ZhangReconstructionImplementation.compute_unit_specific_bin_specific_spike_counts(spikes_df=epoch_spikes_df, active_indicies, debug_print=debug_print)
                 epoch_results_list_dict['spike_counts'].append(epoch_units_total_num_spikes_df)
                 
@@ -333,7 +334,8 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
             epoch_results_list_dict['epoch_unit_fr'].append(unit_approximate_entire_epoch_fr_df)
                 
         ## END for epoch_id in np.arange(n_epochs)...
-        has_epoch_participation: NDArray = np.vstack([(unit_specific_binned_spike_counts_df.T[0].to_numpy() > 0.0) for unit_specific_binned_spike_counts_df in epoch_results_list_dict['spike_counts']]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+        # Per-epoch participation: any spikes across time bins for each aclu. DFs are (n_time_bins, n_aclus).
+        has_epoch_participation: NDArray = np.vstack([(unit_specific_binned_spike_counts_df.sum(axis=0).to_numpy() > 0.0) for unit_specific_binned_spike_counts_df in epoch_results_list_dict['spike_counts']]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
         n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
         assert len(included_neuron_ids) == len(n_participating_epochs), f"len(included_neuron_ids): {len(included_neuron_ids)} != len(n_participating_epochs): {len(n_participating_epochs)}"
         epoch_results_list_dict['epoch_is_participating_dict'] = deepcopy(has_epoch_participation)
@@ -374,7 +376,8 @@ class SpikeRateTrends(HDFMixin, NeuronUnitSlicableObjectProtocol, AttrsBasedClas
             per_aclu_additional_properties_dict['active_neuron_UIDs'] = deepcopy(active_neuron_UIDs)
         n_epochs: int = len(a_pre_post_period_result.filter_epochs_df) ## total number of possible epochs
         
-        has_epoch_participation: NDArray = np.vstack([(v.T[0].to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
+        # Per-epoch participation: any spikes across time bins for each aclu. DFs are (n_time_bins, n_aclus).
+        has_epoch_participation: NDArray = np.vstack([(v.sum(axis=0).to_numpy() > 0.0) for v in a_pre_post_period_result.spike_counts_df_list]) # has_epoch_participation # .shape # (39, 20) - (n_epochs, n_aclus)
         n_participating_epochs: NDArray = has_epoch_participation.sum(axis=0) # .shape (N_ACLUS)
         assert len(active_neuron_identifiers) == len(n_participating_epochs), f"len(a_pre_post_period_result.included_neuron_ids): {len(active_neuron_identifiers)} != len(n_participating_epochs): {len(n_participating_epochs)}"
         n_participating_epochs_dict = dict(zip(active_neuron_identifiers, n_participating_epochs))
