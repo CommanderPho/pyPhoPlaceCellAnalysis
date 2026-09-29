@@ -765,23 +765,26 @@ class TemplateDebugger:
     # Saving/Exporting to file ___________________________________________________________________________________________ #
     #TODO 2023-11-16 22:16: - [ ] Figure out how to save
 
-    def save_figure(self, shared_output_file_prefix = f'output/2025-07-21', export_format: str='.svg', export_merged:bool=True, export_dimensions_px: Optional[Tuple[float, float]]=None) -> Dict[str, Path]: # export_file_base_path: Path = Path(f'output').resolve()
+    def save_figure(self, shared_output_file_prefix = f'output/2025-07-21', export_format: str='.svg', export_merged:bool=True, export_dimensions_px: Optional[Tuple[float, float]]=None, export_content_only: bool=False) -> Dict[str, Path]: # export_file_base_path: Path = Path(f'output').resolve()
         """ Exports the four decoder's pf1D heatmaps and a horizontally merged version if desired.
+
+        export_content_only=True exports each panel's ViewBox (black heatmap + overlays; no title/frame).
+        When export_content_only and export_dimensions_px are both set, (w, h) is the ViewBox content size
+        (widget is inflated by measured title/axis chrome so the ViewBox lands at that size).
                 
         export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-22')
-        export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-23', export_dimensions_px=(114.6818, 156.474))
+        export_dict, _merged_svg_output_path = template_debugger.save_figure(shared_output_file_prefix = f'output/2025-07-23', export_dimensions_px=(114.6818, 156.474), export_content_only=True)
         
         """
         if not export_format.startswith('.'):
             export_format = f'.{export_format}'
 
         export_size_kwargs = {}
-        target_widget_size = None
+        content_w_px = content_h_px = None
         if export_dimensions_px is not None:
             assert len(export_dimensions_px) == 2, f"export_dimensions_px must be (width, height); got {export_dimensions_px}"
-            w_px, h_px = float(export_dimensions_px[0]), float(export_dimensions_px[1])
-            export_size_kwargs = dict(width=w_px, height=h_px)
-            target_widget_size = (int(round(w_px)), int(round(h_px)))
+            content_w_px, content_h_px = float(export_dimensions_px[0]), float(export_dimensions_px[1])
+            export_size_kwargs = dict(width=content_w_px, height=content_h_px)
 
         export_dict = {}    
         _out_pf1D_heatmaps = self.plots.pf1D_heatmaps
@@ -792,18 +795,31 @@ class TemplateDebugger:
             print(f'a_win: {type(a_win)}')
             # save to file
             export_file_path = Path(f'{shared_output_file_prefix}_test_{a_decoder_name}_heatmap').with_suffix(export_format).resolve() # '.svg' # .resolve()
+            export_item = a_win.getViewBox() if export_content_only else a_win.plotItem
             old_size = None
+            did_resize = False
             try:
-                if target_widget_size is not None:
+                if (content_w_px is not None) and (content_h_px is not None):
                     old_size = a_win.size()
-                    a_win.setFixedSize(target_widget_size[0], target_widget_size[1])
+                    tw, th = int(round(content_w_px)), int(round(content_h_px))
+                    if export_content_only:
+                        # Measure title/axis chrome so (tw, th) applies to the ViewBox, not the whole PlotWidget
+                        pg.QtWidgets.QApplication.processEvents()
+                        vb = a_win.getViewBox()
+                        vb_rect = vb.sceneBoundingRect()
+                        chrome_w = max(0, int(round(a_win.width() - vb_rect.width())))
+                        chrome_h = max(0, int(round(a_win.height() - vb_rect.height())))
+                        a_win.setFixedSize(tw + chrome_w, th + chrome_h)
+                    else:
+                        a_win.setFixedSize(tw, th)
                     pg.QtWidgets.QApplication.processEvents()
-                export_pyqtgraph_plot(a_win.plotItem, savepath=export_file_path, **export_size_kwargs) # works
+                    did_resize = True
+                export_pyqtgraph_plot(export_item, savepath=export_file_path, **export_size_kwargs) # works
                 export_dict[a_decoder_name] = export_file_path
             except Exception as e:
                 raise
             finally:
-                if (target_widget_size is not None) and (old_size is not None):
+                if did_resize and (old_size is not None):
                     a_win.setMinimumSize(0, 0)
                     a_win.setMaximumSize(16777215, 16777215)  # QWIDGETSIZE_MAX
                     a_win.resize(old_size)
