@@ -949,7 +949,7 @@ class AcrossSessionsResults:
             raise
 
 
-        _neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df)
+        _neuron_replay_stats_df = deepcopy(jonathan_firing_rate_analysis_result.neuron_replay_stats_df) ## this is okay because both of the above modify the `jonathan_firing_rate_analysis_result.neuron_replay_stats_df`
         _neuron_replay_stats_df = HDF_Converter.prepare_neuron_indexed_dataframe_for_hdf(_neuron_replay_stats_df, active_context=deepcopy(session_context), aclu_column_name=None)        
         
         # jonathan_firing_rate_analysis_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/jonathan_fr_analysis', active_context=session_context)
@@ -1070,12 +1070,12 @@ class AcrossSessionsResults:
         
 
         ## Combine all unique columns from the three loaded dataframes: [neuron_identities_table, long_short_fr_indicies_analysis_table, neuron_replay_stats_table], into a merged df `all_neuron_stats_table`
-        _neuron_replay_stats_df: pd.DataFrame = deepcopy(unique_neuron_identities_df)
+        all_neuron_stats_table: pd.DataFrame = deepcopy(unique_neuron_identities_df)
         ## All dataframes have the same number of rows and are uniquely indexed by their 'neuron_uid' column. Add the additional columns from `long_short_fr_indicies_analysis_table` to `all_neuron_stats_table`
 
         ## OUTPUTS: _neuron_replay_stats_df
         ## merge in `_neuron_replay_stats_df`'s columns
-        _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
+        _neuron_replay_stats_df = pd.merge(all_neuron_stats_table, _neuron_replay_stats_df[['neuron_uid'] + [col for col in _neuron_replay_stats_df.columns if col not in all_neuron_stats_table.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `long_short_fr_indicies_analysis_results_h5_df`'s columns
         _neuron_replay_stats_df = pd.merge(_neuron_replay_stats_df, long_short_fr_indicies_analysis_results_h5_df[['neuron_uid'] + [col for col in long_short_fr_indicies_analysis_results_h5_df.columns if col not in _neuron_replay_stats_df.columns and col != 'neuron_uid']], on='neuron_uid')
         ## merge in `rate_remapping_df`'s columns

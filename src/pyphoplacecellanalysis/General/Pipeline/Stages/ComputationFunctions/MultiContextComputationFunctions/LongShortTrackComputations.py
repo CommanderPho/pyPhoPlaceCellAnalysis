@@ -459,7 +459,7 @@ class JonathanFiringRateAnalysisResult(HDFMixin, AttrsBasedClassHelperMixin):
         neuron_replay_stats_df.loc[np.isin(neuron_replay_stats_df['aclu'].to_numpy(), a_filtered_flat_peaks_df['aclu'].to_numpy()), a_modified_columns] = a_filtered_flat_peaks_df[additive_df_column_names].to_numpy()
 
         all_modified_columns.extend(a_modified_columns)
-        self.neuron_replay_stats_df = neuron_replay_stats_df
+        self.neuron_replay_stats_df = neuron_replay_stats_df # Re-assign the result to `self.neuron_replay_stats_df`
         print(f'all_modified_columns: {all_modified_columns}') # all_modified_columns: ['maze1_odd_pf2D_peak_x', 'maze1_odd_pf2D_peak_y', 'maze1_even_pf2D_peak_x', 'maze1_even_pf2D_peak_y', 'maze2_odd_pf2D_peak_x', 'maze2_odd_pf2D_peak_y', 'maze2_even_pf2D_peak_x', 'maze2_even_pf2D_peak_y']
         return self.neuron_replay_stats_df, all_modified_columns
          
