@@ -2704,7 +2704,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         if include_includelist is not None:
             print(f'WARN: perform_rank_order_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
-        print(f'####> perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        print(f'####> perform_rank_order_shuffle_analysis(..., num_shuffles={num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}, included_qclu_values: {included_qclu_values})')
 
         # Needs to store the parameters
         # num_shuffles:int=1000
