@@ -1935,6 +1935,420 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
 
 
 
+    # ==================================================================================================================== #
+    # Parameters                                                                                                           #
+    # ==================================================================================================================== #
+    @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
+    def get_all_parameters(self, allow_update_global_computation_config:bool=True, get_panel_gui_widget:bool=False) -> Dict:
+        """ gets all user-parameters from the pipeline
+        
+        Actually updates `self.global_computation_results.computation_config`
+        
+        Usage:
+            layout, _master_params_dict = curr_active_pipeline.get_all_parameters(allow_update_global_computation_config=False, get_panel_gui_widget=True)
+            layout
+
+        """
+        from benedict import benedict
+        from neuropy.core.parameters import ParametersContainer
+        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
+        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
+
+        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
+
+        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+        if self.global_computation_results.computation_config is None:
+            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+            if allow_update_global_computation_config:
+                print('global_computation_results.computation_config is None! Making new one!')
+                self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                print(f'\tdone. Pipeline needs resave!')
+        else:
+            curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+            
+
+        _master_params_dict = {}
+        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
+        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+        _master_params_dict = benedict(_master_params_dict)
+
+
+        if not get_panel_gui_widget:
+            ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
+            #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
+
+            # if self.global_computation_results.computation_config is not None:
+            #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
+            #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
+            #     ## TODO: are we sure we have all the parameters just from a global config? do we need to capture the default kwarg values that haven't been assigned or something?
+            # else:
+            #     print(f'WARNING: no global config so using kwarg defaults...')
+            #     ## only the default kwarg values:
+            #     registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
+            #     # registered_merged_computation_function_default_kwargs_dict
+            #     _master_params_dict.update(registered_merged_computation_function_default_kwargs_dict)
+
+            # _master_params_dict
+            # {'merged_directional_placefields': {'laps_decoding_time_bin_size': 0.25, 'ripple_decoding_time_bin_size': 0.025, 'should_validate_lap_decoding_performance': False},
+            #  'rank_order_shuffle_analysis': {'num_shuffles': 500, 'minimum_inclusion_fr_Hz': 5.0, 'included_qclu_values': [1, 2], 'skip_laps': False},
+            #  'directional_decoders_decode_continuous': {'time_bin_size': None},
+            #  'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': False},
+            #  'directional_train_test_split': {'training_data_portion': 0.8333333333333334, 'debug_output_hdf5_file_path': None},
+            #  'long_short_decoding_analyses': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False, 'override_long_epoch_name': None, 'override_short_epoch_name': None},
+            #  'long_short_rate_remapping': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False},
+            #  'long_short_inst_spike_rate_groups': {'instantaneous_time_bin_size_seconds': 0.01},
+            #  'wcorr_shuffle_analysis': {'num_shuffles': 1024, 'drop_previous_result_and_compute_fresh': False},
+            #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
+            #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
+            #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
+            return _master_params_dict
+
+        else:
+            ## get_panel_gui_widget
+            import param
+            import panel as pn
+            pn.extension()
+
+            def _test_perform_recompute_action(self, name):
+                print(f'_test_perform_recompute_action(self: {self}, name: "{name}")')
+
+            out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
+            for a_name, a_params in out_configs_dict.items():
+                # a_params: param.parameterized.Parameters
+                # a_params.add_parameter(
+                # Dynamically add a "Recompute" action button to this instance
+                # a_params.param.add_parameter('recompute', param.Action(lambda x: a_params.recompute_method(), label="Recompute"))
+                a_params.add_parameter('recompute', param.Action(lambda x: _test_perform_recompute_action(a_params, name=a_name), label="Recompute"))
+
+
+            styles_kwargs = dict() # no custom styles
+            # Apply scaling via CSS
+            # style = {"transform": "scale(0.5)", "transform-origin": "top left"}
+            # styles_kwargs = dict(styles=style, sizing_mode="fixed")
+            layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], **styles_kwargs)
+            return layout, _master_params_dict
+
+
+        # ## OUTPUTS: param_typed_parameters
+        # return {
+        #     'preprocessing_parameters': preprocessing_parameters,
+        #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
+        #     'param_typed_parameters': param_typed_parameters,
+        # }
+
+
+    @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=['batch_load_session', 'try_init_from_saved_pickle_or_reload_if_needed'], creation_date='2025-01-16 15:05', related_items=[])
+    def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
+        """ updates any of the user-parameters by keypaths for the pipeline
+        
+        Supports updating both preprocessing parameters and computation parameters.
+        
+        Preprocessing parameters:
+            - Keypaths should start with 'preprocessing.' or 'preprocessing_parameters.'
+            - Examples: 'preprocessing.epoch_estimation_parameters.replays.epochs_source'
+            - WARNING: Changing preprocessing parameters may invalidate filtered sessions and computation results.
+            - Consider re-filtering and re-computing after updating preprocessing parameters.
+        
+        Computation parameters:
+            - Keypaths should reference computation function parameters
+            - Examples: 'rank_order_shuffle_analysis.included_qclu_values', 'directional_train_test_split.training_data_portion'
+        
+        Example:
+        
+            # Update computation parameters
+            override_parameters_flat_keypaths_dict = {
+                'rank_order_shuffle_analysis.included_qclu_values': [1, 2, 4, 9],
+                'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0
+            }
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+            
+            # Update preprocessing parameters
+            override_parameters_flat_keypaths_dict = {
+                'preprocessing.epoch_estimation_parameters.replays.epochs_source': 'normal_computed'
+            }
+            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+
+        """
+        from neuropy.core.parameters import ParametersContainer
+        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
+
+        if override_parameters_flat_keypaths_dict is None:
+            return
+
+        ## `is_computed` lives on the pipeline facade. This method also runs on the stage, and unbound on a pre-compute pipeline whose stage has no `computation_results`.
+        try:
+            _computation_results = self.computation_results
+        except AttributeError:
+            _computation_results = None
+        _is_computed = (_computation_results is not None) and (len(_computation_results) > 0)
+        
+        # Separate preprocessing and computation parameters
+        preprocessing_params = {}
+        computation_params = {}
+        
+        for k, v in override_parameters_flat_keypaths_dict.items():
+            if k.startswith('preprocessing'):
+                preprocessing_params[k] = v
+            else:
+                computation_params[k] = v
+        
+        # Handle preprocessing parameters (can be updated at any stage)
+        if len(preprocessing_params) > 0:
+            # Get the preprocessing_parameters container (which has set_by_keypath)
+            preprocessing_params_container = self.active_sess_config.preprocessing_parameters
+            
+            # Warn about potential invalidation if at computed stage
+            if _is_computed:
+                num_filtered_sessions = len(self.filtered_sessions) if hasattr(self, 'filtered_sessions') and self.filtered_sessions else 0
+                num_computation_results = len(self.computation_results) if hasattr(self, 'computation_results') and self.computation_results else 0
+                print(f'WARNING: Updating preprocessing parameters will affect the base session configuration.')
+                if num_filtered_sessions > 0 or num_computation_results > 0:
+                    print(f'  - This may invalidate {num_filtered_sessions} filtered sessions and {num_computation_results} computation results.')
+                    print(f'  - Consider re-filtering and re-computing after updating preprocessing parameters.')
+            
+            # Update each preprocessing parameter
+            for k, v in preprocessing_params.items():
+                # Strip the prefix to get the actual keypath relative to preprocessing_parameters
+                if k.startswith('preprocessing.'):
+                    keypath = k.removeprefix('preprocessing.')
+                elif k.startswith('preprocessing_parameters.'):
+                    keypath = k.removeprefix('preprocessing_parameters.')
+                else:
+                    # Assume the keypath starts directly with the parameter name
+                    keypath = k
+                
+                try:
+                    # Update using keypath on preprocessing_parameters (e.g. 'epoch_estimation_parameters.replays.epochs_source')
+                    preprocessing_params_container.set_by_keypath(keypath, v)
+                    print(f'Updated preprocessing parameter: {k} -> {keypath} = {v}')
+                except AttributeError as e:
+                    print(f'ERROR: Failed to update preprocessing parameter "{k}" (keypath: "{keypath}"): {e}')
+                    raise
+                except Exception as e:
+                    print(f'ERROR: Unexpected error updating preprocessing parameter "{k}": {e}')
+                    raise
+        
+        # Handle computation parameters (only if at computed stage)
+        if len(computation_params) > 0:
+            if _is_computed:
+                ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
+                if self.global_computation_results.computation_config is None:
+                    print('global_computation_results.computation_config is None! Making new one!')
+                    curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
+                    self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                    print(f'\tdone. Pipeline needs resave!')
+                else:
+                    curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
+                
+                # Update each computation parameter
+                for k, v in computation_params.items():
+                    # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
+                    curr_global_param_typed_parameters.set_by_keypath(k, v)
+
+                self.global_computation_results.computation_config = curr_global_param_typed_parameters
+                # return self.global_computation_results.computation_config # return the updated parameters
+            else:
+                print(f'WARN: ComputedPipelineStage.update_parameters(...): too early to set the computation_config override_parameters, not yet at the computation stage!!')
+                print(f'  - Computation parameters can only be updated after the pipeline reaches the computed stage.')
+                print(f'  - Preprocessing parameters can be updated at any stage.')
+                pass
+
+
+    @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
+    def get_session_additional_parameters_context(self, parts_separator:str='-') -> DisplaySpecifyingIdentifyingContext:
+        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+        
+        Usage:
+            active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
+        
+        """
+        to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+        
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
+
+        additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
+            specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
+
+        }, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
+                'included_qclu_values': lambda k, v: f"qclu_{v}",
+                'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+        })
+        return additional_session_context
+    
+
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
+    def get_custom_pipeline_filenames_from_parameters(self, parts_separator:str='-') -> Tuple:
+        """ gets the custom suffix from the pipeline's parameters 
+        
+        custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
+        
+        """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+        
+        all_params_dict = self.get_all_parameters()
+
+        # preprocessing_parameters = all_params_dict['preprocessing']
+        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
+        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
+        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
+        
+        ## TODO: Ideally would use the value passed in self.get_all_parameters():
+        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
+        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
+        custom_suffix: str = epochs_source
+        # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
+        # print(f'custom_save_filenames: {custom_save_filenames}')
+        # print(f'custom_suffix: "{custom_suffix}"')
+        
+        ## Optionally append extra export filename suffix parts (e.g. ['variant_trackBodyPeakOnly']) set transiently on the pipeline (e.g. by batch completion handlers) to disambiguate variant outputs:
+        extra_suffix_parts = getattr(self, '_export_filename_extra_suffix_parts', None) or []
+        if len(extra_suffix_parts) > 0:
+            _old_custom_suffix: str = custom_suffix
+            custom_suffix = parts_separator.join([custom_suffix, *extra_suffix_parts]) # e.g. '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly'
+            custom_save_filenames = {k:v.replace(_old_custom_suffix, custom_suffix) for k, v in custom_save_filenames.items()}
+            custom_save_filepaths = {k:(v.replace(_old_custom_suffix, custom_suffix) if isinstance(v, str) else v) for k, v in custom_save_filepaths.items()}
+
+        return custom_save_filepaths, custom_save_filenames, custom_suffix
+    
+
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
+    def get_complete_session_identifier_string(self, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        Used to be `parts_separator:str='_'`
+        """
+        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=custom_parameter_keyvalue_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        return complete_session_identifier_string
+
+
+    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_complete_session_identifier_string'], used_by=[], creation_date='2024-11-19 01:19', related_items=[])
+    def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, extra_parts: Optional[List[str]]=None, out_extension: Optional[str]='.csv', suffix_string: Optional[str]=None,
+            output_date_str: Optional[str]=None, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_', ensure_no_duplicate_parts: bool = True) -> Tuple[Path, str, str]:
+        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
+        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
+    
+        Used to be `parts_separator:str='_'`
+        
+        Usage:
+        
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=None, data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=None, ensure_no_duplicate_parts=False)
+        out_filename # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df).csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=['tbin-0.025'])
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)-tbin-0.025.csv'
+
+        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', suffix_string='_tbin-0.025')
+        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv'
+
+        
+        """
+        from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
+
+        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
+
+        # custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
+        # complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
+        if output_date_str is None:
+            output_date_str = get_now_rounded_time_str()
+            # output_date_str = get_now_day_str()
+
+        _all_parts = []
+
+        # _all_parts = [output_date_str, session_identifier_str, data_identifier_str]
+
+        if (output_date_str is not None) and (len(output_date_str) > 0):
+            _all_parts.append(output_date_str)
+            
+        if (session_identifier_str is not None) and (len(session_identifier_str) > 0):
+            _all_parts.append(session_identifier_str)
+            
+        if (data_identifier_str is not None) and (len(data_identifier_str) > 0):
+            _all_parts.append(data_identifier_str)
+
+        # assert output_date_str is not None
+        if extra_parts is not None:
+            for a_part in extra_parts:
+                if (a_part is not None) and (len(a_part) > 0):
+                    _all_parts.append(a_part)
+
+            # _all_parts.extend(extra_parts)
+
+        
+        if ensure_no_duplicate_parts:
+            # _all_parts = list(set(_all_parts)) ## drop duplicate parts
+            # _all_parts = np.unique(_all_parts).tolist()
+            _all_parts = list(dict.fromkeys(_all_parts))
+            
+            
+        # out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        out_basename: str = custom_parameter_keyvalue_parts_separator.join(_all_parts) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
+        if (suffix_string is not None) and (len(suffix_string) > 0):
+            if ensure_no_duplicate_parts:
+                assert (not out_basename.endswith(suffix_string)), f"out_basename: '{out_basename}', suffix_string: '{suffix_string}'"
+            out_basename = f"{out_basename}{suffix_string}" ## append suffix string before extension
+        
+        if out_extension is None:
+            out_extension = ''
+        out_filename: str = f"{out_basename}{out_extension}"
+        if parent_output_path is not None:
+            out_path: Path = parent_output_path.joinpath(out_filename).resolve()
+        else:
+            out_path: Path = Path(out_filename)
+        return out_path, out_filename, out_basename
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
+    def get_complete_session_context(self, parts_separator:str='_') -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
+        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
+        
+        Usage:
+            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
+        
+        """
+        _filename_formatting_fn = partial(
+            session_context_filename_formatting_fn,
+            parts_separator=parts_separator,
+        )
+
+        curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context(),
+        specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn,},
+        # display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
+        #         'included_qclu_values': lambda k, v: f"qclu_{v}",
+        #         'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
+        # },
+        ) # **_obj.to_dict(),
+        additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context(parts_separator=parts_separator)
+        # complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
+        complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context.adding_context(collision_prefix='_additional', **additional_session_context.to_dict()) # hoping this merger works
+        
+        return complete_session_context, (curr_session_context,  additional_session_context)
+
+
+
+
+
         
 
 # self
@@ -3222,409 +3636,58 @@ class PipelineWithComputedPipelineStageMixin:
 
 
 
-
     # ==================================================================================================================== #
     # Parameters                                                                                                           #
     # ==================================================================================================================== #
-    @function_attributes(short_name=None, tags=['parameters', 'computaton'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-23 06:29', related_items=[])
+    def _copy_export_filename_extra_suffix_parts_to_stage(self):
+        """ Copies the transient export-filename suffix from the pipeline onto the stage before filename methods run there. """
+        extra_suffix_parts = getattr(self, '_export_filename_extra_suffix_parts', None)
+        if extra_suffix_parts:
+            self.stage._export_filename_extra_suffix_parts = list(extra_suffix_parts)
+
+
     def get_all_parameters(self, allow_update_global_computation_config:bool=True, get_panel_gui_widget:bool=False) -> Dict:
-        """ gets all user-parameters from the pipeline
-        
-        Actually updates `self.global_computation_results.computation_config`
-        
-        Usage:
-            layout, _master_params_dict = curr_active_pipeline.get_all_parameters(allow_update_global_computation_config=False, get_panel_gui_widget=True)
-            layout
-
-        """
-        from benedict import benedict
-        from neuropy.core.parameters import ParametersContainer
-        from pyphocorehelpers.DataStructure.dynamic_parameters import DynamicParameters
-        from pyphoplacecellanalysis.General.PipelineParameterClassTemplating import GlobalComputationParametersAttrsClassTemplating
-        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters, merged_directional_placefields_Parameters, rank_order_shuffle_analysis_Parameters, directional_decoders_decode_continuous_Parameters, directional_decoders_evaluate_epochs_Parameters, directional_train_test_split_Parameters, long_short_decoding_analyses_Parameters, long_short_rate_remapping_Parameters, long_short_inst_spike_rate_groups_Parameters, wcorr_shuffle_analysis_Parameters, perform_specific_epochs_decoding_Parameters, DEP_ratemap_peaks_Parameters, ratemap_peaks_prominence2d_Parameters
-
-        preprocessing_parameters: ParametersContainer = deepcopy(self.active_sess_config)
-
-        ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
-        if self.global_computation_results.computation_config is None:
-            curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
-            if allow_update_global_computation_config:
-                print('global_computation_results.computation_config is None! Making new one!')
-                self.global_computation_results.computation_config = curr_global_param_typed_parameters
-                print(f'\tdone. Pipeline needs resave!')
-        else:
-            curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
-            
-
-        _master_params_dict = {}
-        _master_params_dict['preprocessing'] = preprocessing_parameters.to_dict()
-        _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
-        _master_params_dict = benedict(_master_params_dict)
+        """Passthrough to ComputedPipelineStage.get_all_parameters."""
+        return self.stage.get_all_parameters(allow_update_global_computation_config=allow_update_global_computation_config, get_panel_gui_widget=get_panel_gui_widget)
 
 
-        if not get_panel_gui_widget:
-            ## Ensured that we have a valid `curr_global_param_typed_parameters` that was created with the kwarg defaults if it didn't exist.
-            #TODO 2024-10-23 06:45: - [ ] What about when a config was created and then later new kwarg values were added to a computation function, or the default values were updated?
-
-            # if self.global_computation_results.computation_config is not None:
-            #     curr_global_param_typed_parameters: ComputationKWargParameters = deepcopy(self.global_computation_results.computation_config)
-            #     _master_params_dict.update(curr_global_param_typed_parameters.to_dict())
-            #     ## TODO: are we sure we have all the parameters just from a global config? do we need to capture the default kwarg values that haven't been assigned or something?
-            # else:
-            #     print(f'WARNING: no global config so using kwarg defaults...')
-            #     ## only the default kwarg values:
-            #     registered_merged_computation_function_default_kwargs_dict, code_str, nested_classes_dict, (imports_dict, imports_list, imports_string) = GlobalComputationParametersAttrsClassTemplating.main_generate_params_classes(curr_active_pipeline=self)
-            #     # registered_merged_computation_function_default_kwargs_dict
-            #     _master_params_dict.update(registered_merged_computation_function_default_kwargs_dict)
-
-            # _master_params_dict
-            # {'merged_directional_placefields': {'laps_decoding_time_bin_size': 0.25, 'ripple_decoding_time_bin_size': 0.025, 'should_validate_lap_decoding_performance': False},
-            #  'rank_order_shuffle_analysis': {'num_shuffles': 500, 'minimum_inclusion_fr_Hz': 5.0, 'included_qclu_values': [1, 2], 'skip_laps': False},
-            #  'directional_decoders_decode_continuous': {'time_bin_size': None},
-            #  'directional_decoders_evaluate_epochs': {'should_skip_radon_transform': False},
-            #  'directional_train_test_split': {'training_data_portion': 0.8333333333333334, 'debug_output_hdf5_file_path': None},
-            #  'long_short_decoding_analyses': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False, 'override_long_epoch_name': None, 'override_short_epoch_name': None},
-            #  'long_short_rate_remapping': {'decoding_time_bin_size': None, 'perform_cache_load': False, 'always_recompute_replays': False},
-            #  'long_short_inst_spike_rate_groups': {'instantaneous_time_bin_size_seconds': 0.01},
-            #  'wcorr_shuffle_analysis': {'num_shuffles': 1024, 'drop_previous_result_and_compute_fresh': False},
-            #  '_perform_specific_epochs_decoding': {'decoder_ndim': 2, 'filter_epochs': 'ripple', 'decoding_time_bin_size': 0.02},
-            #  '_DEP_ratemap_peaks': {'peak_score_inclusion_percent_threshold': 0.25},
-            #  'ratemap_peaks_prominence2d': {'step': 0.01, 'peak_height_multiplier_probe_levels': (0.5, 0.9), 'minimum_included_peak_height': 0.2, 'uniform_blur_size': 3, 'gaussian_blur_sigma': 3}}
-            return _master_params_dict
-
-        else:
-            ## get_panel_gui_widget
-            import param
-            import panel as pn
-            pn.extension()
-
-            def _test_perform_recompute_action(self, name):
-                print(f'_test_perform_recompute_action(self: {self}, name: "{name}")')
-
-            out_configs_dict = curr_global_param_typed_parameters.to_params_dict(recursive_to_dict=False)
-            for a_name, a_params in out_configs_dict.items():
-                # a_params: param.parameterized.Parameters
-                # a_params.add_parameter(
-                # Dynamically add a "Recompute" action button to this instance
-                # a_params.param.add_parameter('recompute', param.Action(lambda x: a_params.recompute_method(), label="Recompute"))
-                a_params.add_parameter('recompute', param.Action(lambda x: _test_perform_recompute_action(a_params, name=a_name), label="Recompute"))
-
-
-            styles_kwargs = dict() # no custom styles
-            # Apply scaling via CSS
-            # style = {"transform": "scale(0.5)", "transform-origin": "top left"}
-            # styles_kwargs = dict(styles=style, sizing_mode="fixed")
-            layout = pn.Column(*[pn.Param(a_sub_v) for a_sub_v in reversed(out_configs_dict.values())], **styles_kwargs)
-            return layout, _master_params_dict
-
-
-        # ## OUTPUTS: param_typed_parameters
-        # return {
-        #     'preprocessing_parameters': preprocessing_parameters,
-        #     'curr_global_param_typed_parameters': curr_global_param_typed_parameters,
-        #     'param_typed_parameters': param_typed_parameters,
-        # }
-
-
-    @function_attributes(short_name=None, tags=['parameters', 'update'], input_requires=[], output_provides=[], uses=[], used_by=['batch_load_session', 'try_init_from_saved_pickle_or_reload_if_needed'], creation_date='2025-01-16 15:05', related_items=[])
     def update_parameters(self, override_parameters_flat_keypaths_dict: Dict[str, Any]=None) -> None:
-        """ updates any of the user-parameters by keypaths for the pipeline
-        
-        Supports updating both preprocessing parameters and computation parameters.
-        
-        Preprocessing parameters:
-            - Keypaths should start with 'preprocessing.' or 'preprocessing_parameters.'
-            - Examples: 'preprocessing.epoch_estimation_parameters.replays.epochs_source'
-            - WARNING: Changing preprocessing parameters may invalidate filtered sessions and computation results.
-            - Consider re-filtering and re-computing after updating preprocessing parameters.
-        
-        Computation parameters:
-            - Keypaths should reference computation function parameters
-            - Examples: 'rank_order_shuffle_analysis.included_qclu_values', 'directional_train_test_split.training_data_portion'
-        
-        Example:
-        
-            # Update computation parameters
-            override_parameters_flat_keypaths_dict = {
-                'rank_order_shuffle_analysis.included_qclu_values': [1, 2, 4, 9],
-                'rank_order_shuffle_analysis.minimum_inclusion_fr_Hz': 5.0
-            }
-            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
-            
-            # Update preprocessing parameters
-            override_parameters_flat_keypaths_dict = {
-                'preprocessing.epoch_estimation_parameters.replays.epochs_source': 'normal_computed'
-            }
-            curr_active_pipeline.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
-
-        """
-        from neuropy.core.parameters import ParametersContainer
-        from pyphoplacecellanalysis.General.Model.SpecificComputationParameterTypes import ComputationKWargParameters
-
-        if override_parameters_flat_keypaths_dict is None:
-            return
-        
-        # Separate preprocessing and computation parameters
-        preprocessing_params = {}
-        computation_params = {}
-        
-        for k, v in override_parameters_flat_keypaths_dict.items():
-            if k.startswith('preprocessing'):
-                preprocessing_params[k] = v
-            else:
-                computation_params[k] = v
-        
-        # Handle preprocessing parameters (can be updated at any stage)
-        if len(preprocessing_params) > 0:
-            # Get the preprocessing_parameters container (which has set_by_keypath)
-            preprocessing_params_container = self.active_sess_config.preprocessing_parameters
-            
-            # Warn about potential invalidation if at computed stage
-            if self.is_computed:
-                num_filtered_sessions = len(self.filtered_sessions) if hasattr(self, 'filtered_sessions') and self.filtered_sessions else 0
-                num_computation_results = len(self.computation_results) if hasattr(self, 'computation_results') and self.computation_results else 0
-                print(f'WARNING: Updating preprocessing parameters will affect the base session configuration.')
-                if num_filtered_sessions > 0 or num_computation_results > 0:
-                    print(f'  - This may invalidate {num_filtered_sessions} filtered sessions and {num_computation_results} computation results.')
-                    print(f'  - Consider re-filtering and re-computing after updating preprocessing parameters.')
-            
-            # Update each preprocessing parameter
-            for k, v in preprocessing_params.items():
-                # Strip the prefix to get the actual keypath relative to preprocessing_parameters
-                if k.startswith('preprocessing.'):
-                    keypath = k.removeprefix('preprocessing.')
-                elif k.startswith('preprocessing_parameters.'):
-                    keypath = k.removeprefix('preprocessing_parameters.')
-                else:
-                    # Assume the keypath starts directly with the parameter name
-                    keypath = k
-                
-                try:
-                    # Update using keypath on preprocessing_parameters (e.g. 'epoch_estimation_parameters.replays.epochs_source')
-                    preprocessing_params_container.set_by_keypath(keypath, v)
-                    print(f'Updated preprocessing parameter: {k} -> {keypath} = {v}')
-                except AttributeError as e:
-                    print(f'ERROR: Failed to update preprocessing parameter "{k}" (keypath: "{keypath}"): {e}')
-                    raise
-                except Exception as e:
-                    print(f'ERROR: Unexpected error updating preprocessing parameter "{k}": {e}')
-                    raise
-        
-        # Handle computation parameters (only if at computed stage)
-        if len(computation_params) > 0:
-            if self.is_computed:
-                ## Add `curr_active_pipeline.global_computation_results.computation_config` as needed:
-                if self.global_computation_results.computation_config is None:
-                    print('global_computation_results.computation_config is None! Making new one!')
-                    curr_global_param_typed_parameters: ComputationKWargParameters = ComputationKWargParameters.init_from_pipeline(curr_active_pipeline=self)
-                    self.global_computation_results.computation_config = curr_global_param_typed_parameters
-                    print(f'\tdone. Pipeline needs resave!')
-                else:
-                    curr_global_param_typed_parameters: ComputationKWargParameters = self.global_computation_results.computation_config
-                
-                # Update each computation parameter
-                for k, v in computation_params.items():
-                    # Set a value using keypath (e.g. 'directional_train_test_split.training_data_portion')
-                    curr_global_param_typed_parameters.set_by_keypath(k, v)
-
-                self.global_computation_results.computation_config = curr_global_param_typed_parameters
-                # return self.global_computation_results.computation_config # return the updated parameters
-            else:
-                print(f'WARN: PipelineWithComputedPipelineStageMixin.update_parameters(...): too early to set the computation_config override_parameters, not yet at the computation stage!!')
-                print(f'  - Computation parameters can only be updated after the pipeline reaches the computed stage.')
-                print(f'  - Preprocessing parameters can be updated at any stage.')
-                pass
+        """Passthrough to the stage once computed; before that, only preprocessing keypaths can be applied."""
+        if isinstance(self.stage, ComputedPipelineStage):
+            return self.stage.update_parameters(override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
+        return ComputedPipelineStage.update_parameters(self, override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict)
 
 
-    @function_attributes(short_name=None, tags=['UNFINSHED', 'context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-31 19:46', related_items=[])
     def get_session_additional_parameters_context(self, parts_separator:str='-') -> DisplaySpecifyingIdentifyingContext:
-        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
-        
-        Usage:
-            active_context, session_ctxt_key, CURR_BATCH_OUTPUT_PREFIX, additional_session_context = curr_active_pipeline.get_complete_session_context(BATCH_DATE_TO_USE=self.BATCH_DATE_TO_USE)
-        
-        """
-        to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
+        """Passthrough to ComputedPipelineStage.get_session_additional_parameters_context."""
+        return self.stage.get_session_additional_parameters_context(parts_separator=parts_separator)
 
-        all_params_dict = self.get_all_parameters()
 
-        # preprocessing_parameters = all_params_dict['preprocessing']
-        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
-        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
-        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
-        
-        
-        ## TODO: Ideally would use the value passed in self.get_all_parameters():
-        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
-        
-        _filename_formatting_fn = partial(
-            session_context_filename_formatting_fn,
-            parts_separator=parts_separator,
-        )
-
-        additional_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
-            specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn, 
-
-        }, display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
-                'included_qclu_values': lambda k, v: f"qclu_{v}",
-                'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
-        })
-        return additional_session_context
-    
-
-    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 16:10', related_items=[])
     def get_custom_pipeline_filenames_from_parameters(self, parts_separator:str='-') -> Tuple:
-        """ gets the custom suffix from the pipeline's parameters 
-        
-        custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
-        
-        """
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
-        
-        all_params_dict = self.get_all_parameters()
+        """Passthrough to ComputedPipelineStage.get_custom_pipeline_filenames_from_parameters."""
+        self._copy_export_filename_extra_suffix_parts_to_stage()
+        return self.stage.get_custom_pipeline_filenames_from_parameters(parts_separator=parts_separator)
 
-        # preprocessing_parameters = all_params_dict['preprocessing']
-        rank_order_shuffle_analysis_parameters = all_params_dict['rank_order_shuffle_analysis']
-        included_qclu_values = deepcopy(rank_order_shuffle_analysis_parameters['included_qclu_values']) # [1, 2, 4, 6, 7, 9]
-        minimum_inclusion_fr_Hz = deepcopy(rank_order_shuffle_analysis_parameters['minimum_inclusion_fr_Hz']) # 5.0
-        
-        ## TODO: Ideally would use the value passed in self.get_all_parameters():
-        active_replay_epoch_parameters = deepcopy(self.sess.config.preprocessing_parameters.epoch_estimation_parameters.replays)
-        epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
-        custom_suffix: str = epochs_source
-        # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
-        # print(f'custom_save_filenames: {custom_save_filenames}')
-        # print(f'custom_suffix: "{custom_suffix}"')
-        
-        ## Optionally append extra export filename suffix parts (e.g. ['variant_trackBodyPeakOnly']) set transiently on the pipeline (e.g. by batch completion handlers) to disambiguate variant outputs:
-        extra_suffix_parts = getattr(self, '_export_filename_extra_suffix_parts', None) or []
-        if len(extra_suffix_parts) > 0:
-            _old_custom_suffix: str = custom_suffix
-            custom_suffix = parts_separator.join([custom_suffix, *extra_suffix_parts]) # e.g. '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly'
-            custom_save_filenames = {k:v.replace(_old_custom_suffix, custom_suffix) for k, v in custom_save_filenames.items()}
-            custom_save_filepaths = {k:(v.replace(_old_custom_suffix, custom_suffix) if isinstance(v, str) else v) for k, v in custom_save_filepaths.items()}
 
-        return custom_save_filepaths, custom_save_filenames, custom_suffix
-    
-
-    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_custom_pipeline_filenames_from_parameters'], used_by=[], creation_date='2024-11-08 10:36', related_items=[])
     def get_complete_session_identifier_string(self, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_') -> str:
-        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
-        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
-    
-        Used to be `parts_separator:str='_'`
-        """
-        custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=custom_parameter_keyvalue_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-        complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
-        return complete_session_identifier_string
+        """Passthrough to ComputedPipelineStage.get_complete_session_identifier_string."""
+        self._copy_export_filename_extra_suffix_parts_to_stage()
+        return self.stage.get_complete_session_identifier_string(parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
 
 
-    @function_attributes(short_name=None, tags=['parameters', 'filenames', 'export'], input_requires=[], output_provides=[], uses=['get_complete_session_identifier_string'], used_by=[], creation_date='2024-11-19 01:19', related_items=[])
     def build_complete_session_identifier_filename_string(self, data_identifier_str: str, parent_output_path: Optional[Path]=None, extra_parts: Optional[List[str]]=None, out_extension: Optional[str]='.csv', suffix_string: Optional[str]=None,
             output_date_str: Optional[str]=None, parts_separator:str='_', custom_parameter_keyvalue_parts_separator:str='-', session_identity_parts_separator:str='_', ensure_no_duplicate_parts: bool = True) -> Tuple[Path, str, str]:
-        """ returns a string like 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]', with the session context and the parameters
-        complete_session_identifier_string: str = curr_active_pipeline.get_complete_session_identifier_string()
-    
-        Used to be `parts_separator:str='_'`
-        
-        Usage:
-        
-        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=None, data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=None, ensure_no_duplicate_parts=False)
-        out_filename # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df).csv'
-
-        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', extra_parts=['tbin-0.025'])
-        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)-tbin-0.025.csv'
-
-        out_path, out_filename, out_basename = curr_active_pipeline.build_complete_session_identifier_filename_string(data_identifier_str="(ripple_WCorrShuffle_df)", parent_output_path=None, out_extension='.csv', suffix_string='_tbin-0.025')
-        out_filename  # '2024-11-19_0148AM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv'
-
-        
-        """
-        from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-
-        session_identifier_str: str = self.get_complete_session_identifier_string(parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator)
-
-        # custom_save_filepaths, custom_save_filenames, custom_suffix = self.get_custom_pipeline_filenames_from_parameters(parts_separator=sub_parts_separator) # 'normal_computed-frateThresh_5.0-qclu_[1, 2]'
-        # complete_session_identifier_string: str = parts_separator.join([self.get_session_context().get_description(separator=session_identity_parts_separator), custom_suffix]) # 'kdiba-gor01-one-2006-6-08_14-26-15__withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]'
-        if output_date_str is None:
-            output_date_str = get_now_rounded_time_str()
-            # output_date_str = get_now_day_str()
-
-        _all_parts = []
-
-        # _all_parts = [output_date_str, session_identifier_str, data_identifier_str]
-
-        if (output_date_str is not None) and (len(output_date_str) > 0):
-            _all_parts.append(output_date_str)
-            
-        if (session_identifier_str is not None) and (len(session_identifier_str) > 0):
-            _all_parts.append(session_identifier_str)
-            
-        if (data_identifier_str is not None) and (len(data_identifier_str) > 0):
-            _all_parts.append(data_identifier_str)
-
-        # assert output_date_str is not None
-        if extra_parts is not None:
-            for a_part in extra_parts:
-                if (a_part is not None) and (len(a_part) > 0):
-                    _all_parts.append(a_part)
-
-            # _all_parts.extend(extra_parts)
-
-        
-        if ensure_no_duplicate_parts:
-            # _all_parts = list(set(_all_parts)) ## drop duplicate parts
-            # _all_parts = np.unique(_all_parts).tolist()
-            _all_parts = list(dict.fromkeys(_all_parts))
-            
-            
-        # out_basename: str = '-'.join([output_date_str, session_identifier_str, data_identifier_str]) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-        out_basename: str = custom_parameter_keyvalue_parts_separator.join(_all_parts) # '2024-01-04-kdiba_gor01_one_2006-6-09_1-22-43|(laps_marginals_df).csv'
-        if (suffix_string is not None) and (len(suffix_string) > 0):
-            if ensure_no_duplicate_parts:
-                assert (not out_basename.endswith(suffix_string)), f"out_basename: '{out_basename}', suffix_string: '{suffix_string}'"
-            out_basename = f"{out_basename}{suffix_string}" ## append suffix string before extension
-        
-        if out_extension is None:
-            out_extension = ''
-        out_filename: str = f"{out_basename}{out_extension}"
-        if parent_output_path is not None:
-            out_path: Path = parent_output_path.joinpath(out_filename).resolve()
-        else:
-            out_path: Path = Path(out_filename)
-        return out_path, out_filename, out_basename
+        """Passthrough to ComputedPipelineStage.build_complete_session_identifier_filename_string."""
+        self._copy_export_filename_extra_suffix_parts_to_stage()
+        return self.stage.build_complete_session_identifier_filename_string(data_identifier_str=data_identifier_str, parent_output_path=parent_output_path, extra_parts=extra_parts, out_extension=out_extension, suffix_string=suffix_string,
+            output_date_str=output_date_str, parts_separator=parts_separator, custom_parameter_keyvalue_parts_separator=custom_parameter_keyvalue_parts_separator, session_identity_parts_separator=session_identity_parts_separator, ensure_no_duplicate_parts=ensure_no_duplicate_parts)
 
 
-
-
-
-    @function_attributes(short_name=None, tags=['context', 'custom', 'parameters'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-01 00:00', related_items=[])
     def get_complete_session_context(self, parts_separator:str='_') -> Tuple[DisplaySpecifyingIdentifyingContext, Tuple[DisplaySpecifyingIdentifyingContext]]:
-        """ gets the entire session context, including the noteworthy computation parameters that would be needed for determing which filename to save under .
-        
-        Usage:
-            complete_session_context, (session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context()
-        
-        """
-        _filename_formatting_fn = partial(
-            session_context_filename_formatting_fn,
-            parts_separator=parts_separator,
-        )
+        """Passthrough to ComputedPipelineStage.get_complete_session_context."""
+        return self.stage.get_complete_session_context(parts_separator=parts_separator)
 
-        curr_session_context: DisplaySpecifyingIdentifyingContext = DisplaySpecifyingIdentifyingContext.init_from_context(a_context=self.get_session_context(),
-        specific_purpose_display_dict={'filename_formatting': _filename_formatting_fn,},
-        # display_dict={'epochs_source': lambda k, v: to_filename_conversion_dict[v],
-        #         'included_qclu_values': lambda k, v: f"qclu_{v}",
-        #         'minimum_inclusion_fr_Hz': lambda k, v: f"frateThresh_{v:.1f}",
-        # },
-        ) # **_obj.to_dict(),
-        additional_session_context: DisplaySpecifyingIdentifyingContext = self.get_session_additional_parameters_context(parts_separator=parts_separator)
-        # complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context | additional_session_context # hoping this merger works
-        complete_session_context: DisplaySpecifyingIdentifyingContext = curr_session_context.adding_context(collision_prefix='_additional', **additional_session_context.to_dict()) # hoping this merger works
-        
-        return complete_session_context, (curr_session_context,  additional_session_context)
+
 
     @function_attributes(short_name=None, tags=['valid_track_times', 'loaded_track_limits'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-05 16:18', related_items=[])
     def find_first_and_last_valid_position_times(self):
