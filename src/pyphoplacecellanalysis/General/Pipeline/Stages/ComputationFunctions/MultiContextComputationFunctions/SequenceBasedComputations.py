@@ -383,23 +383,49 @@ class WCorrShuffle(ComputedResult):
         z_scores = (real_v - mean) / std_dev
         return z_scores
 
+
+    @staticmethod
+    def _positions_of_aclus(source_ids: NDArray, ordered_aclus: NDArray) -> NDArray:
+        """Index of each aclu in `ordered_aclus` inside `source_ids`.
+
+        The returned positions index `source_ids` only. Ratemap positions are not valid indices into a shorter `neuron_IDs` array.
+        """
+        source_ids = np.asarray(source_ids)
+        ordered_aclus = np.asarray(ordered_aclus)
+        positions = np.empty(len(ordered_aclus), dtype=int)
+        for i, aclu in enumerate(ordered_aclus):
+            matches = np.flatnonzero(source_ids == aclu)
+            if len(matches) == 0:
+                raise ValueError(f"aclu {aclu} is not in source_ids")
+            positions[i] = int(matches[0])
+        ## END for i, aclu in enumerate(ordered_aclus)...
+
+        return positions
+
+
     @classmethod
     def _shuffle_pf1D_decoder(cls, a_pf1D_Decoder: BasePositionDecoder, shuffle_IDXs: NDArray, shuffle_aclus: NDArray) -> BasePositionDecoder:
-        """ Shuffle the neuron_ids for a `alt_directional_merged_decoders_result` - `DirectionalPseudo2DDecodersResult `:
+        """Reassign cell identity on one decoder by permuting `neuron_IDs` into `shuffle_aclus` order.
+
+        Spike counts are gathered in `neuron_IDs` order and decoded with `F` columns, which stay in the original order. That mismatch is the cell-identity shuffle. Permuting `F` or the ratemap with the same index would put each field back on its own cell, and the posterior would not change.
+
+        `shuffle_IDXs` indexes the merged decoder that built the shuffle and is not applied here. Each decoder rebuilds positions from its own `neuron_IDs`. A ratemap can be longer than `neuron_IDs` (the reported failure was index 41 into length 33); those ratemap positions are not used.
+
+        `F` is `(n_flat_position_bins, n_neurons)` and stays aligned with the pre-shuffle columns. `Ratemap.get_by_id` is not used: its boolean mask keeps the original neuron order and does not apply this permutation.
         """
         a_shuffled_decoder = deepcopy(a_pf1D_Decoder)
-        # restrict the shuffle_acus to the actual aclus of the ratemap
-        is_shuffle_aclu_included = np.isin(shuffle_aclus, a_shuffled_decoder.pf.ratemap.neuron_ids)
-        shuffle_aclus = shuffle_aclus[is_shuffle_aclu_included]
+        neuron_IDs = np.asarray(a_shuffled_decoder.neuron_IDs)
+        shuffle_aclus = np.asarray(shuffle_aclus)
+        ordered_aclus = shuffle_aclus[np.isin(shuffle_aclus, neuron_IDs)]
+        missing_aclus = neuron_IDs[~np.isin(neuron_IDs, ordered_aclus)]
+        if len(missing_aclus) > 0:
+            ordered_aclus = np.concatenate([ordered_aclus, missing_aclus])
+        neuron_shuffle_IDXs = cls._positions_of_aclus(neuron_IDs, ordered_aclus)
 
-        ## find the correct indicies to shuffle by:
-        # shuffle_IDXs = [list(shuffle_aclus).index(aclu) for aclu in a_shuffled_decoder.pf.ratemap.neuron_ids]
-        shuffle_IDXs = [list(a_shuffled_decoder.pf.ratemap.neuron_ids).index(aclu) for aclu in shuffle_aclus]
-        a_shuffled_decoder.pf.ratemap = a_shuffled_decoder.pf.ratemap.get_by_id(shuffle_aclus)
-        neuron_indexed_field_names = ['neuron_IDs', 'neuron_IDs']
-        for a_field in neuron_indexed_field_names:
-            setattr(a_shuffled_decoder, a_field, getattr(a_shuffled_decoder, a_field)[shuffle_IDXs]) # #TODO 2025-01-20 20:44: - [ ] IndexError: index 21 is out of bounds for axis 0 with size 16
-        a_shuffled_decoder.F[shuffle_IDXs, :] = a_shuffled_decoder.F[shuffle_IDXs, :] # @TODO - is this needed?
+        a_shuffled_decoder.neuron_IDs = neuron_IDs[neuron_shuffle_IDXs]
+        a_shuffled_decoder.neuron_IDXs = np.arange(len(a_shuffled_decoder.neuron_IDs))
+        if (a_shuffled_decoder.F is not None) and (a_shuffled_decoder.F.shape[1] != len(neuron_IDs)):
+            raise ValueError(f"F neuron axis {a_shuffled_decoder.F.shape[1]} does not match len(neuron_IDs)={len(neuron_IDs)}. F is aligned with neuron_IDs, not with pf.ratemap.neuron_ids.")
 
         return a_shuffled_decoder
     
@@ -685,7 +711,8 @@ class WCorrShuffle(ComputedResult):
             ## Shuffle the neuron_ids for a `alt_directional_merged_decoders_result` - `DirectionalPseudo2DDecodersResult `:
             alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = cls._shuffle_pf1D_decoder(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=a_shuffle_aclus)
 
-            shuffled_decoder_specific_neuron_ids_dict = dict(zip(track_templates.get_decoder_names(), [a_shuffle_aclus[np.isin(a_shuffle_aclus, v)] for v in track_templates.decoder_neuron_IDs_list]))
+            ## Filter the global shuffle to each decoder's own neuron_IDs. decoder_neuron_IDs_list is the ratemap ids, which can be longer than neuron_IDs.
+            shuffled_decoder_specific_neuron_ids_dict = {a_name: a_shuffle_aclus[np.isin(a_shuffle_aclus, np.asarray(a_decoder.neuron_IDs))] for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
             ## Shuffle the four 1D decoders as well so they can be passed in.
             shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name:cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
