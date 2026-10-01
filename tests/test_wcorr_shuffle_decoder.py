@@ -85,3 +85,30 @@ class TestWCorrShuffleDecoderIndexing(unittest.TestCase):
 
         np.testing.assert_array_equal(shuffled.neuron_IDs, np.array([3, 1, 2, 4]))
         self.assertEqual(shuffled.F.shape[1], 4)
+
+
+    def test_duplicate_neuron_IDs_and_repeated_shuffle_aclus_are_rejected(self):
+        decoder = _Decoder(np.array([10, 10, 20]), np.array([10, 20]))
+        with self.assertRaises(ValueError):
+            WCorrShuffle._shuffle_pf1D_decoder(decoder, shuffle_IDXs=np.arange(2), shuffle_aclus=np.array([20, 10]))
+
+        decoder = _Decoder(np.array([10, 20, 30]), np.array([10, 20, 30]))
+        original_ids = decoder.neuron_IDs.copy()
+        with self.assertRaises(ValueError):
+            WCorrShuffle._shuffle_pf1D_decoder(decoder, shuffle_IDXs=np.arange(3), shuffle_aclus=np.array([30, 10, 30, 20]))
+        np.testing.assert_array_equal(decoder.neuron_IDs, original_ids)
+
+
+    def test_F_neuron_axis_must_match_neuron_IDs(self):
+        decoder = _Decoder(np.array([1, 2, 3]), np.arange(5))
+        decoder.F = np.zeros((4, 5))
+        with self.assertRaises(ValueError):
+            WCorrShuffle._shuffle_pf1D_decoder(decoder, shuffle_IDXs=np.arange(5), shuffle_aclus=np.array([3, 1, 2]))
+
+
+    def test_int32_shuffle_aclus_match_int64_neuron_IDs(self):
+        neuron_IDs = np.array([10, 20, 30], dtype=np.int64)
+        shuffle_aclus = np.array([30, 10, 20], dtype=np.int32)
+        decoder = _Decoder(neuron_IDs, neuron_IDs)
+        shuffled = WCorrShuffle._shuffle_pf1D_decoder(decoder, shuffle_IDXs=np.arange(3), shuffle_aclus=shuffle_aclus)
+        np.testing.assert_array_equal(shuffled.neuron_IDs, np.array([30, 10, 20]))

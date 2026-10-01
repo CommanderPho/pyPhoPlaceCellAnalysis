@@ -385,6 +385,17 @@ class WCorrShuffle(ComputedResult):
 
 
     @staticmethod
+    def _as_aclu_vector(ids: NDArray, name: str) -> NDArray:
+        """1-D integer aclus. int32 and int64 compare equal after this cast."""
+        arr = np.asarray(ids)
+        if arr.ndim != 1:
+            raise ValueError(f"{name} must be 1-D, got shape {arr.shape}")
+        if arr.dtype.kind not in ("i", "u"):
+            raise ValueError(f"{name} must be integer aclus, got dtype {arr.dtype}")
+        return arr.astype(np.int64, copy=False)
+
+
+    @staticmethod
     def _positions_of_aclus(source_ids: NDArray, ordered_aclus: NDArray) -> NDArray:
         """Index of each aclu in `ordered_aclus` inside `source_ids`.
 
@@ -395,8 +406,8 @@ class WCorrShuffle(ComputedResult):
         positions = np.empty(len(ordered_aclus), dtype=int)
         for i, aclu in enumerate(ordered_aclus):
             matches = np.flatnonzero(source_ids == aclu)
-            if len(matches) == 0:
-                raise ValueError(f"aclu {aclu} is not in source_ids")
+            if len(matches) != 1:
+                raise ValueError(f"aclu {aclu} occurs {len(matches)} times in source_ids; expected exactly one")
             positions[i] = int(matches[0])
         ## END for i, aclu in enumerate(ordered_aclus)...
 
@@ -411,22 +422,37 @@ class WCorrShuffle(ComputedResult):
 
         `shuffle_IDXs` indexes the merged decoder that built the shuffle and is not applied here. Each decoder rebuilds positions from its own `neuron_IDs`. A ratemap can be longer than `neuron_IDs` (the reported failure was index 41 into length 33); those ratemap positions are not used.
 
-        `F` is `(n_flat_position_bins, n_neurons)` and stays aligned with the pre-shuffle columns. `Ratemap.get_by_id` is not used: its boolean mask keeps the original neuron order and does not apply this permutation.
+        `F` is `(n_flat_position_bins, n_neurons)` and stays aligned with the pre-shuffle columns. Reliability columns stay with `F`. `Ratemap.get_by_id` is not used: its boolean mask keeps the original neuron order and does not apply this permutation.
         """
         a_shuffled_decoder = deepcopy(a_pf1D_Decoder)
-        neuron_IDs = np.asarray(a_shuffled_decoder.neuron_IDs)
-        shuffle_aclus = np.asarray(shuffle_aclus)
+        neuron_IDs = cls._as_aclu_vector(a_shuffled_decoder.neuron_IDs, "neuron_IDs")
+        n_neurons: int = len(neuron_IDs)
+        if len(np.unique(neuron_IDs)) != n_neurons:
+            raise ValueError(f"neuron_IDs contains duplicate aclus: {neuron_IDs}")
+        if a_shuffled_decoder.F is None:
+            raise ValueError("decoder.F is missing. Cell-identity shuffle keeps the original F columns and cannot run without them.")
+        if (np.ndim(a_shuffled_decoder.F) != 2) or (a_shuffled_decoder.F.shape[1] != n_neurons):
+            raise ValueError(f"F shape {np.shape(a_shuffled_decoder.F)} is not (n_position_bins, {n_neurons}). F is aligned with neuron_IDs, not with pf.ratemap.neuron_ids.")
+        for field_name in ('reliability_active', 'reliability_silent'):
+            reliability = getattr(a_shuffled_decoder, field_name, None)
+            if (reliability is not None) and (np.shape(reliability)[-1] != n_neurons):
+                raise ValueError(f"{field_name} shape {np.shape(reliability)} does not end with n_neurons={n_neurons}. Reliability stays aligned with F and is not permuted.")
+        ## END for field_name in ('reliability_active', 'reliability_silent')...
+
+        shuffle_aclus = cls._as_aclu_vector(shuffle_aclus, "shuffle_aclus")
         ordered_aclus = shuffle_aclus[np.isin(shuffle_aclus, neuron_IDs)]
+        if len(np.unique(ordered_aclus)) != len(ordered_aclus):
+            raise ValueError(f"shuffle_aclus repeats an aclu that is in this decoder: {ordered_aclus}")
         missing_aclus = neuron_IDs[~np.isin(neuron_IDs, ordered_aclus)]
         if len(missing_aclus) > 0:
+            # Keep F's width. Cells absent from the shuffle stay in their original order and remain paired with their own field.
             ordered_aclus = np.concatenate([ordered_aclus, missing_aclus])
         neuron_shuffle_IDXs = cls._positions_of_aclus(neuron_IDs, ordered_aclus)
+        if (len(neuron_shuffle_IDXs) != n_neurons) or (len(np.unique(neuron_shuffle_IDXs)) != n_neurons):
+            raise ValueError(f"shuffle of neuron_IDs is not a permutation of 0..{n_neurons - 1}: {neuron_shuffle_IDXs}")
 
         a_shuffled_decoder.neuron_IDs = neuron_IDs[neuron_shuffle_IDXs]
-        a_shuffled_decoder.neuron_IDXs = np.arange(len(a_shuffled_decoder.neuron_IDs))
-        if (a_shuffled_decoder.F is not None) and (a_shuffled_decoder.F.shape[1] != len(neuron_IDs)):
-            raise ValueError(f"F neuron axis {a_shuffled_decoder.F.shape[1]} does not match len(neuron_IDs)={len(neuron_IDs)}. F is aligned with neuron_IDs, not with pf.ratemap.neuron_ids.")
-
+        a_shuffled_decoder.neuron_IDXs = np.arange(n_neurons)
         return a_shuffled_decoder
     
 
