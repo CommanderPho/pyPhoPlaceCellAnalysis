@@ -237,13 +237,27 @@ class RadonTransformDebugger:
     def time_bin_size(self) -> float:
         return float(self.result.decoding_time_bin_size)
 
+    def _radon_transform_extras_tuple(self):
+        """ Unwrap stored radon extras to `(num_neighbours, neighbors_arr, ...)`.
+
+        Export stores `df, *extras = compute_radon_transforms(...)`, which nests as `[[(num_neighbours, neighbors_arr, debug_info)]]` — lengths `(1, 1, 3, n_epochs)`.
+        `np.squeeze` cannot build one array from that because `neighbors_arr` and `debug_info` are inhomogeneous across epochs.
+        """
+        payload = self.decoder_radon_transform_extras_dict[self.active_decoder_name]
+        while isinstance(payload, (list, tuple)) and (len(payload) == 1) and isinstance(payload[0], (list, tuple)) and (not isinstance(payload[0], np.ndarray)):
+            payload = payload[0]
+        if isinstance(payload, np.ndarray):
+            payload = np.squeeze(payload) # older homogeneous extras, shape (1, 1, 2, n_epochs) -> (2, n_epochs)
+        return payload
+
+
     @property
     def num_neighbours(self) -> NDArray:
-        return  np.squeeze(deepcopy(self.decoder_radon_transform_extras_dict[self.active_decoder_name]))[0]
+        return self._radon_transform_extras_tuple()[0]
     
     @property
     def neighbors_arr(self) -> NDArray:
-        return  np.squeeze(deepcopy(self.decoder_radon_transform_extras_dict[self.active_decoder_name]))[1]
+        return self._radon_transform_extras_tuple()[1]
     
     @property
     def stats_measures(self) -> List[Tuple]:
@@ -480,8 +494,9 @@ class RadonTransformDebugger:
 
         ## Get the correct band roi start/end points using the same equations as the absolute line:
         real_line_t = deepcopy(a_debug_info.t)
-        best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs])
-
+        # best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs]) #TODO 2026-10-01 13:04: - [ ] This does not work because `a_debug_info.best_y_line_idxs` can fall outside of the bounds (can be lower than self.xbin_centers[0] or beyond self.xbin_centers[-1])
+        best_y_line = scipy.interpolate.interp1d(np.arange(len(self.xbin_centers), dtype=float), np.asarray(self.xbin_centers, dtype=float), fill_value="extrapolate", bounds_error=False)(np.asarray(a_debug_info.best_y_line_idxs, dtype=float))
+        
         # Compute ROI band values. These don't look right despite the above being right.
         start_point = [real_line_t[0], best_y_line[0]]
         end_point = [real_line_t[-1], best_y_line[-1]]
