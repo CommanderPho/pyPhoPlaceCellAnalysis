@@ -18487,8 +18487,9 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
     load_path = Path("W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/output/2024-11-25_AllCustomDecodingResults.pkl")
-    track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
+    track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers, extras = SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
     pos_bin_size = directional_decoders_epochs_decode_result.pos_bin_size
+    long_pf2D = extras.get('long_pf2D')
 
     """
     @function_attributes(short_name=None, tags=['save', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 12:58', related_items=[])
@@ -18497,6 +18498,24 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
                                     #    a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult],
                                     save_path: Path, **kwargs):
         """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
+
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SerializationHelper_AllCustomDecodingResults, SerializationHelper_CustomDecodingResults
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring, HeuristicScoresTuple
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+
+        directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = deepcopy(curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersEpochsEvaluations']) ## GENERAL
+        a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult] = deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict)
+        a_decoded_filter_epochs_decoder_result_dict, _out_new_scores = HeuristicReplayScoring.compute_all_heuristic_scores(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict)
+
+        ## INPUTS: a_decoded_filter_epochs_decoder_result_dict, _out_new_scores
+        save_path = curr_active_pipeline.get_output_path().joinpath(f"{DAY_DATE_TO_USE}_AllCustomDecodingResults.pkl").resolve()
+        save_path = SerializationHelper_AllCustomDecodingResults.save(track_templates=track_templates, a_directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+                                                                    #   a_decoded_filter_epochs_decoder_result_dict=a_decoded_filter_epochs_decoder_result_dict, _out_new_scores=_out_new_scores,
+                                                                      long_pf2D=long_pf2D,
+                                                                      save_path=save_path,
+                                                                    )
+        save_path
+
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
@@ -18519,8 +18538,9 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
         """ Used for "2024-08-01 - Heuristic Analysis.ipynb"
         Usage:
             load_path = Path("W:/Data/KDIBA/gor01/one/2006-6-09_1-22-43/output/2024-11-25_AllCustomDecodingResults.pkl")
-            track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
+            track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers, extras =  SerializationHelper_AllCustomDecodingResults.load(load_path=load_path)
             pos_bin_size = directional_decoders_epochs_decode_result.pos_bin_size
+            long_pf2D = extras.get('long_pf2D')
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
@@ -18535,9 +18555,10 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
         # ybin_centers = deepcopy(long_pf2D.ybin_centers)
         print(f"xbin_centers: {xbin_centers}")
 
-        loaded_dict = base_loaded_dict['directional_decoders_epochs_decode_result']
+        loaded_dict = base_loaded_dict.pop('directional_decoders_epochs_decode_result')
 
-        track_templates = base_loaded_dict['track_templates']
+        track_templates = base_loaded_dict.pop('track_templates')
+        extras = base_loaded_dict # remaining top-level keys are save() **kwargs
 
         ## UNPACK HERE:
         pos_bin_size: float = loaded_dict['pos_bin_size'] # 3.8632841399651463
@@ -18561,7 +18582,7 @@ class SerializationHelper_AllCustomDecodingResults(SerializationHelperBaseClass)
         directional_decoders_epochs_decode_result: DecoderDecodedEpochsResult = DecoderDecodedEpochsResult(**loaded_dict)
         # {'ripple_decoding_time_bin_size':ripple_decoding_time_bin_size, 'laps_decoding_time_bin_size':laps_decoding_time_bin_size, 'decoder_laps_filter_epochs_decoder_result_dict':decoder_laps_filter_epochs_decoder_result_dict, 'decoder_ripple_filter_epochs_decoder_result_dict':decoder_ripple_filter_epochs_decoder_result_dict, 'decoder_laps_radon_transform_df_dict':decoder_laps_radon_transform_df_dict, 'decoder_ripple_radon_transform_df_dict':decoder_ripple_radon_transform_df_dict}
 
-        return track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers
+        return track_templates, directional_decoders_epochs_decode_result, xbin, xbin_centers, extras
 
 # ==================================================================================================================== #
 # 2024-11-07 - PhoJonathan first-spike indicator lines                                                                 #
