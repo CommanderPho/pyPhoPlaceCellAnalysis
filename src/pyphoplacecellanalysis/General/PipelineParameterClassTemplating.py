@@ -56,7 +56,7 @@ class GlobalComputationParametersAttrsClassTemplating:
     #TODO 2025-02-11 02:54: - [ ] returning "pathlib.Path" instead of "Path"
 
     """
-    types_override_dict = {'time_bin_size': Optional[float], 'decoding_time_bin_size': Optional[float], 'instantaneous_time_bin_size_seconds': Optional[float],
+    types_override_dict = {'time_bin_size': Optional[float], 'slideby': Optional[float], 'decoding_time_bin_size': Optional[float], 'instantaneous_time_bin_size_seconds': Optional[float],
         'override_long_epoch_name': Optional[str], 'override_short_epoch_name': Optional[str], 'debug_output_hdf5_file_path': Optional[Path], 
     }
     ignore_kwarg_names = ['include_includelist', 'debug_print']

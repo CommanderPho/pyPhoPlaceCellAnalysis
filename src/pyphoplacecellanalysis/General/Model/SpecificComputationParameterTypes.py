@@ -357,9 +357,11 @@ class directional_decoders_decode_continuous_Parameters(HDF_SerializationMixin, 
     """ Docstring for directional_decoders_decode_continuous_Parameters. 
     """
     time_bin_size: Optional[float] = serialized_attribute_field(default=None)
+    slideby: Optional[float] = serialized_attribute_field(default=None)
     should_disable_cache: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
     time_bin_size_PARAM = param.Number(default=None, doc='time_bin_size param', label='time_bin_size')
+    slideby_PARAM = param.Number(default=None, doc='slideby param', label='slideby')
     should_disable_cache_PARAM = param.Boolean(default=False, doc='should_disable_cache param', label='should_disable_cache')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -477,22 +479,24 @@ class non_PBE_epochs_results_Parameters(HDF_SerializationMixin, AttrsBasedClassH
     """ Docstring for non_PBE_epochs_results_Parameters. 
     """
     training_data_portion: float = serialized_attribute_field(default=0.8333333333333334)
-    epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.025)
+    epochs_decoding_time_bin_size: float = serialized_attribute_field(default=0.05)
     frame_divide_bin_size: float = serialized_attribute_field(default=10.0)
     compute_1D: bool = serialized_attribute_field(default=True)
     compute_2D: bool = serialized_attribute_field(default=True)
     drop_previous_result_and_compute_fresh: bool = serialized_attribute_field(default=False)
     skip_training_test_split: bool = serialized_attribute_field(default=True)
     debug_print_memory_breakdown: bool = serialized_attribute_field(default=False)
+    IGNORE_MEMORY_ERROR_FOR_DEBUGGING: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
     training_data_portion_PARAM = param.Number(default=0.8333333333333334, doc='training_data_portion param', label='training_data_portion')
-    epochs_decoding_time_bin_size_PARAM = param.Number(default=0.025, doc='epochs_decoding_time_bin_size param', label='epochs_decoding_time_bin_size')
+    epochs_decoding_time_bin_size_PARAM = param.Number(default=0.05, doc='epochs_decoding_time_bin_size param', label='epochs_decoding_time_bin_size')
     frame_divide_bin_size_PARAM = param.Number(default=10.0, doc='frame_divide_bin_size param', label='frame_divide_bin_size')
     compute_1D_PARAM = param.Boolean(default=True, doc='compute_1D param', label='compute_1D')
     compute_2D_PARAM = param.Boolean(default=True, doc='compute_2D param', label='compute_2D')
     drop_previous_result_and_compute_fresh_PARAM = param.Boolean(default=False, doc='drop_previous_result_and_compute_fresh param', label='drop_previous_result_and_compute_fresh')
     skip_training_test_split_PARAM = param.Boolean(default=True, doc='skip_training_test_split param', label='skip_training_test_split')
     debug_print_memory_breakdown_PARAM = param.Boolean(default=False, doc='debug_print_memory_breakdown param', label='debug_print_memory_breakdown')
+    IGNORE_MEMORY_ERROR_FOR_DEBUGGING_PARAM = param.Boolean(default=False, doc='IGNORE_MEMORY_ERROR_FOR_DEBUGGING param', label='IGNORE_MEMORY_ERROR_FOR_DEBUGGING')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
@@ -518,10 +522,12 @@ class perform_specific_epochs_decoding_Parameters(HDF_SerializationMixin, AttrsB
     decoder_ndim: int = serialized_attribute_field(default=2)
     filter_epochs: str = serialized_attribute_field(default='ripple')
     decoding_time_bin_size: Optional[float] = serialized_attribute_field(default=0.02)
+    force_recompute: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
     decoder_ndim_PARAM = param.Integer(default=2, doc='decoder_ndim param', label='decoder_ndim')
     filter_epochs_PARAM = param.String(default='ripple', doc='filter_epochs param', label='filter_epochs')
     decoding_time_bin_size_PARAM = param.Number(default=0.02, doc='decoding_time_bin_size param', label='decoding_time_bin_size')
+    force_recompute_PARAM = param.Boolean(default=False, doc='force_recompute param', label='force_recompute')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""
