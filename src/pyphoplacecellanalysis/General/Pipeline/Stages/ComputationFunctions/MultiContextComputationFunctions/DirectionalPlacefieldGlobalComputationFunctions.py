@@ -8776,9 +8776,9 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         # num_shuffles = global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles
 
         directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference?
-        # print(f'minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
-        # print(f'included_qclu_values: {included_qclu_values}')
+        track_templates: TrackTemplates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? 2026-10-01 - minimum_inclusion_fr_Hz: 5.0 !!
+        print(f'\tminimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+        print(f'\tincluded_qclu_values: {included_qclu_values}')
 
         # DirectionalMergedDecoders: Get the result after computation:
         directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = global_computation_results.computed_data['DirectionalMergedDecoders']
@@ -8786,7 +8786,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         laps_decoding_time_bin_size: float = directional_merged_decoders_result.laps_decoding_time_bin_size
         pos_bin_size: float = track_templates.get_decoders()[0].pos_bin_size
 
-        print(f'laps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
+        print(f'\tlaps_decoding_time_bin_size: {laps_decoding_time_bin_size}, ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size}, pos_bin_size: {pos_bin_size}')
         
         # epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.DropShorter - Matches WCorrShuffles
         epochs_filtering_mode: EpochFilteringMode = EpochFilteringMode.ConstrainDecodingTimeBinSizeToMinimum # Pre 2024-06-03 Way 
