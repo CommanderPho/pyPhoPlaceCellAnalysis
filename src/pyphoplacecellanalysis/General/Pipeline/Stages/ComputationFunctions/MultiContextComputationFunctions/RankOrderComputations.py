@@ -2678,7 +2678,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                          input_requires=['DirectionalLaps', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['RankOrder'],
         validate_computation_test=validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:Optional[int]=None, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values: Optional[List[int]]=None, skip_laps=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:Optional[int]=None, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values: Optional[List[int]]=None, skip_laps:Optional[bool]=None):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Does this not depend on the desired_ripple_decoding_time_bin_size?
@@ -2761,16 +2761,21 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
             num_shuffles = _config_num_shuffles
 
         assert (num_shuffles is not None), f"\tWARN: `num_shuffles` is None even after the config block!"
-        if (_prev_RankOrder_result is not None):
-            _prev_RankOrder_result_num_shuffles = getattr(_prev_RankOrder_result, 'num_shuffles', None)
-            needs_replace_result = (needs_replace_result or (_prev_RankOrder_result_num_shuffles != num_shuffles))
-            # global_computation_results.computed_data['RankOrder'].num_shuffles = num_shuffles ## set the new property on the object in-place. This seems unwise as this object will temporary contain a result computed with different parameters
-            if (_prev_RankOrder_result_num_shuffles != num_shuffles):
-                print(f'\tWARN: _prev_RankOrder_result_num_shuffles: {_prev_RankOrder_result_num_shuffles} != num_shuffles: {num_shuffles} RESULT WILL BE REPLACED!')
+        ## Do not compare or store `num_shuffles` on the previous RankOrder result. Repeated runs with the same inclusion parameters accumulate additional shuffles into the existing result.
+
+        # skip_laps ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        _config_skip_laps = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'skip_laps', None)
+        if (skip_laps is not None):
+            print(f'\tWARN: `skip_laps` is non-None, taking as override: skip_laps: {skip_laps}')
+            did_change_parameters = (did_change_parameters or (_config_skip_laps != skip_laps)) ## Mark whether a change occured
+            global_computation_results.computation_config.rank_order_shuffle_analysis.skip_laps = skip_laps ## Update the `global_computation_results.computation_config`
+        else:
+            skip_laps = _config_skip_laps
+
+        assert (skip_laps is not None), f"\tWARN: `skip_laps` is None even after the config block!"
 
 
-
-        if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')) or needs_replace_result:
+        if ('RankOrder' not in global_computation_results.computed_data) or needs_replace_result:
             # initialize
             global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None,
                                                                                                    minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,

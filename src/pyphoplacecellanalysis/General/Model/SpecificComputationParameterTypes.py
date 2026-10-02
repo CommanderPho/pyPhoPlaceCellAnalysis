@@ -339,13 +339,13 @@ class rank_order_shuffle_analysis_Parameters(HDF_SerializationMixin, AttrsBasedC
     """ Docstring for rank_order_shuffle_analysis_Parameters. 
     """
     num_shuffles: int = serialized_attribute_field(default=500)
-    minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=5.0)
-    included_qclu_values: list = serialized_field(default=[1, 2, 4, 6, 7, 9])
+    minimum_inclusion_fr_Hz: float = serialized_attribute_field(default=2.0)
+    included_qclu_values: list = serialized_field(default=[1, 2, 4, 6, 7, 8, 9])
     skip_laps: bool = serialized_attribute_field(default=False)
     ## PARAMS - these are class properties
     num_shuffles_PARAM = param.Integer(default=500, doc='num_shuffles param', label='num_shuffles')
-    minimum_inclusion_fr_Hz_PARAM = param.Number(default=5.0, doc='minimum_inclusion_fr_Hz param', label='minimum_inclusion_fr_Hz')
-    included_qclu_values_PARAM = param.List(default=[1, 2, 4, 6, 7, 9], doc='included_qclu_values param', label='included_qclu_values')
+    minimum_inclusion_fr_Hz_PARAM = param.Number(default=2.0, doc='minimum_inclusion_fr_Hz param', label='minimum_inclusion_fr_Hz')
+    included_qclu_values_PARAM = param.List(default=[1, 2, 4, 6, 7, 8, 9], doc='included_qclu_values param', label='included_qclu_values')
     skip_laps_PARAM = param.Boolean(default=False, doc='skip_laps param', label='skip_laps')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
@@ -673,6 +673,8 @@ class ComputationKWargParameters(BaseContainerAttrsParameterizedParametersToDict
             canonical_key: str = MERGED_FN_SHORT_NAME_TO_PARAM_FIELD.get(final_key, final_key)
             try:
                 a_type = params_class_type_dict[canonical_key]
+                ## Signature defaults of None must not override the parameter-class defaults (e.g. rank_order num_shuffles=500).
+                v_dict = {kk: vv for kk, vv in v_dict.items() if vv is not None}
                 _out_param_typed_parameters_dict[canonical_key] = a_type(**v_dict)
             
             except Exception as e:
