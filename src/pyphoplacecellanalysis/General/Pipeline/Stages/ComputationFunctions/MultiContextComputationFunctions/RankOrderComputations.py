@@ -2678,7 +2678,7 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
                          input_requires=['DirectionalLaps', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['RankOrder'], uses=['RankOrderAnalyses'], used_by=[], creation_date='2023-11-08 17:27', related_items=[],
         requires_global_keys=['DirectionalLaps'], provides_global_keys=['RankOrder'],
         validate_computation_test=validate_has_rank_order_results, is_global=True)
-    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=500, minimum_inclusion_fr_Hz:float=5.0, included_qclu_values=[1,2,4,6,7,9], skip_laps=False):
+    def perform_rank_order_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:Optional[int]=None, minimum_inclusion_fr_Hz:Optional[float]=None, included_qclu_values: Optional[List[int]]=None, skip_laps=False):
         """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
 
         Does this not depend on the desired_ripple_decoding_time_bin_size?
@@ -2711,22 +2711,98 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         # minimum_inclusion_fr_Hz:float=12.0
         # included_qclu_values=[1,2]
 
-        if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')):
+        ## Values explicitly passed are taken to be !overrides! of config values and will be used instead
+        did_change_parameters: bool = False
+        needs_replace_result: bool = False
+
+        _config_minimum_inclusion_fr_Hz = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'minimum_inclusion_fr_Hz', None) ## Check against values in the config:
+        _config_included_qclu_values = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'included_qclu_values', None) ## Check against values in the config:
+        _config_num_shuffles = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'num_shuffles', None)
+
+        _prev_RankOrder_result: Optional[RankOrderComputationsContainer] = global_computation_results.computed_data.get('RankOrder', None) # `getattr(global_computation_results.computed_data, 'RankOrder', None)` won't work due to `DynamicParameters` bug with `getattr`
+        # minimum_inclusion_fr_Hz ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if (minimum_inclusion_fr_Hz is not None):
+            print(f'\tWARN: `minimum_inclusion_fr_Hz` is non-None, taking as override: minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+            did_change_parameters = (did_change_parameters or (_config_minimum_inclusion_fr_Hz != minimum_inclusion_fr_Hz)) ## Mark whether a change occured
+            global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz ## Update the `global_computation_results.computation_config`
+        else:
+            minimum_inclusion_fr_Hz = _config_minimum_inclusion_fr_Hz
+
+        assert (minimum_inclusion_fr_Hz is not None), f"\tWARN: `minimum_inclusion_fr_Hz` is None even after the config block!"
+        if (_prev_RankOrder_result is not None):
+            _prev_RankOrder_result_minimum_inclusion_fr_Hz = getattr(_prev_RankOrder_result, 'minimum_inclusion_fr_Hz', None)
+            needs_replace_result = (needs_replace_result or (_prev_RankOrder_result_minimum_inclusion_fr_Hz != minimum_inclusion_fr_Hz))
+            # global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz ## set the new property on the object in-place. This seems unwise as this object will temporary contain a result computed with different parameters
+            if (_prev_RankOrder_result_minimum_inclusion_fr_Hz != minimum_inclusion_fr_Hz):
+                print(f'\tWARN: _prev_RankOrder_result_minimum_inclusion_fr_Hz: {_prev_RankOrder_result_minimum_inclusion_fr_Hz} != minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} RESULT WILL BE REPLACED!')
+
+        # included_qclu_values _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if (included_qclu_values is not None):
+            print(f'\tWARN: included_qclu_values is non-None, taking as override: included_qclu_values: {included_qclu_values}')    
+            did_change_parameters = (did_change_parameters or (_config_included_qclu_values != included_qclu_values)) ## Mark whether a change occured
+            global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values ## Update the `global_computation_results.computation_config`
+        else:
+            included_qclu_values = _config_included_qclu_values
+
+        assert (included_qclu_values is not None), f"\tWARN: `included_qclu_values` is None even after the config block!"
+        if (_prev_RankOrder_result is not None):
+            _prev_RankOrder_result_included_qclu_values = getattr(_prev_RankOrder_result, 'included_qclu_values', None)
+            needs_replace_result = (needs_replace_result or (_prev_RankOrder_result_included_qclu_values != included_qclu_values))
+            # global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values ## set the new property on the object in-place. This seems unwise as this object will temporary contain a result computed with different parameters
+            if (_prev_RankOrder_result_included_qclu_values != included_qclu_values):
+                print(f'\tWARN: _prev_RankOrder_result_included_qclu_values: {_prev_RankOrder_result_included_qclu_values} != included_qclu_values: {included_qclu_values} RESULT WILL BE REPLACED!')
+
+        # num_shuffles ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        if (num_shuffles is not None):
+            print(f'\tWARN: `num_shuffles` is non-None, taking as override: num_shuffles: {num_shuffles}')
+            did_change_parameters = (did_change_parameters or (_config_num_shuffles != num_shuffles)) ## Mark whether a change occured
+            global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles = num_shuffles ## Update the `global_computation_results.computation_config`
+        else:
+            num_shuffles = _config_num_shuffles
+
+        assert (num_shuffles is not None), f"\tWARN: `num_shuffles` is None even after the config block!"
+        if (_prev_RankOrder_result is not None):
+            _prev_RankOrder_result_num_shuffles = getattr(_prev_RankOrder_result, 'num_shuffles', None)
+            needs_replace_result = (needs_replace_result or (_prev_RankOrder_result_num_shuffles != num_shuffles))
+            # global_computation_results.computed_data['RankOrder'].num_shuffles = num_shuffles ## set the new property on the object in-place. This seems unwise as this object will temporary contain a result computed with different parameters
+            if (_prev_RankOrder_result_num_shuffles != num_shuffles):
+                print(f'\tWARN: _prev_RankOrder_result_num_shuffles: {_prev_RankOrder_result_num_shuffles} != num_shuffles: {num_shuffles} RESULT WILL BE REPLACED!')
+
+
+
+        if ('RankOrder' not in global_computation_results.computed_data) or (not hasattr(global_computation_results.computed_data, 'RankOrder')) or needs_replace_result:
             # initialize
             global_computation_results.computed_data['RankOrder'] = RankOrderComputationsContainer(LR_ripple=None, RL_ripple=None, LR_laps=None, RL_laps=None,
                                                                                                    minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz,
                                                                                                    included_qclu_values=included_qclu_values,
                                                                                                    is_global=True)
 
-        global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
+        
         global_computation_results.computed_data['RankOrder'].minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+        global_computation_results.computed_data['RankOrder'].included_qclu_values = included_qclu_values
 
 
-        ## Update the `global_computation_results.computation_config`
-        global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
-        global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values
-        global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles = num_shuffles
-            
+        # ## Update the `global_computation_results.computation_config`
+        # global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz = minimum_inclusion_fr_Hz
+        # global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values = included_qclu_values
+        # global_computation_results.computation_config.rank_order_shuffle_analysis.num_shuffles = num_shuffles
+
+        ## Check against values in the config:
+        _config_minimum_inclusion_fr_Hz = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'minimum_inclusion_fr_Hz', None)
+        _config_included_qclu_values = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'included_qclu_values', None)
+        _config_num_shuffles = getattr(global_computation_results.computation_config.rank_order_shuffle_analysis, 'num_shuffles', None)
+
+
+        if (_config_minimum_inclusion_fr_Hz is not None) and (_config_minimum_inclusion_fr_Hz != minimum_inclusion_fr_Hz):
+            print(f'\t!!WARN: post-init _config_minimum_inclusion_fr_Hz: {_config_minimum_inclusion_fr_Hz} != minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz}')
+
+        if (_config_included_qclu_values is not None) and (_config_included_qclu_values != included_qclu_values):
+            print(f'\t!!WARN: post-init _config_included_qclu_values: {_config_included_qclu_values} != included_qclu_values: {included_qclu_values}')
+
+        if (_config_num_shuffles is not None) and (_config_num_shuffles != num_shuffles):
+            print(f'\t!!WARN: post-init _config_num_shuffles: {_config_num_shuffles} != num_shuffles: {num_shuffles}')
+
+
 
         ## Laps Rank-Order Analysis:
         if not skip_laps:
