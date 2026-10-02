@@ -2802,73 +2802,73 @@ class RankOrderGlobalComputationFunctions(AllFunctionEnumeratingMixin, metaclass
         if (_config_num_shuffles is not None) and (_config_num_shuffles != num_shuffles):
             print(f'\t!!WARN: post-init _config_num_shuffles: {_config_num_shuffles} != num_shuffles: {num_shuffles}')
 
+        if (needs_replace_result or did_change_parameters):
+
+            ## Laps Rank-Order Analysis:
+            if not skip_laps:
+                print(f'\t##> computing Laps rank-order shuffles:')
+                print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
+                # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
+                _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+                # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
+                (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
+                global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
+                global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
+
+                try:
+                    print(f'\tdone. building global result.')
+                    directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
+                    selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.selected_spikes_df) # WARNING: this is only using the `selected_spikes_df` from LR_laps!! This would miss spikes of any RL-specific cells?
+                    # active_epochs = global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple.active_epochs
+                    active_epochs = deepcopy(LR_laps_outputs.epochs_df)
+                    track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
+                    laps_combined_epoch_stats_df, laps_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+                    # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
+                    global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
+                    print(f'done!')
+
+                except (AssertionError, BaseException) as e:
+                    print(f'Issue with Laps computation in new method 2023-12-15: e: {e}')
+                    raise
+
+            ## END `if not skip_laps`
 
 
-        ## Laps Rank-Order Analysis:
-        if not skip_laps:
-            print(f'\t##> computing Laps rank-order shuffles:')
-            print(f'\t\tnum_shuffles: {num_shuffles}, minimum_inclusion_fr_Hz: {minimum_inclusion_fr_Hz} Hz')
-            # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='center_of_mass')
-            _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='median', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-            # _laps_outputs = RankOrderAnalyses.main_laps_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first')
-            (LR_laps_outputs, RL_laps_outputs, laps_paired_tests)  = _laps_outputs
-            global_computation_results.computed_data['RankOrder'].LR_laps = LR_laps_outputs
-            global_computation_results.computed_data['RankOrder'].RL_laps = RL_laps_outputs
+            ## Ripple Rank-Order Analysis:
+            print(f'\t##> computing Ripple rank-order shuffles:')
+            _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # rank_alignment='first'
+            (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
+            global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
+            global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
 
+            # New method 2023-12-15:
             try:
                 print(f'\tdone. building global result.')
                 directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-                selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_laps.selected_spikes_df) # WARNING: this is only using the `selected_spikes_df` from LR_laps!! This would miss spikes of any RL-specific cells?
-                # active_epochs = global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple.active_epochs
-                active_epochs = deepcopy(LR_laps_outputs.epochs_df)
+                selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
+                # active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
+                active_epochs = deepcopy(LR_ripple_outputs.epochs_df)
                 track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-                laps_combined_epoch_stats_df, laps_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
-                # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = laps_new_output_tuple
-                global_computation_results.computed_data['RankOrder'].laps_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].laps_new_output_tuple = laps_combined_epoch_stats_df, laps_new_output_tuple
+                ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
+                # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
+                global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
                 print(f'done!')
 
             except (AssertionError, BaseException) as e:
-                print(f'Issue with Laps computation in new method 2023-12-15: e: {e}')
+                print(f'New method 2023-12-15: e: {e}')
                 raise
 
-        ## END `if not skip_laps`
 
-
-        ## Ripple Rank-Order Analysis:
-        print(f'\t##> computing Ripple rank-order shuffles:')
-        _ripples_outputs = RankOrderAnalyses.main_ripples_analysis(owning_pipeline_reference, num_shuffles=num_shuffles, rank_alignment='first', minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # rank_alignment='first'
-        (LR_ripple_outputs, RL_ripple_outputs, ripple_evts_paired_tests) = _ripples_outputs
-        global_computation_results.computed_data['RankOrder'].LR_ripple = LR_ripple_outputs
-        global_computation_results.computed_data['RankOrder'].RL_ripple = RL_ripple_outputs
-
-        # New method 2023-12-15:
-        try:
-            print(f'\tdone. building global result.')
-            directional_laps_results: DirectionalLapsResult = global_computation_results.computed_data['DirectionalLaps']
-            selected_spikes_df = deepcopy(global_computation_results.computed_data['RankOrder'].LR_ripple.selected_spikes_df)
-            # active_epochs = global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple.active_epochs
-            active_epochs = deepcopy(LR_ripple_outputs.epochs_df)
-            track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-            ripple_combined_epoch_stats_df, ripple_new_output_tuple = RankOrderAnalyses.pandas_df_based_correlation_computations(selected_spikes_df=selected_spikes_df, active_epochs_df=active_epochs, track_templates=track_templates, num_shuffles=num_shuffles)
-            # new_output_tuple (output_active_epoch_computed_values, valid_stacked_arrays, real_stacked_arrays, n_valid_shuffles) = ripple_new_output_tuple
-            global_computation_results.computed_data['RankOrder'].ripple_combined_epoch_stats_df, global_computation_results.computed_data['RankOrder'].ripple_new_output_tuple = ripple_combined_epoch_stats_df, ripple_new_output_tuple
-            print(f'done!')
-
-        except (AssertionError, BaseException) as e:
-            print(f'New method 2023-12-15: e: {e}')
-            raise
-
-
-        ## Requires "New method 2023-12-15" result
-        # Set the global result:
-        try:
-            print(f'\tdone. building global result.')
-            global_computation_results.computed_data['RankOrder'].adding_active_aclus_info()
-            global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference)
-        
-        except (AssertionError, BaseException) as e:
-            print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
-            raise
+            ## Requires "New method 2023-12-15" result
+            # Set the global result:
+            try:
+                print(f'\tdone. building global result.')
+                global_computation_results.computed_data['RankOrder'].adding_active_aclus_info()
+                global_computation_results.computed_data['RankOrder'].ripple_most_likely_result_tuple, global_computation_results.computed_data['RankOrder'].laps_most_likely_result_tuple = RankOrderAnalyses.most_likely_directional_rank_order_shuffling(owning_pipeline_reference)
+            
+            except (AssertionError, BaseException) as e:
+                print(f'Issue with `RankOrderAnalyses.most_likely_directional_rank_order_shuffling(...)` e: {e}')
+                raise
 
 
         print(f'< done with `perform_rank_order_shuffle_analysis(...)`')
