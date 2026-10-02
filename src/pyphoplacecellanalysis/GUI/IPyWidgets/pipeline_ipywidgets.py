@@ -876,6 +876,11 @@ class PipelinePickleFileSelectorWidget:
                 e = CapturedException(e, exception_info)
                 print(f'ERROR RE-SAVING PIPELINE after update. error: {e}')
 
+        if curr_active_pipeline.pickle_path is None:
+            raise FileNotFoundError(f"Selected pickle exists at '{proposed_load_pkl_path}' but the pipeline was not loaded from it (pickle_path is None). Refusing to continue with a rebuilt pipeline.")
+        ## `__setstate__` clears the path. Re-stamp the file the widget actually opened so Save knows where to write.
+        curr_active_pipeline.set_persistance_state(proposed_load_pkl_path)
+
         print(f'Pipeline loaded from custom pickle!!')
         ## OUTPUT: curr_active_pipeline
         print(f'''# ==================================================================================================================== #
@@ -1051,10 +1056,19 @@ class PipelinePickleFileSelectorWidget:
             assert get_global_variable_fn is not None
             # Get the pipeline
             curr_active_pipeline = get_global_variable_fn('curr_active_pipeline')
-            assert curr_active_pipeline.pickle_path is not None, f"curr_active_pipeline.pickle_path is None! Must be set before knowing where to save to!"
-            curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=curr_active_pipeline.pickle_path, active_pickle_filename=curr_active_pipeline.pickle_path.name) #active_pickle_filename=
-            assert curr_active_pipeline.global_computation_results_pickle_path is not None, f"curr_active_pipeline.global_computation_results_pickle_path is None! Must be set before knowing where to save to!"
-            curr_active_pipeline.save_global_computation_results(override_global_pickle_path=curr_active_pipeline.global_computation_results_pickle_path)
+            local_pkl_path = curr_active_pipeline.pickle_path or self.active_local_pkl
+            assert local_pkl_path is not None, f"curr_active_pipeline.pickle_path is None and no local pickle is selected! Must be set before knowing where to save to!"
+            local_pkl_path = Path(local_pkl_path).resolve()
+            if curr_active_pipeline.pickle_path is None:
+                ## Unpickle drops `_persistance_state`. The selected widget file is the save destination.
+                curr_active_pipeline.set_persistance_state(local_pkl_path)
+            curr_active_pipeline.save_pipeline(saving_mode=PipelineSavingScheme.TEMP_THEN_OVERWRITE, override_pickle_path=local_pkl_path, active_pickle_filename=local_pkl_path.name) #active_pickle_filename=
+            if self.active_global_pkl is not None:
+                global_pkl_path = Path(self.active_global_pkl).resolve()
+            else:
+                global_pkl_path = curr_active_pipeline.global_computation_results_pickle_path
+            assert global_pkl_path is not None, f"curr_active_pipeline.global_computation_results_pickle_path is None! Must be set before knowing where to save to!"
+            curr_active_pipeline.save_global_computation_results(override_global_pickle_path=global_pkl_path)
             
 
         def _subfn_compute():

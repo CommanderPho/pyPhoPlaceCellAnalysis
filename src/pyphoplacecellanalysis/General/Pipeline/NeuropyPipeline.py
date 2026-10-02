@@ -466,8 +466,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         else:
             post_load_functions = known_type_properties.post_load_functions
         
-        ## Build Pickle Path:
-        finalized_loaded_sess_pickle_path = Path(basepath).joinpath(active_pickle_filename).resolve()
+        ## Build Pickle Path. An absolute `active_pickle_filename` is the file itself; a bare name is joined onto basepath.
+        finalized_loaded_sess_pickle_path = cls.resolve_pipeline_pickle_path(basepath, active_pickle_filename)
 
         if not force_reload:
             if debug_print:
@@ -517,15 +517,12 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             desired_time_variable_name = active_data_mode_registered_class._time_variable_name # Requires desired_time_variable_name
             pipeline_needs_resave = _ensure_unpickled_pipeline_up_to_date(curr_active_pipeline, active_data_mode_name=type_name, basedir=Path(basepath), desired_time_variable_name=desired_time_variable_name, debug_print=debug_print)
 
-            if hasattr(curr_active_pipeline, 'pipeline_compare_dict'):
-                pipeline_compare_dict = curr_active_pipeline.pipeline_compare_dict
-            else:
-                pipeline_compare_dict = cls.build_pipeline_compare_dict(curr_active_pipeline)
             # 
             # AttributeError: 'NeuropyPipeline' object has no attribute 'last_completed_stage'
                 # self.stage.identity
             # type(curr_active_pipeline.stage).get_stage_identity()
-            curr_active_pipeline._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=pipeline_compare_dict)
+            ## `__setstate__` clears `_persistance_state`, so the loaded file has to be recorded after unpickling.
+            curr_active_pipeline.set_persistance_state(pickle_path=finalized_loaded_sess_pickle_path)
             ## Save out the changes to the pipeline after computation to the pickle file for easy loading in the future
             if pipeline_needs_resave:
                 if (not skip_save_on_initial_load) or (type_name in {'dandi_nwb', 'dandi_nwb_001754', 'dandi_nwb_001695'}):
@@ -713,6 +710,30 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
             return True # No previous known file (indicating it's never been saved), so return True.
         return self.persistance_state.needs_save(curr_object=self)
 
+
+    @staticmethod
+    def resolve_pipeline_pickle_path(basepath, active_pickle_filename) -> Path:
+        """ Absolute `active_pickle_filename` is the pickle file. A relative name is joined onto `basepath`. """
+        active_pickle_filename = Path(active_pickle_filename)
+        if active_pickle_filename.is_absolute():
+            return active_pickle_filename.resolve()
+        return Path(basepath).joinpath(active_pickle_filename).resolve()
+
+
+    def set_persistance_state(self, pickle_path: Path) -> Path:
+        """ Replaces `_persistance_state` with a record of `pickle_path` and the pipeline's current compare snapshot.
+
+        `pickle_path` is `persistance_state.file_path`. `__setstate__` clears `_persistance_state` because it is not pickled, so callers must set this after unpickling.
+        """
+        pickle_path = Path(pickle_path).resolve()
+        if hasattr(self, 'pipeline_compare_dict'):
+            compare_state_on_load = self.pipeline_compare_dict
+        else:
+            compare_state_on_load = NeuropyPipeline.build_pipeline_compare_dict(self)
+        self._persistance_state = LoadedObjectPersistanceState(pickle_path, compare_state_on_load=compare_state_on_load)
+        return pickle_path
+
+
     # Logging ____________________________________________________________________________________________________________ #
     @property
     def logger(self):
@@ -893,8 +914,8 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                         active_pickle_filename = self.pickle_path.name
                         finalized_loaded_sess_pickle_path = Path(override_pickle_path).joinpath(active_pickle_filename).resolve()                     
                 else:
-                    # use `self.sess.basepath`
-                    finalized_loaded_sess_pickle_path = Path(self.sess.basepath).joinpath(active_pickle_filename).resolve() # Uses the './loadedSessPickle.pkl' path
+                    # use `self.sess.basepath` unless `active_pickle_filename` is already an absolute path
+                    finalized_loaded_sess_pickle_path = self.resolve_pipeline_pickle_path(self.sess.basepath, active_pickle_filename) # Uses the './loadedSessPickle.pkl' path
 
                 # finalized_loaded_sess_pickle_path = self.get_output_path().joinpath(active_pickle_filename).resolve() # Changed to use the 'output/loadedSessPickle.pkl' directory 
                 used_existing_pickle_path = (finalized_loaded_sess_pickle_path == self.pickle_path) # used the existing path if they're the same
@@ -953,7 +974,7 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
 
             if not used_existing_pickle_path:
                 # the pickle path changed, so set it on the pipeline:
-                self._persistance_state = LoadedObjectPersistanceState(finalized_loaded_sess_pickle_path, compare_state_on_load=self.pipeline_compare_dict)
+                self.set_persistance_state(pickle_path=finalized_loaded_sess_pickle_path)
             
             self.logger.info(f'\t save complete.')
             return finalized_loaded_sess_pickle_path
