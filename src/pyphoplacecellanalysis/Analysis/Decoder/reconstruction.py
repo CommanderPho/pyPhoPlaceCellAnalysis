@@ -880,6 +880,7 @@ class SingleEpochDecodedResult(HDF_SerializationMixin, AttrsBasedClassHelperMixi
         raise NotImplementedError("read_hdf not implemented")
 
 
+from neuropy.utils.mixins.binning_helpers import get_bin_centers # used for `pos_bin_centers`
 
 
 @custom_define(slots=False, repr=False, eq=False)
@@ -955,6 +956,17 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
             return len(self.pos_bin_edges)-1
         else:
             return None
+
+    @property
+    def pos_bin_centers(self) -> Optional[NDArray]:
+        """The pos_bin_centers property."""
+        if self.pos_bin_edges is None:
+            return None
+        else:
+            xbin_centers = None
+            if (self.pos_bin_edges is not None) and (len(self.pos_bin_edges) > 2):
+                xbin_centers = deepcopy(get_bin_centers(self.pos_bin_edges))
+            return xbin_centers
 
     @property
     def active_filter_epochs(self):
