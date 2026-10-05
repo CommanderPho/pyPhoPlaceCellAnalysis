@@ -940,23 +940,26 @@ class PipelinePickleFileSelectorWidget:
 
         # Try Unpickling Global Computations to update pipeline ______________________________________________________________ #
         if (not force_reload) and (not skip_global_load): # not just force_reload, needs to recompute whenever the computation fails.
+            print(f'Attempting Loading Global Pickle File:\n\toverride_global_computation_results_pickle_path: "{override_global_computation_results_pickle_path}"...')
             try:
                 # INPUTS: override_global_computation_results_pickle_path
                 with set_posix_windows():
+                    print(f'\tloading using `curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path="{override_global_computation_results_pickle_path}", allow_overwrite_existing=True, allow_overwrite_existing_allow_keys: {allow_overwrite_existing_allow_keys}, ...)`...')
                     sucessfully_updated_keys, successfully_loaded_keys = curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=override_global_computation_results_pickle_path,
                                                                                                     allow_overwrite_existing=True, allow_overwrite_existing_allow_keys=extended_computations_include_includelist, ) # is new
-                    print(f'sucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
+                    print(f'\tsucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
                     did_any_paths_change: bool = curr_active_pipeline.post_load_fixup_sess_basedirs(updated_session_basepath=deepcopy(basedir)) ## use INPUT: basedir
 
             except FileNotFoundError as e:
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
-                print(f'cannot load global results because pickle file does not exist! Maybe it has never been created? {e}')
+                print(f'\tERROR: cannot load global results because pickle file does not exist! Maybe it has never been created? {e}')
             except Exception as e:
                 exception_info = sys.exc_info()
                 e = CapturedException(e, exception_info)
-                print(f'Unhandled exception: cannot load global results: {e}')
+                print(f'\tERROR: Unhandled exception: cannot load global results: {e}')
                 raise
+        print(f'done with loading phase.\n')
 
         # Post-Load __________________________________________________________________________________________________________ #
         force_recompute_global = force_reload
