@@ -1816,7 +1816,7 @@ def validate_has_generalized_specific_epochs_decoding(curr_active_pipeline, comp
     """
     # Unpacking:
     seq_results: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
-    if seq_results is None:
+    if (seq_results is None):
         return False
     
     a_new_NonPBE_Epochs_obj = seq_results.a_new_NonPBE_Epochs_obj
