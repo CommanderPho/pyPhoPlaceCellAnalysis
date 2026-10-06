@@ -174,32 +174,53 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
 
 
 
-    def get_by_id(self, ids, defer_compute_all: bool = False):
+    def get_by_id(self, ids, defer_compute_all:bool=False, recompute:bool=False):
         """Return a DST copy restricted to ``ids``, preserving DST config and sliced reliability when present.
 
         Mirrors ``BayesianPlacemapPositionDecoder.get_by_id`` but constructs ``BayesianPlacemapPositionDecoderDST``.
         Visit-conditioned reliability tables are neuron-filtered onto the slice (sparse counts left None).
+
+        recompute: when True, rebuild the placefield with PfND.compute(). That reapplies pf.config.frate_thresh to the smoothed tuning curves and can return fewer placefield neurons than ids. Decoder neuron_IDs stay in the parent decoder's order and can be a subset of ids. It does not apply rank-order minimum_inclusion_fr_Hz or qclu cuts.
         """
         self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
-        ids = np.asarray(ids)
+        ids_arr = np.atleast_1d(np.asarray(ids))
         source_ids = np.asarray(self.neuron_IDs)
-        assert np.all(np.isin(ids, source_ids))
-        keep = np.isin(source_ids, ids)  # original neuron order
+        missing_decoder_ids = ids_arr[~np.isin(ids_arr, source_ids)]
+        assert len(missing_decoder_ids) == 0, f"requested neuron ids must already be in neuron_IDs. missing: {missing_decoder_ids}"
 
-        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
+        if recompute:
+            neuron_sliced_pf: PfND = self.pf.get_by_id(ids_arr)
+            neuron_index = np.isin(source_ids, ids_arr)  # original neuron order
+            neuron_IDs = source_ids[neuron_index]
+        else:
+            neuron_sliced_pf = deepcopy(self.pf)
+            source_ratemap_ids = np.asarray(neuron_sliced_pf.ratemap.neuron_ids)
+            missing_ids = ids_arr[~np.isin(ids_arr, source_ratemap_ids)]
+            assert len(missing_ids) == 0, f"requested neuron ids must already be in the ratemap. missing: {missing_ids}"
+            ratemap_positions = np.array([int(np.flatnonzero(source_ratemap_ids == an_id)[0]) for an_id in ids_arr], dtype=int) # requested-id order, so neuron_ids equals ids
+            neuron_sliced_pf.ratemap = neuron_sliced_pf.ratemap[ratemap_positions]
+            if neuron_sliced_pf._filtered_spikes_df is not None:
+                neuron_sliced_pf._filtered_spikes_df = neuron_sliced_pf._filtered_spikes_df[np.isin(neuron_sliced_pf._filtered_spikes_df.aclu, ids_arr)]
+            if neuron_sliced_pf._ratemap_spiketrains is not None:
+                neuron_sliced_pf._ratemap_spiketrains = [neuron_sliced_pf._ratemap_spiketrains[int(a_position)] for a_position in ratemap_positions]
+            if neuron_sliced_pf._ratemap_spiketrains_pos is not None:
+                neuron_sliced_pf._ratemap_spiketrains_pos = [neuron_sliced_pf._ratemap_spiketrains_pos[int(a_position)] for a_position in ratemap_positions]
+            neuron_index = np.array([int(np.flatnonzero(source_ids == an_id)[0]) for an_id in ids_arr], dtype=int)
+            neuron_IDs = ids_arr
+
         spikes_df = deepcopy(self.spikes_df)
         if (spikes_df is not None) and ('aclu' in spikes_df.columns):
-            spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids)].copy()
+            spikes_df = spikes_df[np.isin(spikes_df['aclu'].to_numpy(), ids_arr)].copy()
 
         neuron_sliced_decoder = BayesianPlacemapPositionDecoderDST(time_bin_size=self.time_bin_size, pf=neuron_sliced_pf, spikes_df=spikes_df, field_threshold_frac=self.field_threshold_frac, should_discount_silence=self.should_discount_silence, n_top_peaks=self.n_top_peaks, slice_level_multiplier=self.slice_level_multiplier, fn_tn_mode=self.fn_tn_mode, setup_on_init=False, post_load_on_init=False, debug_print=self.debug_print)
 
-        neuron_sliced_decoder.neuron_IDs = source_ids[keep]
-        neuron_sliced_decoder.neuron_IDXs = np.arange(int(np.sum(keep)))
-        neuron_sliced_decoder.F = self.F[:, keep]
+        neuron_sliced_decoder.neuron_IDs = neuron_IDs
+        neuron_sliced_decoder.neuron_IDXs = np.arange(len(neuron_IDs))
+        neuron_sliced_decoder.F = self.F[:, neuron_index]
         neuron_sliced_decoder.P_x = deepcopy(self.P_x)
 
         if self.unit_specific_time_binned_spike_counts is not None:
-            neuron_sliced_decoder.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[keep, :]
+            neuron_sliced_decoder.unit_specific_time_binned_spike_counts = self.unit_specific_time_binned_spike_counts[neuron_index, :]
             neuron_sliced_decoder.total_spike_counts_per_window = np.sum(neuron_sliced_decoder.unit_specific_time_binned_spike_counts, axis=0)
             neuron_sliced_decoder.time_binning_container = deepcopy(self.time_binning_container)
 
@@ -207,20 +228,18 @@ class BayesianPlacemapPositionDecoderDST(BayesianPlacemapPositionDecoder):
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
         neuron_sliced_decoder.reliability_estimation_mode = self.reliability_estimation_mode
-        neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
-        neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
+        neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, neuron_index)
+        neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, neuron_index)
+        id_set = set(int(x) for x in neuron_IDs)
         if self.in_field_masks is not None:
-            id_set = set(int(x) for x in ids)
             neuron_sliced_decoder.in_field_masks = {int(nid): mask for nid, mask in self.in_field_masks.items() if int(nid) in id_set}
 
         # Neuron-slice confusion rates so `_compute_reliability_metrics` can rebuild maps on the slice
         if self.t_bin_aclus_reliability_df is not None:
-            neuron_sliced_decoder.t_bin_aclus_reliability_df = self.t_bin_aclus_reliability_df.reindex(source_ids[keep])
+            neuron_sliced_decoder.t_bin_aclus_reliability_df = self.t_bin_aclus_reliability_df.reindex(neuron_IDs)
         else:
             neuron_sliced_decoder.t_bin_aclus_reliability_df = None
         # Preserve visit-conditioned tables (filtered by aclu) so POSITION_DEPENDENT can rebuild without falling back to global rates × masks
-        keep_ids = source_ids[keep]
-        id_set = set(int(x) for x in keep_ids)
         neuron_sliced_decoder.time_bin_info_df = deepcopy(self.time_bin_info_df) if (self.time_bin_info_df is not None) else None
         if self.per_tbin_aclu_spike_counts_df is not None:
             pdf = self.per_tbin_aclu_spike_counts_df

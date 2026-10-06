@@ -140,6 +140,12 @@ class TestDecodersMethods(unittest.TestCase):
         self.assertEqual(deferred_sliced_decoder.F.shape[1], len(subset_included_neuron_ids))
         self.assertIsNone(deferred_sliced_decoder.p_x_given_n)
         self.assertIsNone(deferred_sliced_decoder.most_likely_positions)
+
+        reversed_neuron_ids = subset_included_neuron_ids[::-1]
+        reversed_sliced_decoder = original_decoder.get_by_id(reversed_neuron_ids, defer_compute_all=True)
+        self.assertTrue(np.all(np.array(reversed_sliced_decoder.pf.ratemap.neuron_ids) == reversed_neuron_ids))
+        self.assertTrue(np.all(reversed_sliced_decoder.neuron_IDs == reversed_neuron_ids))
+        self.assertEqual(reversed_sliced_decoder.F.shape[1], len(reversed_neuron_ids))
         # self.assertTrue(np.all(np.array(neuron_sliced_pf.ratemap.neuron_ids) == subset_included_neuron_ids)) # ensure that the ratemap neuron ids actually equal the desired subset
         # self.assertTrue(len(neuron_sliced_pf.ratemap.tuning_curves) == len(subset_included_neuron_ids)) # ensure one output tuning curve for each neuron_id
         # self.assertTrue(np.all(np.isclose(neuron_sliced_pf.ratemap.tuning_curves, [original_pf.ratemap.tuning_curves[idx] for idx in subset_included_neuron_IDXs]))) # ensure that the tuning curves built for the neuron_slided_pf are the same as those subset as retrieved from the  original_pf
