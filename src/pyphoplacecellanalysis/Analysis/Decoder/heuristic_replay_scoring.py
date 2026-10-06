@@ -390,7 +390,13 @@ class SubsequencesPartitioningResult(ComputedResult):
         longest_sequence_non_intrusion_flatindicies = np.setdiff1d(self.longest_sequence_flatindicies, intrusion_flat_indicies)
         return self.flat_positions[longest_sequence_non_intrusion_flatindicies]
     
-
+    @property
+    def longest_sequence_subsequence_df(self) -> Optional[pd.DataFrame]:
+        """Returns the entry in the subsequence_df that corresponds to the longest merged subsequence. The result is a single-row pd.DataFrame. """
+        if self.subsequences_df is None:
+            return None
+        return self.subsequences_df[self.subsequences_df['is_main']]
+    
     @property
     def longest_subsequence_non_intrusion_nbins(self) -> int:
         """Finds the length of the longest merged subsequence excluding intrusions."""
