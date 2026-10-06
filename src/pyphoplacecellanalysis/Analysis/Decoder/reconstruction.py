@@ -2478,28 +2478,49 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
 
 
     # for NeuronUnitSlicableObjectProtocol:
-    def get_by_id(self, ids, defer_compute_all:bool=False): # defer_compute_all:bool = False
+    def get_by_id(self, ids, defer_compute_all:bool=False, recompute:bool=False): # defer_compute_all:bool = False
         """Implementors return a copy of themselves with neuron_ids equal to ids
             Needs to update: neuron_sliced_decoder.pf, ... (much more)
 
         defer_compute_all: bool - should be set to False if you want to manually decode using custom epochs or something later. Otherwise it will compute for all spikes automatically.
             TODO 2023-04-06 - REMOVE this argument. it is unused. It exists just for backwards compatibility with the stateful decoder.
+
+        recompute: when True, rebuild the placefield with PfND.compute(). That reapplies pf.config.frate_thresh to the smoothed tuning curves and can return fewer neuron_IDs than ids. It does not apply rank-order minimum_inclusion_fr_Hz or qclu cuts.
         """
         self.adding_default_values_for_missing_fields() ## older pickled/autoreloaded instances may lack newly-added reliability fields
-        # call .get_by_id(ids) on the placefield (pf):
-        neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
-        ## apply the neuron_sliced_pf to the decoder:
-        neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+        ids_arr = np.atleast_1d(np.asarray(ids))
+        if recompute:
+            # call .get_by_id(ids) on the placefield (pf):
+            neuron_sliced_pf: PfND = self.pf.get_by_id(ids)
+            ## apply the neuron_sliced_pf to the decoder:
+            neuron_sliced_decoder = BasePositionDecoder(neuron_sliced_pf, setup_on_init=self.setup_on_init, post_load_on_init=self.post_load_on_init, debug_print=self.debug_print)
+            reliability_index = np.isin(np.asarray(self.neuron_IDs), ids_arr) if (self.neuron_IDs is not None) else None
+        else:
+            sliced_pf = deepcopy(self.pf)
+            source_ratemap_ids = np.asarray(sliced_pf.ratemap.neuron_ids)
+            missing_ids = ids_arr[~np.isin(ids_arr, source_ratemap_ids)]
+            assert len(missing_ids) == 0, f"requested neuron ids must already be in the ratemap. missing: {missing_ids}"
+            positions = np.array([int(np.flatnonzero(source_ratemap_ids == an_id)[0]) for an_id in ids_arr], dtype=int) # requested-id order, so neuron_ids equals ids
+            sliced_pf.ratemap = sliced_pf.ratemap[positions]
+            if sliced_pf._filtered_spikes_df is not None:
+                sliced_pf._filtered_spikes_df = sliced_pf._filtered_spikes_df[np.isin(sliced_pf._filtered_spikes_df.aclu, ids_arr)]
+            if sliced_pf._ratemap_spiketrains is not None:
+                sliced_pf._ratemap_spiketrains = [sliced_pf._ratemap_spiketrains[int(a_position)] for a_position in positions]
+            if sliced_pf._ratemap_spiketrains_pos is not None:
+                sliced_pf._ratemap_spiketrains_pos = [sliced_pf._ratemap_spiketrains_pos[int(a_position)] for a_position in positions]
+            neuron_sliced_decoder = BasePositionDecoder(sliced_pf, setup_on_init=True, post_load_on_init=False, debug_print=self.debug_print) # setup() rebuilds neuron_IDs and F from the sliced ratemap
+            reliability_index = None
+            if self.neuron_IDs is not None:
+                source_ids = np.asarray(self.neuron_IDs)
+                reliability_index = np.array([int(np.flatnonzero(source_ids == an_id)[0]) for an_id in ids_arr], dtype=int)
+
         # Preserve config flags and shape-aware reliability slices when present
         neuron_sliced_decoder.should_discount_silence = self.should_discount_silence
         neuron_sliced_decoder.drop_negative_contributing_terms_mode = self.drop_negative_contributing_terms_mode
         neuron_sliced_decoder.reliability_modifier_mode = self.reliability_modifier_mode
-        if (self.neuron_IDs is not None) and ((self.reliability_active is not None) or (self.reliability_silent is not None)):
-            source_ids = np.asarray(self.neuron_IDs)
-            ids_arr = np.asarray(ids)
-            keep = np.isin(source_ids, ids_arr)
-            neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, keep)
-            neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
+        if (reliability_index is not None) and ((self.reliability_active is not None) or (self.reliability_silent is not None)):
+            neuron_sliced_decoder.reliability_active = self._slice_reliability_array(self.reliability_active, reliability_index)
+            neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, reliability_index)
         return neuron_sliced_decoder
     
 
