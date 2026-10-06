@@ -340,12 +340,8 @@ class Render2DScrollWindowPlotMixin:
             active_spikes_df = deepcopy(spikes_df)
 
         # All units at once approach:
+        active_spikes_df: pd.DataFrame = active_spikes_df.spikes.fixing_time_column()
         active_time_variable_name = active_spikes_df.spikes.time_variable_name
-        if active_time_variable_name != 't': 
-            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
-            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
-            active_time_variable_name = 't' ## get the new one
-            active_spikes_df.spikes.set_time_variable_name('t')        
 
         # Copy only the relevent columns so filtering is easier:
         filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()

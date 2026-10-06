@@ -4613,12 +4613,16 @@ class BapunBatchHelpers:
 
                 try:
                     active_spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
+                    # active_time_variable_name = active_spikes_df.spikes.time_variable_name
+                    active_spikes_df = active_spikes_df.spikes.fixing_time_column()
                     active_time_variable_name = active_spikes_df.spikes.time_variable_name
                     print(f'active_time_variable_name: {active_time_variable_name}')
-                    if active_time_variable_name != 't':
-                        active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
-                        active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False)
-                        active_spikes_df.spikes.set_time_variable_name('t')
+                    # if active_time_variable_name != 't':
+                    #     active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+                    #     active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False)
+                    #     active_spikes_df.spikes.set_time_variable_name('t')
+
+                    
                     spike_raster_window, (active_2d_plot, active_3d_plot, *_all_outputs_dict) = Spike3DRasterWindowWidget.find_or_create_if_needed(curr_active_pipeline, force_create_new=False, allow_replace_hardcoded_main_plots_with_tracks=True, active_session_configuration_context='maze_GLOBAL')
                 except Exception as e:
                     print(f'Spike3DRasterWindowWidget.find_or_create_if_needed failed with exception: {e}. Continuing.')

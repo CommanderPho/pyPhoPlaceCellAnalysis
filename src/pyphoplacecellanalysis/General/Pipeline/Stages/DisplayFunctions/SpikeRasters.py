@@ -646,16 +646,11 @@ class NewSimpleRaster:
         
         # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
         # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
+        # All units at once approach:    
         # All units at once approach:
+        active_spikes_df: pd.DataFrame = active_spikes_df.spikes.fixing_time_column()
         active_time_variable_name = active_spikes_df.spikes.time_variable_name
-        if active_time_variable_name != 't': 
-            active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
-            active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False) ## drop the old column    
-            active_time_variable_name = 't' ## get the new one
-            active_spikes_df.spikes.set_time_variable_name('t')
-            # default_datapoint_column_names = [active_spikes_df.spikes.time_variable_name, 'aclu', 'fragile_linear_neuron_IDX']
-            # active_datapoint_column_names = default_datapoint_column_names
-            
+
         # Copy only the relevent columns so filtering is easier:
         filtered_spikes_df = active_spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'aclu', 'fragile_linear_neuron_IDX']].copy()
         
