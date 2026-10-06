@@ -256,12 +256,39 @@ def forwardicity_score(p_x_given_n: Optional[NDArray] = None, most_likely_positi
 
 
 
+@function_attributes(short_name=None, tags=['forwardicity', 'main-sequence', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=['ForwardicityPaginatedPlotDataProvider'], creation_date='2026-10-06 11:32', related_items=['forwardicity_score'])
+def main_sequence_positions(partition_result) -> NDArray:
+    """Time-ordered positions of the ranked main subsequence, with intrusion bins removed.
+
+    Uses the `is_main` row of `partition_result.subsequences_df` (ranked by `len_excluding_intrusions`), then the matching non-intrusion rows of `position_bins_info_df` sorted by `flat_idx`. Repeats stay in the array. An empty array means there is no usable main sequence.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import forwardicity_score, main_sequence_positions
+
+        positions = main_sequence_positions(a_seq_and_heuristics_result)
+        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=positions, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
+    """
+    subsequences_df = getattr(partition_result, 'subsequences_df', None)
+    position_bins_info_df = getattr(partition_result, 'position_bins_info_df', None)
+    if (subsequences_df is None) or (position_bins_info_df is None) or (len(subsequences_df) == 0):
+        return np.array([], dtype=float)
+
+    is_main = subsequences_df['is_main'].to_numpy()
+    if not np.any(is_main):
+        return np.array([], dtype=float)
+
+    main_subsequence_idx = subsequences_df.loc[is_main, 'subsequence_idx'].iloc[0]
+    is_main_bin = (position_bins_info_df['subsequence_idx'] == main_subsequence_idx) & np.logical_not(position_bins_info_df['is_intrusion'])
+    main_bins_df = position_bins_info_df.loc[is_main_bin].sort_values('flat_idx')
+    return main_bins_df['pos'].to_numpy(dtype=float)
+
+
 @metadata_attributes(short_name=None, tags=['forwardicity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:22', related_items=[])
 class ForwardicityPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     """ 
     Usage:
 
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ForwardicityPaginatedPlotDataProvider, forwardicity_score
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ForwardicityPaginatedPlotDataProvider, forwardicity_score, main_sequence_positions
 
         for a_ctrl in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.values():
             ForwardicityPaginatedPlotDataProvider.add_data_to_pagination_controller(a_ctrl, None, update_controller_on_apply=False)
@@ -277,6 +304,7 @@ class ForwardicityPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     def get_provided_callbacks(cls):
         return {'on_render_page_callbacks': {'plot_forwardicity_data': cls._callback_update_curr_single_epoch_slice_plot}}
 
+
     @classmethod
     def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params, plots_data, plots, ui, data_idx, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs):
         if not params.get('enable_forwardicity_info', True):
@@ -285,9 +313,25 @@ class ForwardicityPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         decoder_name = params.active_identifying_figure_ctx.get('decoder', None)
         # most_likely_decoder_direction = {'long_LR': 1.0, 'long_RL': -1.0, 'short_LR': 1.0, 'short_RL': -1.0}.get(decoder_name, None)
         most_likely_decoder_direction = {'long_LR': -1.0, 'long_RL': 1.0, 'short_LR': -1.0, 'short_RL': 1.0}.get(decoder_name, None)
-        xbin_centers = get_bin_centers(params.xbin)
-        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=curr_posterior, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-        final_text = f"fwdicty: {forwardicity:.2f}" ## just main score
+
+        used_main_sequence: bool = False
+        most_likely_positions_arr = None
+        curves_data = plots_data.get('decoded_sequence_and_heuristics_curves_data', None)
+        if (curves_data is not None) and (epoch_slice is not None) and (len(epoch_slice) == 2):
+            epoch_start_t = epoch_slice[0]
+            if epoch_start_t in curves_data:
+                partition_result = curves_data[epoch_start_t].partition_result
+                if partition_result is not None:
+                    most_likely_positions_arr = main_sequence_positions(partition_result)
+                    used_main_sequence = True
+
+        if used_main_sequence:
+            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=most_likely_positions_arr, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
+            final_text = f"main fwdicty: {forwardicity:.2f}"
+        else:
+            xbin_centers = get_bin_centers(params.xbin)
+            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=curr_posterior, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
+            final_text = f"fwdicty: {forwardicity:.2f}" ## full-posterior MAP fallback
         # final_text = f"fwdicity: {forwardicity:.2f}\nfwd_maj: {ratio_major_aligned_bins:.2f}\nfwd_decdr: {ratio_decoder_aligned_bins:.2f}"
         extant = plots[cls.plots_group_identifier_key].get(curr_ax, {}).get('forwardicity_text', None)
         if extant is not None:
