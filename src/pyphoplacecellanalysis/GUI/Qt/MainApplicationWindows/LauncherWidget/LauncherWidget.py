@@ -1,5 +1,6 @@
 # LauncherWidget.py
 # Generated from c:\Users\pho\repos\Spike3DWorkEnv\pyPhoPlaceCellAnalysis\src\pyphoplacecellanalysis\GUI\Qt\MainApplicationWindows\LauncherWidget\LauncherWidget.ui automatically by PhoPyQtClassGenerator VSCode Extension
+import html
 import sys
 import subprocess
 import traceback
@@ -533,25 +534,42 @@ class LauncherWidget(PipelineOwningMixin, QWidget):
     
     def _perform_execute_display_function(self, a_fcn_name: str, *args, **kwargs):
         """ gets the display function to execute and executes it """
-        a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
-        assert a_fn_handle is not None
-        # args = []
-        # kwargs = {}
-        a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
-        assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
-        if self.display_suffix is not None:
-            kwargs['display_suffix'] = self.display_suffix
-        if a_disp_fn_item.is_global:
-            return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=None, *args, **kwargs)
-        else:
-            # non-global, needs a context:
-            current_selected_context = self.displayContextSelectorWidget.current_selected_context
-            if current_selected_context is not None:
-                # args = list(args) ## convert to list if a tuple
-                # args.insert(0, current_selected_context)
-                return self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+        try:
+            a_fn_handle = self._perform_get_display_function_code(a_fcn_name=a_fcn_name)
+            assert a_fn_handle is not None
+            # args = []
+            # kwargs = {}
+            a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+            assert a_disp_fn_item is not None, f"a_disp_fn_item is None! for a_fn_name='{a_fcn_name}'"
+            if self.display_suffix is not None:
+                kwargs['display_suffix'] = self.display_suffix
+            if a_disp_fn_item.is_global:
+                result = self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=None, *args, **kwargs)
             else:
-                return None
+                # non-global, needs a context:
+                current_selected_context = self.displayContextSelectorWidget.current_selected_context
+                if current_selected_context is not None:
+                    # args = list(args) ## convert to list if a tuple
+                    # args.insert(0, current_selected_context)
+                    result = self.curr_active_pipeline.display(display_function=a_disp_fn_item.name, active_session_configuration_context=current_selected_context, *args, **kwargs)
+                else:
+                    result = None
+            self.update_fn_documentation_panel(a_fcn_name=a_fcn_name) # clears a previous error footer
+            return result
+        except Exception:
+            tb_text: str = traceback.format_exc()
+            traceback.print_exc()
+            docs_html: str = ""
+            try:
+                a_disp_fn_item = self.get_display_function_item(a_fn_name=a_fcn_name)
+                if a_disp_fn_item is not None:
+                    docs_html = a_disp_fn_item.longform_description_formatted_html
+            except Exception:
+                docs_html = f"<b style='color:white;'>name</b>: {html.escape(str(a_fcn_name))}"
+            escaped_tb: str = html.escape(tb_text)
+            error_html: str = f"{docs_html}<br><pre style='color:red; font-family:monospace; white-space:pre-wrap;'>{escaped_tb}</pre>"
+            self.docPanelTextBrowser.setHtml(error_html)
+            return None
 
         # return a_fn_handle(*args, **kwargs)
         
