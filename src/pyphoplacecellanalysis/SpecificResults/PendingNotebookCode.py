@@ -141,7 +141,7 @@ from neuropy.utils.matplotlib_helpers import add_inner_title # for `Forwardicity
 
 ## Write the monotonicity score metric, similar to the heuristic
 @function_attributes(short_name=None, tags=['forwardicity', 'forward-v-reverse', 'replay', 'metric', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:30', related_items=[])
-def forwardicity_score(p_x_given_n, xbin_centers: Optional[NDArray] = None, most_likely_decoder_direction: Optional[float] = None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = True):
+def forwardicity_score(p_x_given_n: Optional[NDArray] = None, most_likely_positions_arr: Optional[NDArray] = None, xbin_centers: Optional[NDArray] = None, most_likely_decoder_direction: Optional[float] = None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = True):
     """Signed forward-vs-backward score for one replay posterior.
 
     Steps are the first differences of the MAP position. Bins that do not move are omitted from both the numerator and the denominator.
@@ -155,19 +155,38 @@ def forwardicity_score(p_x_given_n, xbin_centers: Optional[NDArray] = None, most
 
         forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=p_x_given_n, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction)
     """
-    p_x_given_n = np.asarray(p_x_given_n)
-    total_n_time_bins: int = int(np.shape(p_x_given_n)[time_axes])
-
     if debug_print:
         print(f'forwardicity_score(...):')
-        print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}')
 
-    most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes)
-    most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes)
-    if xbin_centers is not None:
-        most_likely_positions_arr = np.ravel(np.asarray(xbin_centers)[most_likely_position_bin_indicies_arr]).astype(float)
+    most_likely_position_bin_indicies_arr = None
+    most_likely_positions_likelihood_arr = None
+
+    if (p_x_given_n is not None):
+        p_x_given_n = np.asarray(p_x_given_n)
+        total_n_time_bins: int = int(np.shape(p_x_given_n)[time_axes])
+
+        if debug_print:
+            print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}')
+
+        most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes)
+        most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes)
+
+        if most_likely_positions_arr is None:
+            if xbin_centers is not None:
+                most_likely_positions_arr = np.ravel(np.asarray(xbin_centers)[most_likely_position_bin_indicies_arr]).astype(float)
+            else:
+                most_likely_positions_arr = np.ravel(most_likely_position_bin_indicies_arr).astype(float)
+        else:
+            Assert.len_equals(most_likely_positions_arr, required_length=total_n_time_bins)
+
+    elif ((p_x_given_n is None) and (most_likely_positions_arr is not None)):
+        total_n_time_bins: int = int(len(most_likely_positions_arr))
+        if debug_print:
+            print(f'\tnp.shape(most_likely_positions_arr): {np.shape(most_likely_positions_arr)}, total_n_time_bins: {total_n_time_bins}')
+        most_likely_positions_arr = np.ravel(most_likely_positions_arr).astype(float)
+
     else:
-        most_likely_positions_arr = np.ravel(most_likely_position_bin_indicies_arr).astype(float)
+        raise ValueError(f'p_x_given_n: {p_x_given_n}, most_likely_positions_arr: {most_likely_positions_arr}')
 
     if most_likely_positions_arr.size < 2:
         if debug_print:
@@ -180,9 +199,11 @@ def forwardicity_score(p_x_given_n, xbin_centers: Optional[NDArray] = None, most
     n_directional_steps: int = int(np.sum(is_directional_step))
 
     if debug_print:
-        print(f'\tmost_likely_position_bin_indicies_arr: {np.ravel(most_likely_position_bin_indicies_arr)}')
+        if most_likely_position_bin_indicies_arr:
+            print(f'\tmost_likely_position_bin_indicies_arr: {np.ravel(most_likely_position_bin_indicies_arr)}')
         print(f'\tmost_likely_positions_arr: {most_likely_positions_arr}')
-        print(f'\tmost_likely_positions_likelihood_arr: {np.ravel(most_likely_positions_likelihood_arr)}')
+        if most_likely_positions_likelihood_arr is not None:
+            print(f'\tmost_likely_positions_likelihood_arr: {np.ravel(most_likely_positions_likelihood_arr)}')
         print(f'\t_positions_diff: {_positions_diff}')
         print(f'\tchange_directions: {change_directions}')
         print(f'\tn_directional_steps: {n_directional_steps} of {len(_positions_diff)} steps ({total_n_time_bins} time bins)')
