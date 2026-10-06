@@ -33,7 +33,7 @@ from neuropy.core.laps import Laps, LapsAccessor # used in `DirectionalLapsHelpe
 from neuropy.utils.result_context import IdentifyingContext
 from neuropy.utils.dynamic_container import DynamicContainer
 from neuropy.utils.mixins.dict_representable import override_dict # used to build config
-from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters
+from neuropy.analyses.placefields import PfND, PlacefieldComputationParameters, filter_neuron_ids_by_frate_and_qclu
 from neuropy.core.epoch import NamedTimerange, Epoch, ensure_dataframe
 from neuropy.core.epoch import find_data_indicies_from_epoch_times
 from neuropy.utils.indexing_helpers import union_of_arrays # `paired_incremental_sort_neurons`
@@ -796,26 +796,14 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
             
         """
         # original_neuron_ids_list = [a_decoder.pf.ratemap.neuron_ids for a_decoder in (long_LR_decoder, long_RL_decoder, short_LR_decoder, short_RL_decoder)]
-        original_neuron_ids_dict = {a_decoder_name:deepcopy(a_decoder.pf.ratemap.neuron_ids) for a_decoder_name, a_decoder in decoders_dict.items()}
-        if (minimum_inclusion_fr_Hz is not None) and (minimum_inclusion_fr_Hz > 0.0):
-            modified_neuron_ids_dict = {a_decoder_name:np.array(a_decoder.pf.ratemap.neuron_ids)[a_decoder.pf.ratemap.tuning_curve_unsmoothed_peak_firing_rates >= minimum_inclusion_fr_Hz] for a_decoder_name, a_decoder in decoders_dict.items()}
-        else:            
-            modified_neuron_ids_dict = {a_decoder_name:deepcopy(a_decoder_neuron_ids) for a_decoder_name, a_decoder_neuron_ids in original_neuron_ids_dict.items()}
-        
-        if included_qclu_values is not None:
-            # filter by included_qclu_values
-            for a_decoder_name, a_decoder in decoders_dict.items():
-                # a_decoder.pf.spikes_df
-                neuron_identities: pd.DataFrame = deepcopy(a_decoder.pf.filtered_spikes_df).spikes.extract_unique_neuron_identities()
-                # filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
-                filtered_neuron_identities: pd.DataFrame = deepcopy(neuron_identities)
-                filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
-                # filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, original_neuron_ids_dict[a_decoder_name])]
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, modified_neuron_ids_dict[a_decoder_name])] # require to match to decoders
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
-                final_included_aclus = filtered_neuron_identities['aclu'].to_numpy()
-                modified_neuron_ids_dict[a_decoder_name] = deepcopy(final_included_aclus) #.tolist()
-                
+        modified_neuron_ids_dict = {}
+        for a_decoder_name, a_decoder in decoders_dict.items():
+            # a_decoder.pf.spikes_df
+            a_ratemap = a_decoder.pf.ratemap
+            # drop [6, 7], which are said to have double fields - 80 remain
+            modified_neuron_ids_dict[a_decoder_name] = filter_neuron_ids_by_frate_and_qclu(neuron_ids=a_ratemap.neuron_ids, peak_frate_Hz=a_ratemap.tuning_curve_unsmoothed_peak_firing_rates, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values, neuron_extended_ids=getattr(a_ratemap, 'neuron_extended_ids', None), spikes_df=a_decoder.pf.filtered_spikes_df)
+        ## END for a_decoder_name, a_decoder in decoders_dict.items()....
+
         return modified_neuron_ids_dict
     
 
@@ -1461,9 +1449,14 @@ class TrackTemplates(BaseTrackTemplates):
                 # filtered_neuron_identities: pd.DataFrame = neuron_identities[neuron_identities.neuron_type == NeuronType.PYRAMIDAL]
                 filtered_neuron_identities: pd.DataFrame = deepcopy(neuron_identities)
                 filtered_neuron_identities = filtered_neuron_identities[['aclu', 'shank', 'cluster', 'qclu']]
+                n_neurons: int = len(filtered_neuron_identities)
                 # filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, original_neuron_ids_dict[a_decoder_name])]
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, modified_neuron_ids_dict[a_decoder_name])] # require to match to decoders
-                filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
+                is_neuron_included = np.full((n_neurons,), fill_value=True)
+                is_neuron_included = np.logical_and(is_neuron_included, np.isin(filtered_neuron_identities.aclu, modified_neuron_ids_dict[a_decoder_name])) # require to match to decoders
+                is_neuron_included = np.logical_and(is_neuron_included, np.isin(filtered_neuron_identities.qclu, included_qclu_values)) # drop [6, 7], which are said to have double fields - 80 remain
+                filtered_neuron_identities = filtered_neuron_identities[is_neuron_included]
+                # filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.aclu, modified_neuron_ids_dict[a_decoder_name])] # require to match to decoders
+                # filtered_neuron_identities = filtered_neuron_identities[np.isin(filtered_neuron_identities.qclu, included_qclu_values)] # drop [6, 7], which are said to have double fields - 80 remain
                 final_included_aclus = filtered_neuron_identities['aclu'].to_numpy()
                 modified_neuron_ids_dict[a_decoder_name] = deepcopy(final_included_aclus) #.tolist()
                 
@@ -7504,7 +7497,7 @@ def get_proper_global_spikes_df(owning_pipeline_reference, minimum_inclusion_fr_
      Get proper global_spikes_df, requires curr_active_pipeline
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
-
+    
     spikes_df = get_proper_global_spikes_df(curr_active_pipeline)
 
     """
@@ -10364,17 +10357,21 @@ class DirectionalPlacefieldGlobalDisplayFunctions(AllFunctionEnumeratingMixin, m
 
 
         # Get appropriate context ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        #TODO 2025-05-30 07:52: - [ ] This assumes `ripple_decoding_time_bin_size == laps_decoding_time_bin_size`
         complete_session_context, (session_context, additional_session_context) = owning_pipeline_reference.get_complete_session_context()
 
-        assert (ripple_decoding_time_bin_size == laps_decoding_time_bin_size), f"ripple_decoding_time_bin_size: {ripple_decoding_time_bin_size} != laps_decoding_time_bin_size: {laps_decoding_time_bin_size}" #TODO 2025-07-10 15:32: - [ ] Why does it matter that they aren't equal?
         active_context = kwargs.pop('active_context', None)
-        if active_context is not None:
-            # Update the existing context:
-            active_context = deepcopy(active_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size)
-        else:
+        if active_context is None:
             # active_context = owning_pipeline_reference.sess.get_context()
-            active_context = deepcopy(complete_session_context).overwriting_context(time_bin_size=ripple_decoding_time_bin_size) # owning_pipeline_reference.sess.get_context()
+            active_context = deepcopy(complete_session_context) # owning_pipeline_reference.sess.get_context()
+        else:
+            # Update the existing context:
+            active_context = deepcopy(active_context)
+
+        if ripple_decoding_time_bin_size == laps_decoding_time_bin_size:
+            active_context = active_context.overwriting_context(time_bin_size=ripple_decoding_time_bin_size)
+        else:
+            ## Separate labels so the lap bin is not recorded as the ripple bin. `time_bin_size` is excluded from the folder description below.
+            active_context = active_context.overwriting_context(laps_time_bin_size=laps_decoding_time_bin_size, ripple_time_bin_size=ripple_decoding_time_bin_size)
 
 
 
