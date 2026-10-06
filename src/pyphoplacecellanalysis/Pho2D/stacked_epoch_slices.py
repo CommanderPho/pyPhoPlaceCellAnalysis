@@ -1796,6 +1796,7 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             DecodedPositionsPlotDataProvider.add_data_to_pagination_controller(self, decoded_position_curves_epochs_data, update_controller_on_apply=False)
 
         pos_bin_edges = deepcopy(self.params.xbin)
+
         decoder_track_length: float = self.params.get('track_length_cm', None)
         # heuristic_kwargs = self.params.get('heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
         data_overlay_heuristic_kwargs = self.params.get('data_overlay_heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
@@ -2298,7 +2299,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## Add the overlays to each of the four figures:
         for a_name, a_pagination_controller in self.pagination_controllers.items():          
             # a_pagination_controller.params.xbin 
+            track_length_cm_dict = a_pagination_controller.params.get('track_length_cm_dict', None)
+            if (track_length_cm_dict is not None) and (a_name in track_length_cm_dict):
+                a_pagination_controller.params.track_length_cm = track_length_cm_dict[a_name] ## per-decoder scalar used by child add_data_overlays
             a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
+        ## END for a_name, a_pagination_controller in self.pagination_controllers.items()...
+
 
         if not defer_refresh:
             self.refresh_current_page()
@@ -2338,7 +2344,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         decoder_names: List[str] = track_templates.get_decoder_names()
         
-        track_length_dict = track_templates.get_track_length_dict()
+        track_length_cm_dict = params_kwargs.pop('track_length_cm_dict', None)
+        if track_length_cm_dict is None:
+            track_length_cm_dict = track_templates.get_track_length_dict()
+        # params_kwargs['track_length_cm_dict'] = track_length_cm_dict
         
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
         # controlled_pagination_controller_names_list = decoder_names[1:]
@@ -2355,7 +2364,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 else:
                     curr_params_kwargs['disable_y_label'] = True
                     
-            curr_params_kwargs['track_length_cm'] = track_length_dict[a_name] ## get the track length in cm
+            curr_params_kwargs['track_length_cm'] = track_length_cm_dict[a_name] ## get the track length in cm from track_length_cm_dict
 
             # a_name: str = 
             a_decoder_decoded_epochs_result: DecodedFilterEpochsResult = decoder_decoded_epochs_result_dict[a_name] # DecodedFilterEpochsResult
@@ -2364,7 +2373,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                                                                 xbin=a_decoder.xbin, global_pos_df=curr_active_pipeline.sess.position.df,
                                                                                                 a_name=f'DecodedEpochSlices[{a_name}]', active_context=curr_active_pipeline.build_display_context_for_session(display_fn_name='DecodedEpochSlices', epochs=epochs_name, decoder=a_name),
                                                                                                 max_subplots_per_page=max_subplots_per_page, debug_print=debug_print, included_epoch_indicies=included_epoch_indicies, params_kwargs=curr_params_kwargs) # , save_figure=save_figure
-
+        ## END for i, (a_name, a_decoder) in enumerate(track_templates.get_decoders_dict().items())...
 
         # Constrains each of the plotters at least to the minimum height:
         for a_name, a_pagination_controller in pagination_controller_dict.items():
