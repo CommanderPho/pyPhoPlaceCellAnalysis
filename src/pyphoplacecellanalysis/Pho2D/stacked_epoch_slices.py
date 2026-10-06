@@ -2294,11 +2294,24 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         if included_columns is None:
             included_columns = []
 
+        ## from params
         decoder_decoded_epochs_result_dict = deepcopy(self.decoder_filter_epochs_decoder_result_dict)
         
         ## Add the overlays to each of the four figures:
         for a_name, a_pagination_controller in self.pagination_controllers.items():          
             # a_pagination_controller.params.xbin 
+
+            enable_radon_transform_info = a_pagination_controller.params.get('enable_radon_transform_info', None)
+            if (enable_radon_transform_info is not None) and enable_radon_transform_info:
+                radon_transform_columns = ['score', 'velocity', 'intercept', 'speed']
+                included_columns.extend(radon_transform_columns)
+
+
+            enable_weighted_correlation_info = a_pagination_controller.params.get('enable_weighted_correlation_info', None)
+            if (enable_weighted_correlation_info is not None) and enable_weighted_correlation_info:
+                wcorr_columns = ['wcorr', 'P_decoder', 'pearsonr']
+                included_columns.extend(wcorr_columns)
+
             track_length_cm_dict = a_pagination_controller.params.get('track_length_cm_dict', None)
             if (track_length_cm_dict is not None) and (a_name in track_length_cm_dict):
                 a_pagination_controller.params.track_length_cm = track_length_cm_dict[a_name] ## per-decoder scalar used by child add_data_overlays
