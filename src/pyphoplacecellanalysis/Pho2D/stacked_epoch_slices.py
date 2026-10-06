@@ -3415,7 +3415,6 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         directional_merged_decoders_result = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders'] # DirectionalPseudo2DDecodersResult, pull from global computations
 
 
-        
         _shared_plotting_kwargs = {                # 'debug_print': True,
                 'max_subplots_per_page': kwargs.get('params_kwargs', {}).get('max_subplots_per_page', 3),
                 'scrollable_figure': kwargs.get('params_kwargs', {}).get('scrollable_figure', False),

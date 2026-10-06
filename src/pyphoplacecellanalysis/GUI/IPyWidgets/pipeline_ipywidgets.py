@@ -944,7 +944,7 @@ class PipelinePickleFileSelectorWidget:
             try:
                 # INPUTS: override_global_computation_results_pickle_path
                 with set_posix_windows():
-                    print(f'\tloading using `curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path="{override_global_computation_results_pickle_path}", allow_overwrite_existing=True, allow_overwrite_existing_allow_keys: {allow_overwrite_existing_allow_keys}, ...)`...')
+                    print(f'\tloading using `curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path="{override_global_computation_results_pickle_path}", allow_overwrite_existing=True, ...)`...')
                     sucessfully_updated_keys, successfully_loaded_keys = curr_active_pipeline.load_pickled_global_computation_results(override_global_computation_results_pickle_path=override_global_computation_results_pickle_path,
                                                                                                     allow_overwrite_existing=True, allow_overwrite_existing_allow_keys=extended_computations_include_includelist, ) # is new
                     print(f'\tsucessfully_updated_keys: {sucessfully_updated_keys}\nsuccessfully_loaded_keys: {successfully_loaded_keys}')
