@@ -777,7 +777,31 @@ class BaseTrackTemplates(HDFMixin, AttrsBasedClassHelperMixin):
         filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
         # build the final shared aclus:
         filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
-        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)]
+        # filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)] #TODO 2026-10-05 16:51: - [ ] AI claims that they're being removed because they fall below the the minimum_firing_rate_Hz on one track, but it's probably more about sequentially filtering the .spikes_df
+        #TODO 2026-10-05 17:25: - [ ] Serious problem with `a_decoder.get_by_id(a_filtered_aclus)` losing IDs, the AI claims this is due to it not realy filtering but instead recomputing.
+        filtered_decoder_list = []
+        for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list):
+            sliced_pf = deepcopy(a_decoder.pf)
+            sliced_pf.ratemap = sliced_pf.ratemap.get_by_id(a_filtered_aclus)
+            sliced_pf._filtered_spikes_df = sliced_pf._filtered_spikes_df[np.isin(sliced_pf._filtered_spikes_df.aclu, a_filtered_aclus)]
+
+            neuron_sliced_decoder = BasePositionDecoder(sliced_pf, setup_on_init=True, post_load_on_init=False, debug_print=a_decoder.debug_print)
+            # Preserve config flags and shape-aware reliability slices when present
+            neuron_sliced_decoder.should_discount_silence = a_decoder.should_discount_silence
+            neuron_sliced_decoder.drop_negative_contributing_terms_mode = a_decoder.drop_negative_contributing_terms_mode
+            neuron_sliced_decoder.reliability_modifier_mode = a_decoder.reliability_modifier_mode
+            if (a_decoder.neuron_IDs is not None) and ((a_decoder.reliability_active is not None) or (a_decoder.reliability_silent is not None)):
+                source_ids = np.asarray(a_decoder.neuron_IDs)
+                ids_arr = np.asarray(ids)
+                keep = np.isin(source_ids, ids_arr)
+                neuron_sliced_decoder.reliability_active = a_decoder._slice_reliability_array(a_decoder.reliability_active, keep)
+                neuron_sliced_decoder.reliability_silent = a_decoder._slice_reliability_array(a_decoder.reliability_silent, keep)
+
+
+            filtered_decoder_list.append(neuron_sliced_decoder)
+        ## END for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)...
+
+
         return filtered_decoder_list, filtered_direction_shared_aclus_list
     
     @classmethod
@@ -1416,7 +1440,71 @@ class TrackTemplates(BaseTrackTemplates):
         filtered_included_RL_aclus = np.union1d(individual_decoder_filtered_aclus_list[1], individual_decoder_filtered_aclus_list[3])
         # build the final shared aclus:
         filtered_direction_shared_aclus_list = [filtered_included_LR_aclus, filtered_included_RL_aclus, filtered_included_LR_aclus, filtered_included_RL_aclus] # contains the shared aclus for that direction
-        filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)]
+        # filtered_decoder_list = [a_decoder.get_by_id(a_filtered_aclus) for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)] #TODO 2026-10-05 16:51: - [ ] AI claims that they're being removed because they fall below the the minimum_firing_rate_Hz on one track, but it's probably more about sequentially filtering the .spikes_df
+        #TODO 2026-10-05 17:25: - [ ] Serious problem with `a_decoder.get_by_id(a_filtered_aclus)` losing IDs, the AI claims this is due to it not realy filtering but instead recomputing.
+        filtered_decoder_list = []
+        for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list):
+            sliced_pf = deepcopy(a_decoder.pf)
+            sliced_pf.ratemap = sliced_pf.ratemap.get_by_id(a_filtered_aclus)
+            sliced_pf._filtered_spikes_df = sliced_pf._filtered_spikes_df[np.isin(sliced_pf._filtered_spikes_df.aclu, a_filtered_aclus)]
+
+            neuron_sliced_decoder = BasePositionDecoder(sliced_pf, setup_on_init=True, post_load_on_init=False, debug_print=a_decoder.debug_print)
+            # Preserve config flags and shape-aware reliability slices when present
+            neuron_sliced_decoder.should_discount_silence = a_decoder.should_discount_silence
+            neuron_sliced_decoder.drop_negative_contributing_terms_mode = a_decoder.drop_negative_contributing_terms_mode
+            neuron_sliced_decoder.reliability_modifier_mode = a_decoder.reliability_modifier_mode
+            if (a_decoder.neuron_IDs is not None) and ((a_decoder.reliability_active is not None) or (a_decoder.reliability_silent is not None)):
+                source_ids = np.asarray(a_decoder.neuron_IDs)
+                ids_arr = np.asarray(ids)
+                keep = np.isin(source_ids, ids_arr)
+                neuron_sliced_decoder.reliability_active = a_decoder._slice_reliability_array(a_decoder.reliability_active, keep)
+                neuron_sliced_decoder.reliability_silent = a_decoder._slice_reliability_array(a_decoder.reliability_silent, keep)
+
+
+            filtered_decoder_list.append(neuron_sliced_decoder)
+        ## END for a_decoder, a_filtered_aclus in zip(original_decoder_list, filtered_direction_shared_aclus_list)...
+        # decoder_names
+        # ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+        # [v.neuron_IDs for v in filtered_decoder_list]
+        # [array([  9,  11,  12,  14,  15,  18,  24,  25,  26,  27,  28,  31,  39,  40,  43,  44...,  84,  87,  89,  91,  92,  95, 101, 104]), array([  2,   5,   9,  19,  26,  29,  30,  31,  40,  43,  52,  53,  59,  60,  61,  68...,  84,  85,  86,  89,  93,  98, 102, 104]), array([  8,  11,  12,  15,  24,  25,  28,  31,  39,  40,  43,  44,  47,  48,  51,  52...,  84,  87,  91,  92,  95, 101, 102, 104]), array([  2,   9,  24,  25,  26,  30,  31,  33,  34,  35,  39,  40,  43,  51,  52,  53...,  86,  87,  89,  92,  93,  98, 102, 104])]
+        # 0 =
+        # array([  9,  11,  12,  14,  15,  18,  24,  25,  26,  27,  28,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  59,  61,  63,  66,  67,  71,  72,  75,  77,  79,  80,  81,  82,  84,  87,  89,  91,  92,  95, 101, 104])
+        # 1 =
+        # array([  2,   5,   9,  19,  26,  29,  30,  31,  40,  43,  52,  53,  59,  60,  61,  68,  72,  75,  77,  79,  81,  82,  83,  84,  85,  86,  89,  93,  98, 102, 104])
+        # 2 =
+        # array([  8,  11,  12,  15,  24,  25,  28,  31,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  58,  61,  66,  67,  68,  71,  72,  75,  79,  80,  81,  82,  84,  87,  91,  92,  95, 101, 102, 104])
+        # 3 =
+        # array([  2,   9,  24,  25,  26,  30,  31,  33,  34,  35,  39,  40,  43,  51,  52,  53,  58,  60,  61,  68,  72,  75,  77,  79,  81,  82,  83,  84,  85,  86,  87,  89,  92,  93,  98, 102, 104])
+        # len() =
+        # 4
+        # [v.neuron_IDs for v in original_decoder_list]
+        # [array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32...,  90,  91,  92,  93,  95, 101, 102, 104]), array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39...,  89,  90,  92,  93,  98, 101, 102, 104]), array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32...,  90,  91,  92,  93,  95, 101, 102, 104]), array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39...,  89,  90,  92,  93,  98, 101, 102, 104])]
+        # 0 =
+        # array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32,  38,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  58,  59,  61,  63,  66,  67,  68,  69,  71,  72,  75,  77,  79,  80,  81,  82,  84,  87,  89,  90,  91,  92,  93,  95, 101, 102, 104])
+        # 1 =
+        # array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39,  40,  43,  44,  51,  52,  53,  56,  58,  59,  60,  61,  66,  68,  72,  75,  77,  79,  80,  81,  82,  83,  84,  85,  86,  87,  89,  90,  92,  93,  98, 101, 102, 104])
+        # 2 =
+        # array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32,  38,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  58,  59,  61,  63,  66,  67,  68,  69,  71,  72,  75,  77,  79,  80,  81,  82,  84,  87,  89,  90,  91,  92,  93,  95, 101, 102, 104])
+        # 3 =
+        # array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39,  40,  43,  44,  51,  52,  53,  56,  58,  59,  60,  61,  66,  68,  72,  75,  77,  79,  80,  81,  82,  83,  84,  85,  86,  87,  89,  90,  92,  93,  98, 101, 102, 104])
+        # len() =
+        # 4
+        # filtered_direction_shared_aclus_list
+        # [array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32...,  90,  91,  92,  93,  95, 101, 102, 104]), array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39...,  89,  90,  92,  93,  98, 101, 102, 104]), array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32...,  90,  91,  92,  93,  95, 101, 102, 104]), array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39...,  89,  90,  92,  93,  98, 101, 102, 104])]
+        # 0 =
+        # array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32,  38,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  58,  59,  61,  63,  66,  67,  68,  69,  71,  72,  75,  77,  79,  80,  81,  82,  84,  87,  89,  90,  91,  92,  93,  95, 101, 102, 104])
+        # 1 =
+        # array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39,  40,  43,  44,  51,  52,  53,  56,  58,  59,  60,  61,  66,  68,  72,  75,  77,  79,  80,  81,  82,  83,  84,  85,  86,  87,  89,  90,  92,  93,  98, 101, 102, 104])
+        # 2 =
+        # array([  4,   8,   9,  11,  12,  13,  14,  15,  18,  24,  25,  26,  27,  28,  31,  32,  38,  39,  40,  43,  44,  47,  48,  51,  52,  53,  56,  57,  58,  59,  61,  63,  66,  67,  68,  69,  71,  72,  75,  77,  79,  80,  81,  82,  84,  87,  89,  90,  91,  92,  93,  95, 101, 102, 104])
+        # 3 =
+        # array([  2,   5,   9,  11,  15,  19,  24,  25,  26,  29,  30,  31,  33,  34,  35,  39,  40,  43,  44,  51,  52,  53,  56,  58,  59,  60,  61,  66,  68,  72,  75,  77,  79,  80,  81,  82,  83,  84,  85,  86,  87,  89,  90,  92,  93,  98, 101, 102, 104])
+        # len() =
+        # 4
+
+
+        # [v.neuron_IDs for v in filtered_decoder_list]
+
         return filtered_decoder_list, filtered_direction_shared_aclus_list
     
     @classmethod
