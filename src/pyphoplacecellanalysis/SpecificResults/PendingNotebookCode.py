@@ -141,94 +141,95 @@ from neuropy.utils.matplotlib_helpers import add_inner_title # for `Forwardicity
 
 ## Write the monotonicity score metric, similar to the heuristic
 @function_attributes(short_name=None, tags=['forwardicity', 'forward-v-reverse', 'replay', 'metric', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:30', related_items=[])
-def forwardicity_score(p_x_given_n, xbin_centers: Optional[NDArray]=None, most_likely_decoder_direction: Optional[float]=None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = True):
-    """ given a multi-time bin posterior p_x_given_n, compute the "forwardicity" score which identifies how forward- v. backward-like a single replay event is. 
-    The metric should return a score between -1 and +1, where +1 indicates a fully forward replay, while a -1 indicates a fully backward one.
+def forwardicity_score(p_x_given_n, xbin_centers: Optional[NDArray] = None, most_likely_decoder_direction: Optional[float] = None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = True):
+    """Signed forward-vs-backward score for one replay posterior.
 
-    I can define a "monotonicity" score -- how many directional changes are in the most-common direction relative to the total number of directional bins. 
-    This would be 1.0 for fully unidirectional events in either dir, or 0.5 for mixed events and we can filter on some threshold like 0.75 to only look at the directional ones
+    Steps are the first differences of the MAP position. Bins that do not move are omitted from both the numerator and the denominator.
+
+    ratio_major_aligned_bins is the fraction of moving steps whose sign matches the majority sign. It is 1.0 for a fully unidirectional event in either direction and 0.5 when the two directions tie. Threshold this (for example at 0.75) to keep directional events.
+
+    forwardicity compares those same moving steps to most_likely_decoder_direction (±1). It is +1 when every moving step matches the decoder, -1 when every moving step opposes it, and 0 for a tie. It is NaN when there is no decoder direction or no moving step.
 
     Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import forwardicity_score
 
-        ratio_major_aligned_bins, ratio_decoder_aligned_bins = forwardicity_score(p_x_given_n=p_x_given_n, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction)
-        (ratio_major_aligned_bins, ratio_decoder_aligned_bins)
-
-
+        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=p_x_given_n, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction)
     """
-    total_n_time_bins: int = np.shape(p_x_given_n)[-1]
+    p_x_given_n = np.asarray(p_x_given_n)
+    total_n_time_bins: int = int(np.shape(p_x_given_n)[time_axes])
 
     if debug_print:
         print(f'forwardicity_score(...):')
-        print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}') # np.shape(p_x_given_n): (59, 3) - (n_x_bins, n_epoch_t_bins)
-        # print(f'\tp_x_given_n: {p_x_given_n}')
+        print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}')
 
-    ## get most-likely positions for each of the p_x_given_n bins
-    most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes) ## last axis should be time
-    most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes) ## last axis should be time
+    most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes)
+    most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes)
     if xbin_centers is not None:
-        most_likely_positions_arr = np.squeeze(xbin_centers[most_likely_position_bin_indicies_arr])
+        most_likely_positions_arr = np.ravel(np.asarray(xbin_centers)[most_likely_position_bin_indicies_arr]).astype(float)
     else:
-        ## treat them as just indicies
-        most_likely_positions_arr = deepcopy(most_likely_position_bin_indicies_arr).astype(float)
+        most_likely_positions_arr = np.ravel(most_likely_position_bin_indicies_arr).astype(float)
 
-    len(most_likely_position_bin_indicies_arr)
-    len(most_likely_positions_likelihood_arr)
+    if most_likely_positions_arr.size < 2:
+        if debug_print:
+            print(f'\tWARN: fewer than 2 time bins ({most_likely_positions_arr.size}); forwardicity is undefined')
+        return np.nan, (np.nan, None)
 
-    ## TODO: take into account how position-like each bin is, to say how well the most_likely_positions_arr reflects the decoded positions, moving the final score closer to 0.0 for bins that are position-like.
-
-    ## compute the 1st-order difference between the most-likely positions.
     _positions_diff = np.diff(most_likely_positions_arr)
+    change_directions = np.sign(_positions_diff)  # {-1, 0, +1}; 0 is a pause, not a direction
+    is_directional_step = (change_directions != 0) & np.isfinite(change_directions)
+    n_directional_steps: int = int(np.sum(is_directional_step))
 
     if debug_print:
-        assert (len(most_likely_position_bin_indicies_arr) == total_n_time_bins), f"len(most_likely_position_bin_indicies_arr): {len(most_likely_position_bin_indicies_arr)} != total_n_time_bins: {total_n_time_bins}"
-        assert (len(most_likely_positions_arr) == total_n_time_bins), f"len(most_likely_positions_arr): {len(most_likely_positions_arr)} != total_n_time_bins: {total_n_time_bins}"
-        # print(f'\tlen(most_likely_position_bin_indicies_arr): {len(most_likely_position_bin_indicies_arr)}')
-        # print(f'\tlen(most_likely_positions_arr): {len(most_likely_positions_arr)}')
-
-        print(f'\tmost_likely_position_bin_indicies_arr: {most_likely_position_bin_indicies_arr}')
+        print(f'\tmost_likely_position_bin_indicies_arr: {np.ravel(most_likely_position_bin_indicies_arr)}')
         print(f'\tmost_likely_positions_arr: {most_likely_positions_arr}')
-        print(f'\tmost_likely_positions_likelihood_arr: {most_likely_positions_likelihood_arr}')
+        print(f'\tmost_likely_positions_likelihood_arr: {np.ravel(most_likely_positions_likelihood_arr)}')
         print(f'\t_positions_diff: {_positions_diff}')
+        print(f'\tchange_directions: {change_directions}')
+        print(f'\tn_directional_steps: {n_directional_steps} of {len(_positions_diff)} steps ({total_n_time_bins} time bins)')
 
-    ## find the most-common direction
-    total_displacement: float = np.nansum(_positions_diff)
-    total_displacement_major_direction = np.sign(total_displacement) ## find the most common displacement direction
+    if n_directional_steps == 0:
+        if debug_print:
+            print(f'\tWARN: no non-zero position steps; forwardicity is undefined')
+        return np.nan, (np.nan, None)
 
-    ## find the number of changes that are aligned with the most common direction vs. the total number of time bins
+    directional_signs = change_directions[is_directional_step]
+    n_positive: int = int(np.sum(directional_signs > 0))
+    n_negative: int = int(np.sum(directional_signs < 0))
+    ## A tie is 0.5 either way. Majority is a step count, so one large jump cannot outvote many small steps.
+    n_major: int = max(n_positive, n_negative)
+    if n_positive > n_negative:
+        total_displacement_major_direction: float = 1.0
+    elif n_negative > n_positive:
+        total_displacement_major_direction = -1.0
+    else:
+        total_displacement_major_direction = 0.0
 
-    change_directions = np.sign(_positions_diff) ## this should be 1D at this point
-    is_change_direction_aligned_with_major = (change_directions == total_displacement_major_direction) ## this should be 1D at this point
-
-    major_direction_aligned_num_displacements: int = np.nansum(is_change_direction_aligned_with_major)
-    ## major_direction_aligned_num_displacements
-
-    ratio_major_aligned_bins: float = float(major_direction_aligned_num_displacements) / float(total_n_time_bins)
+    ratio_major_aligned_bins: float = float(n_major) / float(n_directional_steps)
 
     if debug_print:
-        print(f'\ttotal_displacement: {total_displacement}')
+        print(f'\tn_positive: {n_positive}, n_negative: {n_negative}')
         print(f'\ttotal_displacement_major_direction: {total_displacement_major_direction}')
-
-        print(f'\tchange_directions: {change_directions}')
-        print(f'\tis_change_direction_aligned_with_major: {is_change_direction_aligned_with_major}')
-        print(f'\tmajor_direction_aligned_num_displacements: {major_direction_aligned_num_displacements}')
-
+        print(f'\tratio_major_aligned_bins: {ratio_major_aligned_bins}')
 
     ratio_decoder_aligned_bins: Optional[float] = None
-    if (most_likely_decoder_direction is not None):
-        is_change_direction_aligned_with_decoder = (change_directions == most_likely_decoder_direction) ## this should be 1D at this point
-        decoder_direction_aligned_num_displacements: int = np.nansum(is_change_direction_aligned_with_decoder)
-        ratio_decoder_aligned_bins = float(decoder_direction_aligned_num_displacements) / float(total_n_time_bins) ## this is the magnitude of the score kinda, 0.5 indicates equal num of bins in the decoder's preferred vs. anti-preferred direction
+    forwardicity: float = np.nan
+    if most_likely_decoder_direction is not None:
+        decoder_direction: float = float(np.sign(most_likely_decoder_direction))
+        if decoder_direction == 0.0:
+            if debug_print:
+                print(f'\tWARN: most_likely_decoder_direction={most_likely_decoder_direction} is not ±1; forwardicity is undefined')
+        else:
+            n_decoder_aligned: int = int(np.sum(directional_signs == decoder_direction))
+            ratio_decoder_aligned_bins = float(n_decoder_aligned) / float(n_directional_steps)
+            forwardicity = (ratio_decoder_aligned_bins - 0.5) * 2.0  # 0 -> -1, 0.5 -> 0, 1 -> +1
 
-        forwardicity: float = (ratio_decoder_aligned_bins - 0.5) * 2.0 ## shift by the 50-50 point of 0.5, then multiply by 2.0 so that it spans from -1 for anti-aligned and +1.0 for aligned with the decoder's direction
-
-        if debug_print:
-            print(f'\tis_change_direction_aligned_with_decoder: {is_change_direction_aligned_with_decoder}')
-            print(f'\tdecoder_direction_aligned_num_displacements: {decoder_direction_aligned_num_displacements}')
-            print(f'\tratio_decoder_aligned_bins: {ratio_decoder_aligned_bins}')
-    else:
-        print(f'\tWARN: most_likely_decoder_direction is None')        
-        forwardicity: float = (ratio_major_aligned_bins - 0.5) * 2.0 ## shift by the 50-50 point of 0.5, then multiply by 2.0 so that it spans from -1 for anti-aligned and +1.0 for aligned with the decoder's direction
-
+            if debug_print:
+                print(f'\tdecoder_direction: {decoder_direction}')
+                print(f'\tn_decoder_aligned: {n_decoder_aligned}')
+                print(f'\tratio_decoder_aligned_bins: {ratio_decoder_aligned_bins}')
+                print(f'\tforwardicity: {forwardicity}')
+    elif debug_print:
+        print(f'\tWARN: most_likely_decoder_direction is None; returning monotonicity only')
 
     return forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins)
 
