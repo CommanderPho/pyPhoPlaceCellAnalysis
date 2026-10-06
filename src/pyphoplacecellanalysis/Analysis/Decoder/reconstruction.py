@@ -2502,6 +2502,7 @@ class BasePositionDecoder(HDFMixin, AttrsBasedClassHelperMixin, ContinuousPeakLo
             neuron_sliced_decoder.reliability_silent = self._slice_reliability_array(self.reliability_silent, keep)
         return neuron_sliced_decoder
     
+
     @function_attributes(short_name=None, tags=['epoch', 'slice', 'restrict'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-29 19:08', related_items=[])
     def replacing_computation_epochs(self, epochs: Union[Epoch, pd.DataFrame]):
         """Implementors return a copy of themselves with their computation epochs (contained in their placefields at `self.pf`) replaced by the provided ones. The existing epochs are unrelated and do not need to be related to the new ones.
