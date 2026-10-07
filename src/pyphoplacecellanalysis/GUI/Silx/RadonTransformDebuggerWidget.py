@@ -43,7 +43,7 @@ from silx.gui.plot import Plot2D
 from silx.gui.plot.items import Curve
 from silx.gui.plot.items import ImageData
 from silx.gui.colors import Colormap
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator, ScalarFormatter
 
 """ 
 
@@ -226,6 +226,8 @@ class RadonTransformDebugger:
     )))
     overlay_label_color: str = field(default='white')
     radon_debugging_labels: bool = field(default=True)
+    should_draw_time_bin_boundaries: bool = field(default=True)
+    time_bin_edges_display_kwargs: Dict = field(default=Factory(lambda: dict(color='grey', alpha=0.5, linewidth=1.5)))
 
 
     @property
@@ -437,6 +439,38 @@ class RadonTransformDebugger:
             ys = np.asarray(lower_y + upper_y[::-1], dtype=float)
             yield xs, ys
         ## END while ci < n_t....
+
+
+    def add_time_bin_xgrid(self, a_plot, legend_key: str = 'time_bin_edge', debug_print=False):
+        """ Draw vertical lines at each time-bin edge (DecodedEpochSlices-style xgrid) as silx Curves so they survive replot/export. """
+        # Drop previous edge curves (same legend-prefix cleanup as scoring_band).
+        for item in list(a_plot.getItems()):
+            name = item.getName() if hasattr(item, 'getName') else ''
+            if isinstance(name, str) and name.startswith(legend_key):
+                a_plot.removeItem(item)
+        ## END for item in list(a_plot.getItems())....
+
+        if not self.should_draw_time_bin_boundaries:
+            return []
+
+        time_bin_edges = np.asarray(self.result.time_bin_edges[self.active_epoch_idx], dtype=float)
+        y0: float = float(self.xbin[0])
+        y1: float = float(self.xbin[-1])
+        display_kwargs = dict(self.time_bin_edges_display_kwargs)
+        line_color = display_kwargs.get('color', 'grey')
+        line_alpha = float(display_kwargs.get('alpha', 0.5))
+        line_width = float(display_kwargs.get('linewidth', 1.5))
+        if debug_print:
+            print(f'time_bin_xgrid: n_edges={len(time_bin_edges)}, y=[{y0}, {y1}], color={line_color}, alpha={line_alpha}')
+
+        curves = []
+        for edge_idx, edge_t in enumerate(time_bin_edges):
+            edge_curve: Curve = a_plot.addCurve(x=np.array([edge_t, edge_t], dtype=float), y=np.array([y0, y1], dtype=float), legend=f'{legend_key}_{edge_idx}', color=line_color, linestyle='-', linewidth=line_width, symbol=None, replace=False, z=0.5)
+            edge_curve.setAlpha(alpha=line_alpha)
+            curves.append(edge_curve)
+        ## END for edge_idx, edge_t in enumerate(time_bin_edges)....
+
+        return curves
 
 
     def add_scoring_band_overlay(self, a_plot, legend_key: str = 'scoring_band', debug_print=False):
@@ -767,10 +801,13 @@ class RadonTransformDebugger:
 
 
     def _configure_plot_display(self, a_plot):
-        """ Show epoch/decoder in the title; force plain decimal x ticks (e.g. 1023.90, never scientific). """
+        """ Show epoch/decoder in the title; sparse non-scientific x ticks (bin edges come from the xgrid, not every label). """
         a_plot.setGraphTitle(f'epoch_idx={self.active_epoch_idx} | decoder={self.active_decoder_name}')
         an_ax = a_plot.getBackend().ax  # matplotlib.axes._axes.Axes
-        an_ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        an_ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
+        fmt = ScalarFormatter(useOffset=False)
+        fmt.set_scientific(False)
+        an_ax.xaxis.set_major_formatter(fmt)
 
 
     def _default_export_suffix(self) -> str:
@@ -778,14 +815,33 @@ class RadonTransformDebugger:
 
 
     def _save_publication_pdf(self, save_path: Path) -> Path:
-        """ Write the current silx plot to `save_path` under publication matplotlib defaults. """
+        """ Write the current silx plot to `save_path` under publication matplotlib defaults.
+
+        Flushes the Qt event loop and forces a matplotlib redraw first — required for programmatic
+        exports right after refresh_overlays (the GUI Export button works because QFileDialog already pumped events).
+        """
         assert self.window is not None, "build_GUI() must be called before exporting."
         save_path = Path(save_path)
         if save_path.suffix.lower() != '.pdf':
             save_path = save_path.with_suffix('.pdf')
         save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        a_plot = self.window.plot
+        # Ensure deferred silx/matplotlib paints from the latest refresh_overlays are applied.
+        qt.QApplication.processEvents()
+        if hasattr(a_plot, 'replot'):
+            a_plot.replot()
+        backend = a_plot.getBackend() if hasattr(a_plot, 'getBackend') else None
+        if (backend is not None) and hasattr(backend, 'fig'):
+            backend.fig.canvas.draw()
+            if hasattr(backend.fig.canvas, 'flush_events'):
+                backend.fig.canvas.flush_events()
+        qt.QApplication.processEvents()
+        # Re-apply locator/formatter after replot so export PDFs keep sparse non-scientific x ticks.
+        self._configure_plot_display(a_plot)
+
         with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)):
-            ok = self.window.plot.saveGraph(str(save_path), fileFormat='pdf')
+            ok = a_plot.saveGraph(str(save_path), fileFormat='pdf')
         assert ok, f"silx saveGraph failed for path: {save_path}"
         print(f'export_for_publication: saved "{save_path}"')
         return save_path
@@ -801,7 +857,11 @@ class RadonTransformDebugger:
         if export_suffix is None:
             export_suffix = self._default_export_suffix()
         figures_parent_folder = Path(figures_parent_folder)
-        image_save_path = figures_parent_folder.joinpath(f'RadonTransform_{export_suffix}.pdf')
+        # Avoid RadonTransform_RadonTransform_... when callers already include the prefix.
+        if str(export_suffix).startswith('RadonTransform_'):
+            image_save_path = figures_parent_folder.joinpath(f'{export_suffix}.pdf')
+        else:
+            image_save_path = figures_parent_folder.joinpath(f'RadonTransform_{export_suffix}.pdf')
         return {'pdf': self._save_publication_pdf(image_save_path)}
 
 
@@ -838,6 +898,7 @@ class RadonTransformDebugger:
             return
         a_plot = self.window.plot
         self.add_real_space_posterior(a_plot=a_plot, legend_key='P_x_given_n', resetzoom=resetzoom)
+        self.add_time_bin_xgrid(a_plot=a_plot)
         self.add_scoring_band_overlay(a_plot=a_plot)
         self.add_real_space_curve(a_plot=a_plot)
         if self.radon_debugging_labels:

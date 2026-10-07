@@ -2285,14 +2285,31 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
+
+        A non-empty `included_columns` is treated as the display selection (same role as `visible_overlay_label_keys`):
+            paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr'])
+            # equivalent display intent:
+            paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
+            paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
+
+        When `included_columns` is None/empty, defaults are taken from enable_radon_transform_info / enable_weighted_correlation_info.
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
         
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
-        if included_columns is None:
-            included_columns = []
+        user_provided_columns = deepcopy(included_columns) if included_columns else None
+        user_specified_display_columns: bool = (user_provided_columns is not None) and (len(user_provided_columns) > 0)
+
+        if user_specified_display_columns:
+            # Normalize alias 'radon' -> 'score' for dataframe column loading; keep user list for visible keys
+            display_label_keys = deepcopy(user_provided_columns)
+            load_columns = [('score' if (c == 'radon') else c) for c in display_label_keys]
+            self.update_params(visible_overlay_label_keys=display_label_keys)
+        else:
+            load_columns = []
+            display_label_keys = None
 
         ## from params
         decoder_decoded_epochs_result_dict = deepcopy(self.decoder_filter_epochs_decoder_result_dict)
@@ -2300,22 +2317,24 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         ## Add the overlays to each of the four figures:
         for a_name, a_pagination_controller in self.pagination_controllers.items():          
             # a_pagination_controller.params.xbin 
+            per_decoder_included_columns = deepcopy(load_columns)
 
-            enable_radon_transform_info = a_pagination_controller.params.get('enable_radon_transform_info', None)
-            if (enable_radon_transform_info is not None) and enable_radon_transform_info:
-                radon_transform_columns = ['score', 'velocity', 'intercept', 'speed']
-                included_columns.extend(radon_transform_columns)
+            if not user_specified_display_columns:
+                # Default: extend from master enable flags when caller did not pass an explicit list
+                enable_radon_transform_info = a_pagination_controller.params.get('enable_radon_transform_info', None)
+                if (enable_radon_transform_info is not None) and enable_radon_transform_info:
+                    radon_transform_columns = ['score', 'velocity', 'intercept', 'speed']
+                    per_decoder_included_columns.extend(radon_transform_columns)
 
-
-            enable_weighted_correlation_info = a_pagination_controller.params.get('enable_weighted_correlation_info', None)
-            if (enable_weighted_correlation_info is not None) and enable_weighted_correlation_info:
-                wcorr_columns = ['wcorr', 'P_decoder', 'pearsonr']
-                included_columns.extend(wcorr_columns)
+                enable_weighted_correlation_info = a_pagination_controller.params.get('enable_weighted_correlation_info', None)
+                if (enable_weighted_correlation_info is not None) and enable_weighted_correlation_info:
+                    wcorr_columns = ['wcorr', 'P_decoder', 'pearsonr']
+                    per_decoder_included_columns.extend(wcorr_columns)
 
             track_length_cm_dict = a_pagination_controller.params.get('track_length_cm_dict', None)
             if (track_length_cm_dict is not None) and (a_name in track_length_cm_dict):
                 a_pagination_controller.params.track_length_cm = track_length_cm_dict[a_name] ## per-decoder scalar used by child add_data_overlays
-            a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=included_columns, defer_refresh=True)
+            a_pagination_controller.add_data_overlays(decoder_decoded_epochs_result=decoder_decoded_epochs_result_dict[a_name], included_columns=per_decoder_included_columns, defer_refresh=True)
         ## END for a_name, a_pagination_controller in self.pagination_controllers.items()...
 
 
@@ -2827,12 +2846,23 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             paginated_multi_decoder_decoded_epochs_window.update_params(posterior_heatmap_imshow_kwargs = dict(vmin=0.0))
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
 
+            # Show only specific overlay label fields (None restores all).
+            # 'radon' is an alias for the radon-score field (displayed as "radon: ...", stacked under wcorr):
+            paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
+            paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
+            # Equivalent at add-time (also sets visible_overlay_label_keys):
+            # paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr'])
+            # Optional vertical tweak if radon sits too high/low relative to wcorr:
+            # paginated_multi_decoder_decoded_epochs_window.update_params(radon_label_bbox_y=0.78)
+
 
         """
         # if self.debug_print:
         #     self.ui.print(f'PhoPaginatedMultiDecoderDecodedEpochsWindow.refresh_current_page():') # for page_idx == max_index this is called but doesn't continue
         for a_name, a_pagination_controller in self.pagination_controllers.items():
             a_pagination_controller.params.update(**updated_values)
+        ## END for a_name, a_pagination_controller in self.pagination_controllers.items()....
+
         
     # ==================================================================================================================== #
     # Passthrough methods/properties                                                                                       #

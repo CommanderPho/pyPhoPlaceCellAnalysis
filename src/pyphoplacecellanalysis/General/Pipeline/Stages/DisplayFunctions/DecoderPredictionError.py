@@ -1501,12 +1501,34 @@ class RadonTransformPlotData:
     intercept_text: str = field(default='')
     extra_text: Optional[str] = field(default=None)
 
-    def build_display_text(self) -> str:
-        """ builds the final display string to be rendered in the label. """
-        final_text = f"{self.score_text}\n{self.speed_text}\n{self.intercept_text}"
+    def build_display_text(self, included_keys: Optional[List[str]] = None) -> str:
+        """ builds the final display string to be rendered in the label.
+
+        included_keys: if provided, only include those field names (e.g. ['score', 'speed'] or alias 'radon' for score).
+            None means show all available fields. Unknown keys are ignored.
+        """
+        # Prefer "radon:" display even for older overlays that still store "score: ..."
+        score_display_text = self.score_text
+        if isinstance(score_display_text, str) and score_display_text.startswith('score: '):
+            score_display_text = 'radon: ' + score_display_text[len('score: '):]
+        key_to_text = {'score': score_display_text, 'radon': score_display_text, 'speed': self.speed_text, 'intercept': self.intercept_text}
+        if included_keys is None:
+            ordered_keys = ['score', 'speed', 'intercept']
+        else:
+            # Prefer canonical 'score' over alias 'radon' if both appear
+            seen = set()
+            ordered_keys = []
+            for k in included_keys:
+                canonical = 'score' if (k == 'radon') else k
+                if (canonical in key_to_text) and (canonical not in seen):
+                    ordered_keys.append(canonical)
+                    seen.add(canonical)
+            ## END for k in included_keys....
+
+        parts = [key_to_text[k] for k in ordered_keys if ((key_to_text[k] is not None) and (len(key_to_text[k]) > 0))]
         if (self.extra_text is not None) and (len(self.extra_text) > 0):
-            final_text = f"{final_text}\n{self.extra_text}"
-        return final_text
+            parts.append(self.extra_text)
+        return "\n".join(parts)
     
 
 
@@ -1565,81 +1587,74 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         _build_radon_transform_plotting_data
 
         RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data
+
+        radon_transform_column_names: display-text allow-list (e.g. ['score'] or ['score','speed','intercept']).
+            Structural columns velocity/intercept/speed are always loaded from the DF for the fit line.
         
         """
         if radon_transform_column_names is None:
-            radon_transform_column_names = deepcopy(cls.column_names) #['score', 'velocity', 'intercept', 'speed'] # use default
-            
-        # `active_filter_epochs_df` native columns approach
-        if not np.isin(radon_transform_column_names, active_filter_epochs_df.columns).all():
-            print(f'no radon transform columns present in the the active_filter_epochs_df. Skipping.')
-            radon_transform_data = None
+            display_text_keys = deepcopy(cls.column_names) #['score', 'velocity', 'intercept', 'speed'] # use default
         else:
-            if len(radon_transform_column_names) == 0:
-                return None ## no allowed columns
-            
-            epochs_linear_fit_df = active_filter_epochs_df[radon_transform_column_names].copy() # get the `epochs_linear_fit_df` as a subset of the filter epochs df
-            #TODO 2024-11-25 11:59: - [ ] Error, hard-coded names assume that we want to plot all four columns!
-            
-            score_col_name, velocity_col_name, intercept_col_name, speed_col_name = radon_transform_column_names # extract the column names from the provided list
-            # epochs_linear_fit_df approach
-            assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
+            display_text_keys = deepcopy(radon_transform_column_names)
 
-            radon_transform_data = {}
+        if len(display_text_keys) == 0:
+            return None ## no allowed display columns
 
-            for epoch_idx, epoch_vel, epoch_intercept, epoch_score, epoch_speed in zip(np.arange(num_filter_epochs), epochs_linear_fit_df[velocity_col_name].values, epochs_linear_fit_df[intercept_col_name].values, epochs_linear_fit_df[score_col_name].values, epochs_linear_fit_df[speed_col_name].values):
-                # build the discrete line over the centered time bins:
-                # nt: int = time_bin_containers[epoch_idx].num_bins # .step, .variable_extents
-                # dt: float = time_bin_containers[epoch_idx].edge_info.step
-                # half_dt: float = (0.5 * dt)
-                # epoch_time_bin_edges = time_bin_containers[epoch_idx].edges
-                # t_start, t_end = epoch_time_bin_edges[0], epoch_time_bin_edges[-1]
+        # Structural columns required for the radon fit line (independent of display-text subset)
+        structural_col_names = ['velocity', 'intercept', 'speed']
+        required_df_col_names = deepcopy(structural_col_names)
+        if ('score' in display_text_keys) or ('radon' in display_text_keys) or ('score' in active_filter_epochs_df.columns):
+            # Always prefer loading score when available so text can be built when requested
+            if 'score' in active_filter_epochs_df.columns:
+                required_df_col_names = ['score'] + structural_col_names
 
+        # `active_filter_epochs_df` native columns approach — require structural cols, not the display subset
+        if not np.isin(structural_col_names, active_filter_epochs_df.columns).all():
+            print(f'no radon transform structural columns (velocity/intercept/speed) present in the active_filter_epochs_df. Skipping.')
+            return None
 
-                # ## 2024-05-06 - Compute new epoch_intercepts aligned with the proper time bin. The ones computed are aligned with (0, 0)
-                epoch_time_bin_centers = deepcopy(time_bin_containers[epoch_idx].centers)
-                t_start, t_end = epoch_time_bin_centers[0], epoch_time_bin_centers[-1]
-                # epoch_intercept_old = epoch_intercept
-                # epoch_intercept = epoch_intercept_old - (epoch_vel * epoch_time_bin_centers[0])
+        epochs_linear_fit_df = active_filter_epochs_df[[c for c in required_df_col_names if c in active_filter_epochs_df.columns]].copy()
+        assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
 
-                # duration: float = t_end - t_start
-                # time_bin_containers[epoch_idx].edge_info
-                # time_mid: float = nt * dt / 2
-                
-                ## Hacky `epoch_time_bins` methods that might have been used to work around a bug in plotting the posterior
-                # epoch_time_bins = time_bin_containers[epoch_idx].centers
-                # epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch - TODO NOTE: this makes it so t=0.0 is the center of the first time bin:
-                #TODO 2024-02-15 12:19: - [ ] MAYBE THE CENTER of the epoch, not the start!!
-                # epoch_time_bins = epoch_time_bins - time_mid
-                # Try subtracting another half o a time bin width just for fun:
-                # epoch_time_bins = epoch_time_bins - (0.5 * dt)
+        display_key_set = set(display_text_keys)
+        # Treat 'radon' alias as requesting score text
+        want_score_text: bool = ('score' in display_key_set) or ('radon' in display_key_set)
+        want_speed_text: bool = ('speed' in display_key_set)
+        want_intercept_text: bool = ('intercept' in display_key_set)
 
-                # # epoch_intercept occurs at the left edge of the epoch, meaning t=0.0 relative times:
-                # epoch_time_bins = time_bin_containers[epoch_idx].edges
-                # epoch_time_bins = epoch_time_bins - epoch_time_bins[0] # all values should be relative to the start of the epoch 
+        radon_transform_data = {}
 
-                # epoch_line_fn = lambda t: (epoch_vel * (t - epoch_time_bins[0])) + epoch_intercept
-                # epoch_line_eqn = (epoch_vel * epoch_time_bins) + epoch_intercept
+        has_score_col: bool = ('score' in epochs_linear_fit_df.columns)
+        for epoch_idx in np.arange(num_filter_epochs):
+            epoch_vel = epochs_linear_fit_df['velocity'].values[epoch_idx]
+            epoch_intercept = epochs_linear_fit_df['intercept'].values[epoch_idx]
+            epoch_speed = epochs_linear_fit_df['speed'].values[epoch_idx]
+            epoch_score = epochs_linear_fit_df['score'].values[epoch_idx] if has_score_col else None
 
-                # first_bin_center_epoch_intercept: float = epoch_intercept + (epoch_vel * half_dt)
-                # epoch_line_fn = lambda t: (epoch_vel * (t - t_start)) + epoch_intercept # first_bin_center_epoch_intercept
-                # epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * (t - t_start_bound)) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+            # ## 2024-05-06 - Compute new epoch_intercepts aligned with the proper time bin. The ones computed are aligned with (0, 0)
+            epoch_time_bin_centers = deepcopy(time_bin_containers[epoch_idx].centers)
+            t_start, t_end = epoch_time_bin_centers[0], epoch_time_bin_centers[-1]
 
-                epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * t) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+            epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * t) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
+            epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers]) # this works when plotted with 
 
-                # # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
-                # epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
-                # epoch_line_fn = lambda t: (epoch_vel * t) + epoch_intercept # first_bin_center_epoch_intercept
-                # epoch_line_eqn = (epoch_vel * epoch_time_bins) + first_bin_center_epoch_intercept
-                epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers]) # this works when plotted with 
-
-                # resample at midpoints
-                with np.printoptions(precision=3, suppress=True, threshold=5):
-                    score_text = f"score: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+            # resample at midpoints — only populate text for keys in the display allow-list
+            with np.printoptions(precision=3, suppress=True, threshold=5):
+                if want_score_text and (epoch_score is not None):
+                    score_text = f"radon: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+                else:
+                    score_text = ''
+                if want_speed_text:
                     speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
+                else:
+                    speed_text = ''
+                if want_intercept_text:
                     intercept_text = f"intcpt: " + str(np.array([epoch_intercept])).lstrip("[").rstrip("]")
+                else:
+                    intercept_text = ''
 
-                radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
+            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
+        ## END for epoch_idx in np.arange(num_filter_epochs)....
 
         return radon_transform_data
 
@@ -1648,7 +1663,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     def decoder_build_single_radon_transform_data(cls, curr_results_obj, included_columns=None):
         """ builds for a single decoder. """
         if included_columns is not None:
-            included_columns = [v for v in deepcopy(cls.column_names) if v in included_columns] # only allow the included columns
+            # Normalize alias 'radon' -> 'score' before intersecting with known column names
+            normalized_included = [('score' if (v == 'radon') else v) for v in included_columns]
+            included_columns = [v for v in deepcopy(cls.column_names) if v in normalized_included] # only allow the included columns
         else:
             included_columns = deepcopy(cls.column_names) # allow all default column names
         
@@ -1683,7 +1700,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         # INPUTS: decoder_decoded_epochs_result_dict, a_name
         if included_columns is not None:
-            included_columns = [v for v in cls.column_names if v in included_columns] # only allow the included columns
+            normalized_included = [('score' if (v == 'radon') else v) for v in included_columns]
+            included_columns = [v for v in cls.column_names if v in normalized_included] # only allow the included columns
         else:
             included_columns = deepcopy(cls.column_names) # allow all default column names
 
@@ -1745,26 +1763,19 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
             line_alpha = 0.8  # Faint line
             marker_alpha = 0.8  # More opaque markers
-            text_kwargs = dict(strokewidth=5, stroke_foreground='k', stroke_alpha=0.85, text_foreground='#e5ff00', text_alpha=0.8)
+            # Match wcorr label styling; keep yellow so radon remains distinct from wcorr
+            text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground='#e5ff00', text_alpha=0.95, font_size=11.0)
             
             # Get the axes bounding box in figure coordinates
             a_fig = curr_ax.get_figure()
-            bbox = curr_ax.get_position()
-            half_x_margin_width = (1.0 - bbox.width) / 2.0
-            half_y_margin_width = (1.0 - bbox.ymax) / 2.0
-            bbox_offset_magnitude: Tuple[float,float] = (half_x_margin_width, half_y_margin_width)
-            # bbox_offset_magnitude: float = params.setdefault('bbox_offset_magnitude', 0.075)
+            # Place radon label in the same upper-right stack as wcorr, just below it
+            radon_below_wcorr_y: float = params.setdefault('radon_label_bbox_y', 0.78)
 
-            ## Positioning kwargs:
-            text_kwargs |= dict(loc='upper left', 
-                                    # horizontalalignment='center', ## DOES NOTHING?
-                                    #verticalalignment='center', ## BREAKS IT
-                                    # multialignment='r', ## BREAKS IT
-                                    # horizontalalignment='right',  
-                                    rotation=45, #transform=curr_ax.transAxes,
-                                    # bbox_to_anchor=(-bbox_offset_magnitude, (1.0 + bbox_offset_magnitude)), bbox_transform=curr_ax.transAxes,                        
-                                    bbox_to_anchor=(-bbox_offset_magnitude[0], (1.0 + bbox_offset_magnitude[1])), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
-                                    ) # oriented in upper-right corner, at a diagonal angle
+            ## Positioning kwargs: same corner as wcorr (upper right), offset down so it sits just below wcorr
+            text_kwargs |= dict(loc='upper right',
+                                    horizontalalignment='right',
+                                    bbox_to_anchor=(1.0, radon_below_wcorr_y), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
+                                    ) # stacked under wcorr at upper-right
             
 
             plot_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
@@ -1790,7 +1801,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
         
         # Add replay score text to top-right corner:
-        final_text =  plots_data.radon_transform_data[data_idx].build_display_text()
+        visible_keys = params.get('visible_overlay_label_keys', None)
+        final_text = plots_data.radon_transform_data[data_idx].build_display_text(included_keys=visible_keys)
+        should_show_radon_text: bool = should_enable_radon_transform_info and bool(final_text and str(final_text).strip())
 
         extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
         extant_line = extant_plots.get('line', None)
@@ -1866,7 +1879,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             assert isinstance(extant_score_text, (AnchoredText, AnchoredCustomText)), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
             anchored_text: Union[AnchoredText, AnchoredCustomText] = extant_score_text
 
-            if should_enable_radon_transform_info:
+            if should_show_radon_text:
                 # if we want to see the radon transform info:
                 if anchored_text.axes is None:
                     # Re-add the anchored text if necessary
@@ -1892,7 +1905,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         else:
             ## Create a new one:
-            if should_enable_radon_transform_info:
+            if should_show_radon_text:
                 # if we want to see the radon transform info:
                 anchored_text: Union[AnchoredText, AnchoredCustomText] = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                 anchored_text.patch.set_ec("none")
@@ -2036,9 +2049,19 @@ class WeightedCorrelationPlotData:
         return wcorr_data
 
 
-    def build_display_text(self) -> str:
-        """ builds the final display string to be rendered in the label. """
-        formatted_data_strings_values: List[str] = [v for v in self.data_formatted_strings_dict.values() if ((v is not None) and (len(v) > 0))]
+    def build_display_text(self, included_keys: Optional[List[str]] = None) -> str:
+        """ builds the final display string to be rendered in the label.
+
+        included_keys: if provided, only include those field names (e.g. ['wcorr', 'pearsonr']).
+            None means show all available fields. Unknown keys are ignored.
+        """
+        if included_keys is None:
+            formatted_items = list(self.data_formatted_strings_dict.items())
+        else:
+            included_set = set(included_keys)
+            formatted_items = [(k, v) for k, v in self.data_formatted_strings_dict.items() if k in included_set]
+
+        formatted_data_strings_values: List[str] = [v for k, v in formatted_items if ((v is not None) and (len(v) > 0))]
         return "\n".join(formatted_data_strings_values)
     
 
@@ -2390,7 +2413,9 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         # Add replay score text to top-right corner:
         assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}" # AssertionError: plots_data.weighted_corr_data does not contain index 64.08305454952642
         weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
-        final_text: str = weighted_corr_data_item.build_display_text()
+        visible_keys = params.get('visible_overlay_label_keys', None)
+        final_text: str = weighted_corr_data_item.build_display_text(included_keys=visible_keys)
+        should_show_wcorr_text: bool = should_enable_weighted_correlation_info and bool(final_text and str(final_text).strip())
 
         ## Build or Update:
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
@@ -2402,7 +2427,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             assert isinstance(extant_wcorr_text_label, (AnchoredText, AnchoredCustomText)), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
             anchored_text = extant_wcorr_text_label # AnchoredText or AnchoredCustomText
             # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
-            if should_enable_weighted_correlation_info:
+            if should_show_wcorr_text:
                 if anchored_text.axes is None:
                     if debug_print:
                         print("The AnchoredText object has been removed from the Axes and will be re-added.")
@@ -2425,7 +2450,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         else:
             ## No existing label:
-            if should_enable_weighted_correlation_info:
+            if should_show_wcorr_text:
                 ## Create a new one:
                 if debug_print:
                     print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
@@ -3108,19 +3133,25 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         if debug_print:
             print(f'{params.name}: _callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})\n\tdata_index_value: {data_index_value}')
     
-        extant_plots = plots[cls.plots_group_identifier_key].get(data_index_value, {})
-        extant_line = extant_plots.get('line', None)
+        extant_plots = plots[cls.plots_group_identifier_key].get(data_index_value, None)
+        # extant storage may be a MatplotlibRenderPlots, a dict with 'line', or missing
+        extant_line = None
+        if isinstance(extant_plots, dict):
+            extant_line = extant_plots.get('line', None)
         # plot the radon transform line on the epoch:    
         if (extant_line is not None):
             # already exists, clear the existing ones. 
             # Let's assume we want to remove the 'Quadratic' line (line2)
-            if extant_line is not None:
+            try:
                 extant_line.remove()
+            except Exception:
+                pass
             extant_line = None
             # Is .clear() needed? Why doesn't it remove the heatmap as well?
             # curr_ax.clear()
             pass
 
+        out = None  # initialized so disable / missing-partition paths never leave this unbound
 
         ## Plot the line plot. Could update this like I did for the text?        
         if should_enable_plot:
@@ -3221,12 +3252,31 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
 
         else:
-            # ## Remove the existing one
-            # if extant_line is not None:
-            #     extant_line.remove()
-            # most_likely_decoded_position_plot = None
-            raise NotImplementedError(f'have not yet implemented removing')
-            pass
+            ## Disable / remove path: best-effort clear of previously stored artists; never raise
+            stored = plots[cls.plots_group_identifier_key].get(data_index_value, None)
+            if stored is not None:
+                artists_to_remove = []
+                if isinstance(stored, dict):
+                    artists_to_remove = [v for v in stored.values() if v is not None]
+                elif hasattr(stored, 'plots'):
+                    # MatplotlibRenderPlots-like: attempt to walk nested artists
+                    try:
+                        nested = getattr(stored, 'plots', None)
+                        if isinstance(nested, dict):
+                            artists_to_remove = [v for v in nested.values() if v is not None]
+                        elif nested is not None:
+                            artists_to_remove = [nested]
+                    except Exception:
+                        artists_to_remove = []
+                for an_artist in artists_to_remove:
+                    try:
+                        if hasattr(an_artist, 'remove'):
+                            an_artist.remove()
+                    except Exception:
+                        pass
+                ## END for an_artist in artists_to_remove....
+
+            out = None
 
         # Store the plot objects for future updates:
         plots[cls.plots_group_identifier_key][data_index_value] = out # {'line':most_likely_decoded_position_plot}
