@@ -1274,7 +1274,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
             a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
             ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
-            time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
+            time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":['t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t']}, should_raise_exception_on_fail=True)
             assert time_column_name in a_df
             if (t_delta is not None):
                 a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta
@@ -1330,7 +1330,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         for k in list(a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict.keys()):
             a_df = a_new_fully_generic_result.filter_epochs_decoded_track_marginal_posterior_df_dict[k]
             ## note in per-epoch mode we use the start of the epoch (because for example laps are long and we want to see as soon as it starts) but for time bins we use the center time.
-            time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":{'t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t'}}, should_raise_exception_on_fail=True)
+            time_column_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t', required_columns_synonym_dict={"t":['t_bin_center', 'lap_start_t', 'ripple_start_t', 'epoch_start_t']}, should_raise_exception_on_fail=True)
             assert time_column_name in a_df
             if (t_delta is not None):
                 a_df['delta_aligned_start_t'] = a_df[time_column_name] - t_delta ## subtract off t_delta

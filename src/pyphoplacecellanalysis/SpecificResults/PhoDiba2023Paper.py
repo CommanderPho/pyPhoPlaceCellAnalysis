@@ -4811,7 +4811,7 @@ class LongShortTrackDataframeAccessor(TimeColumnAliasesProtocol):
     
     
     """
-    _time_column_name_synonyms = {"start":{'begin','start_t','lap_start_t'},
+    _time_column_name_synonyms = {"start":['begin','start_t','lap_start_t'],
         "stop":['end','stop_t'],
         "label":['name', 'id', 'flat_replay_idx','lap_id']
     }

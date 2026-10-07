@@ -5065,10 +5065,10 @@ class AcrossSessionIdentityDataframeAccessor:
         if curr_session_t_delta is not None:
             if time_col is None:
                 # time_col = 'start' # 'ripple_start_t' for ripples, etc
-                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
+                time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":['begin','start_t','ripple_start_t'], "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
                 
             if end_time_col_name is None:
-                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
+                end_time_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='stop', required_columns_synonym_dict={"start":['begin','start_t','ripple_start_t'], "stop":['end','stop_t']}, should_raise_exception_on_fail=should_raise_exception_on_fail)
 
             if time_col is not None:
                 if time_col not in df.columns:
@@ -5218,7 +5218,7 @@ class SingleFatDataframe:
                     a_df[a_ctxt_key] = a_ctxt_value_str ## need to turn this into a flat string ValueError: Length of values (6) does not match length of index (19102)
                 
             # time_col = 'start' # 'ripple_start_t' for ripples, etc
-            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":{'lap_start_t','ripple_start_t','start_t','start', 't'}}, should_raise_exception_on_fail=(not allow_missing_time_columns))
+            extant_time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(a_df, col_connonical_name='t_bin_center', required_columns_synonym_dict={"t_bin_center":['lap_start_t','ripple_start_t','start_t','start', 't']}, should_raise_exception_on_fail=(not allow_missing_time_columns))
             if extant_time_col is not None:
                 if extant_time_col != 't_bin_center':
                     a_df['t_bin_center'] = deepcopy(a_df[extant_time_col])

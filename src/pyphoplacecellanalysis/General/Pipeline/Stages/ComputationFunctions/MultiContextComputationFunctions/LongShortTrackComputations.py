@@ -3761,7 +3761,7 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
             return cls(instantaneous_time_bin_size_seconds=0.01)
 
         # Handle column name synonyms
-        df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df, required_columns_synonym_dict={"cell_type":{'neuron_type',}})
+        df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(df, required_columns_synonym_dict={"cell_type":['neuron_type',]})
 
         # Extract scalar session-level metadata
         instantaneous_time_bin_size_seconds = df['instantaneous_time_bin_size_seconds'].iloc[0]

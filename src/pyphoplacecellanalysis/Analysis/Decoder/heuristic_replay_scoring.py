@@ -3487,7 +3487,7 @@ class HeuristicThresholdFiltering:
         """
         from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
 
-        start_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t'}, "stop":['end','stop_t']}, should_raise_exception_on_fail=True)
+        start_col_name: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(df, col_connonical_name='start', required_columns_synonym_dict={"start":['begin','start_t','ripple_start_t'], "stop":['end','stop_t']}, should_raise_exception_on_fail=True)
 
         assert PandasHelpers.require_columns(df, required_columns=[start_col_name], print_missing_columns=True)
         if override_filter_thresholds_dict is not None:

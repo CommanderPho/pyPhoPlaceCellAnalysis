@@ -4618,7 +4618,7 @@ class BapunBatchHelpers:
                     active_time_variable_name = active_spikes_df.spikes.time_variable_name
                     print(f'active_time_variable_name: {active_time_variable_name}')
                     # if active_time_variable_name != 't':
-                    #     active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict={"t":{active_time_variable_name,'t_rel_seconds', 't_seconds'}})
+                    #     active_spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(active_spikes_df, required_columns_synonym_dict=["t":{active_time_variable_name,'t_rel_seconds', 't_seconds']})
                     #     active_spikes_df = active_spikes_df.drop(columns=[active_time_variable_name], inplace=False)
                     #     active_spikes_df.spikes.set_time_variable_name('t')
 
@@ -14492,7 +14492,7 @@ def _subfn_helper_process_epochs_result_dict(epochs_result_dict: Dict[types.Know
         an_out_result.filter_epochs = an_out_result.filter_epochs.pho_LS_epoch.adding_pre_post_delta_category_if_needed(t_delta=t_delta)
         pre_post_delta_epoch_decoded_marginal_posterior_df_dict = an_out_result.filter_epochs.pho.partition_df_dict('pre_post_delta_category') # pre_post_delta_category
         ## note that the parititoning produces the hyphen separated string values and we want the unscore-separated ones (as specified in `types.PrePostDeltaCategory`) instead, so we need to manually provide the indexes
-        time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(an_out_result.filter_epochs, col_connonical_name='start', required_columns_synonym_dict={"start":{'begin','start_t','ripple_start_t','lap_start_t'}}, should_raise_exception_on_fail=False)
+        time_col: str = TimeColumnAliasesProtocol.find_first_extant_suitable_columns_name(an_out_result.filter_epochs, col_connonical_name='start', required_columns_synonym_dict={"start":['begin','start_t','ripple_start_t','lap_start_t']}, should_raise_exception_on_fail=False)
         print(f'\ttime_col: "{time_col}"')
         an_out_result_dict: Dict[types.PrePostDeltaCategory, DecodedFilterEpochsResult] = {'pre_delta': an_out_result.filtered_by_epoch_times(pre_post_delta_epoch_decoded_marginal_posterior_df_dict['pre-delta'][time_col]),
                             'post_delta': an_out_result.filtered_by_epoch_times(pre_post_delta_epoch_decoded_marginal_posterior_df_dict['post-delta'][time_col]),

@@ -51,7 +51,7 @@ class IntervalsDatasource(BaseDatasource):
     _series_update_dict_visualization_columns = ['series_vertical_offset', 'series_height', 'pen', 'brush']
     _series_update_dict_position_columns = ['series_vertical_offset', 'series_height']
 
-    _time_column_name_synonyms = {"t_start":{'begin','start','start_t'},
+    _time_column_name_synonyms = {"t_start":['begin','start','start_t'],
         't_end':['end','stop','stop_t'],
         "t_duration":['duration'],
     }

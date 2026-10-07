@@ -357,7 +357,7 @@ class ThetaPhaseRenderTimeCurves(BasePositionDataframeRenderTimeCurves):
             transformed_df['t'] = deepcopy(transformed_df['t_rel_seconds'])
             
         Assert.require_columns(transformed_df, required_columns=['t'])    
-        # transformed_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(transformed_df, required_columns_synonym_dict={"t":{'t_rel_seconds'}}) # @IgnoreException 
+        # transformed_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(transformed_df, required_columns_synonym_dict={"t":['t_rel_seconds']}) # @IgnoreException 
         
         return transformed_df
 
