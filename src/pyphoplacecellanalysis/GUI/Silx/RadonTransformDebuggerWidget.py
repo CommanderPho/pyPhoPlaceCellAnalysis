@@ -463,10 +463,11 @@ class RadonTransformDebugger:
         if debug_print:
             print(f'rho/phi center=({t_center}, {x_center}), foot=({t_foot}, {x_foot}), rho={best_rho}, phi={best_phi}')
 
-        rho_curve: Curve = a_plot.addCurve(x=np.array([t_center, t_foot], dtype=float), y=np.array([x_center, x_foot], dtype=float), legend=legend_key, color='#000000', linestyle='--', linewidth=2, symbol=None, replace=False, z=3)
+        # White for contrast against the dark viridis posterior
+        rho_curve: Curve = a_plot.addCurve(x=np.array([t_center, t_foot], dtype=float), y=np.array([x_center, x_foot], dtype=float), legend=legend_key, color='#ffffff', linestyle='--', linewidth=2, symbol=None, replace=False, z=3)
         rho_curve.setAlpha(alpha=0.95)
-        a_plot.addMarker(x=t_center, y=x_center, legend=f'{legend_key}_center', text=f'ρ={best_rho:.3g}\nφ={best_phi:.3g}', color='black', symbol='o', selectable=False, draggable=False)
-        a_plot.addMarker(x=t_foot, y=x_foot, legend=f'{legend_key}_foot', text='', color='black', symbol='+', selectable=False, draggable=False)
+        a_plot.addMarker(x=t_center, y=x_center, legend=f'{legend_key}_center', text=f'ρ={best_rho:.3g}\nφ={best_phi:.3g}', color='white', symbol='o', selectable=False, draggable=False)
+        a_plot.addMarker(x=t_foot, y=x_foot, legend=f'{legend_key}_foot', text='', color='white', symbol='+', selectable=False, draggable=False)
         return rho_curve
 
 
