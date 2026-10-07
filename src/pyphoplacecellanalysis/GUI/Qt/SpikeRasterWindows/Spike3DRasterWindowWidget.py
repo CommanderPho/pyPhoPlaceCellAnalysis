@@ -482,7 +482,7 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
                     try:
                         # a_time_sync_widget.installEventFilter(self) # plots.preview_overview_scatter_plot is a ScatterPlotItem ... does it have to be a pyqtgraph subclass to do this? I'm worried it does
                         a_time_sync_widget.ui.canvas.installEventFilter(self)
-                    except KeyError as e:
+                    except (KeyError, AttributeError) as e:
                         ## expect `KeyError: 'canvas'` for pyqtgraph-based sync widgets (as opposed to matplotlib-based ones)
                         pass ## just skip
                     except Exception as e:
