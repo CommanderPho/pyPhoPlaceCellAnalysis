@@ -120,7 +120,7 @@ class SpikesDataframeWindow(LiveWindowedData):
     def __init__(self, spikes_df, window_duration:float=15.0, window_start_time:float=0.0):
         # TimeWindow.__init__(self, window_duration=window_duration, window_start_time=window_start_time)
         # self._df = spikes_df
-        
+        spikes_df = spikes_df.spikes.fixing_time_column()
         # TODO: Time window needs to be passed in or kept a reference to:
         curr_time_window = TimeWindow(window_duration=window_duration, window_start_time=window_start_time)
         spikes_dataSource = SpikesDataframeDatasource(spikes_df)

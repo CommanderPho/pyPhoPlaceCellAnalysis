@@ -267,6 +267,10 @@ class Spike3DRasterWindowWidget(GlobalConnectionManagerAccessingMixin, SpikeRast
         self.SpikeRasterLeftSidebarControlsMixin_on_setup()
         self.SpikeRasterRightSidebarOwningMixin_on_setup()
         
+        ## fix spikes_df's time_variable_name and time columns so that it uses 't_rel_second' on kdiba sessions
+        curr_spikes_df = curr_spikes_df.spikes.fixing_time_column()
+        active_time_variable_name = curr_spikes_df.spikes.time_variable_name
+        print(f'\tactive_time_variable_name: "{active_time_variable_name}"')
         self.initUI(curr_spikes_df, core_app_name=application_name, window_duration=window_duration, window_start_time=window_start_time, neuron_colors=neuron_colors, neuron_sort_order=neuron_sort_order, type_of_3d_plotter=self.params.type_of_3d_plotter)
         
         # Update the windows once before showing the UI:

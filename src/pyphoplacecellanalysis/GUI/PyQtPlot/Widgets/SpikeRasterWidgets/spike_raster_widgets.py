@@ -129,8 +129,6 @@ def _setup_spike_raster_window_for_debugging(spike_raster_window, wants_docked_r
     from pyphoplacecellanalysis.Pho2D.PyQtPlots.Extensions.pyqtgraph_helpers import block_until_render_complete
     from PyQt5.QtCore import QTimer
     
-
-
     is_docked_pyqtgraph_plots_mode: bool = spike_raster_window.params.use_docked_pyqtgraph_plots
 
     if additional_post_hoc_fcns is None:

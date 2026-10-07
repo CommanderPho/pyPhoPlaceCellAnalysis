@@ -146,13 +146,15 @@ class SpikeRastersDisplayFunctions(AllFunctionEnumeratingMixin, metaclass=Displa
         
         included_neuron_ids = kwargs.pop('included_neuron_ids', None)
         spikes_df: pd.DataFrame = computation_result.sess.spikes_df ## pulls from the session here
+
         if included_neuron_ids is None:
             included_neuron_ids = spikes_df.spikes.neuron_ids
 
         # TODO: slice neuron_sort_order, neuron_colors as well now
 
         spikes_df = spikes_df.spikes.sliced_by_neuron_id(included_neuron_ids).copy()
-        
+        spikes_df = spikes_df.spikes.fixing_time_column()
+
         ## Finally, add the display function to the active context
         active_display_fn_identifying_ctx = active_identifying_context.adding_context('display_fn', display_fn_name='display_spike_rasters_window')
         active_display_fn_identifying_ctx_string = active_display_fn_identifying_ctx.get_description(separator='|') # Get final discription string:

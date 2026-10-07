@@ -596,8 +596,8 @@ def independent_build_spikes_all_spots_from_df(spikes_df: pd.DataFrame, config_f
     # INLINEING `build_spikes_data_values_from_df`: ______________________________________________________________________ #
     # curr_spike_x, curr_spike_y, curr_spike_pens, all_scatterplot_tooltips_kwargs, all_spots, curr_n = cls.build_spikes_data_values_from_df(spikes_df, config_fragile_linear_neuron_IDX_map, is_spike_included=is_spike_included, should_return_data_tooltips_kwargs=should_return_data_tooltips_kwargs, **kwargs)
     # All units at once approach:
-    active_spikes_df: pd.DataFrame = active_spikes_df.spikes.fixing_time_column()
-    active_time_variable_name = active_spikes_df.spikes.time_variable_name
+    spikes_df= spikes_df.spikes.fixing_time_column()
+    active_time_variable_name = spikes_df.spikes.time_variable_name
 
     # Copy only the relevent columns so filtering is easier:
     filtered_spikes_df = spikes_df[[active_time_variable_name, 'visualization_raster_y_location',  'visualization_raster_emphasis_state', 'fragile_linear_neuron_IDX']].copy()
