@@ -163,15 +163,10 @@ def _build_included_mask(mask_shape, crossing_beginings, crossing_endings):
 
     ## TODO: general enough to factor out for REUSE?
     """
-    # included_mask = np.full_like(pos_df['x'], False)
-    included_mask = np.full(mask_shape, False) 
-    num_items = len(crossing_beginings)
-    # .astype(int)
-    
-    included_index_ranges = [np.arange(crossing_beginings[i], crossing_endings[i]) for i in np.arange(num_items)]
-    for aRange in included_index_ranges:
-        included_mask[aRange] = True
-    return included_mask, included_index_ranges
+    mask = np.zeros(mask_shape, dtype=bool)
+    for begin, end in zip(crossing_beginings, crossing_endings):
+        mask[begin:end] = True
+    return mask
 
 def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, crossing_midpoints, crossing_endings, color='y', include_highlight=False, ax=None, zorder:int=-5):
     """ renders a set of estimated laps with the provided settings
@@ -199,7 +194,7 @@ def _plot_helper_render_laps(pos_t_rel_seconds, pos_value, crossing_beginings, c
     ax.vlines(pos_t_rel_seconds[crossing_beginings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_beginings', zorder=(zorder)) # index 57100 is out of bounds for axis 0 with size 51455 -> pos_t_rel_seconds has size 51455, and crossing_beginings is too long!
     ax.vlines(pos_t_rel_seconds[crossing_endings], 0, 1, transform=ax.get_xaxis_transform(), colors=color, label='lap_crossing_endings', zorder=(zorder))
     # Plot the ranges for the ascending and descending laps:
-    curr_included_mask, curr_included_index_ranges = _build_included_mask(np.shape(pos_value), crossing_beginings, crossing_endings)
+    curr_included_mask = _build_included_mask(np.shape(pos_value), crossing_beginings, crossing_endings)
     collection = BrokenBarHCollection.span_where(pos_t_rel_seconds, ymin=0, ymax=1, transform=ax.get_xaxis_transform(), where=curr_included_mask, facecolor=color, alpha=0.35, label='lap_span_where', zorder=(zorder-1))
     ax.add_collection(collection)
     
