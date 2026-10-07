@@ -790,9 +790,8 @@ def new_plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort
     if scatter_plot_kwargs is None:
         scatter_plot_kwargs = {} ## make them empty at least
 
-    ## Row-height ticks in data coordinates, same as plot_multi_sort_raster_browser. pxMode=True with a sub-unit path scales to a fraction of a pixel.
-    scatter_plot_kwargs = {**dict(pxMode=False, size=1), **scatter_plot_kwargs}
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 1.0), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
+
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
@@ -885,7 +884,7 @@ def _build_default_tick(tick_width: float = 0.1, tick_height: float = 1.0) -> Qt
         half_tick_width = 0.5 * float(tick_width)
         
         vtick.moveTo(-half_tick_width, -half_tick_height)
-        vtick.addRect(-half_tick_width, -half_tick_height, tick_width, tick_height) # x, y, width, height
+        vtick.addRect(-half_tick_width, -half_tick_height, tick_width, half_tick_height) # x, y, width, height
     return vtick
 
 
@@ -1163,9 +1162,7 @@ def plot_raster_plot(spikes_df: pd.DataFrame, included_neuron_ids, unit_sort_ord
     # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False), tick_width=0.0, tick_height=1.0)
     # build_scatter_plot_kwargs(scatter_plot_kwargs=dict(size=5, hoverable=False, tick_width=0.0, tick_height=1.0))
 
-    if scatter_plot_kwargs is None:
-        scatter_plot_kwargs = {}
-    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 1.0), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
+    scatter_plot_kwargs = build_scatter_plot_kwargs(scatter_plot_kwargs=scatter_plot_kwargs, tick_width=scatter_plot_kwargs.pop('tick_width', 0.1), tick_height=scatter_plot_kwargs.pop('tick_height', 1.0))
     
     plots.scatter_plot = pg.ScatterPlotItem(**scatter_plot_kwargs)
     plots.scatter_plot.setObjectName('scatter_plot') # this seems necissary, the 'name' parameter in addPlot(...) seems to only change some internal property related to the legend AND drastically slows down the plotting
