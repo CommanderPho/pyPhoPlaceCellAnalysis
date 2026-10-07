@@ -280,6 +280,9 @@ class RankOrderRastersDebugger:
         from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.DockAreaWrapper import DockAreaWrapper
         from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
 
+        ## fix spikes_df's time_variable_name and time columns so that it uses 't_rel_seconds' on kdiba sessions
+        global_spikes_df = global_spikes_df.spikes.fixing_time_column()
+
         _obj = cls(global_spikes_df=global_spikes_df, active_epochs_df=active_epochs_df.copy(), track_templates=track_templates, rank_order_results=rank_order_results,
              RL_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=RL_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict, LR_active_epochs_selected_spikes_fragile_linear_neuron_IDX_dict=LR_active_epoch_selected_spikes_fragile_linear_neuron_IDX_dict)
 
