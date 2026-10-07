@@ -151,15 +151,15 @@ def test_build_is_training_mask_matches_pfnd_filtered_by_speed_intervals():
             self.config = PlacefieldComputationParameters(speed_thresh=10.0, grid_bin=1.0, smooth=(0.0, 0.0), frate_thresh=1.0)
             self.should_smooth_speed = False
             self.epochs = None
-            self.position = type("Pos", (), {"t_start": 0.0, "t_stop": 4.0, "to_dataframe": lambda self: pd.DataFrame({'t': np.arange(5, dtype=float), 'x': np.arange(5, dtype=float), 'speed': np.array([0.0, 5.0, 15.0, 5.0, 20.0], dtype=float)})})()
+            self.position = type("Pos", (), {"t_start": 0.0, "t_stop": 5.0, "to_dataframe": lambda self: pd.DataFrame({'t': np.arange(5, dtype=float), 'x': np.arange(5, dtype=float), 'speed': np.array([0.0, 5.0, 15.0, 5.0, 20.0], dtype=float)})})() # stop is past the last sample; a stop equal to t=4 excludes that sample
 
     pf = _SpeedPf()
     position_df = pf.position.to_dataframe()
     included_intervals = _pfnd_speed_filtered_training_intervals(pf, position_df=position_df)
-    np.testing.assert_allclose(included_intervals, np.array([[0.0, 3.0]]))
-    rtc_time = np.array([0.5, 1.5, 2.5, 3.5], dtype=float)
+    np.testing.assert_allclose(included_intervals, np.array([[2.0, 2.0], [4.0, 4.0]])) # speeds [0, 5, 15, 5, 20] with thresh 10: only t=2 and t=4
+    rtc_time = np.array([0.0, 2.0, 3.0, 4.0], dtype=float)
     is_training = build_is_training_mask_from_pfnd(pf, rtc_time)
-    np.testing.assert_array_equal(is_training, np.array([True, True, True, False]))
+    np.testing.assert_array_equal(is_training, np.array([False, True, False, True]))
 
 
 def _write_synthetic_phy_folder(phy_folder: Path, sample_rate_hz: float = 30000.0) -> None:
