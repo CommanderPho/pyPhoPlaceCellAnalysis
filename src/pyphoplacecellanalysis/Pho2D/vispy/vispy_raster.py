@@ -20,7 +20,7 @@ from qtpy.QtGui import QPen
 from pyphocorehelpers.DataStructure.general_parameter_containers import RenderPlotsData
 from pyphocorehelpers.function_helpers import function_attributes
 
-from neuropy.utils.mixins.time_slicing import TimeColumnAliasesProtocol
+from neuropy.core.flattened_spiketrains import SpikesAccessor
 
 from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.SpikeRasters import (
     _build_scatter_plotting_managers,
@@ -35,14 +35,7 @@ from pyphoplacecellanalysis.Pho2D.vispy.predictive_time_colormap import predicti
 
 def _ensure_spikes_df_canonical_time_t(spikes_df: pd.DataFrame) -> pd.DataFrame:
     """Rename the active time column to ``t`` and sync ``spikes`` accessor (matches `build_spikes_data_values_from_df`, avoids cross-epoch class-state mismatch)."""
-    active_time_variable_name = spikes_df.spikes.time_variable_name
-    if active_time_variable_name == 't':
-        return spikes_df
-    spikes_df = TimeColumnAliasesProtocol.renaming_synonym_columns_if_needed(spikes_df, required_columns_synonym_dict={"t": {active_time_variable_name, 't_rel_seconds', 't_seconds'}})
-    if active_time_variable_name in spikes_df.columns and active_time_variable_name != 't':
-        spikes_df = spikes_df.drop(columns=[active_time_variable_name], inplace=False)
-    spikes_df.spikes.set_time_variable_name('t')
-    return spikes_df
+    return spikes_df.spikes.fixing_time_column()
 
 
 VispyMultiRasterPlotTuple = namedtuple('VispyMultiRasterPlotTuple', ['canvas', 'plots', 'plots_data'])

@@ -7,12 +7,13 @@ from pathlib import Path
 
 # Add Neuropy to the path as needed
 tests_folder = Path(os.path.dirname(__file__))
+root_project_folder = tests_folder.parent
+print('root_project_folder: {}'.format(root_project_folder))
 
 try:
     import pyphoplacecellanalysis
 except ModuleNotFoundError as e:    
-    root_project_folder = tests_folder.parent
-    print('root_project_folder: {}'.format(root_project_folder))
+
     src_folder = root_project_folder.joinpath('src')
     pyphoplacecellanalysis_folder = src_folder.joinpath('pyphoplacecellanalysis')
     print('pyphoplacecellanalysis_folder: {}'.format(pyphoplacecellanalysis_folder))
@@ -34,7 +35,10 @@ class TestPhoCustomPositionDecoderMethods(unittest.TestCase):
         # np.savez(test_file, tau=tau, P_x=P_x, F=F, n=n)
 
         ## Load test data:
-        test_file = Path('data/bayes_decoder_test_data.npz')
+        assert root_project_folder.exists(), f"root_project_folder: '{root_project_folder}' does not exist!" 
+        test_file = root_project_folder.joinpath('data/bayes_decoder_test_data.npz')
+        print(f'test_file: "{test_file.as_posix()}"')
+        # test_file = Path('data/bayes_decoder_test_data.npz')
         self.npzfile = np.load(test_file)
         self.tau, self.P_x, self.F, self.n = self.npzfile['tau'], self.npzfile['P_x'], self.npzfile['F'].T, self.npzfile['n']
 
