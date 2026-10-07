@@ -183,9 +183,8 @@ def on_set_active_decoder_name_changed(instance, attribute, new_value):
 def on_set_active_epoch_idx_changed(instance, attribute, new_value):
     print(f'on_set_epoch_idx_changed(new_value: {new_value})')
     new_epoch_idx: int = int(new_value)
-    _ = instance.on_update_epoch_idx(active_epoch_idx=new_epoch_idx) ## change the index
-    instance.window.plot.addImage(instance.active_radon_values.a_posterior)
-    instance._perform_update_band_ROI(start_point=tuple(instance.active_radon_values.start_point), end_point=tuple(instance.active_radon_values.end_point), band_width=float(instance.active_radon_values.band_width))
+    _ = instance.update_epoch_idx(active_epoch_idx=new_epoch_idx) ## change the index
+    instance.refresh_overlays()
     print(f'\tdone.')
     return new_value
 
@@ -289,7 +288,7 @@ class RadonTransformDebugger:
 
 
     @classmethod
-    def perform_add_real_space_posterior(cls, a_plot, p_x_given_n: NDArray, active_time_bin_edges: NDArray, xbin: NDArray, time_bin_size: float, pos_bin_size: float, legend_key:str='p_x_given_n', debug_print=False):
+    def perform_add_real_space_posterior(cls, a_plot, p_x_given_n: NDArray, active_time_bin_edges: NDArray, xbin: NDArray, time_bin_size: float, pos_bin_size: float, legend_key:str='p_x_given_n', resetzoom: bool=True, debug_print=False):
         """ 
         
         active_time_bin_edges = deepcopy(dbgr.result.time_bin_edges[dbgr.active_epoch_idx])
@@ -307,35 +306,120 @@ class RadonTransformDebugger:
         label_kwargs = dict(xlabel='t (sec)', ylabel='x (cm)')
         # label_kwargs = dict(xlabel='t (bin)', ylabel='x (bin)')
 
-        new_image: ImageData = a_plot.addImage(p_x_given_n, legend=legend_key, replace=True, colormap=a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=True) # , colormap="viridis", vmin=0, vmax=1
+        # replace=False: silx replace=True deletes ALL other images (not just this legend).
+        new_image: ImageData = a_plot.addImage(p_x_given_n, legend=legend_key, replace=False, z=0, colormap=a_cmap, origin=img_origin, scale=img_scale, **label_kwargs, resetzoom=resetzoom) # , colormap="viridis", vmin=0, vmax=1
         return new_image
 
 
-    def add_real_space_posterior(self, a_plot, legend_key:str='p_x_given_n', debug_print=False):
+    def add_real_space_posterior(self, a_plot, legend_key:str='p_x_given_n', resetzoom: bool=True, debug_print=False):
         """
         new_image_data: ImageData = dbgr.add_real_space_posterior(a_plot=new_plot)
 
         """
         active_time_bin_edges = deepcopy(self.result.time_bin_edges[self.active_epoch_idx])
         p_x_given_n = deepcopy(self.active_radon_values.p_x_given_n)
-        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size, legend_key=legend_key, debug_print=debug_print)
+        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size, legend_key=legend_key, resetzoom=resetzoom, debug_print=debug_print)
 
 
-    def add_real_space_curve(self, a_plot, legend_key:str='real_curve', debug_print=False):
-        """ 
-        real_space_curve = dbgr.add_real_space_curve(a_plot=new_plot)
+    def _get_image_origin_scale(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """ Same origin/scale used by the posterior image: (time_bin_edges[0], xbin[0]) and (dt, dx). """
+        active_time_bin_edges = deepcopy(self.result.time_bin_edges[self.active_epoch_idx])
+        img_origin = (float(active_time_bin_edges[0]), float(self.xbin[0]))
+        img_scale = (float(self.time_bin_size), float(self.pos_bin_size))
+        return img_origin, img_scale
 
+
+    @classmethod
+    def build_scoring_band_mask(cls, best_y_line_idxs: NDArray, n_pos: int, n_neighbours: int) -> NDArray:
+        """ Vertical scoring window used by radon_transform: rows `best_y_line_idxs[ci] ± n_neighbours`, clipped.
+
+        Out-of-bounds columns (line index outside [0, n_pos)) are left as NaN — those columns use the median fill in compute_score.
         """
-        ## add the absolute line:
-        real_line_t = deepcopy(self.active_radon_values.active_debug_info.t)
-        # best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in self.active_radon_values.active_debug_info.best_y_line_idxs]) #TODO 2026-10-01 13:04: - [ ] This does not work because `a_debug_info.best_y_line_idxs` can fall outside of the bounds (can be lower than self.xbin_centers[0] or beyond self.xbin_centers[-1])
-        best_y_line = scipy.interpolate.interp1d(np.arange(len(self.xbin_centers), dtype=float), np.asarray(self.xbin_centers, dtype=float), fill_value="extrapolate", bounds_error=False)(np.asarray(self.active_radon_values.active_debug_info.best_y_line_idxs, dtype=float))
+        best_y_line_idxs = np.asarray(best_y_line_idxs).astype(int)
+        n_t: int = len(best_y_line_idxs)
+        mask = np.full((n_pos, n_t), np.nan, dtype=float)
+        for ci in np.arange(n_t):
+            ri: int = int(best_y_line_idxs[ci])
+            if (ri < 0) or (ri > (n_pos - 1)):
+                continue
+            lo: int = max(0, ri - int(n_neighbours))
+            hi: int = min(n_pos - 1, ri + int(n_neighbours))
+            mask[lo:(hi + 1), ci] = 1.0
+        ## END for ci in np.arange(n_t)....
 
-        # real_space_curve: Curve = new_plot.addCurve(x=(self.active_radon_values.active_debug_info.ci+0.5), y=self.active_radon_values.active_debug_info.best_y_line_idxs, legend='curve', color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
-        real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=best_y_line, legend=legend_key, color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
-        real_space_curve.setAlpha(alpha=0.86)
+        return mask
 
+
+    def add_scoring_band_overlay(self, a_plot, legend_key: str = 'scoring_band', debug_print=False):
+        """ Overlay the vertical neighbor window that enters the radon score (yellow, translucent RGBA).
+
+        Uses an explicit RGBA image (not a NaN float image): matplotlib backends often paint colormap-NaN
+        pixels as opaque white and hide the posterior underneath.
+        """
+        a_debug_info: RadonTransformDebugValue = self.active_radon_values.active_debug_info
+        n_neighbours: int = int(self.active_radon_values.active_num_neighbors)
+        mask = self.build_scoring_band_mask(best_y_line_idxs=a_debug_info.best_y_line_idxs, n_pos=int(a_debug_info.n_pos), n_neighbours=n_neighbours)
+        img_origin, img_scale = self._get_image_origin_scale()
+        if debug_print:
+            print(f'scoring_band mask finite cells: {np.sum(np.isfinite(mask))}, origin: {img_origin}, scale: {img_scale}')
+
+        rgba = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.float32)
+        in_band = np.isfinite(mask)
+        rgba[in_band, 0] = 1.0
+        rgba[in_band, 1] = 0.75
+        rgba[in_band, 2] = 0.0
+        rgba[in_band, 3] = 0.40
+        # replace=False: silx replace=True would delete the posterior image.
+        band_image = a_plot.addImage(rgba, legend=legend_key, replace=False, z=1, origin=img_origin, scale=img_scale, resetzoom=False)
+        return band_image
+
+
+    def add_real_space_curve(self, a_plot, legend_key: str = 'y(t)=velocity*t+intercept', debug_print=False):
+        """ Plot the geometric radon line from active_debug_info.y_line (internal slope, not the negated returned velocity). """
+        a_debug_info: RadonTransformDebugValue = self.active_radon_values.active_debug_info
+        real_line_t = np.asarray(a_debug_info.t, dtype=float)
+        # When enable_return_neighbors_arr=True, y_line is already the 1d best-line geometry (velocity*t + intercept) before sign flip.
+        y_line = np.asarray(a_debug_info.y_line, dtype=float)
+        if np.ndim(y_line) > 1:
+            y_line = np.squeeze(y_line[a_debug_info.best_line_idx, :])
+        if debug_print:
+            print(f'y_line t range: [{real_line_t[0]}, {real_line_t[-1]}], x range: [{y_line[0]}, {y_line[-1]}]')
+
+        # replace=False: silx replace=True deletes ALL other curves (would wipe rho_phi).
+        real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=y_line, legend=legend_key, color='#00e5ff', linestyle='-', linewidth=3, symbol=None, replace=False, z=2)
+        real_space_curve.setAlpha(alpha=1.0)
         return real_space_curve
+
+
+    def add_rho_phi_overlay(self, a_plot, legend_key: str = 'rho_phi', debug_print=False):
+        """ Draw the index-space rho normal from (ci_mid, ri_mid) to the foot, converted to seconds/centimeters. """
+        a_debug_info: RadonTransformDebugValue = self.active_radon_values.active_debug_info
+        dt: float = float(self.time_bin_size)
+        dx: float = float(self.pos_bin_size)
+        t0: float = float(a_debug_info.t[0])
+        x0: float = float(a_debug_info.pos[0])
+        ci_mid: float = float(a_debug_info.ci_mid)
+        ri_mid: float = float(a_debug_info.ri_mid)
+        best_rho: float = float(a_debug_info.best_rho)
+        best_phi: float = float(a_debug_info.best_phi)
+
+        # Foot of the perpendicular in index space: center + rho * (cos phi, sin phi)
+        ci_foot: float = ci_mid + (best_rho * np.cos(best_phi))
+        ri_foot: float = ri_mid + (best_rho * np.sin(best_phi))
+
+        # t = ci * dt + t0, x = ri * dx + x0  (same mapping as radon_transform)
+        t_center: float = (ci_mid * dt) + t0
+        x_center: float = (ri_mid * dx) + x0
+        t_foot: float = (ci_foot * dt) + t0
+        x_foot: float = (ri_foot * dx) + x0
+        if debug_print:
+            print(f'rho/phi center=({t_center}, {x_center}), foot=({t_foot}, {x_foot}), rho={best_rho}, phi={best_phi}')
+
+        rho_curve: Curve = a_plot.addCurve(x=np.array([t_center, t_foot], dtype=float), y=np.array([x_center, x_foot], dtype=float), legend=legend_key, color='#000000', linestyle='--', linewidth=2, symbol=None, replace=False, z=3)
+        rho_curve.setAlpha(alpha=0.95)
+        a_plot.addMarker(x=t_center, y=x_center, legend=f'{legend_key}_center', text=f'ρ={best_rho:.3g}\nφ={best_phi:.3g}', color='black', symbol='o', selectable=False, draggable=False)
+        a_plot.addMarker(x=t_foot, y=x_foot, legend=f'{legend_key}_foot', text='', color='black', symbol='+', selectable=False, draggable=False)
+        return rho_curve
 
 
 
@@ -494,15 +578,14 @@ class RadonTransformDebugger:
         neighbors_arr = neighbors_arr[0]
         a_debug_info: RadonTransformDebugValue = debug_info[0]
 
-        ## Get the correct band roi start/end points using the same equations as the absolute line:
-        real_line_t = deepcopy(a_debug_info.t)
-        # best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in a_debug_info.best_y_line_idxs]) #TODO 2026-10-01 13:04: - [ ] This does not work because `a_debug_info.best_y_line_idxs` can fall outside of the bounds (can be lower than self.xbin_centers[0] or beyond self.xbin_centers[-1])
-        best_y_line = scipy.interpolate.interp1d(np.arange(len(self.xbin_centers), dtype=float), np.asarray(self.xbin_centers, dtype=float), fill_value="extrapolate", bounds_error=False)(np.asarray(a_debug_info.best_y_line_idxs, dtype=float))
-        
-        # Compute ROI band values. These don't look right despite the above being right.
-        start_point = [real_line_t[0], best_y_line[0]]
-        end_point = [real_line_t[-1], best_y_line[-1]]
-        band_width = float(num_neighbours)
+        ## Geometric line endpoints from y_line (internal slope*t + intercept); band_width is the vertical scoring window height in cm.
+        real_line_t = np.asarray(a_debug_info.t, dtype=float)
+        y_line = np.asarray(a_debug_info.y_line, dtype=float)
+        if np.ndim(y_line) > 1:
+            y_line = np.squeeze(y_line[a_debug_info.best_line_idx, :])
+        start_point = [float(real_line_t[0]), float(y_line[0])]
+        end_point = [float(real_line_t[-1]), float(y_line[-1])]
+        band_width = float((2 * int(num_neighbours) + 1) * self.pos_bin_size)
         
         ## upgrade to RadonDebugValue:
         return RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
@@ -510,23 +593,34 @@ class RadonTransformDebugger:
                             active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr,
                             start_point=start_point, end_point=end_point, band_width=band_width)
 
-    
 
+    def refresh_overlays(self, resetzoom: bool = False):
+        """ Redraw posterior, scoring band, geometric line, and rho/phi from active_radon_values when the window exists.
+
+        All addImage/addCurve calls use replace=False. In silx, replace=True means delete *all* other
+        images/curves (not update-by-legend), which was wiping P_x_given_n when the band was added.
+        """
+        if self.window is None:
+            return
+        a_plot = self.window.plot
+        self.add_real_space_posterior(a_plot=a_plot, legend_key='P_x_given_n', resetzoom=resetzoom)
+        self.add_scoring_band_overlay(a_plot=a_plot)
+        self.add_real_space_curve(a_plot=a_plot)
+        self.add_rho_phi_overlay(a_plot=a_plot)
+        # Keep the posterior as the active image so the colorbar matches p_x_given_n, not the band.
+        a_plot.setActiveImage('P_x_given_n')
 
 
     def build_GUI(self):
         ## Get the current data for this index:
         # an_epoch_debug_value = self.on_update_epoch_idx(active_epoch_idx=5)
 
-        ## Build the BandROI:
-        self.band_roi = BandROI()
-        self.band_roi.setGeometry(begin=self.active_radon_values.start_point, end=self.active_radon_values.end_point, width=self.active_radon_values.band_width)
-        self.band_roi.setName('RadonROI')
-        # self.band_roi.BoundedMode
-        self.band_roi.setInteractionMode(self.band_roi.BoundedMode)
-        # self.band_roi.setInteractionMode(self.band_roi.UnboundedMode)
-        self.window = _RoiStatsDisplayExWindow()
-        self.window.setRois(rois2D=(self.band_roi,))
+        # No default BandROI — the scoring window is drawn as a vertical mask matching compute_score.
+        self.band_roi = None
+        if self.window is None:
+            self.window = _RoiStatsDisplayExWindow()
+        else:
+            self.window.plot.clear()
 
         # Create the thread that calls submitToQtMainThread
         # updateThread = UpdateThread(window.plot)
@@ -535,16 +629,10 @@ class RadonTransformDebugger:
         # define some image and curve
         # self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n', replace=True, xlabel='time bins', ylabel='pos_bins', selectable=False, draggable=False)
 
-        new_image_data: ImageData = self.add_real_space_posterior(a_plot=self.window.plot, legend_key='P_x_given_n')
-        real_space_curve = self.add_real_space_curve(a_plot=self.window.plot)
-
+        self.refresh_overlays(resetzoom=True)
 
         # window.plot.addImage(numpy.random.random(10000).reshape(100, 100), legend='img2', origin=(0, 100))
         self.window.setStats(self.stats_measures)
-
-        # add some couple (plotItem, roi) to be displayed by default
-        img1_item = self.window.plot.getImage('P_x_given_n')
-        self.window.addItem(item=img1_item, roi=self.band_roi)
 
         update_mode: str = 'auto'
         self.window.setUpdateMode(update_mode)
@@ -553,22 +641,15 @@ class RadonTransformDebugger:
         # app.exec()
         # updateThread.stop()  # Stop updating the plot
 
-    def _perform_update_band_ROI(self, start_point: Tuple[float, float], end_point: Tuple[float, float], band_width: float):
-        """ Call to update the band ROI: 
-        `_perform_update_band_ROI(start_point=tuple(start_point), end_point=tuple(end_point), band_width=float(band_width))`
 
-        captures: band_roi 
-        """
-        self.band_roi.setGeometry(begin=start_point, end=end_point, width=band_width)
-        # self.window.setRois()
-        # self.window.setRois(rois2D=(self.band_roi,))
+    def _perform_update_band_ROI(self, start_point: Tuple[float, float] = None, end_point: Tuple[float, float] = None, band_width: float = None):
+        """ Refresh geometric overlays for the active epoch (BandROI no longer used for the scoring window). """
+        self.refresh_overlays(resetzoom=False)
 
 
     def update_ROI(self):
         print(f'update_ROI()\n\tactive_epoch_idx: {self.active_epoch_idx})')
-        self._perform_update_band_ROI(start_point=tuple(self.active_radon_values.start_point), end_point=tuple(self.active_radon_values.end_point), band_width=float(self.active_radon_values.band_width))
-        # img1_item = self.window.plot.getImage('P_x_given_n')
-        # self.window.addItem(item=img1_item, roi=self.band_roi)
+        self.refresh_overlays(resetzoom=False)
         print(f'\tdone.')
 
 
@@ -577,7 +658,8 @@ class RadonTransformDebugger:
         # posterior_identifier_str: str = f"Posterior Epoch[{self.active_epoch_idx}]"
         # self.window.plot.addImage(self.active_radon_values.a_posterior, replace=True, resetzoom=True, copy=True, legend='P_x_given_n', ylabel=posterior_identifier_str)
 
-        self.window.plot.clear()
+        if self.window is not None:
+            self.window.plot.clear()
         self.build_GUI()
         
         # image = self.window.plot.getImage('P_x_given_n')  # Retrieve the image
