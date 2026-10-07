@@ -350,28 +350,76 @@ class RadonTransformDebugger:
         return mask
 
 
-    def add_scoring_band_overlay(self, a_plot, legend_key: str = 'scoring_band', debug_print=False):
-        """ Overlay the vertical neighbor window that enters the radon score (yellow, translucent RGBA).
+    @classmethod
+    def iter_scoring_band_polygons(cls, mask: NDArray, origin: Tuple[float, float], scale: Tuple[float, float]):
+        """ Yield stair-step (x, y) polygons covering contiguous in-band columns (bin edges in real space). """
+        ox, oy = float(origin[0]), float(origin[1])
+        sx, sy = float(scale[0]), float(scale[1])
+        n_pos, n_t = int(mask.shape[0]), int(mask.shape[1])
+        ci: int = 0
+        while ci < n_t:
+            rows = np.where(np.isfinite(mask[:, ci]))[0]
+            if len(rows) == 0:
+                ci += 1
+                continue
+            run_cols: List[Tuple[int, int, int]] = []
+            while ci < n_t:
+                rows = np.where(np.isfinite(mask[:, ci]))[0]
+                if len(rows) == 0:
+                    break
+                run_cols.append((ci, int(rows[0]), int(rows[-1])))
+                ci += 1
+            ## END while ci < n_t....
 
-        Uses an explicit RGBA image (not a NaN float image): matplotlib backends often paint colormap-NaN
-        pixels as opaque white and hide the posterior underneath.
+            lower_x: List[float] = []
+            lower_y: List[float] = []
+            upper_x: List[float] = []
+            upper_y: List[float] = []
+            for col_i, lo, hi in run_cols:
+                x0 = ox + (col_i * sx)
+                x1 = ox + ((col_i + 1) * sx)
+                y0 = oy + (lo * sy)
+                y1 = oy + ((hi + 1) * sy)
+                lower_x.extend([x0, x1])
+                lower_y.extend([y0, y0])
+                upper_x.extend([x0, x1])
+                upper_y.extend([y1, y1])
+            ## END for col_i, lo, hi in run_cols....
+
+            xs = np.asarray(lower_x + upper_x[::-1], dtype=float)
+            ys = np.asarray(lower_y + upper_y[::-1], dtype=float)
+            yield xs, ys
+        ## END while ci < n_t....
+
+
+    def add_scoring_band_overlay(self, a_plot, legend_key: str = 'scoring_band', debug_print=False):
+        """ Overlay the vertical neighbor window that enters the radon score.
+
+        Drawn as filled stair-step shape(s) on top of the posterior. An ImageRgba overlay is unreliable with the
+        matplotlib backend (often invisible on top of ImageData); shapes composite correctly.
         """
         a_debug_info: RadonTransformDebugValue = self.active_radon_values.active_debug_info
         n_neighbours: int = int(self.active_radon_values.active_num_neighbors)
         mask = self.build_scoring_band_mask(best_y_line_idxs=a_debug_info.best_y_line_idxs, n_pos=int(a_debug_info.n_pos), n_neighbours=n_neighbours)
         img_origin, img_scale = self._get_image_origin_scale()
         if debug_print:
-            print(f'scoring_band mask finite cells: {np.sum(np.isfinite(mask))}, origin: {img_origin}, scale: {img_scale}')
+            print(f'scoring_band mask finite cells: {np.sum(np.isfinite(mask))}, n_neighbours: {n_neighbours}, origin: {img_origin}, scale: {img_scale}')
 
-        rgba = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.float32)
-        in_band = np.isfinite(mask)
-        rgba[in_band, 0] = 1.0
-        rgba[in_band, 1] = 0.75
-        rgba[in_band, 2] = 0.0
-        rgba[in_band, 3] = 0.40
-        # replace=False: silx replace=True would delete the posterior image.
-        band_image = a_plot.addImage(rgba, legend=legend_key, replace=False, z=1, origin=img_origin, scale=img_scale, resetzoom=False)
-        return band_image
+        # Drop previous band shapes (ROIStatsWidget ignores Shape removals — no 'key not recognized' warnings).
+        for item in list(a_plot.getItems()):
+            name = item.getName() if hasattr(item, 'getName') else ''
+            if isinstance(name, str) and name.startswith(legend_key):
+                a_plot.removeItem(item)
+        ## END for item in list(a_plot.getItems())....
+
+        shapes = []
+        for poly_idx, (xs, ys) in enumerate(self.iter_scoring_band_polygons(mask=mask, origin=img_origin, scale=img_scale)):
+            # Orange fill matching the reference figure's scoring ROI; overlay=True keeps it above the image.
+            shape_item = a_plot.addShape(xs, ys, legend=f'{legend_key}_{poly_idx}', shape='polygon', color=(1.0, 0.65, 0.0, 0.45), fill=True, overlay=True, z=1, linestyle='-', linewidth=1.5)
+            shapes.append(shape_item)
+        ## END for poly_idx, (xs, ys) in enumerate(self.iter_scoring_band_polygons(mask=mask, origin=img_origin, scale=img_scale))....
+
+        return shapes
 
 
     def add_real_space_curve(self, a_plot, legend_key: str = 'y(t)=velocity*t+intercept', debug_print=False):
