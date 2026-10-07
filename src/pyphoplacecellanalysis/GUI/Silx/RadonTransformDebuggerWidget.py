@@ -471,6 +471,17 @@ class RadonTransformDebugger:
         return rho_curve
 
 
+    def add_score_label(self, a_plot, legend_key: str = 'radon_score', debug_print=False):
+        """ Place a text marker with the epoch's final radon score near the top-left of the posterior (cm/s frame). """
+        a_debug_info: RadonTransformDebugValue = self.active_radon_values.active_debug_info
+        score: float = float(self.active_radon_values.score)
+        t_label: float = float(a_debug_info.t[0])
+        x_label: float = float(a_debug_info.pos[-1])
+        if debug_print:
+            print(f'radon score label: score={score}, at=({t_label}, {x_label})')
+
+        return a_plot.addMarker(x=t_label, y=x_label, legend=legend_key, text=f'score={score:.4g}', color='white', symbol='', selectable=False, draggable=False)
+
 
     def update_epoch_idx(self, active_epoch_idx: int, debug_print=False):
         """ Called when the active_epoch_idx is updated to recompute the required RadonTransform values and update the GUI/ROIs
@@ -656,6 +667,7 @@ class RadonTransformDebugger:
         self.add_scoring_band_overlay(a_plot=a_plot)
         self.add_real_space_curve(a_plot=a_plot)
         self.add_rho_phi_overlay(a_plot=a_plot)
+        self.add_score_label(a_plot=a_plot)
         # Keep the posterior as the active image so the colorbar matches p_x_given_n, not the band.
         a_plot.setActiveImage('P_x_given_n')
 
