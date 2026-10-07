@@ -11,6 +11,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import scipy
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -327,7 +328,8 @@ class RadonTransformDebugger:
         """
         ## add the absolute line:
         real_line_t = deepcopy(self.active_radon_values.active_debug_info.t)
-        best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in self.active_radon_values.active_debug_info.best_y_line_idxs])
+        # best_y_line = np.array([self.xbin_centers[an_idx] for an_idx in self.active_radon_values.active_debug_info.best_y_line_idxs]) #TODO 2026-10-01 13:04: - [ ] This does not work because `a_debug_info.best_y_line_idxs` can fall outside of the bounds (can be lower than self.xbin_centers[0] or beyond self.xbin_centers[-1])
+        best_y_line = scipy.interpolate.interp1d(np.arange(len(self.xbin_centers), dtype=float), np.asarray(self.xbin_centers, dtype=float), fill_value="extrapolate", bounds_error=False)(np.asarray(self.active_radon_values.active_debug_info.best_y_line_idxs, dtype=float))
 
         # real_space_curve: Curve = new_plot.addCurve(x=(self.active_radon_values.active_debug_info.ci+0.5), y=self.active_radon_values.active_debug_info.best_y_line_idxs, legend='curve', color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
         real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=best_y_line, legend=legend_key, color='#dfb976', linestyle=':', symbol='o', replace=True) ## This works
