@@ -1,4 +1,5 @@
 import functools
+from pathlib import Path
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 # pd.options.mode.dtype_backend = 'pyarrow' # use new pyarrow backend instead of numpy
@@ -12,6 +13,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import scipy
+import matplotlib as mpl
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -20,6 +22,8 @@ from neuropy.analyses.decoders import RadonTransformDebugValue
 
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
 from pyphoplacecellanalysis.Analysis.Decoder.decoder_result import get_radon_transform
+from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import FixedCustomColormaps
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
 from silx.gui import qt
 from silx.gui.data.DataViewerFrame import DataViewerFrame
@@ -39,6 +43,7 @@ from silx.gui.plot import Plot2D
 from silx.gui.plot.items import Curve
 from silx.gui.plot.items import ImageData
 from silx.gui.colors import Colormap
+from matplotlib.ticker import FormatStrFormatter
 
 """ 
 
@@ -179,7 +184,6 @@ def on_set_active_decoder_name_changed(instance, attribute, new_value):
     return new_value
 
 
-
 def on_set_active_epoch_idx_changed(instance, attribute, new_value):
     print(f'on_set_epoch_idx_changed(new_value: {new_value})')
     new_epoch_idx: int = int(new_value)
@@ -187,6 +191,7 @@ def on_set_active_epoch_idx_changed(instance, attribute, new_value):
     instance.refresh_overlays()
     print(f'\tdone.')
     return new_value
+
 
 @metadata_attributes(short_name=None, tags=['radon', 'debugger', 'gui', 'Silx'], input_requires=[], output_provides=[], uses=['Silx'], used_by=[], creation_date='2024-08-13 00:00', related_items=[])
 @define(slots=False, repr=False)
@@ -204,13 +209,23 @@ class RadonTransformDebugger:
     _active_epoch_idx: int = field(default=3) # , on_setattr=on_set_active_epoch_idx_changed
     _active_epoch_radon_values: Optional[RadonDebugValue] = field(default=None)
 
-# self.update_epoch_idx(active_epoch_idx=self.active_epoch_idx)
-
     window: _RoiStatsDisplayExWindow = field(default=None)
     _band_roi: BandROI = field(default=None)
 
     xbin: NDArray = field(default=None)
     xbin_centers: NDArray = field(default=None)
+
+    epoch_comments: Dict[Tuple[str, float], str] = field(default=Factory(dict))
+    _comment_line_edit: Optional[Any] = field(default=None, eq=False)
+    _comment_dock: Optional[Any] = field(default=None, eq=False)
+    _comment_loading: bool = field(default=False, eq=False)
+    _last_comment_key: Optional[Tuple[str, float]] = field(default=None, eq=False)
+
+    posterior_heatmap_imshow_kwargs: Dict = field(default=Factory(lambda: dict(
+        cmap=FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25),
+    )))
+    overlay_label_color: str = field(default='white')
+    radon_debugging_labels: bool = field(default=True)
 
 
     @property
@@ -223,19 +238,28 @@ class RadonTransformDebugger:
         self._active_epoch_idx = value
         # if self.window is not None:
         #     self.update_GUI() # update the GUI, hopefuly it exists
- 
+
 
     @property
     def result(self) -> DecodedFilterEpochsResult:
         return self.decoder_filter_epochs_decoder_result_dict[self.active_decoder_name]
 
+
     @property
     def active_filter_epochs(self) -> pd.DataFrame:
         return ensure_dataframe(self.result.active_filter_epochs)
 
+
+    @property
+    def active_epoch_start_t(self) -> float:
+        """ Start time of the currently plotted epoch (seconds). """
+        return float(self.active_filter_epochs['start'].iloc[self.active_epoch_idx])
+
+
     @property
     def time_bin_size(self) -> float:
         return float(self.result.decoding_time_bin_size)
+
 
     def _radon_transform_extras_tuple(self):
         """ Unwrap stored radon extras to `(num_neighbours, neighbors_arr, ...)`.
@@ -288,7 +312,23 @@ class RadonTransformDebugger:
 
 
     @classmethod
-    def perform_add_real_space_posterior(cls, a_plot, p_x_given_n: NDArray, active_time_bin_edges: NDArray, xbin: NDArray, time_bin_size: float, pos_bin_size: float, legend_key:str='p_x_given_n', resetzoom: bool=True, debug_print=False):
+    def matplotlib_cmap_to_silx_colormap(cls, mpl_cmap, vmin: float = 0, vmax: Optional[float] = None, n_colors: int = 256) -> Colormap:
+        """ Convert a matplotlib colormap (or silx Colormap / name string) into a silx Colormap with optional vmin/vmax. """
+        if isinstance(mpl_cmap, Colormap):
+            if vmin is not None:
+                mpl_cmap.setVMin(vmin)
+            if vmax is not None:
+                mpl_cmap.setVMax(vmax)
+            return mpl_cmap
+        if isinstance(mpl_cmap, str):
+            return Colormap(name=mpl_cmap, vmin=vmin, vmax=vmax)
+        # matplotlib Colormap / LinearSegmentedColormap: sample RGBA LUT for silx (preserves alpha)
+        lut = np.asarray(mpl_cmap(np.linspace(0.0, 1.0, int(n_colors))), dtype=float)
+        return Colormap(colors=lut, vmin=vmin, vmax=vmax)
+
+
+    @classmethod
+    def perform_add_real_space_posterior(cls, a_plot, p_x_given_n: NDArray, active_time_bin_edges: NDArray, xbin: NDArray, time_bin_size: float, pos_bin_size: float, legend_key:str='p_x_given_n', resetzoom: bool=True, debug_print=False, posterior_heatmap_imshow_kwargs: Optional[Dict]=None):
         """ 
         
         active_time_bin_edges = deepcopy(dbgr.result.time_bin_edges[dbgr.active_epoch_idx])
@@ -296,7 +336,14 @@ class RadonTransformDebugger:
         new_image = perform_add_real_space_posterior(a_plot=new_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=xbin, time_bin_size=time_bin_size, pos_bin_size=pos_bin_size)
 
         """
-        a_cmap = Colormap(name="viridis", vmin=0) # , vmax=1
+        if posterior_heatmap_imshow_kwargs is None:
+            posterior_heatmap_imshow_kwargs = {}
+        ## END if posterior_heatmap_imshow_kwargs is None...
+        default_cmap = FixedCustomColormaps.get_custom_greyscale_with_low_values_dropped_cmap(low_value_cutoff=0.01, full_opacity_threshold=0.25)
+        mpl_cmap = posterior_heatmap_imshow_kwargs.get('cmap', default_cmap)
+        vmin = posterior_heatmap_imshow_kwargs.get('vmin', 0)
+        vmax = posterior_heatmap_imshow_kwargs.get('vmax', None)
+        a_cmap = cls.matplotlib_cmap_to_silx_colormap(mpl_cmap=mpl_cmap, vmin=vmin, vmax=vmax)
         img_origin = (active_time_bin_edges[0], xbin[0]) # (origin X, origin Y)
         img_scale = (time_bin_size, pos_bin_size) # ??
         if debug_print:
@@ -318,7 +365,7 @@ class RadonTransformDebugger:
         """
         active_time_bin_edges = deepcopy(self.result.time_bin_edges[self.active_epoch_idx])
         p_x_given_n = deepcopy(self.active_radon_values.p_x_given_n)
-        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size, legend_key=legend_key, resetzoom=resetzoom, debug_print=debug_print)
+        return self.perform_add_real_space_posterior(a_plot=a_plot, p_x_given_n=p_x_given_n, active_time_bin_edges=active_time_bin_edges, xbin=self.xbin, time_bin_size=self.time_bin_size, pos_bin_size=self.pos_bin_size, legend_key=legend_key, resetzoom=resetzoom, debug_print=debug_print, posterior_heatmap_imshow_kwargs=self.posterior_heatmap_imshow_kwargs)
 
 
     def _get_image_origin_scale(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
@@ -434,8 +481,8 @@ class RadonTransformDebugger:
             print(f'y_line t range: [{real_line_t[0]}, {real_line_t[-1]}], x range: [{y_line[0]}, {y_line[-1]}]')
 
         # replace=False: silx replace=True deletes ALL other curves (would wipe rho_phi).
-        real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=y_line, legend=legend_key, color='#00e5ff', linestyle='-', linewidth=3, symbol=None, replace=False, z=2)
-        real_space_curve.setAlpha(alpha=1.0)
+        real_space_curve: Curve = a_plot.addCurve(x=real_line_t, y=y_line, legend=legend_key, color=(1.0, 0.0, 0.0, 0.7), linestyle='-', linewidth=3, symbol=None, replace=False, z=2)
+        real_space_curve.setAlpha(alpha=0.7)
         return real_space_curve
 
 
@@ -463,11 +510,11 @@ class RadonTransformDebugger:
         if debug_print:
             print(f'rho/phi center=({t_center}, {x_center}), foot=({t_foot}, {x_foot}), rho={best_rho}, phi={best_phi}')
 
-        # White for contrast against the dark viridis posterior
-        rho_curve: Curve = a_plot.addCurve(x=np.array([t_center, t_foot], dtype=float), y=np.array([x_center, x_foot], dtype=float), legend=legend_key, color='#ffffff', linestyle='--', linewidth=2, symbol=None, replace=False, z=3)
+        # Default white for contrast against dark viridis; override via overlay_label_color (e.g. 'black' on Greys)
+        rho_curve: Curve = a_plot.addCurve(x=np.array([t_center, t_foot], dtype=float), y=np.array([x_center, x_foot], dtype=float), legend=legend_key, color=self.overlay_label_color, linestyle='--', linewidth=2, symbol=None, replace=False, z=3)
         rho_curve.setAlpha(alpha=0.95)
-        a_plot.addMarker(x=t_center, y=x_center, legend=f'{legend_key}_center', text=f'ρ={best_rho:.3g}\nφ={best_phi:.3g}', color='white', symbol='o', selectable=False, draggable=False)
-        a_plot.addMarker(x=t_foot, y=x_foot, legend=f'{legend_key}_foot', text='', color='white', symbol='+', selectable=False, draggable=False)
+        a_plot.addMarker(x=t_center, y=x_center, legend=f'{legend_key}_center', text=f'ρ={best_rho:.3g}\nφ={best_phi:.3g}', color=self.overlay_label_color, symbol='o', selectable=False, draggable=False)
+        a_plot.addMarker(x=t_foot, y=x_foot, legend=f'{legend_key}_foot', text='', color=self.overlay_label_color, symbol='+', selectable=False, draggable=False)
         return rho_curve
 
 
@@ -480,7 +527,69 @@ class RadonTransformDebugger:
         if debug_print:
             print(f'radon score label: score={score}, at=({t_label}, {x_label})')
 
-        return a_plot.addMarker(x=t_label, y=x_label, legend=legend_key, text=f'score={score:.4g}', color='white', symbol='', selectable=False, draggable=False)
+        return a_plot.addMarker(x=t_label, y=x_label, legend=legend_key, text=f'radon={score:.3f}', color=self.overlay_label_color, symbol='', selectable=False, draggable=False)
+
+
+    def _clear_radon_debugging_labels(self, a_plot, legend_keys: Optional[List[str]] = None):
+        """ Remove rho/phi debug overlays (used when radon_debugging_labels is False). Score label is separate. """
+        if legend_keys is None:
+            legend_keys = ['rho_phi', 'rho_phi_center', 'rho_phi_foot']
+        legend_key_set = set(legend_keys)
+        for item in list(a_plot.getItems()):
+            name = item.getName() if hasattr(item, 'getName') else ''
+            if isinstance(name, str) and (name in legend_key_set):
+                a_plot.removeItem(item)
+        ## END for item in list(a_plot.getItems())....
+
+
+    def _comment_key_for_current_epoch(self) -> Tuple[str, float]:
+        """ Identity for the plotted epoch: (active_decoder_name, active_epoch_start_t). """
+        return (self.active_decoder_name, self.active_epoch_start_t)
+
+
+    def _save_comment_from_field(self, key: Optional[Tuple[str, float]] = None):
+        """ Write the Comment QLineEdit into epoch_comments under `key` (default: current epoch). """
+        if (self._comment_line_edit is None) or self._comment_loading:
+            return
+        if key is None:
+            key = self._comment_key_for_current_epoch()
+        self.epoch_comments[key] = str(self._comment_line_edit.text())
+
+
+    def _load_comment_into_field(self):
+        """ Load epoch_comments for the current key into the Comment field; save any pending edit under the previous key first. """
+        if self._comment_line_edit is None:
+            return
+        new_key: Tuple[str, float] = self._comment_key_for_current_epoch()
+        if (self._last_comment_key is not None) and (self._last_comment_key != new_key):
+            self._save_comment_from_field(key=self._last_comment_key)
+        self._comment_loading = True
+        try:
+            self._comment_line_edit.setText(self.epoch_comments.get(new_key, ''))
+        finally:
+            self._comment_loading = False
+        self._last_comment_key = new_key
+
+
+    def _ensure_comment_dock(self):
+        """ Install bottom Comment: QLineEdit dock once on the window (safe across re-build_GUI). """
+        if self.window is None:
+            return
+        if self._comment_dock is not None:
+            return
+        comment_widget = qt.QWidget(self.window)
+        comment_layout = qt.QHBoxLayout(comment_widget)
+        comment_layout.setContentsMargins(6, 4, 6, 4)
+        comment_label = qt.QLabel('Comment:', comment_widget)
+        self._comment_line_edit = qt.QLineEdit(comment_widget)
+        self._comment_line_edit.setPlaceholderText('Add a comment/description for this epoch…')
+        self._comment_line_edit.editingFinished.connect(self._save_comment_from_field)
+        comment_layout.addWidget(comment_label)
+        comment_layout.addWidget(self._comment_line_edit, stretch=1)
+        self._comment_dock = qt.QDockWidget('Comment', self.window)
+        self._comment_dock.setWidget(comment_widget)
+        self.window.addDockWidget(qt.Qt.BottomDockWidgetArea, self._comment_dock)
+        self._load_comment_into_field()
 
 
     def update_epoch_idx(self, active_epoch_idx: int, debug_print=False):
@@ -489,7 +598,8 @@ class RadonTransformDebugger:
             a_posterior, (start_point, end_point, band_width), (active_num_neighbors, active_neighbors_arr) = on_update_epoch_idx(active_epoch_idx=5)
         
         captures: pos_bin_size, time_bin_size """
-        ## ON UPDATE: active_epoch_idx
+        ## ON UPDATE: active_epoch_idx — save comment under the previous key before switching
+        self._save_comment_from_field()
         self.active_epoch_idx = active_epoch_idx ## update the index
         
         ## INPUTS: pos_bin_size
@@ -648,10 +758,74 @@ class RadonTransformDebugger:
         band_width = float((2 * int(num_neighbours) + 1) * self.pos_bin_size)
         
         ## upgrade to RadonDebugValue:
-        return RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
+        result = RadonDebugValue(active_decoded_epoch_container=single_epoch_result, active_debug_info=a_debug_info, score=score, velocity=velocity, intercept=intercept,
                             # active_num_neighbors=num_neighbours, active_neighbors_arr=neighbors_arr,
                             active_num_neighbors=active_num_neighbors, active_neighbors_arr=active_neighbors_arr,
                             start_point=start_point, end_point=end_point, band_width=band_width)
+        self._load_comment_into_field()
+        return result
+
+
+    def _configure_plot_display(self, a_plot):
+        """ Show epoch/decoder in the title; force plain decimal x ticks (e.g. 1023.90, never scientific). """
+        a_plot.setGraphTitle(f'epoch_idx={self.active_epoch_idx} | decoder={self.active_decoder_name}')
+        an_ax = a_plot.getBackend().ax  # matplotlib.axes._axes.Axes
+        an_ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+
+
+    def _default_export_suffix(self) -> str:
+        return f'{self.active_decoder_name}_epoch{self.active_epoch_idx}'
+
+
+    def _save_publication_pdf(self, save_path: Path) -> Path:
+        """ Write the current silx plot to `save_path` under publication matplotlib defaults. """
+        assert self.window is not None, "build_GUI() must be called before exporting."
+        save_path = Path(save_path)
+        if save_path.suffix.lower() != '.pdf':
+            save_path = save_path.with_suffix('.pdf')
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)):
+            ok = self.window.plot.saveGraph(str(save_path), fileFormat='pdf')
+        assert ok, f"silx saveGraph failed for path: {save_path}"
+        print(f'export_for_publication: saved "{save_path}"')
+        return save_path
+
+
+    @function_attributes(short_name=None, tags=['export', 'pdf', 'publication', 'figure'], input_requires=[], output_provides=[], uses=['PhoPublicationFigureHelper.rc_context_kwargs', 'Plot2D.saveGraph'], used_by=[], creation_date='2026-10-07 00:00', related_items=[])
+    def export_for_publication(self, figures_parent_folder: Path, export_suffix: Optional[str] = None) -> Dict[str, Path]:
+        """ Export the current debugger figure to a publication-style PDF.
+
+        Usage:
+            _out_paths = dbgr.export_for_publication(figures_parent_folder=Path('output/figures'))
+        """
+        if export_suffix is None:
+            export_suffix = self._default_export_suffix()
+        figures_parent_folder = Path(figures_parent_folder)
+        image_save_path = figures_parent_folder.joinpath(f'RadonTransform_{export_suffix}.pdf')
+        return {'pdf': self._save_publication_pdf(image_save_path)}
+
+
+    def _on_export_pdf_clicked(self):
+        """ QFileDialog → exact-path publication PDF write. """
+        default_name = f'RadonTransform_{self._default_export_suffix()}.pdf'
+        chosen_path, _ = qt.QFileDialog.getSaveFileName(self.window, 'Export PDF', default_name, 'PDF (*.pdf)')
+        if not chosen_path:
+            return
+        self._save_publication_pdf(Path(chosen_path))
+
+
+    def _ensure_export_toolbar(self):
+        """ Install Export PDF toolbar once on the window (safe across re-build_GUI). """
+        if self.window is None:
+            return
+        if getattr(self, '_export_toolbar', None) is not None:
+            return
+        toolbar = self.window.addToolBar('Export')
+        export_action = qt.QAction('Export PDF', self.window)
+        export_action.setToolTip('Export current figure to a publication-style PDF')
+        export_action.triggered.connect(self._on_export_pdf_clicked)
+        toolbar.addAction(export_action)
+        self._export_toolbar = toolbar
 
 
     def refresh_overlays(self, resetzoom: bool = False):
@@ -666,10 +840,16 @@ class RadonTransformDebugger:
         self.add_real_space_posterior(a_plot=a_plot, legend_key='P_x_given_n', resetzoom=resetzoom)
         self.add_scoring_band_overlay(a_plot=a_plot)
         self.add_real_space_curve(a_plot=a_plot)
-        self.add_rho_phi_overlay(a_plot=a_plot)
+        if self.radon_debugging_labels:
+            self.add_rho_phi_overlay(a_plot=a_plot)
+        else:
+            self._clear_radon_debugging_labels(a_plot=a_plot)
+        ## END if self.radon_debugging_labels...
         self.add_score_label(a_plot=a_plot)
         # Keep the posterior as the active image so the colorbar matches p_x_given_n, not the band.
         a_plot.setActiveImage('P_x_given_n')
+        self._configure_plot_display(a_plot)
+        self._load_comment_into_field()
 
 
     def build_GUI(self):
@@ -690,6 +870,7 @@ class RadonTransformDebugger:
         # define some image and curve
         # self.window.plot.addImage(self.active_radon_values.p_x_given_n, legend='P_x_given_n', replace=True, xlabel='time bins', ylabel='pos_bins', selectable=False, draggable=False)
 
+        self._ensure_comment_dock()
         self.refresh_overlays(resetzoom=True)
 
         # window.plot.addImage(numpy.random.random(10000).reshape(100, 100), legend='img2', origin=(0, 100))
@@ -697,6 +878,8 @@ class RadonTransformDebugger:
 
         update_mode: str = 'auto'
         self.window.setUpdateMode(update_mode)
+
+        self._ensure_export_toolbar()
 
         self.window.show()
         # app.exec()
