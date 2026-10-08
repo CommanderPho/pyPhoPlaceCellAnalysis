@@ -1638,13 +1638,21 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _axes_y_below_anchored_artist(cls, curr_ax, anchored_artist, pad_axes: float = 0.0, fallback_y: float = 0.78) -> float:
-        """Return axes-fraction Y for the top of the next stacked label below `anchored_artist`."""
+        """Return axes-fraction Y for the top of the next stacked label below `anchored_artist`.
+
+        Prefers the last TextArea of AnchoredCustomText so AnchoredOffsetbox borderpad does not inflate the gap.
+        """
         if anchored_artist is None:
             return float(fallback_y)
         try:
             fig = curr_ax.get_figure()
             renderer = fig.canvas.get_renderer()
-            bbox_disp = anchored_artist.get_window_extent(renderer=renderer)
+            # Prefer last text line extent (tighter stack) when available
+            text_areas = getattr(anchored_artist, 'text_areas', None)
+            if text_areas:
+                bbox_disp = text_areas[-1]._text.get_window_extent(renderer=renderer)
+            else:
+                bbox_disp = anchored_artist.get_window_extent(renderer=renderer)
             bbox_axes = bbox_disp.transformed(curr_ax.transAxes.inverted())
             y = float(bbox_axes.y0) - float(pad_axes)
             return max(y, 0.05)
@@ -1653,24 +1661,38 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
     @classmethod
+    def _overlay_stack_anchor_artist(cls, curr_ax, plots, wcorr_anchored_text=None, heuristic_anchored_text=None):
+        """Bottom-most extant overlay label: heuristic (green) if present, else wcorr (blue)."""
+        plots_dict = plots.get('weighted_corr', {}).get(curr_ax, {})
+        heuristic_text = heuristic_anchored_text if (heuristic_anchored_text is not None) else plots_dict.get('heuristic_text', None)
+        wcorr_text = wcorr_anchored_text if (wcorr_anchored_text is not None) else plots_dict.get('wcorr_text', None)
+        for artist in (heuristic_text, wcorr_text):
+            if (artist is not None) and (getattr(artist, 'axes', None) is not None):
+                return artist
+        ## END for artist in (heuristic_text, wcorr_text)...
+        return None
+
+
+    @classmethod
     def _resolve_radon_label_bbox_y(cls, curr_ax, plots, params, pad_axes: float = 0.0) -> float:
-        """Axes-fraction Y for the radon label: below extant wcorr stack, else top-right (1.0)."""
+        """Axes-fraction Y for the radon label: below extant overlay stack, else top-right (1.0)."""
         fallback_y: float = float(params.setdefault('radon_label_bbox_y', 0.78))
-        wcorr_text = plots.get('weighted_corr', {}).get(curr_ax, {}).get('wcorr_text', None)
-        if (wcorr_text is not None) and (getattr(wcorr_text, 'axes', None) is not None):
-            return cls._axes_y_below_anchored_artist(curr_ax, wcorr_text, pad_axes=pad_axes, fallback_y=fallback_y)
+        anchor = cls._overlay_stack_anchor_artist(curr_ax, plots)
+        if anchor is not None:
+            return cls._axes_y_below_anchored_artist(curr_ax, anchor, pad_axes=pad_axes, fallback_y=fallback_y)
         return 1.0
 
 
     @classmethod
-    def _reposition_radon_text_below_wcorr(cls, curr_ax, plots, data_idx, params, wcorr_anchored_text=None, pad_axes: float = 0.0) -> None:
-        """After wcorr(+heuristics) height is known, move extant radon_text label just below it."""
+    def _reposition_radon_text_below_wcorr(cls, curr_ax, plots, data_idx, params, wcorr_anchored_text=None, heuristic_anchored_text=None, pad_axes: float = 0.0) -> None:
+        """After wcorr/heuristic label heights are known, move extant radon_text just below the stack."""
         radon_text_artist = plots.get(cls.plots_group_identifier_key, {}).get(data_idx, {}).get('radon_text', None)
         if radon_text_artist is None:
             return
         fallback_y: float = float(params.setdefault('radon_label_bbox_y', 0.78))
-        if (wcorr_anchored_text is not None) and (getattr(wcorr_anchored_text, 'axes', None) is not None):
-            y = cls._axes_y_below_anchored_artist(curr_ax, wcorr_anchored_text, pad_axes=pad_axes, fallback_y=fallback_y)
+        anchor = cls._overlay_stack_anchor_artist(curr_ax, plots, wcorr_anchored_text=wcorr_anchored_text, heuristic_anchored_text=heuristic_anchored_text)
+        if anchor is not None:
+            y = cls._axes_y_below_anchored_artist(curr_ax, anchor, pad_axes=pad_axes, fallback_y=fallback_y)
         else:
             y = 1.0
         radon_text_artist.set_bbox_to_anchor((1.0, y), transform=curr_ax.transAxes)
@@ -2075,17 +2097,22 @@ class WeightedCorrelationPlotData:
     should_include_epoch_times: bool = field(default=False)
     
     ## class properties:
+    # Outward-facing label themes: wcorr block (blue) vs heuristic scores (green)
+    WCORR_LABEL_KEYS: List[str] = ['wcorr', 'P_decoder', 'pearsonr']
+    HEURISTIC_LABEL_KEYS: List[str] = [
+        'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
+        'total_congruent_direction_change', 'longest_sequence_length',
+        'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len',
+        'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav',
+    ]
+
     @classmethod
     def get_column_names(cls) -> List[str]:
         """ any possible column that you might want to include from the dataframe can be hard-coded here in each derived class 
         """
         # from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
         
-        return ['wcorr', 'P_decoder', 'pearsonr',
-                'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
-                'total_congruent_direction_change', 'longest_sequence_length', # 'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len',
-                'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'mseq_dtrav',
-        ] #+ HeuristicReplayScoring.get_all_score_computation_col_names()
+        return list(cls.WCORR_LABEL_KEYS) + list(cls.HEURISTIC_LABEL_KEYS)
 
     @classmethod
     def init_from_df_row_tuple_and_formatting_fn_dict(cls, a_tuple: Tuple, column_formatting_fn_dict: Dict[str, Optional[Callable]]) -> "WeightedCorrelationPlotData":
@@ -2146,7 +2173,7 @@ class WeightedCorrelationPlotData:
                 'max_jump_cm':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
                 'max_jump_cm_per_sec':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
                 'ratio_jump_valid_bins':(lambda v:f"max_jump_cm: {default_float_formatting_fn(v)}"),
-                'total_congruent_direction_change':(lambda v:f"tot_$\Delta$_con_dir: {default_float_formatting_fn(v)}"),
+                'total_congruent_direction_change':(lambda v:f"tot_$\\Delta$_con_dir: {default_float_formatting_fn(v)}"),
                 'longest_sequence_length':(lambda v:f"longest_seq: {default_int_formatting_fn(v)}"),
                 # 'continuous_seq_sort':(lambda v:f"seq_srt: {default_float_formatting_fn(v)}"),
                 'continuous_seq_sort':default_smart_formatting_fn_factory(short_name='seq_srt'),
@@ -2208,7 +2235,8 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#42D142' # a light green
     # text_color: str = '#66FF00' # a light green
     text_color: str = '#013220' # a very dark forest green
-    theme_stroke_color: str = '#00B0FF' # bright blue outline (mirrors radon's yellow stroke style)
+    theme_stroke_color: str = '#00B0FF' # bright blue outline for wcorr block (mirrors radon's yellow stroke style)
+    heuristic_theme_stroke_color: str = '#00C853' # green outline for heuristic score lines (coverage, mseq_*, …)
 
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info=True, enable_weighted_corr_data_provider_modify_axes_rect=False, weighted_corr_text_original_figure_rect=None, weighted_corr_text_was_axes_rect_modified=False)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
@@ -2533,67 +2561,80 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         # data_index_value = data_idx # OLD MODE
         data_index_value = epoch_start_t
 
-        # Add replay score text to top-right corner:
+        # Add replay score text to top-right corner (wcorr=blue block; heuristic scores=green block below):
         assert data_index_value in plots_data.weighted_corr_data, f"plots_data.weighted_corr_data does not contain index {data_index_value}" # AssertionError: plots_data.weighted_corr_data does not contain index 64.08305454952642
         weighted_corr_data_item: WeightedCorrelationPlotData = plots_data.weighted_corr_data[data_index_value]
         visible_keys = params.get('visible_overlay_label_keys', None)
-        final_text: str = weighted_corr_data_item.build_display_text(included_keys=visible_keys)
-        should_show_wcorr_text: bool = should_enable_weighted_correlation_info and bool(final_text and str(final_text).strip())
+        if visible_keys is None:
+            wcorr_visible_keys = list(WeightedCorrelationPlotData.WCORR_LABEL_KEYS)
+            heuristic_visible_keys = list(WeightedCorrelationPlotData.HEURISTIC_LABEL_KEYS)
+        else:
+            visible_set = set(visible_keys)
+            wcorr_visible_keys = [k for k in WeightedCorrelationPlotData.WCORR_LABEL_KEYS if k in visible_set]
+            heuristic_visible_keys = [k for k in WeightedCorrelationPlotData.HEURISTIC_LABEL_KEYS if k in visible_set]
+        ## END if visible_keys is None...
+
+        wcorr_final_text: str = weighted_corr_data_item.build_display_text(included_keys=wcorr_visible_keys)
+        heuristic_final_text: str = weighted_corr_data_item.build_display_text(included_keys=heuristic_visible_keys)
+        should_show_wcorr_text: bool = should_enable_weighted_correlation_info and bool(wcorr_final_text and str(wcorr_final_text).strip())
+        should_show_heuristic_text: bool = should_enable_weighted_correlation_info and bool(heuristic_final_text and str(heuristic_final_text).strip())
+
+        def _subfn_upsert_overlay_label(extant_artist, should_show: bool, final_text: str, label_text_kwargs: Dict[str, Any]):
+            """ create/update/remove one AnchoredText/AnchoredCustomText overlay label. """
+            if extant_artist is not None:
+                assert isinstance(extant_artist, (AnchoredText, AnchoredCustomText)), f"overlay label is of type {type(extant_artist)} but is expected to be AnchoredText/AnchoredCustomText."
+                if should_show:
+                    if extant_artist.axes is None:
+                        curr_ax.add_artist(extant_artist)
+                    if use_AnchoredCustomText:
+                        extant_artist.remove()
+                        extant_artist = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **label_text_kwargs)
+                        extant_artist.patch.set_ec("none")
+                        extant_artist.set_alpha(anchored_text_alpha_override_value)
+                    else:
+                        extant_artist.txt.set_text(final_text)
+                else:
+                    extant_artist.remove()
+                    extant_artist = None
+            else:
+                if should_show:
+                    if debug_print:
+                        print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
+                    extant_artist = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **label_text_kwargs)
+                    extant_artist.patch.set_ec("none")
+                    extant_artist.set_alpha(anchored_text_alpha_override_value)
+                else:
+                    extant_artist = None
+            if extant_artist is not None:
+                extant_artist.set_zorder(RadonTransformPlotDataProvider.OVERLAY_LABEL_ZORDER)
+            return extant_artist
+
 
         ## Build or Update:
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
-        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
-        # plot the radon transform line on the epoch:    
-        if (extant_wcorr_text_label is not None):
-            # already exists, update the existing ones. 
-            assert isinstance(extant_wcorr_text_label, (AnchoredText, AnchoredCustomText)), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
-            anchored_text = extant_wcorr_text_label # AnchoredText or AnchoredCustomText
-            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
-            if should_show_wcorr_text:
-                if anchored_text.axes is None:
-                    if debug_print:
-                        print("The AnchoredText object has been removed from the Axes and will be re-added.")
-                    # Re-add the anchored text if necessary
-                    curr_ax.add_artist(anchored_text)
-                # Update the text afterwards:
-                if use_AnchoredCustomText:
-                    # anchored_text.update_text(unformatted_text_block=final_text) ## Update is currently broken
-                    anchored_text.remove()
-                    anchored_text = None
-                    anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
-                    anchored_text.patch.set_ec("none")
-                    anchored_text.set_alpha(anchored_text_alpha_override_value)
-                else:
-                    anchored_text.txt.set_text(final_text)
-            else:
-                ## Weighted Correlation info not wanted, clear/hide or remove the label
-                anchored_text.remove()
-                anchored_text = None
 
-        else:
-            ## No existing label:
-            if should_show_wcorr_text:
-                ## Create a new one:
-                if debug_print:
-                    print(f'creating new anchored text label for {curr_ax}, final_text: {final_text}')
-                anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs) # '#ff001a' loc = 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
-                anchored_text.patch.set_ec("none")
-                anchored_text.set_alpha(anchored_text_alpha_override_value)
-            else:
-                anchored_text = None
+        wcorr_text_kwargs = deepcopy(text_kwargs)
+        wcorr_text_kwargs.update(stroke_foreground=cls.theme_stroke_color, bbox_to_anchor=(1.0, 1.0))
+        anchored_text = _subfn_upsert_overlay_label(extant_plots_dict.get('wcorr_text', None), should_show_wcorr_text, wcorr_final_text, wcorr_text_kwargs)
 
-
-        # anchored_text.set_alpha(0.95)
-
+        # Heuristic score lines (coverage, mseq_*, …): green outline, stacked under wcorr
+        heuristic_text_kwargs = deepcopy(text_kwargs)
+        heuristic_y: float = 1.0
         if anchored_text is not None:
-            anchored_text.set_zorder(RadonTransformPlotDataProvider.OVERLAY_LABEL_ZORDER)
+            heuristic_y = RadonTransformPlotDataProvider._axes_y_below_anchored_artist(curr_ax, anchored_text, pad_axes=0.0, fallback_y=0.78)
+        heuristic_text_kwargs.update(stroke_foreground=cls.heuristic_theme_stroke_color, bbox_to_anchor=(1.0, heuristic_y))
+        heuristic_anchored_text = _subfn_upsert_overlay_label(extant_plots_dict.get('heuristic_text', None), should_show_heuristic_text, heuristic_final_text, heuristic_text_kwargs)
+        # Re-measure after create (first draw may refine extent) and snap heuristic under wcorr
+        if (heuristic_anchored_text is not None) and (anchored_text is not None):
+            heuristic_y = RadonTransformPlotDataProvider._axes_y_below_anchored_artist(curr_ax, anchored_text, pad_axes=0.0, fallback_y=heuristic_y)
+            heuristic_anchored_text.set_bbox_to_anchor((1.0, heuristic_y), transform=curr_ax.transAxes)
         
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': anchored_text}
+        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': anchored_text, 'heuristic_text': heuristic_anchored_text}
 
-        # Radon runs before wcorr; once the (variable-height) wcorr+heuristic block is known, stack radon just below it.
-        RadonTransformPlotDataProvider._reposition_radon_text_below_wcorr(curr_ax, plots, data_idx, params, wcorr_anchored_text=anchored_text, pad_axes=0.0)
+        # Radon runs before wcorr; once the overlay stack height is known, place radon just below heuristic (or wcorr).
+        RadonTransformPlotDataProvider._reposition_radon_text_below_wcorr(curr_ax, plots, data_idx, params, wcorr_anchored_text=anchored_text, heuristic_anchored_text=heuristic_anchored_text, pad_axes=0.0)
         
         if debug_print:
             print(f'\t success!')
@@ -2614,16 +2655,13 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
-        extant_wcorr_text_label = extant_plots_dict.get('wcorr_text', None)
-        # plot the radon transform line on the epoch:    
-        if (extant_wcorr_text_label is not None):
-            # already exists, update the existing ones. 
-            assert isinstance(extant_wcorr_text_label, AnchoredText), f"extant_wcorr_text is of type {type(extant_wcorr_text_label)} but is expected to be of type AnchoredText."
-            anchored_text: AnchoredText = extant_wcorr_text_label
-            # Check if the AnchoredText object was removed. This happens when ax.clear() is called in `.on_jump_to_page(...)` before the callbacks part
-            ## Weighted Correlation info not wanted, clear/hide or remove the label
-            anchored_text.remove()
-            anchored_text = None
+        for label_key in ('wcorr_text', 'heuristic_text'):
+            extant_label = extant_plots_dict.get(label_key, None)
+            if extant_label is not None:
+                extant_label.remove()
+            ## END if extant_label is not None...
+        ## END for label_key in ('wcorr_text', 'heuristic_text')...
+        plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': None, 'heuristic_text': None}
 
 
         ## first try to adjust the subplots
