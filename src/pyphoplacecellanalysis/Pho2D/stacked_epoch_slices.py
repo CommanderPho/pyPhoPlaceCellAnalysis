@@ -3285,8 +3285,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, get_utility_dock_colors
             print(f'moving yellow-blue marginals attached window into main window dock...')
             yellowBlueMarginal_dock_name: str = 'yellowBlueMarginal'
+            relative_dock = self.find_display_dock('short_RL')
+            assert relative_dock is not None
             self.contents.dock_configs[yellowBlueMarginal_dock_name] = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
-            self.contents.dock_widgets[yellowBlueMarginal_dock_name] = self.add_display_dock(identifier=yellowBlueMarginal_dock_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=['right'],
+            self.contents.dock_widgets[yellowBlueMarginal_dock_name] = self.add_display_dock(identifier=yellowBlueMarginal_dock_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=['right', relative_dock],
                                                                                       display_config=self.contents.dock_configs[yellowBlueMarginal_dock_name], autoOrientation=False)
 
         else:
@@ -3512,14 +3514,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             **kwargs,
         )
         
-        # Build Raster Widget ________________________________________________________________________________________________ #
-        ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
-        _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
-        ## Attach TemplateViewer to raster:
-        _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
-        # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
-
-        # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #        
+        # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #
+        # Attach before rasters so YellowBlue joins the decoded row as a peer; rasters top strip then spans all 5 columns.
         _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
             'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size, name='TrackIdentity_Marginal_Laps', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)),
         }
@@ -3530,6 +3526,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         yellow_blue_trackID_marginals_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_yellow_blue_track_identity_marginal_window(directional_merged_decoders_result, global_session=global_session, filter_epochs=deepcopy(active_filter_epochs_df), epochs_name=known_epochs_type, 
                                                                                                                                                            **active_build_attached_yellow_blue_track_identity_marginal_window_kwargs, **_shared_plotting_kwargs,
                                                                                                                                                            active_context=yellow_blue_plot_context)
+
+        # Build Raster Widget ________________________________________________________________________________________________ #
+        ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
+        _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
+        ## Attach TemplateViewer to raster:
+        _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
+        # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
