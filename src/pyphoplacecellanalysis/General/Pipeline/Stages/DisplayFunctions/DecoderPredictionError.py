@@ -2,7 +2,7 @@ from matplotlib.offsetbox import AnchoredText
 import numpy as np
 from nptyping import NDArray
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Callable, Union, Any
+from typing import Dict, List, Tuple, Optional, Callable, Union, Any, ClassVar
 from typing_extensions import TypeAlias
 import nptyping as ND
 from nptyping import NDArray
@@ -2098,8 +2098,9 @@ class WeightedCorrelationPlotData:
     
     ## class properties:
     # Outward-facing label themes: wcorr block (blue) vs heuristic scores (green)
-    WCORR_LABEL_KEYS: List[str] = ['wcorr', 'P_decoder', 'pearsonr']
-    HEURISTIC_LABEL_KEYS: List[str] = [
+    # ClassVar so attrs does not turn these into instance fields (cls.WCORR_LABEL_KEYS must work)
+    WCORR_LABEL_KEYS: ClassVar[List[str]] = ['wcorr', 'P_decoder', 'pearsonr']
+    HEURISTIC_LABEL_KEYS: ClassVar[List[str]] = [
         'travel', 'coverage', 'avg_jump_cm', 'max_jump', 'max_jump_cm', 'max_jump_cm_per_sec', 'ratio_jump_valid_bins',
         'total_congruent_direction_change', 'longest_sequence_length',
         'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len',
