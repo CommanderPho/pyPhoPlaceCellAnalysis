@@ -390,61 +390,15 @@ class RadonTransformDebugger:
 
         Out-of-bounds columns (line index outside [0, n_pos)) are left as NaN — those columns use the median fill in compute_score.
         """
-        best_y_line_idxs = np.asarray(best_y_line_idxs).astype(int)
-        n_t: int = len(best_y_line_idxs)
-        mask = np.full((n_pos, n_t), np.nan, dtype=float)
-        for ci in np.arange(n_t):
-            ri: int = int(best_y_line_idxs[ci])
-            if (ri < 0) or (ri > (n_pos - 1)):
-                continue
-            lo: int = max(0, ri - int(n_neighbours))
-            hi: int = min(n_pos - 1, ri + int(n_neighbours))
-            mask[lo:(hi + 1), ci] = 1.0
-        ## END for ci in np.arange(n_t)....
-
-        return mask
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotData
+        return RadonTransformPlotData._build_scoring_band_mask(best_y_line_idxs=best_y_line_idxs, n_pos=n_pos, n_neighbours=n_neighbours)
 
 
     @classmethod
     def iter_scoring_band_polygons(cls, mask: NDArray, origin: Tuple[float, float], scale: Tuple[float, float]):
         """ Yield stair-step (x, y) polygons covering contiguous in-band columns (bin edges in real space). """
-        ox, oy = float(origin[0]), float(origin[1])
-        sx, sy = float(scale[0]), float(scale[1])
-        n_pos, n_t = int(mask.shape[0]), int(mask.shape[1])
-        ci: int = 0
-        while ci < n_t:
-            rows = np.where(np.isfinite(mask[:, ci]))[0]
-            if len(rows) == 0:
-                ci += 1
-                continue
-            run_cols: List[Tuple[int, int, int]] = []
-            while ci < n_t:
-                rows = np.where(np.isfinite(mask[:, ci]))[0]
-                if len(rows) == 0:
-                    break
-                run_cols.append((ci, int(rows[0]), int(rows[-1])))
-                ci += 1
-            ## END while ci < n_t....
-
-            lower_x: List[float] = []
-            lower_y: List[float] = []
-            upper_x: List[float] = []
-            upper_y: List[float] = []
-            for col_i, lo, hi in run_cols:
-                x0 = ox + (col_i * sx)
-                x1 = ox + ((col_i + 1) * sx)
-                y0 = oy + (lo * sy)
-                y1 = oy + ((hi + 1) * sy)
-                lower_x.extend([x0, x1])
-                lower_y.extend([y0, y0])
-                upper_x.extend([x0, x1])
-                upper_y.extend([y1, y1])
-            ## END for col_i, lo, hi in run_cols....
-
-            xs = np.asarray(lower_x + upper_x[::-1], dtype=float)
-            ys = np.asarray(lower_y + upper_y[::-1], dtype=float)
-            yield xs, ys
-        ## END while ci < n_t....
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotData
+        yield from RadonTransformPlotData._iter_scoring_band_polygons(mask=mask, origin=origin, scale=scale)
 
 
     def add_time_bin_xgrid(self, a_plot, legend_key: str = 'time_bin_edge', debug_print=False):

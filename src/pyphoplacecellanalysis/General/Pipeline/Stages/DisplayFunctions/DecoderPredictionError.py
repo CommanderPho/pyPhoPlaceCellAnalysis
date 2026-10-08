@@ -1500,6 +1500,72 @@ class RadonTransformPlotData:
     speed_text: str = field(default='')
     intercept_text: str = field(default='')
     extra_text: Optional[str] = field(default=None)
+    band_polygons: Optional[List[Tuple[NDArray, NDArray]]] = field(default=None)
+    n_neighbours: Optional[int] = field(default=None)
+
+
+    @classmethod
+    def _build_scoring_band_mask(cls, best_y_line_idxs: NDArray, n_pos: int, n_neighbours: int) -> NDArray:
+        """ Vertical scoring window used by radon_transform: rows `best_y_line_idxs[ci] ± n_neighbours`, clipped.
+
+        Out-of-bounds columns (line index outside [0, n_pos)) are left as NaN — those columns use the median fill in compute_score.
+        """
+        best_y_line_idxs = np.asarray(best_y_line_idxs).astype(int)
+        n_t: int = len(best_y_line_idxs)
+        mask = np.full((n_pos, n_t), np.nan, dtype=float)
+        for ci in np.arange(n_t):
+            ri: int = int(best_y_line_idxs[ci])
+            if (ri < 0) or (ri > (n_pos - 1)):
+                continue
+            lo: int = max(0, ri - int(n_neighbours))
+            hi: int = min(n_pos - 1, ri + int(n_neighbours))
+            mask[lo:(hi + 1), ci] = 1.0
+        ## END for ci in np.arange(n_t)....
+
+        return mask
+
+
+    @classmethod
+    def _iter_scoring_band_polygons(cls, mask: NDArray, origin: Tuple[float, float], scale: Tuple[float, float]):
+        """ Yield stair-step (x, y) polygons covering contiguous in-band columns (bin edges in real space). """
+        ox, oy = float(origin[0]), float(origin[1])
+        sx, sy = float(scale[0]), float(scale[1])
+        n_pos, n_t = int(mask.shape[0]), int(mask.shape[1])
+        ci: int = 0
+        while ci < n_t:
+            rows = np.where(np.isfinite(mask[:, ci]))[0]
+            if len(rows) == 0:
+                ci += 1
+                continue
+            run_cols: List[Tuple[int, int, int]] = []
+            while ci < n_t:
+                rows = np.where(np.isfinite(mask[:, ci]))[0]
+                if len(rows) == 0:
+                    break
+                run_cols.append((ci, int(rows[0]), int(rows[-1])))
+                ci += 1
+            ## END while ci < n_t....
+
+            lower_x: List[float] = []
+            lower_y: List[float] = []
+            upper_x: List[float] = []
+            upper_y: List[float] = []
+            for col_i, lo, hi in run_cols:
+                x0 = ox + (col_i * sx)
+                x1 = ox + ((col_i + 1) * sx)
+                y0 = oy + (lo * sy)
+                y1 = oy + ((hi + 1) * sy)
+                lower_x.extend([x0, x1])
+                lower_y.extend([y0, y0])
+                upper_x.extend([x0, x1])
+                upper_y.extend([y1, y1])
+            ## END for col_i, lo, hi in run_cols....
+
+            xs = np.asarray(lower_x + upper_x[::-1], dtype=float)
+            ys = np.asarray(lower_y + upper_y[::-1], dtype=float)
+            yield xs, ys
+        ## END while ci < n_t....
+
 
     def build_display_text(self, included_keys: Optional[List[str]] = None) -> str:
         """ builds the final display string to be rendered in the label.
@@ -1534,7 +1600,7 @@ class RadonTransformPlotData:
 
 # @define(slots=False, repr=False)
 class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
-    """ Adds the yellow Radon Transform result to the posterior heatmap.
+    """ Adds the yellow Radon Transform fit line and scoring band to the posterior heatmap.
 
     `.add_data_to_pagination_controller(...)` adds the result to the pagination controller
 
@@ -1557,7 +1623,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     plots_group_identifier_key: str = 'radon_transform' # _out_pagination_controller.plots['weighted_corr']
     plots_group_data_identifier_key: str = 'radon_transform_data'
     
-    provided_params: Dict[str, Any] = dict(enable_radon_transform_info = True)
+    provided_params: Dict[str, Any] = dict(enable_radon_transform_info=True, enable_radon_transform_line=True, enable_radon_transform_scoring_band=True, radon_transform_margin=4.0, radon_transform_n_neighbours=None)
     provided_plots_data: Dict[str, Any] = {'radon_transform_data': None}
     provided_plots: Dict[str, Any] = {'radon_transform': {}}
 
@@ -1571,7 +1637,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         }
 
     @classmethod
-    def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None):
+    def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None, pos_bin_edges: Optional[NDArray]=None, n_neighbours: Optional[int]=None):
         """ Builds the Radon-transform data to a single decoder.
         
         2023-05-30 - Add the radon-transformed linear fits to each epoch to the stacked epoch plots:
@@ -1590,6 +1656,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         radon_transform_column_names: display-text allow-list (e.g. ['score'] or ['score','speed','intercept']).
             Structural columns velocity/intercept/speed are always loaded from the DF for the fit line.
+
+        Geometry note: `radon_transform` returns `-velocity` while `intercept` was fit with the un-negated slope,
+        so the correct real-space line is `y = intercept - velocity_df * t`.
         
         """
         if radon_transform_column_names is None:
@@ -1622,6 +1691,20 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         want_speed_text: bool = ('speed' in display_key_set)
         want_intercept_text: bool = ('intercept' in display_key_set)
 
+        # Scoring-band geometry (optional): needs pos bin edges + n_neighbours
+        xbin = None
+        dx: Optional[float] = None
+        x0_center: Optional[float] = None
+        n_pos: Optional[int] = None
+        resolved_n_neighbours: Optional[int] = None
+        if pos_bin_edges is not None:
+            xbin = np.asarray(pos_bin_edges, dtype=float)
+            dx = float(np.nanmean(np.diff(xbin)))
+            x0_center = float(xbin[0]) + (dx / 2.0)
+            n_pos = int(len(xbin) - 1)
+            if n_neighbours is not None:
+                resolved_n_neighbours = int(n_neighbours)
+
         radon_transform_data = {}
 
         has_score_col: bool = ('score' in epochs_linear_fit_df.columns)
@@ -1635,8 +1718,17 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             epoch_time_bin_centers = deepcopy(time_bin_containers[epoch_idx].centers)
             t_start, t_end = epoch_time_bin_centers[0], epoch_time_bin_centers[-1]
 
-            epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: (vel_bound * t) + icpt_bound # Attempt to fix the issue with the function by binding each loop variable as a default value.
-            epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers]) # this works when plotted with 
+            # DF stores -velocity (sign flip on return) with intercept fit to +velocity; geometric line is intercept - velocity_df * t
+            epoch_line_fn = lambda t, vel_bound=epoch_vel, t_start_bound=t_start, icpt_bound=epoch_intercept: icpt_bound - (vel_bound * t)
+            epoch_line_eqn = np.array([epoch_line_fn(x) for x in time_bin_containers[epoch_idx].centers])
+
+            band_polygons: Optional[List[Tuple[NDArray, NDArray]]] = None
+            if (xbin is not None) and (dx is not None) and (x0_center is not None) and (n_pos is not None) and (resolved_n_neighbours is not None):
+                best_y_line_idxs = np.rint((epoch_line_eqn - x0_center) / dx).astype(int)
+                mask = RadonTransformPlotData._build_scoring_band_mask(best_y_line_idxs=best_y_line_idxs, n_pos=n_pos, n_neighbours=resolved_n_neighbours)
+                edges = np.asarray(time_bin_containers[epoch_idx].edges, dtype=float)
+                dt: float = float(np.nanmedian(np.diff(edges))) if (len(edges) > 1) else 1.0
+                band_polygons = list(RadonTransformPlotData._iter_scoring_band_polygons(mask=mask, origin=(float(edges[0]), float(xbin[0])), scale=(dt, dx)))
 
             # resample at midpoints — only populate text for keys in the display allow-list
             with np.printoptions(precision=3, suppress=True, threshold=5):
@@ -1653,14 +1745,14 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 else:
                     intercept_text = ''
 
-            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None)
+            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None, band_polygons=band_polygons, n_neighbours=resolved_n_neighbours)
         ## END for epoch_idx in np.arange(num_filter_epochs)....
 
         return radon_transform_data
 
 
     @classmethod
-    def decoder_build_single_radon_transform_data(cls, curr_results_obj, included_columns=None):
+    def decoder_build_single_radon_transform_data(cls, curr_results_obj, included_columns=None, pos_bin_edges=None, n_neighbours=None):
         """ builds for a single decoder. """
         if included_columns is not None:
             # Normalize alias 'radon' -> 'score' before intersecting with known column names
@@ -1680,7 +1772,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         return cls._subfn_build_radon_transform_plotting_data(active_filter_epochs_df=active_filter_epochs_df.copy(),
                                                                     num_filter_epochs=num_filter_epochs, time_bin_containers=time_bin_containers,
-                                                                    radon_transform_column_names=curr_radon_transform_column_names)
+                                                                    radon_transform_column_names=curr_radon_transform_column_names,
+                                                                    pos_bin_edges=pos_bin_edges, n_neighbours=n_neighbours)
             
     
 
@@ -1758,12 +1851,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         from neuropy.utils.matplotlib_helpers import AnchoredCustomText
 
         def _subfn_build_kwargs(curr_ax):
-            # line_alpha = 0.2  # Faint line
-            # marker_alpha = 0.8  # More opaque markers
-
-            line_alpha = 0.8  # Faint line
-            marker_alpha = 0.8  # More opaque markers
-            # Match wcorr label styling; keep yellow so radon remains distinct from wcorr
+            # Match wcorr label styling; yellow text so radon remains distinct from wcorr
             text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground='#e5ff00', text_alpha=0.95, font_size=11.0)
             
             # Get the axes bounding box in figure coordinates
@@ -1776,20 +1864,23 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                                     horizontalalignment='right',
                                     bbox_to_anchor=(1.0, radon_below_wcorr_y), bbox_transform=curr_ax.transAxes, transform=a_fig.transFigure,
                                     ) # stacked under wcorr at upper-right
-            
 
-            plot_kwargs = dict(scalex=False, scaley=False, label=f'computed radon transform', linestyle='none', linewidth=0, color='#e5ff00', alpha=line_alpha,
-                                marker='+', markersize=2, markerfacecolor='#e5ff00', markeredgecolor='#e5ff00') # , markerfacealpha=marker_alpha, markeredgealpha=marker_alpha
+            # Solid yellow line (same #e5ff00 theme as radon score text)
+            plot_kwargs = dict(scalex=False, scaley=False, label='computed radon transform', linestyle='-', linewidth=3, color='#e5ff00', alpha=0.85, marker=None, zorder=3)
 
             return text_kwargs, plot_kwargs
 
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
+        from matplotlib.patches import Polygon
+
         text_kwargs, plot_kwargs = _subfn_build_kwargs(curr_ax)
         debug_print = kwargs.pop('debug_print', True)
 
         ## Extract the visibility:
         should_enable_radon_transform_info: bool = params.enable_radon_transform_info
+        should_enable_radon_transform_line: bool = bool(params.setdefault('enable_radon_transform_line', True)) and should_enable_radon_transform_info
+        should_enable_radon_transform_scoring_band: bool = bool(params.setdefault('enable_radon_transform_scoring_band', True)) and should_enable_radon_transform_info
         use_AnchoredCustomText: bool = params.setdefault('use_AnchoredCustomText', True)
         if use_AnchoredCustomText:
             custom_value_formatter = ValueFormatter()
@@ -1808,19 +1899,21 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
         extant_line = extant_plots.get('line', None)
         extant_score_text = extant_plots.get('score_text', None)
+        extant_band = extant_plots.get('band', None)
         # plot the radon transform line on the epoch:    
-        if (extant_line is not None) or (extant_score_text is not None):
-            # already exists, clear the existing ones. 
-            # Let's assume we want to remove the 'Quadratic' line (line2)
+        if (extant_line is not None) or (extant_score_text is not None) or (extant_band is not None):
+            # already exists, clear the existing ones.
             if extant_line is not None:
                 extant_line.remove()
             extant_line = None
             if extant_score_text is not None:
                 extant_score_text.remove()
             extant_score_text = None
-            # Is .clear() needed? Why doesn't it remove the heatmap as well?
-            # curr_ax.clear()
-            pass
+            if extant_band is not None:
+                for band_artist in list(extant_band):
+                    band_artist.remove()
+                ## END for band_artist in list(extant_band)....
+            extant_band = None
 
         if curr_time_bin_container is not None:
             actual_time_bins = curr_time_bin_container.centers
@@ -1835,41 +1928,24 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 
             actual_time_bins = deepcopy(curr_time_bins)
 
-        ## Plot the line plot. Could update this like I did for the text?        
-        if should_enable_radon_transform_info:
-            ## Perform plotting of the radon transform lines:
-            if extant_line is not None:
-                # extant_line.remove()
-                if extant_line.axes is None:
-                    # Re-add the line to the axis if necessary
-                    curr_ax.add_artist(extant_line)
-            
+        # Scoring band (orange stair-step polygons) — below the red line
+        radon_band_artists = []
+        if should_enable_radon_transform_scoring_band:
+            band_polygons = getattr(plots_data.radon_transform_data[data_idx], 'band_polygons', None)
+            if band_polygons is not None:
+                for xs, ys in band_polygons:
+                    poly = Polygon(np.column_stack([xs, ys]), closed=True, facecolor=(0.898, 1.0, 0.0, 0.35), edgecolor=(0.898, 1.0, 0.0, 0.85), linewidth=1.0, zorder=2)
+                    curr_ax.add_patch(poly)
+                    radon_band_artists.append(poly)
+                ## END for xs, ys in band_polygons....
 
-                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
-                real_line_extrapolated_t = np.squeeze(curr_time_bins)
-                real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
-
-                extant_line.set_data(real_line_extrapolated_t, real_line_extrapolated_x)
-                # extant_line.set_data(actual_time_bins, curr_line_y)
-                # extant_line.set_data(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y)
-                radon_transform_plot = extant_line
-            else:
-                # exception from below: `ValueError: x and y must have same first dimension, but have shapes (4,) and (213,)`
-                # radon_transform_plot, = curr_ax.plot(curr_time_bins, plots_data.radon_transform_data[data_idx].line_y, **plot_kwargs) # exception: Can not put single artist in more than one figure
-
-                # curr_line_y = np.array([plots_data.radon_transform_data[data_idx].line_fn(x) for x in actual_time_bins]) # dynamic line computed from function
-                curr_line_y = plots_data.radon_transform_data[data_idx].line_y
-                real_line_extrapolated_t = np.squeeze(curr_time_bins)
-                real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
-
-                radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **plot_kwargs)
-
-                # radon_transform_plot, = curr_ax.plot(actual_time_bins, curr_line_y, **plot_kwargs)
+        ## Plot the red geometric radon line
+        if should_enable_radon_transform_line:
+            curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+            real_line_extrapolated_t = np.squeeze(curr_time_bins)
+            real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
+            radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **plot_kwargs)
         else:
-            ## Remove the existing one
-            if extant_line is not None:
-                extant_line.remove()
             radon_transform_plot = None
 
 
@@ -1915,7 +1991,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_idx] = {'line':radon_transform_plot, 'score_text':anchored_text}
+        plots[cls.plots_group_identifier_key][data_idx] = {'line': radon_transform_plot, 'score_text': anchored_text, 'band': radon_band_artists}
         
         if debug_print:
             print(f'\t success!')

@@ -1779,8 +1779,19 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         if included_columns is None:
             included_columns = []
 
+        # Resolve n_neighbours for scoring-band overlay (pipeline default margin=4.0 cm)
+        pos_bin_edges = deepcopy(self.params.xbin) if (self.params.get('xbin', None) is not None) else None
+        pos_bin_size = self.params.get('pos_bin_size', None)
+        if (pos_bin_size is None) and (pos_bin_edges is not None) and (len(pos_bin_edges) > 1):
+            pos_bin_size = float(np.nanmean(np.diff(np.asarray(pos_bin_edges, dtype=float))))
+        n_neighbours = self.params.get('radon_transform_n_neighbours', None)
+        if n_neighbours is None:
+            margin = float(self.params.get('radon_transform_margin', 4.0))
+            if (pos_bin_size is not None) and (pos_bin_size > 0):
+                n_neighbours = max(int(round(margin / float(pos_bin_size))), 1)
+
         # Build Radon Transforms and add them:
-        radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
+        radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns, pos_bin_edges=pos_bin_edges, n_neighbours=n_neighbours)
         if radon_transform_epochs_data is not None:
             RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
     
