@@ -1631,6 +1631,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             
             subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=should_show_non_main_sequence_hlines,
                                                               subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0) | kwargs.pop('subsequence_relative_bin_idx_labels_kwargs', {})
+            subsequence_cmap = kwargs.pop('subsequence_cmap', None) # None -> tab10; str name or Colormap override
     
             
             # Example override dict ______________________________________________________________________________________________ #
@@ -1818,8 +1819,13 @@ class SubsequencesPartitioningResult(ComputedResult):
                 out_dict['split_vlines'] = ax.vlines(group_end_indices, ymin, ymax, **split_vlines_kwargs)
 
 
-            # Define a colormap
-            cmap = plt.get_cmap('tab10')
+            # Define a colormap (override via subsequence_cmap=...; default tab10 for other callers)
+            if subsequence_cmap is None:
+                cmap = plt.get_cmap('tab10')
+            elif isinstance(subsequence_cmap, str):
+                cmap = plt.get_cmap(subsequence_cmap)
+            else:
+                cmap = subsequence_cmap
             cmap = modify_colormap_alpha(cmap=cmap, alpha=subsequence_line_color_alpha)
             num_colors: int = cmap.N
 

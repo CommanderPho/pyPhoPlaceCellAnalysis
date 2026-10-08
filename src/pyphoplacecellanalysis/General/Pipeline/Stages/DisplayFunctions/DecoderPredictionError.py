@@ -1496,7 +1496,7 @@ from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotD
 class RadonTransformPlotData:
     line_y: np.ndarray = field()
     line_fn: Callable = field()
-    score_text: str = field(default='')
+    radon_text: str = field(default='')
     speed_text: str = field(default='')
     intercept_text: str = field(default='')
     extra_text: Optional[str] = field(default=None)
@@ -1570,25 +1570,19 @@ class RadonTransformPlotData:
     def build_display_text(self, included_keys: Optional[List[str]] = None) -> str:
         """ builds the final display string to be rendered in the label.
 
-        included_keys: if provided, only include those field names (e.g. ['radon', 'speed'] or alias 'score' for radon).
+        included_keys: if provided, only include those field names (e.g. ['radon', 'speed']).
             None means show all available fields. Unknown keys are ignored.
         """
-        # Canonical display prefix is "radon:"; rewrite legacy in-memory "score: ..." overlays
-        score_display_text = self.score_text
-        if isinstance(score_display_text, str) and score_display_text.startswith('score: '):
-            score_display_text = 'radon: ' + score_display_text[len('score: '):]
-        key_to_text = {'radon': score_display_text, 'score': score_display_text, 'speed': self.speed_text, 'intercept': self.intercept_text}
+        key_to_text = {'radon': self.radon_text, 'speed': self.speed_text, 'intercept': self.intercept_text}
         if included_keys is None:
             ordered_keys = ['radon', 'speed', 'intercept']
         else:
-            # Prefer canonical 'radon' over alias 'score' if both appear
             seen = set()
             ordered_keys = []
             for k in included_keys:
-                canonical = 'radon' if (k == 'score') else k
-                if (canonical in key_to_text) and (canonical not in seen):
-                    ordered_keys.append(canonical)
-                    seen.add(canonical)
+                if (k in key_to_text) and (k not in seen):
+                    ordered_keys.append(k)
+                    seen.add(k)
             ## END for k in included_keys....
 
         parts = [key_to_text[k] for k in ordered_keys if ((key_to_text[k] is not None) and (len(key_to_text[k]) > 0))]
@@ -1627,7 +1621,12 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     provided_plots_data: Dict[str, Any] = {'radon_transform_data': None}
     provided_plots: Dict[str, Any] = {'radon_transform': {}}
 
-    column_names: List[str] = ['score', 'velocity', 'intercept', 'speed']
+    column_names: List[str] = ['radon', 'velocity', 'intercept', 'speed']
+
+    # Above heuristic sequence hlines (~5) and direction-change lines (~22)
+    OVERLAY_LABEL_ZORDER: int = 50
+    # Radon label sits one step above wcorr so a transient overlap still draws radon on top
+    OVERLAY_RADON_LABEL_ZORDER: int = OVERLAY_LABEL_ZORDER + 1
     
 
     @classmethod
@@ -1635,6 +1634,47 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         return {'on_render_page_callbacks': 
                 {'plot_radon_transform_line_data': cls._callback_update_curr_single_epoch_slice_plot}
         }
+
+
+    @classmethod
+    def _axes_y_below_anchored_artist(cls, curr_ax, anchored_artist, pad_axes: float = 0.0, fallback_y: float = 0.78) -> float:
+        """Return axes-fraction Y for the top of the next stacked label below `anchored_artist`."""
+        if anchored_artist is None:
+            return float(fallback_y)
+        try:
+            fig = curr_ax.get_figure()
+            renderer = fig.canvas.get_renderer()
+            bbox_disp = anchored_artist.get_window_extent(renderer=renderer)
+            bbox_axes = bbox_disp.transformed(curr_ax.transAxes.inverted())
+            y = float(bbox_axes.y0) - float(pad_axes)
+            return max(y, 0.05)
+        except Exception:
+            return float(fallback_y)
+
+
+    @classmethod
+    def _resolve_radon_label_bbox_y(cls, curr_ax, plots, params, pad_axes: float = 0.0) -> float:
+        """Axes-fraction Y for the radon label: below extant wcorr stack, else top-right (1.0)."""
+        fallback_y: float = float(params.setdefault('radon_label_bbox_y', 0.78))
+        wcorr_text = plots.get('weighted_corr', {}).get(curr_ax, {}).get('wcorr_text', None)
+        if (wcorr_text is not None) and (getattr(wcorr_text, 'axes', None) is not None):
+            return cls._axes_y_below_anchored_artist(curr_ax, wcorr_text, pad_axes=pad_axes, fallback_y=fallback_y)
+        return 1.0
+
+
+    @classmethod
+    def _reposition_radon_text_below_wcorr(cls, curr_ax, plots, data_idx, params, wcorr_anchored_text=None, pad_axes: float = 0.0) -> None:
+        """After wcorr(+heuristics) height is known, move extant radon_text label just below it."""
+        radon_text_artist = plots.get(cls.plots_group_identifier_key, {}).get(data_idx, {}).get('radon_text', None)
+        if radon_text_artist is None:
+            return
+        fallback_y: float = float(params.setdefault('radon_label_bbox_y', 0.78))
+        if (wcorr_anchored_text is not None) and (getattr(wcorr_anchored_text, 'axes', None) is not None):
+            y = cls._axes_y_below_anchored_artist(curr_ax, wcorr_anchored_text, pad_axes=pad_axes, fallback_y=fallback_y)
+        else:
+            y = 1.0
+        radon_text_artist.set_bbox_to_anchor((1.0, y), transform=curr_ax.transAxes)
+        radon_text_artist.set_zorder(cls.OVERLAY_RADON_LABEL_ZORDER)
 
     @classmethod
     def _subfn_build_radon_transform_plotting_data(cls, active_filter_epochs_df: pd.DataFrame, num_filter_epochs: int, time_bin_containers: List["BinningContainer"], radon_transform_column_names: Optional[List[str]]=None, pos_bin_edges: Optional[NDArray]=None, n_neighbours: Optional[int]=None):
@@ -1654,15 +1694,16 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         RadonTransformPlotDataProvider._subfn_build_radon_transform_plotting_data
 
-        radon_transform_column_names: display-text allow-list (e.g. ['score'] or ['score','speed','intercept']).
+        radon_transform_column_names: display-text allow-list (e.g. ['radon'] or ['radon','speed','intercept']).
             Structural columns velocity/intercept/speed are always loaded from the DF for the fit line.
+            The radon quality value is read from DF column `'score'` (pipeline/radon_transform naming).
 
         Geometry note: `radon_transform` returns `-velocity` while `intercept` was fit with the un-negated slope,
         so the correct real-space line is `y = intercept - velocity_df * t`.
         
         """
         if radon_transform_column_names is None:
-            display_text_keys = deepcopy(cls.column_names) #['score', 'velocity', 'intercept', 'speed'] # use default
+            display_text_keys = deepcopy(cls.column_names) #['radon', 'velocity', 'intercept', 'speed'] # use default
         else:
             display_text_keys = deepcopy(radon_transform_column_names)
 
@@ -1672,8 +1713,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         # Structural columns required for the radon fit line (independent of display-text subset)
         structural_col_names = ['velocity', 'intercept', 'speed']
         required_df_col_names = deepcopy(structural_col_names)
-        if ('score' in display_text_keys) or ('radon' in display_text_keys) or ('score' in active_filter_epochs_df.columns):
-            # Always prefer loading score when available so text can be built when requested
+        # DF column is still named 'score'; load it when radon text is requested or the column is present
+        if ('radon' in display_text_keys) or ('score' in active_filter_epochs_df.columns):
             if 'score' in active_filter_epochs_df.columns:
                 required_df_col_names = ['score'] + structural_col_names
 
@@ -1686,8 +1727,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         assert num_filter_epochs == np.shape(epochs_linear_fit_df)[0]
 
         display_key_set = set(display_text_keys)
-        # Treat 'radon' alias as requesting score text
-        want_score_text: bool = ('score' in display_key_set) or ('radon' in display_key_set)
+        want_radon_text: bool = ('radon' in display_key_set)
         want_speed_text: bool = ('speed' in display_key_set)
         want_intercept_text: bool = ('intercept' in display_key_set)
 
@@ -1707,12 +1747,12 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         radon_transform_data = {}
 
-        has_score_col: bool = ('score' in epochs_linear_fit_df.columns)
+        has_score_col: bool = ('score' in epochs_linear_fit_df.columns) # DF column name from radon_transform
         for epoch_idx in np.arange(num_filter_epochs):
             epoch_vel = epochs_linear_fit_df['velocity'].values[epoch_idx]
             epoch_intercept = epochs_linear_fit_df['intercept'].values[epoch_idx]
             epoch_speed = epochs_linear_fit_df['speed'].values[epoch_idx]
-            epoch_score = epochs_linear_fit_df['score'].values[epoch_idx] if has_score_col else None
+            epoch_radon = epochs_linear_fit_df['score'].values[epoch_idx] if has_score_col else None
 
             # ## 2024-05-06 - Compute new epoch_intercepts aligned with the proper time bin. The ones computed are aligned with (0, 0)
             epoch_time_bin_centers = deepcopy(time_bin_containers[epoch_idx].centers)
@@ -1732,10 +1772,10 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
             # resample at midpoints — only populate text for keys in the display allow-list
             with np.printoptions(precision=3, suppress=True, threshold=5):
-                if want_score_text and (epoch_score is not None):
-                    score_text = f"radon: " + str(np.array([epoch_score])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
+                if want_radon_text and (epoch_radon is not None):
+                    radon_text = f"radon: " + str(np.array([epoch_radon])).lstrip("[").rstrip("]") # output is just the number, as initially it is '[0.67]' but then the [ and ] are stripped.
                 else:
-                    score_text = ''
+                    radon_text = ''
                 if want_speed_text:
                     speed_text = f"speed: " + str(np.array([epoch_speed])).lstrip("[").rstrip("]")
                 else:
@@ -1745,7 +1785,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 else:
                     intercept_text = ''
 
-            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, score_text=score_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None, band_polygons=band_polygons, n_neighbours=resolved_n_neighbours)
+            radon_transform_data[epoch_idx] = RadonTransformPlotData(line_y=epoch_line_eqn, line_fn=epoch_line_fn, radon_text=radon_text, speed_text=speed_text, intercept_text=intercept_text, extra_text=None, band_polygons=band_polygons, n_neighbours=resolved_n_neighbours)
         ## END for epoch_idx in np.arange(num_filter_epochs)....
 
         return radon_transform_data
@@ -1755,13 +1795,11 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
     def decoder_build_single_radon_transform_data(cls, curr_results_obj, included_columns=None, pos_bin_edges=None, n_neighbours=None):
         """ builds for a single decoder. """
         if included_columns is not None:
-            # Normalize alias 'radon' -> 'score' before intersecting with known column names
-            normalized_included = [('score' if (v == 'radon') else v) for v in included_columns]
-            included_columns = [v for v in deepcopy(cls.column_names) if v in normalized_included] # only allow the included columns
+            included_columns = [v for v in deepcopy(cls.column_names) if v in included_columns] # only allow the included columns
         else:
             included_columns = deepcopy(cls.column_names) # allow all default column names
         
-        curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['score', 'velocity', 'intercept', 'speed']
+        curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['radon', 'velocity', 'intercept', 'speed']
         num_filter_epochs:int = curr_results_obj.num_filter_epochs # AttributeError: 'LeaveOneOutDecodingAnalysisResult' object has no attribute 'num_filter_epochs'
         # num_filter_epochs:int = len(curr_results_obj.active_filter_epochs) # LeaveOneOutDecodingAnalysisResult does have this though
         
@@ -1793,8 +1831,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         # INPUTS: decoder_decoded_epochs_result_dict, a_name
         if included_columns is not None:
-            normalized_included = [('score' if (v == 'radon') else v) for v in included_columns]
-            included_columns = [v for v in cls.column_names if v in normalized_included] # only allow the included columns
+            included_columns = [v for v in cls.column_names if v in included_columns] # only allow the included columns
         else:
             included_columns = deepcopy(cls.column_names) # allow all default column names
 
@@ -1815,7 +1852,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         for a_name in track_templates.get_decoder_names():
             curr_results_obj = decoder_decoded_epochs_result_dict[a_name]
             # curr_radon_transform_column_names: List[str] = decoder_radon_transform_result_columns_dict[a_name]
-            curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['score', 'velocity', 'intercept', 'speed']
+            curr_radon_transform_column_names: List[str] = deepcopy(included_columns) #['radon', 'velocity', 'intercept', 'speed']
             # print(f'curr_radon_transform_column_names: {curr_radon_transform_column_names}')
             num_filter_epochs:int = curr_results_obj.num_filter_epochs
             time_bin_containers: List[BinningContainer] = deepcopy(curr_results_obj.time_bin_containers)
@@ -1852,14 +1889,14 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         def _subfn_build_kwargs(curr_ax):
             radon_theme_color: str = '#ffee00' ## a dark yellow/orange
-            # Match wcorr label styling; yellow text so radon remains distinct from wcorr
+            # Match wcorr label styling; yellow stroke so radon remains distinct from wcorr
             # text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground=radon_theme_color, text_alpha=0.95, font_size=9.5)
             text_kwargs = dict(strokewidth=1.5, stroke_foreground=radon_theme_color, stroke_alpha=0.75, text_foreground='black', text_alpha=0.95, font_size=9.5)
             
             # Get the axes bounding box in figure coordinates
             a_fig = curr_ax.get_figure()
-            # Place radon label in the same upper-right stack as wcorr, just below it
-            radon_below_wcorr_y: float = params.setdefault('radon_label_bbox_y', 0.78)
+            # Below extant wcorr(+heuristics) stack when present; else top-right (radon-only). radon_label_bbox_y is measurement-failure fallback only.
+            radon_below_wcorr_y: float = cls._resolve_radon_label_bbox_y(curr_ax, plots, params, pad_axes=0.0)
 
             ## Positioning kwargs: same corner as wcorr (upper right), offset down so it sits just below wcorr
             text_kwargs |= dict(loc='upper right',
@@ -1907,17 +1944,17 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         extant_plots = plots[cls.plots_group_identifier_key].get(data_idx, {})
         extant_line = extant_plots.get('line', None)
-        extant_score_text = extant_plots.get('score_text', None)
+        extant_radon_text = extant_plots.get('radon_text', None)
         extant_band = extant_plots.get('band', None)
         # plot the radon transform line on the epoch:    
-        if (extant_line is not None) or (extant_score_text is not None) or (extant_band is not None):
+        if (extant_line is not None) or (extant_radon_text is not None) or (extant_band is not None):
             # already exists, clear the existing ones.
             if extant_line is not None:
                 extant_line.remove()
             extant_line = None
-            if extant_score_text is not None:
-                extant_score_text.remove()
-            extant_score_text = None
+            if extant_radon_text is not None:
+                extant_radon_text.remove()
+            extant_radon_text = None
             if extant_band is not None:
                 for band_artist in list(extant_band):
                     band_artist.remove()
@@ -1959,10 +1996,10 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
 
         # Text Labels ________________________________________________________________________________________________________ #
-        if (extant_score_text is not None):
+        if (extant_radon_text is not None):
             # already exists, update the existing one:
-            assert isinstance(extant_score_text, (AnchoredText, AnchoredCustomText)), f"extant_score_text is of type {type(extant_score_text)} but is expected to be of type AnchoredText."
-            anchored_text: Union[AnchoredText, AnchoredCustomText] = extant_score_text
+            assert isinstance(extant_radon_text, (AnchoredText, AnchoredCustomText)), f"extant_radon_text is of type {type(extant_radon_text)} but is expected to be of type AnchoredText."
+            anchored_text: Union[AnchoredText, AnchoredCustomText] = extant_radon_text
 
             if should_show_radon_text:
                 # if we want to see the radon transform info:
@@ -1977,7 +2014,6 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                     anchored_text = None
                     anchored_text = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                     anchored_text.patch.set_ec("none")
-                    anchored_text.set_alpha(0.4)
                 else:
                     anchored_text.txt.set_text(final_text)
 
@@ -1994,13 +2030,14 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 # if we want to see the radon transform info:
                 anchored_text: Union[AnchoredText, AnchoredCustomText] = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **text_kwargs)
                 anchored_text.patch.set_ec("none")
-                anchored_text.set_alpha(0.4)
             else:
-                anchored_text = None # remain with no score text
+                anchored_text = None # remain with no radon text
 
+        if anchored_text is not None:
+            anchored_text.set_zorder(cls.OVERLAY_RADON_LABEL_ZORDER)
 
         # Store the plot objects for future updates:
-        plots[cls.plots_group_identifier_key][data_idx] = {'line': radon_transform_plot, 'score_text': anchored_text, 'band': radon_band_artists}
+        plots[cls.plots_group_identifier_key][data_idx] = {'line': radon_transform_plot, 'radon_text': anchored_text, 'band': radon_band_artists}
         
         if debug_print:
             print(f'\t success!')
@@ -2163,7 +2200,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         plots['weighted_corr']
         
     Usage:
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPlotter
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider, WeightedCorrelationPlotData
     """
     plots_group_identifier_key: str = 'weighted_corr' # _out_pagination_controller.plots['weighted_corr']
 
@@ -2171,6 +2208,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
     # text_color: str = '#42D142' # a light green
     # text_color: str = '#66FF00' # a light green
     text_color: str = '#013220' # a very dark forest green
+    theme_stroke_color: str = '#00B0FF' # bright blue outline (mirrors radon's yellow stroke style)
 
     provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info=True, enable_weighted_corr_data_provider_modify_axes_rect=False, weighted_corr_text_original_figure_rect=None, weighted_corr_text_was_axes_rect_modified=False)
     provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
@@ -2486,7 +2524,7 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## On Lab computer, reduce the stroke_Width
         # text_kwargs.update(stroke_alpha=0.95, strokewidth=1.5, stroke_foreground='w', text_foreground='black', font_size=11.0, text_alpha=0.95) # #TODO 2024-12-17 12:33: - [ ] Reduce the stroke width
-        text_kwargs.update(stroke_alpha=0.75, strokewidth=1.5, stroke_foreground='grey', text_foreground='black', font_size=11.0, text_alpha=0.95)
+        text_kwargs.update(stroke_alpha=0.75, strokewidth=1.5, stroke_foreground=cls.theme_stroke_color, text_foreground='black', font_size=11.0, text_alpha=0.95)
         # anchored_text_alpha_override_value: float = 0.4 ## default
         anchored_text_alpha_override_value: float = 1.0 ## default
         # custom_value_formatter = None ## OVERRIDE custom_value_formatter
@@ -2547,9 +2585,15 @@ class WeightedCorrelationPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
 
         # anchored_text.set_alpha(0.95)
+
+        if anchored_text is not None:
+            anchored_text.set_zorder(RadonTransformPlotDataProvider.OVERLAY_LABEL_ZORDER)
         
         # Store the plot objects for future updates:
         plots[cls.plots_group_identifier_key][curr_ax] = {'wcorr_text': anchored_text}
+
+        # Radon runs before wcorr; once the (variable-height) wcorr+heuristic block is known, stack radon just below it.
+        RadonTransformPlotDataProvider._reposition_radon_text_below_wcorr(curr_ax, plots, data_idx, params, wcorr_anchored_text=anchored_text, pad_axes=0.0)
         
         if debug_print:
             print(f'\t success!')
@@ -3069,7 +3113,7 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     Usage:
 
-    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedSequenceAndHeuristicsPlotDataProvider
+    from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedSequenceAndHeuristicsPlotDataProvider, DecodedSequenceAndHeuristicsPlotData
 
     
     Can extract from owner like:
@@ -3085,6 +3129,10 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
 
     """
     plots_group_identifier_key: str = 'decoded_sequence_and_heuristics_curves' # _out_pagination_controller.plots['weighted_corr']
+
+    # Green theme for sequence triangles / hlines / number outlines (main = brightest)
+    theme_main_color: str = '#00C853'
+    theme_secondary_colors: Tuple[str, ...] = ('#69F0AE', '#00E676', '#A5D6A7', '#81C784')
     
     provided_params: Dict[str, Any] = {'enable_decoded_sequence_and_heuristics_curve': True, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False} # , enable_actual_position_curve = False
     provided_plots_data: Dict[str, Any] = {'decoded_sequence_and_heuristics_curves_data': None}
@@ -3097,6 +3145,13 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
         return {'on_render_page_callbacks': 
                 {'plot_decoded_decoded_sequence_and_heuristics_curves_data': cls._callback_update_curr_single_epoch_slice_plot}
         }
+
+
+    @classmethod
+    def build_heuristic_subsequence_cmap(cls):
+        """ListedColormap: main sequence first (#00C853), then lighter greens for secondary subsequences."""
+        from matplotlib.colors import ListedColormap
+        return ListedColormap([cls.theme_main_color, *cls.theme_secondary_colors], name='heuristic_sequence_greens')
 
     
     @classmethod
@@ -3254,10 +3309,10 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                 
                 # Most likely position plots:
                 basic_linestyle = '-' # default
-                common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=False, defer_show=True) | kwargs
+                common_plot_time_bins_multiple_kwargs = dict(subsequence_line_color_alpha=0.95, arrow_alpha=0.4, enable_axes_formatting=False, defer_show=True, subsequence_cmap=cls.build_heuristic_subsequence_cmap()) | kwargs
 
                 merged_debug_sequences_kwargs = dict(
-                    sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=basic_linestyle, zorder=10, alpha=1.0), # high-zorder to place it on-top, linestyle is "densely-dashed"
+                    sequence_position_hlines_kwargs=dict(linewidth=2, linestyle=basic_linestyle, zorder=5, alpha=1.0), # above heatmap/radon; below overlay labels (RadonTransformPlotDataProvider.OVERLAY_LABEL_ZORDER)
                     # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
                     split_vlines_kwargs = dict(should_skip=False),
                     time_bin_edges_vlines_kwargs = dict(should_skip=False),

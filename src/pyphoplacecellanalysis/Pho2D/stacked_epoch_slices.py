@@ -2310,7 +2310,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
 
         A non-empty `included_columns` is treated as the display selection (same role as `visible_overlay_label_keys`):
-            paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr'])
+            paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['radon', 'wcorr'])
             # equivalent display intent:
             paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
@@ -2326,9 +2326,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         user_specified_display_columns: bool = (user_provided_columns is not None) and (len(user_provided_columns) > 0)
 
         if user_specified_display_columns:
-            # Normalize alias 'radon' -> 'score' for dataframe column loading; keep user list for visible keys
+            # Outward-facing key is 'radon' (DF column remains 'score' and is read inside the radon provider)
             display_label_keys = deepcopy(user_provided_columns)
-            load_columns = [('score' if (c == 'radon') else c) for c in display_label_keys]
+            load_columns = deepcopy(display_label_keys)
             self.update_params(visible_overlay_label_keys=display_label_keys)
         else:
             load_columns = []
@@ -2346,7 +2346,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 # Default: extend from master enable flags when caller did not pass an explicit list
                 enable_radon_transform_info = a_pagination_controller.params.get('enable_radon_transform_info', None)
                 if (enable_radon_transform_info is not None) and enable_radon_transform_info:
-                    radon_transform_columns = ['score', 'velocity', 'intercept', 'speed']
+                    radon_transform_columns = ['radon', 'velocity', 'intercept', 'speed']
                     per_decoder_included_columns.extend(radon_transform_columns)
 
                 enable_weighted_correlation_info = a_pagination_controller.params.get('enable_weighted_correlation_info', None)
@@ -2870,12 +2870,12 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
 
             # Show only specific overlay label fields (None restores all).
-            # 'radon' is an alias for the radon-score field (displayed as "radon: ...").
+            # Use 'radon' (not 'score') for the radon quality label (displayed as "radon: ...").
             # Radon auto-stacks under the full wcorr(+heuristic) label block; radon_label_bbox_y is only a measurement-failure fallback:
             paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
             # Equivalent at add-time (also sets visible_overlay_label_keys):
-            # paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr', 'coverage', 'mseq_tcov'])
+            # paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['radon', 'wcorr', 'coverage', 'mseq_tcov'])
             # Fallback Y only if window-extent measurement fails (dynamic stack is preferred):
             # paginated_multi_decoder_decoded_epochs_window.update_params(radon_label_bbox_y=0.78)
 
