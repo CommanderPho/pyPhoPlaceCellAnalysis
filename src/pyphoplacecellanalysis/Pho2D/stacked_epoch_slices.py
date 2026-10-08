@@ -3466,12 +3466,15 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                                                 active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], directional_decoders_epochs_decode_result: "DecoderDecodedEpochsResult", 
                                                 active_filter_epochs_df: pd.DataFrame, known_epochs_type='ripple', title='Long-like post-Delta Ripples Only', **kwargs):
         """ 
-        Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters
+        Plots 3 connected windows: the main decoded position posteriors, the track identity posteriors, and the rasters.
 
+        Pass `enable_directional_template_debugger=False` to skip creating the Pho Directional Template Debugger window.
         """
         from neuropy.utils.matplotlib_helpers import get_heatmap_cmap
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import co_filter_epochs_and_spikes
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import get_proper_global_spikes_df
+
+        enable_directional_template_debugger: bool = kwargs.pop('enable_directional_template_debugger', True)
 
         ## INPUTS: curr_active_pipeline, track_templates, active_spikes_df, active_decoder_decoded_epochs_result_dict: Dict[types.DecoderName, DecodedFilterEpochsResult], known_epochs_type='ripple', title='Long-like post-Delta Ripples Only'
         assert known_epochs_type in ['ripple', 'laps'], f"known_epochs_type: '{known_epochs_type}' should be either 'ripple' or 'laps'"
@@ -3542,9 +3545,11 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         # Build Raster Widget ________________________________________________________________________________________________ #
         ripple_rasters_plot_tuple = paginated_multi_decoder_decoded_epochs_window.build_attached_raster_viewer_widget(track_templates=track_templates, active_spikes_df=active_spikes_df, filtered_epochs_df=active_filter_epochs_df) 
         _out_ripple_rasters, update_attached_raster_viewer_epoch_callback = ripple_rasters_plot_tuple    
-        ## Attach TemplateViewer to raster:
-        _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
-        # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
+        ## Attach TemplateViewer to raster (optional):
+        if enable_directional_template_debugger:
+            _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
+            # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
+        ## END if enable_directional_template_debugger...
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
