@@ -2870,12 +2870,13 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
 
             # Show only specific overlay label fields (None restores all).
-            # 'radon' is an alias for the radon-score field (displayed as "radon: ...", stacked under wcorr):
+            # 'radon' is an alias for the radon-score field (displayed as "radon: ...").
+            # Radon auto-stacks under the full wcorr(+heuristic) label block; radon_label_bbox_y is only a measurement-failure fallback:
             paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
             # Equivalent at add-time (also sets visible_overlay_label_keys):
-            # paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr'])
-            # Optional vertical tweak if radon sits too high/low relative to wcorr:
+            # paginated_multi_decoder_decoded_epochs_window.add_data_overlays(included_columns=['score', 'wcorr', 'coverage', 'mseq_tcov'])
+            # Fallback Y only if window-extent measurement fails (dynamic stack is preferred):
             # paginated_multi_decoder_decoded_epochs_window.update_params(radon_label_bbox_y=0.78)
 
 
@@ -3299,9 +3300,14 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             yellowBlueMarginal_dock_name: str = 'yellowBlueMarginal'
             relative_dock = self.find_display_dock('short_RL')
             assert relative_dock is not None
+            # Embedding reparents mw so later showEvent/setWindowTitle would overwrite this window's title.
+            saved_window_title = self.windowTitle()
             self.contents.dock_configs[yellowBlueMarginal_dock_name] = CustomDockDisplayConfig(custom_get_colors_callback_fn=get_utility_dock_colors, showCloseButton=False)
             self.contents.dock_widgets[yellowBlueMarginal_dock_name] = self.add_display_dock(identifier=yellowBlueMarginal_dock_name, widget=a_win, dockSize=(430,780), dockAddLocationOpts=['right', relative_dock],
                                                                                       display_config=self.contents.dock_configs[yellowBlueMarginal_dock_name], autoOrientation=False)
+            # Keep dock title via Dock identifier; stop mw.showEvent from re-applying YellowBlue's name to the parent window.
+            a_yellow_blue_controller.ui.mw.params.window_title = saved_window_title
+            self.setWindowTitle(saved_window_title)
 
         else:
             ## separate window        
@@ -3531,6 +3537,9 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
         # Build Yellow-Blue Marginal Widget __________________________________________________________________________________ #
         # Attach before rasters so YellowBlue joins the decoded row as a peer; rasters top strip then spans all 5 columns.
+        # Save title: embedding YellowBlue then adding the rasters top dock can re-show child matplotlib widgets, whose
+        # showEvent calls window().setWindowTitle(...) and would otherwise overwrite this main window title.
+        saved_window_title = paginated_multi_decoder_decoded_epochs_window.windowTitle()
         _build_attached_yellow_blue_track_identity_marginal_window_kwargs_DICT = {'ripple': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.ripple_decoding_time_bin_size, name='TrackIdentity_Marginal_Ripples', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_ripple_filter_epochs_decoder_result)),
             'laps': dict(decoding_time_bin_size=directional_decoders_epochs_decode_result.laps_decoding_time_bin_size, name='TrackIdentity_Marginal_Laps', filter_epochs_decoder_result=deepcopy(directional_merged_decoders_result.all_directional_laps_filter_epochs_decoder_result)),
         }
@@ -3550,6 +3559,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             _out_directional_template_pfs_debugger, debug_update_paired_directional_template_pfs_debugger = _out_ripple_rasters.plot_attached_directional_templates_pf_debugger(curr_active_pipeline=curr_active_pipeline)
             # Accessible via `directional_template_pfs_debugger = paginated_multi_decoder_decoded_epochs_window.ui.attached_ripple_rasters_widget.ui.controlled_references['directional_template_pfs_debugger']`
         ## END if enable_directional_template_debugger...
+        paginated_multi_decoder_decoded_epochs_window.setWindowTitle(saved_window_title)
 
         return (app, paginated_multi_decoder_decoded_epochs_window, pagination_controller_dict), ripple_rasters_plot_tuple, yellow_blue_trackID_marginals_plot_tuple
 
