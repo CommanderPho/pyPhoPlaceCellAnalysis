@@ -1867,15 +1867,22 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                                     ) # stacked under wcorr at upper-right
 
             # Solid yellow line (same #e5ff00 theme as radon score text)
-            plot_kwargs = dict(scalex=False, scaley=False, label='computed radon transform', linestyle='-', linewidth=1, color=radon_theme_color, alpha=0.85, marker=None, zorder=3)
+            line_kwargs = dict(scalex=False, scaley=False, label='computed radon transform', linestyle='-', linewidth=0.5, color=radon_theme_color, alpha=0.85, marker=None, zorder=3)
 
-            return text_kwargs, plot_kwargs
+            fn_rgb255_to_rgbF = lambda arr: [(float(v)/float(255)) for v in arr]
+            # fRGB_band_color = [(float(v)/float(255)) for v in [235, 192, 52]]
+            fRGB_band_facecolor = fn_rgb255_to_rgbF([235, 192, 52])
+            fRGB_band_edgecolor = fn_rgb255_to_rgbF([235, 177, 52])
+            
+            band_kwargs = dict(facecolor=(*fRGB_band_facecolor, 0.35), edgecolor=(*fRGB_band_edgecolor, 0.85), linewidth=1.0)
+
+            return text_kwargs, line_kwargs, band_kwargs
 
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         from matplotlib.patches import Polygon
 
-        text_kwargs, plot_kwargs = _subfn_build_kwargs(curr_ax)
+        text_kwargs, line_kwargs, band_kwargs = _subfn_build_kwargs(curr_ax)
         debug_print = kwargs.pop('debug_print', True)
 
         ## Extract the visibility:
@@ -1929,13 +1936,13 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 
             actual_time_bins = deepcopy(curr_time_bins)
 
-        # Scoring band (orange stair-step polygons) — below the red line
+        # Scoring band (orange stair-step polygons) — below the yellow line
         radon_band_artists = []
         if should_enable_radon_transform_scoring_band:
             band_polygons = getattr(plots_data.radon_transform_data[data_idx], 'band_polygons', None)
             if band_polygons is not None:
                 for xs, ys in band_polygons:
-                    poly = Polygon(np.column_stack([xs, ys]), closed=True, facecolor=(0.898, 1.0, 0.0, 0.35), edgecolor=(0.898, 1.0, 0.0, 0.85), linewidth=1.0, zorder=2)
+                    poly = Polygon(np.column_stack([xs, ys]), closed=True, **band_kwargs, zorder=2)
                     curr_ax.add_patch(poly)
                     radon_band_artists.append(poly)
                 ## END for xs, ys in band_polygons....
@@ -1945,7 +1952,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
             curr_line_y = plots_data.radon_transform_data[data_idx].line_y
             real_line_extrapolated_t = np.squeeze(curr_time_bins)
             real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
-            radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **plot_kwargs)
+            radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **line_kwargs)
         else:
             radon_transform_plot = None
 
