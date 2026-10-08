@@ -1775,12 +1775,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
     def add_data_overlays(self, decoder_decoded_epochs_result, included_columns=None, defer_refresh=False):
-        """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
+        """ builds the Radon Transforms and Overlay Labels (wcorr/heuristic/radon corner text) data for this decoder and adds them to the plot.
         
         I think decoder_decoded_epochs_result:DecodedFilterEpochsResult
+
+        When `included_columns` is None/empty, load columns are expanded from the enable flags
+        (`enable_radon_transform_info` -> radon columns; `enable_overlay_labels_info` -> wcorr/heuristic columns), mirroring the multi-decoder wrapper.
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import OverlayLabelsPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider, MarginalLabelsPlotDataProvider
         # from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import TrainTestSplitPlotDataProvider, TrainTestSplitPlotData
         # self: PaginatedFigureController
@@ -1790,6 +1793,15 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
         if included_columns is None:
             included_columns = []
+        else:
+            included_columns = list(included_columns)
+
+        if len(included_columns) == 0:
+            # Default: extend from master enable flags when caller did not pass an explicit list
+            if bool(self.params.get('enable_radon_transform_info', False)):
+                included_columns.extend(deepcopy(RadonTransformPlotDataProvider.column_names)) # ['radon', 'velocity', 'intercept', 'speed']
+            if bool(self.params.get('enable_overlay_labels_info', False)):
+                included_columns.extend(OverlayLabelsPaginatedPlotDataProvider.get_column_names()) # wcorr/P_decoder/pearsonr + heuristic keys
 
         # Resolve n_neighbours for scoring-band overlay (pipeline default margin=4.0 cm)
         pos_bin_edges = deepcopy(self.params.xbin) if (self.params.get('xbin', None) is not None) else None
@@ -1802,15 +1814,17 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
             if (pos_bin_size is not None) and (pos_bin_size > 0):
                 n_neighbours = max(int(round(margin / float(pos_bin_size))), 1)
 
-        # Build Radon Transforms and add them:
+        # Build Radon Transforms and add them (line/band geometry; radon corner text strings consumed by OverlayLabels below):
         radon_transform_epochs_data = RadonTransformPlotDataProvider.decoder_build_single_radon_transform_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns, pos_bin_edges=pos_bin_edges, n_neighbours=n_neighbours)
-        if radon_transform_epochs_data is not None:
+        did_add_radon_transform_data: bool = (radon_transform_epochs_data is not None)
+        if did_add_radon_transform_data:
             RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
     
-        # Build Weighted Correlation Data Info and add them:    
-        wcorr_epochs_data = WeightedCorrelationPaginatedPlotDataProvider.decoder_build_single_weighted_correlation_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
-        if wcorr_epochs_data is not None:
-            WeightedCorrelationPaginatedPlotDataProvider.add_data_to_pagination_controller(self, wcorr_epochs_data, update_controller_on_apply=False)
+        # Build Overlay Labels data (wcorr/heuristic DF scores) and add them. Must be registered after radon so the label callback can read radon_transform_data.
+        # Register even when DF-derived data is None if radon was added, so the radon corner label (owned by OverlayLabels) still renders on radon-only paths.
+        overlay_labels_epochs_data = OverlayLabelsPaginatedPlotDataProvider.decoder_build_single_overlay_labels_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
+        if (overlay_labels_epochs_data is not None) or did_add_radon_transform_data:
+            OverlayLabelsPaginatedPlotDataProvider.add_data_to_pagination_controller(self, (overlay_labels_epochs_data or {}), update_controller_on_apply=False)
 
 
         # Build Decoded Positions Data and add them:    
@@ -1846,14 +1860,14 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
     @function_attributes(short_name=None, tags=['data-overlays', 'remove'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['add_data_overlays'])
     def remove_data_overlays(self, defer_refresh=False):
-        """ builds the Radon Transforms and Weighted Correlation data for this decoder and adds them to the plot.
+        """ removes the Radon Transforms and Overlay Labels data for this decoder from the plot.
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import OverlayLabelsPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
 
         RadonTransformPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
-        WeightedCorrelationPaginatedPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
+        OverlayLabelsPaginatedPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
         DecodedPositionsPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
         DecodedSequenceAndHeuristicsPlotDataProvider.remove_data_from_pagination_controller(self, update_controller_on_apply=False)
 
@@ -2305,7 +2319,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         
     @function_attributes(short_name=None, tags=['data-overlays', 'add'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-08-12 00:00', related_items=['remove_data_overlays'])
     def add_data_overlays(self, included_columns=None, defer_refresh=False):
-        """ builds the Radon Transforms and Weighted Correlation data and adds them to the plot.
+        """ builds the Radon Transforms and Overlay Labels (wcorr/heuristic/radon corner text) data and adds them to the plot.
         
         REFINEMENT: note that it only plots either 'laps' or 'ripple', not both, so it doesn't need all this data.
 
@@ -2315,10 +2329,10 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
             paginated_multi_decoder_decoded_epochs_window.update_params(visible_overlay_label_keys=['radon', 'wcorr'])
             paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
 
-        When `included_columns` is None/empty, defaults are taken from enable_radon_transform_info / enable_weighted_correlation_info.
+        When `included_columns` is None/empty, defaults are taken from enable_radon_transform_info / enable_overlay_labels_info.
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import RadonTransformPlotDataProvider
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import WeightedCorrelationPaginatedPlotDataProvider
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import OverlayLabelsPaginatedPlotDataProvider
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.DecoderPredictionError import DecodedPositionsPlotDataProvider, DecodedSequenceAndHeuristicsPlotDataProvider
         
         ## Choose which columns from the filter_epochs dataframe to include on the plot.
@@ -2349,8 +2363,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                     radon_transform_columns = ['radon', 'velocity', 'intercept', 'speed']
                     per_decoder_included_columns.extend(radon_transform_columns)
 
-                enable_weighted_correlation_info = a_pagination_controller.params.get('enable_weighted_correlation_info', None)
-                if (enable_weighted_correlation_info is not None) and enable_weighted_correlation_info:
+                enable_overlay_labels_info = a_pagination_controller.params.get('enable_overlay_labels_info', None)
+                if (enable_overlay_labels_info is not None) and enable_overlay_labels_info:
                     wcorr_columns = ['wcorr', 'P_decoder', 'pearsonr']
                     per_decoder_included_columns.extend(wcorr_columns)
 
@@ -3214,7 +3228,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
                 'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
                                                                                                     'enable_decoded_sequence_and_heuristics_curve': False, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False,
-                                                                                                     'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False, 'enable_weighted_corr_data_provider_modify_axes_rect': False, 'enable_marginal_labels': True, 'marginal_y_bin_labels': marginal_y_bin_labels} | params_kwargs
+                                                                                                     'enable_radon_transform_info': False, 'enable_overlay_labels_info': False, 'enable_overlay_labels_modify_axes_rect': False, 'enable_marginal_labels': True, 'marginal_y_bin_labels': marginal_y_bin_labels} | params_kwargs
         
         print(f'params_kwargs: {params_kwargs}')
         
@@ -3516,8 +3530,8 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         params_kwargs = {'known_epochs_type': known_epochs_type,
                          'enable_per_epoch_action_buttons': False,
                 'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-                'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-                # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                'enable_decoded_most_likely_position_curve': False, 'enable_decoded_sequence_and_heuristics_curve': False, 'enable_radon_transform_info': False, 'enable_overlay_labels_info': False,
+                # 'enable_radon_transform_info': False, 'enable_overlay_labels_info': False,
                 # 'disable_y_label': True,
                 'isPaginatorControlWidgetBackedMode': True,
                 'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True,

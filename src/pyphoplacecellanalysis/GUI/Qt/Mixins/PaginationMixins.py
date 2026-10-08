@@ -116,12 +116,12 @@ class PaginatedPlotDataProvider:
 
     Implmentors must provide:
 
-        plots_group_identifier_key: str = 'weighted_corr'
+        plots_group_identifier_key: str = 'overlay_labels'
 
         @classmethod
         def get_provided_callbacks(cls) -> Dict[str, Dict]:
             return {'on_render_page_callbacks': 
-                    {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+                    {'plot_overlay_labels_data': cls._callback_update_curr_single_epoch_slice_plot}
             }
 
 
@@ -129,11 +129,13 @@ class PaginatedPlotDataProvider:
         def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs):
             pass
     
-    
+    History:
+        Template defaults formerly used the `weighted_corr` / `weighted_corr_data` keys, `enable_weighted_correlation_info` param, and `plot_wcorr_data` callback id
+        (the former `WeightedCorrelationPaginatedPlotDataProvider`, now `OverlayLabelsPaginatedPlotDataProvider`).
     """
-    provided_params: Dict[str, Any] = dict(enable_weighted_correlation_info = True)
-    provided_plots_data: Dict[str, Any] = {'weighted_corr_data': None}
-    provided_plots: Dict[str, Any] = {'weighted_corr': {}}
+    provided_params: Dict[str, Any] = dict(enable_overlay_labels_info = True)
+    provided_plots_data: Dict[str, Any] = {'overlay_labels_data': None}
+    provided_plots: Dict[str, Any] = {'overlay_labels': {}}
     column_names: List[str] = []
 
     @classmethod
@@ -159,7 +161,7 @@ class PaginatedPlotDataProvider:
     def get_provided_callbacks(cls) -> Dict[str, Dict]:
         """ override """
         return deepcopy({'on_render_page_callbacks': 
-                {'plot_wcorr_data': cls._callback_update_curr_single_epoch_slice_plot}
+                {'plot_overlay_labels_data': cls._callback_update_curr_single_epoch_slice_plot}
         })
 
     @classmethod
@@ -180,7 +182,7 @@ class PaginatedPlotDataProvider:
 
         ## Add the .plots_data:
         assert len(provided_data) == 1
-        # weighted_corr_data = provided_data[1]
+        # overlay_labels_data = provided_data[1]
         assert len(provided_data) == len(cls.get_provided_plots_data()), f"len(provided_data): {len(provided_data)} != len(cls.get_provided_plots_data()): {len(cls.get_provided_plots_data())}"
         active_plots_data = {k:(deepcopy(provided_data[i]) or default_class_value) for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items())}
 

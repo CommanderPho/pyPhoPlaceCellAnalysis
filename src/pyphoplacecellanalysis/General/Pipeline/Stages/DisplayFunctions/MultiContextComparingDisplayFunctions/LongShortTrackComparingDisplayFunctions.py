@@ -898,8 +898,8 @@ class LongShortTrackComparingDisplayFunctions(AllFunctionEnumeratingMixin, metac
 
             params_kwargs = {'enable_per_epoch_action_buttons': False,
                     'skip_plotting_most_likely_positions': True, 'skip_plotting_measured_positions': True, 
-                    'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
-                    # 'enable_radon_transform_info': False, 'enable_weighted_correlation_info': False,
+                    'enable_decoded_most_likely_position_curve': False, 'enable_radon_transform_info': False, 'enable_overlay_labels_info': False,
+                    # 'enable_radon_transform_info': False, 'enable_overlay_labels_info': False,
                     # 'disable_y_label': True,
                     # 'isPaginatorControlWidgetBackedMode': True,
                     'isPaginatorControlWidgetBackedMode': False,
