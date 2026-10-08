@@ -228,6 +228,8 @@ class RadonTransformDebugger:
     radon_debugging_labels: bool = field(default=True)
     should_draw_time_bin_boundaries: bool = field(default=True)
     time_bin_edges_display_kwargs: Dict = field(default=Factory(lambda: dict(color='grey', alpha=0.5, linewidth=1.5)))
+    export_desired_height_px: Optional[int] = field(default=None)  # None → n_pos (1 px per xbin), same as PosteriorExporting
+    export_dpi: float = field(default=100.0)
 
 
     @property
@@ -814,11 +816,23 @@ class RadonTransformDebugger:
         return f'{self.active_decoder_name}_epoch{self.active_epoch_idx}'
 
 
+    def _export_figsize_inches(self) -> Tuple[float, float]:
+        """ Match PosteriorExporting / get_array_as_image: height defaults to n_pos (1 px/xbin); width = height * n_t / n_pos. """
+        p = np.asarray(self.active_radon_values.p_x_given_n)
+        n_pos: int = int(p.shape[0])
+        n_t: int = int(p.shape[1])
+        height_px: int = int(self.export_desired_height_px) if (self.export_desired_height_px is not None) else n_pos
+        width_px: int = int(height_px * n_t / max(n_pos, 1))
+        dpi: float = float(self.export_dpi)
+        return (float(width_px) / dpi, float(height_px) / dpi)
+
+
     def _save_publication_pdf(self, save_path: Path) -> Path:
         """ Write the current silx plot to `save_path` under publication matplotlib defaults.
 
         Flushes the Qt event loop and forces a matplotlib redraw first — required for programmatic
         exports right after refresh_overlays (the GUI Export button works because QFileDialog already pumped events).
+        Temporarily resizes the figure so export width scales with the epoch's time-bin count, then restores it.
         """
         assert self.window is not None, "build_GUI() must be called before exporting."
         save_path = Path(save_path)
@@ -832,19 +846,30 @@ class RadonTransformDebugger:
         if hasattr(a_plot, 'replot'):
             a_plot.replot()
         backend = a_plot.getBackend() if hasattr(a_plot, 'getBackend') else None
-        if (backend is not None) and hasattr(backend, 'fig'):
-            backend.fig.canvas.draw()
-            if hasattr(backend.fig.canvas, 'flush_events'):
-                backend.fig.canvas.flush_events()
+        fig = backend.fig if ((backend is not None) and hasattr(backend, 'fig')) else None
+        old_size = None
+        if fig is not None:
+            old_size = np.array(fig.get_size_inches(), dtype=float, copy=True)
+            fig.set_size_inches(*self._export_figsize_inches(), forward=True)
+            fig.canvas.draw()
+            if hasattr(fig.canvas, 'flush_events'):
+                fig.canvas.flush_events()
         qt.QApplication.processEvents()
         # Re-apply locator/formatter after replot so export PDFs keep sparse non-scientific x ticks.
         self._configure_plot_display(a_plot)
 
-        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)):
-            ok = a_plot.saveGraph(str(save_path), fileFormat='pdf')
-        assert ok, f"silx saveGraph failed for path: {save_path}"
-        print(f'export_for_publication: saved "{save_path}"')
-        return save_path
+        try:
+            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)):
+                ok = a_plot.saveGraph(str(save_path), fileFormat='pdf', dpi=self.export_dpi)
+            assert ok, f"silx saveGraph failed for path: {save_path}"
+            print(f'export_for_publication: saved "{save_path}"')
+            return save_path
+        finally:
+            if (fig is not None) and (old_size is not None):
+                fig.set_size_inches(old_size, forward=True)
+                fig.canvas.draw()
+                qt.QApplication.processEvents()
+
 
 
     @function_attributes(short_name=None, tags=['export', 'pdf', 'publication', 'figure'], input_requires=[], output_provides=[], uses=['PhoPublicationFigureHelper.rc_context_kwargs', 'Plot2D.saveGraph'], used_by=[], creation_date='2026-10-07 00:00', related_items=[])
