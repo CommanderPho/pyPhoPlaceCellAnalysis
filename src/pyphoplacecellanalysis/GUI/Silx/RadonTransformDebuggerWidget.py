@@ -228,8 +228,9 @@ class RadonTransformDebugger:
     radon_debugging_labels: bool = field(default=True)
     should_draw_time_bin_boundaries: bool = field(default=True)
     time_bin_edges_display_kwargs: Dict = field(default=Factory(lambda: dict(color='grey', alpha=0.5, linewidth=1.5)))
-    export_desired_height_px: Optional[int] = field(default=None)  # None → n_pos (1 px per xbin), same as PosteriorExporting
-    export_dpi: float = field(default=100.0)
+    export_desired_height_px: Optional[int] = field(default=400)  # None → n_pos (1 px per xbin); 400 keeps labeled PDFs readable
+    export_bin_width_scale: float = field(default=8.0)  # multiply time-bin width vs image-export aspect (height * n_t / n_pos)
+    export_dpi: float = field(default=100.0)  # saveGraph raster dpi; page inches always use layout dpi 100 so high dpi does not shrink the PDF
 
 
     @property
@@ -817,14 +818,14 @@ class RadonTransformDebugger:
 
 
     def _export_figsize_inches(self) -> Tuple[float, float]:
-        """ Match PosteriorExporting / get_array_as_image: height defaults to n_pos (1 px/xbin); width = height * n_t / n_pos. """
+        """ Match image-export aspect (width = height * n_t / n_pos). Page inches use layout dpi=100 so export_dpi does not shrink the PDF. """
         p = np.asarray(self.active_radon_values.p_x_given_n)
         n_pos: int = int(p.shape[0])
         n_t: int = int(p.shape[1])
         height_px: int = int(self.export_desired_height_px) if (self.export_desired_height_px is not None) else n_pos
-        width_px: int = int(height_px * n_t / max(n_pos, 1))
-        dpi: float = float(self.export_dpi)
-        return (float(width_px) / dpi, float(height_px) / dpi)
+        width_px: int = int(height_px * n_t / max(n_pos, 1) * float(self.export_bin_width_scale))
+        layout_dpi: float = 100.0  # fixed: figsize inches = px/100 (readable page size; independent of save dpi)
+        return (float(width_px) / layout_dpi, float(height_px) / layout_dpi)
 
 
     def _save_publication_pdf(self, save_path: Path) -> Path:
