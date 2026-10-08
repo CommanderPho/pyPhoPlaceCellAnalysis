@@ -1392,7 +1392,17 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         # self.params.on_secondary_click_item_callbacks['copy_epoch_times_to_clipboard_callback'] = ClickActionCallbacks.copy_epoch_times_to_clipboard_callback
         self.params.on_secondary_click_item_callbacks['log_clicked_epoch_times_to_message_box_callback'] = ClickActionCallbacks.log_clicked_epoch_times_to_message_box_callback
-        
+
+
+    @classmethod
+    def _configure_time_axis_seconds_formatter(cls, curr_ax, nbins: int = 6):
+        """ Absolute time in seconds; sparse ticks; never scientific / offset notation. """
+        from matplotlib.ticker import MaxNLocator, ScalarFormatter
+        curr_ax.xaxis.set_major_locator(MaxNLocator(nbins=nbins))
+        fmt = ScalarFormatter(useOffset=False)
+        fmt.set_scientific(False)
+        curr_ax.xaxis.set_major_formatter(fmt)
+
 
     @function_attributes(short_name=None, tags=['update', 'jump-to-page', 'page', 'callback'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', '_pagination_helper_plot_single_epoch_slice'], used_by=[], creation_date='2023-08-12 00:00', related_items=[])
     def on_jump_to_page(self, page_idx: int):
@@ -1498,6 +1508,8 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
                     
                 curr_ax.set_xlim(*curr_epoch_slice)
                 curr_ax.set_title(f'') # needs to be set to empty string '' because this is the title that appears above each subplot/slice
+                time_axis_max_nbins: int = int(self.params.setdefault('time_axis_max_nbins', 6))
+                self._configure_time_axis_seconds_formatter(curr_ax, nbins=time_axis_max_nbins)
                 # Update selections:
                 assert curr_slice_idx in self.params.is_selected, f"curr_slice_idx: {curr_slice_idx} is not in self.params.is_selected!"
                 curr_is_selected: bool = self.params.is_selected[curr_slice_idx] # need to get whether the data indicies (curr_slice_idxs) are selected
