@@ -1570,22 +1570,22 @@ class RadonTransformPlotData:
     def build_display_text(self, included_keys: Optional[List[str]] = None) -> str:
         """ builds the final display string to be rendered in the label.
 
-        included_keys: if provided, only include those field names (e.g. ['score', 'speed'] or alias 'radon' for score).
+        included_keys: if provided, only include those field names (e.g. ['radon', 'speed'] or alias 'score' for radon).
             None means show all available fields. Unknown keys are ignored.
         """
-        # Prefer "radon:" display even for older overlays that still store "score: ..."
+        # Canonical display prefix is "radon:"; rewrite legacy in-memory "score: ..." overlays
         score_display_text = self.score_text
         if isinstance(score_display_text, str) and score_display_text.startswith('score: '):
             score_display_text = 'radon: ' + score_display_text[len('score: '):]
-        key_to_text = {'score': score_display_text, 'radon': score_display_text, 'speed': self.speed_text, 'intercept': self.intercept_text}
+        key_to_text = {'radon': score_display_text, 'score': score_display_text, 'speed': self.speed_text, 'intercept': self.intercept_text}
         if included_keys is None:
-            ordered_keys = ['score', 'speed', 'intercept']
+            ordered_keys = ['radon', 'speed', 'intercept']
         else:
-            # Prefer canonical 'score' over alias 'radon' if both appear
+            # Prefer canonical 'radon' over alias 'score' if both appear
             seen = set()
             ordered_keys = []
             for k in included_keys:
-                canonical = 'score' if (k == 'radon') else k
+                canonical = 'radon' if (k == 'score') else k
                 if (canonical in key_to_text) and (canonical not in seen):
                     ordered_keys.append(canonical)
                     seen.add(canonical)
@@ -1851,8 +1851,9 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         from neuropy.utils.matplotlib_helpers import AnchoredCustomText
 
         def _subfn_build_kwargs(curr_ax):
+            radon_theme_color: str = '#ffee00' ## a dark yellow/orange
             # Match wcorr label styling; yellow text so radon remains distinct from wcorr
-            text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground='#e5ff00', text_alpha=0.95, font_size=11.0)
+            text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground=radon_theme_color, text_alpha=0.95, font_size=11.0)
             
             # Get the axes bounding box in figure coordinates
             a_fig = curr_ax.get_figure()
@@ -1866,7 +1867,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                                     ) # stacked under wcorr at upper-right
 
             # Solid yellow line (same #e5ff00 theme as radon score text)
-            plot_kwargs = dict(scalex=False, scaley=False, label='computed radon transform', linestyle='-', linewidth=3, color='#e5ff00', alpha=0.85, marker=None, zorder=3)
+            plot_kwargs = dict(scalex=False, scaley=False, label='computed radon transform', linestyle='-', linewidth=1, color=radon_theme_color, alpha=0.85, marker=None, zorder=3)
 
             return text_kwargs, plot_kwargs
 
