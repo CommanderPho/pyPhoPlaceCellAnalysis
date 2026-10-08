@@ -1853,7 +1853,8 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         def _subfn_build_kwargs(curr_ax):
             radon_theme_color: str = '#ffee00' ## a dark yellow/orange
             # Match wcorr label styling; yellow text so radon remains distinct from wcorr
-            text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground=radon_theme_color, text_alpha=0.95, font_size=11.0)
+            # text_kwargs = dict(strokewidth=1.5, stroke_foreground='grey', stroke_alpha=0.75, text_foreground=radon_theme_color, text_alpha=0.95, font_size=9.5)
+            text_kwargs = dict(strokewidth=1.5, stroke_foreground=radon_theme_color, stroke_alpha=0.75, text_foreground='black', text_alpha=0.95, font_size=9.5)
             
             # Get the axes bounding box in figure coordinates
             a_fig = curr_ax.get_figure()
