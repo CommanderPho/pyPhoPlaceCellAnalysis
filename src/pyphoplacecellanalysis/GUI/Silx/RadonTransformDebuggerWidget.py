@@ -1,4 +1,6 @@
 import functools
+import logging
+import warnings
 from pathlib import Path
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -14,6 +16,9 @@ import numpy as np
 import pandas as pd
 import scipy
 import matplotlib as mpl
+
+# Curve/marker removeItem spam from ROIStatsWidget when refreshing overlays (time_bin_edge_*, etc.)
+logging.getLogger('silx.gui.plot.ROIStatsWidget').setLevel(logging.ERROR)
 
 from pyphocorehelpers.programming_helpers import metadata_attributes
 from pyphocorehelpers.function_helpers import function_attributes
@@ -185,11 +190,9 @@ def on_set_active_decoder_name_changed(instance, attribute, new_value):
 
 
 def on_set_active_epoch_idx_changed(instance, attribute, new_value):
-    print(f'on_set_epoch_idx_changed(new_value: {new_value})')
     new_epoch_idx: int = int(new_value)
     _ = instance.update_epoch_idx(active_epoch_idx=new_epoch_idx) ## change the index
     instance.refresh_overlays()
-    print(f'\tdone.')
     return new_value
 
 
@@ -828,17 +831,18 @@ class RadonTransformDebugger:
         return (float(width_px) / layout_dpi, float(height_px) / layout_dpi)
 
 
-    def _save_publication_pdf(self, save_path: Path) -> Path:
-        """ Write the current silx plot to `save_path` under publication matplotlib defaults.
+    def _save_publication_figure(self, save_path: Path, file_format: str = 'pdf') -> Path:
+        """ Write the current silx plot to `save_path` as PDF or SVG (Illustrator-friendly fonts).
 
-        Flushes the Qt event loop and forces a matplotlib redraw first — required for programmatic
-        exports right after refresh_overlays (the GUI Export button works because QFileDialog already pumped events).
-        Temporarily resizes the figure so export width scales with the epoch's time-bin count, then restores it.
+        Vector text/lines/shapes; posterior heatmap remains an embedded raster (imshow). SVG uses
+        svg.fonttype='none' so text stays editable; PDF uses pdf.fonttype=42 (TrueType).
         """
         assert self.window is not None, "build_GUI() must be called before exporting."
+        file_format = str(file_format).lower().lstrip('.')
+        assert file_format in ('pdf', 'svg'), f"unsupported file_format: {file_format!r} (expected 'pdf' or 'svg')"
         save_path = Path(save_path)
-        if save_path.suffix.lower() != '.pdf':
-            save_path = save_path.with_suffix('.pdf')
+        if save_path.suffix.lower() != f'.{file_format}':
+            save_path = save_path.with_suffix(f'.{file_format}')
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
         a_plot = self.window.plot
@@ -856,13 +860,24 @@ class RadonTransformDebugger:
             if hasattr(fig.canvas, 'flush_events'):
                 fig.canvas.flush_events()
         qt.QApplication.processEvents()
-        # Re-apply locator/formatter after replot so export PDFs keep sparse non-scientific x ticks.
+        # Re-apply locator/formatter after replot so export keeps sparse non-scientific x ticks.
         self._configure_plot_display(a_plot)
 
+        vector_rc = PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True) | {
+            'svg.fonttype': 'none',  # editable <text> in Illustrator (not path outlines)
+            'pdf.fonttype': 42,  # TrueType embed
+        }
         try:
-            with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)):
-                ok = a_plot.saveGraph(str(save_path), fileFormat='pdf', dpi=self.export_dpi)
-            assert ok, f"silx saveGraph failed for path: {save_path}"
+            with mpl.rc_context(vector_rc):
+                # Silence matplotlib/pyparsing DeprecationWarning spam from mathtext during savefig.
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', DeprecationWarning)
+                    if fig is not None:
+                        # Omit dpi: page size follows figsize (layout dpi); heatmap embeds as image either way.
+                        fig.savefig(str(save_path), format=file_format, transparent=True)
+                    else:
+                        ok = a_plot.saveGraph(str(save_path), fileFormat=file_format)
+                        assert ok, f"silx saveGraph failed for path: {save_path}"
             print(f'export_for_publication: saved "{save_path}"')
             return save_path
         finally:
@@ -873,22 +888,35 @@ class RadonTransformDebugger:
 
 
 
-    @function_attributes(short_name=None, tags=['export', 'pdf', 'publication', 'figure'], input_requires=[], output_provides=[], uses=['PhoPublicationFigureHelper.rc_context_kwargs', 'Plot2D.saveGraph'], used_by=[], creation_date='2026-10-07 00:00', related_items=[])
-    def export_for_publication(self, figures_parent_folder: Path, export_suffix: Optional[str] = None) -> Dict[str, Path]:
-        """ Export the current debugger figure to a publication-style PDF.
+    def _save_publication_pdf(self, save_path: Path) -> Path:
+        """ Backward-compatible wrapper → `_save_publication_figure(..., file_format='pdf')`. """
+        return self._save_publication_figure(save_path=save_path, file_format='pdf')
+
+
+    @function_attributes(short_name=None, tags=['export', 'pdf', 'svg', 'publication', 'figure', 'illustrator'], input_requires=[], output_provides=[], uses=['PhoPublicationFigureHelper.rc_context_kwargs', '_save_publication_figure'], used_by=[], creation_date='2026-10-07 00:00', related_items=[])
+    def export_for_publication(self, figures_parent_folder: Path, export_suffix: Optional[str] = None, formats: Tuple[str, ...] = ('pdf', 'svg')) -> Dict[str, Path]:
+        """ Export publication-style PDF and/or SVG (editable text in Illustrator; heatmap stays raster).
 
         Usage:
             _out_paths = dbgr.export_for_publication(figures_parent_folder=Path('output/figures'))
+            _out_paths = dbgr.export_for_publication(..., formats=('svg',))
         """
         if export_suffix is None:
             export_suffix = self._default_export_suffix()
         figures_parent_folder = Path(figures_parent_folder)
         # Avoid RadonTransform_RadonTransform_... when callers already include the prefix.
         if str(export_suffix).startswith('RadonTransform_'):
-            image_save_path = figures_parent_folder.joinpath(f'{export_suffix}.pdf')
+            stem: str = str(export_suffix)
         else:
-            image_save_path = figures_parent_folder.joinpath(f'RadonTransform_{export_suffix}.pdf')
-        return {'pdf': self._save_publication_pdf(image_save_path)}
+            stem = f'RadonTransform_{export_suffix}'
+
+        out_paths: Dict[str, Path] = {}
+        for file_format in formats:
+            fmt = str(file_format).lower().lstrip('.')
+            out_paths[fmt] = self._save_publication_figure(save_path=figures_parent_folder.joinpath(f'{stem}.{fmt}'), file_format=fmt)
+        ## END for file_format in formats....
+
+        return out_paths
 
 
     def _on_export_pdf_clicked(self):
@@ -897,20 +925,33 @@ class RadonTransformDebugger:
         chosen_path, _ = qt.QFileDialog.getSaveFileName(self.window, 'Export PDF', default_name, 'PDF (*.pdf)')
         if not chosen_path:
             return
-        self._save_publication_pdf(Path(chosen_path))
+        self._save_publication_figure(Path(chosen_path), file_format='pdf')
+
+
+    def _on_export_svg_clicked(self):
+        """ QFileDialog → exact-path publication SVG write (editable text in Illustrator). """
+        default_name = f'RadonTransform_{self._default_export_suffix()}.svg'
+        chosen_path, _ = qt.QFileDialog.getSaveFileName(self.window, 'Export SVG', default_name, 'SVG (*.svg)')
+        if not chosen_path:
+            return
+        self._save_publication_figure(Path(chosen_path), file_format='svg')
 
 
     def _ensure_export_toolbar(self):
-        """ Install Export PDF toolbar once on the window (safe across re-build_GUI). """
+        """ Install Export PDF/SVG toolbar once on the window (safe across re-build_GUI). """
         if self.window is None:
             return
         if getattr(self, '_export_toolbar', None) is not None:
             return
         toolbar = self.window.addToolBar('Export')
-        export_action = qt.QAction('Export PDF', self.window)
-        export_action.setToolTip('Export current figure to a publication-style PDF')
-        export_action.triggered.connect(self._on_export_pdf_clicked)
-        toolbar.addAction(export_action)
+        export_pdf_action = qt.QAction('Export PDF', self.window)
+        export_pdf_action.setToolTip('Export publication PDF (editable TrueType text; heatmap is raster)')
+        export_pdf_action.triggered.connect(self._on_export_pdf_clicked)
+        toolbar.addAction(export_pdf_action)
+        export_svg_action = qt.QAction('Export SVG', self.window)
+        export_svg_action.setToolTip('Export SVG for Illustrator (editable text; heatmap is raster)')
+        export_svg_action.triggered.connect(self._on_export_svg_clicked)
+        toolbar.addAction(export_svg_action)
         self._export_toolbar = toolbar
 
 
