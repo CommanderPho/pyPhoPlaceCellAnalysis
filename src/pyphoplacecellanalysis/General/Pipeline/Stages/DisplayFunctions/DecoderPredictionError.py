@@ -1970,6 +1970,7 @@ class OverlayLabelsPlotData:
         'total_congruent_direction_change', 'longest_sequence_length',
         'continuous_seq_sort', 'continuous_seq_len_ratio_no_repeats', 'main_contiguous_subsequence_len',
         'mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav',
+        'forwardicity',
     ]
 
     @classmethod
@@ -2051,7 +2052,8 @@ class OverlayLabelsPlotData:
                 'mseq_len_ignoring_intrusions_and_repeats':default_smart_formatting_fn_factory(short_name='mseq_len_-intru_-repeats'),
                 'mseq_len_ratio_ignoring_intrusions_and_repeats':default_smart_formatting_fn_factory(short_name='mseq_len_ratio_-intru_-repeats'),
                 'mseq_tcov':default_smart_formatting_fn_factory(short_name='mseq_tcov'),
-                'mseq_dtrav':default_smart_formatting_fn_factory(short_name='mseq_dtrav'),                            
+                'mseq_dtrav':default_smart_formatting_fn_factory(short_name='mseq_dtrav'),
+                'forwardicity':default_smart_formatting_fn_factory(short_name='fwdicty'),
             }
 
             # actually_present_column_formatting_fn_dict = {k:v for k, v in column_formatting_fn_dict.items() if k in actually_present_df_column_names} # this version requires all columns to be defined in the above  `column_formatting_fn_dict`, see below

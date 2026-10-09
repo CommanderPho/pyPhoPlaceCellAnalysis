@@ -135,67 +135,8 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-03 - "Forwardicity" score for determining forward vs. backward replay                                                                                                                                                                                                        #
 # ==================================================================================================================================================================================================================================================================================== #
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider # for `ForwardicityPaginatedPlotDataProvider`
-from neuropy.utils.matplotlib_helpers import add_inner_title # for `ForwardicityPaginatedPlotDataProvider`
-from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import forwardicity_score, main_sequence_positions, DECODER_DIRECTION_MAP # re-export for notebook compatibility
-
-
-@metadata_attributes(short_name=None, tags=['forwardicity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:22', related_items=[])
-class ForwardicityPaginatedPlotDataProvider(PaginatedPlotDataProvider):
-    """ 
-    Usage:
-
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ForwardicityPaginatedPlotDataProvider, forwardicity_score, main_sequence_positions
-
-        for a_ctrl in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.values():
-            ForwardicityPaginatedPlotDataProvider.add_data_to_pagination_controller(a_ctrl, None, update_controller_on_apply=False)
-
-        paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
-    """
-    plots_group_identifier_key: str = 'forwardicity'
-    provided_params = dict(enable_forwardicity_info=True)
-    provided_plots_data = {'forwardicity_data': None}
-    provided_plots = {'forwardicity': {}}
-
-    @classmethod
-    def get_provided_callbacks(cls):
-        return {'on_render_page_callbacks': {'plot_forwardicity_data': cls._callback_update_curr_single_epoch_slice_plot}}
-
-
-    @classmethod
-    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params, plots_data, plots, ui, data_idx, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs):
-        if not params.get('enable_forwardicity_info', True):
-            return params, plots_data, plots, ui
-        curr_posterior = args[0]  # p_x_given_n for this dock, (n_pos_bins, n_time_bins)
-        decoder_name = params.active_identifying_figure_ctx.get('decoder', None)
-        most_likely_decoder_direction = DECODER_DIRECTION_MAP.get(decoder_name, None)
-
-        used_main_sequence: bool = False
-        most_likely_positions_arr = None
-        curves_data = plots_data.get('decoded_sequence_and_heuristics_curves_data', None)
-        if (curves_data is not None) and (epoch_slice is not None) and (len(epoch_slice) == 2):
-            epoch_start_t = epoch_slice[0]
-            if epoch_start_t in curves_data:
-                partition_result = curves_data[epoch_start_t].partition_result
-                if partition_result is not None:
-                    most_likely_positions_arr = main_sequence_positions(partition_result)
-                    used_main_sequence = True
-
-        if used_main_sequence:
-            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=most_likely_positions_arr, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-            final_text = f"main fwdicty: {forwardicity:.2f}"
-        else:
-            xbin_centers = get_bin_centers(params.xbin)
-            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=curr_posterior, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-            final_text = f"fwdicty: {forwardicity:.2f}" ## full-posterior MAP fallback
-        # final_text = f"fwdicity: {forwardicity:.2f}\nfwd_maj: {ratio_major_aligned_bins:.2f}\nfwd_decdr: {ratio_decoder_aligned_bins:.2f}"
-        extant = plots[cls.plots_group_identifier_key].get(curr_ax, {}).get('forwardicity_text', None)
-        if extant is not None:
-            extant.remove()
-        anchored_text = add_inner_title(curr_ax, final_text, loc='upper left', font_size=9)
-        anchored_text.patch.set_ec("none")
-        plots[cls.plots_group_identifier_key][curr_ax] = {'forwardicity_text': anchored_text}
-        return params, plots_data, plots, ui
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import forwardicity_score, main_sequence_positions # re-export for notebook compatibility
+# Display: forwardicity is shown in OverlayLabelsPaginatedPlotDataProvider green heuristic text (filter_epochs column) when enable_overlay_labels_info is on.
 
 
 # ==================================================================================================================================================================================================================================================================================== #

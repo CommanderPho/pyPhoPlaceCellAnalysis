@@ -2600,7 +2600,7 @@ def forwardicity_score(p_x_given_n: Optional[NDArray] = None, most_likely_positi
 
 
 
-@function_attributes(short_name=None, tags=['forwardicity', 'main-sequence', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=['SubsequencesPartitioningResultScoringComputations', 'ForwardicityPaginatedPlotDataProvider'], creation_date='2026-10-06 11:32', related_items=['forwardicity_score'])
+@function_attributes(short_name=None, tags=['forwardicity', 'main-sequence', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=['SubsequencesPartitioningResultScoringComputations'], creation_date='2026-10-06 11:32', related_items=['forwardicity_score'])
 def main_sequence_positions(partition_result) -> NDArray:
     """Time-ordered positions of the ranked main subsequence, with intrusion bins removed.
 
