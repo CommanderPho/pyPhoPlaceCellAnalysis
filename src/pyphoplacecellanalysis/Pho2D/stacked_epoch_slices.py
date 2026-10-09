@@ -1796,12 +1796,30 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         else:
             included_columns = list(included_columns)
 
+        radon_column_names: List[str] = list(RadonTransformPlotDataProvider.column_names) # ['radon', 'velocity', 'intercept', 'speed']
+        overlay_label_column_names: List[str] = list(OverlayLabelsPaginatedPlotDataProvider.get_column_names()) # wcorr/P_decoder/pearsonr + heuristic keys
+
         if len(included_columns) == 0:
             # Default: extend from master enable flags when caller did not pass an explicit list
             if bool(self.params.get('enable_radon_transform_info', False)):
-                included_columns.extend(deepcopy(RadonTransformPlotDataProvider.column_names)) # ['radon', 'velocity', 'intercept', 'speed']
+                included_columns.extend(deepcopy(radon_column_names))
             if bool(self.params.get('enable_overlay_labels_info', False)):
-                included_columns.extend(OverlayLabelsPaginatedPlotDataProvider.get_column_names()) # wcorr/P_decoder/pearsonr + heuristic keys
+                included_columns.extend(deepcopy(overlay_label_column_names))
+        else:
+            # Explicit request: provider defaults are only applied to params when the key is missing (`add_data_to_pagination_controller`), so an init-time `False`
+            # would otherwise stay sticky and keep the artists hidden even though the data registered. Force-enable the matching gates and ensure radon has its structural columns.
+            requested_set = set(included_columns)
+            if len(requested_set.intersection(radon_column_names)) > 0:
+                self.params['enable_radon_transform_info'] = True
+                for a_structural_col in ['velocity', 'intercept', 'speed']:
+                    if a_structural_col not in requested_set:
+                        included_columns.append(a_structural_col)
+                        requested_set.add(a_structural_col)
+                ## END for a_structural_col in ['velocity', 'intercept', 'speed']....
+
+            if len(requested_set.intersection(overlay_label_column_names)) > 0:
+                self.params['enable_overlay_labels_info'] = True
+        ## END if len(included_columns) == 0...
 
         # Resolve n_neighbours for scoring-band overlay (pipeline default margin=4.0 cm)
         pos_bin_edges = deepcopy(self.params.xbin) if (self.params.get('xbin', None) is not None) else None
@@ -1819,12 +1837,16 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
         did_add_radon_transform_data: bool = (radon_transform_epochs_data is not None)
         if did_add_radon_transform_data:
             RadonTransformPlotDataProvider.add_data_to_pagination_controller(self, radon_transform_epochs_data, update_controller_on_apply=False)
+        elif len(set(included_columns).intersection(radon_column_names)) > 0:
+            print(f'add_data_overlays(...): RadonTransform builder returned None for included_columns: {included_columns} (missing structural velocity/intercept/speed columns on active_filter_epochs?) so skipping radon line/band/label')
     
         # Build Overlay Labels data (wcorr/heuristic DF scores) and add them. Must be registered after radon so the label callback can read radon_transform_data.
         # Register even when DF-derived data is None if radon was added, so the radon corner label (owned by OverlayLabels) still renders on radon-only paths.
         overlay_labels_epochs_data = OverlayLabelsPaginatedPlotDataProvider.decoder_build_single_overlay_labels_data(deepcopy(decoder_decoded_epochs_result), included_columns=included_columns)
+        if (overlay_labels_epochs_data is None) and (len(set(included_columns).intersection(overlay_label_column_names)) > 0):
+            print(f'add_data_overlays(...): OverlayLabels builder returned None for included_columns: {included_columns} so skipping wcorr/heuristic labels')
         if (overlay_labels_epochs_data is not None) or did_add_radon_transform_data:
-            OverlayLabelsPaginatedPlotDataProvider.add_data_to_pagination_controller(self, (overlay_labels_epochs_data or {}), update_controller_on_apply=False)
+            OverlayLabelsPaginatedPlotDataProvider.add_data_to_pagination_controller(self, (overlay_labels_epochs_data if (overlay_labels_epochs_data is not None) else {}), update_controller_on_apply=False)
 
 
         # Build Decoded Positions Data and add them:    
@@ -1834,7 +1856,18 @@ class DecodedEpochSlicesPaginatedFigureController(PaginatedFigureController):
 
         pos_bin_edges = deepcopy(self.params.xbin)
 
-        decoder_track_length: float = self.params.get('track_length_cm', None)
+        decoder_track_length: Optional[float] = self.params.get('track_length_cm', None)
+        if decoder_track_length is None:
+            # Fallback: resolve the per-decoder scalar from the persisted `track_length_cm_dict` by matching this controller's decoder name (e.g. 'DecodedEpochSlices[long_LR]' -> 'long_LR')
+            track_length_cm_dict = self.params.get('track_length_cm_dict', None)
+            if (track_length_cm_dict is not None) and (len(track_length_cm_dict) > 0):
+                a_controller_name: str = str(self.params.get('name', ''))
+                matching_decoder_names = [a_decoder_name for a_decoder_name in track_length_cm_dict.keys() if (a_decoder_name in a_controller_name)]
+                if len(matching_decoder_names) == 1:
+                    decoder_track_length = track_length_cm_dict[matching_decoder_names[0]]
+                    self.params['track_length_cm'] = decoder_track_length ## cache for subsequent calls
+            ## END if (track_length_cm_dict is not None) and (len(track_length_cm_dict) > 0)...
+        ## END if decoder_track_length is None...
         # heuristic_kwargs = self.params.get('heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
         data_overlay_heuristic_kwargs = self.params.get('data_overlay_heuristic_kwargs', dict(same_thresh_fraction_of_track = 0.075, max_jump_distance_cm = 60, max_ignore_bins = 2))
         # assert decoder_track_length is not None
@@ -2416,7 +2449,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         track_length_cm_dict = params_kwargs.pop('track_length_cm_dict', None)
         if track_length_cm_dict is None:
             track_length_cm_dict = track_templates.get_track_length_dict()
-        # params_kwargs['track_length_cm_dict'] = track_length_cm_dict
+        params_kwargs['track_length_cm_dict'] = deepcopy(track_length_cm_dict) ## persist on every child controller so later `add_data_overlays(...)` calls can re-resolve the per-decoder `track_length_cm` (needed for heuristics overlays)
         
         controlling_pagination_item_name: str = decoder_names[0] # first item # 'long_LR'
         # controlled_pagination_controller_names_list = decoder_names[1:]
@@ -3226,7 +3259,7 @@ class PhoPaginatedMultiDecoderDecodedEpochsWindow(PhoDockAreaContainingWindow):
         params_kwargs = dict(skip_plotting_measured_positions=True, skip_plotting_most_likely_positions=True, isPaginatorControlWidgetBackedMode=True) | params_kwargs ## merge 
         params_kwargs = {'max_subplots_per_page': 10, 'scrollable_figure': False, 'use_AnchoredCustomText': False,
                 'should_suppress_callback_exceptions': False, 'isPaginatorControlWidgetBackedMode': True,
-                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': True, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
+                'enable_update_window_title_on_page_change': False, 'build_internal_callbacks': True, 'debug_print': False, 'skip_plotting_measured_positions': True,  'enable_decoded_most_likely_position_curve': False, 
                                                                                                     'enable_decoded_sequence_and_heuristics_curve': False, 'show_pre_merged_debug_sequences': False, 'show_heuristic_criteria_filter_epoch_inclusion_status': False,
                                                                                                      'enable_radon_transform_info': False, 'enable_overlay_labels_info': False, 'enable_overlay_labels_modify_axes_rect': False, 'enable_marginal_labels': True, 'marginal_y_bin_labels': marginal_y_bin_labels} | params_kwargs
         

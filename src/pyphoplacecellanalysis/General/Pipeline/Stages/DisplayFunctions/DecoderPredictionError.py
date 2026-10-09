@@ -1853,7 +1853,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
         line_kwargs, band_kwargs = _subfn_build_kwargs(curr_ax)
-        debug_print = kwargs.pop('debug_print', True)
+        debug_print = kwargs.pop('debug_print', False)
 
         ## Extract the visibility:
         should_enable_radon_transform_info: bool = params.enable_radon_transform_info
@@ -1881,6 +1881,19 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
                 ## END for band_artist in list(extant_band)....
             extant_band = None
 
+        # Soft-guard: never let a missing/partial radon dataset raise here, since (with should_suppress_callback_exceptions=False) that would abort every later on_render_page callback (overlay labels, heuristics, ...) for this axis.
+        radon_transform_data = getattr(plots_data, 'radon_transform_data', None)
+        radon_data_item = None
+        if (radon_transform_data is not None) and (len(radon_transform_data) > 0):
+            radon_data_item = radon_transform_data.get(data_idx, None)
+        if radon_data_item is None:
+            if should_enable_radon_transform_info and debug_print:
+                n_entries = (len(radon_transform_data) if (radon_transform_data is not None) else 0)
+                print(f'WARNING: RadonTransformPlotDataProvider: plots_data.radon_transform_data ({n_entries} entries) has no entry for data_idx: {data_idx}. Skipping radon line/band for this axis.')
+            plots[cls.plots_group_identifier_key][data_idx] = {'line': None, 'band': []}
+            return params, plots_data, plots, ui
+        ## END if radon_data_item is None...
+
         if curr_time_bin_container is not None:
             actual_time_bins = curr_time_bin_container.centers
             if debug_print:
@@ -1897,7 +1910,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
         # Scoring band (orange stair-step polygons) — below the yellow line
         radon_band_artists = []
         if should_enable_radon_transform_scoring_band:
-            band_polygons = getattr(plots_data.radon_transform_data[data_idx], 'band_polygons', None)
+            band_polygons = getattr(radon_data_item, 'band_polygons', None)
             if band_polygons is not None:
                 for xs, ys in band_polygons:
                     poly = Polygon(np.column_stack([xs, ys]), closed=True, **band_kwargs, zorder=2)
@@ -1907,7 +1920,7 @@ class RadonTransformPlotDataProvider(PaginatedPlotDataProvider):
 
         ## Plot the yellow geometric radon line
         if should_enable_radon_transform_line:
-            curr_line_y = plots_data.radon_transform_data[data_idx].line_y
+            curr_line_y = radon_data_item.line_y
             real_line_extrapolated_t = np.squeeze(curr_time_bins)
             real_line_extrapolated_x = np.interp(real_line_extrapolated_t, xp=np.squeeze(actual_time_bins), fp=np.squeeze(curr_line_y))
             radon_transform_plot, = curr_ax.plot(real_line_extrapolated_t, real_line_extrapolated_x, **line_kwargs)
@@ -2122,10 +2135,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _axes_y_below_anchored_artist(cls, curr_ax, anchored_artist, pad_axes: float = 0.0, fallback_y: float = 0.78) -> float:
-        """Return axes-fraction Y for the top of the next stacked label below `anchored_artist`.
-
-        Prefers the last TextArea of AnchoredCustomText so AnchoredOffsetbox borderpad does not inflate the gap.
-        """
+        """Legacy: measure window extent for stack Y. Prefer `_overlay_stack_y_below` for placement."""
         if anchored_artist is None:
             return float(fallback_y)
         try:
@@ -2142,6 +2152,40 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             return max(y, 0.05)
         except Exception:
             return float(fallback_y)
+
+
+    @classmethod
+    def _overlay_label_line_count(cls, final_text: str) -> int:
+        """Number of display lines in an overlay label string (0 if empty)."""
+        if (final_text is None) or (not str(final_text).strip()):
+            return 0
+        return int(str(final_text).count('\n') + 1)
+
+
+    @classmethod
+    def _overlay_line_height_axes(cls, curr_ax, font_size_pt: float, line_spacing: float = 1.25) -> float:
+        """Axes-fraction height of one overlay label line for the current axes pixel height."""
+        try:
+            ax_height_px = float(curr_ax.get_window_extent().height)
+            if ax_height_px <= 0:
+                return 0.08
+            dpi = float(curr_ax.get_figure().dpi)
+            return (float(font_size_pt) * float(line_spacing) * dpi / 72.0) / ax_height_px
+        except Exception:
+            return 0.08
+
+
+    @classmethod
+    def _overlay_stack_y_below(cls, curr_ax, n_lines_above: int, font_size_pt: float, line_spacing: float = 1.25, gap_lines: float = 0.0, top_y: float = 0.97) -> float:
+        """Return axes-fraction Y for the top of the next stacked label below `n_lines_above` lines.
+
+        Deterministic equal steps from `top_y` (inset below the spine so the first line is not clipped).
+        """
+        if int(n_lines_above) <= 0:
+            return float(top_y)
+        line_h_axes = cls._overlay_line_height_axes(curr_ax, font_size_pt=font_size_pt, line_spacing=line_spacing)
+        y = float(top_y) - (float(n_lines_above) * line_h_axes) - (float(gap_lines) * line_h_axes)
+        return max(float(y), 0.02)
 
 
     @classmethod
@@ -2185,7 +2229,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         from matplotlib.offsetbox import AnchoredText
         from neuropy.utils.matplotlib_helpers import AnchoredCustomText, ValueFormatter
 
-        debug_print = kwargs.pop('debug_print', True)
+        debug_print = kwargs.pop('debug_print', False)
         if debug_print:
             print(f'OverlayLabelsPaginatedPlotDataProvider._callback_update_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
         
@@ -2252,7 +2296,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # extra_text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
             # extra_text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
             # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
 
             font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 #   size=10,
@@ -2289,7 +2333,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # text_kwargs = dict(loc='upper center', stroke_alpha=0.35, strokewidth=5, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=13, text_alpha=0.8)
             # text_kwargs = dict(loc='upper left', stroke_alpha=0.35, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.7)
             # text_kwargs = dict(stroke_alpha=0.8, strokewidth=4, stroke_foreground='k', text_foreground=f'{cls.text_color}', font_size=10, text_alpha=0.75)
-            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=11, text_alpha=0.75)
+            text_kwargs = dict(stroke_alpha=0.8, strokewidth=5, stroke_foreground='w', text_foreground=f'{cls.text_color}', font_size=9.5, text_alpha=0.75)
 
             font_prop = font_manager.FontProperties(family=found_matplotlib_font_name, # 'Source Code Pro'
                                 #   size=10,
@@ -2368,7 +2412,8 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                                 )
             text_kwargs['fontproperties'] = font_prop
 
-            ## Positioning kwargs:
+            ## Positioning kwargs: axes-relative only (no fig.transFigure — that drifts across subplot rows)
+            # Inset from x=1.0 so rightmost digits / stroke are not clipped by the right spine.
             text_kwargs |= dict(loc='upper right',
                                     # horizontalalignment='center', ## DOES NOTHING?
                                     #verticalalignment='center', ## BREAKS IT
@@ -2376,7 +2421,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                                     horizontalalignment='right',  
                                     # rotation=-45, #transform=a_curr_ax.transAxes,
                                     # bbox_to_anchor=((1.0 + bbox_offset_magnitude[0]), (1.0 + bbox_offset_magnitude[1])), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure, ## good
-                                    bbox_to_anchor=(1.0, 1.0), bbox_transform=a_curr_ax.transAxes, transform=a_fig.transFigure,
+                                    bbox_to_anchor=(0.96, 1.0), bbox_transform=a_curr_ax.transAxes,
                                     # bbox_to_anchor=((1.0 + bbox_offset_magnitude), (1.0 + bbox_offset_magnitude)), bbox_transform=a_curr_ax.transAxes,                        
                                     ) # oriented in upper-right corner, at a diagonal angle
 
@@ -2439,7 +2484,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             # end if isinst...
             text_kwargs = _helper_build_text_kwargs_outside_right(a_curr_ax=curr_ax)
         else:
-            ## Inset internally
+            ## Inset internally — flush top-right (axes-only; no rotation / fig transform)
             text_kwargs = _helper_build_text_kwargs_adjacent_right_lots_of_text(a_curr_ax=curr_ax)
             
         # text_kwargs = _helper_build_text_kwargs_angled_upper_right_corner(a_curr_ax=curr_ax)
@@ -2448,9 +2493,9 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         ## On Lab computer, reduce the stroke_Width
         # text_kwargs.update(stroke_alpha=0.95, strokewidth=1.5, stroke_foreground='w', text_foreground='black', font_size=11.0, text_alpha=0.95) # #TODO 2024-12-17 12:33: - [ ] Reduce the stroke width
-        text_kwargs.update(stroke_alpha=0.75, strokewidth=1.5, stroke_foreground=cls.theme_stroke_color, text_foreground='black', font_size=cls.overlay_label_font_size, text_alpha=0.95)
-        # anchored_text_alpha_override_value: float = 0.4 ## default
-        anchored_text_alpha_override_value: float = 1.0 ## default
+        text_kwargs.update(stroke_alpha=0.55, strokewidth=1.5, stroke_foreground=cls.theme_stroke_color, text_foreground='black', font_size=cls.overlay_label_font_size, text_alpha=0.75)
+        # Keep artist alpha below 1 so heatmap/trajectory remain visible under the labels
+        anchored_text_alpha_override_value: float = 0.4 ## default
         # custom_value_formatter = None ## OVERRIDE custom_value_formatter
         
         
@@ -2468,15 +2513,23 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
             heuristic_visible_keys = [k for k in OverlayLabelsPlotData.HEURISTIC_LABEL_KEYS if k in visible_set]
         ## END if visible_keys is None...
 
-        # DF-derived labels (wcorr/heuristic) are optional: provider may be registered for radon-only labels with empty overlay_labels_data
-        overlay_labels_data = plots_data.get('overlay_labels_data', None)
-        overlay_labels_data_item: Optional[OverlayLabelsPlotData] = (overlay_labels_data or {}).get(data_index_value, None)
+        # DF-derived labels (wcorr/heuristic) are optional: provider may be registered for radon-only labels with an intentionally-empty overlay_labels_data ({}).
+        # Only a None/empty dict is a legitimate soft-skip; a populated dict missing this epoch's key is a real indexing mismatch and must be surfaced.
+        overlay_labels_data = getattr(plots_data, 'overlay_labels_data', None)
+        overlay_labels_data_item: Optional[OverlayLabelsPlotData] = None
+        if (overlay_labels_data is not None) and (len(overlay_labels_data) > 0):
+            overlay_labels_data_item = overlay_labels_data.get(data_index_value, None)
+            if (overlay_labels_data_item is None) and should_enable_overlay_labels_info and debug_print:
+                sample_keys = list(overlay_labels_data.keys())[:5]
+                print(f'WARNING: OverlayLabelsPaginatedPlotDataProvider: plots_data.overlay_labels_data ({len(overlay_labels_data)} entries) has no entry for epoch_start_t: {data_index_value} (data_idx: {data_idx}). Sample keys: {sample_keys}. Skipping wcorr/heuristic labels for this axis.')
+        elif debug_print:
+            print(f'\toverlay_labels_data is None/empty (radon-only registration?); skipping wcorr/heuristic labels')
+        ## END if (overlay_labels_data is not None) and (len(overlay_labels_data) > 0)...
+
         if overlay_labels_data_item is not None:
             wcorr_final_text: str = overlay_labels_data_item.build_display_text(included_keys=wcorr_visible_keys)
             heuristic_final_text: str = overlay_labels_data_item.build_display_text(included_keys=heuristic_visible_keys)
         else:
-            if debug_print:
-                print(f'\tno overlay_labels_data for data_index_value: {data_index_value}; skipping wcorr/heuristic labels')
             wcorr_final_text = ''
             heuristic_final_text = ''
         should_show_wcorr_text: bool = should_enable_overlay_labels_info and bool(wcorr_final_text and str(wcorr_final_text).strip())
@@ -2484,8 +2537,14 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         # Radon corner text (yellow): strings come from RadonTransformPlotData (indexed by data_idx); gated by enable_radon_transform_info
         should_enable_radon_transform_info: bool = bool(params.get('enable_radon_transform_info', False))
-        radon_transform_data = plots_data.get('radon_transform_data', None)
-        radon_data_item = (radon_transform_data or {}).get(data_idx, None)
+        radon_transform_data = getattr(plots_data, 'radon_transform_data', None)
+        radon_data_item = None
+        if (radon_transform_data is not None) and (len(radon_transform_data) > 0):
+            radon_data_item = radon_transform_data.get(data_idx, None)
+            if (radon_data_item is None) and should_enable_radon_transform_info and debug_print:
+                print(f'WARNING: OverlayLabelsPaginatedPlotDataProvider: plots_data.radon_transform_data ({len(radon_transform_data)} entries) has no entry for data_idx: {data_idx}. Skipping radon label for this axis.')
+        ## END if (radon_transform_data is not None) and (len(radon_transform_data) > 0)...
+
         if radon_data_item is not None:
             radon_final_text: str = radon_data_item.build_display_text(included_keys=visible_keys)
         else:
@@ -2494,11 +2553,14 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
         def _subfn_upsert_overlay_label(extant_artist, should_show: bool, final_text: str, label_text_kwargs: Dict[str, Any]):
             """ create/update/remove one AnchoredText/AnchoredCustomText overlay label. """
+            # Zero borderpad so stacked blocks share the same line-step rhythm (no OffsetBox pad inflation).
+            label_text_kwargs = {**label_text_kwargs, 'borderpad': 0.}
+            # After ax.clear(), detached OffsetBoxes are dead — do not re-add_artist; recreate when showing.
+            if (extant_artist is not None) and (extant_artist.axes is None):
+                extant_artist = None
             if extant_artist is not None:
                 assert isinstance(extant_artist, (AnchoredText, AnchoredCustomText)), f"overlay label is of type {type(extant_artist)} but is expected to be AnchoredText/AnchoredCustomText."
                 if should_show:
-                    if extant_artist.axes is None:
-                        curr_ax.add_artist(extant_artist)
                     if use_AnchoredCustomText:
                         extant_artist.remove()
                         extant_artist = add_inner_title(curr_ax, final_text, use_AnchoredCustomText=use_AnchoredCustomText, custom_value_formatter=custom_value_formatter, **label_text_kwargs)
@@ -2506,6 +2568,9 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                         extant_artist.set_alpha(anchored_text_alpha_override_value)
                     else:
                         extant_artist.txt.set_text(final_text)
+                        _fs = label_text_kwargs.get('font_size', None)
+                        if (_fs is not None) and hasattr(extant_artist.txt, '_text') and (extant_artist.txt._text is not None):
+                            extant_artist.txt._text.set_fontsize(float(_fs))
                 else:
                     extant_artist.remove()
                     extant_artist = None
@@ -2520,6 +2585,15 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
                     extant_artist = None
             if extant_artist is not None:
                 extant_artist.set_zorder(cls.OVERLAY_LABEL_ZORDER)
+                # Keep glyphs inside this axes from being clipped by the axes patch; also clear clip path.
+                extant_artist.set_clip_on(False)
+                extant_artist.set_clip_path(None)
+                if hasattr(extant_artist, 'patch') and (extant_artist.patch is not None):
+                    extant_artist.patch.set_clip_on(False)
+                if hasattr(extant_artist, 'txt') and (extant_artist.txt is not None):
+                    extant_artist.txt.set_clip_on(False)
+                    if hasattr(extant_artist.txt, '_text') and (extant_artist.txt._text is not None):
+                        extant_artist.txt._text.set_clip_on(False)
             return extant_artist
 
 
@@ -2527,35 +2601,53 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
         assert cls.plots_group_identifier_key in plots, f"ERROR: key cls.plots_group_identifier_key: {cls.plots_group_identifier_key} is not in plots. plots.keys(): {list(plots.keys())}"
         extant_plots_dict = plots[cls.plots_group_identifier_key].get(curr_ax, {}) ## 2024-02-29 ERROR: there should only be one item per axes (a single page worth), not one per data_index
 
-        wcorr_text_kwargs = deepcopy(text_kwargs)
-        wcorr_text_kwargs.update(stroke_foreground=cls.theme_stroke_color, bbox_to_anchor=(1.0, 1.0))
+        # Equal-step top-right stack: inset from top + right spines so glyphs/stroke are not clipped.
+        # On short epoch axes, shrink font so N lines fit in the usable vertical band (avoids bottom cutoff).
+        overlay_stack_right_x: float = 0.96
+        overlay_stack_top_y: float = 0.97
+        overlay_stack_bottom_y: float = 0.02
+        font_size_pt: float = float(cls.overlay_label_font_size)
+        wcorr_n_lines: int = cls._overlay_label_line_count(wcorr_final_text) if should_show_wcorr_text else 0
+        heuristic_n_lines: int = cls._overlay_label_line_count(heuristic_final_text) if should_show_heuristic_text else 0
+        radon_n_lines: int = cls._overlay_label_line_count(radon_final_text) if should_show_radon_text else 0
+        n_stack_lines: int = int(wcorr_n_lines + heuristic_n_lines + radon_n_lines)
+        if n_stack_lines > 0:
+            natural_line_h: float = cls._overlay_line_height_axes(curr_ax, font_size_pt=font_size_pt, line_spacing=1.25)
+            usable_h: float = float(overlay_stack_top_y - overlay_stack_bottom_y)
+            fit_line_h: float = usable_h / float(n_stack_lines)
+            if natural_line_h > fit_line_h:
+                font_size_pt = float(font_size_pt) * (fit_line_h / natural_line_h)
+                text_kwargs['font_size'] = font_size_pt
+                if ('fontproperties' in text_kwargs) and (text_kwargs['fontproperties'] is not None):
+                    text_kwargs['fontproperties'] = text_kwargs['fontproperties'].copy()
+                    text_kwargs['fontproperties'].set_size(font_size_pt)
+            ## END if natural_line_h > fit_line_h...
+        ## END if n_stack_lines > 0...
+
+        wcorr_y: float = float(overlay_stack_top_y)
+        heuristic_y: float = cls._overlay_stack_y_below(curr_ax, wcorr_n_lines, font_size_pt, top_y=overlay_stack_top_y) if (wcorr_n_lines > 0) else wcorr_y
+        radon_y: float = cls._overlay_stack_y_below(curr_ax, (wcorr_n_lines + heuristic_n_lines), font_size_pt, top_y=overlay_stack_top_y) if ((wcorr_n_lines + heuristic_n_lines) > 0) else wcorr_y
+        wcorr_bbox = (overlay_stack_right_x, wcorr_y)
+        heuristic_bbox = (overlay_stack_right_x, heuristic_y)
+        radon_bbox = (overlay_stack_right_x, radon_y)
+
+        # Shallow-copy shared inset kwargs per block (stroke + bbox only); avoid deepcopy×3 on the page hot path
+        wcorr_text_kwargs = {**text_kwargs, 'stroke_foreground': cls.theme_stroke_color, 'bbox_to_anchor': wcorr_bbox}
         anchored_text = _subfn_upsert_overlay_label(extant_plots_dict.get('wcorr_text', None), should_show_wcorr_text, wcorr_final_text, wcorr_text_kwargs)
+        if anchored_text is not None:
+            anchored_text.set_bbox_to_anchor(wcorr_bbox, transform=curr_ax.transAxes)
 
         # Heuristic score lines (coverage, mseq_*, …): green outline, stacked under wcorr
-        heuristic_text_kwargs = deepcopy(text_kwargs)
-        heuristic_y: float = 1.0
-        if anchored_text is not None:
-            heuristic_y = cls._axes_y_below_anchored_artist(curr_ax, anchored_text, pad_axes=0.0, fallback_y=0.78)
-        heuristic_text_kwargs.update(stroke_foreground=cls.heuristic_theme_stroke_color, bbox_to_anchor=(1.0, heuristic_y))
+        heuristic_text_kwargs = {**text_kwargs, 'stroke_foreground': cls.heuristic_theme_stroke_color, 'bbox_to_anchor': heuristic_bbox}
         heuristic_anchored_text = _subfn_upsert_overlay_label(extant_plots_dict.get('heuristic_text', None), should_show_heuristic_text, heuristic_final_text, heuristic_text_kwargs)
-        # Re-measure after create (first draw may refine extent) and snap heuristic under wcorr
-        if (heuristic_anchored_text is not None) and (anchored_text is not None):
-            heuristic_y = cls._axes_y_below_anchored_artist(curr_ax, anchored_text, pad_axes=0.0, fallback_y=heuristic_y)
-            heuristic_anchored_text.set_bbox_to_anchor((1.0, heuristic_y), transform=curr_ax.transAxes)
+        if heuristic_anchored_text is not None:
+            heuristic_anchored_text.set_bbox_to_anchor(heuristic_bbox, transform=curr_ax.transAxes)
 
-        # Radon score lines: yellow outline, stacked under the bottom-most extant label (heuristic, else wcorr); top-right when radon-only
-        stack_anchor_artist = heuristic_anchored_text if (heuristic_anchored_text is not None) else anchored_text
-        radon_text_kwargs = deepcopy(text_kwargs)
-        radon_y: float = 1.0
-        if stack_anchor_artist is not None:
-            radon_y = cls._axes_y_below_anchored_artist(curr_ax, stack_anchor_artist, pad_axes=0.0, fallback_y=float(params.setdefault('radon_label_bbox_y', 0.78)))
-        radon_text_kwargs.update(stroke_foreground=cls.radon_theme_stroke_color, bbox_to_anchor=(1.0, radon_y))
+        # Radon score lines: yellow outline, stacked under wcorr(+heuristic) by line count; top-right when radon-only
+        radon_text_kwargs = {**text_kwargs, 'stroke_foreground': cls.radon_theme_stroke_color, 'bbox_to_anchor': radon_bbox}
         radon_anchored_text = _subfn_upsert_overlay_label(extant_plots_dict.get('radon_text', None), should_show_radon_text, radon_final_text, radon_text_kwargs)
         if radon_anchored_text is not None:
-            # Re-measure after create and snap radon under the stack; one zorder step above so a transient overlap draws radon on top
-            if stack_anchor_artist is not None:
-                radon_y = cls._axes_y_below_anchored_artist(curr_ax, stack_anchor_artist, pad_axes=0.0, fallback_y=radon_y)
-                radon_anchored_text.set_bbox_to_anchor((1.0, radon_y), transform=curr_ax.transAxes)
+            radon_anchored_text.set_bbox_to_anchor(radon_bbox, transform=curr_ax.transAxes)
             radon_anchored_text.set_zorder(cls.OVERLAY_RADON_LABEL_ZORDER)
         
         # Store the plot objects for future updates:
@@ -2568,7 +2660,7 @@ class OverlayLabelsPaginatedPlotDataProvider(PaginatedPlotDataProvider):
 
     @classmethod
     def _callback_remove_curr_single_epoch_slice_plot(cls, curr_ax, params: "VisualizationParameters", plots_data: "RenderPlotsData", plots: "RenderPlots", ui: "PhoUIContainer", data_idx:int, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs): # curr_posterior, curr_most_likely_positions, debug_print:bool=False
-        debug_print = kwargs.pop('debug_print', True)
+        debug_print = kwargs.pop('debug_print', False)
         if debug_print:
             print(f'OverlayLabelsPaginatedPlotDataProvider._callback_remove_curr_single_epoch_slice_plot(..., data_idx: {data_idx}, curr_time_bins: {curr_time_bins})')
 
@@ -3280,11 +3372,11 @@ class DecodedSequenceAndHeuristicsPlotDataProvider(PaginatedPlotDataProvider):
                     # sequence_position_hlines_kwargs=dict(linewidth=3, linestyle=basic_linestyle, zorder=9, alpha=1.0),
                     split_vlines_kwargs = dict(should_skip=False),
                     time_bin_edges_vlines_kwargs = dict(should_skip=False),
-                    direction_change_lines_kwargs = dict(should_skip=False),
-                    intrusion_time_bin_shading_kwargs = dict(should_skip=False, facecolor='red', alpha=0.15),
+                    direction_change_lines_kwargs = dict(should_skip=True),
+                    intrusion_time_bin_shading_kwargs = dict(should_skip=True, facecolor='red', alpha=0.15),
                     # main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor ="red", s = 100, zorder=1),
-                    main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=2, marker ="^", edgecolor="#141414F9", s=75, zorder=11, alpha=0.85),
-                    subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=False, should_skip_if_non_main_sequence=False, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0),
+                    main_sequence_position_dots_kwargs = dict(should_skip=False, linewidths=0.5, marker ="^", edgecolor="#141414F9", s=75, zorder=11, alpha=0.45),
+                    subsequence_relative_bin_idx_labels_kwargs = dict(should_skip=True, should_skip_if_non_main_sequence=False, subseq_idx_text_alpha = 0.95, subseq_idx_text_outline_color = ('color', 'color', 'color', 0.95), subsequence_idx_offset = 4.0),
                 )
         
                 if show_heuristic_criteria_filter_epoch_inclusion_status:
