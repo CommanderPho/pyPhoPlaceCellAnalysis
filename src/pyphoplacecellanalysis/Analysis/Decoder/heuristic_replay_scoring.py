@@ -1588,7 +1588,14 @@ class SubsequencesPartitioningResult(ComputedResult):
         # }
 
         all_subseq_partitioning_score_computations_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
-        results_dict = {score_computation_name:computation_fn(partition_result=self, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=self.pos_bin_edges) for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()}
+        results_dict = {}
+        for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items():
+            if score_computation_name in FORWARDICITY_SCORE_COL_NAMES:
+                results_dict[score_computation_name] = computation_fn(partition_result=self, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=self.pos_bin_edges, decoder_name=None)
+            else:
+                results_dict[score_computation_name] = computation_fn(partition_result=self, a_result=None, an_epoch_idx=-1, a_decoder_track_length=decoder_track_length, pos_bin_edges=self.pos_bin_edges)
+        ## END for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()....
+
         return results_dict
     
 
@@ -2469,6 +2476,158 @@ class SequenceScoringComputations:
     # def replay_fidelity(cls, positions: NDArray, original_trajectory: NDArray) -> float:
     #     return np.corrcoef(positions, original_trajectory)[0, 1]
 
+
+# ==================================================================================================================== #
+# Forwardicity (forward-vs-backward) score                                                                             #
+# ==================================================================================================================== #
+FORWARDICITY_SCORE_COL_NAMES: List[str] = ['forwardicity', 'ratio_major_aligned_bins', 'ratio_decoder_aligned_bins']
+DECODER_DIRECTION_MAP: Dict[str, float] = {'long_LR': -1.0, 'long_RL': 1.0, 'short_LR': -1.0, 'short_RL': 1.0}
+
+
+@function_attributes(short_name=None, tags=['forwardicity', 'forward-v-reverse', 'replay', 'metric', 'score'], input_requires=[], output_provides=[], uses=[], used_by=['SubsequencesPartitioningResultScoringComputations'], creation_date='2026-10-06 09:30', related_items=[])
+def forwardicity_score(p_x_given_n: Optional[NDArray] = None, most_likely_positions_arr: Optional[NDArray] = None, xbin_centers: Optional[NDArray] = None, most_likely_decoder_direction: Optional[float] = None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = False):
+    """Signed forward-vs-backward score for one replay posterior.
+
+    Steps are the first differences of the MAP position. Bins that do not move are omitted from both the numerator and the denominator.
+
+    ratio_major_aligned_bins is the fraction of moving steps whose sign matches the majority sign. It is 1.0 for a fully unidirectional event in either direction and 0.5 when the two directions tie. Threshold this (for example at 0.75) to keep directional events.
+
+    forwardicity compares those same moving steps to most_likely_decoder_direction (±1). It is +1 when every moving step matches the decoder, -1 when every moving step opposes it, and 0 for a tie. It is NaN when there is no decoder direction or no moving step.
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import forwardicity_score
+
+        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=p_x_given_n, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction)
+    """
+    if debug_print:
+        print(f'forwardicity_score(...):')
+
+    most_likely_position_bin_indicies_arr = None
+    most_likely_positions_likelihood_arr = None
+
+    if (p_x_given_n is not None):
+        p_x_given_n = np.asarray(p_x_given_n)
+        total_n_time_bins: int = int(np.shape(p_x_given_n)[time_axes])
+
+        if debug_print:
+            print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}')
+
+        most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes)
+        most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes)
+
+        if most_likely_positions_arr is None:
+            if xbin_centers is not None:
+                most_likely_positions_arr = np.ravel(np.asarray(xbin_centers)[most_likely_position_bin_indicies_arr]).astype(float)
+            else:
+                most_likely_positions_arr = np.ravel(most_likely_position_bin_indicies_arr).astype(float)
+        else:
+            Assert.len_equals(most_likely_positions_arr, required_length=total_n_time_bins)
+
+    elif ((p_x_given_n is None) and (most_likely_positions_arr is not None)):
+        total_n_time_bins: int = int(len(most_likely_positions_arr))
+        if debug_print:
+            print(f'\tnp.shape(most_likely_positions_arr): {np.shape(most_likely_positions_arr)}, total_n_time_bins: {total_n_time_bins}')
+        most_likely_positions_arr = np.ravel(most_likely_positions_arr).astype(float)
+
+    else:
+        raise ValueError(f'p_x_given_n: {p_x_given_n}, most_likely_positions_arr: {most_likely_positions_arr}')
+
+    if most_likely_positions_arr.size < 2:
+        if debug_print:
+            print(f'\tWARN: fewer than 2 time bins ({most_likely_positions_arr.size}); forwardicity is undefined')
+        return np.nan, (np.nan, None)
+
+    _positions_diff = np.diff(most_likely_positions_arr)
+    change_directions = np.sign(_positions_diff)  # {-1, 0, +1}; 0 is a pause, not a direction
+    is_directional_step = (change_directions != 0) & np.isfinite(change_directions)
+    n_directional_steps: int = int(np.sum(is_directional_step))
+
+    if debug_print:
+        if most_likely_position_bin_indicies_arr is not None and np.size(most_likely_position_bin_indicies_arr) > 0:
+            print(f'\tmost_likely_position_bin_indicies_arr: {np.ravel(most_likely_position_bin_indicies_arr)}')
+        print(f'\tmost_likely_positions_arr: {most_likely_positions_arr}')
+        if most_likely_positions_likelihood_arr is not None:
+            print(f'\tmost_likely_positions_likelihood_arr: {np.ravel(most_likely_positions_likelihood_arr)}')
+        print(f'\t_positions_diff: {_positions_diff}')
+        print(f'\tchange_directions: {change_directions}')
+        print(f'\tn_directional_steps: {n_directional_steps} of {len(_positions_diff)} steps ({total_n_time_bins} time bins)')
+
+    if n_directional_steps == 0:
+        if debug_print:
+            print(f'\tWARN: no non-zero position steps; forwardicity is undefined')
+        return np.nan, (np.nan, None)
+
+    directional_signs = change_directions[is_directional_step]
+    n_positive: int = int(np.sum(directional_signs > 0))
+    n_negative: int = int(np.sum(directional_signs < 0))
+    ## A tie is 0.5 either way. Majority is a step count, so one large jump cannot outvote many small steps.
+    n_major: int = max(n_positive, n_negative)
+    if n_positive > n_negative:
+        total_displacement_major_direction: float = 1.0
+    elif n_negative > n_positive:
+        total_displacement_major_direction = -1.0
+    else:
+        total_displacement_major_direction = 0.0
+
+    ratio_major_aligned_bins: float = float(n_major) / float(n_directional_steps)
+
+    if debug_print:
+        print(f'\tn_positive: {n_positive}, n_negative: {n_negative}')
+        print(f'\ttotal_displacement_major_direction: {total_displacement_major_direction}')
+        print(f'\tratio_major_aligned_bins: {ratio_major_aligned_bins}')
+
+    ratio_decoder_aligned_bins: Optional[float] = None
+    forwardicity: float = np.nan
+    if most_likely_decoder_direction is not None:
+        decoder_direction: float = float(np.sign(most_likely_decoder_direction))
+        if decoder_direction == 0.0:
+            if debug_print:
+                print(f'\tWARN: most_likely_decoder_direction={most_likely_decoder_direction} is not ±1; forwardicity is undefined')
+        else:
+            n_decoder_aligned: int = int(np.sum(directional_signs == decoder_direction))
+            ratio_decoder_aligned_bins = float(n_decoder_aligned) / float(n_directional_steps)
+            forwardicity = (ratio_decoder_aligned_bins - 0.5) * 2.0  # 0 -> -1, 0.5 -> 0, 1 -> +1
+
+            if debug_print:
+                print(f'\tdecoder_direction: {decoder_direction}')
+                print(f'\tn_decoder_aligned: {n_decoder_aligned}')
+                print(f'\tratio_decoder_aligned_bins: {ratio_decoder_aligned_bins}')
+                print(f'\tforwardicity: {forwardicity}')
+    elif debug_print:
+        print(f'\tWARN: most_likely_decoder_direction is None; returning monotonicity only')
+
+    return forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins)
+
+
+
+@function_attributes(short_name=None, tags=['forwardicity', 'main-sequence', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=['SubsequencesPartitioningResultScoringComputations', 'ForwardicityPaginatedPlotDataProvider'], creation_date='2026-10-06 11:32', related_items=['forwardicity_score'])
+def main_sequence_positions(partition_result) -> NDArray:
+    """Time-ordered positions of the ranked main subsequence, with intrusion bins removed.
+
+    Uses the `is_main` row of `partition_result.subsequences_df` (ranked by `len_excluding_intrusions`), then the matching non-intrusion rows of `position_bins_info_df` sorted by `flat_idx`. Repeats stay in the array. An empty array means there is no usable main sequence.
+
+    Usage:
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import forwardicity_score, main_sequence_positions
+
+        positions = main_sequence_positions(a_seq_and_heuristics_result)
+        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=positions, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
+    """
+    subsequences_df = getattr(partition_result, 'subsequences_df', None)
+    position_bins_info_df = getattr(partition_result, 'position_bins_info_df', None)
+    if (subsequences_df is None) or (position_bins_info_df is None) or (len(subsequences_df) == 0):
+        return np.array([], dtype=float)
+
+    is_main = subsequences_df['is_main'].to_numpy()
+    if not np.any(is_main):
+        return np.array([], dtype=float)
+
+    main_subsequence_idx = subsequences_df.loc[is_main, 'subsequence_idx'].iloc[0]
+    is_main_bin = (position_bins_info_df['subsequence_idx'] == main_subsequence_idx) & np.logical_not(position_bins_info_df['is_intrusion'])
+    main_bins_df = position_bins_info_df.loc[is_main_bin].sort_values('flat_idx')
+    return main_bins_df['pos'].to_numpy(dtype=float)
+
+
+
 class SubsequencesPartitioningResultScoringComputations:
     @classmethod
     @function_attributes(short_name=None, tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
@@ -2520,7 +2679,10 @@ class SubsequencesPartitioningResultScoringComputations:
          'mseq_len_ratio_ignoring_intrusions_and_repeats': cls.bin_wise_main_subsequence_len_ratio_ignoring_intrusions_and_repeats_fn,
          'mseq_tcov': cls.bin_wise_main_subsequence_track_coverage_score_fn, 
          'mseq_dtrav': cls.bin_wise_main_subsequence_total_distance_traveled_fn,
-         # ['mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav']
+         'forwardicity': cls.bin_wise_forwardicity_fn,
+         'ratio_major_aligned_bins': cls.bin_wise_ratio_major_aligned_bins_fn,
+         'ratio_decoder_aligned_bins': cls.bin_wise_ratio_decoder_aligned_bins_fn,
+         # ['mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_tcov', 'mseq_dtrav', 'forwardicity', 'ratio_major_aligned_bins', 'ratio_decoder_aligned_bins']
         }
     
 
@@ -2569,6 +2731,42 @@ class SubsequencesPartitioningResultScoringComputations:
         assert partition_result.subsequences_df is not None
         main_subsequence_df = partition_result.subsequences_df[partition_result.subsequences_df['is_main']]
         return main_subsequence_df['total_distance_traveled'].to_numpy()[0]
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['forwardicity', 'private'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-09 11:36', related_items=[])
+    def _compute_forwardicity_tuple_from_partition_result(cls, partition_result: SubsequencesPartitioningResult, decoder_name: Optional[str] = None) -> Tuple[float, float, Optional[float]]:
+        """Returns (forwardicity, ratio_major_aligned_bins, ratio_decoder_aligned_bins) for the main sequence of partition_result."""
+        positions = main_sequence_positions(partition_result)
+        most_likely_decoder_direction: Optional[float] = DECODER_DIRECTION_MAP.get(decoder_name, None) if (decoder_name is not None) else None
+        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=positions, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
+        if ratio_major_aligned_bins is None:
+            ratio_major_aligned_bins = np.nan
+        return float(forwardicity) if np.isfinite(forwardicity) else np.nan, float(ratio_major_aligned_bins) if np.isfinite(ratio_major_aligned_bins) else np.nan, (float(ratio_decoder_aligned_bins) if (ratio_decoder_aligned_bins is not None and np.isfinite(ratio_decoder_aligned_bins)) else np.nan)
+
+
+    @classmethod
+    @function_attributes(short_name='forwardicity', tags=['bin-wise', 'forwardicity', 'score', 'replay'], input_requires=[], output_provides=[],
+                          uses=['main_sequence_positions', 'forwardicity_score'], used_by=[], creation_date='2026-10-09 11:30', related_items=['SubsequencesPartitioningResult'])
+    def bin_wise_forwardicity_fn(cls, partition_result: SubsequencesPartitioningResult, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, decoder_name: Optional[str] = None) -> float:
+        forwardicity, _ratio_major, _ratio_decoder = cls._compute_forwardicity_tuple_from_partition_result(partition_result=partition_result, decoder_name=decoder_name)
+        return forwardicity
+
+
+    @classmethod
+    @function_attributes(short_name='ratio_major_aligned_bins', tags=['bin-wise', 'forwardicity', 'score', 'replay'], input_requires=[], output_provides=[],
+                          uses=['main_sequence_positions', 'forwardicity_score'], used_by=[], creation_date='2026-10-09 11:30', related_items=['SubsequencesPartitioningResult'])
+    def bin_wise_ratio_major_aligned_bins_fn(cls, partition_result: SubsequencesPartitioningResult, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, decoder_name: Optional[str] = None) -> float:
+        _forwardicity, ratio_major_aligned_bins, _ratio_decoder = cls._compute_forwardicity_tuple_from_partition_result(partition_result=partition_result, decoder_name=decoder_name)
+        return ratio_major_aligned_bins
+
+
+    @classmethod
+    @function_attributes(short_name='ratio_decoder_aligned_bins', tags=['bin-wise', 'forwardicity', 'score', 'replay'], input_requires=[], output_provides=[],
+                          uses=['main_sequence_positions', 'forwardicity_score'], used_by=[], creation_date='2026-10-09 11:30', related_items=['SubsequencesPartitioningResult'])
+    def bin_wise_ratio_decoder_aligned_bins_fn(cls, partition_result: SubsequencesPartitioningResult, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, decoder_name: Optional[str] = None) -> float:
+        _forwardicity, _ratio_major, ratio_decoder_aligned_bins = cls._compute_forwardicity_tuple_from_partition_result(partition_result=partition_result, decoder_name=decoder_name)
+        return ratio_decoder_aligned_bins
 
 
 
@@ -3204,9 +3402,12 @@ class HeuristicReplayScoring:
                 unique_full_decoder_score_column_name: str = f"{score_name}_{a_name}"
 
                 # 'main_contiguous_subsequence_len_short_LR'
-                _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
+                if score_computation_name in FORWARDICITY_SCORE_COL_NAMES:
+                    _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges, decoder_name=a_name) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
+                else:
+                    _all_epochs_scores_dict[unique_full_decoder_score_column_name] = [computation_fn(partition_result=a_partition_result, a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges) for an_epoch_idx, a_partition_result in enumerate(partition_result_dict[a_name])]
                 _a_separate_decoder_new_scores_dict[single_decoder_column_name] = deepcopy(_all_epochs_scores_dict[unique_full_decoder_score_column_name]) # a single column, all epochs
-            # END for all_subseq_partitioning_score_computations_fn_dict
+            ## END for score_computation_name, computation_fn in all_subseq_partitioning_score_computations_fn_dict.items()....
             
 
             ## compute all scores for this decoder:
