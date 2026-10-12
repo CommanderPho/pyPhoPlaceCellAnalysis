@@ -26,44 +26,13 @@ class BasicBinnedImageRenderingHelpers:
 
     @classmethod
     def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65, grid_color=None, use_bin_index_axes:bool=True, extra_space_for_labels=12):
-        """ adds the ticks for xbins and ybins to the plot_item (axis grid disabled; use `_add_bounded_bin_grid` for in-bounds grid lines).
+        """Hide ViewBox-edge axes/ticks; bin structure is drawn via `_add_bounded_bin_grid` + matrixBoundaryRectItem around the data.
 
-            use_bin_index_axes: If True, ticks are set at indices (0, 1, 2, ...). If False, ticks are set at actual bin values (data coordinates).
+            use_bin_index_axes / xbins / ybins / grid_* kept for call-site compatibility (axis ticks no longer drawn at window edges).
 
         """
-        # show full frame, label tick marks at top and left sides, with some extra space for labels:
-        plot_item.showAxes(True, showValues=(True, True, False, False), size=extra_space_for_labels)
-        # define major tick marks and labels:
-        if xbins is not None:
-            if use_bin_index_axes:
-                # Use indices as tick positions (0, 1, 2, ...)
-                xticks = [(idx, label) for idx, label in enumerate(xbins)]
-            else:
-                # Use actual bin values as tick positions (data coordinates)
-                xticks = [(bin_val, label) for bin_val, label in zip(xbins, xbins)]
-            for side in ('top','bottom'):
-                plot_item.getAxis(side).setStyle(showValues=False)
-                plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks
-            ## END for side in ('top','bottom')...
-        if ybins is not None:
-            if use_bin_index_axes:
-                # Use indices as tick positions (0, 1, 2, ...)
-                yticks = [(idx, label) for idx, label in enumerate(ybins)]
-            else:
-                # Use actual bin values as tick positions (data coordinates)
-                yticks = [(bin_val, label) for bin_val, label in zip(ybins, ybins)]
-            for side in ('left','right'):
-                plot_item.getAxis(side).setStyle(showValues=False)
-                plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
-            ## END for side in ('left','right')...
-
-        # Set grid color if provided
-        if grid_color is not None:
-            for side in ('top', 'bottom', 'left', 'right'):
-                plot_item.getAxis(side).setPen(grid_color)
-            ## END for side in ('top', 'bottom', 'left', 'right')...
-
-        # Axis showGrid spans the full ViewBox (including empty aspect-locked margins); bounded grid is added separately.
+        # Outer PlotItem axes hug the ViewBox (often far outside a tall/narrow image); hide them.
+        plot_item.showAxes(False)
         plot_item.showGrid(x=False, y=False)
         return plot_item
 
