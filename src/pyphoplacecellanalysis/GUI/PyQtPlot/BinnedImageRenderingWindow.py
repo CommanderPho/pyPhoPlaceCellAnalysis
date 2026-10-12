@@ -26,7 +26,7 @@ class BasicBinnedImageRenderingHelpers:
 
     @classmethod
     def _add_bin_ticks(cls, plot_item, xbins=None, ybins=None, grid_opacity:float=0.65, grid_color=None, use_bin_index_axes:bool=True, extra_space_for_labels=12):
-        """ adds the ticks/grid for xbins and ybins to the plot_item 
+        """ adds the ticks for xbins and ybins to the plot_item (axis grid disabled; use `_add_bounded_bin_grid` for in-bounds grid lines).
 
             use_bin_index_axes: If True, ticks are set at indices (0, 1, 2, ...). If False, ticks are set at actual bin values (data coordinates).
 
@@ -44,6 +44,7 @@ class BasicBinnedImageRenderingHelpers:
             for side in ('top','bottom'):
                 plot_item.getAxis(side).setStyle(showValues=False)
                 plot_item.getAxis(side).setTicks((xticks, [])) # add list of major ticks; no minor ticks
+            ## END for side in ('top','bottom')...
         if ybins is not None:
             if use_bin_index_axes:
                 # Use indices as tick positions (0, 1, 2, ...)
@@ -54,15 +55,48 @@ class BasicBinnedImageRenderingHelpers:
             for side in ('left','right'):
                 plot_item.getAxis(side).setStyle(showValues=False)
                 plot_item.getAxis(side).setTicks((yticks, [])) # add list of major ticks; no minor ticks
+            ## END for side in ('left','right')...
 
         # Set grid color if provided
         if grid_color is not None:
             for side in ('top', 'bottom', 'left', 'right'):
                 plot_item.getAxis(side).setPen(grid_color)
+            ## END for side in ('top', 'bottom', 'left', 'right')...
 
-
-        plot_item.showGrid(x=True, y=True, alpha=grid_opacity)
+        # Axis showGrid spans the full ViewBox (including empty aspect-locked margins); bounded grid is added separately.
+        plot_item.showGrid(x=False, y=False)
         return plot_item
+
+
+    @classmethod
+    def _add_bounded_bin_grid(cls, plot_item, x_min, x_max, y_min, y_max, n_xbins: int, n_ybins: int, grid_opacity: float = 0.65, grid_color=None):
+        """Draws finite bin grid lines clipped to the matrix bounds (does not span the ViewBox)."""
+        path = QtGui.QPainterPath()
+        x_edges = np.linspace(x_min, x_max, int(n_xbins) + 1)
+        y_edges = np.linspace(y_min, y_max, int(n_ybins) + 1)
+
+        for x in x_edges:
+            path.moveTo(float(x), float(y_min))
+            path.lineTo(float(x), float(y_max))
+        ## END for x in x_edges...
+
+        for y in y_edges:
+            path.moveTo(float(x_min), float(y))
+            path.lineTo(float(x_max), float(y))
+        ## END for y in y_edges...
+
+        if grid_color is None:
+            grid_pen_color: QtCore.QColor = pg.mkColor('#a0a0a0')
+        else:
+            grid_pen_color = pg.mkColor(grid_color)
+        grid_pen_color.setAlphaF(float(grid_opacity))
+        pen = pg.mkPen(grid_pen_color, width=1)
+
+        grid_item = QtGui.QGraphicsPathItem(path)
+        grid_item.setPen(pen)
+        plot_item.addItem(grid_item)
+        return grid_item
+
 
     @classmethod
     def _build_binned_imageItem(cls, plot_item: pg.PlotItem, params, xbins=None, ybins=None, matrix=None, name='avg_velocity', data_label='Avg Velocity', color_bar_mode=None, use_bin_index_axes:bool=True) -> Tuple[RenderPlots, RenderPlotsData]:
@@ -117,7 +151,7 @@ class BasicBinnedImageRenderingHelpers:
         
         # plotItem.invertY(True)           # orient y axis to run top-to-bottom
         
-        local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None, matrixBoundaryRectItem=None)
+        local_plots = RenderPlots(name=name, imageItem=None, colorBarItem=None, matrixBoundaryRectItem=None, binGridItem=None)
         # Normal ImageItem():
         local_plots.imageItem = pg.ImageItem(matrix.T)
         plot_item.addItem(local_plots.imageItem)
@@ -144,6 +178,9 @@ class BasicBinnedImageRenderingHelpers:
         local_plots.matrixBoundaryRectItem = pg.QtGui.QGraphicsRectItem(rect)
         local_plots.matrixBoundaryRectItem.setPen(pen)
         plot_item.addItem(local_plots.matrixBoundaryRectItem)
+
+        # Finite grid clipped to matrix bounds (avoids ViewBox-spanning AxisItem grid in empty margins)
+        local_plots.binGridItem = cls._add_bounded_bin_grid(plot_item, x_min=local_plots_data.x_min, x_max=local_plots_data.x_max, y_min=local_plots_data.y_min, y_max=local_plots_data.y_max, n_xbins=n_xbins, n_ybins=n_ybins, grid_opacity=getattr(params, 'grid_opacity', 0.65))
 
         # Mask the outside area to be transparent
         plot_item.setClipToView(True)
