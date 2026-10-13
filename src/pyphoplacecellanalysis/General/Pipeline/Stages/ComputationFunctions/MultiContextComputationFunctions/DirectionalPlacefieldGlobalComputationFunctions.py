@@ -10503,19 +10503,19 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
             ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
             
-            time_bin_size: float = directional_decoders_decode_result.most_recent_decoding_time_bin_size
+            cache_key: DecodingContinuousCacheKey = directional_decoders_decode_result.most_recent_continuous_decoding_cache_key
             if debug_print:
-                print(f'time_bin_size: {time_bin_size}')
+                print(f'continuous_decoding_cache_key (W, H): {cache_key}')
 
             # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
             all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(time_bin_size, None)
-            all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
-            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(time_bin_size, None)
+            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.most_recent_continuously_decoded_dict
+            all_time_bin_sizes_output_dict: Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(cache_key, None)
 
-            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
-            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None even after recomputing!"
-            info_string: str = f" - t_bin_size: {time_bin_size:.3f}"
+            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None for cache_key={cache_key}!"
+            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None for cache_key={cache_key}!"
+            info_string: str = f" - t_bin={cache_key}"
 
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
@@ -10548,26 +10548,24 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         
 
         return output_dict
-    
+
+
     def validate_can_display(self) -> bool:
         """ returns True if the item is enabled, otherwise returns false """
-        #TODO 2025-06-02 10:42: - [ ] Fixed, but now redundant, so disable perminantly by default
-        return False
-        # try:
-        #     curr_active_pipeline = self._active_pipeline
-        #     # assert curr_active_pipeline is not None
-        #     if curr_active_pipeline is None:
-        #         raise ValueError("Current active pipeline is None!")
-        #     active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
-        #     # assert active_2d_plot is not None
-        #     if active_2d_plot is None:
-        #         raise ValueError("active_2d_plot is None!")
+        try:
+            curr_active_pipeline = self._active_pipeline
+            if curr_active_pipeline is None:
+                raise ValueError("Current active pipeline is None!")
+            active_2d_plot = self._spike_raster_window.spike_raster_plt_2d
+            if active_2d_plot is None:
+                raise ValueError("active_2d_plot is None!")
 
-        #     return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
+            return DirectionalDecodersContinuouslyDecodedResult.validate_has_directional_decoded_continuous_epochs(curr_active_pipeline=curr_active_pipeline)
             
-        # except Exception as e:
-        #     print(f'Exception {e} occured in validate_can_display(), returning False')
-        #     return False
+        except Exception as e:
+            print(f'Exception {e} occured in validate_can_display(), returning False')
+            return False
+
 
     def execute(self, *args, **kwargs) -> None:
         print(f'menu execute(): {self}')
@@ -10583,6 +10581,8 @@ class AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand(BaseMenuCommand):
         for a_decoder_name, an_output_tuple in output_dict.items():
             identifier_name, widget, matplotlib_fig, matplotlib_fig_axes, dDisplayItem = an_output_tuple
             self._display_output[identifier_name] = an_output_tuple
+
+        ## END for a_decoder_name, an_output_tuple in output_dict.items()...
 
         print(f'\t AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand.execute() is done.')
         
@@ -10607,7 +10607,15 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
     _active_config_name = field(default=None)
     _context = field(default=None, alias="active_context")
     _display_output = field(default=Factory(dict))
-    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})    
+    active_time_bin_sizes_whitelist: Optional[List[DecodingContinuousCacheKey]] = field(default=None, metadata={'desc':'if not None, only results with these DecodingContinuousCacheKey (W, H) values will be plotted, otherwise all available cache keys will be shown.'})    
+
+
+    @classmethod
+    def _normalize_time_bin_sizes_whitelist(cls, active_time_bin_sizes_whitelist: Optional[List[Union[float, DecodingContinuousCacheKey]]]) -> Optional[List[DecodingContinuousCacheKey]]:
+        """Normalize whitelist entries (float W or (W, H)) to DecodingContinuousCacheKey tuples."""
+        if active_time_bin_sizes_whitelist is None:
+            return None
+        return [normalize_continuous_decoding_cache_lookup_key(k) for k in active_time_bin_sizes_whitelist]
 
 
     @function_attributes(short_name=None, tags=['row', 'posterior'], input_requires=[], output_provides=[], uses=['add_new_matplotlib_render_plot_widget', 'plot_1D_most_likely_position_comparsions'], used_by=[], creation_date='2024-12-18 08:53', related_items=[])
@@ -10795,31 +10803,16 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
-    def get_all_computed_time_bin_sizes(cls, curr_active_pipeline) -> List[float]:
-        """ gets (but does not add) all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
-        time_bin_size_list: List[float] = []
+    def get_all_computed_time_bin_sizes(cls, curr_active_pipeline) -> List[DecodingContinuousCacheKey]:
+        """ gets (but does not add) all computed DecodingContinuousCacheKey values in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict`. """
+        time_bin_size_list: List[DecodingContinuousCacheKey] = []
 
         try:
             ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
-            # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
-            # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
             continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-            # time_bin_size_list = [str(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
-            # time_bin_size_list = [float(a_time_bin_size) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()] ## doesn't work for sliding window
-            # time_bin_size_list = [np.asarray(a_time_bin_size, dtype=np.float64) for a_time_bin_size in continuously_decoded_result_cache_dict.keys()]
             
-            ## had to generalize for sliding windows
-            time_bin_size_list = []
-            for a_time_bin_size in continuously_decoded_result_cache_dict.keys():
-                if isinstance(a_time_bin_size, (Tuple, List, np.array, Set)):
-                    a_time_bin_size = [float(v) for v in a_time_bin_size] ## turn the members into floats
-                else:
-                    ## single item
-                    a_time_bin_size = float(a_time_bin_size)
-                    
-                time_bin_size_list.append(a_time_bin_size)
-            ## END for a_time_bin_size in continuously_decoded_result_cache_dict.keys()....
+            time_bin_size_list = [normalize_continuous_decoding_cache_lookup_key(k) for k in continuously_decoded_result_cache_dict.keys()]
             
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
@@ -10836,9 +10829,10 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
 
     @function_attributes(short_name=None, tags=['multi-time-bin'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_add_pseudo2D_decoder_decoded_epochs'], used_by=[], creation_date='2025-02-26 05:37', related_items=[])
     @classmethod
-    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epochs(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[Union[float, DecodingContinuousCacheKey]]]=None, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows. """
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
+        normalized_whitelist: Optional[List[DecodingContinuousCacheKey]] = cls._normalize_time_bin_sizes_whitelist(active_time_bin_sizes_whitelist)
         
         try:
             ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
@@ -10854,15 +10848,16 @@ class AddNewDecodedPosteriors_MatplotlibPlotCommand(BaseMenuCommand):
                 ## Each iteration here adds 4 more tracks -- one for each decoding context
                 
                 # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
+                cache_key: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(time_bin_size)
                 will_skip_time_bin_size: bool = False
-                if active_time_bin_sizes_whitelist is not None:
-                    if time_bin_size not in active_time_bin_sizes_whitelist:
+                if normalized_whitelist is not None:
+                    if cache_key not in normalized_whitelist:
                         will_skip_time_bin_size = True
                         if debug_print:
-                            print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
+                            print(f'active_time_bin_sizes_whitelist will be used: {normalized_whitelist} and current cache_key: {cache_key} will be excluded.')
 
                 if not will_skip_time_bin_size:
-                    info_string: str = f" - t_bin_size: {time_bin_size}"
+                    info_string: str = f" - t_bin={cache_key}"
                     # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
                     output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epochs(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, a_pseudo2D_decoder=pseudo2D_decoder, debug_print=debug_print, **kwargs)
                     for a_key, an_output_tuple in output_dict.items():
@@ -11080,17 +11075,17 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
     enable_marginal_over_direction: bool = field(default=False)
     enable_marginal_over_track_ID: bool = field(default=True)
     allow_overwrite_enabled_marginals_from_params: bool = field(default=True, metadata={'desc': 'if True, allows overwriting self.enable_* properties with the values in `self._spike_raster_window.spike_raster_plt_2d.params`.'})
-    active_time_bin_sizes_whitelist: Optional[List[float]] = field(default=None, metadata={'desc':'if not None, only results with this decoding_time_bin_size will be plotted, otherwise all available time_bin_sizes will be shown.'})
+    active_time_bin_sizes_whitelist: Optional[List[DecodingContinuousCacheKey]] = field(default=None, metadata={'desc':'if not None, only results with these DecodingContinuousCacheKey (W, H) values will be plotted, otherwise all available cache keys will be shown.'})
 
 
     @property
-    def all_computed_time_bin_sizes(self) -> List[float]:
+    def all_computed_time_bin_sizes(self) -> List[DecodingContinuousCacheKey]:
         """The all_computed_time_bin_sizes property."""
         assert self._active_pipeline is not None
         ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
         directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = self._active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
-        return list(continuously_decoded_result_cache_dict.keys())
+        return [normalize_continuous_decoding_cache_lookup_key(k) for k in continuously_decoded_result_cache_dict.keys()]
 
 
     @function_attributes(short_name=None, tags=['private'], input_requires=[], output_provides=[], uses=['plot_1D_most_likely_position_comparsions', 'get_heatmap_cmap'], used_by=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], creation_date='2025-06-02 09:55', related_items=[])
@@ -11270,7 +11265,7 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals'], used_by=[], creation_date='2025-06-02 09:50', related_items=[])
     @classmethod
-    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[float]]=None, **kwargs):
+    def add_active_computed_time_bin_sizes_pseudo2D_decoder_decoded_epoch_marginals(cls, curr_active_pipeline, active_2d_plot, debug_print=False, active_time_bin_sizes_whitelist: Optional[List[Union[float, DecodingContinuousCacheKey]]]=None, **kwargs):
         """ adds all computed time_bin_sizes in `curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded'].continuously_decoded_result_cache_dict` from the global_computation_results as new matplotlib plot rows.
 
         We might not always want to add all time bin sizes, sometimes they're overwhelming. Better to generate a separate menu option for each size.
@@ -11283,24 +11278,26 @@ class AddNewDecodedEpochMarginal_MatplotlibPlotCommand(AddNewDecodedPosteriors_M
         # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder        
         # all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
         continuously_decoded_result_cache_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict
+        normalized_whitelist: Optional[List[DecodingContinuousCacheKey]] = cls._normalize_time_bin_sizes_whitelist(active_time_bin_sizes_whitelist)
 
         all_time_bin_sizes_output_dict = {'non_marginalized_raw_result': [], 'marginal_over_direction': [], 'marginal_over_track_ID': []}
         # flat_all_time_bin_sizes_output_tuples_list: List[Tuple] = []
         flat_all_time_bin_sizes_output_tuples_dict: Dict[str, Tuple] = {}
         for time_bin_size, a_continuously_decoded_dict in continuously_decoded_result_cache_dict.items():
             # a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult]
+            cache_key: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(time_bin_size)
             will_skip_time_bin_size: bool = False
-            if active_time_bin_sizes_whitelist is not None:
-                if time_bin_size not in active_time_bin_sizes_whitelist:
+            if normalized_whitelist is not None:
+                if cache_key not in normalized_whitelist:
                     will_skip_time_bin_size = True
                     if debug_print:
-                        print(f'active_time_bin_sizes_whitelist will be used: {active_time_bin_sizes_whitelist} and current time_bin_size: {time_bin_size} will be excluded.')
+                        print(f'active_time_bin_sizes_whitelist will be used: {normalized_whitelist} and current cache_key: {cache_key} will be excluded.')
 
             if not will_skip_time_bin_size:
                 if debug_print:
-                    print(f'time_bin_size: {time_bin_size}')
+                    print(f'cache_key: {cache_key}')
 
-                info_string: str = f" - t_bin_size: {time_bin_size}"
+                info_string: str = f" - t_bin={cache_key}"
                 # output_dict = _cmd.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=_cmd._active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, **enable_rows_config_kwargs)
                 output_dict = cls.prepare_and_perform_add_pseudo2D_decoder_decoded_epoch_marginals(curr_active_pipeline=curr_active_pipeline, active_2d_plot=active_2d_plot, continuously_decoded_dict=deepcopy(a_continuously_decoded_dict), info_string=info_string, debug_print=debug_print, **kwargs)
                 for a_key, an_output_tuple in output_dict.items():

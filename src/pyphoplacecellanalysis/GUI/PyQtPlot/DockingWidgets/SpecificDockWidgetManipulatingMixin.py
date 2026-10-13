@@ -28,7 +28,7 @@ from neuropy.utils.mixins.indexing_helpers import UnpackableMixin
 from neuropy.utils.indexing_helpers import PandasHelpers
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import DisplayColorsEnum
 from pyphoplacecellanalysis.GUI.PyQtPlot.DockingWidgets.DynamicDockDisplayAreaContent import CustomDockDisplayConfig, CustomCyclicColorsDockDisplayConfig, NamedColorScheme
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalDecodersContinuouslyDecodedResult, DecodedFilterEpochsResult, DecodingContinuousCacheKey, normalize_continuous_decoding_cache_lookup_key
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import SingleEpochDecodedResult
 from pyphoplacecellanalysis.General.Model.Configs.LongShortDisplayConfig import PlottingHelpers
 
@@ -832,7 +832,8 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         # COMPUTING                                                                                                            #
         # ==================================================================================================================== #
         
-        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+        cache_key: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(desired_time_bin_size)
+        curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': cache_key[0], 'slideby': cache_key[1], 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
         
         ## get the result data:
         try:
@@ -840,13 +841,13 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
             # pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
             all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
-            all_time_bin_sizes_output_dict: Dict[float, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
-            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(desired_time_bin_size, None)
+            a_continuously_decoded_dict: Dict[str, DecodedFilterEpochsResult] = directional_decoders_decode_result.get_continuously_decoded_dict(cache_key)
+            all_time_bin_sizes_output_dict: Dict[DecodingContinuousCacheKey, Dict[types.DecoderName, SingleEpochDecodedResult]] = directional_decoders_decode_result.split_pseudo2D_continuous_result_to_1D_continuous_result()
+            a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict: Dict[types.DecoderName, SingleEpochDecodedResult] = all_time_bin_sizes_output_dict.get(cache_key, None)
             
-            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
-            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None even after recomputing!"
-            info_string: str = f" - t_bin_size: {desired_time_bin_size:.3f}"
+            assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None for cache_key={cache_key} even after recomputing!"
+            assert a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is not None, f"a_split_pseudo2D_continuous_result_to_1D_continuous_result_dict is None for cache_key={cache_key} even after recomputing!"
+            info_string: str = f" - t_bin={cache_key}"
 
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
@@ -904,20 +905,21 @@ class SpecificDockWidgetManipulatingMixin(BaseDynamicInstanceConformingMixin):
         ## get the result data:
         try:
             ## Uses the `global_computation_results.computed_data['DirectionalDecodersDecoded']`
+            cache_key: DecodingContinuousCacheKey = normalize_continuous_decoding_cache_lookup_key(desired_time_bin_size)
             directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
             pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
             all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-            a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
+            a_continuously_decoded_dict = directional_decoders_decode_result.get_continuously_decoded_dict(cache_key)
             if a_continuously_decoded_dict is None:
                 ## recompute
-                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': desired_time_bin_size, 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
+                curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_decode_continuous'], computation_kwargs_list=[{'time_bin_size': cache_key[0], 'slideby': cache_key[1], 'should_disable_cache': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False)
                 directional_decoders_decode_result: DirectionalDecodersContinuouslyDecodedResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalDecodersDecoded']
                 pseudo2D_decoder: BasePositionDecoder = directional_decoders_decode_result.pseudo2D_decoder
                 all_directional_pf1D_Decoder_dict: Dict[str, BasePositionDecoder] = directional_decoders_decode_result.pf1D_Decoder_dict
-                a_continuously_decoded_dict = directional_decoders_decode_result.continuously_decoded_result_cache_dict.get(desired_time_bin_size, None)
-                assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None even after recomputing!"
+                a_continuously_decoded_dict = directional_decoders_decode_result.get_continuously_decoded_dict(cache_key)
+                assert a_continuously_decoded_dict is not None, f"a_continuously_decoded_dict is None for cache_key={cache_key} even after recomputing!"
 
-            info_string: str = f" - t_bin_size: {desired_time_bin_size}"
+            info_string: str = f" - t_bin={cache_key}"
 
         except (KeyError, AttributeError) as e:
             # KeyError: 'DirectionalDecodersDecoded'
