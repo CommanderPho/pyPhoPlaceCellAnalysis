@@ -144,31 +144,36 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
 
-def as_length_df(trial_df: pd.DataFrame, agg_df: pd.DataFrame, length_col: str = 'L') -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Return copies with a unified length column named 'n' for plotting."""
+def as_length_df(trial_df: pd.DataFrame, agg_df: pd.DataFrame, length_col: Optional[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Return copies with a unified length column named 'n' for plotting.
+
+    Resolves length from `length_col`, else prefers 'n', else 'L'.
+    `df_shuf` often has both `n` and `L` while `agg_by_L` only has `L` — handle that mismatch.
+    """
     df_n = trial_df.copy()
     agg_n = agg_df.copy()
-    if length_col != 'n':
-        df_n['n'] = df_n[length_col]
-        if length_col in agg_n.columns:
-            agg_n = agg_n.rename(columns={length_col: 'n'})
-    elif 'n' not in df_n.columns and 'L' in df_n.columns:
-        df_n['n'] = df_n['L']
-        if 'L' in agg_n.columns and 'n' not in agg_n.columns:
-            agg_n = agg_n.rename(columns={'L': 'n'})
-    ## END if length_col != 'n'...
+
+    def _resolve_length_col(frame: pd.DataFrame, preferred: Optional[str]) -> str:
+        if preferred is not None and preferred in frame.columns:
+            return preferred
+        if 'n' in frame.columns:
+            return 'n'
+        if 'L' in frame.columns:
+            return 'L'
+        raise KeyError(f'No length column among preferred={preferred!r}, n, L; columns={list(frame.columns)}')
+
+    trial_len_col = _resolve_length_col(df_n, length_col)
+    agg_len_col = _resolve_length_col(agg_n, length_col if (length_col in agg_n.columns) else None)
+
+    if trial_len_col != 'n':
+        df_n['n'] = df_n[trial_len_col]
+    if agg_len_col != 'n':
+        agg_n = agg_n.rename(columns={agg_len_col: 'n'})
+    ## END if length columns need normalizing...
 
     df_n['n'] = df_n['n'].astype(int)
     agg_n['n'] = agg_n['n'].astype(int)
     return df_n, agg_n
-
-
-def _subsample_trials_by_n(df: pd.DataFrame, max_per_n: int, random_state: int = 0) -> pd.DataFrame:
-    return (
-        df.groupby('n', group_keys=False)
-          .apply(lambda g: g.sample(n=min(len(g), max_per_n), random_state=random_state))
-          .reset_index(drop=True)
-    )
 
 
 @function_attributes(short_name=None, tags=['plot', 'sequence-scores', 'iid', 'shuffle', 'figure-s6'], input_requires=[], output_provides=[], uses=['as_length_df', 'PhoPublicationFigureHelper'], used_by=[], creation_date='2026-10-13 12:14', related_items=[])
@@ -177,12 +182,14 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
                                    title: str = 'Sequence scores vs length', export_stem: str = 'sequence_scores_vs_length',
                                    figures_parent_folder: Optional[Union[Path, str]] = None, export_formats: Sequence[str] = ('svg', 'pdf'),
                                    prepare_for_publication: bool = True, enable_error_bars: bool = True, figsize: Tuple[float, float] = (12, 6.8),
-                                   max_per_n: int = 800, defer_show: bool = False, overlay_draw_violins: bool = False) -> Dict[str, Path]:
-    """Violin + point summaries of sequence-score metrics vs length `n`.
+                                   max_scatter_per_n: int = 400, x_jitter_scale: float = 0.35, y_jitter_scale: float = 0.015,
+                                   xlim: Optional[Tuple[float, float]] = (2, 16), defer_show: bool = False,
+                                   draw_scatter: bool = True, overlay_draw_scatter: bool = True) -> Dict[str, Path]:
+    """Jittered trial scatter + summary curves of sequence-score metrics vs length `n`.
 
-    Primary series: trial distributions (subsampled) + means (± SD).
-    Probability curves (P mono / P>|thr|) come from `agg`.
-    Optional `overlay=(df2, agg2, label2)` draws a second series for comparison (e.g. i.i.d. vs shuffles).
+    Background: subsampled trial cloud at each discrete n (`draw_scatter=False` skips primary cloud).
+    Foreground: means / P(>|thr|) / P(mono) from `agg` (optional ±1 SD whiskers).
+    Optional `overlay=(df2, agg2, label2)` draws a second series (e.g. i.i.d. vs shuffles).
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_sequence_scores_vs_length
 
@@ -190,12 +197,20 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
     plot_sequence_scores_vs_length(df_shuf, agg_by_L, length_col='L', primary_label='shuffle', title='Shuffle scores vs L')
 
     # i.i.d. vs shuffle:
-    plot_sequence_scores_vs_length(df, agg, length_col='n', primary_label='i.i.d.', overlay=(df_shuf, agg_by_L, 'shuffle'))
+    plot_sequence_scores_vs_length(df, agg, primary_label='i.i.d.',
+        overlay=(df_shuf, agg_by_L, 'shuffle'),
+        title='i.i.d. + shuffle scores vs length',
+        overlay_draw_scatter=False,
+        draw_scatter=False,
+        export_formats=[],
+    )  # set False if dual clouds are too busy
     """
     df, agg = as_length_df(df, agg, length_col=length_col)
 
-    assert (df is not None) and (len(df) > 0), "Need trial-level df (KEEP_TRIAL_DF=True)."
     assert (agg is not None) and (len(agg) > 0), "Need agg summary table."
+    if draw_scatter:
+        assert (df is not None) and (len(df) > 0), "Need trial-level df (KEEP_TRIAL_DF=True) when draw_scatter=True."
+    ## END if draw_scatter...
 
     if figures_parent_folder is None:
         figures_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S6 - Heuristic for Detecting Spatial Replay/iid_uniform_trajectory_chance').resolve()
@@ -203,81 +218,126 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
         figures_parent_folder = Path(figures_parent_folder).resolve()
     figures_parent_folder.mkdir(parents=True, exist_ok=True)
 
-    plot_df = _subsample_trials_by_n(df, max_per_n=max_per_n, random_state=0)
-
     vector_rc = PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication, **{
         'figure.figsize': figsize, 'figure.dpi': '100', 'figure.frameon': False,
         'svg.fonttype': 'none', 'pdf.fonttype': 42,
     })
+    err_kw = dict(capsize=2.5, elinewidth=0.9, markeredgewidth=0.9)
+    scatter_kw = dict(s=10, alpha=0.22, linewidths=0, rasterized=True)
 
-    def _dist_and_mean(ax, data, y, color, label, *, draw_violin: bool = True):
-        if draw_violin:
-            sns.violinplot(data=data, x='n', y=y, ax=ax, color=color, inner=None, cut=0, density_norm='width', linewidth=0.6, alpha=0.35)
-        err = 'sd' if enable_error_bars else None
-        sns.pointplot(data=data, x='n', y=y, ax=ax, color=color, errorbar=err, markers='o', linestyles='-', label=label)
+    def _errorbar(ax, x, y, yerr, **kwargs):
+        yerr = np.asarray(yerr, dtype=float)
+        yerr = np.where(np.isfinite(yerr), yerr, 0.0)
+        return ax.errorbar(x, y, yerr=yerr, **err_kw, **kwargs)
 
-    def _overlay_agg_prob(ax, agg_table: pd.DataFrame, y_col: str, color, label, marker='s', linestyle='--'):
-        xticklabels = [int(t.get_text()) for t in ax.get_xticklabels() if str(t.get_text()).strip() != '']
-        p_map = dict(zip(agg_table['n'].to_numpy(), agg_table[y_col].to_numpy()))
-        ys = [p_map.get(n, np.nan) for n in xticklabels]
-        ax.plot(range(len(xticklabels)), ys, marker=marker, linestyle=linestyle, color=color, label=label, zorder=6)
 
-    with mpl.rc_context(vector_rc), sns.axes_style('ticks'):
+    def _scatter_trials(ax, trials: pd.DataFrame, y_col: str, color, rng: np.random.Generator, **kwargs):
+        parts = []
+        for _n_val, g in trials.groupby('n'):
+            if len(g) > max_scatter_per_n:
+                g = g.sample(n=max_scatter_per_n, random_state=int(rng.integers(0, 1_000_000_000)))
+            parts.append(g)
+        ## END for _n_val, g in trials.groupby('n')...
+
+        sub = pd.concat(parts, ignore_index=True) if parts else trials.iloc[0:0]
+        x = sub['n'].to_numpy(dtype=float) + rng.uniform(-x_jitter_scale, x_jitter_scale, size=len(sub))
+        y = sub[y_col].to_numpy(dtype=float) + rng.uniform(-y_jitter_scale, y_jitter_scale, size=len(sub))
+        finite = np.isfinite(x) & np.isfinite(y)
+        return ax.scatter(x[finite], y[finite], c=color, **scatter_kw, **kwargs)
+
+
+    def _plot_summary_curves(axes, agg_table: pd.DataFrame, label_prefix: str, *,
+                             fmt_spearman='o-', fmt_pearson='s--', fmt_prob='o-', fmt_prob2='s--',
+                             color_spearman='C0', color_pearson='C1', color_prob='C2', color_mono='C3',
+                             color_wcorr='C0', color_wcorr_p='C2', color_radon='C1', color_cov='C4'):
+        if enable_error_bars:
+            _errorbar(axes[0, 0], agg_table['n'], agg_table['mean_abs_spearman'], agg_table['std_abs_spearman'], fmt=fmt_spearman, color=color_spearman, label=f'{label_prefix} mean |Spearman| ± 1 SD', zorder=5)
+            _errorbar(axes[0, 0], agg_table['n'], agg_table['mean_abs_pearson'], agg_table['std_abs_pearson'], fmt=fmt_pearson, color=color_pearson, label=f'{label_prefix} mean |Pearson| ± 1 SD', zorder=5)
+            _errorbar(axes[0, 1], agg_table['n'], agg_table['p_abs_spearman_gt_0_8'], agg_table['std_p_abs_spearman_gt_0_8'], fmt=fmt_prob, color=color_prob, label=fr'{label_prefix} P(|Spearman| > 0.8)', zorder=5)
+            _errorbar(axes[0, 2], agg_table['n'], np.clip(agg_table['p_mono'], 1e-5, 1), agg_table['std_p_mono'], fmt=fmt_prob, color=color_mono, label=f'{label_prefix} P(strictly monotonic)', zorder=5)
+            _errorbar(axes[1, 0], agg_table['n'], agg_table['mean_abs_wcorr'], agg_table['std_abs_wcorr'], fmt=fmt_spearman, color=color_wcorr, label=f'{label_prefix} mean |wcorr| ± 1 SD', zorder=5)
+            _errorbar(axes[1, 0], agg_table['n'], agg_table['p_abs_wcorr_gt_0_8'], agg_table['std_p_abs_wcorr_gt_0_8'], fmt=fmt_prob2, color=color_wcorr_p, label=fr'{label_prefix} P(|wcorr| > 0.8)', zorder=5)
+            _errorbar(axes[1, 1], agg_table['n'], agg_table['mean_radon'], agg_table['std_radon'], fmt=fmt_spearman, color=color_radon, label=f'{label_prefix} mean radon ± 1 SD', zorder=5)
+            _errorbar(axes[1, 2], agg_table['n'], agg_table['mean_coverage'], agg_table['std_coverage'], fmt=fmt_spearman, color=color_cov, label=f'{label_prefix} mean tcov_seq ± 1 SD', zorder=5)
+        else:
+            axes[0, 0].plot(agg_table['n'], agg_table['mean_abs_spearman'], fmt_spearman, color=color_spearman, label=f'{label_prefix} mean |Spearman|', zorder=5)
+            axes[0, 0].plot(agg_table['n'], agg_table['mean_abs_pearson'], fmt_pearson, color=color_pearson, label=f'{label_prefix} mean |Pearson|', zorder=5)
+            axes[0, 1].plot(agg_table['n'], agg_table['p_abs_spearman_gt_0_8'], fmt_prob, color=color_prob, label=fr'{label_prefix} P(|Spearman| > 0.8)', zorder=5)
+            axes[0, 2].plot(agg_table['n'], np.clip(agg_table['p_mono'], 1e-5, 1), fmt_prob, color=color_mono, label=f'{label_prefix} P(strictly monotonic)', zorder=5)
+            axes[1, 0].plot(agg_table['n'], agg_table['mean_abs_wcorr'], fmt_spearman, color=color_wcorr, label=f'{label_prefix} mean |wcorr|', zorder=5)
+            axes[1, 0].plot(agg_table['n'], agg_table['p_abs_wcorr_gt_0_8'], fmt_prob2, color=color_wcorr_p, label=fr'{label_prefix} P(|wcorr| > 0.8)', zorder=5)
+            axes[1, 1].plot(agg_table['n'], agg_table['mean_radon'], fmt_spearman, color=color_radon, label=f'{label_prefix} mean radon', zorder=5)
+            axes[1, 2].plot(agg_table['n'], agg_table['mean_coverage'], fmt_spearman, color=color_cov, label=f'{label_prefix} mean tcov_seq', zorder=5)
+
+
+    scatter_rng = np.random.default_rng(0)
+    with mpl.rc_context(vector_rc):
         fig, axes = plt.subplots(2, 3, figsize=figsize, num=str(title))
 
-        _dist_and_mean(axes[0, 0], plot_df, 'abs_spearman', 'C0', f'{primary_label} |Spearman|')
-        _dist_and_mean(axes[0, 0], plot_df, 'abs_pearson', 'C1', f'{primary_label} |Pearson|')
-        axes[0, 0].set_ylabel('|corr(t, x)|'); axes[0, 0].set_title('Trajectory correlation')
-        axes[0, 0].set_ylim(0, 1)
+        # Continuous trial scores in the background (NOT 0/1 indicators).
+        if draw_scatter:
+            _scatter_trials(axes[0, 0], df, 'abs_spearman', color='C0', rng=scatter_rng)
+            _scatter_trials(axes[0, 0], df, 'abs_pearson', color='C1', rng=scatter_rng)
+            _scatter_trials(axes[0, 1], df, 'abs_spearman', color='C2', rng=scatter_rng)
+            _scatter_trials(axes[0, 2], df, 'abs_spearman', color='C3', rng=scatter_rng)
+            _scatter_trials(axes[1, 0], df, 'abs_wcorr', color='C0', rng=scatter_rng)
+            _scatter_trials(axes[1, 1], df, 'radon', color='C1', rng=scatter_rng)
+            _scatter_trials(axes[1, 2], df, 'coverage', color='C4', rng=scatter_rng)
+        ## END if draw_scatter...
 
-        _dist_and_mean(axes[0, 1], plot_df, 'abs_spearman', 'C2', f'{primary_label} |Spearman|')
-        axes[0, 1].axhline(0.8, color='0.35', ls=':', lw=0.9, label='threshold 0.8')
-        _overlay_agg_prob(axes[0, 1], agg, 'p_abs_spearman_gt_0_8', 'C2', fr'{primary_label} P(|Spearman|>0.8)')
-        axes[0, 1].set_ylabel('|Spearman| / probability'); axes[0, 1].set_title('Looks sequential')
-        axes[0, 1].set_ylim(0, 1)
-
-        sns.lineplot(data=agg, x='n', y='p_mono', ax=axes[0, 2], marker='o', color='C3', label=fr'{primary_label} P(strictly monotonic)')
-        axes[0, 2].set_ylabel('P(strictly monotonic)'); axes[0, 2].set_title('Perfect mono order')
-        axes[0, 2].set_ylim(0, 1)
-
-        _dist_and_mean(axes[1, 0], plot_df, 'abs_wcorr', 'C0', f'{primary_label} |wcorr|')
-        axes[1, 0].axhline(0.8, color='0.35', ls=':', lw=0.9)
-        _overlay_agg_prob(axes[1, 0], agg, 'p_abs_wcorr_gt_0_8', 'C2', fr'{primary_label} P(|wcorr|>0.8)')
-        axes[1, 0].set_ylabel('|wcorr| / probability'); axes[1, 0].set_title('wcorr')
-        axes[1, 0].set_ylim(0, 1)
-
-        _dist_and_mean(axes[1, 1], plot_df, 'radon', 'C1', f'{primary_label} radon')
-        axes[1, 1].set_ylabel('radon score'); axes[1, 1].set_title('radon')
-
-        _dist_and_mean(axes[1, 2], plot_df, 'coverage', 'C4', f'{primary_label} tcov_seq')
-        axes[1, 2].set_ylabel('track coverage'); axes[1, 2].set_title('tcov_seq')
-        axes[1, 2].set_ylim(0, 1)
+        _plot_summary_curves(axes, agg, primary_label)
 
         if overlay is not None:
             df2, agg2, label2 = overlay
-            overlay_length_col = 'n' if 'n' in df2.columns else ('L' if 'L' in df2.columns else length_col)
-            df2, agg2 = as_length_df(df2, agg2, length_col=overlay_length_col)
-            plot_df2 = _subsample_trials_by_n(df2, max_per_n=max_per_n, random_state=1)
+            # Resolve length per-frame (df may have both n and L; agg_by_L often only has L)
+            df2, agg2 = as_length_df(df2, agg2, length_col=None)
+            overlay_rng = np.random.default_rng(1)
+            if overlay_draw_scatter:
+                _scatter_trials(axes[0, 0], df2, 'abs_spearman', color='C3', rng=overlay_rng)
+                _scatter_trials(axes[0, 0], df2, 'abs_pearson', color='C5', rng=overlay_rng)
+                _scatter_trials(axes[0, 1], df2, 'abs_spearman', color='C3', rng=overlay_rng)
+                _scatter_trials(axes[0, 2], df2, 'abs_spearman', color='C5', rng=overlay_rng)
+                _scatter_trials(axes[1, 0], df2, 'abs_wcorr', color='C3', rng=overlay_rng)
+                _scatter_trials(axes[1, 1], df2, 'radon', color='C5', rng=overlay_rng)
+                _scatter_trials(axes[1, 2], df2, 'coverage', color='C5', rng=overlay_rng)
+            ## END if overlay_draw_scatter...
 
-            # Secondary: point/line overlays (violins optional — dual violins clutter categorical x)
-            _dist_and_mean(axes[0, 0], plot_df2, 'abs_spearman', 'C3', f'{label2} |Spearman|', draw_violin=overlay_draw_violins)
-            _dist_and_mean(axes[0, 0], plot_df2, 'abs_pearson', 'C5', f'{label2} |Pearson|', draw_violin=overlay_draw_violins)
-            _dist_and_mean(axes[0, 1], plot_df2, 'abs_spearman', 'C3', f'{label2} |Spearman|', draw_violin=overlay_draw_violins)
-            _overlay_agg_prob(axes[0, 1], agg2, 'p_abs_spearman_gt_0_8', 'C3', fr'{label2} P(|Spearman|>0.8)', marker='D', linestyle='-.')
-            sns.lineplot(data=agg2, x='n', y='p_mono', ax=axes[0, 2], marker='D', color='C5', label=fr'{label2} P(strictly monotonic)')
-            _dist_and_mean(axes[1, 0], plot_df2, 'abs_wcorr', 'C3', f'{label2} |wcorr|', draw_violin=overlay_draw_violins)
-            _overlay_agg_prob(axes[1, 0], agg2, 'p_abs_wcorr_gt_0_8', 'C3', fr'{label2} P(|wcorr|>0.8)', marker='D', linestyle='-.')
-            _dist_and_mean(axes[1, 1], plot_df2, 'radon', 'C5', f'{label2} radon', draw_violin=overlay_draw_violins)
-            _dist_and_mean(axes[1, 2], plot_df2, 'coverage', 'C5', f'{label2} tcov_seq', draw_violin=overlay_draw_violins)
+            _plot_summary_curves(
+                axes, agg2, label2,
+                fmt_spearman='D-.', fmt_pearson='^-.', fmt_prob='D-.', fmt_prob2='^-.',
+                color_spearman='C3', color_pearson='C5', color_prob='C3', color_mono='C5',
+                color_wcorr='C3', color_wcorr_p='C5', color_radon='C5', color_cov='C5',
+            )
         ## END if overlay is not None...
 
+        axes[0, 0].set_xlabel('sequence length n'); axes[0, 0].set_ylabel('|corr(t, x)|  (points = trials)')
+        axes[0, 0].set_title('Mean trajectory correlation'); axes[0, 0].set_ylim(0, 1)
+
+        axes[0, 1].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4, label='threshold 0.8')
+        axes[0, 1].set_xlabel('sequence length n'); axes[0, 1].set_ylabel(r'|Spearman| trials; line = P(> 0.8)')
+        axes[0, 1].set_title('Chance of "looks sequential"'); axes[0, 1].set_ylim(0, 1)
+
+        axes[0, 2].set_xlabel('sequence length n'); axes[0, 2].set_ylabel(r'|Spearman| trials; line = P(mono)')
+        axes[0, 2].set_title('Perfect ascending/descending order'); axes[0, 2].set_ylim(0, 1)
+
+        axes[1, 0].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4)
+        axes[1, 0].set_xlabel('sequence length n'); axes[1, 0].set_ylabel('|wcorr|  (points = trials)')
+        axes[1, 0].set_title('wcorr'); axes[1, 0].set_ylim(0, 1)
+
+        axes[1, 1].set_xlabel('sequence length n'); axes[1, 1].set_ylabel('radon score  (points = trials)')
+        axes[1, 1].set_title('radon')
+
+        axes[1, 2].set_xlabel('sequence length n'); axes[1, 2].set_ylabel('track coverage  (points = trials)')
+        axes[1, 2].set_title('tcov_seq'); axes[1, 2].set_ylim(0, 1)
+
         for ax in axes.ravel():
-            ax.set_xlabel('sequence length n')
             ax.legend(fontsize=7)
+            if xlim is not None:
+                ax.set_xlim(list(xlim))
         ## END for ax in axes.ravel()...
 
-        fig.suptitle(title)
-        sns.despine(fig=fig)
+        subtitle = '\n(background points: subsampled trials at each discrete n; solid/dashed: summary curves)'
+        fig.suptitle(f'{title}{subtitle}')
         plt.tight_layout()
 
         _out_paths: Dict[str, Path] = {}
@@ -296,15 +356,15 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
 
 def plot_iid_uniform_trajectory_chance(df: pd.DataFrame, agg: pd.DataFrame,
                                        figures_parent_folder: Optional[Union[Path, str]] = None, export_stem: str = 'iid_uniform_short_sequences_look_trajectory_like', export_formats: Sequence[str] = ('svg', 'pdf'),
-                                       prepare_for_publication: bool = True, enable_error_bars: bool = True, figsize: Tuple[float, float] = (12, 6.8),
-                                       max_per_n: int = 800, defer_show: bool = False) -> Dict[str, Path]:
-    """Backward-compatible wrapper around `plot_sequence_scores_vs_length`. """
+                                       prepare_for_publication: bool = True, enable_error_bars: bool = False, figsize: Tuple[float, float] = (12, 6.8),
+                                       max_scatter_per_n: int = 400, defer_show: bool = False) -> Dict[str, Path]:
+    """ Backward-compatible wrapper around `plot_sequence_scores_vs_length` (scatter + summary curves). """
     return plot_sequence_scores_vs_length(
         df, agg, length_col='n', primary_label='i.i.d.',
         title='i.i.d. Uniform positions — short sequences look more trajectory-like by chance',
         export_stem=export_stem, figures_parent_folder=figures_parent_folder, export_formats=export_formats,
         prepare_for_publication=prepare_for_publication, enable_error_bars=enable_error_bars, figsize=figsize,
-        max_per_n=max_per_n, defer_show=defer_show,
+        max_scatter_per_n=max_scatter_per_n, defer_show=defer_show,
     )
 
 
