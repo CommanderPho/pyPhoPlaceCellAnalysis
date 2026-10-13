@@ -131,6 +131,182 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-13 - Shuffles/Code for `2024-04-20 - silx_RadonTransformTesting.ipynb` and figure S6                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pathlib import Path
+from typing import Dict, Optional, Sequence, Tuple, Union
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
+def as_length_df(trial_df: pd.DataFrame, agg_df: pd.DataFrame, length_col: str = 'L') -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Return copies with a unified length column named 'n' for plotting."""
+    df_n = trial_df.copy()
+    agg_n = agg_df.copy()
+    if length_col != 'n':
+        df_n['n'] = df_n[length_col]
+        if length_col in agg_n.columns:
+            agg_n = agg_n.rename(columns={length_col: 'n'})
+    elif 'n' not in df_n.columns and 'L' in df_n.columns:
+        df_n['n'] = df_n['L']
+        if 'L' in agg_n.columns and 'n' not in agg_n.columns:
+            agg_n = agg_n.rename(columns={'L': 'n'})
+    ## END if length_col != 'n'...
+
+    df_n['n'] = df_n['n'].astype(int)
+    agg_n['n'] = agg_n['n'].astype(int)
+    return df_n, agg_n
+
+
+def _subsample_trials_by_n(df: pd.DataFrame, max_per_n: int, random_state: int = 0) -> pd.DataFrame:
+    return (
+        df.groupby('n', group_keys=False)
+          .apply(lambda g: g.sample(n=min(len(g), max_per_n), random_state=random_state))
+          .reset_index(drop=True)
+    )
+
+
+@function_attributes(short_name=None, tags=['plot', 'sequence-scores', 'iid', 'shuffle', 'figure-s6'], input_requires=[], output_provides=[], uses=['as_length_df', 'PhoPublicationFigureHelper'], used_by=[], creation_date='2026-10-13 12:14', related_items=[])
+def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, length_col: str = 'n',
+                                   overlay: Optional[Tuple[pd.DataFrame, pd.DataFrame, str]] = None, primary_label: str = 'primary',
+                                   title: str = 'Sequence scores vs length', export_stem: str = 'sequence_scores_vs_length',
+                                   figures_parent_folder: Optional[Union[Path, str]] = None, export_formats: Sequence[str] = ('svg', 'pdf'),
+                                   prepare_for_publication: bool = True, enable_error_bars: bool = True, figsize: Tuple[float, float] = (12, 6.8),
+                                   max_per_n: int = 800, defer_show: bool = False, overlay_draw_violins: bool = False) -> Dict[str, Path]:
+    """Violin + point summaries of sequence-score metrics vs length `n`.
+
+    Primary series: trial distributions (subsampled) + means (± SD).
+    Probability curves (P mono / P>|thr|) come from `agg`.
+    Optional `overlay=(df2, agg2, label2)` draws a second series for comparison (e.g. i.i.d. vs shuffles).
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_sequence_scores_vs_length
+
+    # shuffle only:
+    plot_sequence_scores_vs_length(df_shuf, agg_by_L, length_col='L', primary_label='shuffle', title='Shuffle scores vs L')
+
+    # i.i.d. vs shuffle:
+    plot_sequence_scores_vs_length(df, agg, length_col='n', primary_label='i.i.d.', overlay=(df_shuf, agg_by_L, 'shuffle'))
+    """
+    df, agg = as_length_df(df, agg, length_col=length_col)
+
+    assert (df is not None) and (len(df) > 0), "Need trial-level df (KEEP_TRIAL_DF=True)."
+    assert (agg is not None) and (len(agg) > 0), "Need agg summary table."
+
+    if figures_parent_folder is None:
+        figures_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S6 - Heuristic for Detecting Spatial Replay/iid_uniform_trajectory_chance').resolve()
+    else:
+        figures_parent_folder = Path(figures_parent_folder).resolve()
+    figures_parent_folder.mkdir(parents=True, exist_ok=True)
+
+    plot_df = _subsample_trials_by_n(df, max_per_n=max_per_n, random_state=0)
+
+    vector_rc = PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication, **{
+        'figure.figsize': figsize, 'figure.dpi': '100', 'figure.frameon': False,
+        'svg.fonttype': 'none', 'pdf.fonttype': 42,
+    })
+
+    def _dist_and_mean(ax, data, y, color, label, *, draw_violin: bool = True):
+        if draw_violin:
+            sns.violinplot(data=data, x='n', y=y, ax=ax, color=color, inner=None, cut=0, density_norm='width', linewidth=0.6, alpha=0.35)
+        err = 'sd' if enable_error_bars else None
+        sns.pointplot(data=data, x='n', y=y, ax=ax, color=color, errorbar=err, markers='o', linestyles='-', label=label)
+
+    def _overlay_agg_prob(ax, agg_table: pd.DataFrame, y_col: str, color, label, marker='s', linestyle='--'):
+        xticklabels = [int(t.get_text()) for t in ax.get_xticklabels() if str(t.get_text()).strip() != '']
+        p_map = dict(zip(agg_table['n'].to_numpy(), agg_table[y_col].to_numpy()))
+        ys = [p_map.get(n, np.nan) for n in xticklabels]
+        ax.plot(range(len(xticklabels)), ys, marker=marker, linestyle=linestyle, color=color, label=label, zorder=6)
+
+    with mpl.rc_context(vector_rc), sns.axes_style('ticks'):
+        fig, axes = plt.subplots(2, 3, figsize=figsize, num=str(title))
+
+        _dist_and_mean(axes[0, 0], plot_df, 'abs_spearman', 'C0', f'{primary_label} |Spearman|')
+        _dist_and_mean(axes[0, 0], plot_df, 'abs_pearson', 'C1', f'{primary_label} |Pearson|')
+        axes[0, 0].set_ylabel('|corr(t, x)|'); axes[0, 0].set_title('Trajectory correlation')
+        axes[0, 0].set_ylim(0, 1)
+
+        _dist_and_mean(axes[0, 1], plot_df, 'abs_spearman', 'C2', f'{primary_label} |Spearman|')
+        axes[0, 1].axhline(0.8, color='0.35', ls=':', lw=0.9, label='threshold 0.8')
+        _overlay_agg_prob(axes[0, 1], agg, 'p_abs_spearman_gt_0_8', 'C2', fr'{primary_label} P(|Spearman|>0.8)')
+        axes[0, 1].set_ylabel('|Spearman| / probability'); axes[0, 1].set_title('Looks sequential')
+        axes[0, 1].set_ylim(0, 1)
+
+        sns.lineplot(data=agg, x='n', y='p_mono', ax=axes[0, 2], marker='o', color='C3', label=fr'{primary_label} P(strictly monotonic)')
+        axes[0, 2].set_ylabel('P(strictly monotonic)'); axes[0, 2].set_title('Perfect mono order')
+        axes[0, 2].set_ylim(0, 1)
+
+        _dist_and_mean(axes[1, 0], plot_df, 'abs_wcorr', 'C0', f'{primary_label} |wcorr|')
+        axes[1, 0].axhline(0.8, color='0.35', ls=':', lw=0.9)
+        _overlay_agg_prob(axes[1, 0], agg, 'p_abs_wcorr_gt_0_8', 'C2', fr'{primary_label} P(|wcorr|>0.8)')
+        axes[1, 0].set_ylabel('|wcorr| / probability'); axes[1, 0].set_title('wcorr')
+        axes[1, 0].set_ylim(0, 1)
+
+        _dist_and_mean(axes[1, 1], plot_df, 'radon', 'C1', f'{primary_label} radon')
+        axes[1, 1].set_ylabel('radon score'); axes[1, 1].set_title('radon')
+
+        _dist_and_mean(axes[1, 2], plot_df, 'coverage', 'C4', f'{primary_label} tcov_seq')
+        axes[1, 2].set_ylabel('track coverage'); axes[1, 2].set_title('tcov_seq')
+        axes[1, 2].set_ylim(0, 1)
+
+        if overlay is not None:
+            df2, agg2, label2 = overlay
+            overlay_length_col = 'n' if 'n' in df2.columns else ('L' if 'L' in df2.columns else length_col)
+            df2, agg2 = as_length_df(df2, agg2, length_col=overlay_length_col)
+            plot_df2 = _subsample_trials_by_n(df2, max_per_n=max_per_n, random_state=1)
+
+            # Secondary: point/line overlays (violins optional — dual violins clutter categorical x)
+            _dist_and_mean(axes[0, 0], plot_df2, 'abs_spearman', 'C3', f'{label2} |Spearman|', draw_violin=overlay_draw_violins)
+            _dist_and_mean(axes[0, 0], plot_df2, 'abs_pearson', 'C5', f'{label2} |Pearson|', draw_violin=overlay_draw_violins)
+            _dist_and_mean(axes[0, 1], plot_df2, 'abs_spearman', 'C3', f'{label2} |Spearman|', draw_violin=overlay_draw_violins)
+            _overlay_agg_prob(axes[0, 1], agg2, 'p_abs_spearman_gt_0_8', 'C3', fr'{label2} P(|Spearman|>0.8)', marker='D', linestyle='-.')
+            sns.lineplot(data=agg2, x='n', y='p_mono', ax=axes[0, 2], marker='D', color='C5', label=fr'{label2} P(strictly monotonic)')
+            _dist_and_mean(axes[1, 0], plot_df2, 'abs_wcorr', 'C3', f'{label2} |wcorr|', draw_violin=overlay_draw_violins)
+            _overlay_agg_prob(axes[1, 0], agg2, 'p_abs_wcorr_gt_0_8', 'C3', fr'{label2} P(|wcorr|>0.8)', marker='D', linestyle='-.')
+            _dist_and_mean(axes[1, 1], plot_df2, 'radon', 'C5', f'{label2} radon', draw_violin=overlay_draw_violins)
+            _dist_and_mean(axes[1, 2], plot_df2, 'coverage', 'C5', f'{label2} tcov_seq', draw_violin=overlay_draw_violins)
+        ## END if overlay is not None...
+
+        for ax in axes.ravel():
+            ax.set_xlabel('sequence length n')
+            ax.legend(fontsize=7)
+        ## END for ax in axes.ravel()...
+
+        fig.suptitle(title)
+        sns.despine(fig=fig)
+        plt.tight_layout()
+
+        _out_paths: Dict[str, Path] = {}
+        for file_format in export_formats:
+            save_path = figures_parent_folder.joinpath(f'{export_stem}.{file_format}')
+            fig.savefig(str(save_path), format=file_format, transparent=True)
+            _out_paths[file_format] = save_path
+            print(f'export_for_publication: saved "{save_path}"')
+        ## END for file_format in export_formats...
+
+        if not defer_show:
+            plt.show()
+
+    return _out_paths
+
+
+def plot_iid_uniform_trajectory_chance(df: pd.DataFrame, agg: pd.DataFrame,
+                                       figures_parent_folder: Optional[Union[Path, str]] = None, export_stem: str = 'iid_uniform_short_sequences_look_trajectory_like', export_formats: Sequence[str] = ('svg', 'pdf'),
+                                       prepare_for_publication: bool = True, enable_error_bars: bool = True, figsize: Tuple[float, float] = (12, 6.8),
+                                       max_per_n: int = 800, defer_show: bool = False) -> Dict[str, Path]:
+    """Backward-compatible wrapper around `plot_sequence_scores_vs_length`. """
+    return plot_sequence_scores_vs_length(
+        df, agg, length_col='n', primary_label='i.i.d.',
+        title='i.i.d. Uniform positions — short sequences look more trajectory-like by chance',
+        export_stem=export_stem, figures_parent_folder=figures_parent_folder, export_formats=export_formats,
+        prepare_for_publication=prepare_for_publication, enable_error_bars=enable_error_bars, figsize=figsize,
+        max_per_n=max_per_n, defer_show=defer_show,
+    )
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-03 - "Forwardicity" score for determining forward vs. backward replay                                                                                                                                                                                                        #
