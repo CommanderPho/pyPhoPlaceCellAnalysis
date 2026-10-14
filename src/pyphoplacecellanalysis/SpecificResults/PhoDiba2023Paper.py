@@ -5399,19 +5399,30 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 
 @metadata_attributes(short_name=None, tags=['LdC', 'Long/Short', 'SdC', 'PostDelta', 'figure2'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-14 15:34', related_items=[])
 class Figure2Extended:
-    """
+    """ Tests whether Figure-2 post-Δ (ReplayDeltaPlus) PBE activity of LdCs is elevated specifically on clear LONG-track PBEs.
+
+    For each session: matches FAT `pbe` rows with `is_clear_LONG` onto `LxC_ReplayDeltaPlus` / `AnyC_ReplayDeltaPlus`
+    `filter_epochs_df` by start/stop, then compares mean per-epoch FR of LdCs vs non-LdCs on clear_LONG vs other PBEs.
+    Aggregates those session means into `summary_df` (across-session mean/sem/median).
+
+    Requires notebook-scope `pbe` (FAT per-epoch PBE df with `is_clear_LONG`, `session_name`, start/stop or parent_epoch_*).
 
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure2Extended
 
-    ## INPUTS: across_session_inst_fr_computation_dict
+    ## INPUTS: pbe, across_session_inst_fr_computation_dict
     summary_df, session_activity_dict = Figure2Extended.main(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
     summary_df
+    # session_activity_dict[ctxt] == {'LdCs': {False: ..., True: ...}, 'non_LdCs': {False: ..., True: ...}}  # keys: is_clear_LONG
+
+    # single session:
+    # _out_dict, _extras = Figure2Extended.compute_single_session(an_inst_fr_comp=across_session_inst_fr_computation_dict[ctxt], curr_session_context=ctxt)
 
     """
     @classmethod
     def compute_delta_plus_LdC_result(cls, a_specific_spikeratetrends_result: SpikeRateTrends, curr_sess_pbe: pd.DataFrame, curr_session_context: IdentifyingContext, debug_print=False):
-        """
+        """ Match clear_LONG PBEs onto a SpikeRateTrends epoch list; return FR agg by is_clear_LONG.
 
+        Returns: epoch_unit_fr_agg_df, epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (fr_aclus_col_names, aclu_agg_column_names_list)
         """
         sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
 
