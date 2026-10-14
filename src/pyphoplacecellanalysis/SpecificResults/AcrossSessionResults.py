@@ -277,13 +277,16 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership', PBE_col_variable_names: Optional[List[str]] = None) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership', PBE_col_variable_names: Optional[List[str]] = None, include_non_XdC_cells_as_inset: bool = False) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
         The values come from the `data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']` of the `loaded_result_df`
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
 
         Creates a modified 'visualization_df' from 'loaded_result_df' by adding columns: ['color', 'marker', 'scatter_props']
+
+        When `include_non_XdC_cells_as_inset=True`, also attaches AnyC (non-XdC) fields:
+            `_shell_obj.AnyC_aclus`, `_shell_obj.Fig2_Laps_AnyC_FR`, `_shell_obj.Fig2_Replay_AnyC_FR`
 
         Usage:
             ## Read the previously saved-out result:
@@ -315,14 +318,15 @@ class InstantaneousFiringRatesDataframeAccessor():
             assert active_set_cell_groups_column_name in across_session_inst_fr_computation_df
 
             ## Publication
-            fig2_kwargs = dict(save_figure=True, enable_tiny_point_labels=False, enable_hover_labels=False, write_vector_format=True, prepare_for_publication=True) ## Publication
+            fig2_kwargs = dict(save_figure=True, enable_tiny_point_labels=False, enable_hover_labels=False, write_vector_format=True, prepare_for_publication=True, include_non_XdC_cells_as_inset=True) ## Publication
 
             ## Debugging
-            # fig2_kwargs = dict(save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=True, write_vector_format=False, prepare_for_publication=False) ## Debugging
+            # fig2_kwargs = dict(save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=True, write_vector_format=False, prepare_for_publication=False, include_non_XdC_cells_as_inset=True) ## Debugging
 
             num_sessions: int = active_across_session_inst_fr_computation_df['session_uid'].nunique(dropna=True)
             across_session_inst_fr_computation_shell_obj, visualization_df = InstantaneousFiringRatesDataframeAccessor.build_shell_object_for_plot(loaded_result_df=active_across_session_inst_fr_computation_df,
-                                                                                                                                                    active_set_cell_groups_column_name=active_set_cell_groups_column_name, PBE_col_variable_names=PBE_col_variable_names)
+                                                                                                                                                    active_set_cell_groups_column_name=active_set_cell_groups_column_name, PBE_col_variable_names=PBE_col_variable_names,
+                                                                                                                                                    include_non_XdC_cells_as_inset=fig2_kwargs.get('include_non_XdC_cells_as_inset', False))
             # Perform the actual plotting:
             fig2_ctxt, fig2, _fig_2_output_dict = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation_shell_obj, num_sessions=num_sessions, **fig2_kwargs) # fig2_export_folder
             fig2
@@ -425,6 +429,28 @@ class InstantaneousFiringRatesDataframeAccessor():
         _shell_obj.SxC_aclus = SxC_aclus
         # _shell_obj.LxC_scatter_props = LxC_scatter_props
         # _shell_obj.SxC_scatter_props = SxC_scatter_props
+
+        if include_non_XdC_cells_as_inset:
+            ## Attach AnyC (non-XdC) 2-bar results for the inset plot when membership column has 'AnyC'
+            try:
+                AnyC_df = grouped_df.get_group('AnyC')
+            except KeyError:
+                AnyC_df = visualization_df.iloc[0:0].copy() # empty frame with same columns
+
+            AnyC_aclus = AnyC_df.neuron_uid.values if (len(AnyC_df) > 0 and 'neuron_uid' in AnyC_df.columns) else np.array([], dtype=object)
+            AnyC_scatter_props = [{'alpha': 0.35, 'edgecolors': 'gray', 'linewidths': 0.5, 'marker': a_marker} for a_color, a_marker in zip(AnyC_df['color'], AnyC_df['marker'])] if len(AnyC_df) > 0 else []
+
+            if len(AnyC_df) > 0:
+                Fig2_Laps_AnyC_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, AnyC_aclus, AnyC_aclus, AnyC_scatter_props, AnyC_scatter_props) for v in (AnyC_df['lap_delta_minus'].values, AnyC_df['lap_delta_plus'].values)]
+                Fig2_Replay_AnyC_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, AnyC_aclus, AnyC_aclus, AnyC_scatter_props, AnyC_scatter_props) for v in (AnyC_df[PBE_delta_minus_col_name].values, AnyC_df[PBE_delta_plus_col_name].values)]
+            else:
+                empty_vals = np.array([], dtype=float)
+                Fig2_Laps_AnyC_FR = [SingleBarResult(None, None, empty_vals, AnyC_aclus, AnyC_aclus, None, None) for _ in range(2)]
+                Fig2_Replay_AnyC_FR = [SingleBarResult(None, None, empty_vals, AnyC_aclus, AnyC_aclus, None, None) for _ in range(2)]
+
+            _shell_obj.AnyC_aclus = AnyC_aclus
+            _shell_obj.Fig2_Laps_AnyC_FR = Fig2_Laps_AnyC_FR
+            _shell_obj.Fig2_Replay_AnyC_FR = Fig2_Replay_AnyC_FR
 
         return _shell_obj, visualization_df
 
@@ -3784,7 +3810,7 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
-    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: InstantaneousSpikeRateGroupsComputation, num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, **kwargs):
+    def across_sessions_bar_graphs(cls, across_session_inst_fr_computation: InstantaneousSpikeRateGroupsComputation, num_sessions:int, save_figure=True, instantaneous_time_bin_size_seconds=0.003, include_non_XdC_cells_as_inset: bool = False, **kwargs):
         """ 2023-07-21 - Across Sessions Aggregate Figure - I know this is hacked-up to use `PaperFigureTwo`'s existing plotting machinery (which was made to plot a single session) to plot something it isn't supposed to.
         Aggregate across all of the sessions to build a new combined `InstantaneousSpikeRateGroupsComputation`, which can be used to plot the "PaperFigureTwo", bar plots for many sessions.
         
@@ -3792,18 +3818,25 @@ class AcrossSessionsVisualizations:
         Values come from:
             `self.computation_result.Fig2_Laps_FR`
             `self.computation_result.Fig2_Replay_FR`
+
+        When `include_non_XdC_cells_as_inset=True`, also expects AnyC (non-XdC) data via
+        `Fig2_Laps_AnyC_FR` / `Fig2_Replay_AnyC_FR` on the shell object, or live `AnyC_*` trends
+        on `InstantaneousSpikeRateGroupsComputation`, plotted as a 2-bar inset sharing the main y-scale.
             
         """
 
         # num_sessions = len(across_sessions_instantaneous_fr_dict)
         print(f'num_sessions: {num_sessions}')
 
+        # Allow callers that only pass **fig2_kwargs to override the explicit default
+        include_non_XdC_cells_as_inset = kwargs.pop('include_non_XdC_cells_as_inset', include_non_XdC_cells_as_inset)
+
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
 
         # To correctly aggregate results across sessions, it only makes sense to combine entries at the `.cell_agg_inst_fr_list` variable and lower (as the number of cells can be added across sessions, treated as unique for each session).
 
         ## Display the aggregate across sessions:
-        _out_aggregate_fig_2 = PaperFigureTwo(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # WARNING: we didn't save this info
+        _out_aggregate_fig_2: PaperFigureTwo = PaperFigureTwo(instantaneous_time_bin_size_seconds=instantaneous_time_bin_size_seconds) # WARNING: we didn't save this info
         _out_aggregate_fig_2.computation_result = across_session_inst_fr_computation
         _out_aggregate_fig_2.active_identifying_session_ctx = across_session_inst_fr_computation.active_identifying_session_ctx
         # Set callback, the only self-specific property
@@ -3820,7 +3853,7 @@ class AcrossSessionsVisualizations:
         _output_dict = {}
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
-        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, **kwargs)
+        _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, include_non_XdC_cells_as_inset=include_non_XdC_cells_as_inset, **kwargs)
         _output_dict.update( {'theta': _fig_2_theta_out, 'replay': _fig_2_replay_out})
         if save_figure:
             # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)

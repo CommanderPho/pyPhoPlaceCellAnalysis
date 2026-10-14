@@ -1106,6 +1106,102 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                                     plot_data=plot_data)
 
 
+    @classmethod
+    def _resolve_AnyC_bar_results(cls, computation_result: InstantaneousSpikeRateGroupsComputation) -> Tuple[Optional[List[SingleBarResult]], Optional[List[SingleBarResult]]]:
+        """ Return (Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR) from shell fields, or derive from live AnyC_* trends. """
+        laps_anyc = getattr(computation_result, 'Fig2_Laps_AnyC_FR', None)
+        replay_anyc = getattr(computation_result, 'Fig2_Replay_AnyC_FR', None)
+        if (laps_anyc is not None) and (replay_anyc is not None):
+            return laps_anyc, replay_anyc
+
+        anyc_theta_minus = getattr(computation_result, 'AnyC_ThetaDeltaMinus', None)
+        anyc_theta_plus = getattr(computation_result, 'AnyC_ThetaDeltaPlus', None)
+        anyc_replay_minus = getattr(computation_result, 'AnyC_ReplayDeltaMinus', None)
+        anyc_replay_plus = getattr(computation_result, 'AnyC_ReplayDeltaPlus', None)
+        anyc_aclus = getattr(computation_result, 'AnyC_aclus', None)
+        if (anyc_aclus is None) or (anyc_theta_minus is None) or (anyc_theta_plus is None):
+            return None, None
+
+        LxC_set = set(np.asarray(getattr(computation_result, 'LxC_aclus', np.array([]))).tolist())
+        SxC_set = set(np.asarray(getattr(computation_result, 'SxC_aclus', np.array([]))).tolist())
+        exclusive_set = LxC_set | SxC_set
+        anyc_aclus_arr = np.asarray(anyc_aclus)
+        keep_mask = np.array([(aclu not in exclusive_set) for aclu in anyc_aclus_arr])
+        filtered_aclus = anyc_aclus_arr[keep_mask]
+
+        def _bar_from_trend(trend) -> SingleBarResult:
+            if trend is None:
+                return SingleBarResult(None, None, np.array([], dtype=float), filtered_aclus, filtered_aclus, None, None)
+            vals = np.asarray(trend.cell_agg_inst_fr_list)
+            if len(vals) == len(keep_mask):
+                vals = vals[keep_mask]
+            mean_v = float(np.nanmean(vals)) if len(vals) > 0 else None
+            std_v = float(np.nanstd(vals)) if len(vals) > 0 else None
+            return SingleBarResult(mean_v, std_v, vals, filtered_aclus, filtered_aclus, None, None)
+
+        Fig2_Laps_AnyC_FR: List[SingleBarResult] = [_bar_from_trend(anyc_theta_minus), _bar_from_trend(anyc_theta_plus)]
+        if (anyc_replay_minus is not None) and (anyc_replay_plus is not None):
+            Fig2_Replay_AnyC_FR: List[SingleBarResult] = [_bar_from_trend(anyc_replay_minus), _bar_from_trend(anyc_replay_plus)]
+        else:
+            Fig2_Replay_AnyC_FR = None
+        return Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR
+
+
+    @classmethod
+    def add_non_XdC_inset(cls, ax, anyc_bar_results: List[SingleBarResult], delta_minus_str: str = None, delta_plus_str: str = None, fr_label: str = 'AnyC', inset_bounds=None, **kwargs):
+        """ Add a 2-bar AnyC (Δ− / Δ+) inset sharing the parent axes y-scale. """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+        if delta_minus_str is None:
+            delta_minus_str = PhoPublicationFigureHelper.delta_minus_str
+        if delta_plus_str is None:
+            delta_plus_str = PhoPublicationFigureHelper.delta_plus_str
+        if inset_bounds is None:
+            inset_bounds = [0.62, 0.55, 0.35, 0.40]
+        if (anyc_bar_results is None) or (len(anyc_bar_results) < 2):
+            return None
+
+        y_values = [np.asarray(v.values) if (v is not None and v.values is not None) else np.array([], dtype=float) for v in anyc_bar_results[:2]]
+        if all(len(yi) == 0 for yi in y_values):
+            return None
+
+        ax_inset = ax.inset_axes(inset_bounds)
+        x = np.arange(2)
+        width = 0.3
+        muted_colors = [(0.45, 0.45, 0.45, 1), (0.65, 0.65, 0.65, 1)]
+        means = [float(np.nanmean(yi)) if len(yi) > 0 else 0.0 for yi in y_values]
+        stds = [float(np.nanstd(yi)) if len(yi) > 0 else 0.0 for yi in y_values]
+        x_labels = [f'$AnyC$' + '_{' + delta_minus_str + '}$', f'$AnyC$' + '_{' + delta_plus_str + '}$']
+
+        bars = ax_inset.bar(x, means, yerr=stds, capsize=3, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=muted_colors)
+
+        for i in range(len(x)):
+            if len(y_values[i]) == 0:
+                continue
+            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
+            scatter_props = getattr(anyc_bar_results[i], 'LxC_scatter_props', None)
+            if scatter_props is None:
+                ax_inset.scatter(x_values, y_values[i], color=muted_colors[i], s=12, alpha=0.35)
+            elif isinstance(scatter_props, list) and (len(scatter_props) == len(y_values[i])):
+                for point_index in range(len(y_values[i])):
+                    point_kwargs = dict(scatter_props[point_index]) if isinstance(scatter_props[point_index], dict) else {}
+                    point_kwargs.setdefault('s', 12)
+                    ax_inset.scatter(x_values[point_index], y_values[i][point_index], color=muted_colors[i], **point_kwargs)
+                ## END for point_index in range(len(y_values[i]))...
+
+            else:
+                ax_inset.scatter(x_values, y_values[i], color=muted_colors[i], s=12, alpha=0.35)
+        ## END for i in range(len(x))...
+
+
+        ax_inset.set_ylim(ax.get_ylim())
+        ax_inset.set_xticks(x)
+        ax_inset.set_xticklabels(x_labels, fontsize=7)
+        ax_inset.tick_params(axis='y', labelsize=7)
+        ax_inset.spines[['right', 'top']].set_visible(False)
+        ax_inset.set_title(fr_label if fr_label else 'AnyC', fontsize=8)
+        return ax_inset
+
+
     # @providing_context(fig='F2', frs='Laps')
     @classmethod
     def fig_2_Theta_FR_matplotlib(cls, Fig2_Laps_FR, defer_show=False, active_context=None, title_modifier=None, prepare_for_publication: bool = False, **kwargs) -> MatplotlibRenderPlots:
@@ -1180,12 +1276,19 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         Values come from:
         `self.computation_result.Fig2_Laps_FR`
         `self.computation_result.Fig2_Replay_FR`
+
+        When `include_non_XdC_cells_as_inset=True`, also plots a 2-bar AnyC inset
+        from `Fig2_*_AnyC_FR` or live `AnyC_*` trends, sharing the main axes y-scale.
         """
         
         
         # Get the provided context or use the session context:
         active_context = active_context if active_context is not None else self.active_identifying_session_ctx
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
+
+        include_non_XdC_cells_as_inset: bool = kwargs.pop('include_non_XdC_cells_as_inset', False)
+        delta_minus_str: str = kwargs.get('delta_minus_str', None)
+        delta_plus_str: str = kwargs.get('delta_plus_str', None)
 
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
@@ -1249,6 +1352,20 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
 
 
+        if include_non_XdC_cells_as_inset:
+            Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR = self._resolve_AnyC_bar_results(self.computation_result)
+            if Fig2_Laps_AnyC_FR is not None:
+                ax_inset_theta = self.add_non_XdC_inset(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR, delta_minus_str=delta_minus_str, delta_plus_str=delta_plus_str, fr_label='AnyC')
+                if ax_inset_theta is not None:
+                    if getattr(_fig_2_theta_out, 'plot_objects', None) is None:
+                        _fig_2_theta_out.plot_objects = {}
+                    _fig_2_theta_out.plot_objects['anyc_inset'] = ax_inset_theta
+            if Fig2_Replay_AnyC_FR is not None:
+                ax_inset_replay = self.add_non_XdC_inset(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR, delta_minus_str=delta_minus_str, delta_plus_str=delta_plus_str, fr_label='AnyC')
+                if ax_inset_replay is not None:
+                    if getattr(_fig_2_replay_out, 'plot_objects', None) is None:
+                        _fig_2_replay_out.plot_objects = {}
+                    _fig_2_replay_out.plot_objects['anyc_inset'] = ax_inset_replay
 
 
         def _perform_write_to_file_callback():
