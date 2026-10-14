@@ -3872,7 +3872,17 @@ class AcrossSessionsVisualizations:
         matplotlib_configuration_update(is_interactive=True, backend='Qt5Agg')
         # Perform interactive Matplotlib operations with 'Qt5Agg' backend
         _fig_2_theta_out, _fig_2_replay_out = _out_aggregate_fig_2.display(active_context=global_multi_session_context, title_modifier_fn=lambda original_title: f"{original_title} ({num_sessions} sessions)", save_figure=save_figure, include_non_XdC_cells_as_inset=include_non_XdC_cells_as_inset, **kwargs)
-        _output_dict.update( {'theta': _fig_2_theta_out, 'replay': _fig_2_replay_out})
+        bar_graph_stats_str = None
+        bar_graph_t_results = None
+        if _fig_2_theta_out is not None:
+            bar_graph_stats_str = _fig_2_theta_out.get('bar_graph_stats_str', None)
+            bar_graph_t_results = _fig_2_theta_out.get('bar_graph_t_results', None)
+        _output_dict.update({
+            'theta': _fig_2_theta_out,
+            'replay': _fig_2_replay_out,
+            'bar_graph_stats_str': bar_graph_stats_str,
+            'bar_graph_t_results': bar_graph_t_results,
+        })
         if save_figure:
             # _out_aggregate_fig_2.perform_save(_fig_2_theta_out)
             print(f'save_figure()!')

@@ -673,8 +673,11 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01, ns_fontsize: float = 10):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08):
     """Add significance bars to a boxplot.
+
+    When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
+    (`y_offset_frac * |y|` and `0.02 * |y|`) so participation (0–1) and Hz modes both get proportional headroom.
 
 
     Usage:
@@ -687,6 +690,11 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
 
     """
       # Offset for the bar above y
+    y_scale: float = max(abs(float(y)), 1e-12)
+    if y_offset is None:
+        y_offset = y_offset_frac * y_scale
+    if text_additional_y_offset is None:
+        text_additional_y_offset = 0.02 * y_scale
     _out_ann = {}
     _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
     
@@ -1051,15 +1059,23 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None, prepare_for_publication: bool = False, **kwargs):
         """ Main plotting function, called by both Laps and PBE subfigures
         
-        prepare_for_publication: if True, no context footer is added
+        prepare_for_publication: if True, no context footer is added; also skips title_modifier (e.g. '(N sessions)') and uses publication epoch titles
         """
-        if title_modifier:
+        if title_modifier and (not prepare_for_publication):
             title = title_modifier(title)
 
         ylabel = cls._coerce_axis_label(ylabel)
 
         # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plots_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
         text_formatter = FormattedFigureText()
+        # Axes top from kwargs (display default 0.78); title sits slightly higher so sig labels clear the subtitle
+        top_margin: float = float(kwargs.pop('top_margin', 0.78))
+        left_margin: float = float(kwargs.pop('left_margin', text_formatter.left_margin))
+        bottom_margin: float = float(kwargs.pop('bottom_margin', text_formatter.bottom_margin))
+        title_top_margin: float = float(kwargs.pop('title_top_margin', top_margin + 0.02))
+        text_formatter.top_margin = top_margin
+        text_formatter.left_margin = left_margin
+        text_formatter.bottom_margin = bottom_margin
         x = np.arange(len(x_labels))
         width = 0.3
 
@@ -1091,6 +1107,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     for point_index, a_marker in enumerate(user_markers):
                         a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
                         scatter_plot.append(a_sub_scatter_plot)
+                    ## END for point_index, a_marker in enumerate(user_markers)...
+
                     had_custom_marker_handling = True # indicate that this was handled in this manner
 
             if not had_custom_marker_handling:
@@ -1099,7 +1117,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
-            
+        ## END for i in range(len(x))...
+
         ax.set_xlabel('Neuron Track Dominance Classification')
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
@@ -1108,7 +1127,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         metric_name: str = cls._metric_name_from_ylabel(ylabel)
         _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
         active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
-        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
+        title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
                                 cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
@@ -1250,8 +1269,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
 
         laps_y_axis_label: str = cls._coerce_axis_label(kwargs.get('laps_y_axis_label', 'Lap-averaged Firing Rates (Hz)'))
+        epochs_title: str = 'Lap' if prepare_for_publication else 'Lap ($\\theta$)'
 
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, laps_y_axis_label, 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, laps_y_axis_label, epochs_title, 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     # @providing_context(fig='F2', frs='Replay')
     @classmethod
@@ -1289,7 +1309,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.78, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -1334,6 +1354,14 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             ## Add stats from t-tests (check?)
             ## INPUTS: across_session_inst_fr_computation_shell_obj
             LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
+            bar_graph_stats_str: str = format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+            print(bar_graph_stats_str)
+            bar_graph_t_results = (LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+            # Stash on the returned figure containers (picked up by across_sessions_bar_graphs output dict)
+            _fig_2_theta_out['bar_graph_stats_str'] = bar_graph_stats_str
+            _fig_2_theta_out['bar_graph_t_results'] = bar_graph_t_results
+            _fig_2_replay_out['bar_graph_stats_str'] = bar_graph_stats_str
+            _fig_2_replay_out['bar_graph_t_results'] = bar_graph_t_results
             
             ## get the max datapoint so we can position the signifiance indicator bars above them:
             max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
@@ -1659,6 +1687,34 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
     return LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result
 
 
+@function_attributes(short_name=None, tags=['stats', 'bar', 'format'], input_requires=[], output_provides=[], uses=[], used_by=['PaperFigureTwo.display'], creation_date='2026-03-26 08:20', related_items=[])
+def format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result) -> str:
+    """ Format Fig2 bar-graph paired t-test p-values for notebook/publication paste.
+
+    Returns e.g. '(Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)'
+
+    Very small p-values use MS Word UnicodeMath-friendly scientific notation (`a×10^b`),
+    which converts to a proper equation when pasted into Insert → Equation.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_bar_graph_t_tests, format_bar_graph_t_test_pvalues_str
+        LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+        print(format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result))
+    """
+    def _fmt_p_scientific_word(p: float) -> str:
+        """e.g. 1.25e-13 -> '1.25×10^-13' (Word equation linear / UnicodeMath)."""
+        mantissa_str, exp_str = f'{p:.2e}'.split('e')
+        return f'{mantissa_str}×10^{int(exp_str)}'
+
+    def _fmt_p(p: float) -> str:
+        if p < 1e-4:
+            return _fmt_p_scientific_word(p)
+        if p < 1e-3:
+            return f'{p:.6f}'.rstrip('0').rstrip('.')
+        return f'{p:.3g}'
+
+    return (f'(Laps: LdC p={_fmt_p(float(LxC_Laps_T_result.pvalue))},  SdC p={_fmt_p(float(SxC_Laps_T_result.pvalue))}; '
+            f'PBEs: LdC p={_fmt_p(float(LxC_Replay_T_result.pvalue))}, SdC p={_fmt_p(float(SxC_Replay_T_result.pvalue))})')
 
 
 @function_attributes(short_name=None, tags=['epoch', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
