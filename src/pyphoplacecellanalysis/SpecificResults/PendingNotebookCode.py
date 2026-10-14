@@ -242,22 +242,33 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
                                    xlim: Optional[Tuple[float, float]] = (2, 16), defer_show: bool = False,
                                    draw_scatter: bool = True, overlay_draw_scatter: bool = True,
                                    real_draw_scatter: bool = True, real_draw_summary: bool = True) -> Dict[str, Path]:
-    """Jittered trial scatter + summary curves of sequence-score metrics vs length `n`.
+    """Summary curves (± optional SD) of sequence-score metrics vs event length L.
 
-    Background: subsampled trial cloud at each discrete n (`draw_scatter=False` skips primary cloud).
-    Foreground: means / P(>|thr|) / P(mono) from `agg` (optional ±1 SD whiskers).
-    Optional `overlay=(df2, agg2, label2)` draws a second series (e.g. i.i.d. vs shuffles).
-    Optional `real=(df_real, agg_real|None, label)` overlays unshuffled epochs (stars); if `agg_real` is None and
-    `real_draw_summary=True`, aggregates `df_real` by length automatically.
+    Optional trial/epoch scatter clouds (`draw_scatter` / `overlay_draw_scatter` / `real_draw_scatter`).
+    Optional `overlay=(df2, agg2, label2)` and `real=(df_real, agg_real|None, label)`; if `agg_real` is None
+    and `real_draw_summary=True`, aggregates `df_real` by length automatically.
+
+    Markers: i.i.d. = open circles; shuffle = filled diamonds; real = filled stars.
 
     from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_sequence_scores_vs_length
 
-    # i.i.d. + shuffle curves + real epochs:
-    plot_sequence_scores_vs_length(df, agg, primary_label='i.i.d.',
-        overlay=(df_shuf, agg_by_L, 'shuffle'),
-        real=(df_real, None, 'real'),
-        draw_scatter=False, overlay_draw_scatter=False, real_draw_scatter=True,
-        title='i.i.d. + shuffle + real scores vs length', export_formats=[])
+    # shuffle / compare
+    plot_sequence_scores_vs_length(df, agg, primary_label='i.i.d.', draw_scatter=False,
+        overlay=(df_shuf, agg_by_L, 'shuffle'), overlay_draw_scatter=False,
+        # real=(df_real, None, 'real'), real_draw_scatter=False, real_draw_summary=True,   # agg=None → auto mean/P by length, black ★ per epoch, mean curves by L from df_real
+        title='i.i.d. + shuffle scores vs length',
+        export_formats=[],
+    )  # set False if dual clouds are too busy
+
+
+    # # i.i.d. vs shuffle
+    # plot_sequence_scores_vs_length(df, agg, length_col='n', primary_label='i.i.d.',
+    #     overlay=(df_shuf, agg_by_L, 'shuffle'),
+    #     title='i.i.d. vs shuffle scores vs length',
+    #     export_stem=f'iid_vs_shuffle_scores_vs_length_{decoder_name}')
+
+
+
     """
     df, agg = as_length_df(df, agg, length_col=length_col)
 
@@ -322,11 +333,11 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
     # Within a source, metrics differ by color + linestyle only (solid vs dashed).
     source_style = dict(
         primary=dict(marker='o', filled=False, ls_main='-', ls_alt='--',
-                     color_spearman='C0', color_pearson='C1', color_prob='C2', color_mono='C3',
-                     color_wcorr='C0', color_wcorr_p='C2', color_radon='C1', color_cov='C4'),
+                     color_spearman='C0', color_pearson='C1', color_prob='C0', color_mono='C0',
+                     color_wcorr='C0', color_wcorr_p='C1', color_radon='C0', color_cov='C0'),
         overlay=dict(marker='D', filled=True, ls_main='-', ls_alt='--',
-                     color_spearman='C3', color_pearson='C5', color_prob='C3', color_mono='C5',
-                     color_wcorr='C3', color_wcorr_p='C5', color_radon='C5', color_cov='C5'),
+                     color_spearman='C3', color_pearson='C5', color_prob='C3', color_mono='C3',
+                     color_wcorr='C3', color_wcorr_p='C5', color_radon='C3', color_cov='C3'),
         real=dict(marker='*', filled=True, ls_main='-', ls_alt='--',
                   color_spearman='k', color_pearson='0.35', color_prob='k', color_mono='0.2',
                   color_wcorr='k', color_wcorr_p='0.35', color_radon='k', color_cov='k'),
@@ -437,24 +448,27 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
             ## END if real_draw_summary...
         ## END if real is not None...
 
-        axes[0, 0].set_xlabel('sequence length n'); axes[0, 0].set_ylabel('|corr(t, x)|  (points = trials)')
-        axes[0, 0].set_title('Mean trajectory correlation'); axes[0, 0].set_ylim(0, 1)
+        any_scatter = bool(draw_scatter or overlay_draw_scatter or (real is not None and real_draw_scatter))
+        xlabel = 'Event sequence length L'
+
+        axes[0, 0].set_xlabel(xlabel); axes[0, 0].set_ylabel('mean |corr(t, x)|')
+        axes[0, 0].set_title('Trajectory correlation'); axes[0, 0].set_ylim(0, 1)
 
         axes[0, 1].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4, label='threshold 0.8')
-        axes[0, 1].set_xlabel('sequence length n'); axes[0, 1].set_ylabel(r'|Spearman| trials; line = P(> 0.8)')
+        axes[0, 1].set_xlabel(xlabel); axes[0, 1].set_ylabel('P(|Spearman| > 0.8)')
         axes[0, 1].set_title('Chance of "looks sequential"'); axes[0, 1].set_ylim(0, 1)
 
-        axes[0, 2].set_xlabel('sequence length n'); axes[0, 2].set_ylabel(r'|Spearman| trials; line = P(mono)')
+        axes[0, 2].set_xlabel(xlabel); axes[0, 2].set_ylabel('P(strictly monotonic)')
         axes[0, 2].set_title('Perfect ascending/descending order'); axes[0, 2].set_ylim(0, 1)
 
         axes[1, 0].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4)
-        axes[1, 0].set_xlabel('sequence length n'); axes[1, 0].set_ylabel('|wcorr|  (points = trials)')
+        axes[1, 0].set_xlabel(xlabel); axes[1, 0].set_ylabel('mean |wcorr|  /  P(|wcorr| > 0.8)')
         axes[1, 0].set_title('wcorr'); axes[1, 0].set_ylim(0, 1)
 
-        axes[1, 1].set_xlabel('sequence length n'); axes[1, 1].set_ylabel('radon score  (points = trials)')
+        axes[1, 1].set_xlabel(xlabel); axes[1, 1].set_ylabel('mean radon score')
         axes[1, 1].set_title('radon')
 
-        axes[1, 2].set_xlabel('sequence length n'); axes[1, 2].set_ylabel('track coverage  (points = trials)')
+        axes[1, 2].set_xlabel(xlabel); axes[1, 2].set_ylabel('mean track coverage')
         axes[1, 2].set_title('tcov_seq'); axes[1, 2].set_ylim(0, 1)
 
         for ax in axes.ravel():
@@ -463,8 +477,10 @@ def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, lengt
                 ax.set_xlim(list(xlim))
         ## END for ax in axes.ravel()...
 
-        subtitle = '\n(background points: subsampled trials at each discrete n; solid/dashed: summary curves)'
-        fig.suptitle(f'{title}{subtitle}')
+        if any_scatter:
+            fig.suptitle(f'{title}\n(markers: summary means; faint points: individual trials/epochs)')
+        else:
+            fig.suptitle(title)
         plt.tight_layout()
 
         _out_paths: Dict[str, Path] = {}
@@ -495,6 +511,11 @@ def plot_iid_uniform_trajectory_chance(df: pd.DataFrame, agg: pd.DataFrame,
         plot_iid_uniform_trajectory_chance(df, agg, draw_scatter=False,
             export_formats=[],
         )
+
+        # call
+        _out_paths = plot_iid_uniform_trajectory_chance(df=df, agg=agg, enable_error_bars=True)
+        _out_paths
+
     """
     return plot_sequence_scores_vs_length(
         df, agg, length_col='n', primary_label='i.i.d.',
