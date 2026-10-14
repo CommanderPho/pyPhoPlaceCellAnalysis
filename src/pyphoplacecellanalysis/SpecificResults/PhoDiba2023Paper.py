@@ -5389,3 +5389,254 @@ def _plot_recreated_figure():
 
     return fig
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-14 - Analysis of LdC effect on Post-Delta Bars in Figure 2                                                                                                                                                                                                                   #
+# ==================================================================================================================================================================================================================================================================================== #
+
+## INPUTS: pbe, across_session_inst_fr_computation_dict
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation, SpikeRateTrends ## for `Figure2Extended`
+
+@metadata_attributes(short_name=None, tags=['LdC', 'Long/Short', 'SdC', 'PostDelta', 'figure2'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-14 15:34', related_items=[])
+class Figure2Extended:
+    """
+    """
+    @classmethod
+    def compute_delta_plus_LdC_result(cls, a_specific_spikeratetrends_result: SpikeRateTrends, curr_sess_pbe: pd.DataFrame, curr_session_context: IdentifyingContext, debug_print=False):
+        """
+
+        """
+        sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
+
+        inst_fr_df_list = a_specific_spikeratetrends_result.inst_fr_df_list
+        epoch_unit_fr_df_list = a_specific_spikeratetrends_result.epoch_unit_fr_df_list
+        filter_epochs_df = deepcopy(a_specific_spikeratetrends_result.filter_epochs_df).reset_index(drop=True)  # row i ↔ epoch_unit_fr_df_list[i]
+        assert len(filter_epochs_df) == len(epoch_unit_fr_df_list), (len(filter_epochs_df), len(epoch_unit_fr_df_list))
+
+        pbe_clear_long = curr_sess_pbe.loc[curr_sess_pbe['is_clear_LONG']].copy()
+
+        # FAT often has parent_epoch_*; prefer those, else start/stop
+        t0_col = 'parent_epoch_start_t' if 'parent_epoch_start_t' in pbe_clear_long.columns else 'start'
+        t1_col = 'parent_epoch_end_t' if 'parent_epoch_end_t' in pbe_clear_long.columns else 'stop'
+        if debug_print:
+            print(f'pbe clear_LONG for {sess_name_underscore}: n={len(pbe_clear_long)} (using {t0_col}/{t1_col})')
+
+
+        # --- match clear_LONG times onto filter_epochs_df ---
+        atol = 1e-2  # seconds
+        fe_starts = filter_epochs_df['start'].to_numpy(dtype=float)
+        fe_stops = filter_epochs_df['stop'].to_numpy(dtype=float)
+
+        matched_idxs = []
+        match_rows = []
+        for _, row in pbe_clear_long.iterrows():
+            t0, t1 = float(row[t0_col]), float(row[t1_col])
+            hit = np.where((np.abs(fe_starts - t0) <= atol) & (np.abs(fe_stops - t1) <= atol))[0]
+            if len(hit) == 0:
+                # looser: start-only
+                hit = np.where(np.abs(fe_starts - t0) <= atol)[0]
+            if len(hit):
+                i = int(hit[0])
+                matched_idxs.append(i)
+                match_rows.append({
+                    'filter_epochs_idx': i,
+                    'start': fe_starts[i],
+                    'stop': fe_stops[i],
+                    'pbe_start': t0,
+                    'pbe_stop': t1,
+                    'P_Long': row.get('P_Long', np.nan),
+                    'P_Short': row.get('P_Short', np.nan),
+                })
+            ## END if len(hit)...
+        ## END for _, row in pbe_clear_long.iterrows()...
+
+        matched_idxs = np.unique(matched_idxs)
+        if debug_print:
+            print(f'matched {len(matched_idxs)} / {len(pbe_clear_long)} clear_LONG → filter_epochs_df (atol={atol}s)')
+
+        # boolean mask on filter_epochs_df
+        filter_epochs_df['is_clear_LONG'] = False
+        filter_epochs_df.loc[matched_idxs, 'is_clear_LONG'] = True
+        # clear_long_filter_epochs_df = filter_epochs_df.loc[filter_epochs_df['is_clear_LONG']].copy()
+        # display(clear_long_filter_epochs_df)
+
+        # --- LxC activity for those matched epochs ---
+        # epoch_unit_fr_df_list[i]: DataFrame with columns = LxC aclus, values = FR in that epoch
+        n_LdC_active = []
+        mean_LdC_fr = []
+        for i in matched_idxs:
+            fr_df = epoch_unit_fr_df_list[i]
+            fr = fr_df.to_numpy(dtype=float).ravel() if hasattr(fr_df, 'to_numpy') else np.asarray(fr_df, dtype=float).ravel()
+            # "active" = FR > 0 (same idea as rdf active_aclus)
+            n_LdC_active.append(int(np.sum(np.isfinite(fr) & (fr > 0))))
+            mean_LdC_fr.append(float(np.nanmean(fr)) if fr.size else np.nan)
+        ## END for i in matched_idxs...
+
+        clear_long_activity = pd.DataFrame({
+            'filter_epochs_idx': matched_idxs,
+            'start': filter_epochs_df.loc[matched_idxs, 'start'].to_numpy(),
+            'stop': filter_epochs_df.loc[matched_idxs, 'stop'].to_numpy(),
+            'n_LdC_active': n_LdC_active,
+            'mean_LdC_fr': mean_LdC_fr,
+        })
+        if debug_print:
+            display(clear_long_activity)
+            print(f"clear_LONG: mean n_LdC_active={np.nanmean(n_LdC_active):.2f}  |  other epochs for contrast:")
+
+        # optional contrast: non-clear epochs in the same filter_epochs_df
+        other_idxs = filter_epochs_df.index[~filter_epochs_df['is_clear_LONG']].to_numpy()
+
+        ## OUTPUTS: matched_idxs, other_idxs
+
+        # matched_items = [epoch_unit_fr_df_list[i].to_dict() for i in matched_idxs]
+        # other_items = [epoch_unit_fr_df_list[i].to_dict() for i in other_idxs]
+
+        epoch_unit_fr_df = pd.DataFrame.from_records([df.to_dict() for i, df in enumerate(epoch_unit_fr_df_list)])
+        fr_aclus_col_names = list(epoch_unit_fr_df.columns)
+        epoch_unit_fr_df['epoch_IDX'] = epoch_unit_fr_df.index.astype(int)
+        Assert.same_length(epoch_unit_fr_df, filter_epochs_df)
+        # transfer_col_names
+        if debug_print:
+            print(f'fr_aclus_col_names: {fr_aclus_col_names}')
+        epoch_unit_fr_df = pd.concat((filter_epochs_df, epoch_unit_fr_df), axis='columns')
+
+        # Performed 4 aggregations grouped on column: 'is_clear_LONG'
+        # agg_dict = {{f'{aclu}_mean':(int(aclu), 'mean'), f'{aclu}_max':(int(aclu), 'max')} for aclu in fr_aclus_col_names}
+        agg_dict = {f'{aclu}_mean':(int(aclu), 'mean') for aclu in fr_aclus_col_names}
+        aclu_agg_column_names_list = list(agg_dict.keys())
+        epoch_unit_fr_agg_df = epoch_unit_fr_df.groupby(['is_clear_LONG']).agg(**agg_dict).reset_index()
+        # epoch_unit_fr_agg_df = epoch_unit_fr_df.groupby(['is_clear_LONG']).agg(col8_mean=(8, 'mean'), col8_max=(8, 'max'), col97_mean=(97, 'mean'), col109_mean=(109, 'mean')).reset_index()
+        epoch_unit_fr_agg_df.set_index('is_clear_LONG', drop=True, inplace=True)
+        return epoch_unit_fr_agg_df, epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (fr_aclus_col_names, aclu_agg_column_names_list)
+
+
+
+    ## INPUTS: an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext
+    @classmethod
+    def compute_single_session(cls, an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext):
+        ## DeltaMinus
+        # a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaMinus  # long-maze replay pool; use Plus for short-maze
+        # an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaMinus
+
+        ## DeltaPlus
+        a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaPlus  # long-maze replay pool; use Plus for short-maze
+        an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaPlus
+
+        if a_pbeDelta_result is None:
+            print(f'\tWARN: a_pbeDelta_result is None for curr_session_context: {curr_session_context}. Skipping.')
+
+        sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
+
+        ## INPUTS: sess_name_underscore
+        # --- this session's clear_LONG PBEs from FAT `pbe` ---
+        curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str).str.replace('-', '_', regex=False) == sess_name_underscore.replace('-', '_')].copy()
+        # also try hyphenated FAT style if needed
+        if curr_sess_pbe.empty:
+            curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str) == curr_session_context.get_description(separator='_')].copy()
+        if curr_sess_pbe.empty:
+            curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str).str.contains(curr_session_context.session_name)].copy()
+
+        LdC_epoch_unit_fr_agg_df, LdC_epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (LdC_fr_aclus_col_names, LdC_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=a_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+        an_LdC_all_aclus_mean_fr_dict = LdC_epoch_unit_fr_agg_df[LdC_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
+        # an_LdC_all_aclus_mean_fr_dict
+        # epoch_unit_fr_agg_df
+        ## OUTPUTS: epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict
+        an_any_C_epoch_unit_fr_agg_df, an_any_C_epoch_unit_fr_df, an_any_C_filter_epochs_df, an_any_C_clear_long_activity, (an_any_C_fr_aclus_col_names, an_any_C_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_any_C_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+        # an_any_C_epoch_unit_fr_agg_df
+        ## any_C aclus include the LdCs, so exclude those to look at the mean of the rest
+        # an_any_C_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[an_any_C_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
+        # an_any_C_all_aclus_mean_fr_dict
+        non_LdC_aclu_col_names = set(list(an_any_C_epoch_unit_fr_agg_df)) - set(list(LdC_epoch_unit_fr_agg_df.columns))
+        an_non_LdC_aclu_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[non_LdC_aclu_col_names].mean(axis='columns', skipna=True).to_dict()
+        # an_non_LdC_aclu_all_aclus_mean_fr_dict
+
+        ## OUTPUTS: an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict
+        _out_dict = {'LdCs': an_LdC_all_aclus_mean_fr_dict, 'non_LdCs': an_non_LdC_aclu_all_aclus_mean_fr_dict}
+        # an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict
+        return _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict)
+
+
+    @classmethod
+    def build_across_session_cell_stats(cls, session_activity_dict, results_print=False):
+
+        # Flatten: one row per (session, cell_group, is_clear_LONG)
+        rows = []
+        for ctxt, group_dict in session_activity_dict.items():
+            base = ctxt.to_dict() if hasattr(ctxt, 'to_dict') else dict(
+                format_name=ctxt.format_name, animal=ctxt.animal,
+                exper_name=ctxt.exper_name, session_name=ctxt.session_name,
+            )
+            for cell_group, clear_dict in group_dict.items():  # 'LdCs' / 'non_LdCs'
+                for is_clear_LONG, mean_n_active in clear_dict.items():  # False / True
+                    rows.append({
+                        **base,
+                        'cell_group': cell_group,
+                        'is_clear_LONG': bool(is_clear_LONG),
+                        'mean_n_active': float(mean_n_active),
+                    })
+                ## END for is_clear_LONG, mean_n_active...
+            ## END for cell_group, clear_dict...
+        ## END for ctxt, group_dict...
+
+        df = pd.DataFrame(rows)
+        df['session_key'] = df['format_name'] + '_' + df['animal'] + '_' + df['exper_name'] + '_' + df['session_name']
+
+        # Wide per session: columns = (cell_group, is_clear_LONG)
+        wide = df.pivot_table(
+            index=['session_key', 'animal', 'exper_name', 'session_name'],
+            columns=['cell_group', 'is_clear_LONG'],
+            values='mean_n_active',
+            aggfunc='mean',
+        ).sort_index(axis=1)
+        wide.columns = [f'{g}_{"clearLONG" if c else "other"}' for g, c in wide.columns]
+        wide = wide.reset_index()
+
+        # Per-session deltas (clear_LONG − other)
+        wide['LdCs_delta'] = wide['LdCs_clearLONG'] - wide['LdCs_other']
+        wide['non_LdCs_delta'] = wide['non_LdCs_clearLONG'] - wide['non_LdCs_other']
+
+        # display(wide)
+        # display(df)
+
+        # Across-session averages
+        summary = df.groupby(['cell_group', 'is_clear_LONG'], as_index=False).agg(
+            n_sessions=('session_key', 'nunique'),
+            mean=('mean_n_active', 'mean'),
+            sem=('mean_n_active', 'sem'),
+            median=('mean_n_active', 'median'),
+        )
+        if results_print:
+            display(summary)
+
+            # Compact: mean ± sem across sessions
+            print(summary.pivot(index='cell_group', columns='is_clear_LONG', values='mean'))
+            print('Across-session mean deltas (clearLONG − other):')
+            print(wide[['LdCs_delta', 'non_LdCs_delta']].agg(['mean', 'sem', 'median']))
+
+        return summary
+
+
+
+    @classmethod
+    def main(cls, across_session_inst_fr_computation_dict, **kwargs):
+        session_activity_dict = {}
+        for curr_session_context, an_inst_fr_comp in across_session_inst_fr_computation_dict.items():
+            if an_inst_fr_comp is not None:
+                try:
+                    _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict) = cls.compute_single_session(an_inst_fr_comp=an_inst_fr_comp, curr_session_context=curr_session_context)
+                    session_activity_dict[curr_session_context] = _out_dict
+                except (ValueError, AttributeError) as e:
+                    print(f'WARN error e: {e} occured for curr_session_context: {curr_session_context}! Skipping.')
+                    # raise e
+
+            else:
+                print(f'WARN an_inst_fr_comp is None for curr_session_context: {curr_session_context}! Skipping.')
+
+        ## OUTPUTS: session_activity_dict
+
+        summary_df = cls.build_across_session_cell_stats(session_activity_dict=session_activity_dict)
+        return summary_df, session_activity_dict
+
+        # ## False: not 'is_clear_LONG', True: 'is_clear_LONG'
+        # {'LdCs': {False: 0.4424268194353505, True: 0.337761670749316},
+        #  'non_LdCs': {False: 8.747961407968651, True: 8.24495517634073}}
