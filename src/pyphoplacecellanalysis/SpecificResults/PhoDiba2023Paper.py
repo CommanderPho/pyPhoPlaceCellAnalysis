@@ -1626,10 +1626,18 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 
 # Define a simple attrs class that's better than a namedtuple and unpackable:
 LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model", "r_value")}, bases=(UnpackableMixin, object,))
-LinearRegressionOutput.plot = lambda self, ax, **kwargs: (
-    ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs)),
-    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, fontsize=8, verticalalignment='top', color='black', alpha=0.9)
-)[0]
+
+
+def _linear_regression_output_plot(self, ax, r_text_kwargs=None, **kwargs):
+    """Plot regression line and R-value label. Line kwargs default to red/0.7/0.5; R text defaults to black/8pt. Pass r_text_kwargs to override the R label."""
+    line_kwargs = dict(color='red', alpha=0.7, lw=0.5) | kwargs
+    _r_text_kwargs = dict(fontsize=8, color='black', alpha=0.9, verticalalignment='top') | (r_text_kwargs or {})
+    line_artists = ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **line_kwargs)
+    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
+    return line_artists[0]
+
+
+LinearRegressionOutput.plot = _linear_regression_output_plot
 
 @function_attributes(short_name=None, tags=['stats', 'regression'], input_requires=[], output_provides=[], uses=['LinearRegressionOutput'], used_by=[], creation_date='2025-07-04 03:11', related_items=[])
 def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegressionOutput":
@@ -5138,6 +5146,34 @@ class PhoPublicationFigureHelper:
     # delta_plus_str: str = '⬗'
     delta_minus_str: str = 't < \\Delta'        
     delta_plus_str: str = 't > \\Delta'
+
+    # Extracted from Artboard 3.pdf (Fig3 laps|PBEs scatter panels)
+    artboard3_fig3_style: Dict = {
+        'colors': {
+            'long': '#4D69B1',
+            'short': '#DC1E3D',
+            'title_body': '#231F20',
+            'r_fit': '#7900B3',
+            'marker': '#333333',
+        },
+        'sizes': {
+            'track_title': 9.087,
+            'title_body': 8.077,
+            'axis_label': 7,
+            'tick_label': 8.077,
+            'r_value': 8,
+        },
+        'axes': {
+            'linewidth': 0.75,
+            'tick_width': 0.75,
+            'tick_length': 3.5,
+        },
+        'scatter': {
+            's': 5.0,  # diameter ≈ 2.236 pt → s = d²; notebook may still pass s explicitly
+            'point_colors': '#33333333',
+        },
+    }
+
     
     @classmethod
     def rc_context_kwargs(cls, prepare_for_publication: bool=True, **kwargs) -> Dict:

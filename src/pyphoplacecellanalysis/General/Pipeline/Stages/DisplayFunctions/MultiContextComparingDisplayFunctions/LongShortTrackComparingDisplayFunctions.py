@@ -2316,7 +2316,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
         # Fit linear regression using numpy.polyfit
         _lin_reg = pho_stats_linear_regression(list(x_frs_index.to_numpy()), list(y_frs_index.to_numpy()))
-        _out_regression_line_artist = _lin_reg.plot(ax=ax)
+        if prepare_for_publication:
+            artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+            r_fit_color = artboard3_style['colors']['r_fit']
+            r_fontsize = artboard3_style['sizes']['r_value']
+            _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+        else:
+            _out_regression_line_artist = _lin_reg.plot(ax=ax)
         
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
@@ -2330,6 +2336,14 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     else:
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
+
+    if prepare_for_publication:
+        artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+        axes_style = artboard3_style['axes']
+        ax.tick_params(labelsize=artboard3_style['sizes']['tick_label'], width=axes_style['tick_width'], length=axes_style['tick_length'])
+        for spine_name in ('left', 'bottom'):
+            ax.spines[spine_name].set_linewidth(axes_style['linewidth'])
+        ## END for spine_name in ('left', 'bottom')...
         
 
     if include_axes_lines:
@@ -3063,12 +3077,13 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
         
         """
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput        
-    
-        prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', True)
-            
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput, PhoPublicationFigureHelper
+
+        prepare_for_publication = scatter_params.pop('prepare_for_publication', prepare_for_publication)
+        artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+
         if prepare_for_publication:
-            x_y_axes_label_kwargs = dict(fontsize=7)
+            x_y_axes_label_kwargs = dict(fontsize=artboard3_style['sizes']['axis_label'])
             if 's' not in scatter_params:
                 scatter_params['s'] = 18 ## override it
         else:
@@ -3138,9 +3153,13 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         else:  
-            ## Publication Mode
-            ## Smaller fonts for publication -- Originally 18, now 9
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+            ## Publication Mode — Artboard 3.pdf title: colored track name + #231F20 body
+            track_key = 'short' if ('short' in str(track_name).lower()) else 'long'
+            track_color = artboard3_style['colors'][track_key]
+            title_body_color = artboard3_style['colors']['title_body']
+            track_title_size = artboard3_style['sizes']['track_title']
+            title_body_size = artboard3_style['sizes']['title_body']
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></><size:{title_body_size}><color:{title_body_color}> laps|PBEs </><weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
@@ -3157,11 +3176,22 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             # Hide the right and top spines (box components)
             ax.spines[['right', 'top']].set_visible(False)
 
+        if prepare_for_publication:
+            axes_style = artboard3_style['axes']
+            ax.tick_params(labelsize=artboard3_style['sizes']['tick_label'], width=axes_style['tick_width'], length=axes_style['tick_length'])
+            for spine_name in ('left', 'bottom'):
+                ax.spines[spine_name].set_linewidth(axes_style['linewidth'])
+            ## END for spine_name in ('left', 'bottom')...
 
         if include_linear_regression_line:
             # Fit linear regression using numpy.polyfit
             _lin_reg = pho_stats_linear_regression(list(laps_frs_dict.values()), list(replays_frs_dict.values()))
-            _out_regression_line_artist = _lin_reg.plot(ax=ax)
+            if prepare_for_publication:
+                r_fit_color = artboard3_style['colors']['r_fit']
+                r_fontsize = artboard3_style['sizes']['r_value']
+                _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+            else:
+                _out_regression_line_artist = _lin_reg.plot(ax=ax)
 
         if not defer_render:
             fig.show()
