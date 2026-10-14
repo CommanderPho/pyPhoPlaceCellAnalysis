@@ -707,9 +707,14 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if p_value < significance_level / 100:
         sig_astrisks_str += '*'
     ## OUTPUT:
+    label_y: float = float(y + y_offset + text_additional_y_offset)
     if sig_astrisks_str:
         label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), (y + y_offset + text_additional_y_offset), sig_astrisks_str, fontsize=label_fontsize, ha='center')
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center')
+
+    # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
+    _ymin, _ymax = ax.get_ylim()
+    ax.set_ylim(0.0, max(float(_ymax), label_y * 1.08))
 
     return _out_ann
 
@@ -1056,6 +1061,22 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
+    def _apply_publication_grouped_xticklabels(cls, ax):
+        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, LdCs/SdCs under each pair. """
+        ax.set_xticks(np.arange(4))
+        ax.set_xticklabels([r'pre-$\Delta$', r'post-$\Delta$', r'pre-$\Delta$', r'post-$\Delta$'])
+        ax.tick_params(axis='x', length=0, pad=2)
+        ax.set_xlabel('')
+
+        # Group labels centered under bars 0–1 and 2–3 (matplotlib multilevel-tick pattern)
+        sec = ax.secondary_xaxis(location=0)
+        sec.set_xticks([0.5, 2.5], labels=['\n\nLdCs', '\n\nSdCs'])
+        sec.tick_params('x', length=0)
+        sec.spines['bottom'].set_visible(False)
+        return sec
+
+
+    @classmethod
     def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None, prepare_for_publication: bool = False, **kwargs):
         """ Main plotting function, called by both Laps and PBE subfigures
         
@@ -1139,6 +1160,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
+        if prepare_for_publication:
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax)
+
+        # Firing rates / participation fractions are non-negative; keep axis floor at 0
+        _ymin, _ymax = ax.get_ylim()
+        ax.set_ylim(0.0, max(float(_ymax), 0.0))
 
         plot_data = (x_values_list, y_values)
         
@@ -1230,7 +1257,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             scatter_artists.append(sc)
         ## END for i in range(n_main_bars)...
 
-        ax.set_ylim(ylim0)
+        ax.set_ylim(0.0, max(float(ylim0[1]), 0.0))
         return scatter_artists if len(scatter_artists) > 0 else None
 
 
@@ -1362,7 +1389,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _fig_2_theta_out['bar_graph_t_results'] = bar_graph_t_results
             _fig_2_replay_out['bar_graph_stats_str'] = bar_graph_stats_str
             _fig_2_replay_out['bar_graph_t_results'] = bar_graph_t_results
-            
+
             ## get the max datapoint so we can position the signifiance indicator bars above them:
             max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
             max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
@@ -1415,6 +1442,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                         _fig_2_replay_out.plot_objects = {}
                     _fig_2_replay_out.plot_objects['anyc_background_scatter'] = anyc_scatters_replay
 
+
+        # Keep y-axis floor at 0 after overlays (stats bars / AnyC) may have re-autoscaled
+        for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]:
+            _ymin, _ymax = _fig_out.ax.get_ylim()
+            _fig_out.ax.set_ylim(0.0, max(float(_ymax), 0.0))
+        ## END for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]...
 
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
@@ -1688,10 +1721,11 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
 
 
 @function_attributes(short_name=None, tags=['stats', 'bar', 'format'], input_requires=[], output_provides=[], uses=[], used_by=['PaperFigureTwo.display'], creation_date='2026-03-26 08:20', related_items=[])
-def format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result) -> str:
+def format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result, include_num_cells: bool = True) -> str:
     """ Format Fig2 bar-graph paired t-test p-values for notebook/publication paste.
 
     Returns e.g. '(Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)'
+        or '25 LdC, 17 SdC cells; (Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)' if (include_num_cells == True)
 
     Very small p-values use MS Word UnicodeMath-friendly scientific notation (`a×10^b`),
     which converts to a proper equation when pasted into Insert → Equation.
@@ -1713,9 +1747,16 @@ def format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, Lx
             return f'{p:.6f}'.rstrip('0').rstrip('.')
         return f'{p:.3g}'
 
-    return (f'(Laps: LdC p={_fmt_p(float(LxC_Laps_T_result.pvalue))},  SdC p={_fmt_p(float(SxC_Laps_T_result.pvalue))}; '
+    _out_str: str = (f'(Laps: LdC p={_fmt_p(float(LxC_Laps_T_result.pvalue))},  SdC p={_fmt_p(float(SxC_Laps_T_result.pvalue))}; '
             f'PBEs: LdC p={_fmt_p(float(LxC_Replay_T_result.pvalue))}, SdC p={_fmt_p(float(SxC_Replay_T_result.pvalue))})')
 
+    if include_num_cells:
+        ## creates output string like '25 LdC, 17 SdC cells; (Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)'
+        n_LdC, n_SdC = [v.df for v in (LxC_Laps_T_result, SxC_Laps_T_result)]
+        num_cells_str: str = f'{n_LdC} LdC, {n_SdC} SdC cells'
+        _out_str = '; '.join([num_cells_str, _out_str])
+
+    return _out_str
 
 @function_attributes(short_name=None, tags=['epoch', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
 def build_derived_epochs_dicts(owning_pipeline_reference):
