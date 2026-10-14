@@ -1148,58 +1148,52 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def add_non_XdC_inset(cls, ax, anyc_bar_results: List[SingleBarResult], delta_minus_str: str = None, delta_plus_str: str = None, fr_label: str = 'AnyC', inset_bounds=None, **kwargs):
-        """ Add a 2-bar AnyC (Δ− / Δ+) inset sharing the parent axes y-scale. """
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
-        if delta_minus_str is None:
-            delta_minus_str = PhoPublicationFigureHelper.delta_minus_str
-        if delta_plus_str is None:
-            delta_plus_str = PhoPublicationFigureHelper.delta_plus_str
-        if inset_bounds is None:
-            inset_bounds = [0.62, 0.55, 0.35, 0.40]
+    def add_non_XdC_background_scatter(cls, ax, anyc_bar_results: List[SingleBarResult], width: float = 0.3, n_main_bars: int = 4, **kwargs):
+        """ Scatter AnyC (non-XdC) Δ−/Δ+ points faintly behind the main XdC 4-bar figure.
+
+        Mapping by epoch column:
+            AnyC Δ− -> bars 0 and 2 (LxC Δ−, SxC Δ−)
+            AnyC Δ+ -> bars 1 and 3 (LxC Δ+, SxC Δ+)
+
+        Y-limits are restored after plotting so AnyC extremes do not expand the axis.
+        """
         if (anyc_bar_results is None) or (len(anyc_bar_results) < 2):
             return None
 
-        y_values = [np.asarray(v.values) if (v is not None and v.values is not None) else np.array([], dtype=float) for v in anyc_bar_results[:2]]
-        if all(len(yi) == 0 for yi in y_values):
+        y_minus = np.asarray(anyc_bar_results[0].values) if (anyc_bar_results[0] is not None and anyc_bar_results[0].values is not None) else np.array([], dtype=float)
+        y_plus = np.asarray(anyc_bar_results[1].values) if (anyc_bar_results[1] is not None and anyc_bar_results[1].values is not None) else np.array([], dtype=float)
+        if (len(y_minus) == 0) and (len(y_plus) == 0):
             return None
 
-        ax_inset = ax.inset_axes(inset_bounds)
-        x = np.arange(2)
-        width = 0.3
-        muted_colors = [(0.45, 0.45, 0.45, 1), (0.65, 0.65, 0.65, 1)]
-        means = [float(np.nanmean(yi)) if len(yi) > 0 else 0.0 for yi in y_values]
-        stds = [float(np.nanstd(yi)) if len(yi) > 0 else 0.0 for yi in y_values]
-        x_labels = [f'$AnyC$' + '_{' + delta_minus_str + '}$', f'$AnyC$' + '_{' + delta_plus_str + '}$']
+        ylim0 = ax.get_ylim()
+        # Ensure existing XdC artists stay above the faint AnyC series
+        for artist in list(ax.patches) + list(ax.collections):
+            try:
+                if artist.get_zorder() < 2:
+                    artist.set_zorder(2)
+            except Exception:
+                pass
+        ## END for artist in list(ax.patches) + list(ax.collections)...
 
-        bars = ax_inset.bar(x, means, yerr=stds, capsize=3, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=muted_colors)
-
-        for i in range(len(x)):
-            if len(y_values[i]) == 0:
+        scatter_artists = []
+        x = np.arange(n_main_bars)
+        for i in range(n_main_bars):
+            y_i = y_minus if (i in (0, 2)) else y_plus
+            if len(y_i) == 0:
                 continue
-            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
-            scatter_props = getattr(anyc_bar_results[i], 'LxC_scatter_props', None)
-            if scatter_props is None:
-                ax_inset.scatter(x_values, y_values[i], color=muted_colors[i], s=12, alpha=0.35)
-            elif isinstance(scatter_props, list) and (len(scatter_props) == len(y_values[i])):
-                for point_index in range(len(y_values[i])):
-                    point_kwargs = dict(scatter_props[point_index]) if isinstance(scatter_props[point_index], dict) else {}
-                    point_kwargs.setdefault('s', 12)
-                    ax_inset.scatter(x_values[point_index], y_values[i][point_index], color=muted_colors[i], **point_kwargs)
-                ## END for point_index in range(len(y_values[i]))...
+            x_values = (x[i] + np.random.random(y_i.size) * width - width / 2)
+            sc = ax.scatter(x_values, y_i, color=(0.5, 0.5, 0.5), alpha=0.50, s=20, zorder=1, marker='.', linewidths=0)
+            scatter_artists.append(sc)
+        ## END for i in range(n_main_bars)...
 
-            else:
-                ax_inset.scatter(x_values, y_values[i], color=muted_colors[i], s=12, alpha=0.35)
-        ## END for i in range(len(x))...
+        ax.set_ylim(ylim0)
+        return scatter_artists if len(scatter_artists) > 0 else None
 
 
-        ax_inset.set_ylim(ax.get_ylim())
-        ax_inset.set_xticks(x)
-        ax_inset.set_xticklabels(x_labels, fontsize=7)
-        ax_inset.tick_params(axis='y', labelsize=7)
-        ax_inset.spines[['right', 'top']].set_visible(False)
-        ax_inset.set_title(fr_label if fr_label else 'AnyC', fontsize=8)
-        return ax_inset
+    @classmethod
+    def add_non_XdC_inset(cls, ax, anyc_bar_results: List[SingleBarResult], **kwargs):
+        """ Deprecated alias for `add_non_XdC_background_scatter` (kept for notebook autoreload / old callers). """
+        return cls.add_non_XdC_background_scatter(ax, anyc_bar_results, **kwargs)
 
 
     # @providing_context(fig='F2', frs='Laps')
@@ -1277,8 +1271,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         `self.computation_result.Fig2_Laps_FR`
         `self.computation_result.Fig2_Replay_FR`
 
-        When `include_non_XdC_cells_as_inset=True`, also plots a 2-bar AnyC inset
-        from `Fig2_*_AnyC_FR` or live `AnyC_*` trends, sharing the main axes y-scale.
+        When `include_non_XdC_cells_as_inset=True`, also plots a faint AnyC (non-XdC)
+        scatter series behind the main XdC bars from `Fig2_*_AnyC_FR` or live `AnyC_*` trends
+        (AnyC Δ− under bars 0/2, AnyC Δ+ under bars 1/3; XdC y-limits preserved).
         """
         
         
@@ -1287,8 +1282,6 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
 
         include_non_XdC_cells_as_inset: bool = kwargs.pop('include_non_XdC_cells_as_inset', False)
-        delta_minus_str: str = kwargs.get('delta_minus_str', None)
-        delta_plus_str: str = kwargs.get('delta_plus_str', None)
 
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
@@ -1355,17 +1348,17 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if include_non_XdC_cells_as_inset:
             Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR = self._resolve_AnyC_bar_results(self.computation_result)
             if Fig2_Laps_AnyC_FR is not None:
-                ax_inset_theta = self.add_non_XdC_inset(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR, delta_minus_str=delta_minus_str, delta_plus_str=delta_plus_str, fr_label='AnyC')
-                if ax_inset_theta is not None:
+                anyc_scatters_theta = self.add_non_XdC_background_scatter(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR)
+                if anyc_scatters_theta is not None:
                     if getattr(_fig_2_theta_out, 'plot_objects', None) is None:
                         _fig_2_theta_out.plot_objects = {}
-                    _fig_2_theta_out.plot_objects['anyc_inset'] = ax_inset_theta
+                    _fig_2_theta_out.plot_objects['anyc_background_scatter'] = anyc_scatters_theta
             if Fig2_Replay_AnyC_FR is not None:
-                ax_inset_replay = self.add_non_XdC_inset(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR, delta_minus_str=delta_minus_str, delta_plus_str=delta_plus_str, fr_label='AnyC')
-                if ax_inset_replay is not None:
+                anyc_scatters_replay = self.add_non_XdC_background_scatter(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR)
+                if anyc_scatters_replay is not None:
                     if getattr(_fig_2_replay_out, 'plot_objects', None) is None:
                         _fig_2_replay_out.plot_objects = {}
-                    _fig_2_replay_out.plot_objects['anyc_inset'] = ax_inset_replay
+                    _fig_2_replay_out.plot_objects['anyc_background_scatter'] = anyc_scatters_replay
 
 
         def _perform_write_to_file_callback():

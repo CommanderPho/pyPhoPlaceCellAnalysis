@@ -431,7 +431,7 @@ class InstantaneousFiringRatesDataframeAccessor():
         # _shell_obj.SxC_scatter_props = SxC_scatter_props
 
         if include_non_XdC_cells_as_inset:
-            ## Attach AnyC (non-XdC) 2-bar results for the inset plot when membership column has 'AnyC'
+            ## Attach AnyC (non-XdC) 2-bar results for the faint background scatter when membership column has 'AnyC'
             try:
                 AnyC_df = grouped_df.get_group('AnyC')
             except KeyError:
@@ -3821,7 +3821,7 @@ class AcrossSessionsVisualizations:
 
         When `include_non_XdC_cells_as_inset=True`, also expects AnyC (non-XdC) data via
         `Fig2_Laps_AnyC_FR` / `Fig2_Replay_AnyC_FR` on the shell object, or live `AnyC_*` trends
-        on `InstantaneousSpikeRateGroupsComputation`, plotted as a 2-bar inset sharing the main y-scale.
+        on `InstantaneousSpikeRateGroupsComputation`, plotted as a faint scatter series behind the main XdC bars.
             
         """
 
