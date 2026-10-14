@@ -673,7 +673,7 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01, ns_fontsize: float = 10):
     """Add significance bars to a boxplot.
 
 
@@ -700,7 +700,8 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
         sig_astrisks_str += '*'
     ## OUTPUT:
     if sig_astrisks_str:
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), (y + y_offset + text_additional_y_offset), sig_astrisks_str, fontsize=16, ha='center')
+        label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), (y + y_offset + text_additional_y_offset), sig_astrisks_str, fontsize=label_fontsize, ha='center')
 
     return _out_ann
 
@@ -1011,9 +1012,17 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
     
     @classmethod
+    def _coerce_axis_label(cls, label) -> str:
+        """ Unwrap accidental 1-tuples/lists from trailing-comma assignments; return a plain str. """
+        if isinstance(label, (tuple, list)) and (len(label) == 1):
+            label = label[0]
+        return str(label)
+
+
+    @classmethod
     def _metric_name_from_ylabel(cls, ylabel: str) -> str:
         """ Derive the flexitext title metric phrase from the y-axis label. """
-        ylabel_lower: str = str(ylabel).lower()
+        ylabel_lower: str = cls._coerce_axis_label(ylabel).lower()
         if 'participat' in ylabel_lower:
             return 'Participation Fractions'
         if 'firing rate' in ylabel_lower:
@@ -1046,6 +1055,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         """
         if title_modifier:
             title = title_modifier(title)
+
+        ylabel = cls._coerce_axis_label(ylabel)
 
         # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plots_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
         text_formatter = FormattedFigureText()
@@ -1095,6 +1106,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.spines[['right', 'top']].set_visible(False)
 
         metric_name: str = cls._metric_name_from_ylabel(ylabel)
+        _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
+        active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
                                 cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
@@ -1236,7 +1249,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
 
-        laps_y_axis_label: str = kwargs.get('laps_y_axis_label', 'Lap-averaged Firing Rates (Hz)')
+        laps_y_axis_label: str = cls._coerce_axis_label(kwargs.get('laps_y_axis_label', 'Lap-averaged Firing Rates (Hz)'))
 
         return cls.create_plot(x_labels, all_data_points, all_scatter_props, laps_y_axis_label, 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
@@ -1253,7 +1266,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         var_name:str = 'PBE'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
-        pbe_y_axis_label: str = kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)')
+        pbe_y_axis_label: str = cls._coerce_axis_label(kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)'))
 
         # PBE_fr_label: str = 'R'
         PBE_fr_label: str = '\\text{PBE}'
