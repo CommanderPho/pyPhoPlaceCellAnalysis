@@ -277,10 +277,11 @@ class InstantaneousFiringRatesDataframeAccessor():
 
 
     @classmethod
-    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership', PBE_col_variable_names: Optional[List[str]] = None, include_non_XdC_cells_as_inset: bool = False) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
+    def build_shell_object_for_plot(cls, loaded_result_df: pd.DataFrame, column_name_to_colorize:str = 'session_name', active_set_cell_groups_column_name: str = 'active_set_membership', Laps_col_variable_names: Optional[List[str]] = None, PBE_col_variable_names: Optional[List[str]] = None, include_non_XdC_cells_as_inset: bool = False) -> Tuple[InstantaneousSpikeRateGroupsComputation, pd.DataFrame]:
         """ loads the previously saved out inst_fr_scatter_plot_results_table and prepares it for plotting.
 
         The values come from the `data_columns = ['lap_delta_minus', 'lap_delta_plus', 'replay_delta_minus', 'replay_delta_plus']` of the `loaded_result_df`
+        (or alternate column pairs via `Laps_col_variable_names` / `PBE_col_variable_names`).
         returns a `InstantaneousSpikeRateGroupsComputation` _shell_obj which can be plotted
 
         Creates a modified 'visualization_df' from 'loaded_result_df' by adding columns: ['color', 'marker', 'scatter_props']
@@ -306,8 +307,15 @@ class InstantaneousFiringRatesDataframeAccessor():
             # active_set_cell_groups_column_name: str = 'active_set_membership_from_all' # 2025-08-06
 
 
-            # PBE_col_variable_names: List[str] = ['replay_delta_minus', 'replay_delta_plus'] 
+            # Laps_col_variable_names: List[str] = ['lap_delta_minus', 'lap_delta_plus']
+            # laps_y_axis_label = 'Lap-averaged Firing Rates (Hz)'
+            Laps_col_variable_names: List[str] = ['ThetaDeltaMinus_ratio_participating_epochs', 'ThetaDeltaPlus_ratio_participating_epochs']
+            laps_y_axis_label = 'Fraction of Participating Lap Epochs'
+
+            # PBE_col_variable_names: List[str] = ['replay_delta_minus', 'replay_delta_plus']
+            # pbe_y_axis_label = 'PBE-averaged Firing Rates (Hz)'
             PBE_col_variable_names: List[str] = ['ReplayDeltaMinus_ratio_participating_epochs', 'ReplayDeltaPlus_ratio_participating_epochs']
+            pbe_y_axis_label = 'Fraction of Participating PBE Epochs'
 
 
             # fig2_export_folder = Path(r"E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/2025-06-06 - EXPORTS FOR PUBLICATION/Figure 2 - XxC Bar").resolve()
@@ -318,14 +326,17 @@ class InstantaneousFiringRatesDataframeAccessor():
             assert active_set_cell_groups_column_name in across_session_inst_fr_computation_df
 
             ## Publication
-            fig2_kwargs = dict(save_figure=True, enable_tiny_point_labels=False, enable_hover_labels=False, write_vector_format=True, prepare_for_publication=True, include_non_XdC_cells_as_inset=True) ## Publication
+            fig2_kwargs = dict(save_figure=True, enable_tiny_point_labels=False, enable_hover_labels=False, write_vector_format=True, prepare_for_publication=True, include_non_XdC_cells_as_inset=True,
+                               laps_y_axis_label=laps_y_axis_label, pbe_y_axis_label=pbe_y_axis_label) ## Publication
 
             ## Debugging
-            # fig2_kwargs = dict(save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=True, write_vector_format=False, prepare_for_publication=False, include_non_XdC_cells_as_inset=True) ## Debugging
+            # fig2_kwargs = dict(save_figure=False, enable_tiny_point_labels=False, enable_hover_labels=True, write_vector_format=False, prepare_for_publication=False, include_non_XdC_cells_as_inset=True,
+            #                    laps_y_axis_label=laps_y_axis_label, pbe_y_axis_label=pbe_y_axis_label) ## Debugging
 
             num_sessions: int = active_across_session_inst_fr_computation_df['session_uid'].nunique(dropna=True)
             across_session_inst_fr_computation_shell_obj, visualization_df = InstantaneousFiringRatesDataframeAccessor.build_shell_object_for_plot(loaded_result_df=active_across_session_inst_fr_computation_df,
-                                                                                                                                                    active_set_cell_groups_column_name=active_set_cell_groups_column_name, PBE_col_variable_names=PBE_col_variable_names,
+                                                                                                                                                    active_set_cell_groups_column_name=active_set_cell_groups_column_name,
+                                                                                                                                                    Laps_col_variable_names=Laps_col_variable_names, PBE_col_variable_names=PBE_col_variable_names,
                                                                                                                                                     include_non_XdC_cells_as_inset=fig2_kwargs.get('include_non_XdC_cells_as_inset', False))
             # Perform the actual plotting:
             fig2_ctxt, fig2, _fig_2_output_dict = AcrossSessionsVisualizations.across_sessions_bar_graphs(across_session_inst_fr_computation_shell_obj, num_sessions=num_sessions, **fig2_kwargs) # fig2_export_folder
@@ -409,15 +420,22 @@ class InstantaneousFiringRatesDataframeAccessor():
         # SxC_scatter_props = [{} for a_color, a_marker in zip(SxC_df['color'], SxC_df['marker'])]
 
         ## Convert back to `InstantaneousSpikeRateGroupsComputation`'s language:
-        Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['lap_delta_minus'].values, LxC_df['lap_delta_plus'].values, SxC_df['lap_delta_minus'].values, SxC_df['lap_delta_plus'].values)]
-        
+        if Laps_col_variable_names is None:
+            Laps_col_variable_names = ['lap_delta_minus', 'lap_delta_plus']
+
+        assert len(Laps_col_variable_names) == 2, f'len(Laps_col_variable_names) must be 2, but is {len(Laps_col_variable_names)}'
+        Laps_delta_minus_col_name: str = Laps_col_variable_names[0]
+        Laps_delta_plus_col_name: str = Laps_col_variable_names[1]
+
+        Fig2_Laps_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df[Laps_delta_minus_col_name].values, LxC_df[Laps_delta_plus_col_name].values, SxC_df[Laps_delta_minus_col_name].values, SxC_df[Laps_delta_plus_col_name].values)]
+
         if PBE_col_variable_names is None:
-            PBE_col_variable_names = ['replay_delta_minus', 'replay_delta_plus'] 
-            
+            PBE_col_variable_names = ['replay_delta_minus', 'replay_delta_plus']
+
         assert len(PBE_col_variable_names) == 2, f'len(PBE_col_variable_names) must be 2, but is {len(PBE_col_variable_names)}'
         PBE_delta_minus_col_name: str = PBE_col_variable_names[0]
         PBE_delta_plus_col_name: str = PBE_col_variable_names[1]
-        
+
         Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df[PBE_delta_minus_col_name].values, LxC_df[PBE_delta_plus_col_name].values, SxC_df[PBE_delta_minus_col_name].values, SxC_df[PBE_delta_plus_col_name].values)]
 
         # Fig2_Replay_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, LxC_aclus, SxC_aclus, LxC_scatter_props, SxC_scatter_props) for v in (LxC_df['replay_delta_minus'].values, LxC_df['replay_delta_plus'].values, SxC_df['replay_delta_minus'].values, SxC_df['replay_delta_plus'].values)]
@@ -441,7 +459,7 @@ class InstantaneousFiringRatesDataframeAccessor():
             AnyC_scatter_props = [{'alpha': 0.35, 'edgecolors': 'gray', 'linewidths': 0.5, 'marker': a_marker} for a_color, a_marker in zip(AnyC_df['color'], AnyC_df['marker'])] if len(AnyC_df) > 0 else []
 
             if len(AnyC_df) > 0:
-                Fig2_Laps_AnyC_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, AnyC_aclus, AnyC_aclus, AnyC_scatter_props, AnyC_scatter_props) for v in (AnyC_df['lap_delta_minus'].values, AnyC_df['lap_delta_plus'].values)]
+                Fig2_Laps_AnyC_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, AnyC_aclus, AnyC_aclus, AnyC_scatter_props, AnyC_scatter_props) for v in (AnyC_df[Laps_delta_minus_col_name].values, AnyC_df[Laps_delta_plus_col_name].values)]
                 Fig2_Replay_AnyC_FR: list[SingleBarResult] = [SingleBarResult(v.mean(), v.std(), v, AnyC_aclus, AnyC_aclus, AnyC_scatter_props, AnyC_scatter_props) for v in (AnyC_df[PBE_delta_minus_col_name].values, AnyC_df[PBE_delta_plus_col_name].values)]
             else:
                 empty_vals = np.array([], dtype=float)

@@ -1011,7 +1011,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
     
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False) -> str:
+    def _metric_name_from_ylabel(cls, ylabel: str) -> str:
+        """ Derive the flexitext title metric phrase from the y-axis label. """
+        ylabel_lower: str = str(ylabel).lower()
+        if 'participat' in ylabel_lower:
+            return 'Participation Fractions'
+        if 'firing rate' in ylabel_lower:
+            return 'Firing Rates'
+        return 'Firing Rates'
+
+
+    @classmethod
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates') -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
         if not prepare_for_publication:
@@ -1021,7 +1032,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             title_font_size: int = 9*2
             subtitle_font_size: int = 7*2
 
-        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> Firing Rates\n"
+        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> {metric_name}\n"
                 f"<size:{subtitle_font_size}>for the "
                 "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track</></>"
                 )
@@ -1082,9 +1093,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
-        
+
+        metric_name: str = cls._metric_name_from_ylabel(ylabel)
         title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
@@ -1224,7 +1236,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
 
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Lap-averaged Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+        laps_y_axis_label: str = kwargs.get('laps_y_axis_label', 'Lap-averaged Firing Rates (Hz)')
+
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, laps_y_axis_label, 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     # @providing_context(fig='F2', frs='Replay')
     @classmethod
