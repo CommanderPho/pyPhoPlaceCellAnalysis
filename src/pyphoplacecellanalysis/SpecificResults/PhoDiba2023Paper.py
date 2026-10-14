@@ -5400,6 +5400,13 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 @metadata_attributes(short_name=None, tags=['LdC', 'Long/Short', 'SdC', 'PostDelta', 'figure2'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-14 15:34', related_items=[])
 class Figure2Extended:
     """
+
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure2Extended
+
+    ## INPUTS: across_session_inst_fr_computation_dict
+    summary_df, session_activity_dict = Figure2Extended.main(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+    summary_df
+
     """
     @classmethod
     def compute_delta_plus_LdC_result(cls, a_specific_spikeratetrends_result: SpikeRateTrends, curr_sess_pbe: pd.DataFrame, curr_session_context: IdentifyingContext, debug_print=False):
