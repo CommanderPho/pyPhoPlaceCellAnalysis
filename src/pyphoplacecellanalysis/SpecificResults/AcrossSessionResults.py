@@ -4058,6 +4058,8 @@ class AcrossSessionsVisualizations:
                                                                          short_col_names:List[str]=['short_non_replay_mean', 'short_replay_mean'], **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
+        Uses: 'active_set_membership_from_user_annotations' to color LxC/SxC (LdC/SdC) point edges like across_sessions_firing_rate_index_figure
+
         Based off of `pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions._plot_session_long_short_track_firing_rate_figures`
 
 
@@ -4086,16 +4088,30 @@ class AcrossSessionsVisualizations:
         common_scatter_kwargs = dict(point_colors='#33333333', defer_render=True) | kwargs
         
         ## Long Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=long_col_names, inplace=False)
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=long_col_names, inplace=False).copy()
+        # same defaults/colors as across_sessions_firing_rate_index_figure (LdC/SdC = LxC/SxC edge emphasis)
+        neuron_replay_stats_df['point_colors'] = '#33333333'
+        neuron_replay_stats_df['edgecolors'] = '#33333300'
+        if 'active_set_membership_from_user_annotations' in neuron_replay_stats_df:
+            neuron_replay_stats_df.loc[neuron_replay_stats_df['active_set_membership_from_user_annotations'] == 'LxC', 'edgecolors'] = '#0000B3'
+            neuron_replay_stats_df.loc[neuron_replay_stats_df['active_set_membership_from_user_annotations'] == 'SxC', 'edgecolors'] = '#9C0000'
+        track_scatter_kwargs = common_scatter_kwargs | dict(point_colors=neuron_replay_stats_df['point_colors'].to_numpy(), edgecolors=neuron_replay_stats_df['edgecolors'].to_numpy(), zorder=5)
         x_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[0]].items()} 
         y_frs = {k:v for k,v in neuron_replay_stats_df[long_col_names[1]].items()}
-        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
+        fig_L, ax_L, active_display_context_L = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='long'), prepare_for_publication=prepare_for_publication, **track_scatter_kwargs)
 
         ## Short Track Replay|Laps FR Figure
-        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=short_col_names, inplace=False)
+        neuron_replay_stats_df = neuron_replay_stats_table.dropna(subset=short_col_names, inplace=False).copy()
+        # same defaults/colors as across_sessions_firing_rate_index_figure (LdC/SdC = LxC/SxC edge emphasis)
+        neuron_replay_stats_df['point_colors'] = '#33333333'
+        neuron_replay_stats_df['edgecolors'] = '#33333300'
+        if 'active_set_membership_from_user_annotations' in neuron_replay_stats_df:
+            neuron_replay_stats_df.loc[neuron_replay_stats_df['active_set_membership_from_user_annotations'] == 'LxC', 'edgecolors'] = '#0000B3'
+            neuron_replay_stats_df.loc[neuron_replay_stats_df['active_set_membership_from_user_annotations'] == 'SxC', 'edgecolors'] = '#9C0000'
+        track_scatter_kwargs = common_scatter_kwargs | dict(point_colors=neuron_replay_stats_df['point_colors'].to_numpy(), edgecolors=neuron_replay_stats_df['edgecolors'].to_numpy(), zorder=5)
         x_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[0]].items()} 
         y_frs = {k:v for k,v in neuron_replay_stats_df[short_col_names[1]].items()}
-        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), prepare_for_publication=prepare_for_publication, **common_scatter_kwargs)
+        fig_S, ax_S, active_display_context_S = _plot_single_track_firing_rate_compare(x_frs, y_frs, active_context=final_context.adding_context_if_missing(filter_name='short'), prepare_for_publication=prepare_for_publication, **track_scatter_kwargs)
 
         ## Fit both the axes:
         fit_both_axes(ax_L, ax_S)
