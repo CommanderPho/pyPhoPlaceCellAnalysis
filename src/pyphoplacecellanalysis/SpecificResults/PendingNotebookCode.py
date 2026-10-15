@@ -13003,7 +13003,7 @@ class MeasuredVsDecodedOccupancy:
     """
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df, track_templates, figure_title='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, track_templates: TrackTemplates, figure_title: str='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, **kwargs):
         """ analyze and plot
 
         
@@ -13037,7 +13037,7 @@ class MeasuredVsDecodedOccupancy:
 
         """
         ## INPUTS: best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df
-
+        decoding_time_bin_size: int = a_result.decoding_time_bin_size
         
         is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
         # a_decoded_marginal_posterior_df['is_post_delta'] = is_post_delta
@@ -13060,6 +13060,7 @@ class MeasuredVsDecodedOccupancy:
         # ==================================================================================================================================================================================================================================================================================== #
         # Plotting                                                                                                                                                                                                                                                                             #
         # ==================================================================================================================================================================================================================================================================================== #
+        plot_meas_vs_decoded_kwargs = dict(time_bin_size=decoding_time_bin_size, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured)
 
         # for k, a_result in pre_post_delta_result_dict.items():
         if plot_in_same_figure:
@@ -13087,7 +13088,7 @@ class MeasuredVsDecodedOccupancy:
                 # np.shape(a_timebins_p_x_given_n)
                 # ax = ax_dict[a_pre_post_delta_name]  # Get the appropriate subplot axis
                 active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
-                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, **kwargs)
+                cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, **plot_meas_vs_decoded_kwargs, **kwargs)
                 # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
 
             plt.suptitle(f'{figure_title}')  # Set overall figure title
@@ -13099,7 +13100,7 @@ class MeasuredVsDecodedOccupancy:
                 if debug_print:
                     print(f'k: {a_pre_post_delta_name}')
                 # np.shape(a_timebins_p_x_given_n)
-                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, should_max_normalize=should_max_normalize, debug_print=debug_print, skip_plotting_measured=skip_plotting_measured, **kwargs)
+                fig, ax_dict = cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, num=f'{figure_title} - {a_pre_post_delta_name} - plot_meas_vs_decoded_occupancy', a_pre_post_delta_name=a_pre_post_delta_name, **plot_meas_vs_decoded_kwargs, **kwargs)
                 plt.suptitle(f'{figure_title} - {a_pre_post_delta_name}')
                 all_figs.append((fig, ax_dict))
             return all_figs
@@ -13107,7 +13108,9 @@ class MeasuredVsDecodedOccupancy:
 
 
     @classmethod
-    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, **kwargs):
+    def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates: TrackTemplates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, 
+            time_bin_size: Optional[float]=0.075, debug_print=False, **kwargs,
+        ):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
         
@@ -13121,10 +13124,46 @@ class MeasuredVsDecodedOccupancy:
 
         # n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten()
         # timebins_p_x_given_n.shape
+        n_x_bins, n_decoders, n_t_bins = np.shape(timebins_p_x_given_n)
+        is_nan_t_bins = np.all(np.isnan(timebins_p_x_given_n), axis=(0, 1))
+        n_nan_t_bins: int = np.sum(is_nan_t_bins) # 1724
+        n_valid_t_bins: int = np.sum(~is_nan_t_bins) # 3723
+        timebins_p_x_given_n = timebins_p_x_given_n[:, :, ~is_nan_t_bins] # np.shape(...): (n_x_bins, 4, n_valid_t_bins)
+        timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n) # np.shape(...): (n_x_bins, 4, n_valid_t_bins)
 
-        timebins_p_x_given_n = np.nan_to_num(timebins_p_x_given_n)
-        timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders)
-        timebins_p_x_given_n_occupancy.shape
+        assert np.all(np.isclose(np.nansum(timebins_p_x_given_n, axis=(0, 1)), 1.0)), f"normalization sanity check failed! np.nansum(timebins_p_x_given_n, axis=(0, 1)): {np.nansum(timebins_p_x_given_n, axis=(0, 1))}"
+
+        most_likely_decoder_idxs = np.argmax(np.nansum(timebins_p_x_given_n, axis=0), axis=0) # (n_valid_t_bins, )
+
+        timebins_p_x_given_n_occupancy = []
+        for i in np.arange(n_decoders):
+            decoder_is_most_likely_t_bins = np.where(most_likely_decoder_idxs == i)[0]
+            n_t_bins_where_decoder_is_most_likely: int = len(decoder_is_most_likely_t_bins)
+            decoder_is_most_likely_timebins_p_x_given_n = timebins_p_x_given_n[:, i, decoder_is_most_likely_t_bins] # (n_pos, n_t_bins_where_decoder_is_most_likely)
+            ## marginalize
+            decoder_is_most_likely_timebins_p_x_given_n = decoder_is_most_likely_timebins_p_x_given_n / np.nansum(decoder_is_most_likely_timebins_p_x_given_n, axis=0, keepdims=True) ## sum over positions to normalize
+            
+            decoder_is_most_likely_timebins_p_x_given_n_occupancy = np.nansum(decoder_is_most_likely_timebins_p_x_given_n, axis=1) # (n_pos,) - note this adds up to 1.0 for each time bins, so result is arbitrary and not normalized, but can multiply by dt to get seconds
+            if time_bin_size is not None:
+                decoder_is_most_likely_timebins_p_x_given_n_occupancy_seconds = decoder_is_most_likely_timebins_p_x_given_n_occupancy * float(time_bin_size)
+                timebins_p_x_given_n_occupancy.append(decoder_is_most_likely_timebins_p_x_given_n_occupancy_seconds)   
+            else:
+                timebins_p_x_given_n_occupancy.append(decoder_is_most_likely_timebins_p_x_given_n_occupancy)
+
+            if debug_print:
+                print(f'decoder[{i}]:\n\tn_t_bins_where_decoder_is_most_likely: {n_t_bins_where_decoder_is_most_likely}\n\tnp.shape(decoder_is_most_likely_timebins_p_x_given_n_occupancy): {np.shape(decoder_is_most_likely_timebins_p_x_given_n_occupancy)}')
+
+
+        ## timebins_p_x_given_n_occupancy
+        timebins_p_x_given_n_occupancy = np.vstack(timebins_p_x_given_n_occupancy).T # (n_pos, n_decoders) - note this is in seconds for each decoder if time_bin_size is not None, otherwise in n_t_bins
+
+        # timebins_p_x_given_n_occupancy = np.nansum(timebins_p_x_given_n, axis=2) # (n_pos, n_decoders) - note this adds up to 1.0 for each time bins, so result is arbitrary and not normalized
+        # timebins_p_x_given_n_occupancy.shape
+
+        # marginalized_decoder_p_x_given_n_occupancy = [(timebins_p_x_given_n_occupancy[:, i] / np.nansum(timebins_p_x_given_n_occupancy[:, i])) for i in np.arange(n_decoders)] ## separate marginal for each decoder
+        # most_likely_decoder_only_marginalized_p_x_given_n_occupancy = np.vstack(marginalized_decoder_p_x_given_n_occupancy)  # np.vstack(marginalized_decoder_p_x_given_n_occupancy).shape: (n_decoders, n_x_bins)
+        
+        # timebins_p_x_given_n_normalized_occupancy = timebins_p_x_given_n_occupancy / np.sum(timebins_p_x_given_n_occupancy)
 
         ## sum over all positions to get the scalar per decoder
         scalar_likelihood_per_decoder = np.nansum(timebins_p_x_given_n_occupancy, axis=0) # (n_decoders,)
