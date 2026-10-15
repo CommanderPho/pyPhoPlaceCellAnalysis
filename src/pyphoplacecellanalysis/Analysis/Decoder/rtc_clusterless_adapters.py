@@ -172,7 +172,7 @@ def _pfnd_speed_filtered_training_intervals(pf: PfND, position_df: Optional[pd.D
         epochs_df = deepcopy(pf.epochs.to_dataframe())
     else:
         epochs_df = pd.DataFrame({'start': [float(pf.position.t_start)], 'stop': [float(pf.position.t_stop)], 'label': [0], 'duration': [float(pf.position.t_stop - pf.position.t_start)]})
-    speed_filtered_epochs_df = PfND.filtered_by_speed(epochs_df, position_df=position_df, speed_thresh=pf.config.speed_thresh, speed_column_override_name=speed_column_name, debug_print=False)
+    speed_filtered_epochs_df = PfND.filtered_by_speed(epochs_df, position_df=position_df, minimum_speed_thresh=pf.config.speed_thresh, speed_column_override_name=speed_column_name, debug_print=False)
     if speed_filtered_epochs_df is None or len(speed_filtered_epochs_df) == 0:
         return np.empty((0, 2), dtype=float)
     return speed_filtered_epochs_df[['start', 'stop']].to_numpy(dtype=float)
