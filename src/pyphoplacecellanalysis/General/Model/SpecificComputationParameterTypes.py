@@ -373,8 +373,10 @@ class directional_decoders_evaluate_epochs_Parameters(HDF_SerializationMixin, At
     """ Docstring for directional_decoders_evaluate_epochs_Parameters. 
     """
     should_skip_radon_transform: bool = serialized_attribute_field(default=False)
+    n_jobs: int = serialized_attribute_field(default=6)
     ## PARAMS - these are class properties
     should_skip_radon_transform_PARAM = param.Boolean(default=False, doc='should_skip_radon_transform param', label='should_skip_radon_transform')
+    n_jobs_PARAM = param.Integer(default=6, doc='n_jobs for radon transform parallel computation', label='n_jobs')
     # HDFMixin Conformances ______________________________________________________________________________________________ #
     def to_hdf(self, file_path, key: str, **kwargs):
         """ Saves the object to key in the hdf5 file specified by file_path"""

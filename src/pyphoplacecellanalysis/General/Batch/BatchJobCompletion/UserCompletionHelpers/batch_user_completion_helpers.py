@@ -736,6 +736,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
 def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
                                                ripple_decoding_time_bin_size_override: Optional[float]=None, laps_decoding_time_bin_size_override: Optional[float]=None,
                                                 needs_recompute_heuristics: bool = False, force_recompute_all_decoding: bool = False,
+                                                should_skip_radon_transform: bool = False, n_jobs: int = 6,
                                                 save_hdf:bool=True, allow_append_to_session_h5_file:bool=True, max_ignore_bins: float = 2, same_thresh_cm: float = 10.7, max_jump_distance_cm: float = 60.0) -> dict:
     """
     Aims to export the results of the global 'directional_decoders_evaluate_epochs' calculation
@@ -892,7 +893,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
         # 'DirectionalDecodersEpochsEvaluations': `directional_decoders_evaluate_epochs`
         global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
         curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs'], # ,  'directional_decoders_epoch_heuristic_scoring'
-                        computation_kwargs_list=[{'should_skip_radon_transform': False}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+                        computation_kwargs_list=[{'should_skip_radon_transform': should_skip_radon_transform, 'n_jobs': n_jobs}], enabled_filter_names=None, fail_on_exception=True, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
         needs_recompute_heuristics = True
         
         ## gets the newly computed value

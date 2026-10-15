@@ -195,7 +195,8 @@ class BatchCompletionHelpers:
 	@classmethod
 	def overwrite_replay_epochs_and_recompute(cls, curr_active_pipeline, new_replay_epochs: Epoch, ripple_decoding_time_bin_size: float = 0.025, 
 											num_wcorr_shuffles: int=25, fail_on_exception=True,
-											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = True, user_completion_dummy=None, drop_previous_result_and_compute_fresh:bool=True):
+											enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=False, enable_save_h5: bool = True, user_completion_dummy=None, drop_previous_result_and_compute_fresh:bool=True,
+											should_skip_radon_transform: bool = False, n_jobs: int = 6):
 		""" Recomputes the replay epochs using a custom implementation of the criteria in Diba 2007.
 
 		, included_qclu_values=[1,2], minimum_inclusion_fr_Hz=5.0
@@ -306,7 +307,7 @@ class BatchCompletionHelpers:
 			global_dropped_keys, local_dropped_keys = curr_active_pipeline.perform_drop_computed_result(computed_data_keys_to_drop=['DirectionalDecodersEpochsEvaluations'], debug_print=True)
 
 			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['directional_decoders_evaluate_epochs',  'directional_decoders_epoch_heuristic_scoring'],
-							computation_kwargs_list=[{'should_skip_radon_transform': False}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
+							computation_kwargs_list=[{'should_skip_radon_transform': should_skip_radon_transform, 'n_jobs': n_jobs}, {}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False) # 'laps_decoding_time_bin_size': None prevents laps recomputation
 			
 			## Export these new computations to .csv for across-session analysis:
 			# Uses `perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function` to compute the new outputs:

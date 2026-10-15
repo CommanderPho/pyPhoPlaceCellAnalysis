@@ -7930,7 +7930,7 @@ def _subfn_compute_complete_df_metrics(directional_merged_decoders_result: "Dire
 #TODO 2024-07-03 17:17: - [ ] NOT YET FINISHED
 @function_attributes(short_name=None, tags=['NOT_YET_FINISHED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-03 17:18', related_items=[])
 def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates, new_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
-                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False, suppress_exceptions: bool=False):
+                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False, suppress_exceptions: bool=False, n_jobs: int = 6):
     """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
     
     spikes_df is needed for Simple Correlation Score calculation.
@@ -7963,7 +7963,7 @@ def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_r
         for a_name, a_decoder in track_templates.get_decoders_dict().items():
             decoder_ripple_radon_transform_df_dict[a_name], decoder_ripple_radon_transform_extras_dict[a_name] = _subfn_compute_arbitrary_epoch_decoding_radon_transform_for_decoder(a_directional_pf1D_Decoder=a_decoder, a_directional_arbitrary_filter_epochs_decoder_result=new_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                     nlines=8192, margin=4.0,
-                                                                                                                                                                                    n_jobs=6)
+                                                                                                                                                                                    n_jobs=n_jobs)
             
         # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
         # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
@@ -8036,7 +8036,7 @@ def _compute_arbitrary_epochs_all_df_score_metrics(directional_merged_decoders_r
  used_by=['_decode_and_evaluate_epochs_using_directional_decoders', 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function'], creation_date='2024-02-15 19:55', related_items=[])
 def _compute_all_df_score_metrics(directional_merged_decoders_result: "DirectionalPseudo2DDecodersResult", track_templates,
                                    decoder_laps_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], decoder_ripple_filter_epochs_decoder_result_dict: Dict[str, Optional[DecodedFilterEpochsResult]],
-                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False, suppress_exceptions: bool=False):
+                                   spikes_df: pd.DataFrame, should_skip_radon_transform=False, suppress_exceptions: bool=False, n_jobs: int = 6):
     """ computes for all score metrics (Radon Transform, WCorr, PearsonR) and adds them appropriately. 
     
     spikes_df is needed for Simple Correlation Score calculation.
@@ -8072,7 +8072,7 @@ def _compute_all_df_score_metrics(directional_merged_decoders_result: "Direction
                                                                                                                                                                                                                                                                             a_directional_laps_filter_epochs_decoder_result=decoder_laps_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             a_directional_ripple_filter_epochs_decoder_result=decoder_ripple_filter_epochs_decoder_result_dict[a_name],
                                                                                                                                                                                                                                                                             nlines=8192, margin=4.0,
-                                                                                                                                                                                                                                                                            n_jobs=6)
+                                                                                                                                                                                                                                                                            n_jobs=n_jobs)
             
         # 6m 19.7s - nlines=8192, margin=16, n_jobs=1
         # 17m 57.6s - nlines=24000, margin=16, n_jobs=1
@@ -8706,7 +8706,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
                          requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders'], provides_global_keys=['DirectionalDecodersEpochsEvaluations'],
                          validate_computation_test=_workaround_validate_has_directional_decoded_epochs_evaluations,
                         is_global=True, computation_precidence=(1002.1))
-    def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False):
+    def _decode_and_evaluate_epochs_using_directional_decoders(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, should_skip_radon_transform=False, n_jobs: int = 6):
         """ Using the four 1D decoders, performs 1D Bayesian decoding for each of the known epochs (Laps, Ripple) from the neural activity during these peirods.
         
         Requires:
@@ -8792,7 +8792,7 @@ class DirectionalPlacefieldGlobalComputationFunctions(AllFunctionEnumeratingMixi
         (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict), merged_df_outputs_tuple, raw_dict_outputs_tuple = _compute_all_df_score_metrics(directional_merged_decoders_result, track_templates,
                                                                                                                                                                                             decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict,
                                                                                                                                                                                             spikes_df=deepcopy(owning_pipeline_reference.sess.spikes_df),
-                                                                                                                                                                                            should_skip_radon_transform=should_skip_radon_transform, suppress_exceptions=False)
+                                                                                                                                                                                            should_skip_radon_transform=should_skip_radon_transform, suppress_exceptions=False, n_jobs=n_jobs)
         laps_radon_transform_merged_df, ripple_radon_transform_merged_df, laps_weighted_corr_merged_df, ripple_weighted_corr_merged_df, laps_simple_pf_pearson_merged_df, ripple_simple_pf_pearson_merged_df = merged_df_outputs_tuple
         decoder_laps_radon_transform_df_dict, decoder_ripple_radon_transform_df_dict, decoder_laps_radon_transform_extras_dict, decoder_ripple_radon_transform_extras_dict, decoder_laps_weighted_corr_df_dict, decoder_ripple_weighted_corr_df_dict = raw_dict_outputs_tuple
 
