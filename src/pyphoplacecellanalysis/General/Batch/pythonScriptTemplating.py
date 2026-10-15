@@ -1,7 +1,9 @@
 import sys
 import os
 import re
+import json
 import platform
+import subprocess
 import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
 from datetime import datetime, timedelta
@@ -9,7 +11,7 @@ import pathlib
 from pathlib import Path
 import attrs
 from attrs import define, field, Factory
-from typing import List, Dict, Optional, Tuple, Union, Callable
+from typing import Any, List, Dict, Optional, Tuple, Union, Callable
 # import numpy as np
 # import pandas as pd
 # from attrs import define, field, Factory
@@ -391,6 +393,199 @@ def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], j
     raw_name = short_session if not compact_suffix else f"{short_session}_{compact_suffix}"
     safe_name = re.sub(r'[\[\],\s]+', '-', raw_name).strip('-')
     return safe_name[:max_length]
+
+
+def _session_key_str(curr_session_context: Union[IdentifyingContext, str]) -> str:
+    if isinstance(curr_session_context, IdentifyingContext):
+        return curr_session_context.get_description()
+    return str(curr_session_context)
+
+
+def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
+    """Submit one Slurm script via `sbatch --parsable` and return the job id."""
+    script_path = Path(slurm_script_path)
+    result = subprocess.run(['sbatch', '--parsable', str(script_path)], check=True, capture_output=True, text=True)
+    job_id_str = result.stdout.strip().split(';')[0].strip()
+    if not job_id_str.isdigit():
+        raise RuntimeError(f"Could not parse sbatch job ID from stdout={result.stdout!r} stderr={result.stderr!r}")
+    job_id = int(job_id_str)
+    print(f"Submitted job {job_id}: {script_path}")
+    return job_id
+
+
+def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCollection'], script_kind: str = 'run') -> Dict[str, Dict[str, str]]:
+    """Align per-phase BatchScriptsCollection run/fig Slurm paths by session.
+
+    phase_collections: mapping phase_name -> BatchScriptsCollection from generate_batch_single_session_scripts.
+    Returns: session_key -> {phase_name: slurm_script_path_str}
+    """
+    session_phase_scripts: Dict[str, Dict[str, str]] = {}
+    for phase_name, collection in phase_collections.items():
+        contexts = list(collection.included_session_contexts or [])
+        slurm_paths = list((collection.output_slurm_scripts or {}).get(script_kind, []) or [])
+        if len(contexts) != len(slurm_paths):
+            raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len(output_slurm_scripts[{script_kind!r}])={len(slurm_paths)}")
+        for ctx, slurm_path in zip(contexts, slurm_paths):
+            session_key = _session_key_str(ctx)
+            session_phase_scripts.setdefault(session_key, {})[phase_name] = str(Path(slurm_path))
+        ## END for ctx, slurm_path in zip(contexts, slurm_paths)...
+    ## END for phase_name, collection in phase_collections.items()...
+    return session_phase_scripts
+
+
+def _bash_sbatch_chain_lines(phase_script_paths: List[Tuple[str, str]], indent: str = '  ') -> List[str]:
+    """Build bash lines that sbatch a phase chain with afterok dependencies. phase_script_paths: [(phase_name, path), ...]."""
+    if len(phase_script_paths) == 0:
+        return []
+    lines: List[str] = []
+    first_phase, first_path = phase_script_paths[0]
+    lines.append(f"{indent}echo \"Submitting {first_phase}: {first_path}\"")
+    lines.append(f"{indent}jid=$(sbatch --parsable '{first_path}')")
+    lines.append(f"{indent}echo \"  job $jid ({first_phase})\"")
+    for phase_name, script_path in phase_script_paths[1:]:
+        lines.append(f"{indent}echo \"Submitting {phase_name} afterok:$jid: {script_path}\"")
+        lines.append(f"{indent}jid=$(sbatch --parsable --dependency=afterok:$jid '{script_path}')")
+        lines.append(f"{indent}echo \"  job $jid ({phase_name})\"")
+    ## END for phase_name, script_path in phase_script_paths[1:]...
+    return lines
+
+
+def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]], out_path: Union[str, Path], phases_ordered: List[str],
+                                manifest_path: Optional[Union[str, Path]] = None, batch_date_to_use: Optional[str] = None) -> Tuple[Path, Path]:
+    """Write a bash script that submits per-session afterok phase chains, plus a JSON manifest of script paths.
+
+    Returns (submit_script_path, manifest_path).
+    """
+    out_path = Path(out_path)
+    if manifest_path is None:
+        manifest_path = out_path.with_suffix('.json')
+    else:
+        manifest_path = Path(manifest_path)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    bash_lines: List[str] = [
+        '#!/bin/bash',
+        '# Per-session Slurm phase chains (dependency=afterok).',
+        '# A failed phase cancels only that session\'s later phases; earlier successful pickles are kept.',
+        '# Retry a failed phase with write_retry_from_phase_script(...) / retry_from_*.sh — do not re-run completed earlier phases.',
+        'set -euo pipefail',
+        '',
+    ]
+    if batch_date_to_use:
+        bash_lines.append(f'# batch: {batch_date_to_use}')
+        bash_lines.append('')
+
+    for session_key, phase_paths in session_phase_scripts.items():
+        ordered: List[Tuple[str, str]] = []
+        for phase_name in phases_ordered:
+            if phase_name not in phase_paths:
+                continue
+            ordered.append((phase_name, phase_paths[phase_name]))
+        ## END for phase_name in phases_ordered...
+        if len(ordered) == 0:
+            continue
+        bash_lines.append(f'echo "=== session: {session_key} ==="')
+        bash_lines.extend(_bash_sbatch_chain_lines(ordered, indent=''))
+        bash_lines.append('')
+    ## END for session_key, phase_paths in session_phase_scripts.items()...
+
+    bash_lines.append('echo "All session phase chains submitted."')
+    out_path.write_text('\n'.join(bash_lines) + '\n', encoding='utf-8')
+    try:
+        out_path.chmod(out_path.stat().st_mode | 0o111)
+    except OSError:
+        pass
+
+    manifest: Dict[str, Any] = {
+        'batch_date_to_use': batch_date_to_use,
+        'phases_ordered': list(phases_ordered),
+        'sessions': session_phase_scripts,
+        'submit_script': str(out_path),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    print(f'Wrote chained submit script: {out_path}')
+    print(f'Wrote phase-chain manifest: {manifest_path}')
+    return out_path, manifest_path
+
+
+def write_retry_from_phase_script(manifest: Union[Dict[str, Any], str, Path], session_key: str, start_phase: str,
+                                  out_path: Union[str, Path], phases_ordered: Optional[List[str]] = None) -> Path:
+    """Write a bash script that re-chains from start_phase onward for one session (skips completed earlier phases)."""
+    if isinstance(manifest, (str, Path)):
+        with open(manifest, 'r', encoding='utf-8') as f:
+            manifest = json.load(f)
+    sessions = manifest.get('sessions', {})
+    if session_key not in sessions:
+        raise KeyError(f"session_key={session_key!r} not in manifest sessions ({list(sessions.keys())})")
+    phase_paths = sessions[session_key]
+    if phases_ordered is None:
+        phases_ordered = list(manifest.get('phases_ordered') or [])
+    if start_phase not in phases_ordered:
+        raise ValueError(f"start_phase={start_phase!r} not in phases_ordered={phases_ordered}")
+    start_idx = phases_ordered.index(start_phase)
+    remaining = phases_ordered[start_idx:]
+    ordered: List[Tuple[str, str]] = []
+    for phase_name in remaining:
+        if phase_name not in phase_paths:
+            continue
+        ordered.append((phase_name, phase_paths[phase_name]))
+    ## END for phase_name in remaining...
+    if len(ordered) == 0:
+        raise ValueError(f"No scripts found for session={session_key!r} from phase={start_phase!r}")
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    bash_lines: List[str] = [
+        '#!/bin/bash',
+        f'# Retry session {session_key} from phase {start_phase} (afterok chain).',
+        '# Earlier phases are intentionally not re-submitted; their pickles remain on disk.',
+        'set -euo pipefail',
+        '',
+        f'echo "=== retry session: {session_key} from {start_phase} ==="',
+    ]
+    bash_lines.extend(_bash_sbatch_chain_lines(ordered, indent=''))
+    bash_lines.append('echo "Retry chain submitted."')
+    out_path.write_text('\n'.join(bash_lines) + '\n', encoding='utf-8')
+    try:
+        out_path.chmod(out_path.stat().st_mode | 0o111)
+    except OSError:
+        pass
+    print(f'Wrote retry script: {out_path}')
+    return out_path
+
+
+def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path], start_phase: str,
+                                       out_dir: Union[str, Path], phases_ordered: Optional[List[str]] = None) -> List[Path]:
+    """Write one retry_from_<start_phase>_<session>.sh per session under out_dir."""
+    if isinstance(manifest, (str, Path)):
+        manifest_path = Path(manifest)
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            manifest_dict = json.load(f)
+    else:
+        manifest_dict = manifest
+        manifest_path = None
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written: List[Path] = []
+    for session_key in (manifest_dict.get('sessions') or {}).keys():
+        safe_session = re.sub(r'[^A-Za-z0-9._-]+', '_', session_key)
+        retry_path = out_dir / f'retry_from_{start_phase}_{safe_session}.sh'
+        written.append(write_retry_from_phase_script(manifest_dict, session_key=session_key, start_phase=start_phase, out_path=retry_path, phases_ordered=phases_ordered))
+    ## END for session_key in (manifest_dict.get('sessions') or {}).keys()...
+    return written
+
+
+def print_chain_status_hint(job_ids: Optional[List[int]] = None) -> None:
+    """Print short sacct/squeue commands for monitoring chained phase jobs (no login-node poller)."""
+    print('Monitor chained phase jobs:')
+    print('  squeue -u $USER')
+    if job_ids:
+        job_id_str = ','.join(str(j) for j in job_ids)
+        print(f'  squeue -j {job_id_str}')
+        print(f'  sacct -j {job_id_str} --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
+    else:
+        print('  sacct -u $USER --starttime=now-2days --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
+    print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
