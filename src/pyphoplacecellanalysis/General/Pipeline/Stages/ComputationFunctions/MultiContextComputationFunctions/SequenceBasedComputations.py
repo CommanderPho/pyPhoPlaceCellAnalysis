@@ -184,6 +184,7 @@ class WCorrShuffle(ComputedResult):
     active_spikes_df: pd.DataFrame = serialized_field(default=Factory(pd.DataFrame), repr=False)
 
     real_decoder_ripple_weighted_corr_arr: NDArray = serialized_field(default=None, repr=False, metadata={'shape': ('n_epochs', 'n_decoders')})
+    real_decoder_ripple_filter_epochs_decoder_result_dict: Optional[DecodedEpochsResultsDict] = serialized_field(default=None, repr=False, metadata={'description': 'real (non-shuffled) ripple decode results for the same filtered epochs used by the shuffles; always retained (not gated by enable_saving_entire_decoded_shuffle_result).'})
 
     all_templates_decode_kwargs: Dict = non_serialized_field(default=Factory(dict), repr=False)
 
@@ -366,6 +367,7 @@ class WCorrShuffle(ComputedResult):
             filtered_epochs_df=replay_epochs_df, active_spikes_df=active_spikes_df,
             # alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, real_directional_merged_decoders_result=real_directional_merged_decoders_result,
             real_decoder_ripple_weighted_corr_arr=real_decoder_ripple_weighted_corr_arr,
+            real_decoder_ripple_filter_epochs_decoder_result_dict=real_decoder_ripple_filter_epochs_decoder_result_dict,
             all_templates_decode_kwargs=all_templates_decode_kwargs, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result) # output_extracted_result_wcorrs_list=[], 
 
 
@@ -1035,10 +1037,21 @@ class WCorrShuffle(ComputedResult):
 
     def save_data(self, filepath):
         """ saves the important results to pickle
-         
-          
-        2024-05-31_1015AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
-        2024-05-31_0900AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
+
+        Payload (5-tuple; older pickles may omit trailing elements):
+            (output_extracted_result_wcorrs_list,
+             real_decoder_ripple_weighted_corr_arr,
+             output_all_shuffles_decoded_results_list,
+             all_shuffles_wcorr_array,
+             real_decoder_ripple_filter_epochs_decoder_result_dict)
+
+        Older layouts:
+            3-tuple: (wcorrs_list, real_wcorr_arr, shuffle_decoded_list)
+            4-tuple: above + all_shuffles_wcorr_array
+
+        Examples:
+            2024-05-31_1015AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
+            2024-05-31_0900AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
@@ -1050,7 +1063,7 @@ class WCorrShuffle(ComputedResult):
         except (BaseException, AssertionError):
             all_shuffles_wcorr_array = []
 
-        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array))
+        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array, self.real_decoder_ripple_filter_epochs_decoder_result_dict))
         
 
     def save_data_mat(self, filepath, **additional_mat_elements):
@@ -1103,6 +1116,9 @@ class WCorrShuffle(ComputedResult):
             self.output_extracted_result_wcorrs_list.extend(loaded_output_extracted_result_wcorrs_list)
             if self.enable_saving_entire_decoded_shuffle_result:
                 self.output_all_shuffles_decoded_results_list.extend(loaded_output_all_shuffles_decoded_results_list)
+            # 4-tuple rest: [all_shuffles_wcorr_array]; 5-tuple rest: [all_shuffles_wcorr_array, real_decoder_ripple_filter_epochs_decoder_result_dict]
+            if (len(loaded_results_list) >= 2) and (self.real_decoder_ripple_filter_epochs_decoder_result_dict is None) and (loaded_results_list[1] is not None):
+                self.real_decoder_ripple_filter_epochs_decoder_result_dict = loaded_results_list[1]
             ## #TODO 2024-06-04 03:37: - [ ] remove duplicates
             self.ensure_all_shuffles_unique()
 
@@ -1198,13 +1214,21 @@ class WCorrShuffle(ComputedResult):
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
 
-        output_extracted_result_wcorrs_list, real_decoder_ripple_weighted_corr_arr, output_all_shuffles_decoded_results_list = loadData(filepath)
+        loaded = loadData(filepath)
+        assert isinstance(loaded, (tuple, list)) and (len(loaded) >= 3), f"unexpected pickle payload: type={type(loaded)}, len={getattr(loaded, '__len__', None)}"
+        output_extracted_result_wcorrs_list = loaded[0]
+        real_decoder_ripple_weighted_corr_arr = loaded[1]
+        output_all_shuffles_decoded_results_list = loaded[2]
+        # loaded[3] may be all_shuffles_wcorr_array (not needed to rebuild the object)
+        real_decoder_ripple_filter_epochs_decoder_result_dict = loaded[4] if len(loaded) >= 5 else None
         _obj = cls.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
                                         directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
                                         global_epoch_name=global_epoch_name)
         _obj.output_extracted_result_wcorrs_list = output_extracted_result_wcorrs_list
         _obj.real_decoder_ripple_weighted_corr_arr = real_decoder_ripple_weighted_corr_arr
-        _obj.output_all_shuffles_decoded_results_list = output_all_shuffles_decoded_results_list        
+        _obj.output_all_shuffles_decoded_results_list = output_all_shuffles_decoded_results_list
+        if real_decoder_ripple_filter_epochs_decoder_result_dict is not None:
+            _obj.real_decoder_ripple_filter_epochs_decoder_result_dict = real_decoder_ripple_filter_epochs_decoder_result_dict
         return _obj
 
 

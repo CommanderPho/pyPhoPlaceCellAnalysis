@@ -184,7 +184,13 @@ class PaginatedPlotDataProvider:
         assert len(provided_data) == 1
         # overlay_labels_data = provided_data[1]
         assert len(provided_data) == len(cls.get_provided_plots_data()), f"len(provided_data): {len(provided_data)} != len(cls.get_provided_plots_data()): {len(cls.get_provided_plots_data())}"
-        active_plots_data = {k:(deepcopy(provided_data[i]) or default_class_value) for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items())}
+        # NOTE: use an explicit `is None` check (not truthiness) so an intentionally-empty dict (e.g. radon-only OverlayLabels registration) is preserved instead of collapsing to the class default `None`
+        active_plots_data = {}
+        for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items()):
+            a_provided_value = deepcopy(provided_data[i])
+            active_plots_data[k] = default_class_value if (a_provided_value is None) else a_provided_value
+        ## END for i, (k, default_class_value) in enumerate(cls.get_provided_plots_data().items())....
+
 
         for a_key, a_value in active_plots_data.items():
             a_pagination_controller.plots_data[a_key] = a_value # DEEPCOPY ALT

@@ -104,7 +104,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
         self.ui.actionCombineTimeSynchronizedPlotterWindow
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewDecodedPosteriors_MatplotlibPlotCommand, AddNewDecodedEpochMarginal_MatplotlibPlotCommand
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import AddNewDirectionalDecodedEpochs_MatplotlibPlotCommand, AddNewDecodedPosteriors_MatplotlibPlotCommand, AddNewDecodedEpochMarginal_MatplotlibPlotCommand, DecodingContinuousCacheKey
         
         spike_raster_window = kwargs.get('spike_raster_window', None)
         # active_pf_2D_dt = kwargs.get('active_pf_2D_dt', None)
@@ -147,14 +147,14 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
                 # addSubmenuActionKeys.append(curr_action_key)
                 # curr_action_key = PhoMenuHelper.add_action_item(self.root_window, "Pseudo2D Continuous Decoded Marginals in Matplotlib Views", name="actionContinuousPseudo2DDecodedMarginalsDockedMatplotlibView", tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_actions_dict)
                 # addSubmenuActionKeys.append(curr_action_key)
-                time_bin_size_list: List[float] = AddNewDecodedPosteriors_MatplotlibPlotCommand.get_all_computed_time_bin_sizes(curr_active_pipeline=curr_active_pipeline)
+                time_bin_size_list: List[DecodingContinuousCacheKey] = AddNewDecodedPosteriors_MatplotlibPlotCommand.get_all_computed_time_bin_sizes(curr_active_pipeline=curr_active_pipeline)
                 curr_time_bin_specific_submenu_actions_dict = {}
                 # curr_time_bin_specific_addSubmenuActionKeys = []
                 curr_time_bin_specific_addPositionsSubmenuActionKeys = []
                 curr_time_bin_specific_addMarginalsSubmenuActionKeys = []
 
                 for a_time_bin_size in time_bin_size_list:
-                    ## values with time-bin size arguments:
+                    ## values with DecodingContinuousCacheKey (W, H) arguments:
                     curr_action_name: str = f"actionPseudo2DDecodedEpochsDockedMatplotlibView_tbin_{a_time_bin_size}"
                     curr_action_key = PhoMenuHelper.add_action_item(self.root_window, f"Pseudo2D Positions {a_time_bin_size}", name=curr_action_name, tooltip="", icon_path=":/Graphics/Icons/graphics/ic_multiline_chart_48px.png", actions_dict=curr_time_bin_specific_submenu_actions_dict)
                     curr_time_bin_specific_addPositionsSubmenuActionKeys.append(curr_action_key)
@@ -166,7 +166,7 @@ class DockedWidgets_MenuProvider(BaseMenuProviderMixin):
                     curr_time_bin_specific_addMarginalsSubmenuActionKeys.append(curr_action_key)
                     action_command_map[curr_action_name] = AddNewDecodedEpochMarginal_MatplotlibPlotCommand(spike_raster_window, curr_active_pipeline, active_config_name=active_config_name, active_context=active_context, display_output=display_output, active_time_bin_sizes_whitelist=[a_time_bin_size], action_identifier=curr_action_name)
 
-                ## END for a_time_bin_size in time_bin_size_list..
+                ## END for a_time_bin_size in time_bin_size_list...
                 ## OUTPUTS: curr_time_bin_specific_addSubmenuActionKeys, curr_time_bin_specific_submenu_actions_dict
                 ## OUTPUTS: curr_time_bin_specific_addPositionsSubmenuActionKeys, curr_time_bin_specific_addMarginalsSubmenuActionKeys
                 curr_actions_dict.update(curr_time_bin_specific_submenu_actions_dict) ## add to the default actions dict, not sure if this is needed

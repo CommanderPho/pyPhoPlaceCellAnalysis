@@ -2316,7 +2316,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
         # Fit linear regression using numpy.polyfit
         _lin_reg = pho_stats_linear_regression(list(x_frs_index.to_numpy()), list(y_frs_index.to_numpy()))
-        _out_regression_line_artist = _lin_reg.plot(ax=ax)
+        if prepare_for_publication:
+            artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+            r_fit_color = artboard3_style['colors']['r_fit']
+            r_fontsize = artboard3_style['sizes']['r_value']
+            _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+        else:
+            _out_regression_line_artist = _lin_reg.plot(ax=ax)
         
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
@@ -2330,6 +2336,14 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     else:
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
+
+    if prepare_for_publication:
+        artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+        axes_style = artboard3_style['axes']
+        ax.tick_params(labelsize=artboard3_style['sizes']['tick_label'], width=axes_style['tick_width'], length=axes_style['tick_length'])
+        for spine_name in ('left', 'bottom'):
+            ax.spines[spine_name].set_linewidth(axes_style['linewidth'])
+        ## END for spine_name in ('left', 'bottom')...
         
 
     if include_axes_lines:
@@ -3054,21 +3068,24 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, include_linear_regression_line:bool=True, **scatter_params):
+def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, include_linear_regression_line:bool=True, enable_histograms: bool = False, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
         is_centered: bool - if True, the spines are centered at (0, 0)
+        enable_histograms: if True, add top/right black marginals (no diagonal). Default False.
 
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
         
         """
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput        
-    
-        prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', True)
-            
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_linear_regression, LinearRegressionOutput, PhoPublicationFigureHelper
+
+        prepare_for_publication = scatter_params.pop('prepare_for_publication', prepare_for_publication)
+        enable_histograms = scatter_params.pop('enable_histograms', enable_histograms)
+        artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
+
         if prepare_for_publication:
-            x_y_axes_label_kwargs = dict(fontsize=7)
+            x_y_axes_label_kwargs = dict(fontsize=artboard3_style['sizes']['axis_label'])
             if 's' not in scatter_params:
                 scatter_params['s'] = 18 ## override it
         else:
@@ -3095,6 +3112,7 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         point_hover_labels = [f'{i}' for i in list(laps_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
         fig_kwargs = dict(figsize=(1.68535, 1.4375), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'bbox_inches', 'pad_inches'])
         print(f'fig_kwargs: {fig_kwargs}')
+        # Always create a single axes first; append marginals after setup_margins so FormattedFigureText.subplots_adjust does not collapse a mosaic.
         fig, ax = plt.subplots(**fig_kwargs)
         
         # TODO 2023-05-25 - build the display context:
@@ -3106,7 +3124,9 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             xlabel_kwargs = dict(loc='left')
             ylabel_kwargs = dict(loc='bottom')
 
-        scatter_plot = ax.scatter(laps_frs_dict.values(), replays_frs_dict.values(), c=point_colors, **scatter_params) # , s=10, alpha=0.5
+        x_values = np.asarray(list(laps_frs_dict.values()), dtype=float)
+        y_values = np.asarray(list(replays_frs_dict.values()), dtype=float)
+        scatter_plot = ax.scatter(x_values, y_values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
         ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
         ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
 
@@ -3138,14 +3158,18 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             ## Only include the footer label when not for publication
             footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
         else:  
-            ## Publication Mode
-            ## Smaller fonts for publication -- Originally 18, now 9
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:8><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+            ## Publication Mode — Artboard 3.pdf title: colored track name + #231F20 body
+            track_key = 'short' if ('short' in str(track_name).lower()) else 'long'
+            track_color = artboard3_style['colors'][track_key]
+            title_body_color = artboard3_style['colors']['title_body']
+            track_title_size = artboard3_style['sizes']['track_title']
+            title_body_size = artboard3_style['sizes']['title_body']
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></><size:{title_body_size}><color:{title_body_color}> laps|PBEs </><weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
             text_kwargs = dict(textcoords="offset points", xytext=(0,0)) # (2,2)
-            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(laps_frs_dict.values(), replays_frs_dict.values(), point_hover_labels))]
+            texts = [ax.annotate(label, (x, y), ha='left', va='bottom', fontsize=8, **text_kwargs) for i, (x, y, label) in enumerate(zip(x_values, y_values, point_hover_labels))]
         else:
             texts = []
                     
@@ -3157,11 +3181,48 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             # Hide the right and top spines (box components)
             ax.spines[['right', 'top']].set_visible(False)
 
+        if prepare_for_publication:
+            axes_style = artboard3_style['axes']
+            ax.tick_params(labelsize=artboard3_style['sizes']['tick_label'], width=axes_style['tick_width'], length=axes_style['tick_length'])
+            for spine_name in ('left', 'bottom'):
+                ax.spines[spine_name].set_linewidth(axes_style['linewidth'])
+            ## END for spine_name in ('left', 'bottom')...
 
         if include_linear_regression_line:
             # Fit linear regression using numpy.polyfit
             _lin_reg = pho_stats_linear_regression(list(laps_frs_dict.values()), list(replays_frs_dict.values()))
-            _out_regression_line_artist = _lin_reg.plot(ax=ax)
+            if prepare_for_publication:
+                r_fit_color = artboard3_style['colors']['r_fit']
+                r_fontsize = artboard3_style['sizes']['r_value']
+                _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+            else:
+                _out_regression_line_artist = _lin_reg.plot(ax=ax)
+
+        if enable_histograms:
+            from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+            divider = make_axes_locatable(ax)
+            ax_histx = divider.append_axes("top", size="18%", pad=0.02, sharex=ax)
+            ax_histy = divider.append_axes("right", size="18%", pad=0.02, sharey=ax)
+
+            xymax = float(np.nanmax([np.nanmax(np.abs(x_values)), np.nanmax(np.abs(y_values)), 0.0]))
+            binwidth = max(xymax / 20.0, 1e-6)
+            lim = (int(xymax / binwidth) + 1) * binwidth
+            bins = np.arange(0.0, lim + binwidth, binwidth)
+            ax_histx.hist(x_values, bins=bins, color='black')
+            ax_histy.hist(y_values, bins=bins, orientation='horizontal', color='black')
+
+            # Hide hist chrome only — do not call set_*ticklabels([]) on shared axes (clears scatter ticks).
+            ax_histx.tick_params(axis='x', labelbottom=False, length=0)
+            ax_histx.tick_params(axis='y', left=False, labelleft=False, length=0)
+            ax_histy.tick_params(axis='y', labelleft=False, length=0)
+            ax_histy.tick_params(axis='x', bottom=False, labelbottom=False, length=0)
+            ax_histx.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+            ax_histy.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+
+            # Keep scatter data bounds on the non-negative Hz range (shared with marginals).
+            ax.set_xlim(0.0, lim)
+            ax.set_ylim(0.0, lim)
 
         if not defer_render:
             fig.show()

@@ -673,8 +673,11 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: float = 0.5, text_additional_y_offset:float=0.01):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08):
     """Add significance bars to a boxplot.
+
+    When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
+    (`y_offset_frac * |y|` and `0.02 * |y|`) so participation (0–1) and Hz modes both get proportional headroom.
 
 
     Usage:
@@ -687,6 +690,11 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
 
     """
       # Offset for the bar above y
+    y_scale: float = max(abs(float(y)), 1e-12)
+    if y_offset is None:
+        y_offset = y_offset_frac * y_scale
+    if text_additional_y_offset is None:
+        text_additional_y_offset = 0.02 * y_scale
     _out_ann = {}
     _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
     
@@ -699,8 +707,14 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if p_value < significance_level / 100:
         sig_astrisks_str += '*'
     ## OUTPUT:
+    label_y: float = float(y + y_offset + text_additional_y_offset)
     if sig_astrisks_str:
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), (y + y_offset + text_additional_y_offset), sig_astrisks_str, fontsize=16, ha='center')
+        label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center')
+
+    # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
+    _ymin, _ymax = ax.get_ylim()
+    ax.set_ylim(0.0, max(float(_ymax), label_y * 1.08))
 
     return _out_ann
 
@@ -1011,7 +1025,26 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
     
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False) -> str:
+    def _coerce_axis_label(cls, label) -> str:
+        """ Unwrap accidental 1-tuples/lists from trailing-comma assignments; return a plain str. """
+        if isinstance(label, (tuple, list)) and (len(label) == 1):
+            label = label[0]
+        return str(label)
+
+
+    @classmethod
+    def _metric_name_from_ylabel(cls, ylabel: str) -> str:
+        """ Derive the flexitext title metric phrase from the y-axis label. """
+        ylabel_lower: str = cls._coerce_axis_label(ylabel).lower()
+        if 'participat' in ylabel_lower:
+            return 'Participation Fractions'
+        if 'firing rate' in ylabel_lower:
+            return 'Firing Rates'
+        return 'Firing Rates'
+
+
+    @classmethod
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates') -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
         if not prepare_for_publication:
@@ -1021,23 +1054,49 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             title_font_size: int = 9*2
             subtitle_font_size: int = 7*2
 
-        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> Firing Rates\n"
+        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> {metric_name}\n"
                 f"<size:{subtitle_font_size}>for the "
                 "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track</></>"
                 )
 
 
     @classmethod
+    def _apply_publication_grouped_xticklabels(cls, ax):
+        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, LdCs/SdCs under each pair. """
+        ax.set_xticks(np.arange(4))
+        ax.set_xticklabels([r'pre-$\Delta$', r'post-$\Delta$', r'pre-$\Delta$', r'post-$\Delta$'])
+        ax.tick_params(axis='x', length=0, pad=2)
+        ax.set_xlabel('')
+
+        # Group labels centered under bars 0–1 and 2–3 (matplotlib multilevel-tick pattern)
+        sec = ax.secondary_xaxis(location=0)
+        sec.set_xticks([0.5, 2.5], labels=['\n\nLdCs', '\n\nSdCs'])
+        sec.tick_params('x', length=0)
+        sec.spines['bottom'].set_visible(False)
+        return sec
+
+
+    @classmethod
     def create_plot(cls, x_labels, y_values, scatter_props, ylabel, title, fig_name, active_context, defer_show, title_modifier=None, prepare_for_publication: bool = False, **kwargs):
         """ Main plotting function, called by both Laps and PBE subfigures
         
-        prepare_for_publication: if True, no context footer is added
+        prepare_for_publication: if True, no context footer is added; also skips title_modifier (e.g. '(N sessions)') and uses publication epoch titles
         """
-        if title_modifier:
+        if title_modifier and (not prepare_for_publication):
             title = title_modifier(title)
+
+        ylabel = cls._coerce_axis_label(ylabel)
 
         # fig, ax, bars, scatter_plots, title_text_obj, footer_text_obj, plots_data = cls.create_bar_plot(x_labels, y_values, scatter_props, active_context, ylabel, title)
         text_formatter = FormattedFigureText()
+        # Axes top from kwargs (display default 0.78); title sits slightly higher so sig labels clear the subtitle
+        top_margin: float = float(kwargs.pop('top_margin', 0.78))
+        left_margin: float = float(kwargs.pop('left_margin', text_formatter.left_margin))
+        bottom_margin: float = float(kwargs.pop('bottom_margin', text_formatter.bottom_margin))
+        title_top_margin: float = float(kwargs.pop('title_top_margin', top_margin + 0.02))
+        text_formatter.top_margin = top_margin
+        text_formatter.left_margin = left_margin
+        text_formatter.bottom_margin = bottom_margin
         x = np.arange(len(x_labels))
         width = 0.3
 
@@ -1069,6 +1128,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     for point_index, a_marker in enumerate(user_markers):
                         a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
                         scatter_plot.append(a_sub_scatter_plot)
+                    ## END for point_index, a_marker in enumerate(user_markers)...
+
                     had_custom_marker_handling = True # indicate that this was handled in this manner
 
             if not had_custom_marker_handling:
@@ -1077,14 +1138,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
     
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
-            
+        ## END for i in range(len(x))...
+
         ax.set_xlabel('Neuron Track Dominance Classification')
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
-        
-        title_text_obj = flexitext(text_formatter.left_margin, text_formatter.top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication), va="bottom", xycoords="figure fraction")
+
+        metric_name: str = cls._metric_name_from_ylabel(ylabel)
+        _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
+        active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
+        title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
@@ -1095,6 +1160,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
+        if prepare_for_publication:
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax)
+
+        # Firing rates / participation fractions are non-negative; keep axis floor at 0
+        _ymin, _ymax = ax.get_ylim()
+        ax.set_ylim(0.0, max(float(_ymax), 0.0))
 
         plot_data = (x_values_list, y_values)
         
@@ -1104,6 +1175,96 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         return MatplotlibRenderPlots(name=fig_name, figures=[fig], axes=[ax], context=active_context,
                                     plot_objects={'bars': bars, 'scatter_plots': scatter_plots, 'text_objects': text_objects},
                                     plot_data=plot_data)
+
+
+    @classmethod
+    def _resolve_AnyC_bar_results(cls, computation_result: InstantaneousSpikeRateGroupsComputation) -> Tuple[Optional[List[SingleBarResult]], Optional[List[SingleBarResult]]]:
+        """ Return (Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR) from shell fields, or derive from live AnyC_* trends. """
+        laps_anyc = getattr(computation_result, 'Fig2_Laps_AnyC_FR', None)
+        replay_anyc = getattr(computation_result, 'Fig2_Replay_AnyC_FR', None)
+        if (laps_anyc is not None) and (replay_anyc is not None):
+            return laps_anyc, replay_anyc
+
+        anyc_theta_minus = getattr(computation_result, 'AnyC_ThetaDeltaMinus', None)
+        anyc_theta_plus = getattr(computation_result, 'AnyC_ThetaDeltaPlus', None)
+        anyc_replay_minus = getattr(computation_result, 'AnyC_ReplayDeltaMinus', None)
+        anyc_replay_plus = getattr(computation_result, 'AnyC_ReplayDeltaPlus', None)
+        anyc_aclus = getattr(computation_result, 'AnyC_aclus', None)
+        if (anyc_aclus is None) or (anyc_theta_minus is None) or (anyc_theta_plus is None):
+            return None, None
+
+        LxC_set = set(np.asarray(getattr(computation_result, 'LxC_aclus', np.array([]))).tolist())
+        SxC_set = set(np.asarray(getattr(computation_result, 'SxC_aclus', np.array([]))).tolist())
+        exclusive_set = LxC_set | SxC_set
+        anyc_aclus_arr = np.asarray(anyc_aclus)
+        keep_mask = np.array([(aclu not in exclusive_set) for aclu in anyc_aclus_arr])
+        filtered_aclus = anyc_aclus_arr[keep_mask]
+
+        def _bar_from_trend(trend) -> SingleBarResult:
+            if trend is None:
+                return SingleBarResult(None, None, np.array([], dtype=float), filtered_aclus, filtered_aclus, None, None)
+            vals = np.asarray(trend.cell_agg_inst_fr_list)
+            if len(vals) == len(keep_mask):
+                vals = vals[keep_mask]
+            mean_v = float(np.nanmean(vals)) if len(vals) > 0 else None
+            std_v = float(np.nanstd(vals)) if len(vals) > 0 else None
+            return SingleBarResult(mean_v, std_v, vals, filtered_aclus, filtered_aclus, None, None)
+
+        Fig2_Laps_AnyC_FR: List[SingleBarResult] = [_bar_from_trend(anyc_theta_minus), _bar_from_trend(anyc_theta_plus)]
+        if (anyc_replay_minus is not None) and (anyc_replay_plus is not None):
+            Fig2_Replay_AnyC_FR: List[SingleBarResult] = [_bar_from_trend(anyc_replay_minus), _bar_from_trend(anyc_replay_plus)]
+        else:
+            Fig2_Replay_AnyC_FR = None
+        return Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR
+
+
+    @classmethod
+    def add_non_XdC_background_scatter(cls, ax, anyc_bar_results: List[SingleBarResult], width: float = 0.3, n_main_bars: int = 4, **kwargs):
+        """ Scatter AnyC (non-XdC) Δ−/Δ+ points faintly behind the main XdC 4-bar figure.
+
+        Mapping by epoch column:
+            AnyC Δ− -> bars 0 and 2 (LxC Δ−, SxC Δ−)
+            AnyC Δ+ -> bars 1 and 3 (LxC Δ+, SxC Δ+)
+
+        Y-limits are restored after plotting so AnyC extremes do not expand the axis.
+        """
+        if (anyc_bar_results is None) or (len(anyc_bar_results) < 2):
+            return None
+
+        y_minus = np.asarray(anyc_bar_results[0].values) if (anyc_bar_results[0] is not None and anyc_bar_results[0].values is not None) else np.array([], dtype=float)
+        y_plus = np.asarray(anyc_bar_results[1].values) if (anyc_bar_results[1] is not None and anyc_bar_results[1].values is not None) else np.array([], dtype=float)
+        if (len(y_minus) == 0) and (len(y_plus) == 0):
+            return None
+
+        ylim0 = ax.get_ylim()
+        # Ensure existing XdC artists stay above the faint AnyC series
+        for artist in list(ax.patches) + list(ax.collections):
+            try:
+                if artist.get_zorder() < 2:
+                    artist.set_zorder(2)
+            except Exception:
+                pass
+        ## END for artist in list(ax.patches) + list(ax.collections)...
+
+        scatter_artists = []
+        x = np.arange(n_main_bars)
+        for i in range(n_main_bars):
+            y_i = y_minus if (i in (0, 2)) else y_plus
+            if len(y_i) == 0:
+                continue
+            x_values = (x[i] + np.random.random(y_i.size) * width - width / 2)
+            sc = ax.scatter(x_values, y_i, color=(0.5, 0.5, 0.5), alpha=0.50, s=20, zorder=1, marker='.', linewidths=0)
+            scatter_artists.append(sc)
+        ## END for i in range(n_main_bars)...
+
+        ax.set_ylim(0.0, max(float(ylim0[1]), 0.0))
+        return scatter_artists if len(scatter_artists) > 0 else None
+
+
+    @classmethod
+    def add_non_XdC_inset(cls, ax, anyc_bar_results: List[SingleBarResult], **kwargs):
+        """ Deprecated alias for `add_non_XdC_background_scatter` (kept for notebook autoreload / old callers). """
+        return cls.add_non_XdC_background_scatter(ax, anyc_bar_results, **kwargs)
 
 
     # @providing_context(fig='F2', frs='Laps')
@@ -1134,7 +1295,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         all_scatter_props = [{}, {}, {}, {}] # override, 2023-10-03
 
-        return cls.create_plot(x_labels, all_data_points, all_scatter_props, 'Lap-averaged Firing Rates (Hz)', 'Lap ($\\theta$)', 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
+        laps_y_axis_label: str = cls._coerce_axis_label(kwargs.get('laps_y_axis_label', 'Lap-averaged Firing Rates (Hz)'))
+        epochs_title: str = 'Lap' if prepare_for_publication else 'Lap ($\\theta$)'
+
+        return cls.create_plot(x_labels, all_data_points, all_scatter_props, laps_y_axis_label, epochs_title, 'fig_2_Theta_FR_matplotlib', active_context=active_context, defer_show=defer_show, title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, **kwargs)
 
     # @providing_context(fig='F2', frs='Replay')
     @classmethod
@@ -1149,7 +1313,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         var_name:str = 'PBE'
         active_context = active_context.adding_context_if_missing(variable=var_name) # title='Laps'
 
-        pbe_y_axis_label: str = kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)')
+        pbe_y_axis_label: str = cls._coerce_axis_label(kwargs.get('pbe_y_axis_label', 'PBE-averaged Firing Rates (Hz)'))
 
         # PBE_fr_label: str = 'R'
         PBE_fr_label: str = '\\text{PBE}'
@@ -1172,7 +1336,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.8, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.78, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -1180,12 +1344,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         Values come from:
         `self.computation_result.Fig2_Laps_FR`
         `self.computation_result.Fig2_Replay_FR`
+
+        When `include_non_XdC_cells_as_inset=True`, also plots a faint AnyC (non-XdC)
+        scatter series behind the main XdC bars from `Fig2_*_AnyC_FR` or live `AnyC_*` trends
+        (AnyC Δ− under bars 0/2, AnyC Δ+ under bars 1/3; XdC y-limits preserved).
         """
         
         
         # Get the provided context or use the session context:
         active_context = active_context if active_context is not None else self.active_identifying_session_ctx
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
+
+        include_non_XdC_cells_as_inset: bool = kwargs.pop('include_non_XdC_cells_as_inset', False)
 
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
@@ -1211,7 +1381,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             ## Add stats from t-tests (check?)
             ## INPUTS: across_session_inst_fr_computation_shell_obj
             LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
-            
+            bar_graph_stats_str: str = format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+            print(bar_graph_stats_str)
+            bar_graph_t_results = (LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+            # Stash on the returned figure containers (picked up by across_sessions_bar_graphs output dict)
+            _fig_2_theta_out['bar_graph_stats_str'] = bar_graph_stats_str
+            _fig_2_theta_out['bar_graph_t_results'] = bar_graph_t_results
+            _fig_2_replay_out['bar_graph_stats_str'] = bar_graph_stats_str
+            _fig_2_replay_out['bar_graph_t_results'] = bar_graph_t_results
+
             ## get the max datapoint so we can position the signifiance indicator bars above them:
             max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
             max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
@@ -1249,7 +1427,27 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
 
 
+        if include_non_XdC_cells_as_inset:
+            Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR = self._resolve_AnyC_bar_results(self.computation_result)
+            if Fig2_Laps_AnyC_FR is not None:
+                anyc_scatters_theta = self.add_non_XdC_background_scatter(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR)
+                if anyc_scatters_theta is not None:
+                    if getattr(_fig_2_theta_out, 'plot_objects', None) is None:
+                        _fig_2_theta_out.plot_objects = {}
+                    _fig_2_theta_out.plot_objects['anyc_background_scatter'] = anyc_scatters_theta
+            if Fig2_Replay_AnyC_FR is not None:
+                anyc_scatters_replay = self.add_non_XdC_background_scatter(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR)
+                if anyc_scatters_replay is not None:
+                    if getattr(_fig_2_replay_out, 'plot_objects', None) is None:
+                        _fig_2_replay_out.plot_objects = {}
+                    _fig_2_replay_out.plot_objects['anyc_background_scatter'] = anyc_scatters_replay
 
+
+        # Keep y-axis floor at 0 after overlays (stats bars / AnyC) may have re-autoscaled
+        for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]:
+            _ymin, _ymax = _fig_out.ax.get_ylim()
+            _fig_out.ax.set_ylim(0.0, max(float(_ymax), 0.0))
+        ## END for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]...
 
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
@@ -1428,10 +1626,18 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 
 # Define a simple attrs class that's better than a namedtuple and unpackable:
 LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model", "r_value")}, bases=(UnpackableMixin, object,))
-LinearRegressionOutput.plot = lambda self, ax, **kwargs: (
-    ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **(dict(color='red', alpha=0.7, lw=0.5) | kwargs)),
-    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, fontsize=8, verticalalignment='top', color='black', alpha=0.9)
-)[0]
+
+
+def _linear_regression_output_plot(self, ax, r_text_kwargs=None, **kwargs):
+    """Plot regression line and R-value label. Line kwargs default to red/0.7/0.5; R text defaults to black/8pt. Pass r_text_kwargs to override the R label."""
+    line_kwargs = dict(color='red', alpha=0.7, lw=0.5) | kwargs
+    _r_text_kwargs = dict(fontsize=8, color='black', alpha=0.9, verticalalignment='top') | (r_text_kwargs or {})
+    line_artists = ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **line_kwargs)
+    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
+    return line_artists[0]
+
+
+LinearRegressionOutput.plot = _linear_regression_output_plot
 
 @function_attributes(short_name=None, tags=['stats', 'regression'], input_requires=[], output_provides=[], uses=['LinearRegressionOutput'], used_by=[], creation_date='2025-07-04 03:11', related_items=[])
 def pho_stats_linear_regression(reg_x: NDArray, reg_y: NDArray) -> "LinearRegressionOutput":
@@ -1522,7 +1728,43 @@ def pho_stats_bar_graph_t_tests(across_session_inst_fr_computation):
     return LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result
 
 
+@function_attributes(short_name=None, tags=['stats', 'bar', 'format'], input_requires=[], output_provides=[], uses=[], used_by=['PaperFigureTwo.display'], creation_date='2026-03-26 08:20', related_items=[])
+def format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result, include_num_cells: bool = True) -> str:
+    """ Format Fig2 bar-graph paired t-test p-values for notebook/publication paste.
 
+    Returns e.g. '(Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)'
+        or '25 LdC, 17 SdC cells; (Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)' if (include_num_cells == True)
+
+    Very small p-values use MS Word UnicodeMath-friendly scientific notation (`a×10^b`),
+    which converts to a proper equation when pasted into Insert → Equation.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import pho_stats_bar_graph_t_tests, format_bar_graph_t_test_pvalues_str
+        LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(across_session_inst_fr_computation)
+        print(format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result))
+    """
+    def _fmt_p_scientific_word(p: float) -> str:
+        """e.g. 1.25e-13 -> '1.25×10^-13' (Word equation linear / UnicodeMath)."""
+        mantissa_str, exp_str = f'{p:.2e}'.split('e')
+        return f'{mantissa_str}×10^{int(exp_str)}'
+
+    def _fmt_p(p: float) -> str:
+        if p < 1e-4:
+            return _fmt_p_scientific_word(p)
+        if p < 1e-3:
+            return f'{p:.6f}'.rstrip('0').rstrip('.')
+        return f'{p:.3g}'
+
+    _out_str: str = (f'(Laps: LdC p={_fmt_p(float(LxC_Laps_T_result.pvalue))},  SdC p={_fmt_p(float(SxC_Laps_T_result.pvalue))}; '
+            f'PBEs: LdC p={_fmt_p(float(LxC_Replay_T_result.pvalue))}, SdC p={_fmt_p(float(SxC_Replay_T_result.pvalue))})')
+
+    if include_num_cells:
+        ## creates output string like '25 LdC, 17 SdC cells; (Laps: LdC p=1.25×10^-13,  SdC p=8.65×10^-9; PBEs: LdC p=0.0618, SdC p=0.000635)'
+        n_LdC, n_SdC = [v.df for v in (LxC_Laps_T_result, SxC_Laps_T_result)]
+        num_cells_str: str = f'{n_LdC} LdC, {n_SdC} SdC cells'
+        _out_str = '; '.join([num_cells_str, _out_str])
+
+    return _out_str
 
 @function_attributes(short_name=None, tags=['epoch', 'pbe'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-10-11 14:13', related_items=[])
 def build_derived_epochs_dicts(owning_pipeline_reference):
@@ -4904,6 +5146,34 @@ class PhoPublicationFigureHelper:
     # delta_plus_str: str = '⬗'
     delta_minus_str: str = 't < \\Delta'        
     delta_plus_str: str = 't > \\Delta'
+
+    # Extracted from Artboard 3.pdf (Fig3 laps|PBEs scatter panels)
+    artboard3_fig3_style: Dict = {
+        'colors': {
+            'long': '#4D69B1',
+            'short': '#DC1E3D',
+            'title_body': '#231F20',
+            'r_fit': '#7900B3',
+            'marker': '#333333',
+        },
+        'sizes': {
+            'track_title': 9.087,
+            'title_body': 8.077,
+            'axis_label': 7,
+            'tick_label': 8.077,
+            'r_value': 8,
+        },
+        'axes': {
+            'linewidth': 0.75,
+            'tick_width': 0.75,
+            'tick_length': 3.5,
+        },
+        'scatter': {
+            's': 5.0,  # diameter ≈ 2.236 pt → s = d²; notebook may still pass s explicitly
+            'point_colors': '#33333333',
+        },
+    }
+
     
     @classmethod
     def rc_context_kwargs(cls, prepare_for_publication: bool=True, **kwargs) -> Dict:
@@ -5119,3 +5389,279 @@ def _plot_recreated_figure():
 
     return fig
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-14 - Analysis of LdC effect on Post-Delta Bars in Figure 2                                                                                                                                                                                                                   #
+# ==================================================================================================================================================================================================================================================================================== #
+
+## INPUTS: pbe, across_session_inst_fr_computation_dict
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation, SpikeRateTrends ## for `Figure2Extended`
+
+@metadata_attributes(short_name=None, tags=['LdC', 'Long/Short', 'SdC', 'PostDelta', 'figure2'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-14 15:34', related_items=[])
+class Figure2Extended:
+    """ Tests whether Figure-2 post-Δ (ReplayDeltaPlus) PBE activity of LdCs is elevated specifically on clear LONG-track PBEs.
+
+    For each session: matches FAT `pbe` rows with `is_clear_LONG` onto `LxC_ReplayDeltaPlus` / `SxC_ReplayDeltaPlus` / `AnyC_ReplayDeltaPlus`
+    `filter_epochs_df` by start/stop, then compares mean per-epoch FR of LdCs, SdCs, and non-(LdC∪SdC) on clear_LONG vs other PBEs.
+    Aggregates those session means into `summary_df` (across-session mean/sem/median).
+
+    Requires notebook-scope `pbe` (FAT per-epoch PBE df with `is_clear_LONG`, `session_name`, start/stop or parent_epoch_*).
+
+    from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure2Extended
+
+    ## INPUTS: pbe, across_session_inst_fr_computation_dict
+    summary_df, session_activity_dict = Figure2Extended.main(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
+    summary_df
+    # session_activity_dict[ctxt] == {'LdCs': {False: ..., True: ...}, 'SdCs': {...}, 'non_LdCs': {...}}  # keys: is_clear_LONG
+
+    # single session:
+    # _out_dict, _extras = Figure2Extended.compute_single_session(an_inst_fr_comp=across_session_inst_fr_computation_dict[ctxt], curr_session_context=ctxt)
+
+    """
+    @classmethod
+    def compute_delta_plus_LdC_result(cls, a_specific_spikeratetrends_result: SpikeRateTrends, curr_sess_pbe: pd.DataFrame, curr_session_context: IdentifyingContext, debug_print=False):
+        """ Match clear_LONG PBEs onto a SpikeRateTrends epoch list; return FR agg by is_clear_LONG.
+
+        Returns: epoch_unit_fr_agg_df, epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (fr_aclus_col_names, aclu_agg_column_names_list)
+        """
+        sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
+
+        inst_fr_df_list = a_specific_spikeratetrends_result.inst_fr_df_list
+        epoch_unit_fr_df_list = a_specific_spikeratetrends_result.epoch_unit_fr_df_list
+        filter_epochs_df = deepcopy(a_specific_spikeratetrends_result.filter_epochs_df).reset_index(drop=True)  # row i ↔ epoch_unit_fr_df_list[i]
+        assert len(filter_epochs_df) == len(epoch_unit_fr_df_list), (len(filter_epochs_df), len(epoch_unit_fr_df_list))
+
+        pbe_clear_long = curr_sess_pbe.loc[curr_sess_pbe['is_clear_LONG']].copy()
+
+        # FAT often has parent_epoch_*; prefer those, else start/stop
+        t0_col = 'parent_epoch_start_t' if 'parent_epoch_start_t' in pbe_clear_long.columns else 'start'
+        t1_col = 'parent_epoch_end_t' if 'parent_epoch_end_t' in pbe_clear_long.columns else 'stop'
+        if debug_print:
+            print(f'pbe clear_LONG for {sess_name_underscore}: n={len(pbe_clear_long)} (using {t0_col}/{t1_col})')
+
+
+        # --- match clear_LONG times onto filter_epochs_df ---
+        atol = 1e-2  # seconds
+        fe_starts = filter_epochs_df['start'].to_numpy(dtype=float)
+        fe_stops = filter_epochs_df['stop'].to_numpy(dtype=float)
+
+        matched_idxs = []
+        match_rows = []
+        for _, row in pbe_clear_long.iterrows():
+            t0, t1 = float(row[t0_col]), float(row[t1_col])
+            hit = np.where((np.abs(fe_starts - t0) <= atol) & (np.abs(fe_stops - t1) <= atol))[0]
+            if len(hit) == 0:
+                # looser: start-only
+                hit = np.where(np.abs(fe_starts - t0) <= atol)[0]
+            if len(hit):
+                i = int(hit[0])
+                matched_idxs.append(i)
+                match_rows.append({
+                    'filter_epochs_idx': i,
+                    'start': fe_starts[i],
+                    'stop': fe_stops[i],
+                    'pbe_start': t0,
+                    'pbe_stop': t1,
+                    'P_Long': row.get('P_Long', np.nan),
+                    'P_Short': row.get('P_Short', np.nan),
+                })
+            ## END if len(hit)...
+        ## END for _, row in pbe_clear_long.iterrows()...
+
+        matched_idxs = np.unique(matched_idxs)
+        if debug_print:
+            print(f'matched {len(matched_idxs)} / {len(pbe_clear_long)} clear_LONG → filter_epochs_df (atol={atol}s)')
+
+        # boolean mask on filter_epochs_df
+        filter_epochs_df['is_clear_LONG'] = False
+        filter_epochs_df.loc[matched_idxs, 'is_clear_LONG'] = True
+        # clear_long_filter_epochs_df = filter_epochs_df.loc[filter_epochs_df['is_clear_LONG']].copy()
+        # display(clear_long_filter_epochs_df)
+
+        # --- LxC activity for those matched epochs ---
+        # epoch_unit_fr_df_list[i]: DataFrame with columns = LxC aclus, values = FR in that epoch
+        n_LdC_active = []
+        mean_LdC_fr = []
+        for i in matched_idxs:
+            fr_df = epoch_unit_fr_df_list[i]
+            fr = fr_df.to_numpy(dtype=float).ravel() if hasattr(fr_df, 'to_numpy') else np.asarray(fr_df, dtype=float).ravel()
+            # "active" = FR > 0 (same idea as rdf active_aclus)
+            n_LdC_active.append(int(np.sum(np.isfinite(fr) & (fr > 0))))
+            mean_LdC_fr.append(float(np.nanmean(fr)) if fr.size else np.nan)
+        ## END for i in matched_idxs...
+
+        clear_long_activity = pd.DataFrame({
+            'filter_epochs_idx': matched_idxs,
+            'start': filter_epochs_df.loc[matched_idxs, 'start'].to_numpy(),
+            'stop': filter_epochs_df.loc[matched_idxs, 'stop'].to_numpy(),
+            'n_LdC_active': n_LdC_active,
+            'mean_LdC_fr': mean_LdC_fr,
+        })
+        if debug_print:
+            display(clear_long_activity)
+            print(f"clear_LONG: mean n_LdC_active={np.nanmean(n_LdC_active):.2f}  |  other epochs for contrast:")
+
+        # optional contrast: non-clear epochs in the same filter_epochs_df
+        other_idxs = filter_epochs_df.index[~filter_epochs_df['is_clear_LONG']].to_numpy()
+
+        ## OUTPUTS: matched_idxs, other_idxs
+
+        # matched_items = [epoch_unit_fr_df_list[i].to_dict() for i in matched_idxs]
+        # other_items = [epoch_unit_fr_df_list[i].to_dict() for i in other_idxs]
+
+        epoch_unit_fr_df = pd.DataFrame.from_records([df.to_dict() for i, df in enumerate(epoch_unit_fr_df_list)])
+        fr_aclus_col_names = list(epoch_unit_fr_df.columns)
+        epoch_unit_fr_df['epoch_IDX'] = epoch_unit_fr_df.index.astype(int)
+        Assert.same_length(epoch_unit_fr_df, filter_epochs_df)
+        # transfer_col_names
+        if debug_print:
+            print(f'fr_aclus_col_names: {fr_aclus_col_names}')
+        epoch_unit_fr_df = pd.concat((filter_epochs_df, epoch_unit_fr_df), axis='columns')
+
+        # Performed 4 aggregations grouped on column: 'is_clear_LONG'
+        # agg_dict = {{f'{aclu}_mean':(int(aclu), 'mean'), f'{aclu}_max':(int(aclu), 'max')} for aclu in fr_aclus_col_names}
+        agg_dict = {f'{aclu}_mean':(int(aclu), 'mean') for aclu in fr_aclus_col_names}
+        aclu_agg_column_names_list = list(agg_dict.keys())
+        epoch_unit_fr_agg_df = epoch_unit_fr_df.groupby(['is_clear_LONG']).agg(**agg_dict).reset_index()
+        # epoch_unit_fr_agg_df = epoch_unit_fr_df.groupby(['is_clear_LONG']).agg(col8_mean=(8, 'mean'), col8_max=(8, 'max'), col97_mean=(97, 'mean'), col109_mean=(109, 'mean')).reset_index()
+        epoch_unit_fr_agg_df.set_index('is_clear_LONG', drop=True, inplace=True)
+        return epoch_unit_fr_agg_df, epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (fr_aclus_col_names, aclu_agg_column_names_list)
+
+
+
+    ## INPUTS: an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext
+    @classmethod
+    def compute_single_session(cls, epochs_df: pd.DataFrame, an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext):
+        ## DeltaMinus
+        # a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaMinus  # long-maze replay pool; use Plus for short-maze
+        # an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaMinus
+
+        ## DeltaPlus (short-maze replay pool)
+        a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaPlus
+        an_SxC_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.SxC_ReplayDeltaPlus
+        an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaPlus
+
+        if a_pbeDelta_result is None:
+            print(f'\tWARN: a_pbeDelta_result (LxC_ReplayDeltaPlus) is None for curr_session_context: {curr_session_context}. Skipping.')
+
+        sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
+
+        ## INPUTS: sess_name_underscore
+        # --- this session's clear_LONG PBEs from FAT `pbe` ---
+        curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str).str.replace('-', '_', regex=False) == sess_name_underscore.replace('-', '_')].copy()
+        # also try hyphenated FAT style if needed
+        if curr_sess_pbe.empty:
+            curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str) == curr_session_context.get_description(separator='_')].copy()
+        if curr_sess_pbe.empty:
+            curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str).str.contains(curr_session_context.session_name)].copy()
+
+        LdC_epoch_unit_fr_agg_df, LdC_epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (LdC_fr_aclus_col_names, LdC_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=a_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+        an_LdC_all_aclus_mean_fr_dict = LdC_epoch_unit_fr_agg_df[LdC_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
+        ## OUTPUTS: epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict
+
+        an_SdC_all_aclus_mean_fr_dict = {}
+        SdC_epoch_unit_fr_agg_df = None
+        if an_SxC_pbeDelta_result is not None:
+            SdC_epoch_unit_fr_agg_df, SdC_epoch_unit_fr_df, SdC_filter_epochs_df, SdC_clear_long_activity, (SdC_fr_aclus_col_names, SdC_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_SxC_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+            an_SdC_all_aclus_mean_fr_dict = SdC_epoch_unit_fr_agg_df[SdC_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
+        else:
+            print(f'\tWARN: SxC_ReplayDeltaPlus is None for curr_session_context: {curr_session_context}. SdCs skipped.')
+
+        an_any_C_epoch_unit_fr_agg_df, an_any_C_epoch_unit_fr_df, an_any_C_filter_epochs_df, an_any_C_clear_long_activity, (an_any_C_fr_aclus_col_names, an_any_C_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_any_C_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+        ## any_C aclus include the LdCs/SdCs, so exclude those to look at the mean of the rest
+        exclusive_aclu_col_names = set(list(LdC_epoch_unit_fr_agg_df.columns))
+        if SdC_epoch_unit_fr_agg_df is not None:
+            exclusive_aclu_col_names |= set(list(SdC_epoch_unit_fr_agg_df.columns))
+        non_LdC_aclu_col_names = set(list(an_any_C_epoch_unit_fr_agg_df)) - exclusive_aclu_col_names
+        an_non_LdC_aclu_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[non_LdC_aclu_col_names].mean(axis='columns', skipna=True).to_dict()
+
+        ## OUTPUTS: an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict
+        _out_dict = {'LdCs': an_LdC_all_aclus_mean_fr_dict, 'SdCs': an_SdC_all_aclus_mean_fr_dict, 'non_LdCs': an_non_LdC_aclu_all_aclus_mean_fr_dict}
+        return _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict)
+
+
+    @classmethod
+    def build_across_session_cell_stats(cls, session_activity_dict, results_print=False):
+
+        # Flatten: one row per (session, cell_group, is_clear_LONG)
+        rows = []
+        for ctxt, group_dict in session_activity_dict.items():
+            base = ctxt.to_dict() if hasattr(ctxt, 'to_dict') else dict(
+                format_name=ctxt.format_name, animal=ctxt.animal,
+                exper_name=ctxt.exper_name, session_name=ctxt.session_name,
+            )
+            for cell_group, clear_dict in group_dict.items():  # 'LdCs' / 'SdCs' / 'non_LdCs'
+                for is_clear_LONG, mean_n_active in clear_dict.items():  # False / True
+                    rows.append({
+                        **base,
+                        'cell_group': cell_group,
+                        'is_clear_LONG': bool(is_clear_LONG),
+                        'mean_n_active': float(mean_n_active),
+                    })
+                ## END for is_clear_LONG, mean_n_active...
+            ## END for cell_group, clear_dict...
+        ## END for ctxt, group_dict...
+
+        df = pd.DataFrame(rows)
+        df['session_key'] = df['format_name'] + '_' + df['animal'] + '_' + df['exper_name'] + '_' + df['session_name']
+
+        # Wide per session: columns = (cell_group, is_clear_LONG)
+        wide = df.pivot_table(
+            index=['session_key', 'animal', 'exper_name', 'session_name'],
+            columns=['cell_group', 'is_clear_LONG'],
+            values='mean_n_active',
+            aggfunc='mean',
+        ).sort_index(axis=1)
+        wide.columns = [f'{g}_{"clearLONG" if c else "other"}' for g, c in wide.columns]
+        wide = wide.reset_index()
+
+        # Per-session deltas (clear_LONG − other)
+        for g in ['LdCs', 'SdCs', 'non_LdCs']:
+            clear_col, other_col = f'{g}_clearLONG', f'{g}_other'
+            if (clear_col in wide.columns) and (other_col in wide.columns):
+                wide[f'{g}_delta'] = wide[clear_col] - wide[other_col]
+            ## END if (clear_col in wide.columns) and (other_col in wide.columns)...
+        ## END for g in ['LdCs', 'SdCs', 'non_LdCs']...
+
+        # Across-session averages
+        summary = df.groupby(['cell_group', 'is_clear_LONG'], as_index=False).agg(
+            n_sessions=('session_key', 'nunique'),
+            mean=('mean_n_active', 'mean'),
+            sem=('mean_n_active', 'sem'),
+            median=('mean_n_active', 'median'),
+        )
+        if results_print:
+            display(summary)
+
+            # Compact: mean ± sem across sessions
+            print(summary.pivot(index='cell_group', columns='is_clear_LONG', values='mean'))
+            print('Across-session mean deltas (clearLONG − other):')
+            delta_cols = [c for c in ['LdCs_delta', 'SdCs_delta', 'non_LdCs_delta'] if c in wide.columns]
+            print(wide[delta_cols].agg(['mean', 'sem', 'median']))
+
+        return summary
+
+
+
+    @classmethod
+    def main(cls, epochs_df: pd.DataFrame, across_session_inst_fr_computation_dict, **kwargs):
+        session_activity_dict = {}
+        for curr_session_context, an_inst_fr_comp in across_session_inst_fr_computation_dict.items():
+            if an_inst_fr_comp is not None:
+                try:
+                    _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict) = cls.compute_single_session(epochs_df=epochs_df, an_inst_fr_comp=an_inst_fr_comp, curr_session_context=curr_session_context)
+                    session_activity_dict[curr_session_context] = _out_dict
+                except (ValueError, AttributeError) as e:
+                    print(f'WARN error e: {e} occured for curr_session_context: {curr_session_context}! Skipping.')
+                    # raise e
+
+            else:
+                print(f'WARN an_inst_fr_comp is None for curr_session_context: {curr_session_context}! Skipping.')
+
+        ## OUTPUTS: session_activity_dict
+
+        summary_df = cls.build_across_session_cell_stats(session_activity_dict=session_activity_dict)
+        return summary_df, session_activity_dict
+
+        # ## False: not 'is_clear_LONG', True: 'is_clear_LONG'
+        # {'LdCs': {False: ..., True: ...}, 'SdCs': {False: ..., True: ...}, 'non_LdCs': {False: ..., True: ...}}

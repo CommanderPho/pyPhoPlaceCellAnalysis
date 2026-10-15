@@ -131,215 +131,406 @@ from neuropy.utils.matplotlib_helpers import perform_update_title_subtitle
 from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-13 - Shuffles/Code for `2024-04-20 - silx_RadonTransformTesting.ipynb` and figure S6                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pathlib import Path
+from typing import Dict, Optional, Sequence, Tuple, Union
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+
+def as_length_df(trial_df: pd.DataFrame, agg_df: pd.DataFrame, length_col: Optional[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Return copies with a unified length column named 'n' for plotting.
+
+    Resolves length from `length_col`, else prefers 'n', else 'L'.
+    `df_shuf` often has both `n` and `L` while `agg_by_L` only has `L` — handle that mismatch.
+    """
+    df_n = trial_df.copy()
+    agg_n = agg_df.copy()
+
+    def _resolve_length_col(frame: pd.DataFrame, preferred: Optional[str]) -> str:
+        if preferred is not None and preferred in frame.columns:
+            return preferred
+        if 'n' in frame.columns:
+            return 'n'
+        if 'L' in frame.columns:
+            return 'L'
+        raise KeyError(f'No length column among preferred={preferred!r}, n, L; columns={list(frame.columns)}')
+
+    trial_len_col = _resolve_length_col(df_n, length_col)
+    agg_len_col = _resolve_length_col(agg_n, length_col if (length_col in agg_n.columns) else None)
+
+    if trial_len_col != 'n':
+        df_n['n'] = df_n[trial_len_col]
+    if agg_len_col != 'n':
+        agg_n = agg_n.rename(columns={agg_len_col: 'n'})
+    ## END if length columns need normalizing...
+
+    df_n['n'] = df_n['n'].astype(int)
+    agg_n['n'] = agg_n['n'].astype(int)
+    return df_n, agg_n
+
+
+def aggregate_sequence_scores_by_length(trial_df: pd.DataFrame, length_col: Optional[str] = None) -> pd.DataFrame:
+    """Build an `agg`-style summary table from per-trial/per-epoch scores (e.g. `df_real`)."""
+    df_n = trial_df.copy()
+    if length_col is None:
+        length_col = 'n' if 'n' in df_n.columns else 'L'
+    if length_col != 'n':
+        df_n['n'] = df_n[length_col]
+    df_n['n'] = df_n['n'].astype(int)
+
+    def _mean_std(series: pd.Series) -> Tuple[float, float]:
+        s = pd.to_numeric(series, errors='coerce')
+        s = s[np.isfinite(s)]
+        if len(s) == 0:
+            return np.nan, np.nan
+        if len(s) == 1:
+            return float(s.iloc[0]), np.nan
+        return float(s.mean()), float(s.std(ddof=1))
+
+    rows = []
+    for n_val, g in df_n.groupby('n'):
+        n_trials = int(len(g))
+        mean_keys = ('abs_spearman', 'abs_pearson', 'r2', 'abs_wcorr', 'radon', 'radon_speed', 'travel', 'coverage', 'avg_jump', 'longest_seq_ratio', 'total_variation', 'stddev_of_diff')
+        out = dict(n=int(n_val), n_trials=n_trials)
+        for k in mean_keys:
+            if k in g.columns:
+                m, s = _mean_std(g[k])
+            else:
+                m, s = np.nan, np.nan
+            out[f'mean_{k}'] = m
+            out[f'std_{k}'] = s
+        ## END for k in mean_keys...
+
+        if 'abs_spearman_gt_0_8' in g.columns:
+            ind = g['abs_spearman_gt_0_8'].astype(float)
+        else:
+            ind = (pd.to_numeric(g['abs_spearman'], errors='coerce') > 0.8).astype(float)
+        out['p_abs_spearman_gt_0_8'], out['std_p_abs_spearman_gt_0_8'] = _mean_std(ind)
+
+        if 'abs_wcorr_gt_0_8' in g.columns:
+            ind_w = g['abs_wcorr_gt_0_8'].astype(float)
+        else:
+            ind_w = (pd.to_numeric(g['abs_wcorr'], errors='coerce') > 0.8).astype(float)
+        out['p_abs_wcorr_gt_0_8'], out['std_p_abs_wcorr_gt_0_8'] = _mean_std(ind_w)
+
+        if 'is_mono' in g.columns:
+            ind_m = g['is_mono'].astype(float)
+        else:
+            ind_m = pd.Series(np.nan, index=g.index)
+        out['p_mono'], out['std_p_mono'] = _mean_std(ind_m)
+        rows.append(out)
+    ## END for n_val, g in df_n.groupby('n')...
+
+    return pd.DataFrame(rows).sort_values('n').reset_index(drop=True)
+
+
+@function_attributes(short_name=None, tags=['plot', 'sequence-scores', 'iid', 'shuffle', 'figure-s6'], input_requires=[], output_provides=[], uses=['as_length_df', 'PhoPublicationFigureHelper'], used_by=[], creation_date='2026-10-13 12:14', related_items=[])
+def plot_sequence_scores_vs_length(df: pd.DataFrame, agg: pd.DataFrame, *, length_col: str = 'n',
+                                   overlay: Optional[Tuple[pd.DataFrame, pd.DataFrame, str]] = None, primary_label: str = 'primary',
+                                   real: Optional[Tuple[pd.DataFrame, Optional[pd.DataFrame], str]] = None,
+                                   title: str = 'Sequence scores vs length', export_stem: str = 'sequence_scores_vs_length',
+                                   figures_parent_folder: Optional[Union[Path, str]] = None, export_formats: Sequence[str] = ('svg', 'pdf'),
+                                   prepare_for_publication: bool = True, enable_error_bars: bool = True, figsize: Tuple[float, float] = (12, 6.8),
+                                   max_scatter_per_n: int = 400, x_jitter_scale: float = 0.35, y_jitter_scale: float = 0.015,
+                                   xlim: Optional[Tuple[float, float]] = (2, 16), defer_show: bool = False,
+                                   draw_scatter: bool = True, overlay_draw_scatter: bool = True,
+                                   real_draw_scatter: bool = True, real_draw_summary: bool = True) -> Dict[str, Path]:
+    """Summary curves (± optional SD) of sequence-score metrics vs event length L.
+
+    Optional trial/epoch scatter clouds (`draw_scatter` / `overlay_draw_scatter` / `real_draw_scatter`).
+    Optional `overlay=(df2, agg2, label2)` and `real=(df_real, agg_real|None, label)`; if `agg_real` is None
+    and `real_draw_summary=True`, aggregates `df_real` by length automatically.
+
+    Markers: i.i.d. = open circles; shuffle = filled diamonds; real = filled stars.
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_sequence_scores_vs_length
+
+    # shuffle / compare
+    plot_sequence_scores_vs_length(df, agg, primary_label='i.i.d.', draw_scatter=False,
+        overlay=(df_shuf, agg_by_L, 'shuffle'), overlay_draw_scatter=False,
+        # real=(df_real, None, 'real'), real_draw_scatter=False, real_draw_summary=True,   # agg=None → auto mean/P by length, black ★ per epoch, mean curves by L from df_real
+        title='i.i.d. + shuffle scores vs length',
+        export_formats=[],
+    )  # set False if dual clouds are too busy
+
+
+    # # i.i.d. vs shuffle
+    # plot_sequence_scores_vs_length(df, agg, length_col='n', primary_label='i.i.d.',
+    #     overlay=(df_shuf, agg_by_L, 'shuffle'),
+    #     title='i.i.d. vs shuffle scores vs length',
+    #     export_stem=f'iid_vs_shuffle_scores_vs_length_{decoder_name}')
+
+
+
+    """
+    df, agg = as_length_df(df, agg, length_col=length_col)
+
+    assert (agg is not None) and (len(agg) > 0), "Need agg summary table."
+    if draw_scatter:
+        assert (df is not None) and (len(df) > 0), "Need trial-level df (KEEP_TRIAL_DF=True) when draw_scatter=True."
+    ## END if draw_scatter...
+
+    if figures_parent_folder is None:
+        figures_parent_folder = Path('E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S6 - Heuristic for Detecting Spatial Replay/iid_uniform_trajectory_chance').resolve()
+    else:
+        figures_parent_folder = Path(figures_parent_folder).resolve()
+    figures_parent_folder.mkdir(parents=True, exist_ok=True)
+
+    vector_rc = PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication, **{
+        'figure.figsize': figsize, 'figure.dpi': '100', 'figure.frameon': False,
+        'svg.fonttype': 'none', 'pdf.fonttype': 42,
+    })
+    err_kw = dict(capsize=2.5, elinewidth=0.9)  # markeredgewidth set per-series in _marker_face_edge
+    scatter_kw = dict(s=10, alpha=0.22, linewidths=0, rasterized=True)
+
+    def _errorbar(ax, x, y, yerr, **kwargs):
+        yerr = np.asarray(yerr, dtype=float)
+        yerr = np.where(np.isfinite(yerr), yerr, 0.0)
+        return ax.errorbar(x, y, yerr=yerr, **err_kw, **kwargs)
+
+
+    def _scatter_trials(ax, trials: pd.DataFrame, y_col: str, color, rng: np.random.Generator,
+                        *, marker: str = 'o', s: Optional[float] = None, alpha: Optional[float] = None,
+                        zorder: int = 2, edgecolors: str = 'none', linewidths: float = 0.0,
+                        x_jit: Optional[float] = None, y_jit: Optional[float] = None, label: Optional[str] = None, **kwargs):
+        parts = []
+        for _n_val, g in trials.groupby('n'):
+            if len(g) > max_scatter_per_n:
+                g = g.sample(n=max_scatter_per_n, random_state=int(rng.integers(0, 1_000_000_000)))
+            parts.append(g)
+        ## END for _n_val, g in trials.groupby('n')...
+
+        sub = pd.concat(parts, ignore_index=True) if parts else trials.iloc[0:0]
+        _x_jit = x_jitter_scale if x_jit is None else x_jit
+        _y_jit = y_jitter_scale if y_jit is None else y_jit
+        x = sub['n'].to_numpy(dtype=float) + rng.uniform(-_x_jit, _x_jit, size=len(sub))
+        y = sub[y_col].to_numpy(dtype=float) + rng.uniform(-_y_jit, _y_jit, size=len(sub))
+        finite = np.isfinite(x) & np.isfinite(y)
+        kw = dict(scatter_kw)
+        kw.update(dict(marker=marker, zorder=zorder, edgecolors=edgecolors, linewidths=linewidths, rasterized=True))
+        if s is not None:
+            kw['s'] = s
+        if alpha is not None:
+            kw['alpha'] = alpha
+        if label is not None:
+            kw['label'] = label
+        kw.update(kwargs)
+        # Allow open markers via color='none' / facecolors already in kw
+        if (color is None) or (color == 'none') or ('facecolors' in kw):
+            return ax.scatter(x[finite], y[finite], **kw)
+        return ax.scatter(x[finite], y[finite], c=color, **kw)
+
+
+    # Marker identity by data source (same shape everywhere); fill distinguishes chance vs data.
+    # i.i.d. = open circles; shuffle = filled diamonds; real = filled stars.
+    # Within a source, metrics differ by color + linestyle only (solid vs dashed).
+    source_style = dict(
+        primary=dict(marker='o', filled=False, ls_main='-', ls_alt='--',
+                     color_spearman='C0', color_pearson='C1', color_prob='C0', color_mono='C0',
+                     color_wcorr='C0', color_wcorr_p='C1', color_radon='C0', color_cov='C0'),
+        overlay=dict(marker='D', filled=True, ls_main='-', ls_alt='--',
+                     color_spearman='C3', color_pearson='C5', color_prob='C3', color_mono='C3',
+                     color_wcorr='C3', color_wcorr_p='C5', color_radon='C3', color_cov='C3'),
+        real=dict(marker='*', filled=True, ls_main='-', ls_alt='--',
+                  color_spearman='k', color_pearson='0.35', color_prob='k', color_mono='0.2',
+                  color_wcorr='k', color_wcorr_p='0.35', color_radon='k', color_cov='k'),
+    )
+
+    def _marker_face_edge(color, filled: bool):
+        if filled:
+            return dict(markerfacecolor=color, markeredgecolor=color, markeredgewidth=0.9)
+        return dict(markerfacecolor='none', markeredgecolor=color, markeredgewidth=1.25)
+
+
+    def _plot_one(ax, x, y, yerr, *, color, marker, filled, linestyle, label, zorder=5):
+        mk = _marker_face_edge(color, filled)
+        if enable_error_bars and (yerr is not None):
+            return _errorbar(ax, x, y, yerr, fmt=marker, color=color, linestyle=linestyle, label=label, zorder=zorder, **mk)
+        return ax.plot(x, y, marker=marker, color=color, linestyle=linestyle, label=label, zorder=zorder, **mk)
+
+
+    def _plot_summary_curves(axes, agg_table: pd.DataFrame, label_prefix: str, *, style: dict):
+        marker = style['marker']
+        filled = bool(style['filled'])
+        ls_main, ls_alt = style['ls_main'], style['ls_alt']
+        suffix = ' ± 1 SD' if enable_error_bars else ''
+
+        def _yerr(col):
+            return agg_table[col] if enable_error_bars and (col in agg_table.columns) else None
+
+        _plot_one(axes[0, 0], agg_table['n'], agg_table['mean_abs_spearman'], _yerr('std_abs_spearman'), color=style['color_spearman'], marker=marker, filled=filled, linestyle=ls_main, label=f'{label_prefix} mean |Spearman|{suffix}')
+        _plot_one(axes[0, 0], agg_table['n'], agg_table['mean_abs_pearson'], _yerr('std_abs_pearson'), color=style['color_pearson'], marker=marker, filled=filled, linestyle=ls_alt, label=f'{label_prefix} mean |Pearson|{suffix}')
+        _plot_one(axes[0, 1], agg_table['n'], agg_table['p_abs_spearman_gt_0_8'], _yerr('std_p_abs_spearman_gt_0_8'), color=style['color_prob'], marker=marker, filled=filled, linestyle=ls_main, label=fr'{label_prefix} P(|Spearman| > 0.8)')
+        _plot_one(axes[0, 2], agg_table['n'], np.clip(agg_table['p_mono'], 1e-5, 1), _yerr('std_p_mono'), color=style['color_mono'], marker=marker, filled=filled, linestyle=ls_main, label=f'{label_prefix} P(strictly monotonic)')
+        _plot_one(axes[1, 0], agg_table['n'], agg_table['mean_abs_wcorr'], _yerr('std_abs_wcorr'), color=style['color_wcorr'], marker=marker, filled=filled, linestyle=ls_main, label=f'{label_prefix} mean |wcorr|{suffix}')
+        _plot_one(axes[1, 0], agg_table['n'], agg_table['p_abs_wcorr_gt_0_8'], _yerr('std_p_abs_wcorr_gt_0_8'), color=style['color_wcorr_p'], marker=marker, filled=filled, linestyle=ls_alt, label=fr'{label_prefix} P(|wcorr| > 0.8)')
+        _plot_one(axes[1, 1], agg_table['n'], agg_table['mean_radon'], _yerr('std_radon'), color=style['color_radon'], marker=marker, filled=filled, linestyle=ls_main, label=f'{label_prefix} mean radon{suffix}')
+        _plot_one(axes[1, 2], agg_table['n'], agg_table['mean_coverage'], _yerr('std_coverage'), color=style['color_cov'], marker=marker, filled=filled, linestyle=ls_main, label=f'{label_prefix} mean tcov_seq{suffix}')
+
+
+    scatter_rng = np.random.default_rng(0)
+    with mpl.rc_context(vector_rc):
+        fig, axes = plt.subplots(2, 3, figsize=figsize, num=str(title))
+
+        # Continuous trial scores in the background (NOT 0/1 indicators).
+        if draw_scatter:
+            _ps = source_style['primary']
+            def _open_scatter(ax, y_col, edge_color):
+                return _scatter_trials(ax, df, y_col, color='none', rng=scatter_rng, marker=_ps['marker'],
+                                       facecolors='none', edgecolors=edge_color, linewidths=0.8, alpha=0.3)
+            _open_scatter(axes[0, 0], 'abs_spearman', _ps['color_spearman'])
+            _open_scatter(axes[0, 0], 'abs_pearson', _ps['color_pearson'])
+            _open_scatter(axes[0, 1], 'abs_spearman', _ps['color_prob'])
+            _open_scatter(axes[0, 2], 'abs_spearman', _ps['color_mono'])
+            _open_scatter(axes[1, 0], 'abs_wcorr', _ps['color_wcorr'])
+            _open_scatter(axes[1, 1], 'radon', _ps['color_radon'])
+            _open_scatter(axes[1, 2], 'coverage', _ps['color_cov'])
+        ## END if draw_scatter...
+
+        _plot_summary_curves(axes, agg, primary_label, style=source_style['primary'])
+
+        if overlay is not None:
+            df2, agg2, label2 = overlay
+            # Resolve length per-frame (df may have both n and L; agg_by_L often only has L)
+            df2, agg2 = as_length_df(df2, agg2, length_col=None)
+            overlay_rng = np.random.default_rng(1)
+            _os = source_style['overlay']
+            if overlay_draw_scatter:
+                _scatter_trials(axes[0, 0], df2, 'abs_spearman', color=_os['color_spearman'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[0, 0], df2, 'abs_pearson', color=_os['color_pearson'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[0, 1], df2, 'abs_spearman', color=_os['color_prob'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[0, 2], df2, 'abs_spearman', color=_os['color_mono'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[1, 0], df2, 'abs_wcorr', color=_os['color_wcorr'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[1, 1], df2, 'radon', color=_os['color_radon'], rng=overlay_rng, marker=_os['marker'])
+                _scatter_trials(axes[1, 2], df2, 'coverage', color=_os['color_cov'], rng=overlay_rng, marker=_os['marker'])
+            ## END if overlay_draw_scatter...
+
+            _plot_summary_curves(axes, agg2, label2, style=_os)
+        ## END if overlay is not None...
+
+        if real is not None:
+            df_real, agg_real, real_label = real
+            assert (df_real is not None) and (len(df_real) > 0), "real=(df_real, agg_real|None, label) needs non-empty df_real"
+            df_real = df_real.copy()
+            if 'n' not in df_real.columns:
+                assert 'L' in df_real.columns, "df_real needs n or L"
+                df_real['n'] = df_real['L']
+            df_real['n'] = df_real['n'].astype(int)
+            if agg_real is not None:
+                _, agg_real = as_length_df(df_real, agg_real, length_col=None)
+            elif real_draw_summary:
+                agg_real = aggregate_sequence_scores_by_length(df_real, length_col='n')
+            ## END if agg_real is not None...
+
+            real_rng = np.random.default_rng(2)
+            _rs = source_style['real']
+            if real_draw_scatter:
+                real_scatter_kw = dict(marker=_rs['marker'], s=36, alpha=0.85, zorder=8, edgecolors='k', linewidths=0.35,
+                                       x_jit=0.12, y_jit=0.0)
+                _scatter_trials(axes[0, 0], df_real, 'abs_spearman', color=_rs['color_spearman'], rng=real_rng, label=f'{real_label} |Spearman|', **real_scatter_kw)
+                _scatter_trials(axes[0, 0], df_real, 'abs_pearson', color=_rs['color_pearson'], rng=real_rng, label=f'{real_label} |Pearson|', **real_scatter_kw)
+                _scatter_trials(axes[0, 1], df_real, 'abs_spearman', color=_rs['color_prob'], rng=real_rng, label=f'{real_label} |Spearman|', **real_scatter_kw)
+                _scatter_trials(axes[0, 2], df_real, 'abs_spearman', color=_rs['color_mono'], rng=real_rng, label=f'{real_label} |Spearman|', **real_scatter_kw)
+                _scatter_trials(axes[1, 0], df_real, 'abs_wcorr', color=_rs['color_wcorr'], rng=real_rng, label=f'{real_label} |wcorr|', **real_scatter_kw)
+                _scatter_trials(axes[1, 1], df_real, 'radon', color=_rs['color_radon'], rng=real_rng, label=f'{real_label} radon', **real_scatter_kw)
+                _scatter_trials(axes[1, 2], df_real, 'coverage', color=_rs['color_cov'], rng=real_rng, label=f'{real_label} tcov_seq', **real_scatter_kw)
+            ## END if real_draw_scatter...
+
+            if real_draw_summary and (agg_real is not None) and (len(agg_real) > 0):
+                _plot_summary_curves(axes, agg_real, real_label, style=_rs)
+            ## END if real_draw_summary...
+        ## END if real is not None...
+
+        any_scatter = bool(draw_scatter or overlay_draw_scatter or (real is not None and real_draw_scatter))
+        xlabel = 'Event sequence length L'
+
+        axes[0, 0].set_xlabel(xlabel); axes[0, 0].set_ylabel('mean |corr(t, x)|')
+        axes[0, 0].set_title('Trajectory correlation'); axes[0, 0].set_ylim(0, 1)
+
+        axes[0, 1].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4, label='threshold 0.8')
+        axes[0, 1].set_xlabel(xlabel); axes[0, 1].set_ylabel('P(|Spearman| > 0.8)')
+        axes[0, 1].set_title('Chance of "looks sequential"'); axes[0, 1].set_ylim(0, 1)
+
+        axes[0, 2].set_xlabel(xlabel); axes[0, 2].set_ylabel('P(strictly monotonic)')
+        axes[0, 2].set_title('Perfect ascending/descending order'); axes[0, 2].set_ylim(0, 1)
+
+        axes[1, 0].axhline(0.8, color='0.35', lw=0.9, ls=':', zorder=4)
+        axes[1, 0].set_xlabel(xlabel); axes[1, 0].set_ylabel('mean |wcorr|  /  P(|wcorr| > 0.8)')
+        axes[1, 0].set_title('wcorr'); axes[1, 0].set_ylim(0, 1)
+
+        axes[1, 1].set_xlabel(xlabel); axes[1, 1].set_ylabel('mean radon score')
+        axes[1, 1].set_title('radon')
+
+        axes[1, 2].set_xlabel(xlabel); axes[1, 2].set_ylabel('mean track coverage')
+        axes[1, 2].set_title('tcov_seq'); axes[1, 2].set_ylim(0, 1)
+
+        for ax in axes.ravel():
+            ax.legend(fontsize=7)
+            if xlim is not None:
+                ax.set_xlim(list(xlim))
+        ## END for ax in axes.ravel()...
+
+        if any_scatter:
+            fig.suptitle(f'{title}\n(markers: summary means; faint points: individual trials/epochs)')
+        else:
+            fig.suptitle(title)
+        plt.tight_layout()
+
+        _out_paths: Dict[str, Path] = {}
+        for file_format in export_formats:
+            save_path = figures_parent_folder.joinpath(f'{export_stem}.{file_format}')
+            fig.savefig(str(save_path), format=file_format, transparent=True)
+            _out_paths[file_format] = save_path
+            print(f'export_for_publication: saved "{save_path}"')
+        ## END for file_format in export_formats...
+
+        if not defer_show:
+            plt.show()
+
+    return _out_paths
+
+
+def plot_iid_uniform_trajectory_chance(df: pd.DataFrame, agg: pd.DataFrame,
+                                       figures_parent_folder: Optional[Union[Path, str]] = None, export_stem: str = 'iid_uniform_short_sequences_look_trajectory_like', export_formats: Sequence[str] = ('svg', 'pdf'),
+                                       prepare_for_publication: bool = True, enable_error_bars: bool = False, figsize: Tuple[float, float] = (12, 6.8),
+                                       max_scatter_per_n: int = 400, defer_show: bool = False, **kwargs) -> Dict[str, Path]:
+    """ Backward-compatible wrapper around `plot_sequence_scores_vs_length` (scatter + summary curves).
+
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_sequence_scores_vs_length, plot_iid_uniform_trajectory_chance
+
+        # same as your cell
+        plot_iid_uniform_trajectory_chance(df, agg, draw_scatter=False,
+            export_formats=[],
+        )
+
+        # call
+        _out_paths = plot_iid_uniform_trajectory_chance(df=df, agg=agg, enable_error_bars=True)
+        _out_paths
+
+    """
+    return plot_sequence_scores_vs_length(
+        df, agg, length_col='n', primary_label='i.i.d.',
+        title='i.i.d. Uniform positions — short sequences look more trajectory-like by chance',
+        export_stem=export_stem, figures_parent_folder=figures_parent_folder, export_formats=export_formats,
+        prepare_for_publication=prepare_for_publication, enable_error_bars=enable_error_bars, figsize=figsize,
+        max_scatter_per_n=max_scatter_per_n, defer_show=defer_show, **kwargs,
+    )
+
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-03 - "Forwardicity" score for determining forward vs. backward replay                                                                                                                                                                                                        #
 # ==================================================================================================================================================================================================================================================================================== #
-from pyphoplacecellanalysis.GUI.Qt.Mixins.PaginationMixins import PaginatedPlotDataProvider # for `ForwardicityPaginatedPlotDataProvider`
-from neuropy.utils.matplotlib_helpers import add_inner_title # for `ForwardicityPaginatedPlotDataProvider`
-
-
-## Write the monotonicity score metric, similar to the heuristic
-@function_attributes(short_name=None, tags=['forwardicity', 'forward-v-reverse', 'replay', 'metric', 'score'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:30', related_items=[])
-def forwardicity_score(p_x_given_n: Optional[NDArray] = None, most_likely_positions_arr: Optional[NDArray] = None, xbin_centers: Optional[NDArray] = None, most_likely_decoder_direction: Optional[float] = None, pos_axes: int = 0, time_axes: int = -1, debug_print: bool = True):
-    """Signed forward-vs-backward score for one replay posterior.
-
-    Steps are the first differences of the MAP position. Bins that do not move are omitted from both the numerator and the denominator.
-
-    ratio_major_aligned_bins is the fraction of moving steps whose sign matches the majority sign. It is 1.0 for a fully unidirectional event in either direction and 0.5 when the two directions tie. Threshold this (for example at 0.75) to keep directional events.
-
-    forwardicity compares those same moving steps to most_likely_decoder_direction (±1). It is +1 when every moving step matches the decoder, -1 when every moving step opposes it, and 0 for a tie. It is NaN when there is no decoder direction or no moving step.
-
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import forwardicity_score
-
-        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=p_x_given_n, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction)
-    """
-    if debug_print:
-        print(f'forwardicity_score(...):')
-
-    most_likely_position_bin_indicies_arr = None
-    most_likely_positions_likelihood_arr = None
-
-    if (p_x_given_n is not None):
-        p_x_given_n = np.asarray(p_x_given_n)
-        total_n_time_bins: int = int(np.shape(p_x_given_n)[time_axes])
-
-        if debug_print:
-            print(f'\tnp.shape(p_x_given_n): {np.shape(p_x_given_n)}, total_n_time_bins: {total_n_time_bins}')
-
-        most_likely_position_bin_indicies_arr = np.argmax(p_x_given_n, axis=pos_axes)
-        most_likely_positions_likelihood_arr = np.nanmax(p_x_given_n, axis=pos_axes)
-
-        if most_likely_positions_arr is None:
-            if xbin_centers is not None:
-                most_likely_positions_arr = np.ravel(np.asarray(xbin_centers)[most_likely_position_bin_indicies_arr]).astype(float)
-            else:
-                most_likely_positions_arr = np.ravel(most_likely_position_bin_indicies_arr).astype(float)
-        else:
-            Assert.len_equals(most_likely_positions_arr, required_length=total_n_time_bins)
-
-    elif ((p_x_given_n is None) and (most_likely_positions_arr is not None)):
-        total_n_time_bins: int = int(len(most_likely_positions_arr))
-        if debug_print:
-            print(f'\tnp.shape(most_likely_positions_arr): {np.shape(most_likely_positions_arr)}, total_n_time_bins: {total_n_time_bins}')
-        most_likely_positions_arr = np.ravel(most_likely_positions_arr).astype(float)
-
-    else:
-        raise ValueError(f'p_x_given_n: {p_x_given_n}, most_likely_positions_arr: {most_likely_positions_arr}')
-
-    if most_likely_positions_arr.size < 2:
-        if debug_print:
-            print(f'\tWARN: fewer than 2 time bins ({most_likely_positions_arr.size}); forwardicity is undefined')
-        return np.nan, (np.nan, None)
-
-    _positions_diff = np.diff(most_likely_positions_arr)
-    change_directions = np.sign(_positions_diff)  # {-1, 0, +1}; 0 is a pause, not a direction
-    is_directional_step = (change_directions != 0) & np.isfinite(change_directions)
-    n_directional_steps: int = int(np.sum(is_directional_step))
-
-    if debug_print:
-        if most_likely_position_bin_indicies_arr:
-            print(f'\tmost_likely_position_bin_indicies_arr: {np.ravel(most_likely_position_bin_indicies_arr)}')
-        print(f'\tmost_likely_positions_arr: {most_likely_positions_arr}')
-        if most_likely_positions_likelihood_arr is not None:
-            print(f'\tmost_likely_positions_likelihood_arr: {np.ravel(most_likely_positions_likelihood_arr)}')
-        print(f'\t_positions_diff: {_positions_diff}')
-        print(f'\tchange_directions: {change_directions}')
-        print(f'\tn_directional_steps: {n_directional_steps} of {len(_positions_diff)} steps ({total_n_time_bins} time bins)')
-
-    if n_directional_steps == 0:
-        if debug_print:
-            print(f'\tWARN: no non-zero position steps; forwardicity is undefined')
-        return np.nan, (np.nan, None)
-
-    directional_signs = change_directions[is_directional_step]
-    n_positive: int = int(np.sum(directional_signs > 0))
-    n_negative: int = int(np.sum(directional_signs < 0))
-    ## A tie is 0.5 either way. Majority is a step count, so one large jump cannot outvote many small steps.
-    n_major: int = max(n_positive, n_negative)
-    if n_positive > n_negative:
-        total_displacement_major_direction: float = 1.0
-    elif n_negative > n_positive:
-        total_displacement_major_direction = -1.0
-    else:
-        total_displacement_major_direction = 0.0
-
-    ratio_major_aligned_bins: float = float(n_major) / float(n_directional_steps)
-
-    if debug_print:
-        print(f'\tn_positive: {n_positive}, n_negative: {n_negative}')
-        print(f'\ttotal_displacement_major_direction: {total_displacement_major_direction}')
-        print(f'\tratio_major_aligned_bins: {ratio_major_aligned_bins}')
-
-    ratio_decoder_aligned_bins: Optional[float] = None
-    forwardicity: float = np.nan
-    if most_likely_decoder_direction is not None:
-        decoder_direction: float = float(np.sign(most_likely_decoder_direction))
-        if decoder_direction == 0.0:
-            if debug_print:
-                print(f'\tWARN: most_likely_decoder_direction={most_likely_decoder_direction} is not ±1; forwardicity is undefined')
-        else:
-            n_decoder_aligned: int = int(np.sum(directional_signs == decoder_direction))
-            ratio_decoder_aligned_bins = float(n_decoder_aligned) / float(n_directional_steps)
-            forwardicity = (ratio_decoder_aligned_bins - 0.5) * 2.0  # 0 -> -1, 0.5 -> 0, 1 -> +1
-
-            if debug_print:
-                print(f'\tdecoder_direction: {decoder_direction}')
-                print(f'\tn_decoder_aligned: {n_decoder_aligned}')
-                print(f'\tratio_decoder_aligned_bins: {ratio_decoder_aligned_bins}')
-                print(f'\tforwardicity: {forwardicity}')
-    elif debug_print:
-        print(f'\tWARN: most_likely_decoder_direction is None; returning monotonicity only')
-
-    return forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins)
-
-
-
-@function_attributes(short_name=None, tags=['forwardicity', 'main-sequence', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=['ForwardicityPaginatedPlotDataProvider'], creation_date='2026-10-06 11:32', related_items=['forwardicity_score'])
-def main_sequence_positions(partition_result) -> NDArray:
-    """Time-ordered positions of the ranked main subsequence, with intrusion bins removed.
-
-    Uses the `is_main` row of `partition_result.subsequences_df` (ranked by `len_excluding_intrusions`), then the matching non-intrusion rows of `position_bins_info_df` sorted by `flat_idx`. Repeats stay in the array. An empty array means there is no usable main sequence.
-
-    Usage:
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import forwardicity_score, main_sequence_positions
-
-        positions = main_sequence_positions(a_seq_and_heuristics_result)
-        forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=positions, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-    """
-    subsequences_df = getattr(partition_result, 'subsequences_df', None)
-    position_bins_info_df = getattr(partition_result, 'position_bins_info_df', None)
-    if (subsequences_df is None) or (position_bins_info_df is None) or (len(subsequences_df) == 0):
-        return np.array([], dtype=float)
-
-    is_main = subsequences_df['is_main'].to_numpy()
-    if not np.any(is_main):
-        return np.array([], dtype=float)
-
-    main_subsequence_idx = subsequences_df.loc[is_main, 'subsequence_idx'].iloc[0]
-    is_main_bin = (position_bins_info_df['subsequence_idx'] == main_subsequence_idx) & np.logical_not(position_bins_info_df['is_intrusion'])
-    main_bins_df = position_bins_info_df.loc[is_main_bin].sort_values('flat_idx')
-    return main_bins_df['pos'].to_numpy(dtype=float)
-
-
-@metadata_attributes(short_name=None, tags=['forwardicity'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-06 09:22', related_items=[])
-class ForwardicityPaginatedPlotDataProvider(PaginatedPlotDataProvider):
-    """ 
-    Usage:
-
-        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import ForwardicityPaginatedPlotDataProvider, forwardicity_score, main_sequence_positions
-
-        for a_ctrl in paginated_multi_decoder_decoded_epochs_window.pagination_controllers.values():
-            ForwardicityPaginatedPlotDataProvider.add_data_to_pagination_controller(a_ctrl, None, update_controller_on_apply=False)
-
-        paginated_multi_decoder_decoded_epochs_window.refresh_current_page()
-    """
-    plots_group_identifier_key: str = 'forwardicity'
-    provided_params = dict(enable_forwardicity_info=True)
-    provided_plots_data = {'forwardicity_data': None}
-    provided_plots = {'forwardicity': {}}
-
-    @classmethod
-    def get_provided_callbacks(cls):
-        return {'on_render_page_callbacks': {'plot_forwardicity_data': cls._callback_update_curr_single_epoch_slice_plot}}
-
-
-    @classmethod
-    def _callback_update_curr_single_epoch_slice_plot(cls, curr_ax, params, plots_data, plots, ui, data_idx, curr_time_bins, *args, epoch_slice=None, curr_time_bin_container=None, **kwargs):
-        if not params.get('enable_forwardicity_info', True):
-            return params, plots_data, plots, ui
-        curr_posterior = args[0]  # p_x_given_n for this dock, (n_pos_bins, n_time_bins)
-        decoder_name = params.active_identifying_figure_ctx.get('decoder', None)
-        # most_likely_decoder_direction = {'long_LR': 1.0, 'long_RL': -1.0, 'short_LR': 1.0, 'short_RL': -1.0}.get(decoder_name, None)
-        most_likely_decoder_direction = {'long_LR': -1.0, 'long_RL': 1.0, 'short_LR': -1.0, 'short_RL': 1.0}.get(decoder_name, None)
-
-        used_main_sequence: bool = False
-        most_likely_positions_arr = None
-        curves_data = plots_data.get('decoded_sequence_and_heuristics_curves_data', None)
-        if (curves_data is not None) and (epoch_slice is not None) and (len(epoch_slice) == 2):
-            epoch_start_t = epoch_slice[0]
-            if epoch_start_t in curves_data:
-                partition_result = curves_data[epoch_start_t].partition_result
-                if partition_result is not None:
-                    most_likely_positions_arr = main_sequence_positions(partition_result)
-                    used_main_sequence = True
-
-        if used_main_sequence:
-            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(most_likely_positions_arr=most_likely_positions_arr, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-            final_text = f"main fwdicty: {forwardicity:.2f}"
-        else:
-            xbin_centers = get_bin_centers(params.xbin)
-            forwardicity, (ratio_major_aligned_bins, ratio_decoder_aligned_bins) = forwardicity_score(p_x_given_n=curr_posterior, xbin_centers=xbin_centers, most_likely_decoder_direction=most_likely_decoder_direction, debug_print=False)
-            final_text = f"fwdicty: {forwardicity:.2f}" ## full-posterior MAP fallback
-        # final_text = f"fwdicity: {forwardicity:.2f}\nfwd_maj: {ratio_major_aligned_bins:.2f}\nfwd_decdr: {ratio_decoder_aligned_bins:.2f}"
-        extant = plots[cls.plots_group_identifier_key].get(curr_ax, {}).get('forwardicity_text', None)
-        if extant is not None:
-            extant.remove()
-        anchored_text = add_inner_title(curr_ax, final_text, loc='upper left', font_size=9)
-        anchored_text.patch.set_ec("none")
-        plots[cls.plots_group_identifier_key][curr_ax] = {'forwardicity_text': anchored_text}
-        return params, plots_data, plots, ui
+from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import forwardicity_score, main_sequence_positions # re-export for notebook compatibility
+# Display: forwardicity is shown in OverlayLabelsPaginatedPlotDataProvider green heuristic text (filter_epochs column) when enable_overlay_labels_info is on.
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -12527,8 +12718,6 @@ class LongShort3DPlacefieldsHelpers:
 import numpy as np
 import itertools
 from typing import List, Tuple, Dict
-# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import analyze_epoch_dynamics
-# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
 from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
 from neuropy.utils.indexing_helpers import PandasHelpers
         
