@@ -1364,7 +1364,21 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         _newly_updated_values_tuple = a_new_fully_generic_result.compute_all_per_epoch_aggregations_from_per_time_bin_results(flat_decoded_marginal_posterior_df_context_dict=flat_decoded_marginal_posterior_df_context_dict)
         # per_time_bin_to_per_epoch_context_map_dict, flat_decoded_marginal_posterior_df_per_epoch_marginals_df_context_dict, flat_decoded_marginal_posterior_df_per_time_bin_marginals_df_context_dict = _newly_updated_values_tuple
 
-
+        # ==================================================================================================================== #
+        # Phase 5.5 - Attach heuristic score columns onto per_epoch FAT DFs (laps + pbe)                                       #
+        # ==================================================================================================================== #
+        try:
+            directional_decoders_epochs_decode_result = None
+            if hasattr(curr_active_pipeline, 'global_computation_results') and (curr_active_pipeline.global_computation_results is not None):
+                _computed_data = getattr(curr_active_pipeline.global_computation_results, 'computed_data', None)
+                if _computed_data is not None:
+                    directional_decoders_epochs_decode_result = _computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+            if directional_decoders_epochs_decode_result is None:
+                print('WARN: missing "DirectionalDecodersEpochsEvaluations" global result. Skipping heuristic per_epoch enrichment.')
+            else:
+                a_new_fully_generic_result = a_new_fully_generic_result.adding_heuristic_score_columns_to_per_epoch_marginals(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+        except Exception as e:
+            print(f'2026-10-15 ERROR: Phase 5.5 heuristic per_epoch enrichment failed with error: {e}. Continuing without heuristic columns.')
 
 
         # ==================================================================================================================== #
@@ -2577,4 +2591,130 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         per_epoch_flat_context_list, per_epoch_flat_result_context_dict, per_epoch_flat_decoder_context_dict, per_epoch_flat_decoded_marginal_posterior_df_context_dict = self.get_results_matching_contexts(context_query=IdentifyingContext(trained_compute_epochs='laps', decoder_identifier='pseudo2D', known_named_decoding_epochs_type=['pbe', 'laps'], data_grain= 'per_epoch'))        
         per_epoch_keys = list(per_epoch_flat_decoded_marginal_posterior_df_context_dict.keys())
         return (len(per_time_bin_keys) == len(per_epoch_keys))
+
+
+    @classmethod
+    def _helper_merge_heuristic_columns_onto_per_epoch_df(cls, per_epoch_df: pd.DataFrame, decoder_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult]) -> pd.DataFrame:
+        """ Left-merge decoder-suffixed HeuristicReplayScoring columns onto a per_epoch marginal DF by epoch start time.
+
+        Returns the original DF unchanged when heuristic columns are missing/empty.
+        Prefer `parent_epoch_start_t` for Phase-5 aggregated per_epoch DFs (equals filter_epochs start);
+        fall back to epoch/lap/ripple start cols, then bin `start` last (bin start may not match epoch start).
+        """
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _build_merged_score_metric_df
+
+        if per_epoch_df is None or len(per_epoch_df) == 0:
+            return per_epoch_df
+        if decoder_filter_epochs_decoder_result_dict is None or len(decoder_filter_epochs_decoder_result_dict) == 0:
+            return per_epoch_df
+
+        left_join_col: Optional[str] = None
+        for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'lap_start_t', 'ripple_start_t', 'start'):
+            if a_candidate_col in per_epoch_df.columns:
+                left_join_col = a_candidate_col
+                break
+        ## END for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'lap_start_t', 'ripple_start_t', 'start')...
+
+        if left_join_col is None:
+            raise KeyError(f'per_epoch_df missing epoch-start join column; columns: {list(per_epoch_df.columns)}')
+
+        extracted_filter_epochs_dfs_dict = {k: ensure_dataframe(a_result.filter_epochs) for k, a_result in decoder_filter_epochs_decoder_result_dict.items() if (a_result is not None) and (getattr(a_result, 'filter_epochs', None) is not None)}
+        if len(extracted_filter_epochs_dfs_dict) == 0:
+            print(f'2026-10-15 WARN: _helper_merge_heuristic_columns_onto_per_epoch_df: no usable filter_epochs in decoder result dict; skipping.')
+            return per_epoch_df
+
+        _ref_df: pd.DataFrame = deepcopy(tuple(extracted_filter_epochs_dfs_dict.values())[0])
+        if 'start' not in _ref_df.columns:
+            raise KeyError(f'filter_epochs missing "start" column; columns: {list(_ref_df.columns)}')
+
+        heuristic_score_col_names: List[str] = HeuristicReplayScoring.get_all_score_computation_col_names()
+        ## Require columns present on all decoder filter_epochs (same intersection _build_merged_score_metric_df uses):
+        present_heuristic_col_names: List[str] = [c for c in heuristic_score_col_names if all((c in a_df.columns) for a_df in extracted_filter_epochs_dfs_dict.values())]
+        if len(present_heuristic_col_names) == 0:
+            print(f'2026-10-15 WARN: _helper_merge_heuristic_columns_onto_per_epoch_df: no heuristic columns present on all filter_epochs; skipping.')
+            return per_epoch_df
+
+        extracted_merged_scores_df: pd.DataFrame = _build_merged_score_metric_df(extracted_filter_epochs_dfs_dict, columns=present_heuristic_col_names, best_decoder_index_column_name=None)
+        if extracted_merged_scores_df is None or len(extracted_merged_scores_df) == 0:
+            print(f'2026-10-15 WARN: _helper_merge_heuristic_columns_onto_per_epoch_df: merged heuristic scores DF empty; skipping.')
+            return per_epoch_df
+        if len(extracted_merged_scores_df) != len(_ref_df):
+            raise ValueError(f'merged heuristic scores row count ({len(extracted_merged_scores_df)}) != filter_epochs row count ({len(_ref_df)})')
+
+        right_df: pd.DataFrame = deepcopy(extracted_merged_scores_df)
+        right_df['_heuristic_join_start'] = np.asarray(_ref_df['start'])
+        right_df = right_df.drop_duplicates(subset=['_heuristic_join_start'], keep='first')
+
+        ## Do not overwrite columns already present on the left DF:
+        cols_to_add: List[str] = [c for c in right_df.columns if (c != '_heuristic_join_start') and (c not in per_epoch_df.columns)]
+        if len(cols_to_add) == 0:
+            print(f'2026-10-15 WARN: _helper_merge_heuristic_columns_onto_per_epoch_df: all heuristic columns already present; skipping.')
+            return per_epoch_df
+
+        n_rows_before: int = len(per_epoch_df)
+        right_df = right_df[['_heuristic_join_start'] + cols_to_add]
+        enriched_df: pd.DataFrame = deepcopy(per_epoch_df).merge(right_df, how='left', left_on=left_join_col, right_on='_heuristic_join_start')
+        if '_heuristic_join_start' in enriched_df.columns:
+            enriched_df = enriched_df.drop(columns=['_heuristic_join_start'])
+        if len(enriched_df) != n_rows_before:
+            raise ValueError(f'heuristic left-merge changed row count ({n_rows_before} -> {len(enriched_df)}); refusing to apply')
+        n_matched = int(enriched_df[cols_to_add[0]].notna().sum()) if len(cols_to_add) > 0 else 0
+        if n_matched == 0:
+            print(f'2026-10-15 WARN: _helper_merge_heuristic_columns_onto_per_epoch_df: left-merge on "{left_join_col}" matched 0/{n_rows_before} rows; keeping original DF.')
+            return per_epoch_df
+        return enriched_df
+
+
+    def adding_heuristic_score_columns_to_per_epoch_marginals(self, directional_decoders_epochs_decode_result: Optional[DecoderDecodedEpochsResult]=None, debug_print: bool=True) -> "GenericDecoderDictDecodedEpochsDictResult":
+        """ Merge HeuristicReplayScoring columns onto all laps/pbe `data_grain=='per_epoch'` marginal DFs.
+
+        Fault-tolerant: logs and continues on missing data / merge failures so FAT export is not aborted.
+        Intended to run after Phase 5 per_epoch aggregations.
+
+        Usage:
+            directional_decoders_epochs_decode_result = curr_active_pipeline.global_computation_results.computed_data.get('DirectionalDecodersEpochsEvaluations', None)
+            a_new_fully_generic_result = a_new_fully_generic_result.adding_heuristic_score_columns_to_per_epoch_marginals(directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result)
+        """
+        try:
+            if directional_decoders_epochs_decode_result is None:
+                print(f'2026-10-15 WARN: adding_heuristic_score_columns_to_per_epoch_marginals(...): directional_decoders_epochs_decode_result is None. Skipping.')
+                return self
+
+            epochs_type_to_decoder_result_dict = {
+                'laps': getattr(directional_decoders_epochs_decode_result, 'decoder_laps_filter_epochs_decoder_result_dict', None),
+                'pbe': getattr(directional_decoders_epochs_decode_result, 'decoder_ripple_filter_epochs_decoder_result_dict', None),
+            }
+
+            flat_context_list, flat_result_context_dict, flat_decoder_context_dict, flat_decoded_marginal_posterior_df_context_dict = self.get_results_matching_contexts(context_query=IdentifyingContext(known_named_decoding_epochs_type=['laps', 'pbe'], data_grain='per_epoch'))
+            if (flat_decoded_marginal_posterior_df_context_dict is None) or (len(flat_decoded_marginal_posterior_df_context_dict) == 0):
+                print(f'2026-10-15 WARN: adding_heuristic_score_columns_to_per_epoch_marginals(...): no matching per_epoch contexts. Skipping.')
+                return self
+
+            for a_ctxt, a_per_epoch_df in flat_decoded_marginal_posterior_df_context_dict.items():
+                try:
+                    a_known_epochs_type = a_ctxt.get('known_named_decoding_epochs_type', None) if hasattr(a_ctxt, 'get') else a_ctxt['known_named_decoding_epochs_type']
+                    a_decoder_result_dict = epochs_type_to_decoder_result_dict.get(a_known_epochs_type, None)
+                    if a_decoder_result_dict is None:
+                        print(f'2026-10-15 WARN: adding_heuristic_score_columns_to_per_epoch_marginals(...): missing decoder filter_epochs dict for known_named_decoding_epochs_type="{a_known_epochs_type}" (context={a_ctxt}). Skipping this context.')
+                        continue
+                    a_enriched_df = self._helper_merge_heuristic_columns_onto_per_epoch_df(per_epoch_df=a_per_epoch_df, decoder_filter_epochs_decoder_result_dict=a_decoder_result_dict)
+                    self.filter_epochs_decoded_track_marginal_posterior_df_dict[a_ctxt] = a_enriched_df
+                    if debug_print:
+                        print(f'2026-10-15 Adding heuristic score columns to per_epoch marginal DF for context: {a_ctxt}')
+                except (AssertionError, ValueError, AttributeError, KeyError, TypeError) as e:
+                    print(f'2026-10-15 ERROR: adding_heuristic_score_columns_to_per_epoch_marginals(...): failed for context {a_ctxt} with error: {e}. Continuing.')
+                    continue
+                except Exception as e:
+                    print(f'2026-10-15 ERROR: adding_heuristic_score_columns_to_per_epoch_marginals(...): unexpected error for context {a_ctxt}: {e}. Continuing.')
+                    continue
+            ## END for a_ctxt, a_per_epoch_df in flat_decoded_marginal_posterior_df_context_dict.items()...
+
+        except (AssertionError, ValueError, AttributeError, KeyError, TypeError) as e:
+            print(f'2026-10-15 ERROR: adding_heuristic_score_columns_to_per_epoch_marginals(...): failed with error: {e}. Skipping heuristic enrichment.')
+        except Exception as e:
+            print(f'2026-10-15 ERROR: adding_heuristic_score_columns_to_per_epoch_marginals(...): unexpected error: {e}. Skipping heuristic enrichment.')
+
+        return self
+
         
