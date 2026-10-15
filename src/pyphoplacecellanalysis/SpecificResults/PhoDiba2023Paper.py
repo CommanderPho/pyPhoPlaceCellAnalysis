@@ -5401,8 +5401,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 class Figure2Extended:
     """ Tests whether Figure-2 post-Δ (ReplayDeltaPlus) PBE activity of LdCs is elevated specifically on clear LONG-track PBEs.
 
-    For each session: matches FAT `pbe` rows with `is_clear_LONG` onto `LxC_ReplayDeltaPlus` / `AnyC_ReplayDeltaPlus`
-    `filter_epochs_df` by start/stop, then compares mean per-epoch FR of LdCs vs non-LdCs on clear_LONG vs other PBEs.
+    For each session: matches FAT `pbe` rows with `is_clear_LONG` onto `LxC_ReplayDeltaPlus` / `SxC_ReplayDeltaPlus` / `AnyC_ReplayDeltaPlus`
+    `filter_epochs_df` by start/stop, then compares mean per-epoch FR of LdCs, SdCs, and non-(LdC∪SdC) on clear_LONG vs other PBEs.
     Aggregates those session means into `summary_df` (across-session mean/sem/median).
 
     Requires notebook-scope `pbe` (FAT per-epoch PBE df with `is_clear_LONG`, `session_name`, start/stop or parent_epoch_*).
@@ -5412,7 +5412,7 @@ class Figure2Extended:
     ## INPUTS: pbe, across_session_inst_fr_computation_dict
     summary_df, session_activity_dict = Figure2Extended.main(across_session_inst_fr_computation_dict=across_session_inst_fr_computation_dict)
     summary_df
-    # session_activity_dict[ctxt] == {'LdCs': {False: ..., True: ...}, 'non_LdCs': {False: ..., True: ...}}  # keys: is_clear_LONG
+    # session_activity_dict[ctxt] == {'LdCs': {False: ..., True: ...}, 'SdCs': {...}, 'non_LdCs': {...}}  # keys: is_clear_LONG
 
     # single session:
     # _out_dict, _extras = Figure2Extended.compute_single_session(an_inst_fr_comp=across_session_inst_fr_computation_dict[ctxt], curr_session_context=ctxt)
@@ -5531,47 +5531,53 @@ class Figure2Extended:
 
     ## INPUTS: an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext
     @classmethod
-    def compute_single_session(cls, an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext):
+    def compute_single_session(cls, epochs_df: pd.DataFrame, an_inst_fr_comp: InstantaneousSpikeRateGroupsComputation, curr_session_context: IdentifyingContext):
         ## DeltaMinus
         # a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaMinus  # long-maze replay pool; use Plus for short-maze
         # an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaMinus
 
-        ## DeltaPlus
-        a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaPlus  # long-maze replay pool; use Plus for short-maze
+        ## DeltaPlus (short-maze replay pool)
+        a_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.LxC_ReplayDeltaPlus
+        an_SxC_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.SxC_ReplayDeltaPlus
         an_any_C_pbeDelta_result: SpikeRateTrends = an_inst_fr_comp.AnyC_ReplayDeltaPlus
 
         if a_pbeDelta_result is None:
-            print(f'\tWARN: a_pbeDelta_result is None for curr_session_context: {curr_session_context}. Skipping.')
+            print(f'\tWARN: a_pbeDelta_result (LxC_ReplayDeltaPlus) is None for curr_session_context: {curr_session_context}. Skipping.')
 
         sess_name_underscore: str = curr_session_context.get_description(separator='_')  # 'kdiba_gor01_one_2006-6-08_14-26-15'
 
         ## INPUTS: sess_name_underscore
         # --- this session's clear_LONG PBEs from FAT `pbe` ---
-        curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str).str.replace('-', '_', regex=False) == sess_name_underscore.replace('-', '_')].copy()
+        curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str).str.replace('-', '_', regex=False) == sess_name_underscore.replace('-', '_')].copy()
         # also try hyphenated FAT style if needed
         if curr_sess_pbe.empty:
-            curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str) == curr_session_context.get_description(separator='_')].copy()
+            curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str) == curr_session_context.get_description(separator='_')].copy()
         if curr_sess_pbe.empty:
-            curr_sess_pbe = pbe.loc[pbe['session_name'].astype(str).str.contains(curr_session_context.session_name)].copy()
+            curr_sess_pbe = epochs_df.loc[epochs_df['session_name'].astype(str).str.contains(curr_session_context.session_name)].copy()
 
         LdC_epoch_unit_fr_agg_df, LdC_epoch_unit_fr_df, filter_epochs_df, clear_long_activity, (LdC_fr_aclus_col_names, LdC_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=a_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
         an_LdC_all_aclus_mean_fr_dict = LdC_epoch_unit_fr_agg_df[LdC_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
-        # an_LdC_all_aclus_mean_fr_dict
-        # epoch_unit_fr_agg_df
         ## OUTPUTS: epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict
-        an_any_C_epoch_unit_fr_agg_df, an_any_C_epoch_unit_fr_df, an_any_C_filter_epochs_df, an_any_C_clear_long_activity, (an_any_C_fr_aclus_col_names, an_any_C_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_any_C_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
-        # an_any_C_epoch_unit_fr_agg_df
-        ## any_C aclus include the LdCs, so exclude those to look at the mean of the rest
-        # an_any_C_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[an_any_C_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
-        # an_any_C_all_aclus_mean_fr_dict
-        non_LdC_aclu_col_names = set(list(an_any_C_epoch_unit_fr_agg_df)) - set(list(LdC_epoch_unit_fr_agg_df.columns))
-        an_non_LdC_aclu_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[non_LdC_aclu_col_names].mean(axis='columns', skipna=True).to_dict()
-        # an_non_LdC_aclu_all_aclus_mean_fr_dict
 
-        ## OUTPUTS: an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict
-        _out_dict = {'LdCs': an_LdC_all_aclus_mean_fr_dict, 'non_LdCs': an_non_LdC_aclu_all_aclus_mean_fr_dict}
-        # an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict
-        return _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict)
+        an_SdC_all_aclus_mean_fr_dict = {}
+        SdC_epoch_unit_fr_agg_df = None
+        if an_SxC_pbeDelta_result is not None:
+            SdC_epoch_unit_fr_agg_df, SdC_epoch_unit_fr_df, SdC_filter_epochs_df, SdC_clear_long_activity, (SdC_fr_aclus_col_names, SdC_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_SxC_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+            an_SdC_all_aclus_mean_fr_dict = SdC_epoch_unit_fr_agg_df[SdC_aclu_agg_column_names_list].mean(axis='columns', skipna=True).to_dict()
+        else:
+            print(f'\tWARN: SxC_ReplayDeltaPlus is None for curr_session_context: {curr_session_context}. SdCs skipped.')
+
+        an_any_C_epoch_unit_fr_agg_df, an_any_C_epoch_unit_fr_df, an_any_C_filter_epochs_df, an_any_C_clear_long_activity, (an_any_C_fr_aclus_col_names, an_any_C_aclu_agg_column_names_list) = cls.compute_delta_plus_LdC_result(a_specific_spikeratetrends_result=an_any_C_pbeDelta_result, curr_sess_pbe=curr_sess_pbe, curr_session_context=curr_session_context)
+        ## any_C aclus include the LdCs/SdCs, so exclude those to look at the mean of the rest
+        exclusive_aclu_col_names = set(list(LdC_epoch_unit_fr_agg_df.columns))
+        if SdC_epoch_unit_fr_agg_df is not None:
+            exclusive_aclu_col_names |= set(list(SdC_epoch_unit_fr_agg_df.columns))
+        non_LdC_aclu_col_names = set(list(an_any_C_epoch_unit_fr_agg_df)) - exclusive_aclu_col_names
+        an_non_LdC_aclu_all_aclus_mean_fr_dict = an_any_C_epoch_unit_fr_agg_df[non_LdC_aclu_col_names].mean(axis='columns', skipna=True).to_dict()
+
+        ## OUTPUTS: an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict
+        _out_dict = {'LdCs': an_LdC_all_aclus_mean_fr_dict, 'SdCs': an_SdC_all_aclus_mean_fr_dict, 'non_LdCs': an_non_LdC_aclu_all_aclus_mean_fr_dict}
+        return _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict)
 
 
     @classmethod
@@ -5584,7 +5590,7 @@ class Figure2Extended:
                 format_name=ctxt.format_name, animal=ctxt.animal,
                 exper_name=ctxt.exper_name, session_name=ctxt.session_name,
             )
-            for cell_group, clear_dict in group_dict.items():  # 'LdCs' / 'non_LdCs'
+            for cell_group, clear_dict in group_dict.items():  # 'LdCs' / 'SdCs' / 'non_LdCs'
                 for is_clear_LONG, mean_n_active in clear_dict.items():  # False / True
                     rows.append({
                         **base,
@@ -5610,11 +5616,12 @@ class Figure2Extended:
         wide = wide.reset_index()
 
         # Per-session deltas (clear_LONG − other)
-        wide['LdCs_delta'] = wide['LdCs_clearLONG'] - wide['LdCs_other']
-        wide['non_LdCs_delta'] = wide['non_LdCs_clearLONG'] - wide['non_LdCs_other']
-
-        # display(wide)
-        # display(df)
+        for g in ['LdCs', 'SdCs', 'non_LdCs']:
+            clear_col, other_col = f'{g}_clearLONG', f'{g}_other'
+            if (clear_col in wide.columns) and (other_col in wide.columns):
+                wide[f'{g}_delta'] = wide[clear_col] - wide[other_col]
+            ## END if (clear_col in wide.columns) and (other_col in wide.columns)...
+        ## END for g in ['LdCs', 'SdCs', 'non_LdCs']...
 
         # Across-session averages
         summary = df.groupby(['cell_group', 'is_clear_LONG'], as_index=False).agg(
@@ -5629,19 +5636,20 @@ class Figure2Extended:
             # Compact: mean ± sem across sessions
             print(summary.pivot(index='cell_group', columns='is_clear_LONG', values='mean'))
             print('Across-session mean deltas (clearLONG − other):')
-            print(wide[['LdCs_delta', 'non_LdCs_delta']].agg(['mean', 'sem', 'median']))
+            delta_cols = [c for c in ['LdCs_delta', 'SdCs_delta', 'non_LdCs_delta'] if c in wide.columns]
+            print(wide[delta_cols].agg(['mean', 'sem', 'median']))
 
         return summary
 
 
 
     @classmethod
-    def main(cls, across_session_inst_fr_computation_dict, **kwargs):
+    def main(cls, epochs_df: pd.DataFrame, across_session_inst_fr_computation_dict, **kwargs):
         session_activity_dict = {}
         for curr_session_context, an_inst_fr_comp in across_session_inst_fr_computation_dict.items():
             if an_inst_fr_comp is not None:
                 try:
-                    _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_any_C_epoch_unit_fr_agg_df, an_non_LdC_aclu_all_aclus_mean_fr_dict) = cls.compute_single_session(an_inst_fr_comp=an_inst_fr_comp, curr_session_context=curr_session_context)
+                    _out_dict, (an_any_C_epoch_unit_fr_agg_df, an_LdC_all_aclus_mean_fr_dict, an_SdC_all_aclus_mean_fr_dict, an_non_LdC_aclu_all_aclus_mean_fr_dict) = cls.compute_single_session(epochs_df=epochs_df, an_inst_fr_comp=an_inst_fr_comp, curr_session_context=curr_session_context)
                     session_activity_dict[curr_session_context] = _out_dict
                 except (ValueError, AttributeError) as e:
                     print(f'WARN error e: {e} occured for curr_session_context: {curr_session_context}! Skipping.')
@@ -5656,5 +5664,4 @@ class Figure2Extended:
         return summary_df, session_activity_dict
 
         # ## False: not 'is_clear_LONG', True: 'is_clear_LONG'
-        # {'LdCs': {False: 0.4424268194353505, True: 0.337761670749316},
-        #  'non_LdCs': {False: 8.747961407968651, True: 8.24495517634073}}
+        # {'LdCs': {False: ..., True: ...}, 'SdCs': {False: ..., True: ...}, 'non_LdCs': {False: ..., True: ...}}
