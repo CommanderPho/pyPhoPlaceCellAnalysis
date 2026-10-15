@@ -380,7 +380,7 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
 
 
     # @function_attributes(short_name=None, tags=['adding', 'pseudo2D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-03-11 14:24', related_items=[])
-    def adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(self, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, masked_bin_fill_mode = 'nan_filled', debug_print: bool=True) -> "GenericDecoderDictDecodedEpochsDictResult":
+    def adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(self, directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, masked_bin_fill_mode = 'nan_filled', debug_print: bool=True, global_measured_position_df: Optional[pd.DataFrame]=None) -> "GenericDecoderDictDecodedEpochsDictResult":
         """ Takes the previously computed results and produces versions with each time bin masked by a required number of spike counts/participation.
         Updates in-places, creating new entries, but also returns self
 
@@ -389,6 +389,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
             a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result)
 
         """
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+
         if debug_print:
             print(f'.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(...):')
         filtered_epochs_df = None ## parameter just to allow an override I think
@@ -526,6 +528,15 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                         print(f'2025-08-13 19:18 Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df`.')
                     except (AssertionError, ValueError, AttributeError) as e:
                         print(f'2025-08-13 19:18 ERROR: Adding "most_likely_positions_1D" column to `a_dropping_masked_decoded_marginal_posterior_df` failed with error: {e}.')  # AssertionError: len(time_bin_extracted_most_likely_positions_1D_column): 9578, len(a_dropping_masked_decoded_marginal_posterior_df): 84
+                    except Exception as e:
+                        raise e
+
+                if (a_known_data_grain == 'per_time_bin') and (global_measured_position_df is not None):
+                    try:
+                        a_dropping_masked_decoded_marginal_posterior_df = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_dropping_masked_pseudo2D_continuous_specific_decoded_result, a_decoder=all_directional_pf1D_Decoder, a_decoded_marginal_posterior_df=a_dropping_masked_decoded_marginal_posterior_df, global_measured_position_df=global_measured_position_df)
+                        print(f'2026-10-15 Adding measured position columns (x_meas/y_meas/binned_x_meas) to `a_dropping_masked_decoded_marginal_posterior_df` for per_time_bin.')
+                    except (AssertionError, ValueError, AttributeError) as e:
+                        print(f'2026-10-15 ERROR: Adding measured position columns to `a_dropping_masked_decoded_marginal_posterior_df` failed with error: {e}.')
                     except Exception as e:
                         raise e
                     
@@ -1232,7 +1243,9 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
         if 'DirectionalMergedDecoders' in curr_active_pipeline.global_computation_results.computed_data:
             # DirectionalMergedDecoders: Get the result after computation:
             directional_merged_decoders_result: DirectionalPseudo2DDecodersResult = curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']
-            a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result) # , spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
+            global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+            a_new_fully_generic_result.pos_df = deepcopy(global_measured_position_df)
+            a_new_fully_generic_result = a_new_fully_generic_result.adding_directional_pseudo2D_decoder_results_filtered_by_spikes_per_t_bin_masked(directional_merged_decoders_result=directional_merged_decoders_result, global_measured_position_df=global_measured_position_df) # , spikes_df=deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
         else:
             print('WARN: missing "DirectionalMergedDecoders" global result. Skipping.')
         

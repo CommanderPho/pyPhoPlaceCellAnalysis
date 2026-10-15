@@ -8229,11 +8229,11 @@ def _helper_add_interpolated_position_columns_to_decoded_result_df(a_result: Dec
     active_computation_config = deepcopy(a_decoder.pf.config)
     # grid_bin_bounds = deepcopy(a_decoder.pf.config.grid_bin_bounds)
 
-    measured_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list[0])
+    measured_positions_df: pd.DataFrame = pd.concat(deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.measured_positions_dfs_list), ignore_index=True)
     measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
     measured_positions_df = measured_positions_df.rename(columns={'x':'x_meas', 'y':'y_meas', 'binned_x':'binned_x_meas', 'binned_y':'binned_y_meas'}, inplace=False).drop(columns=['t'], inplace=False) ## measured
 
-    decoded_positions_df: pd.DataFrame = deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list[0])
+    decoded_positions_df: pd.DataFrame = pd.concat(deepcopy(global_all_directional_decoder_result.measured_decoded_position_comparion.decoded_positions_df_list), ignore_index=True)
     decoded_positions_df = decoded_positions_df.position.adding_binned_position_columns(xbin_edges=xbin_edges, ybin_edges=ybin_edges, active_computation_config=active_computation_config)
     decoded_positions_df = decoded_positions_df.rename(columns={'x':'x_decoded_most_likely', 'binned_x':'binned_x_decoded_most_likely'}, inplace=False).drop(columns=['t'], inplace=False) ## decoded most likely
 
