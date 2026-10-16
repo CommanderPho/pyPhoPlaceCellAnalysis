@@ -13109,7 +13109,7 @@ class MeasuredVsDecodedOccupancy:
 
     @classmethod
     def plot_meas_vs_decoded_occupancy(cls, timebins_p_x_given_n: NDArray, track_templates: TrackTemplates, num='plot_meas_vs_decoded_occupancy', fig=None, ax_dict=None, should_max_normalize: bool=False, a_pre_post_delta_name=None, debug_print=False, skip_plotting_measured: bool=False, 
-            time_bin_size: Optional[float]=0.075, debug_print=False, **kwargs,
+            time_bin_size: Optional[float]=0.075, **kwargs,
         ):
         """ from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_meas_vs_decoded_occupancy
         a_result: DecodedFilterEpochsResult
