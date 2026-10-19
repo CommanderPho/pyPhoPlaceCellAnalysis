@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 
 
-def _compute_single_lap_reliability(curr_lap_filtered_spikes_df, variable_extents_array, min_subdivision_resolution:float = 0.01, spike_blurring:float = 80.0, span_width:int=None, debug_print=False):
+def _compute_single_lap_reliability(curr_lap_filtered_spikes_df: pd.DataFrame, variable_extents_array, min_subdivision_resolution:float = 0.01, spike_blurring:float = 80.0, span_width:int=None, debug_print=False):
     """ """
     # for now, just do x (first variable)
     curr_variable_extents = variable_extents_array[0]

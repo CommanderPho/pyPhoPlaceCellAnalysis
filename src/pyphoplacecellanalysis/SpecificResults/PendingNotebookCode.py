@@ -9424,6 +9424,686 @@ def bapun_proper_linearize_tracks(curr_active_pipeline):
 
 
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-11-05 - Factor out by-animal code                                                                                                                                                                                                                                               #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D, capture_new_figures_decorator, CaptureNewFiguresContextManager
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from neuropy.utils.matplotlib_helpers import FormattedFigureText
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+from pyphocorehelpers.plotting.figure_management import PhoActiveFigureManager2D
+from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, image_grid
+import matplotlib
+import matplotlib.pyplot as plt
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import SeriesLetter, AnimalName
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import _perform_dual_hist_plot, _perform_matplotlib_pre_post_scatter, _perform_matplotlib_SINGLE_SERIES_pre_post_scatter
+from pyphocorehelpers.plotting.media_output_helpers import figure_to_pil_image, vertical_image_stack, horizontal_image_stack, image_grid
+
+@function_attributes(short_name=None, tags=['session', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-11-06 08:09', related_items=[])
+def plot_by_session_split_histogram_figure(active_all_sessions_laps_time_bin_df: pd.DataFrame, active_all_sessions_ripple_time_bin_df: pd.DataFrame,
+                                           hist_animal_split_samples_df_dict, a_time_bin_size: float = 0.075):
+  """ 
+  
+  Temporarily produces a separate figure for each animal (laps/PBEs) and then merges them to a single figure and closes the temporaries.
+  
+  
+  from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_by_animal_split_histogram_figure
+  """
+  matplotlib.use('Qt5Agg')
+
+  display_context = IdentifyingContext(name=f'fig4_hist_validations')
+  constrained_layout = True
+  ## Debug plot separate for each animals
+  new_figs_dict = {}
+  collector = None
+  with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.dpi': str(dpi), 'figure.figsize': (12.4, 4.8), , 'figure.figsize': size
+    # Create a FigureCollector instance
+    with FigureCollector(name='fig4_by_animal_sess_validation', base_context=display_context) as collector:
+          
+      with CaptureNewFiguresContextManager() as fig_capturer:
+          # code that generates figures
+          _laps_histogram_out_by_animal = {}
+          _ripple_histogram_out_by_animal = {}
+
+          # _common_kwargs = dict(time_column='t_bin_center', legend_groups_to_solo=[0.025], legend_groups_to_hide=None,)
+          _common_kwargs = dict(
+                  # time_column='t_bin_center',
+                  time_column='delta_aligned_start_t',
+                  legend_groups_to_solo=[a_time_bin_size], legend_groups_to_hide=None,
+                              #   subplot_by_column='session_name', 
+          )
+
+
+          for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+              hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+              # animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+              _laps_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                            epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                              **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                              )
+              plt.suptitle(f'Session: {an_animal_name}')    
+              collector.post_hoc_append_container(a_container=_laps_histogram_out_by_animal[an_animal_name])
+              
+              _ripple_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                                                                  epochs_df=deepcopy(active_all_sessions_ripple_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                                  **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                                  )
+              plt.suptitle(f'Session: {an_animal_name}')
+              # collector.post_hoc_append(figs=[a_container.fig], axes=(a_container.ax_dict or a_container.axes), contexts=[(a_container.plots.context or None)])
+              collector.post_hoc_append_container(a_container=_ripple_histogram_out_by_animal[an_animal_name]) # new_figs_dict
+              
+      ## END with CaptureNewFiguresContextManager() as fig_capturer.....
+
+      new_figs_dict = fig_capturer.new_fig_dict
+      # new_figs_dict
+      # collector.post_hoc_append(figs=new_figs_dict.values()) # new_figs_dict
+      
+
+  new_figs_dict
+  # collector
+  # join to single figure: new_figs_dict _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+  # 1) Collect open figures
+  figs = new_figs_dict # PhoActiveFigureManager2D().figures_dict  # {fignum: Figure}
+
+  # 2) Convert to images (pick order you want)
+  pil_images = [figure_to_pil_image(a_fig=f) for _, f in sorted(figs.items())]
+
+  # 3) Compose into a grid (or use horizontal_image_stack/vertical_image_stack)
+  combined_img = vertical_image_stack(pil_images)  # one row; or arrange into rows
+
+  # 4) Show in a new Matplotlib figure
+  new_fig = plt.figure(constrained_layout=True, num='AcrossSessionFigures')
+  ax = new_fig.add_subplot(111)
+  ax.imshow(combined_img)
+  ax.axis('off')
+  plt.show()
+
+  ## Close old open images
+  for k, a_fig in figs.items():
+      plt.close(a_fig)
+      
+  return combined_img, collector
+
+
+
+
+# fig_man = PhoActiveFigureManager2D(name=f'fig_man') # Initialize a new figure manager
+def plot_by_animal_split_histogram_figure(active_all_sessions_laps_time_bin_df: pd.DataFrame, active_all_sessions_ripple_time_bin_df: pd.DataFrame,
+                                           hist_animal_split_samples_df_dict, a_time_bin_size: float = 0.075):
+  """ 
+  
+  Temporarily produces a separate figure for each animal (laps/PBEs) and then merges them to a single figure and closes the temporaries.
+  
+  
+  from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import plot_by_animal_split_histogram_figure
+  """
+  matplotlib.use('Qt5Agg')
+
+  display_context = IdentifyingContext(name=f'fig4_hist_validations')
+  constrained_layout = True
+  ## Debug plot separate for each animals
+  new_figs_dict = {}
+  collector = None
+  with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs({'figure.constrained_layout.use': (constrained_layout or False), 'figure.frameon': False, })): # 'figure.dpi': str(dpi), 'figure.figsize': (12.4, 4.8), , 'figure.figsize': size
+    # Create a FigureCollector instance
+    with FigureCollector(name='fig4_by_animal_sess_validation', base_context=display_context) as collector:
+          
+      with CaptureNewFiguresContextManager() as fig_capturer:
+          # code that generates figures
+          _laps_histogram_out_by_animal = {}
+          _ripple_histogram_out_by_animal = {}
+
+          # _common_kwargs = dict(time_column='t_bin_center', legend_groups_to_solo=[0.025], legend_groups_to_hide=None,)
+          _common_kwargs = dict(
+                  # time_column='t_bin_center',
+                  time_column='delta_aligned_start_t',
+                  legend_groups_to_solo=[0.075], legend_groups_to_hide=None,
+                              #   subplot_by_column='session_name',
+          )
+
+
+          for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+              hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+              # animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+              _laps_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                            epochs_df=deepcopy(active_all_sessions_laps_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                              **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                              )
+              plt.suptitle(f'Animal: {an_animal_name}')    
+              collector.post_hoc_append_container(a_container=_laps_histogram_out_by_animal[an_animal_name])
+              
+              _ripple_histogram_out_by_animal[an_animal_name] = _perform_matplotlib_SINGLE_SERIES_pre_post_scatter(grainularity_desc='by-time-bin',
+                                                                                  epochs_df=deepcopy(active_all_sessions_ripple_time_bin_df).pho.constrain_df_cols(trained_compute_epochs="laps", decoder_identifier="pseudo2D", masked_time_bin_fill_type='dropped', custom_replay_name="withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0", animal=an_animal_name), # , time_bin_size=a_time_bin_size
+                                                                                  **_common_kwargs, context_prefix = f'{an_animal_name} - ',
+                                                                                  )
+              plt.suptitle(f'Animal: {an_animal_name}')
+              # collector.post_hoc_append(figs=[a_container.fig], axes=(a_container.ax_dict or a_container.axes), contexts=[(a_container.plots.context or None)])
+              collector.post_hoc_append_container(a_container=_ripple_histogram_out_by_animal[an_animal_name]) # new_figs_dict
+              
+      ## END with CaptureNewFiguresContextManager() as fig_capturer.....
+
+      new_figs_dict = fig_capturer.new_fig_dict
+      # new_figs_dict
+      # collector.post_hoc_append(figs=new_figs_dict.values()) # new_figs_dict
+      
+
+  new_figs_dict
+  # collector
+  # join to single figure: new_figs_dict _______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+  # 1) Collect open figures
+  figs = new_figs_dict # PhoActiveFigureManager2D().figures_dict  # {fignum: Figure}
+
+  # 2) Convert to images (pick order you want)
+  pil_images = [figure_to_pil_image(a_fig=f) for _, f in sorted(figs.items())]
+
+  # 3) Compose into a grid (or use horizontal_image_stack/vertical_image_stack)
+  combined_img = vertical_image_stack(pil_images)  # one row; or arrange into rows
+
+  # 4) Show in a new Matplotlib figure
+  new_fig = plt.figure(constrained_layout=True, num='AcrossAnimalsFigures')
+  ax = new_fig.add_subplot(111)
+  ax.imshow(combined_img)
+  ax.axis('off')
+  plt.show()
+
+  ## Close old open images
+  for k, a_fig in figs.items():
+      plt.close(a_fig)
+      
+  return combined_img, collector
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-31 Find all potentially good KDIBA SESSIONS:                                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+import pandas as pd 
+from pathlib import Path
+from neuropy.utils.result_context import IdentifyingContext
+
+
+# @function_attributes(short_name=None, tags=['kdiba', 'fixup', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-31 18:33', related_items=[])
+def process_good_bad_sess_table(a_csv_path: Path, a_sess_good_bad_name: str ='good'):
+    """ processing MATLAB's output files to determine good/bad sessions
+
+    Usage:
+
+        sessions_table_paths_dict = {'bad': Path("C:/Users/pho/repos/matlab-to-neuropy-exporter/output/2025-10-31_bad_sessions_table.csv"),
+                'good': Path("C:/Users/pho/repos/matlab-to-neuropy-exporter/output/2025-10-31_good_sessions_table.csv"),
+        }
+
+
+        should_print: bool = True
+        for a_sess_good_bad_name, a_path in sessions_table_paths_dict.items():
+
+            sess_table, out_init_str = process_good_bad_sess_table(a_csv_path=a_path, a_sess_good_bad_name=a_sess_good_bad_name)
+            if should_print:
+                print(f'========================== {a_sess_good_bad_name} =======================')
+                print(f'{out_init_str}')    
+
+
+
+    """
+    sess_table: pd.DataFrame = pd.read_csv(a_csv_path)
+
+    
+    session_path_col_name: str = {'good': 'session_export_path', 'bad': 'session_folder'}[a_sess_good_bad_name]
+
+    loc_0 = sess_table.columns.get_loc(session_path_col_name)
+    sess_table_split = sess_table[session_path_col_name].str.split(pat='\\', expand=True).add_prefix('session_export_path_')
+    sess_table = pd.concat([sess_table.iloc[:, :loc_0], sess_table_split, sess_table.iloc[:, loc_0:]], axis=1)
+    sess_table = sess_table.drop(columns=[session_path_col_name])
+
+    # Drop columns: 'session_export_path_0', 'session_export_path_1'
+    sess_table = sess_table.drop(columns=['session_export_path_0', 'session_export_path_1'])
+
+    # Rename column 'session_export_path_3' to 'animal'
+    sess_table = sess_table.rename(columns={'session_export_path_3': 'animal'})
+
+    # Rename column 'session_export_path_5' to 'session_name'
+    if 'session_name' not in sess_table.columns:
+        sess_table = sess_table.rename(columns={'session_export_path_5': 'session_name'})
+    else:
+        sess_table = sess_table.drop(columns=['session_export_path_5'])
+        pass ## we already have this column
+    
+
+    # Rename column 'session_export_path_4' to 'exper_name'
+    sess_table = sess_table.rename(columns={'session_export_path_4': 'exper_name'})
+
+    # Rename column 'session_export_path_2' to 'format_name'
+    sess_table = sess_table.rename(columns={'session_export_path_2': 'format_name'})
+
+    # Convert text to lowercase in columns: 'format_name', 'animal', 'exper_name'
+    sess_table['format_name'] = sess_table['format_name'].str.lower()
+    sess_table['animal'] = sess_table['animal'].str.lower()
+    sess_table['exper_name'] = sess_table['exper_name'].str.lower()
+
+
+    # Select columns: 'format_name', 'animal' and 2 other columns
+    sess_table = sess_table.loc[:, ['format_name', 'animal', 'exper_name', 'session_name']].drop_duplicates(subset=['session_name'], ignore_index=True, inplace=False)
+    # Sort by columns: 'format_name' (ascending), 'animal' (ascending) and 2 other columns
+    sess_table = sess_table.sort_values(['format_name', 'animal', 'session_name', 'exper_name'])
+
+    out_contexts = []
+    for a_row in sess_table.itertuples(index=False, name='ContextRow'):
+        out_contexts.append(IdentifyingContext(**a_row._asdict()))
+        
+    out_init_str: str = ',\n'.join([ctx.get_initialization_code_string() for ctx in out_contexts])
+
+    return sess_table, out_init_str
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-25 - Previous stuff regarding bootstrapping                                                                                                                                                                                                                                  #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import random
+import numpy as np
+import pandas as pd
+from scipy.special import rel_entr
+from scipy import stats
+from scipy.stats import chisquare, chi2_contingency
+
+from typing import NewType
+
+SeriesLetter = NewType('SeriesLetter', str) # a letter in ['a', 'b', 'c', 'd'] coresponding to one of the four configurations
+AnimalName = NewType('AnimalName', str) # an animal name in ['gor01', 'vvp01', ''] coresponding to one of the three animals
+
+
+def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}fisherZ (from Teams) bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: {curr_num_draws}'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+        
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('fisherZ(post) - fisherZ(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+def plot_earthmovers(sim_diffs, num_bootstrap_samples, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}EarthMovers bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+        
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('EarthMovers(post) - EarthMovers(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+def plot_kldivergence(sim_diffs, num_bootstrap_samples, extra_title: str='', ax=None):
+    fig_title: str = f'{extra_title}KLDiv bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: realistic'
+    if ax is None:
+        fig, ax = plt.subplots(num=fig_title, clear=True)
+    else:
+        plt.sca(ax)
+        fig = ax.get_figure()
+
+    ax.hist(sim_diffs, bins=25)
+    plt.title(fig_title)
+    plt.xlabel('KLDiv(post) - KLDiv(pre)')
+    plt.ylabel('counts')
+    plt.axvline(0.0, color='red', alpha=0.7)
+    return fig, ax
+
+
+# @function_attributes(short_name=None, tags=['PENDING', 'count', 'extrema'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-16 13:04', related_items=[])
+# def compute_hist_variables(df: pd.DataFrame, column_name: str = 'P_Short', n_bins: int = 11, hist_range_min_max = (0.0, 1.0), use_density: bool = False, **kwargs):
+#     """ computes the counts, extrema counts, ratios, densities, etc for the dataframe passed. """
+#     bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+#     ## ensure only a single time_bin_size is in here so we're not multi-counting
+#     # df_tbs: pd.DataFrame = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+#     unique_time_bin_sizes = np.unique(df['time_bin_size'].to_numpy())
+#     assert len(unique_time_bin_sizes) == 1, f"unique_time_bin_sizes: {unique_time_bin_sizes} should only contain one time_bin_size to get accurate counts!"
+
+#     ## clean up NaNs before plotting
+#     df = df.dropna(subset=[column_name], how='any', inplace=False)
+#     # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
+#     data = df[column_name].dropna()
+
+#     # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+#     counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+
+#     # hist_count_extremas_only_dict = {k:np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+#     # hist_count_extrema_ratios = {k:(float(v[0])/float(v[-1])) for k, v in hist_counts_dict.items()}
+#     # hist_densities_dict = {k:(v.astype(float)/np.sum(v)) for k, v in hist_counts_dict.items()}
+    
+#     count_extremas_only = np.array([counts[0], counts[-1]])
+#     count_extrema_ratios = (float(counts[0])/float(counts[-1]))
+#     densities = (counts.astype(float)/np.sum(counts))
+    
+#     ## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+#     return counts, bin_edges, bin_values, count_extremas_only, count_extrema_ratios, densities
+
+
+
+@function_attributes(short_name=None, tags=['PENDING', 'count', 'extrema'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-16 13:04', related_items=[])
+def compute_hist_variables(hist_samples_df_dict: Dict[SeriesLetter, pd.DataFrame], column_name: str = 'P_Short', n_bins: int = 11, hist_range_min_max = (0.0, 1.0), use_density: bool = False, enable_safety_checks:bool=True, *kwargs):
+    """ computes the counts, extrema counts, ratios, densities, etc for the dataframe passed. """
+    bin_values: NDArray = np.linspace(*hist_range_min_max, n_bins)
+    
+    if enable_safety_checks:
+        hist_counts_dict = {}
+        
+        for k, df in hist_samples_df_dict.items():
+            ## ensure only a single time_bin_size is in here so we're not multi-counting
+            # df_tbs: pd.DataFrame = pre_delta_df[pre_delta_df['time_bin_size']==time_bin_size]
+            unique_time_bin_sizes = np.unique(df['time_bin_size'].to_numpy())
+            assert len(unique_time_bin_sizes) == 1, f"unique_time_bin_sizes: {unique_time_bin_sizes} should only contain one time_bin_size to get accurate counts!"
+
+            ## clean up NaNs before plotting
+            df = df.dropna(subset=[column_name], how='any', inplace=False)
+            # _fig_container.plots.hist['epochs_pre_delta'][time_bin_size] = df_tbs[column_name].hist(ax=ax_dict['epochs_pre_delta'], alpha=0.5, label=str(time_bin_size), **histogram_kwargs)     
+            data = df[column_name].dropna()
+
+            # Compute histogram bins and counts using numpy to match pandas .hist() behavior
+            counts, bin_edges = np.histogram(data, bins=n_bins, range=hist_range_min_max, density=use_density)
+            hist_counts_dict[k] = counts ## add the counts to the dict
+
+    else:
+        ## compute all inline, assumes only one time_bin_size, etc
+        bin_edges = None
+        hist_counts_dict = {k:np.histogram(df.dropna(subset=[column_name], how='any', inplace=False)[column_name].dropna(), bins=n_bins, range=hist_range_min_max, density=use_density)[0] for k, df in hist_samples_df_dict.items()}
+
+    hist_count_extremas_only_dict = {k:np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+    hist_count_extrema_ratios = {k:(float(v[0])/float(v[-1])) for k, v in hist_counts_dict.items()}
+    hist_densities_dict = {k:(v.astype(float)/np.sum(v)) for k, v in hist_counts_dict.items()}
+    
+    # count_extremas_only = np.array([counts[0], counts[-1]])
+    # count_extrema_ratios = (float(counts[0])/float(counts[-1]))
+    # densities = (counts.astype(float)/np.sum(counts))
+    
+    ## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+    return hist_counts_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios, hist_densities_dict, (bin_edges, bin_values)
+
+
+
+
+
+
+@function_attributes(short_name=None, tags=['fig4', 'stats', 'hist', 'final'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-10-10 14:13', related_items=[])
+def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confidence_level: float = 0.95):
+    """ fig4_hist_stats_pho to compare the histograms
+    
+    ### 2025-10-10 - Fresh start with binomial resampling
+    
+    'a': PreLaps, 'b': PostLabs, 'c': PrePBEs, 'd': PostPBEs
+    metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+    
+    bags = {
+        'a': np.array([9558, 312], dtype=int),
+        'b': np.array([1514, 3767], dtype=int),
+        'c': np.array([1616, 282], dtype=int),
+        'd': np.array([906, 721], dtype=int)
+    }
+    
+    """
+
+    def _subfn_simulate_draws(num_red: int, num_blue: int, num_draws: int):
+        """Simulates drawing balls with replacement from a bag, returns a boolean NDArayy with n_draws items.
+        red: 1, blue: 0
+        
+        """
+        # bag = ['red'] * num_red + ['blue'] * num_blue
+        # draws = random.choices(bag, k=num_draws)
+        # # Convert simulation results to a numerical format (e.g., 1 for red, 0 for blue)
+        # draw_binary_outcome_vector = np.array([1 if draw == 'red' else 0 for draw in draws])
+        # return draw_binary_outcome_vector
+        p_red = num_red / (num_red + num_blue)
+        return np.random.binomial(1, p_red, size=num_draws)
+
+
+    def _subfn_bootstrap_mean_ci(num_red: int, num_blue: int, num_bootstrap_samples: int, confidence_level: float=0.95):
+        """Calculates bootstrap confidence intervals for the mean."""
+        # num_draws: int = num_bootstrap_samples
+        num_draws: int = num_red + num_blue
+
+        samples = []
+        means = []
+        # n = len(data)
+        for _ in range(num_bootstrap_samples):
+            # sample = np.random.choice(data, size=n, replace=True)
+            # sample = [1 if draw == 'red' else 0 for draw in random.choices((['red'] * num_red + ['blue'] * num_blue), k=num_draws)]
+            sample = _subfn_simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=num_draws)
+            samples.append(sample)
+            means.append(np.mean(sample))
+
+        alpha = 1.0 - confidence_level
+        lower_bound = np.percentile(means, alpha / 2 * 100)
+        upper_bound = np.percentile(means, (1 - alpha / 2) * 100)
+
+        return np.mean(means), np.std(means), lower_bound, upper_bound, samples
+
+
+    def _subfn_compute_fisher_z(total_n_per_bag: Dict, an_observed_n_red_sample: Dict, a_simulated_prob_by_bag: Dict, k1: str, k2: str):
+        """ captures: nothing 
+        k1, k2: bag_name strings to be compared
+        """
+        n1 = total_n_per_bag[k1]
+        n2 = total_n_per_bag[k2]
+        an_X1 = an_observed_n_red_sample[k1]
+        an_X2 = an_observed_n_red_sample[k2]
+        p1 = a_simulated_prob_by_bag[k1]
+        p2 = a_simulated_prob_by_bag[k2]
+        
+        a_pooled_prob: bool = (an_X1 + an_X2) / (n1 + n2) # booled over the Laps/PBEs for a given result
+        a_z: float = (p1 - p2) / np.sqrt( a_pooled_prob * (1.0 - a_pooled_prob) * ((1.0/n1) + (1.0/n2)) )
+        return a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2)
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # BEGIN FUNCTION BODY                                                                                                                                                                                                                                                                  #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    
+    metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+    
+    # num_draws: int = 1024
+    # num_draws: int = 10000
+
+    ## INPUTS: bags, confidence_level, num_simulations
+    alpha: float = 1.0 - confidence_level
+    simulated_samples_by_bag = {}
+    simulated_counts_by_bag = {}
+    # simulation_results_by_bag = {}
+    simulation_results: List[Dict] = []
+    total_n_per_bag: Dict = {bag_name:np.sum(ball_counts) for bag_name, ball_counts in bags.items()}
+
+    # Main Bootstrap loop ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+    for _ in range(num_bootstrap_samples):
+        
+        an_observed_n_red_sample = {}
+
+        for bag_name, ball_counts in bags.items():
+            if bag_name not in simulated_samples_by_bag:
+                simulated_samples_by_bag[bag_name] = []
+                simulated_counts_by_bag[bag_name] = []
+                
+            num_red, num_blue = ball_counts
+            
+            # ## override curr_num_draws
+            # curr_num_draws = 1024
+            # total_n_per_bag[bag_name] = curr_num_draws
+            
+            ## typical (non-overriden) curr_num_draws:
+            curr_num_draws = num_red + num_blue
+            
+            sample = _subfn_simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=curr_num_draws)
+            # sample = simulate_draws(num_red=num_red, num_blue=num_blue, num_draws=num_draws)
+            simulated_samples_by_bag[bag_name].append(sample)
+            ## Get the counts from the sample:
+            obs_num_red: int = np.sum(sample)
+            obs_num_blue: int = curr_num_draws - obs_num_red
+            
+            an_observed_n_red_sample[bag_name] = obs_num_red
+            simulated_counts_by_bag[bag_name].append((obs_num_red, obs_num_blue))
+            
+        ## END for bag_name, ball...
+        
+        ## Get most recent sample of pre-delta: ('a', 'c') and do the test
+        a_simulation_result = {}
+
+        # a_simulated_prob_by_bag = {k:(v[-1][0] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        # a_simulated_prob_dist_by_bag = {k:(v[-1] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+
+
+        a_simulated_prob_by_bag = {k:(np.asarray(v[-1], dtype=float)[0] / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+        a_simulated_prob_dist_by_bag = {k:(np.asarray(v[-1], dtype=float) / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
+
+        ## INPUTS: total_n_per_bag, an_observed_n_red_sample, a_simulated_prob_by_bag, k1, k2
+        a_simulation_result.update(**a_simulated_prob_by_bag)
+        # a_simulation_result['p_pooled'] = # a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2)
+        # a_simulation_result['pre_delta'] = compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='a', k2='c')
+        # a_simulation_result['post_delta'] = compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='b', k2='d')
+        # a_simulation_result['diff'] = np.abs(a_simulation_result['post_delta'][0]) - np.abs(a_simulation_result['pre_delta'][0]) ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+
+        metrics_to_compute = ['EARTHMOVERS', 'KLDIV']
+        
+        def _subfn_KL_DIV(p, q, epsilon: float = 1e-10):
+            """ stabilized KLDivergence by adding a small epsilon.
+            """
+            p, q = p + epsilon, q + epsilon
+            p /= p.sum(); q /= q.sum()
+            return np.sum(rel_entr(p, q))
+
+
+        ## EARTHMOVERS
+        a_simulation_result['KLDIV_pre_delta'] = _subfn_KL_DIV(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])
+        a_simulation_result['KLDIV_post_delta'] = _subfn_KL_DIV(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        
+        ## KL Divergence
+        a_simulation_result['EARTHMOVERS_pre_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c'])
+        a_simulation_result['EARTHMOVERS_post_delta'] = stats.wasserstein_distance(a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        
+        ## Broken EARTHMOVERS: ValueError: Value and weight array-likes for the same empirical distribution must be of the same size.
+        # a_simulation_result['pre_delta'] = stats.wasserstein_distance(simulated_samples_by_bag['a'][-1], simulated_samples_by_bag['c'][-1], a_simulated_prob_dist_by_bag['a'], a_simulated_prob_dist_by_bag['c']) # compute_fisher_z(total_n_per_bag=total_n_per_bag, an_observed_n_red_sample=an_observed_n_red_sample, a_simulated_prob_by_bag=a_simulated_prob_by_bag, k1='a', k2='c')
+        # a_simulation_result['post_delta'] = stats.wasserstein_distance(simulated_samples_by_bag['b'][-1], simulated_samples_by_bag['d'][-1], a_simulated_prob_dist_by_bag['b'], a_simulated_prob_dist_by_bag['d'])
+        
+        # simulated_samples_by_bag[bag_name]
+        
+        # a_simulation_result['diff'] = np.abs(a_simulation_result['post_delta']) - np.abs(a_simulation_result['pre_delta']) ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        a_simulation_result['EARTHMOVERS_diff'] = a_simulation_result['EARTHMOVERS_post_delta'] - a_simulation_result['EARTHMOVERS_pre_delta'] ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        a_simulation_result['KLDIV_diff'] = a_simulation_result['KLDIV_post_delta'] - a_simulation_result['KLDIV_pre_delta'] ## [0] is inexing into the tuple (a_z, a_pooled_prob, (n1, n2), (an_X1, an_X2), (p1, p2))
+        
+        simulation_results.append(a_simulation_result)
+
+    # metric_diff_names = [f'{k}_diff' for k in metrics_to_compute]
+    sim_diffs_dict = {k:np.array([a_sim[f'{k}_diff'] for a_sim in simulation_results]) for k in metrics_to_compute}
+    # sim_diffs = np.array([a_sim['diff'] for a_sim in simulation_results])
+    ## OUTPUTS: simulation_results, sim_diffs
+    # np.shape(sim_diffs)
+    # sim_diffs
+
+    simulation_results_df: pd.DataFrame = pd.DataFrame(simulation_results)
+    return sim_diffs_dict, simulation_results_df
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2025-10-09 - PhoDibaPaper2025 Figure Finalization                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
+from pyphoplacecellanalysis.GUI.PyQtPlot.Widgets.ContainerBased.PhoContainerTool import GenericMatplotlibContainer
+
+
+
+class HistDistributionPlotterTest:
+    """ 
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import HistDistributionPlotterTest
+
+        ## INPUTS: bin_values
+        # hist_data_array_dict = deepcopy(hist_counts_dict)
+        hist_data_array_dict = deepcopy(hist_densities_dict)
+        bin_values = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['bin_values']
+        bin_edges = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['bin_edges']
+        # hist_range_min_max = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['hist_range_min_max']
+        # n_bins: int = _laps_histogram_out.plots_data.hist['epochs_pre_delta'][a_time_bin_size]['n_bins']
+        hist_range_min_max = (bin_values[0], bin_values[-1])
+        n_bins: int = len(bin_values)
+
+        use_density: bool = False
+        plotter = HistDistributionPlotterTest()
+
+        collector = plotter.plot_hists(hist_data_array_dict, bin_values)
+        collector
+    """
+    def plot_hists(self, hist_data_array_dict: Dict, bin_values: NDArray, bin_edges: NDArray, **kwargs):
+        """ 
+        
+        , n_bins: int
+        
+        """
+        
+        n_bins: int = kwargs.pop('n_bins', (len(bin_edges)-1))
+        hist_range_min_max = kwargs.pop('hist_range_min_max', (bin_values[0], bin_values[-1]))
+
+
+        with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True, **{'figure.figsize': (6.5, 2), 'figure.dpi': '220',})):
+        # with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=False, **{})):
+
+            # Create a FigureCollector instance
+            with FigureCollector(name='test_Fig4_stats', base_context=IdentifyingContext()) as collector:
+
+                fig = collector.build_or_reuse_figure(fignum='test_Fig4_stats', clear=True) 
+                _fig_container: GenericMatplotlibContainer = GenericMatplotlibContainer(name='plot_pre_scatter_post_matplotlib')
+                _fig_container.fig = fig
+                fig, ax_dict = collector.subplot_mosaic(
+                    [
+                        ["a", 'b'],
+                        ['c','d'],        
+                    ],
+                    # set the height ratios between the rows
+                    sharex=True, sharey=True,
+                    width_ratios = [1, 1],
+                    gridspec_kw=dict(wspace=0, hspace=0.15), # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
+                    extant_fig=fig,
+                ) 
+                _fig_container.ax_dict = ax_dict
+                fig.suptitle('test_Fig4_stats')
+
+                # histogram_kwargs = dict(orientation="horizontal", bins=11)
+                histogram_kwargs = dict(orientation="vertical", bins=n_bins, range=hist_range_min_max)
+                histogram_kwargs.update(dict(color='blue', ))
+                # val = np.linspace(0, 1.0, 11)
+                
+                for k, v in hist_data_array_dict.items():
+                    # ax_dict[k].hist(v, bins=histogram_kwargs['bins'], range=hist_range_min_max, density=use_density, alpha=0.5, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    # ax_dict[k].hist(bin_values, weights=v, alpha=0.5, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    ax_dict[k].stairs(v, bin_edges, alpha=0.5, fill=True, hatch='//', label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']})
+                    ax_dict[k].stairs(v, bin_edges, alpha=0.9, fill=False, label=f"{k}", **{k: v for k, v in histogram_kwargs.items() if k not in ['bins', 'range', 'density']}) ## for edges
+
+                    # ax_dict[k].set_ylabel(k)
+                    ax_dict[k].set_title(k)
+                    # val, weight = zip(*[(k, v) for k,v in counted_data.items()])
+
+                    # plt.hist(val, weights=weight)
+                    # ax_dict[k]
+
+        return collector
+
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-09-05 - Bapun Co/plotting                                                                                                                                                                                                                                                       #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -10432,6 +11112,14 @@ def _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot, decoded_epo
         _out_pbe_tracks = _add_context_decoded_epoch_marginals_to_timeline(active_2d_plot=active_2d_plot, decoded_epochs_result=pbe_decoder_result)
 
     """
+    if isinstance(decoded_epochs_result, DecodedFilterEpochsResult):
+        slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
+        slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+        slices_time_window_centers = decoded_epochs_result.time_window_centers
+    else:
+        slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in [decoded_epochs_result.p_x_given_n]]
+        slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
+        slices_time_window_centers = [deepcopy(decoded_epochs_result.time_bin_container.centers)]
     if isinstance(decoded_epochs_result, DecodedFilterEpochsResult):
         slices_posteriors = [np.nansum(a_p_x_given_x, axis=(0, 1)) for a_p_x_given_x in decoded_epochs_result.p_x_given_n_list]
         slices_posteriors = [(marginal_z / np.sum(marginal_z, axis=0, keepdims=True)) for marginal_z in slices_posteriors]
@@ -13047,7 +13735,7 @@ class MeasuredVsDecodedOccupancy:
         # a_decoded_marginal_posterior_df['is_post_delta'] = a_decoded_marginal_posterior_df['is_post_delta'].astype(int)
         a_decoded_marginal_posterior_df
 
-        # pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
+        pre_post_delta_result_splits_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_id')
 
         n_timebins, flat_time_bin_containers, timebins_p_x_given_n = a_result.flatten() # (59, 4, 69488)
         # timebins_p_x_given_n.shape
@@ -13090,6 +13778,43 @@ class MeasuredVsDecodedOccupancy:
                 active_ax_dict = {ax_name:v for ax_name, v in ax_dict.items() if (ax_name.split('_', maxsplit=1)[0] == a_pre_post_delta_name)}
                 cls.plot_meas_vs_decoded_occupancy(timebins_p_x_given_n=a_timebins_p_x_given_n, track_templates=track_templates, fig=fig, ax_dict=active_ax_dict, a_pre_post_delta_name=a_pre_post_delta_name, **plot_meas_vs_decoded_kwargs, **kwargs)
                 # ax.set_title(f'{figure_title} - {a_pre_post_delta_name}')  # Set subplot title
+                
+                if include_only_track_body_time_bins:
+                    active_a_decoded_marginal_posterior_df: pd.DataFrame = deepcopy(pre_post_delta_result_splits_dict[a_pre_post_delta_name])
+                    active_a_decoded_marginal_posterior_df = deepcopy(active_a_decoded_marginal_posterior_df[active_a_decoded_marginal_posterior_df['is_track_body']])
+
+                    decoded_col_name: str = 'binned_x_decoded_most_likely'
+                    meas_col_name: str = 'binned_x_meas'
+
+                    # decoded_col_name: str = 'x_decoded_most_likely'
+                    # meas_col_name: str = 'x_meas'
+                    
+                    track_body_only_kwargs = dict(alpha=0.9)
+                    legend_series_names = ['decoded', 'measured']
+                    for i, (ax_name, ax) in enumerate(ax_dict.items()):
+                        
+                        if decoded_col_name in active_a_decoded_marginal_posterior_df:
+                            # a_decoded_occupancy = active_a_decoded_marginal_posterior_df[decoded_col_name].to_numpy()
+                            xbin_bin_ids = np.arange(len(track_templates.get_decoders_dict()['long_LR'].xbin_centers)) + 1
+                            a_decoded_occupancy_dict = {a_xbin_idx:active_a_decoded_marginal_posterior_df[decoded_col_name].value_counts().to_dict().get(a_xbin_idx, 0) for a_xbin_idx in xbin_bin_ids}
+                            a_decoded_occupancy = np.array(list(a_decoded_occupancy_dict.values()))                            
+                            occupancy_fig, occupancy_ax = perform_plot_occupancy(a_decoded_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='decoded_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
+                            legend_series_names.append('decoded_trackBodyOnly')
+                            
+                        if not skip_plotting_measured:
+                            if meas_col_name in active_a_decoded_marginal_posterior_df:
+                                a_measured_occupancy = active_a_decoded_marginal_posterior_df[meas_col_name].to_numpy()
+                                ## we have all the bin_ids in the above vector, and to get the occupancy we need to count them up:
+                                # active_a_decoded_marginal_posterior_df[meas_col_name].value_counts().to_dict()
+                                xbin_bin_ids = np.arange(len(track_templates.get_decoders_dict()['long_LR'].xbin_centers)) + 1
+                                a_measured_occupancy_dict = {a_xbin_idx:active_a_decoded_marginal_posterior_df[meas_col_name].value_counts().to_dict().get(a_xbin_idx, 0) for a_xbin_idx in xbin_bin_ids}
+                                a_measured_occupancy = np.array(list(a_measured_occupancy_dict.values()))
+                                occupancy_fig, occupancy_ax = perform_plot_occupancy(a_measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured_trackBodyOnly', should_max_normalize=should_max_normalize, **track_body_only_kwargs)
+                                legend_series_names.append('measured_trackBodyOnly')
+                                            
+                    ## END for i, (ax_name, ax) in enumerate(ax_di...
+                    plt.legend(legend_series_names)
+            ## END for a_pre_post_delta_name, a_timebins_p_x_given_n in pre_post_delta_timebins_...
 
             plt.suptitle(f'{figure_title}')  # Set overall figure title
             return fig, ax_dict
@@ -13115,7 +13840,7 @@ class MeasuredVsDecodedOccupancy:
         a_result: DecodedFilterEpochsResult
         
         """
-        from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+        from neuropy.plotting.placemaps import perform_plot_occupancy
         
         ## Measured
         decoders_dict: Dict[types.DecoderName, BasePositionDecoder] = track_templates.get_decoders_dict()
@@ -13225,11 +13950,233 @@ class MeasuredVsDecodedOccupancy:
             if is_measured_result_curr_period:
                 ## only plot measured for the correct measured period:
                 occupancy_fig, occupancy_ax = perform_plot_occupancy(measured_occupancy, xbin_centers=None, ybin_centers=None, fig=fig, ax=ax, plot_pos_bin_axes=False, label='measured', should_max_normalize=should_max_normalize, **measured_kwargs)
+
+
+            # if include_time_bin_only_values:
+            #     active_a_decoded_marginal_posterior_df: pd.DataFrame = deepcopy(a_decoded_marginal_posterior_df[a_decoded_marginal_posterior_df['is_track_body']])
+                
+
+
             ax.set_title(ax_title)
+        ## END for i, (ax_name, ax) in enumerate(ax_di...
 
         plt.legend(['decoded', 'measured'])
         # occupancy_fig.show()
         return fig, ax_dict
+
+
+@function_attributes(short_name=None, tags=['decoding', 'context', 'position', 'performance'], input_requires=[], output_provides=['optional_decoded_marginal_posterior_partition_csvs', 'optional_pos_by_ctxt_joint_pngs'], uses=[], used_by=[], creation_date='2026-04-08 13:51', related_items=[])
+def determine_decoded_context_uncertainty_as_fn_of_position(curr_active_pipeline, time_bin_size: float=0.060, enable_export_path: Optional[Path]=None, show_pos_by_ctxt_joint_figure: bool=True, a_target_context: Optional[IdentifyingContext]=None) -> Dict[str, pd.DataFrame]:
+    """ sees if some positions consistently decode to ambiguous context/etc
+
+    If ``enable_export_path`` is set, per-partition decoded marginal posterior DataFrames are written as CSV under
+    ``<enable_export_path>/output/`` (directory created if needed), ``curr_active_pipeline.register_output_file`` is
+    called for each successful write, and export failures are logged without aborting the rest of the function.
+    The same folder receives an optional matplotlib PNG: a single figure with ``result_pos_by_ctxt_joint`` heatmaps
+    side-by-side for all pre/post-delta partitions (shared colormap, one colorbar), registered on success.
+
+    Returns ``pre_post_delta_a_decoded_marginal_posterior_df_dict`` (partition key to DataFrame).
+
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import determine_percent_correctly_decoded_contexts
+    ## find the number of correctly decoded components:
+    
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+
+    records_df: pd.DataFrame = determine_percent_correctly_decoded_contexts(curr_active_pipeline, time_bin_size=time_bin_size)
+    records_df
+    
+    """
+    from pyphocorehelpers.assertion_helpers import Assert
+    from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+    from neuropy.utils.result_context import IdentifyingContext
+    from neuropy.utils.mixins.binning_helpers import build_df_discretized_binned_position_columns
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import _helper_add_interpolated_position_columns_to_decoded_result_df
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import CustomDecodeEpochsResult, MeasuredDecodedPositionComparison, DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.EpochComputationFunctions import EpochComputationFunctions, EpochComputationsComputationsContainer
+
+    valid_EpochComputations_result: EpochComputationsComputationsContainer = curr_active_pipeline.global_computation_results.computed_data['EpochComputations']
+    a_new_fully_generic_result: GenericDecoderDictDecodedEpochsDictResult = valid_EpochComputations_result.a_generic_decoder_dict_decoded_epochs_dict_result
+
+    ## INPUTS: a_new_fully_generic_result
+    if a_target_context is None:
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='nan_filled', data_grain='per_time_bin')        
+        # a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='global', masked_time_bin_fill_type='ignore', data_grain='per_time_bin') ## global
+        a_target_context: IdentifyingContext = IdentifyingContext(trained_compute_epochs='laps', pfND_ndim=1, decoder_identifier='pseudo2D', known_named_decoding_epochs_type='laps', masked_time_bin_fill_type='ignore', data_grain='per_time_bin')
+
+    best_matching_context, a_result, a_decoder, a_decoded_marginal_posterior_df = a_new_fully_generic_result.get_results_best_matching_context(context_query=a_target_context, debug_print=False)
+    ## OUTPUTS: a_result, a_decoder, a_decoded_marginal_posterior_df
+    ## INPUTS: curr_active_pipeline, a_result, a_decoder, a_decoded_marginal_posterior_df
+    global_measured_position_df: pd.DataFrame = deepcopy(curr_active_pipeline.sess.position.to_dataframe())
+    a_decoded_marginal_posterior_df, a_custom_decode_analysis = _helper_add_interpolated_position_columns_to_decoded_result_df(a_result=a_result, a_decoder=a_decoder, a_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df,
+                                                                                                                global_measured_position_df=global_measured_position_df)
+
+    is_post_delta = (a_decoded_marginal_posterior_df['delta_aligned_start_t'] > 0.0)
+    a_decoded_marginal_posterior_df['pre_post_delta_id'] = 'pre-delta'
+    a_decoded_marginal_posterior_df.loc[is_post_delta, 'pre_post_delta_id'] = 'post-delta'
+
+    ## INPUTS: a_decoder, a_decoded_marginal_posterior_df
+
+    a_decoded_marginal_posterior_df = a_decoded_marginal_posterior_df.drop(columns=[k for k in ['binned_x_meas', 'binned_y_meas'] if k in a_decoded_marginal_posterior_df], inplace=False)
+
+
+    position_column_names = [k for k in ('x_meas','y_meas') if k in a_decoded_marginal_posterior_df.columns]
+    binned_column_names = [f'binned_{k}' for k in position_column_names]
+    ndim: int = len(position_column_names)
+    if ndim == 2:
+        bin_values=(a_decoder.xbin, a_decoder.ybin)
+    else:
+        bin_values=(a_decoder.xbin, )
+
+    a_decoded_marginal_posterior_df, updated_bin_values, bin_infos = build_df_discretized_binned_position_columns(a_decoded_marginal_posterior_df, 
+                                                                                                            bin_values=bin_values, position_column_names = position_column_names,  binned_column_names = binned_column_names,
+                                                                                                            force_recompute=True, debug_print=True)
+
+    # unpack updated_bin_values:
+    # if ndim == 2:
+    #     (xbin, ybin) = updated_bin_values
+    # else:
+    #     xbin = updated_bin_values        
+
+    # ['binned_x_meas', 'binned_y_meas']
+    # print(f'{list(a_decoded_marginal_posterior_df.columns)}')
+    # ['P_LR', 'P_RL', 'P_Long', 'P_Short', 'long_LR', 'long_RL', 'short_LR', 'short_RL',
+    #  'parent_epoch_df_idx', 'result_t_bin_idx', 'epoch_id', 'sub_epoch_time_bin_index', 'parent_epoch_id', 'parent_epoch_label', 'parent_epoch_start_t', 'parent_epoch_end_t', 'parent_epoch_duration',
+    #  'most_likely_positions_1D', 'label', 'start', 't_bin_center', 'stop', 'delta_aligned_start_t',
+    #  'session_name', 'time_bin_size', 'pre_post_delta_category', 'trained_compute_epochs', 'pfND_ndim', 'decoder_identifier', 'known_named_decoding_epochs_type', 'masked_time_bin_fill_type', 'data_grain', 'format_name', 'animal', 'exper_name', 'epochs_source', 'included_qclu_values', 'minimum_inclusion_fr_Hz', ## Context/Compute Params
+
+    #  'is_t_bin_center_fake', 'x_meas', 'y_meas', 'binned_x_meas', 'binned_y_meas', 'x_decoded_most_likely', 'sq_err', 'err_cm', 'binned_x_decoded_most_likely', ## Position matching
+    #  'is_decoded_pos_long_track_body', 'is_decoded_pos_short_track_body', 'is_most_likely_decoder_Long', 'is_track_body']
+
+    def _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df, debug_print: bool=False):
+        """ captures: a_decoder, a_decoder 
+        """
+        binned_pos_columns = ['binned_x_meas'] # 'sq_err', 'err_cm', 'binned_y_meas'
+        # binned_pos_columns = ['binned_y_meas'] #, 'binned_x_decoded_most_likely'] # 'sq_err', 'err_cm', 'binned_y_meas', 
+        context_decoding_columns = ['P_Long', 'P_Short'] ## 2-context
+        # context_decoding_columns = ['long_LR', 'long_RL', 'short_LR', 'short_RL'] ## 4-context
+
+        n_contexts: int = len(context_decoding_columns)
+        n_pos_bins: int = len(a_decoder.xbin_centers) # xbin (len(xbin): 60) is correct here, len(a_decoder.ybin) # 5
+        ## INPUTS: a_decoded_marginal_posterior_df
+        n_original_t_bins: int = len(active_decoded_marginal_posterior_df)
+        if debug_print:
+            print(f'n_contexts: {n_contexts}')
+            print(f'n_pos_bins: {n_pos_bins}')
+            print(f'n_original_t_bins: {n_original_t_bins}')
+
+
+        result_pos_by_ctxt_joint = np.zeros(shape=[n_contexts, n_pos_bins])
+        # epoch_partitioned_dfs_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict(partitionColumn='parent_epoch_label')
+        pos_binned_x_partitioned_dfs_dict = active_decoded_marginal_posterior_df.pho.partition_df_dict(partitionColumn=binned_pos_columns[0])
+
+        for a_pos_bin_idx, a_df in pos_binned_x_partitioned_dfs_dict.items():
+            a_ctxt_posterior_list = a_df[context_decoding_columns].to_numpy()
+            # np.shape(a_ctxt_posterior_list)
+            result_pos_by_ctxt_joint[:, (a_pos_bin_idx-1)] += np.nansum(a_ctxt_posterior_list, axis=0)
+
+        # result_pos_by_ctxt_joint ## re-normalize
+        result_pos_by_ctxt_joint = result_pos_by_ctxt_joint / np.nansum(result_pos_by_ctxt_joint, axis=0, keepdims=True)
+        ## OUTPUTS: result_pos_by_ctxt_joint
+        return result_pos_by_ctxt_joint
+    ## END def _subfn_compute_pre_post_delta_pos_by_ctxt_j....
+
+
+    pre_post_delta_a_decoded_marginal_posterior_df_dict = a_decoded_marginal_posterior_df.pho.partition_df_dict('pre_post_delta_category') # pre_post_delta_category
+    # pre_post_delta_a_decoded_marginal_posterior_df_dict['pre-delta']
+    # pre_post_delta_a_decoded_marginal_posterior_df_dict['post-delta']
+
+    ## OUTPUTS: pre_post_delta_a_decoded_marginal_posterior_df_dict
+    pre_post_delta_result_pos_by_ctxt_joint_dict: Dict[str, NDArray] = {}
+    csv_export_out_dir: Optional[Path] = None
+    if enable_export_path is not None:
+        csv_export_out_dir = Path(enable_export_path).joinpath('output')
+        csv_export_out_dir.mkdir(parents=True, exist_ok=True)
+    for a_pre_post_delta, a_decoded_marginal_posterior_df in pre_post_delta_a_decoded_marginal_posterior_df_dict.items():
+        result_pos_by_ctxt_joint = _subfn_compute_pre_post_delta_pos_by_ctxt_joint(active_decoded_marginal_posterior_df=a_decoded_marginal_posterior_df)
+        pre_post_delta_result_pos_by_ctxt_joint_dict[a_pre_post_delta] = result_pos_by_ctxt_joint
+
+        if csv_export_out_dir is not None:
+            _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
+            _delta_part = sanitize_filename_for_Windows(str(a_pre_post_delta))
+            _date = datetime.now().strftime('%Y-%m-%d')
+            _tbin = str(time_bin_size).replace('.', 'p')
+            export_csv_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_decoded_marginal_posterior_with_meas_pos_{_delta_part}_tbin{_tbin}.csv')
+            try:
+                export_resolved = export_csv_path.resolve()
+                a_decoded_marginal_posterior_df.to_csv(export_resolved, index=False)
+                print(f'exported decoded marginal posterior CSV: {export_resolved}')
+                curr_active_pipeline.register_output_file(output_path=export_resolved, output_metadata=dict(kind='decoded_marginal_posterior_df_csv', pre_post_delta=a_pre_post_delta, time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
+            except Exception as e:
+                print(f'WARN: failed to export CSV to {export_csv_path}: {e}')
+
+    ## OUTPUTS: pre_post_delta_result_pos_by_ctxt_joint_dict
+    # pre_post_delta_result_pos_by_ctxt_joint_dict
+    # list(pre_post_delta_a_decoded_marginal_posterior_df_dict.keys()) # ['post-delta', 'pre-delta']
+
+    ## OUTPUTS: a_decoded_marginal_posterior_df
+
+    if (csv_export_out_dir is not None) or show_pos_by_ctxt_joint_figure:
+        import matplotlib.pyplot as plt
+        from pyphoplacecellanalysis.Pho2D.matplotlib.visualize_heatmap import visualize_heatmap
+        
+        _pos_by_ctxt_context_labels = ['P_Long', 'P_Short']
+        _preferred_pre_post_order = ('pre-delta', 'post-delta')
+        _ordered_pre_post_deltas = [k for k in _preferred_pre_post_order if k in pre_post_delta_result_pos_by_ctxt_joint_dict]
+        _ordered_pre_post_deltas.extend(sorted(k for k in pre_post_delta_result_pos_by_ctxt_joint_dict.keys() if k not in _preferred_pre_post_order))
+        if _ordered_pre_post_deltas:
+            _png_save_path: Optional[Path] = None
+            if csv_export_out_dir is not None:
+                _sess = sanitize_filename_for_Windows(getattr(curr_active_pipeline, 'session_name', None) or 'unknown_session')
+                _date = datetime.now().strftime('%Y-%m-%d')
+                _tbin = str(time_bin_size).replace('.', 'p')
+                _delta_slug = '_'.join(sanitize_filename_for_Windows(str(k)) for k in _ordered_pre_post_deltas)
+                _png_save_path = csv_export_out_dir.joinpath(f'{_date}_{_sess}_pos_by_ctxt_joint_{_delta_slug}_tbin{_tbin}.png')
+            try:
+                _imgs = [np.asarray(pre_post_delta_result_pos_by_ctxt_joint_dict[k], dtype=float).T for k in _ordered_pre_post_deltas]
+                _stack = np.concatenate([im.ravel() for im in _imgs])
+                if not np.any(np.isfinite(_stack)):
+                    _vmin, _vmax = 0.0, 1.0
+                else:
+                    _vmin, _vmax = float(np.nanmin(_stack)), float(np.nanmax(_stack))
+                    if _vmin == _vmax:
+                        _vmax = _vmin + 1e-12
+                n_panels = len(_ordered_pre_post_deltas)
+                fig, axes = plt.subplots(1, n_panels, num='pos_by_ctxt_joint_combined', figsize=(10.0 * float(n_panels), 4.0), dpi=220, sharey=True, clear=True)
+                if n_panels == 1:
+                    axes = np.array([axes])
+                _cmap = mpl.colormaps.get_cmap('viridis')
+                _cmap.set_bad(color='black')
+                for i, a_pre_post_delta in enumerate(_ordered_pre_post_deltas):
+                    img = _imgs[i]
+                    n_pos, n_ctx = int(img.shape[0]), int(img.shape[1])
+                    xc = np.asarray(a_decoder.xbin_centers, dtype=float)
+                    if xc.size != n_pos:
+                        xc = np.arange(n_pos, dtype=float)
+                    half_bin = (float(xc[1]) - float(xc[0])) / 2.0 if n_pos > 1 else 0.5
+                    y_bottom, y_top = float(xc[0] - half_bin), float(xc[-1] + half_bin)
+                    extent = (-0.5, float(n_ctx) - 0.5, y_bottom, y_top)
+                    imshow_kwargs = dict(origin='lower', interpolation='nearest', aspect='auto', extent=extent, cmap=_cmap, animated=False, vmin=_vmin, vmax=_vmax)
+                    ax = axes[i]
+                    fig, ax, _ = visualize_heatmap(img, ax=ax, title=a_pre_post_delta, layout='none', defer_show=True, show_colorbar=False, show_xticks=False, show_yticks=False, **imshow_kwargs)
+                    ax.set_xticks(np.arange(n_ctx))
+                    ax.set_xticklabels(_pos_by_ctxt_context_labels)
+                    ax.set_xlabel('Context')
+                    if i == 0:
+                        ax.set_ylabel('Linearized position')
+                fig.colorbar(axes[0].get_images()[0], ax=np.ravel(axes).tolist(), shrink=0.82)
+                if _png_save_path is not None:
+                    fig.savefig(_png_save_path, dpi=300, bbox_inches='tight')
+                if not show_pos_by_ctxt_joint_figure:
+                    plt.close(fig)
+                if _png_save_path is not None:
+                    export_png_resolved = _png_save_path.resolve()
+                    curr_active_pipeline.register_output_file(output_path=export_png_resolved, output_metadata=dict(kind='pos_by_ctxt_joint_png', pre_post_deltas=tuple(_ordered_pre_post_deltas), time_bin_size=time_bin_size, source_fn='determine_decoded_context_uncertainty_as_fn_of_position'))
+            except Exception as e:
+                print(f'WARN: failed to plot/save pos_by_ctxt_joint PNG to {_png_save_path}: {e}')
+
+    return pre_post_delta_a_decoded_marginal_posterior_df_dict
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -18338,6 +19285,8 @@ from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiCo
 class EstimationCorrectnessPlots:
     """ Compares ground truth to the decoded positions during laps
 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import EstimationCorrectnessPlots
+    
     EstimationCorrectnessPlots.plot_estimation_correctness_vertical_stack(
         _out_subset_decode_dfs_dict, 'binned_x_meas', 'estimation_correctness_track_ID'
     )
