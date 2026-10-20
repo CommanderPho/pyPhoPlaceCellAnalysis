@@ -9420,9 +9420,301 @@ def bapun_proper_linearize_tracks(curr_active_pipeline):
     return pos_df_dict, maze_track_line_dict
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-20 - OpenAI Figure 4 Stats                                                                                                                                                                                                                                                   #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import pandas as pd
+from scipy.stats import wasserstein_distance
 
 
+class PrePostDeltaDistributionComparison:
+    """Compare pre/post-delta P_Short distributions without treating time bins as independent replicates.
 
+    from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PrePostDeltaDistributionComparison
+
+    """
+
+    def __init__(self, filtered_all_sessions_laps_time_bin_df, value_col='P_Short',
+                 condition_col='pre_post_delta_category', animal_col='animal',
+                 session_col='session_name', lap_col='parent_epoch_id',
+                 pre_label='pre-delta', post_label='post-delta',
+                 n_bootstrap=1000, random_state=None):
+
+        self.value_col = value_col
+        self.condition_col = condition_col
+        self.animal_col = animal_col
+        self.session_col = session_col
+        self.lap_col = lap_col
+        self.group_values = (pre_label, post_label)
+        self.n_bootstrap = n_bootstrap
+        self.rng = np.random.default_rng(random_state)
+
+        required_cols = [value_col, condition_col, animal_col, session_col, lap_col]
+        missing_cols = set(required_cols).difference(filtered_all_sessions_laps_time_bin_df.columns)
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+
+        data = filtered_all_sessions_laps_time_bin_df.loc[
+            filtered_all_sessions_laps_time_bin_df[condition_col].isin(self.group_values),
+            required_cols
+        ].dropna(subset=required_cols).copy().reset_index(drop=True)
+
+        if data.empty or data[condition_col].nunique() != 2:
+            raise ValueError(f'Data must contain both groups: {self.group_values}')
+
+        data[value_col] = pd.to_numeric(data[value_col], errors='raise')
+        self._y = data[value_col].to_numpy(dtype=float)
+
+        if not np.isfinite(self._y).all() or np.any((self._y < 0) | (self._y > 1)):
+            raise ValueError(f'{value_col} must contain finite probabilities in [0, 1].')
+
+        data['_condition_code'] = (data[condition_col] == post_label).astype(np.int8)
+        data['_lap_id'] = data.groupby(
+            [animal_col, session_col, lap_col], sort=False, dropna=False
+        ).ngroup().astype(np.int64)
+        data['_animal_code'], self._animals = pd.factorize(data[animal_col], sort=False)
+
+        # A lap is the resampling unit: all its time bins must retain one condition label.
+        if data.groupby('_lap_id')['_condition_code'].nunique().gt(1).any():
+            raise ValueError(
+                'Some laps contain both condition labels. Use an appropriate higher-level '
+                'event/lap identifier or define the analysis windows before resampling.'
+            )
+
+        self._data = data
+        self._n_animals = len(self._animals)
+        self._row_lap_id = data['_lap_id'].to_numpy()
+        self._row_condition_code = data['_condition_code'].to_numpy()
+        self._animal_code_rows = data['_animal_code'].to_numpy()
+        self._observed_lap_labels = (
+            data.drop_duplicates('_lap_id')
+            .sort_values('_lap_id')['_condition_code'].to_numpy()
+        )
+
+        self._lap_table = (
+            data[['_lap_id', '_animal_code', session_col, '_condition_code']]
+            .drop_duplicates('_lap_id')
+            .sort_values('_lap_id')
+            .reset_index(drop=True)
+        )
+
+        # Cache each lap's complete probability vector.
+        self._values_by_lap = {
+            int(lap_id): self._y[positions]
+            for lap_id, positions in data.groupby('_lap_id', sort=False).indices.items()
+        }
+
+        # Nested hierarchy: animal -> session -> condition -> lap IDs.
+        self._tree = {}
+        for row in self._lap_table.to_dict('records'):
+            animal = int(row['_animal_code'])
+            session = row[session_col]
+            condition = int(row['_condition_code'])
+            self._tree.setdefault(animal, {}).setdefault(session, {0: [], 1: []})
+            self._tree[animal][session][condition].append(int(row['_lap_id']))
+
+        # Equal-animal weighting requires both conditions in every animal.
+        for animal in range(self._n_animals):
+            animal_mask = self._animal_code_rows == animal
+            if set(self._row_condition_code[animal_mask]) != {0, 1}:
+                raise ValueError(
+                    f'Animal {self._animals[animal]!r} lacks one condition; '
+                    'a balanced equal-animal comparison cannot be estimated.'
+                )
+
+        # Also cache session groups for restricted lap-label permutation.
+        self._session_positions = list(
+            self._lap_table.groupby(
+                ['_animal_code', session_col], sort=False
+            ).indices.values()
+        )
+
+    @staticmethod
+    def _wasserstein(pre, post, pre_weights=None, post_weights=None):
+        return float(wasserstein_distance(
+            pre, post, u_weights=pre_weights, v_weights=post_weights
+        ))
+
+    def _equal_animal_weights(self, mask):
+        animal_codes = self._animal_code_rows[mask]
+        counts = np.bincount(animal_codes, minlength=self._n_animals)
+        if np.any(counts == 0):
+            return None
+        return 1.0 / counts[animal_codes]
+
+    def _distance_for_labels(self, row_labels):
+        pre_mask = row_labels == 0
+        post_mask = row_labels == 1
+
+        pre_weights = self._equal_animal_weights(pre_mask)
+        post_weights = self._equal_animal_weights(post_mask)
+        if pre_weights is None or post_weights is None:
+            return np.nan
+
+        return self._wasserstein(
+            self._y[pre_mask], self._y[post_mask],
+            pre_weights, post_weights
+        )
+
+    def _distance_for_bootstrap_samples(self, pre_by_animal, post_by_animal):
+        pre = np.concatenate(pre_by_animal)
+        post = np.concatenate(post_by_animal)
+        pre_weights = np.concatenate([np.full(x.size, 1.0 / x.size) for x in pre_by_animal])
+        post_weights = np.concatenate([np.full(x.size, 1.0 / x.size) for x in post_by_animal])
+        return self._wasserstein(pre, post, pre_weights, post_weights)
+
+    def _hierarchical_bootstrap(self):
+        """Resample animals, sessions within animals, and whole laps within session/condition."""
+        bootstrap_distances = []
+        max_attempts = max(20 * self.n_bootstrap, 100)
+
+        for _ in range(max_attempts):
+            if len(bootstrap_distances) >= self.n_bootstrap:
+                break
+
+            sampled_animals = self.rng.choice(
+                self._n_animals, size=self._n_animals, replace=True
+            )
+            pre_by_animal, post_by_animal = [], []
+            valid_sample = True
+
+            for animal in sampled_animals:
+                sessions = list(self._tree[int(animal)])
+                sampled_sessions = self.rng.choice(
+                    len(sessions), size=len(sessions), replace=True
+                )
+                animal_values = {0: [], 1: []}
+
+                for session_idx in sampled_sessions:
+                    session_laps = self._tree[int(animal)][sessions[session_idx]]
+
+                    for condition in (0, 1):
+                        lap_ids = session_laps[condition]
+                        if not lap_ids:
+                            continue
+
+                        sampled_laps = self.rng.choice(
+                            lap_ids, size=len(lap_ids), replace=True
+                        )
+                        animal_values[condition].extend(
+                            self._values_by_lap[int(lap_id)]
+                            for lap_id in sampled_laps
+                        )
+
+                if not animal_values[0] or not animal_values[1]:
+                    valid_sample = False
+                    break
+
+                pre_by_animal.append(np.concatenate(animal_values[0]))
+                post_by_animal.append(np.concatenate(animal_values[1]))
+
+            if valid_sample:
+                bootstrap_distances.append(
+                    self._distance_for_bootstrap_samples(pre_by_animal, post_by_animal)
+                )
+
+        if len(bootstrap_distances) < self.n_bootstrap:
+            raise RuntimeError(
+                f'Only {len(bootstrap_distances)} valid bootstrap samples were generated. '
+                'Check condition coverage across animals and sessions.'
+            )
+
+        return np.quantile(bootstrap_distances, [0.025, 0.975])
+
+    def _restricted_permutation_test(self, n_permutations):
+        """Shuffle whole-lap labels within sessions; valid only under lap exchangeability."""
+        observed = self._distance_for_labels(self._row_condition_code)
+        null_distances = np.empty(n_permutations, dtype=float)
+        lap_labels = self._observed_lap_labels
+
+        for i in range(n_permutations):
+            permuted_lap_labels = lap_labels.copy()
+
+            for positions in self._session_positions:
+                permuted_lap_labels[positions] = self.rng.permutation(
+                    lap_labels[positions]
+                )
+
+            row_labels = permuted_lap_labels[self._row_lap_id]
+            null_distances[i] = self._distance_for_labels(row_labels)
+
+        valid = np.isfinite(null_distances)
+        if not valid.all():
+            raise RuntimeError('Some permutations lacked both conditions for every animal.')
+
+        p_value = (1 + np.count_nonzero(null_distances >= observed)) / (n_permutations + 1)
+        return float(p_value), null_distances
+
+    def run(self, perform_permutation_test=False, assume_lap_exchangeability=False,
+            n_permutations=2000):
+        """Return effect size, hierarchical-bootstrap CI, per-animal summaries, and optional p-value."""
+        if self.n_bootstrap < 1:
+            raise ValueError('n_bootstrap must be at least 1.')
+
+        if perform_permutation_test and not assume_lap_exchangeability:
+            raise ValueError(
+                'A lap-level permutation p-value requires an explicit, defensible '
+                'exchangeability assumption. If labels follow temporal pre/post blocks, '
+                'use a design-appropriate block permutation instead.'
+            )
+
+        pre_label, post_label = self.group_values
+        labels = self._row_condition_code
+        animal_rows = []
+
+        for animal_code, animal in enumerate(self._animals):
+            pre = self._y[(self._animal_code_rows == animal_code) & (labels == 0)]
+            post = self._y[(self._animal_code_rows == animal_code) & (labels == 1)]
+
+            animal_rows.append({
+                'animal': animal,
+                'n_bins_pre': pre.size,
+                'n_bins_post': post.size,
+                'mean_pre': pre.mean(),
+                'mean_post': post.mean(),
+                'mean_difference_post_minus_pre': post.mean() - pre.mean(),
+                'median_pre': np.median(pre),
+                'median_post': np.median(post),
+                'median_difference_post_minus_pre': np.median(post) - np.median(pre),
+                'wasserstein_1': self._wasserstein(pre, post),
+            })
+
+        animal_summary = pd.DataFrame(animal_rows)
+        ci = self._hierarchical_bootstrap()
+        p_value = None
+        null_distances = None
+
+        if perform_permutation_test:
+            if n_permutations < 1:
+                raise ValueError('n_permutations must be at least 1.')
+            p_value, null_distances = self._restricted_permutation_test(n_permutations)
+
+        lap_counts = self._lap_table.groupby('_condition_code').size()
+        bin_counts = self._data['_condition_code'].value_counts()
+
+        return {
+            'comparison': f'{pre_label} vs {post_label}',
+            'wasserstein_1': self._distance_for_labels(labels),
+            'wasserstein_1_bootstrap_95ci': tuple(ci),
+            'mean_difference_post_minus_pre': float(
+                animal_summary['mean_difference_post_minus_pre'].mean()
+            ),
+            'median_difference_post_minus_pre': float(
+                animal_summary['median_difference_post_minus_pre'].mean()
+            ),
+            'p_value': p_value,
+            'permutation_null_distances': null_distances,
+            'n_animals': self._n_animals,
+            # 'n_sessions': self._lap_table[[self.animal_col, self.session_col]].drop_duplicates().shape[0],
+            'n_sessions': self._lap_table[['_animal_code', self.session_col]].drop_duplicates().shape[0],
+            'n_laps_pre': int(lap_counts.get(0, 0)),
+            'n_laps_post': int(lap_counts.get(1, 0)),
+            'n_bins_pre': int(bin_counts.get(0, 0)),
+            'n_bins_post': int(bin_counts.get(1, 0)),
+            'animal_summary': animal_summary,
+        }
 
 
 # ==================================================================================================================================================================================================================================================================================== #
