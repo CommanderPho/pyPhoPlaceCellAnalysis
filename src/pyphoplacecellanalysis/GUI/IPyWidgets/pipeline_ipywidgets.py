@@ -136,7 +136,7 @@ class CustomProcessingPhases(OrderedEnum):
             continued_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False)
             _out_run_config = continued_run
         elif self.value == CustomProcessingPhases.final_run.value:
-            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            final_run = dict(saving_mode=PipelineSavingScheme.SKIP_SAVING, should_force_reload_all=False, should_freeze_pipeline_updates=False) # use save_custom_session_files_completion_function (enable_save_h5 / should_write_posterior_h5) instead of enable_hdf5_output=True
             _out_run_config = final_run
         else: 
             raise NotImplementedError

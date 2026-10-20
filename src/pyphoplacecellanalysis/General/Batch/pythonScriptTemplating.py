@@ -162,7 +162,7 @@ class ProcessingScriptPhases(Enum):
         """ get the extra user_completion functions
         
         """
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_session_h5_file_completion_function, export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
         
         if self.value == ProcessingScriptPhases.figure_run.value:
@@ -182,7 +182,6 @@ class ProcessingScriptPhases(Enum):
                 # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-05-22 12:58am
                 # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
                 # 'kdiba_session_post_fixup_completion_function': kdiba_session_post_fixup_completion_function,
-                # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                 }
             
             phase0_any_run_custom_user_completion_functions_dict = {
@@ -207,7 +206,6 @@ class ProcessingScriptPhases(Enum):
                 # 'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                 # 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                 # 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
-                # 'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
             }
 
             phase3_any_run_custom_user_completion_functions_dict = {                
@@ -219,8 +217,7 @@ class ProcessingScriptPhases(Enum):
                 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
                 'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
-                'export_session_h5_file_completion_function': export_session_h5_file_completion_function, # ran 2024-09-26 3pm
-                'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
+                'save_custom_session_files_completion_function': save_custom_session_files_completion_function, # session pkl/h5 + optional posteriors H5 (enable_save_h5 / should_write_posterior_h5)
                 'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56 
                 'compute_and_pickle_clusterless_decoder_completion_function': compute_and_pickle_clusterless_decoder_completion_function,
                 'compute_and_pickle_spyglass_clusterless_decoder_completion_function': compute_and_pickle_spyglass_clusterless_decoder_completion_function,
@@ -323,7 +320,7 @@ class ProcessingScriptPhases(Enum):
             _out_run_config = continued_run
         elif self.value == ProcessingScriptPhases.final_run.value:
             # final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=True), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code)
-            final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code) # use export_session_h5_file_completion_function instead of enable_hdf5_output=True
+            final_run = dict(should_force_reload_all=False, should_freeze_pipeline_updates=False, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), should_perform_figure_generation_to_file=False, custom_user_completion_function_template_code=custom_user_completion_function_template_code) # use save_custom_session_files_completion_function (enable_save_h5 / should_write_posterior_h5) instead of enable_hdf5_output=True
             _out_run_config = final_run
         elif self.value == ProcessingScriptPhases.figure_run.value:
             figure_run = dict(should_perform_figure_generation_to_file=True, should_force_reload_all=False, should_freeze_pipeline_updates=True, extended_computations_include_includelist=phase3_extended_computations_include_includelist, batch_session_completion_handler_kwargs=dict(enable_hdf5_output=False), custom_user_completion_function_template_code=custom_user_completion_function_template_code)

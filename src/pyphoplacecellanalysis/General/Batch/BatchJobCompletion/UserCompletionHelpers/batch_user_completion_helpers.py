@@ -2796,78 +2796,86 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def export_session_h5_file_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                should_write_pipeline_h5: bool=False, should_write_posterior_h5: bool=True) -> dict:
-    """  Export the pipeline's HDF5 as 'pipeline_results.h5'
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import kdiba_session_post_fixup_completion_function
-    
-    Results can be extracted from batch output by 
-    
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('export_session_h5_file_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+@function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export', 'hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
+def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None,
+        enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=True, enable_save_h5: bool=True, should_write_posterior_h5: bool=True,
+    ) -> dict:
+    """ Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters.
+    Also optionally exports decoded-posteriors HDF5 into collected_outputs (formerly export_session_h5_file_completion_function).
 
+    Session pipeline H5: via custom_save_pipeline_as(..., enable_save_h5=True) under session output/ with custom-suffix names.
+    Posteriors H5: PosteriorExporting under self.collected_outputs_path with data_identifier_str='(decoded_posteriors)'.
 
-    Exports:
-        '/nfs/turbo/umms-kdiba/KDIBA/pin01/one/fet11-01_12-58-54/output/pipeline_results.h5'
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import save_custom_session_files_completion_function
+
+    Results can be extracted from batch output by
+
+    # Extracts the callback results 'save_custom_session_files_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('save_custom_session_files_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
     """
     import sys
     from datetime import timedelta, datetime
-    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
-    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import ContextToPathMode
+
+    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
+    custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
 
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'export_session_h5_file_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-    
-    # custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
-    # print(f'\tcustom_save_filenames: {custom_save_filenames}')
-    # print(f'\tcustom_suffix: "{custom_suffix}"')
+    print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, enable_save_pipeline_pkl={enable_save_pipeline_pkl}, enable_save_global_computations_pkl={enable_save_global_computations_pkl}, enable_save_h5={enable_save_h5}, should_write_posterior_h5={should_write_posterior_h5},...)')
+
+    print(f'custom_save_filenames: {custom_save_filenames}')
+    print(f'custom_suffix: "{custom_suffix}"')
+
     err = None
     hdf5_output_path: Path = None
     was_write_good: bool = False
-    
+    should_save_any_session_files: bool = (enable_save_pipeline_pkl or enable_save_global_computations_pkl or enable_save_h5)
 
-    active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
-    # Assert.path_exists(active_export_parent_output_path)
-    callback_outputs = {}
-
-
-    if should_write_pipeline_h5:
+    if should_save_any_session_files:
         try:
-            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=False, enable_save_global_computations_pkl=False, enable_save_h5=True)
+            custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
             was_write_good = True
-            hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
-            print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
+            if enable_save_h5 and ('pipeline_h5' in custom_save_filepaths_dict):
+                hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
+                print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
         except Exception as e:
             exception_info = sys.exc_info()
             err = CapturedException(e, exception_info)
-            print(f"\tERROR: encountered exception {err} while trying to build the session HDF output for {curr_session_context}")
+            print(f"ERROR: encountered exception {err} while trying to backup the pipeline for {curr_session_context}")
             if self.fail_on_exception:
                 raise err.exc
-            
-        callback_outputs.update(**{
-            'hdf5_output_path': hdf5_output_path, #'t_end': t_end   
-        })
-    # END if should_write_pipeline_h5
+    else:
+        print(f'\tskipping custom_save_pipeline_as (all enable_save_* flags False)')
+    # END if should_save_any_session_files
+
+    callback_outputs = {
+     'desired_suffix': custom_suffix,
+    #  'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
+     'session_files_dict': custom_save_filepaths_dict, 'successfully_copied_files_dict': custom_save_filepaths_dict,
+     'was_write_good': was_write_good,
+    }
+    if enable_save_h5 and (hdf5_output_path is not None):
+        callback_outputs['hdf5_output_path'] = hdf5_output_path
 
     if should_write_posterior_h5:
+        active_export_parent_output_path: Path = self.collected_outputs_path.resolve()
         try:
             ## Get needed results
             rank_order_results = curr_active_pipeline.global_computation_results.computed_data.get('RankOrder', None)
             if rank_order_results is not None:
                 minimum_inclusion_fr_Hz: float = rank_order_results.minimum_inclusion_fr_Hz
                 included_qclu_values: List[int] = rank_order_results.included_qclu_values
-            else:        
+            else:
                 ## get from parameters:
                 minimum_inclusion_fr_Hz: float = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz
                 included_qclu_values: List[int] = curr_active_pipeline.global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values
-                
+
             # DirectionalMergedDecoders: Get the result after computation:
             directional_laps_results = curr_active_pipeline.global_computation_results.computed_data['DirectionalLaps'] # : "DirectionalLapsResult"
             track_templates = directional_laps_results.get_templates(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values) # non-shared-only -- !! Is minimum_inclusion_fr_Hz=None the issue/difference? : "TrackTemplates"
@@ -2901,64 +2909,10 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
                 raise err.exc
     # END if should_write_posterior_h5
 
-    across_session_results_extended_dict['export_session_h5_file_completion_function'] = callback_outputs
-
-    if was_write_good:
-        print(f'\tHDF5 file "{hdf5_output_path}" successfully written out! done.')    
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
-    return across_session_results_extended_dict
-
-
-@function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
-def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None,
-        enable_save_pipeline_pkl:bool=True, enable_save_global_computations_pkl:bool=True, enable_save_h5:bool=True,
-    ) -> dict:
-    """ Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters
-    
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import backup_previous_session_files_completion_function
-    
-    Results can be extracted from batch output by 
-    
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
-
-    """
-    import sys
-    from datetime import timedelta, datetime
-    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
-
-    apply_export_filename_extra_suffix_parts_to_pipeline(curr_active_pipeline, export_filename_extra_suffix_parts=export_filename_extra_suffix_parts) ## disambiguates variant export filenames (e.g. appending '-variant_trackBodyPeakOnly')
-    custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
-    
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, enable_save_pipeline_pkl={enable_save_pipeline_pkl}, enable_save_global_computations_pkl={enable_save_global_computations_pkl}, enable_save_h5={enable_save_h5},...)')
-    
-    print(f'custom_save_filenames: {custom_save_filenames}')
-    print(f'custom_suffix: "{custom_suffix}"')
-    
-    was_write_good: bool = False
-    try:
-        custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=True, enable_save_h5=True)
-        was_write_good = True
-
-    except Exception as e:
-        exception_info = sys.exc_info()
-        err = CapturedException(e, exception_info)
-        print(f"ERROR: encountered exception {err} while trying to backup the pipeline for {curr_session_context}")
-        if self.fail_on_exception:
-            raise err.exc
-
-    callback_outputs = {
-     'desired_suffix': custom_suffix,
-    #  'session_files_dict': _existing_session_files_dict, 'successfully_copied_files_dict':_successful_copies_dict,
-     'session_files_dict': custom_save_filepaths_dict, 'successfully_copied_files_dict': custom_save_filepaths_dict,
-     'was_write_good': was_write_good,
-    }
     across_session_results_extended_dict['save_custom_session_files_completion_function'] = callback_outputs
-    
+
+    if was_write_good and (hdf5_output_path is not None):
+        print(f'\tHDF5 file "{hdf5_output_path}" successfully written out! done.')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
@@ -5064,7 +5018,6 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-                                    'export_session_h5_file_completion_function': export_session_h5_file_completion_function,
                                     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                                     'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
