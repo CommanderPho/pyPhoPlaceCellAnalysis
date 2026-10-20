@@ -11,7 +11,7 @@ import pathlib
 from pathlib import Path
 import attrs
 from attrs import define, field, Factory
-from typing import Any, List, Dict, Optional, Tuple, Union, Callable
+from typing import Any, List, Dict, Literal, Optional, Tuple, Union, Callable
 # import numpy as np
 # import pandas as pd
 # from attrs import define, field, Factory
@@ -420,6 +420,26 @@ def _subfn_bash_sbatch_chain_lines(phase_script_paths: List[Tuple[str, str]], in
     return lines
 
 
+def _subfn_bash_direct_run_lines(phase_script_paths: List[Tuple[str, str]], indent: str = '') -> List[str]:
+    """Shared by write_chained_submit_script / write_all_retry_from_phase_scripts: sequential bash run lines (Lab linux_standalone)."""
+    if len(phase_script_paths) == 0:
+        return []
+    lines: List[str] = []
+    for phase_name, script_path in phase_script_paths:
+        lines.append(f'{indent}echo "Running {phase_name}: {script_path}"')
+        lines.append(f"{indent}bash '{script_path}'")
+    ## END for phase_name, script_path in phase_script_paths...
+    return lines
+
+
+def _subfn_phase_chain_lines(phase_script_paths: List[Tuple[str, str]], phase_chain_backend: str, indent: str = '') -> List[str]:
+    if phase_chain_backend == 'bash':
+        return _subfn_bash_direct_run_lines(phase_script_paths, indent=indent)
+    if phase_chain_backend == 'slurm':
+        return _subfn_bash_sbatch_chain_lines(phase_script_paths, indent=indent)
+    raise ValueError(f"phase_chain_backend must be 'slurm' or 'bash', got {phase_chain_backend!r}")
+
+
 def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
     """Submit one Slurm script via `sbatch --parsable` and return the job id (optional auto-submit; generator writes chains instead)."""
     script_path = Path(slurm_script_path)
@@ -432,11 +452,12 @@ def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
     return job_id
 
 
-def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCollection'], script_kind: str = 'run') -> Dict[str, Dict[str, str]]:
-    """Align per-phase BatchScriptsCollection run/fig Slurm paths by session.
+def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCollection'], script_kind: str = 'run', script_collection_key: Literal['slurm', 'bash'] = 'slurm') -> Dict[str, Dict[str, str]]:
+    """Align per-phase BatchScriptsCollection run/fig script paths by session.
 
     phase_collections: mapping phase_name -> BatchScriptsCollection from generate_batch_single_session_scripts.
-    Returns: session_key -> {phase_name: slurm_script_path_str}
+    script_collection_key: 'slurm' -> output_slurm_scripts; 'bash' -> output_non_slurm_bash_scripts.
+    Returns: session_key -> {phase_name: script_path_str}
     """
     def _subfn_session_key_str(curr_session_context: Union[IdentifyingContext, str]) -> str:
         if isinstance(curr_session_context, IdentifyingContext):
@@ -446,20 +467,30 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
     session_phase_scripts: Dict[str, Dict[str, str]] = {}
     for phase_name, collection in phase_collections.items():
         contexts = list(collection.included_session_contexts or [])
-        slurm_paths = list((collection.output_slurm_scripts or {}).get(script_kind, []) or [])
-        if len(contexts) != len(slurm_paths):
-            raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len(output_slurm_scripts[{script_kind!r}])={len(slurm_paths)}")
-        for ctx, slurm_path in zip(contexts, slurm_paths):
+        if script_collection_key == 'slurm':
+            script_paths = list((collection.output_slurm_scripts or {}).get(script_kind, []) or [])
+            paths_label = 'output_slurm_scripts'
+        elif script_collection_key == 'bash':
+            script_paths = list((collection.output_non_slurm_bash_scripts or {}).get(script_kind, []) or [])
+            paths_label = 'output_non_slurm_bash_scripts'
+        else:
+            raise ValueError(f"script_collection_key must be 'slurm' or 'bash', got {script_collection_key!r}")
+        if len(contexts) != len(script_paths):
+            raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len({paths_label}[{script_kind!r}])={len(script_paths)}")
+        for ctx, script_path in zip(contexts, script_paths):
             session_key = _subfn_session_key_str(ctx)
-            session_phase_scripts.setdefault(session_key, {})[phase_name] = str(Path(slurm_path))
-        ## END for ctx, slurm_path in zip(contexts, slurm_paths)...
+            session_phase_scripts.setdefault(session_key, {})[phase_name] = str(Path(script_path))
+        ## END for ctx, script_path in zip(contexts, script_paths)...
     ## END for phase_name, collection in phase_collections.items()...
     return session_phase_scripts
 
 
 def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]], out_path: Union[str, Path], phases_ordered: List[str],
-                                manifest_path: Optional[Union[str, Path]] = None, batch_date_to_use: Optional[str] = None) -> Tuple[Path, Path]:
-    """Write a bash script that submits per-session afterok phase chains, plus a JSON manifest of script paths.
+                                manifest_path: Optional[Union[str, Path]] = None, batch_date_to_use: Optional[str] = None, phase_chain_backend: Literal['slurm', 'bash'] = 'slurm') -> Tuple[Path, Path]:
+    """Write a bash script that runs or submits per-session phase chains, plus a JSON manifest of script paths.
+
+    phase_chain_backend: 'slurm' submits afterok chains (sessions in parallel on the cluster); 'bash' runs one session
+    at a time with sequential phase scripts (Lab linux_standalone).
 
     Returns (submit_script_path, manifest_path).
     """
@@ -470,14 +501,24 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
         manifest_path = Path(manifest_path)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    bash_lines: List[str] = [
-        '#!/bin/bash',
-        '# Per-session Slurm phase chains (dependency=afterok).',
-        '# A failed phase cancels only that session\'s later phases; earlier successful pickles are kept.',
-        '# Retry a failed phase with retry_from_*.sh — do not re-run completed earlier phases.',
-        'set -euo pipefail',
-        '',
-    ]
+    if phase_chain_backend == 'bash':
+        bash_lines: List[str] = [
+            '#!/bin/bash',
+            '# Per-session sequential phase chains (linux_standalone; no Slurm).',
+            '# One session at a time; within a session, phases run in order. A failed phase skips later phases for that session.',
+            '# Retry a failed phase with retry_from_*.sh — do not re-run completed earlier phases.',
+            'set -uo pipefail',
+            '',
+        ]
+    else:
+        bash_lines = [
+            '#!/bin/bash',
+            '# Per-session Slurm phase chains (dependency=afterok).',
+            '# A failed phase cancels only that session\'s later phases; earlier successful pickles are kept.',
+            '# Retry a failed phase with retry_from_*.sh — do not re-run completed earlier phases.',
+            'set -euo pipefail',
+            '',
+        ]
     if batch_date_to_use:
         bash_lines.append(f'# batch: {batch_date_to_use}')
         bash_lines.append('')
@@ -492,11 +533,20 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
         if len(ordered) == 0:
             continue
         bash_lines.append(f'echo "=== session: {session_key} ==="')
-        bash_lines.extend(_subfn_bash_sbatch_chain_lines(ordered, indent=''))
+        if phase_chain_backend == 'bash':
+            bash_lines.append('(')
+            bash_lines.append('  set -e')
+            bash_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='bash', indent='  '))
+            bash_lines.append(f') || echo "Session failed (later phases skipped for this session): {session_key}"')
+        else:
+            bash_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='slurm', indent=''))
         bash_lines.append('')
     ## END for session_key, phase_paths in session_phase_scripts.items()...
 
-    bash_lines.append('echo "All session phase chains submitted."')
+    if phase_chain_backend == 'bash':
+        bash_lines.append('echo "All session phase chains completed."')
+    else:
+        bash_lines.append('echo "All session phase chains submitted."')
     out_path.write_text('\n'.join(bash_lines) + '\n', encoding='utf-8')
     try:
         out_path.chmod(out_path.stat().st_mode | 0o111)
@@ -506,6 +556,7 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
     manifest: Dict[str, Any] = {
         'batch_date_to_use': batch_date_to_use,
         'phases_ordered': list(phases_ordered),
+        'execution_backend': phase_chain_backend,
         'sessions': session_phase_scripts,
         'submit_script': str(out_path),
     }
@@ -538,17 +589,30 @@ def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path
         if len(ordered) == 0:
             raise ValueError(f"No scripts found for session={session_key!r} from phase={start_phase_name!r}")
 
+        execution_backend = str(manifest_dict.get('execution_backend') or 'slurm')
         retry_out_path.parent.mkdir(parents=True, exist_ok=True)
-        bash_lines: List[str] = [
-            '#!/bin/bash',
-            f'# Retry session {session_key} from phase {start_phase_name} (afterok chain).',
-            '# Earlier phases are intentionally not re-submitted; their pickles remain on disk.',
-            'set -euo pipefail',
-            '',
-            f'echo "=== retry session: {session_key} from {start_phase_name} ==="',
-        ]
-        bash_lines.extend(_subfn_bash_sbatch_chain_lines(ordered, indent=''))
-        bash_lines.append('echo "Retry chain submitted."')
+        if execution_backend == 'bash':
+            bash_lines = [
+                '#!/bin/bash',
+                f'# Retry session {session_key} from phase {start_phase_name} (sequential bash).',
+                '# Earlier phases are intentionally not re-run; their pickles remain on disk.',
+                'set -euo pipefail',
+                '',
+                f'echo "=== retry session: {session_key} from {start_phase_name} ==="',
+            ]
+            bash_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='bash', indent=''))
+            bash_lines.append('echo "Retry chain completed."')
+        else:
+            bash_lines = [
+                '#!/bin/bash',
+                f'# Retry session {session_key} from phase {start_phase_name} (afterok chain).',
+                '# Earlier phases are intentionally not re-submitted; their pickles remain on disk.',
+                'set -euo pipefail',
+                '',
+                f'echo "=== retry session: {session_key} from {start_phase_name} ==="',
+            ]
+            bash_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='slurm', indent=''))
+            bash_lines.append('echo "Retry chain submitted."')
         retry_out_path.write_text('\n'.join(bash_lines) + '\n', encoding='utf-8')
         try:
             retry_out_path.chmod(retry_out_path.stat().st_mode | 0o111)
@@ -575,8 +639,13 @@ def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path
     return written
 
 
-def print_chain_status_hint(job_ids: Optional[List[int]] = None) -> None:
-    """Print short sacct/squeue commands for monitoring chained phase jobs (no login-node poller)."""
+def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backend: Literal['slurm', 'bash'] = 'slurm') -> None:
+    """Print monitoring hints for chained phase jobs (Slurm) or sequential bash runs (Lab)."""
+    if execution_backend == 'bash':
+        print('Monitor linux_standalone phase chains:')
+        print('  Watch the terminal running submit_phase_chains_*.sh, or tail per-session log files next to each run_*.sh.')
+        print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
+        return
     print('Monitor chained phase jobs:')
     print('  squeue -u $USER')
     if job_ids:
