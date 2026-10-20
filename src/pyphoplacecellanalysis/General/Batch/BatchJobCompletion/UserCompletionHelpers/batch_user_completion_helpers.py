@@ -2912,7 +2912,9 @@ def export_session_h5_file_completion_function(self, global_data_root_parent_pat
 
 
 @function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
-def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None) -> dict:
+def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None,
+        enable_save_pipeline_pkl:bool=True, enable_save_global_computations_pkl:bool=True, enable_save_h5:bool=True,
+    ) -> dict:
     """ Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import backup_previous_session_files_completion_function
@@ -2932,7 +2934,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     custom_save_filepaths_dict, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'save_custom_session_files_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, enable_save_pipeline_pkl={enable_save_pipeline_pkl}, enable_save_global_computations_pkl={enable_save_global_computations_pkl}, enable_save_h5={enable_save_h5},...)')
     
     print(f'custom_save_filenames: {custom_save_filenames}')
     print(f'custom_suffix: "{custom_suffix}"')
