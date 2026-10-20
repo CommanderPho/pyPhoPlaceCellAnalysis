@@ -4755,8 +4755,11 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None):
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None, session_rel_search_dir: str = 'output/'):
         """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
+
+        session_rel_search_dir (str): relative path under each session folder to search. Defaults to 'output/'.
+            Use '' or '.' to search the session root (e.g. for loadedSessPickle*.pkl).
 
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
@@ -4783,6 +4786,13 @@ class AcrossSessionHelpers:
            'h5': '*.h5',
         }, rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         copy_dict
+
+        ## Pipeline pickles at session root (not under output/):
+        copy_dict, moved_files_dict_files = AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs(
+            BATCH_DATE_TO_USE='2024-11-19', cuttoff_date=datetime(2024, 11, 16), target_dir=collected_outputs_directory,
+            custom_file_globs_dict={'pipeline_pkl': '*loadedSessPickle*.pkl'},
+            session_rel_search_dir='',  # session root (not output/)
+            rename_backup_basename_fn=_across_session_h5_output_basename_fn, is_dry_run=False)
         
         
         
@@ -4860,8 +4870,13 @@ class AcrossSessionHelpers:
                 print(f'a_good_session_concrete_folder: "{a_good_session_concrete_folder}", a_session_basedir: "{a_session_basedir}", session_descr: "{session_descr}"')
                 
             should_skip_session: bool = True
-                
-            a_session_output_folder = a_good_session_concrete_folder.output_folder
+
+            # '' / '.' / None → session root; otherwise join relative path under session.path
+            _rel = (session_rel_search_dir or '').strip().strip('/\\')
+            if _rel in ('', '.'):
+                a_session_search_folder = a_good_session_concrete_folder.path
+            else:
+                a_session_search_folder = a_good_session_concrete_folder.path.joinpath(_rel)
             
             if a_good_session_concrete_folder.context in included_session_contexts:
                 should_skip_session = False
@@ -4879,7 +4894,10 @@ class AcrossSessionHelpers:
                 
                 for k, a_glob in custom_file_globs_dict.items():
                     
-                    all_found_custom_glob_files_dict[k] = list(a_session_output_folder.glob(a_glob))
+                    if a_session_search_folder.exists():
+                        all_found_custom_glob_files_dict[k] = list(a_session_search_folder.glob(a_glob))
+                    else:
+                        all_found_custom_glob_files_dict[k] = []
                     _, a_most_recent_parsed_files_df, all_parsed_files_df  = find_most_recent_files(found_session_export_paths=all_found_custom_glob_files_dict[k], cuttoff_date=cuttoff_date, **find_most_recent_files_kwargs)
                     a_most_recent_parsed_files_df['filename'] = a_most_recent_parsed_files_df['path'].map(lambda x: x.name)
                     
