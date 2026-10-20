@@ -649,7 +649,7 @@ def loadData(pkl_path, debug_print=False, **kwargs):
     db = None
     active_move_modules_list: Dict = kwargs.pop('move_modules_list', global_move_modules_list)
     
-    with ProgressMessagePrinter(pkl_path, action='Computing', contents_description='loaded session pickle file'):
+    with ProgressMessagePrinter(pkl_path, action='Loading', contents_description='loaded session pickle file'):
         
         with open(pkl_path, 'rb') as dbfile:
             try:

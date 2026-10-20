@@ -130,9 +130,16 @@ if (print != builtins.print):
 
 _original_print = print
 def new_print(*args, **kwargs):
-    # Call both regular print and logger.info
-    _original_print(*args, **kwargs)
-    curr_task_logger.info(*args)
+    # Call both regular print and logger.info; never raise (Slurm-safe)
+    try:
+        kwargs.setdefault('flush', True)
+        _original_print(*args, **kwargs)
+    except Exception:
+        pass
+    try:
+        curr_task_logger.info(' '.join(str(a) for a in args))
+    except Exception:
+        pass
 
 # Replace the print function within this scope
 # _original_print = print

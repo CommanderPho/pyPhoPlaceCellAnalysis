@@ -1,6 +1,7 @@
 import sys
 import logging
 import pathlib
+import time
 from pathlib import Path
 from typing import List, Dict, Optional, Union, Callable, Tuple
 # import datetime
@@ -984,9 +985,16 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     #     print = builtins.print ## restore the default print function before continuing
 
     def new_print(*args, **kwargs):
-        # Call both regular print and logger.info
-        print(*args, **kwargs)
-        curr_task_logger.info(*args)
+        # Call both regular print and logger.info; never raise (Slurm-safe)
+        try:
+            kwargs.setdefault('flush', True)
+            print(*args, **kwargs)
+        except Exception:
+            pass
+        try:
+            curr_task_logger.info(' '.join(str(a) for a in args))
+        except Exception:
+            pass
 
     # Replace the print function within this scope
     # _backup_print = print
@@ -1034,13 +1042,21 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
     preflight_bapun_batch_helpers_run_all = bool(kwargs.pop('preflight_bapun_batch_helpers_run_all', False))
     _out_error = None
 
+    _batch_load_t0 = time.perf_counter()
+    _batch_load_status = 'ok'
     try:
+        try:
+            _batch_load_wall = datetime.now().isoformat(timespec='seconds')
+        except Exception:
+            _batch_load_wall = '?'
+        new_print(f'[TIMING START] batch_load_session @ {_batch_load_wall}')
         curr_active_pipeline = batch_load_session(global_data_root_parent_path, active_data_mode_name, basedir, active_pickle_filename=active_pickle_filename, epoch_name_includelist=epoch_name_includelist,
                                         computation_functions_name_includelist=active_computation_functions_name_includelist,
                                         saving_mode=saving_mode, force_reload=force_reload, skip_extended_batch_computations=skip_extended_batch_computations, debug_print=debug_print, fail_on_exception=fail_on_exception,
                                         override_parameters_flat_keypaths_dict=override_parameters_flat_keypaths_dict, **kwargs)
         
     except Exception as e:
+        _batch_load_status = 'error'
         ## can fail here before callback function is even called.
         exception_info = sys.exc_info()
         an_error = CapturedException(e, exception_info, None)
@@ -1051,6 +1067,16 @@ def run_specific_batch(global_data_root_parent_path: Path, curr_session_context:
         _out_error = f"{an_error!r}\n{an_error.get_full_traceback()}"
         
         return (SessionBatchProgress.FAILED, _out_error, None) # return the Failed status and the exception that occured.
+    finally:
+        try:
+            _elapsed_s = time.perf_counter() - _batch_load_t0
+            if _elapsed_s >= 60.0:
+                _elapsed_str = f'{_elapsed_s:.1f}s ({_elapsed_s / 60.0:.1f}m)'
+            else:
+                _elapsed_str = f'{_elapsed_s:.1f}s'
+            new_print(f'[TIMING END] batch_load_session elapsed={_elapsed_str} status={_batch_load_status}')
+        except Exception:
+            pass
     # finally:
     #     print = _backup_print # restore default print, I think it's okay because it's only used in this context.
 
