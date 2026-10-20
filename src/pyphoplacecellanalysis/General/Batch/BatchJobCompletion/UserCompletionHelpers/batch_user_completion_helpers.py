@@ -2816,6 +2816,8 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     """
     import sys
     from datetime import timedelta, datetime
+    from pyphocorehelpers.Filesystem.metadata_helpers import FilesystemMetadata
+    from pyphoplacecellanalysis.General.Mixins.ExportHelpers import ContextToPathMode
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import apply_export_filename_extra_suffix_parts_to_pipeline
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult, SingleEpochDecodedResult
