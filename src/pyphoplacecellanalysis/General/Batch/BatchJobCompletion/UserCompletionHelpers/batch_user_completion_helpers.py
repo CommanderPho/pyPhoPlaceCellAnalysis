@@ -994,7 +994,7 @@ def compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_fu
             'custom_suffix': lambda k, v: f"{v}", # just include the name
             'display_fn_name': lambda k, v: f"{v}", # just include the name
         }
-        out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=None,
+        out_contexts, _flat_all_HDF5_out_paths = PosteriorExporting.perform_save_all_decoded_posteriors_to_HDF5(decoder_laps_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_laps_filter_epochs_decoder_result_dict),
                                                                                     decoder_ripple_filter_epochs_decoder_result_dict=deepcopy(directional_decoders_epochs_decode_result.decoder_ripple_filter_epochs_decoder_result_dict),
                                                                                     _save_context=_parent_save_context.get_raw_identifying_context(), save_path=save_path, should_overwrite_extant_file=(not allow_append_to_session_h5_file))
 
