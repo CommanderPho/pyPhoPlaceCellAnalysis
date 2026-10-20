@@ -4903,7 +4903,8 @@ class AcrossSessionHelpers:
                     
                     ## Build desired filepaths optionally using the `rename_backup_basename_fn` to rename them
                     # a_most_recent_parsed_files_df['desired_filepath'] = a_most_recent_parsed_files_df['path'].map(lambda x: target_dir.joinpath(x.name))
-                    a_most_recent_parsed_files_df['desired_filepath'] = []
+                    desired_filepaths = []
+                    # a_most_recent_parsed_files_df['desired_filepath'] = []
                     for src_file in a_most_recent_parsed_files_df['path']:
                         basename: str = src_file.stem
                         if rename_backup_basename_fn is not None:
@@ -4915,8 +4916,11 @@ class AcrossSessionHelpers:
                         if debug_print:
                             print(f'\tfinal_dest_name: {final_dest_name}')
                         dest_path: Path = target_dir.joinpath(final_dest_name).resolve()
-                        a_most_recent_parsed_files_df['desired_filepath'].append(dest_path)
-
+                        # a_most_recent_parsed_files_df['desired_filepath'].append(dest_path)
+                        desired_filepaths.append(dest_path)
+                    ## END for src_fi..
+                    assert len(desired_filepaths) == len(a_most_recent_parsed_files_df), f"len(a_most_recent_parsed_files_df): {len(a_most_recent_parsed_files_df)} != len(desired_filepaths): {len(desired_filepaths)}"
+                    a_most_recent_parsed_files_df['desired_filepath'] = desired_filepaths
 
                     all_found_custom_glob_parsed_files_df_dict[k] = deepcopy(a_most_recent_parsed_files_df)
                     
