@@ -490,9 +490,10 @@ class LeaveOneOutDecodingAnalysis(ComputedResult):
 @custom_define(slots=False, kw_only=True) # NOTE: kw_only=True prevents errors from only assigning some of the attributes with a specific field
 class ExpectedVsObservedResult(ComputedResult):
     """ Allows initialization from 
+    from neuropy.utils.mixins.indexing_helpers import get_dict_subset
     curr_long_short_post_decoding = curr_active_pipeline.global_computation_results.computed_data['long_short_post_decoding']
     expected_v_observed_result = curr_long_short_post_decoding.expected_v_observed_result
-    expected_v_observed_result_obj = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
+    expected_v_observed_result_obj = ExpectedVsObservedResult(**get_dict_subset(expected_v_observed_result.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
     expected_v_observed_result_obj
     """
     _VersionedResultMixin_version: str = "2024.01.10_0" # to be updated in your IMPLEMENTOR to indicate its version

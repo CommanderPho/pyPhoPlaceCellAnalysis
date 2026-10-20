@@ -2841,10 +2841,12 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
     if should_save_any_session_files:
         try:
             custom_save_filepaths_dict, custom_suffix = curr_active_pipeline.custom_save_pipeline_as(enable_save_pipeline_pkl=enable_save_pipeline_pkl, enable_save_global_computations_pkl=enable_save_global_computations_pkl, enable_save_h5=enable_save_h5)
-            was_write_good = True
-            if enable_save_h5 and ('pipeline_h5' in custom_save_filepaths_dict):
-                hdf5_output_path = custom_save_filepaths_dict['pipeline_h5']
-                print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
+            was_write_good = True  # custom_save_pipeline_as returned without raising; H5 success is checked separately via Path
+            if enable_save_h5:
+                _candidate_h5 = custom_save_filepaths_dict.get('pipeline_h5', None)
+                if isinstance(_candidate_h5, Path):
+                    hdf5_output_path = _candidate_h5
+                    print(f'\tpipeline hdf5_output_path: "{hdf5_output_path}"')
 
         except Exception as e:
             exception_info = sys.exc_info()
@@ -2862,7 +2864,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
      'session_files_dict': custom_save_filepaths_dict, 'successfully_copied_files_dict': custom_save_filepaths_dict,
      'was_write_good': was_write_good,
     }
-    if enable_save_h5 and (hdf5_output_path is not None):
+    if enable_save_h5 and isinstance(hdf5_output_path, Path):
         callback_outputs['hdf5_output_path'] = hdf5_output_path
 
     if should_write_posterior_h5:
@@ -2913,7 +2915,7 @@ def save_custom_session_files_completion_function(self, global_data_root_parent_
 
     across_session_results_extended_dict['save_custom_session_files_completion_function'] = callback_outputs
 
-    if was_write_good and (hdf5_output_path is not None):
+    if was_write_good and isinstance(hdf5_output_path, Path) and hdf5_output_path.exists():
         print(f'\tHDF5 file "{hdf5_output_path}" successfully written out! done.')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')

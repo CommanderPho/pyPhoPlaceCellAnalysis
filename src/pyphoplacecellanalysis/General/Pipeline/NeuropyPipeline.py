@@ -176,14 +176,26 @@ def helper_perform_pickle_pipeline(a_curr_active_pipeline, custom_save_filenames
         if enable_save_global_computations_pkl:
             custom_save_filepaths_dict['global_computation_pkl'] = a_curr_active_pipeline.save_global_computation_results(override_global_pickle_filename=custom_save_filenames['global_computation_pkl'])
 
-        if enable_save_h5:
-            custom_save_filepaths_dict['pipeline_h5'], _HDF5_err = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
-        
-        print(f'custom_save_filepaths: {custom_save_filepaths_dict}')
-
     except Exception as e:
         print(f'failed pickling in `helper_perform_pickle_pipeline(...)` with error: {e}')
         pass
+
+    # H5 export isolated from pickle saves so a failed H5 does not look like a failed pickle, and so a pre-seeded filename string is not left as a false-success Path.
+    if enable_save_h5:
+        try:
+            _pipeline_h5_path, _HDF5_err = a_curr_active_pipeline.export_pipeline_to_h5(override_filename=custom_save_filenames['pipeline_h5'])
+            if (_HDF5_err is None) and isinstance(_pipeline_h5_path, Path):
+                custom_save_filepaths_dict['pipeline_h5'] = _pipeline_h5_path
+            else:
+                custom_save_filepaths_dict.pop('pipeline_h5', None)
+                if _HDF5_err is not None:
+                    print(f'failed HDF5 export in `helper_perform_pickle_pipeline(...)` with error: {_HDF5_err}')
+        except Exception as e:
+            custom_save_filepaths_dict.pop('pipeline_h5', None)
+            print(f'failed HDF5 export in `helper_perform_pickle_pipeline(...)` with error: {e}')
+            pass
+
+    print(f'custom_save_filepaths: {custom_save_filepaths_dict}')
     
     return custom_save_filepaths_dict
 
@@ -1046,10 +1058,23 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
         except BaseException:
             raise
 
-        if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
-            expected_v_observed_result = ExpectedVsObservedResult(**expected_v_observed_result.to_dict())
-        
-        expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+        # ExpectedVsObservedResult ___________________________________________________________________________________________ #
+        # Local rebind only for HDF write — do not assign back into global_computation_results (pickle safety).
+        try:
+            from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+            if not isinstance(expected_v_observed_result, ExpectedVsObservedResult):
+                expected_v_observed_result = ExpectedVsObservedResult(**get_dict_subset(expected_v_observed_result.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
+
+            expected_v_observed_result.to_hdf(file_path=file_path, key=f'{a_global_computations_group_key}/expected_v_observed_result', active_context=session_context) # 'output/test_ExpectedVsObservedResult.h5', '/expected_v_observed_result')
+        except (KeyError, AttributeError) as e:
+            print(f'expected_v_observed_result is missing and will be skipped. Error: {e}')
+        except NotImplementedError as e:
+            print(f'expected_v_observed_result failed to save to HDF5 due to NotImplementedError issues and will be skipped. Error {e}')
+        except TypeError as e:
+            # TypeError: Object dtype dtype('O') has no native HDF5 equivalent; also unexpected kwargs from to_dict reconstruction
+            print(f'expected_v_observed_result failed to save to HDF5 due to type issues and will be skipped. Error {e}')
+        except BaseException:
+            raise
 
 
         ##TODO: remainder of global_computations
