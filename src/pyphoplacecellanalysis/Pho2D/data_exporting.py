@@ -1826,7 +1826,7 @@ class LoadedPosteriorContainer:
     def load_batch_hdf5_exports(cls, exported_posterior_data_h5_files: List[Path]) -> Dict[str, "LoadedPosteriorContainer"]:
         """ 
         
-        all_sessions_exported_posteriors_list = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=exported_posterior_data_h5_files)
+        all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=exported_posterior_data_h5_files)
         
         """
         exported_posterior_data_h5_files = [Path(v).resolve() for v in exported_posterior_data_h5_files] ## should parse who name and stuff... but we don't.
