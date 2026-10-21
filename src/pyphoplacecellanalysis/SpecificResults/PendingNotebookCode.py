@@ -9815,7 +9815,7 @@ class PrePostDeltaDistributionComparison:
 
 
 
-def estimate_block_length_laps_from_autocorrelation(
+def estimate_block_length_lap_t_bins_from_autocorrelation(
     filtered_all_sessions_laps_time_bin_df,
     value_col='P_Short',
     condition_col='pre_post_delta_category',
@@ -10122,6 +10122,279 @@ def estimate_block_length_laps_from_autocorrelation(
     }
 
 
+def estimate_block_length_laps_from_autocorrelation(
+    filtered_all_sessions_laps_df,
+    value_col='P_Short',
+    condition_col='pre_post_delta_category',
+    animal_col='animal',
+    session_col='session_name',
+    lap_col=None,
+    lap_order_col=None,
+    pre_label='pre-delta',
+    post_label='post-delta',
+    acf_threshold=0.1,
+    consecutive_lags=3,
+    min_run_laps=12,
+    max_lag=None,
+    recommendation_quantile=0.90,
+    plot=False,
+):
+    """Estimate a candidate moving-block length from lap-level P_Short autocorrelation."""
+
+    import numpy as np
+    import pandas as pd
+
+    required_cols = [value_col, condition_col, animal_col, session_col]
+    missing_cols = set(required_cols).difference(filtered_all_sessions_laps_df.columns)
+    if missing_cols:
+        raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+
+    # Detect common lap ID and chronological-order columns when unspecified.
+    if lap_col is None:
+        lap_col = next((
+            col for col in ['lap_idx', 'parent_epoch_id', 'epoch_id']
+            if col in filtered_all_sessions_laps_df.columns
+            and filtered_all_sessions_laps_df[col].notna().any()
+        ), None)
+
+    if lap_order_col is None:
+        lap_order_col = next((
+            col for col in ['lap_start_t', 'parent_epoch_start_t', 'epoch_start_t', 'start']
+            if col in filtered_all_sessions_laps_df.columns
+            and filtered_all_sessions_laps_df[col].notna().any()
+        ), None)
+
+    if lap_col is None or lap_order_col is None:
+        raise ValueError(
+            'Could not identify lap_col or lap_order_col. '
+            'Specify both explicitly.'
+        )
+
+    data = filtered_all_sessions_laps_df[
+        required_cols + [lap_col, lap_order_col]
+    ].copy()
+
+    data[value_col] = pd.to_numeric(data[value_col], errors='raise')
+    data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
+
+    data = data.dropna(subset=[
+        animal_col, session_col, lap_col, lap_order_col,
+    ])
+
+    valid_values = data[value_col].dropna().to_numpy(dtype=float)
+    if not np.isfinite(valid_values).all() or np.any(
+        (valid_values < 0) | (valid_values > 1)
+    ):
+        raise ValueError(f'{value_col} must contain finite probabilities in [0, 1].')
+
+    # This version expects exactly one row per lap.
+    group_cols = [animal_col, session_col, lap_col]
+    if data.duplicated(group_cols).any():
+        raise ValueError(
+            'Expected one row per lap. Duplicate animal/session/lap combinations found.'
+        )
+
+    # A row with a missing score or a different condition breaks a run;
+    # do not silently join observations across that gap.
+    runs = []
+    for (animal, session), session_laps in data.groupby(
+        [animal_col, session_col], sort=False
+    ):
+        session_laps = session_laps.sort_values(lap_order_col, kind='stable')
+
+        current_condition = None
+        current_rows = []
+
+        for row in session_laps.to_dict('records'):
+            condition = row[condition_col]
+            score = row[value_col]
+
+            eligible = (
+                pd.notna(condition)
+                and condition in (pre_label, post_label)
+                and pd.notna(score)
+                and np.isfinite(score)
+            )
+
+            if current_rows and (
+                not eligible or condition != current_condition
+            ):
+                runs.append({
+                    'animal': animal,
+                    'session': session,
+                    'condition': current_condition,
+                    'rows': current_rows,
+                })
+                current_rows = []
+                current_condition = None
+
+            if eligible:
+                if not current_rows:
+                    current_condition = condition
+                current_rows.append(row)
+
+        if current_rows:
+            runs.append({
+                'animal': animal,
+                'session': session,
+                'condition': current_condition,
+                'rows': current_rows,
+            })
+
+    acf_records = []
+    run_records = []
+
+    for run_id, run in enumerate(runs):
+        x = np.asarray(
+            [row[value_col] for row in run['rows']], dtype=float
+        )
+        n_laps = len(x)
+
+        record = {
+            'run_id': run_id,
+            'animal': run['animal'],
+            'session': run['session'],
+            'condition': run['condition'],
+            'n_laps': n_laps,
+            'decorrelation_lag_laps': np.nan,
+            'censored': False,
+            'status': 'ok',
+        }
+
+        if n_laps < min_run_laps:
+            record['status'] = 'too_short'
+            run_records.append(record)
+            continue
+
+        current_max_lag = (
+            min(25, n_laps // 3)
+            if max_lag is None
+            else min(int(max_lag), n_laps // 3)
+        )
+
+        if current_max_lag < consecutive_lags:
+            record['status'] = 'too_short_for_acf'
+            run_records.append(record)
+            continue
+
+        x = x - x.mean()
+        denominator = np.dot(x, x)
+
+        if denominator <= np.finfo(float).eps:
+            record['status'] = 'constant_series'
+            run_records.append(record)
+            continue
+
+        acf_values = {}
+        for lag in range(1, current_max_lag + 1):
+            rho = float(np.dot(x[:-lag], x[lag:]) / denominator)
+            acf_values[lag] = rho
+
+            acf_records.append({
+                'run_id': run_id,
+                'animal': run['animal'],
+                'session': run['session'],
+                'condition': run['condition'],
+                'lag': lag,
+                'acf': rho,
+            })
+
+        # First lag followed by consecutive_lags values below the threshold.
+        decorrelation_lag = None
+        for start_lag in range(
+            1, current_max_lag - consecutive_lags + 2
+        ):
+            if all(
+                abs(acf_values[lag]) <= acf_threshold
+                for lag in range(start_lag, start_lag + consecutive_lags)
+            ):
+                decorrelation_lag = start_lag
+                break
+
+        if decorrelation_lag is None:
+            record['decorrelation_lag_laps'] = current_max_lag + 1
+            record['censored'] = True
+            record['status'] = 'dependence_not_resolved'
+        else:
+            record['decorrelation_lag_laps'] = decorrelation_lag
+
+        run_records.append(record)
+
+    acf_df = pd.DataFrame(acf_records)
+    run_diagnostics = pd.DataFrame(run_records)
+
+    informative_runs = run_diagnostics.loc[
+        run_diagnostics['decorrelation_lag_laps'].notna()
+    ]
+
+    provisional_block_length_laps = None
+    suggested_block_length_laps = None
+
+    if not informative_runs.empty:
+        provisional_block_length_laps = max(
+            1,
+            int(np.ceil(informative_runs['decorrelation_lag_laps'].quantile(
+                recommendation_quantile, interpolation='higher'
+            ))),
+        )
+
+        if not informative_runs['censored'].any():
+            suggested_block_length_laps = provisional_block_length_laps
+
+    if not acf_df.empty:
+        acf_df['abs_acf'] = acf_df['acf'].abs()
+        acf_summary = acf_df.groupby('lag')['abs_acf'].agg(
+            median_abs_acf='median',
+            q90_abs_acf=lambda x: x.quantile(0.90),
+            n_series='size',
+        ).reset_index()
+    else:
+        acf_summary = pd.DataFrame(
+            columns=['lag', 'median_abs_acf', 'q90_abs_acf', 'n_series']
+        )
+
+    fig = ax = None
+    if plot and not acf_summary.empty:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(
+            acf_summary['lag'], acf_summary['median_abs_acf'],
+            label='Median absolute ACF',
+        )
+        ax.plot(
+            acf_summary['lag'], acf_summary['q90_abs_acf'],
+            label='90th percentile absolute ACF',
+        )
+        ax.axhline(
+            acf_threshold, color='black', linestyle='--',
+            label=f'ACF threshold = {acf_threshold:g}',
+        )
+        ax.set(
+            xlabel='Lag (laps)',
+            ylabel='Absolute autocorrelation',
+            title='Autocorrelation of lap-level P_Short',
+        )
+        ax.legend()
+        fig.tight_layout()
+
+    return {
+        'lap_col': lap_col,
+        'lap_order_col': lap_order_col,
+        'suggested_block_length_laps': suggested_block_length_laps,
+        'provisional_block_length_laps': provisional_block_length_laps,
+        'acf_threshold': acf_threshold,
+        'consecutive_lags': consecutive_lags,
+        'recommendation_quantile': recommendation_quantile,
+        'n_runs': len(run_diagnostics),
+        'n_informative_runs': len(informative_runs),
+        'n_censored_runs': int(informative_runs['censored'].sum()),
+        'run_diagnostics': run_diagnostics,
+        'acf_by_run': acf_df,
+        'acf_summary': acf_summary,
+        'figure': fig,
+        'axes': ax,
+    }
 
 
 # ==================================================================================================================================================================================================================================================================================== #
