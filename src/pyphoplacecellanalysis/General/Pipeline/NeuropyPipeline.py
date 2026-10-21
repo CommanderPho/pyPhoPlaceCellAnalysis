@@ -259,26 +259,20 @@ def _get_custom_suffix_for_filename_from_computation_metadata(*extras_strings, p
     return custom_suffix
 
 
-_TBIN_SUFFIXED_SAVE_KEYS: Tuple[str, ...] = ('global_computation_pkl', 'pipeline_h5')
-
-
-@function_attributes(short_name=None, tags=['filename', 'tbin', 'time_bin_size'], input_requires=[], output_provides=[], uses=[], used_by=['build_decoding_time_bin_size_filename_suffix', 'parse_decoding_time_bin_size_str'], creation_date='2026-10-21 12:55', related_items=[])
-def format_decoding_time_bin_size_filename_token(time_bin_size: Optional[float]) -> str:
-    """ Convert a decoding time_bin_size in seconds to an integer-millisecond filename token.
+@function_attributes(short_name=None, tags=['filename', 'tbin', 'time_bin_size'], input_requires=[], output_provides=[], uses=[], used_by=['_get_custom_filenames_from_computation_metadata', 'global_computation_results_pickle_path'], creation_date='2026-10-21 12:55', related_items=[])
+def build_decoding_time_bin_size_filename_suffix(laps_decoding_time_bin_size: Optional[float] = None, ripple_decoding_time_bin_size: Optional[float] = None) -> str:
+    """ Filename fragment for decoding time_bin_size: '-tbin_25ms' or '-tbin_laps25ms_ripple75ms'.
 
     0.025 -> '25ms'; 0.075 -> '75ms'; 0.250 -> '250ms'
     """
-    if time_bin_size is None:
-        return ''
-    ms: int = int(round(float(time_bin_size) * 1000.0))
-    return f"{ms}ms"
+    def _format_ms_token(time_bin_size: Optional[float]) -> str:
+        if time_bin_size is None:
+            return ''
+        ms: int = int(round(float(time_bin_size) * 1000.0))
+        return f"{ms}ms"
 
-
-@function_attributes(short_name=None, tags=['filename', 'tbin', 'time_bin_size'], input_requires=[], output_provides=[], uses=['format_decoding_time_bin_size_filename_token'], used_by=['_get_custom_filenames_from_computation_metadata', 'global_computation_results_pickle_path'], creation_date='2026-10-21 12:55', related_items=[])
-def build_decoding_time_bin_size_filename_suffix(laps_decoding_time_bin_size: Optional[float] = None, ripple_decoding_time_bin_size: Optional[float] = None) -> str:
-    """ Filename fragment for decoding time_bin_size: '-tbin_25ms' or '-tbin_laps25ms_ripple75ms'. """
-    laps_token: str = format_decoding_time_bin_size_filename_token(laps_decoding_time_bin_size)
-    ripple_token: str = format_decoding_time_bin_size_filename_token(ripple_decoding_time_bin_size)
+    laps_token: str = _format_ms_token(laps_decoding_time_bin_size)
+    ripple_token: str = _format_ms_token(ripple_decoding_time_bin_size)
     if (not laps_token) and (not ripple_token):
         return ''
     if laps_token and ripple_token:
@@ -343,29 +337,7 @@ def try_get_decoding_time_bin_sizes_from_parameters(all_params_dict: Optional[Di
     return getattr(md, 'laps_decoding_time_bin_size', None), getattr(md, 'ripple_decoding_time_bin_size', None)
 
 
-def _apply_decoding_time_bin_size_to_save_filenames(custom_save_filenames: Dict[str, str], custom_save_filepaths: Dict[str, Any], laps_decoding_time_bin_size: Optional[float] = None, ripple_decoding_time_bin_size: Optional[float] = None) -> Tuple[Dict[str, str], Dict[str, Any]]:
-    """ Append `-tbin_25ms` to global pickle and pipeline h5 names only (not local pipeline_pkl). """
-    tbin_suffix: str = build_decoding_time_bin_size_filename_suffix(laps_decoding_time_bin_size=laps_decoding_time_bin_size, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
-    if not tbin_suffix:
-        return custom_save_filenames, custom_save_filepaths
-    for k in _TBIN_SUFFIXED_SAVE_KEYS:
-        if k in custom_save_filenames:
-            name = custom_save_filenames[k]
-            p = Path(name)
-            custom_save_filenames[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
-        if k in custom_save_filepaths:
-            v = custom_save_filepaths[k]
-            if isinstance(v, str):
-                p = Path(v)
-                custom_save_filepaths[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
-            elif isinstance(v, Path):
-                custom_save_filepaths[k] = v.with_name(f"{v.stem}{tbin_suffix}{v.suffix}")
-    ## END for k in _TBIN_SUFFIXED_SAVE_KEYS...
-
-    return custom_save_filenames, custom_save_filepaths
-
-
-@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata'], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
+@function_attributes(short_name=None, tags=['NEEDS_REFACTOR', 'dataframe', 'filename', 'metadata'], input_requires=[], output_provides=[], uses=['_get_custom_suffix_for_filename_from_computation_metadata', 'build_decoding_time_bin_size_filename_suffix'], used_by=['save_custom_parameters_pipeline', 'get_custom_pipeline_filenames_from_parameters'], creation_date='2024-10-28 12:40', related_items=[])
 def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_computed', included_qclu_values=None, minimum_inclusion_fr_Hz=None, parts_separator:str='-', laps_decoding_time_bin_size: Optional[float] = None, ripple_decoding_time_bin_size: Optional[float] = None) -> Dict[str, str]:
     """ Uses parameters stored in the pipeline to determine an appropriate filename
     
@@ -377,6 +349,25 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
     print(f'custom_suffix: "{custom_suffix}"')
 
     """
+    def _append_tbin_to_global_and_h5(custom_save_filenames: Dict[str, str], custom_save_filepaths: Dict[str, Any]) -> Tuple[Dict[str, str], Dict[str, Any]]:
+        """ Append `-tbin_25ms` to global pickle and pipeline h5 names only (not local pipeline_pkl). """
+        tbin_suffix: str = build_decoding_time_bin_size_filename_suffix(laps_decoding_time_bin_size=laps_decoding_time_bin_size, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+        if not tbin_suffix:
+            return custom_save_filenames, custom_save_filepaths
+        for k in ('global_computation_pkl', 'pipeline_h5'):
+            if k in custom_save_filenames:
+                p = Path(custom_save_filenames[k])
+                custom_save_filenames[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
+            if k in custom_save_filepaths:
+                v = custom_save_filepaths[k]
+                if isinstance(v, str):
+                    p = Path(v)
+                    custom_save_filepaths[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
+                elif isinstance(v, Path):
+                    custom_save_filepaths[k] = v.with_name(f"{v.stem}{tbin_suffix}{v.suffix}")
+        ## END for k in ('global_computation_pkl', 'pipeline_h5')...
+        return custom_save_filenames, custom_save_filepaths
+
     valid_epochs_source_values = ['compute_diba_quiescent_style_replay_events', 'diba_evt_file', 'initial_loaded', 'normal_computed']
     assert epochs_source in valid_epochs_source_values, f"epochs_source: '{epochs_source}' is not in valid_epochs_source_values: {valid_epochs_source_values}"
     to_filename_conversion_dict = {'compute_diba_quiescent_style_replay_events':'_withNewComputedReplays', 'diba_evt_file':'_withNewKamranExportedReplays', 'initial_loaded': '_withOldestImportedReplays', 'normal_computed': '_withNormalComputedReplays'}
@@ -390,7 +381,7 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
     }
     # print(f'custom_save_filenames: {custom_save_filenames}')
     custom_save_filepaths = {k:v for k, v in custom_save_filenames.items()}
-    custom_save_filenames, custom_save_filepaths = _apply_decoding_time_bin_size_to_save_filenames(custom_save_filenames, custom_save_filepaths, laps_decoding_time_bin_size=laps_decoding_time_bin_size, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+    custom_save_filenames, custom_save_filepaths = _append_tbin_to_global_and_h5(custom_save_filenames, custom_save_filepaths)
     return custom_save_filepaths, custom_save_filenames, custom_suffix
 
 
