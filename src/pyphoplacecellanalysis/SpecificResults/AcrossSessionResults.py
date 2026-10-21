@@ -2329,6 +2329,9 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
         date_day_time_variant_suffix_missing_tbin_name = "2024-11-27_1220PM_GL-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(ripple_all_scores_merged_df)",
         track_body_variant_name = "2026-08-27_0500PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly-(ripple_all_scores_merged_df)_tbin-0.075",
         track_body_variant_perfmnc_session_name = "2026-08-28_0830PM-kdiba_gor01_one_2006-6-08_14-26-15__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly-(perfmnc_session)_tbin-0.075",
+        tbin_ms_csv_name = "2026-10-21_1200PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-(ripple_all_scores_merged_df)_tbin_25ms",
+        tbin_ms_dash_csv_name = "2026-10-21_1200PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-(ripple_all_scores_merged_df)-tbin_25ms",
+        tbin_ms_global_pkl_style_name = "2026-10-21_1200PM-kdiba_gor01_one_2006-6-12_15-55-31__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-(global_computation_results)-tbin_25ms",
         )
 
         expected_parse_results_dict = dict(
@@ -2338,7 +2341,10 @@ def parse_filename(path: Union[Path, str], should_print_unparsable_filenames: bo
             date_day_time_variant_suffix_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', '0.025'),
             date_day_time_variant_suffix_missing_tbin_name = (datetime(2024, 11, 27, 12, 20), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0', 'ripple_all_scores_merged_df', None),
             track_body_variant_name = (datetime(2026, 8, 27, 17, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'ripple_all_scores_merged_df', '0.075'),
-            track_body_variant_perfmnc_session_name = (datetime(2026, 8, 28, 20, 30), 'kdiba_gor01_one_2006-6-08_14-26-15', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'perfmnc_session', '0.075')
+            track_body_variant_perfmnc_session_name = (datetime(2026, 8, 28, 20, 30), 'kdiba_gor01_one_2006-6-08_14-26-15', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-variant_trackBodyPeakOnly', 'perfmnc_session', '0.075'),
+            tbin_ms_csv_name = (datetime(2026, 10, 21, 12, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0', 'ripple_all_scores_merged_df', '25ms'),
+            tbin_ms_dash_csv_name = (datetime(2026, 10, 21, 12, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0', 'ripple_all_scores_merged_df', '25ms'),
+            tbin_ms_global_pkl_style_name = (datetime(2026, 10, 21, 12, 0), 'kdiba_gor01_one_2006-6-12_15-55-31', 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0', 'global_computation_results', '25ms')
         )
 
         ## perform the actual parsing:
@@ -3151,11 +3157,21 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
 
 def try_convert_to_float(a_str: str, default_val: float = np.nan) -> float:
     """ allows trying to parse to a float, and fallsback to a default value if it fails.
+
+    Accepts both seconds (`'0.025'`) and millisecond tokens (`'25ms'`, `'tbin_25ms'`).
     """
     try:
         return float(a_str)
-    except:
-        return default_val
+    except Exception:
+        pass
+    try:
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import parse_decoding_time_bin_size_str
+        parsed = parse_decoding_time_bin_size_str(a_str)
+        if parsed is not None:
+            return parsed
+    except Exception:
+        pass
+    return default_val
     
 ## INPUTS: an_active_df, all_sessions_all_scores_df, a_time_column_names = 'ripple_start_t'
 @function_attributes(short_name=None, tags=['IMPORTANT', 'missing-columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-05-23 18:10', related_items=[])

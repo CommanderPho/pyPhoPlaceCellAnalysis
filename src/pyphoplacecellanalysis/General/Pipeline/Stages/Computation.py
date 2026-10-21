@@ -2199,7 +2199,7 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         custom_save_filepaths, custom_save_filenames, custom_suffix = curr_active_pipeline.get_custom_pipeline_filenames_from_parameters()
         
         """
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata, try_get_decoding_time_bin_sizes_from_parameters
         
         all_params_dict = self.get_all_parameters()
 
@@ -2213,7 +2213,9 @@ class ComputedPipelineStage(FilterablePipelineStage, LoadedPipelineStage):
         epochs_source: str = active_replay_epoch_parameters.get('epochs_source', 'normal_computed')
         custom_suffix: str = epochs_source
         # custom_suffix += _get_custom_suffix_for_filename_from_computation_metadata(minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator)
+        computation_config = getattr(getattr(self, 'global_computation_results', None), 'computation_config', None)
+        laps_decoding_time_bin_size, ripple_decoding_time_bin_size = try_get_decoding_time_bin_sizes_from_parameters(all_params_dict=all_params_dict, computation_config=computation_config)
+        custom_save_filepaths, custom_save_filenames, custom_suffix = _get_custom_filenames_from_computation_metadata(epochs_source=epochs_source, included_qclu_values=included_qclu_values, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, parts_separator=parts_separator, laps_decoding_time_bin_size=laps_decoding_time_bin_size, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
         # print(f'custom_save_filenames: {custom_save_filenames}')
         # print(f'custom_suffix: "{custom_suffix}"')
         
@@ -3080,10 +3082,17 @@ class PipelineWithComputedPipelineStageMixin:
         Looks in the `output/global_computation_results.pkl` folder first.
         
         """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import build_decoding_time_bin_size_filename_suffix, try_get_decoding_time_bin_sizes_from_parameters
+
         special_designator_suffix = self.special_pickle_designator_suffix
         
         # if len(special_designator_suffix) > 0:
         desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}.pkl" # 'global_computation_results_withDirectionalLaps.pkl'
+        computation_config = getattr(getattr(self, 'global_computation_results', None), 'computation_config', None)
+        laps_decoding_time_bin_size, ripple_decoding_time_bin_size = try_get_decoding_time_bin_sizes_from_parameters(computation_config=computation_config)
+        tbin_suffix: str = build_decoding_time_bin_size_filename_suffix(laps_decoding_time_bin_size=laps_decoding_time_bin_size, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
+        if tbin_suffix and ('-tbin_' not in desired_global_pickle_filename):
+            desired_global_pickle_filename = f"global_computation_results{special_designator_suffix}{tbin_suffix}.pkl"
         # desired_global_pickle_filename = f'global_computation_results.pkl' # old way
         return self.get_output_path().joinpath(desired_global_pickle_filename).resolve()
 
