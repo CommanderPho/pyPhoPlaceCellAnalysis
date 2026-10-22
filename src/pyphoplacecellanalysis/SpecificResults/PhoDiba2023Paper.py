@@ -65,6 +65,431 @@ _bak_rcParams = mpl.rcParams.copy()
 # %matplotlib qt
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-22 - Extract out Figure 5 Meas v. Decoded Occupancy code                                                                                                                                                                                                                     #
+# ==================================================================================================================================================================================================================================================================================== #
+from pyphoplacecellanalysis.Pho2D.data_exporting import LoadedPosteriorContainer
+from pyphoplacecellanalysis.Pho2D.track_shape_drawing import LinearTrackInstance
+from neuropy.core.user_annotations import UserAnnotationsManager
+import neuropy.utils.type_aliases as types
+
+loaded_track_limits = {'long_xlim': np.array([59.0774, 228.69]),
+ 'long_unit_xlim': np.array([0.205294, 0.794698]),
+ 'short_xlim': np.array([94.0156, 193.757]),
+ 'short_unit_xlim': np.array([0.326704, 0.673304]),
+ 'long_ylim': np.array([138.164, 146.12]),
+ 'long_unit_ylim': np.array([0.48012, 0.507766]),
+ 'short_ylim': np.array([138.021, 146.263]),
+ 'short_unit_ylim': np.array([0.479622, 0.508264])
+}
+
+long_track_inst, short_track_inst = LinearTrackInstance.init_LS_tracks_from_loaded_track_limits(loaded_track_limits=loaded_track_limits)
+
+
+
+
+@metadata_attributes(short_name=None, tags=['figure-5', 'fig-5', 'figure'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-22 09:32', related_items=['MeasuredVsDecodedOccupancy', 'perform_plot_occupancy'])
+class Figure5:
+    """ Plots Measured v. Decoded occupancy from h5 batch outputs
+
+    Related:
+        from neuropy.plotting.placemaps import plot_placefield_occupancy, perform_plot_occupancy
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import MeasuredVsDecodedOccupancy
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure5
+        from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
+
+
+        # ==================================================================================================================================================================================================================================================================================== #
+        # HDF5 (H5) Posterior Import from Batch                                                                                                                                                                                                                                                #
+        # ==================================================================================================================================================================================================================================================================================== #
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import H5FileAggregator
+        from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting, LoadedPosteriorContainer
+        from neuropy.utils.indexing_helpers import flatten, flatten_dict
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionIdentityDataframeAccessor
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import Figure5
+
+        # ## INPUTS: parsed_h5_files_df
+        decoded_posteriors_parsed_h5_files_df = parsed_h5_files_df[parsed_h5_files_df['file_type'] == 'decoded_posteriors']
+        # print(decoded_posteriors_parsed_h5_files_df['custom_replay_name'].unique())
+        # # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2]"
+        # # matching_custom_replay_name_str: str = "withNormalComputedReplays-frateThresh_5.0-qclu_[1, 2, 4, 6, 7, 9]"
+        # matching_custom_replay_name_str: str = 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        # decoded_posteriors_parsed_h5_files_df = decoded_posteriors_parsed_h5_files_df[decoded_posteriors_parsed_h5_files_df['custom_replay_name'] == matching_custom_replay_name_str]
+        # decoded_posteriors_parsed_h5_files_df
+        decoded_posteriors_h5_files = [Path(v.as_posix()).resolve() for v in decoded_posteriors_parsed_h5_files_df['path'].to_list()]
+        # decoded_posteriors_h5_files
+        ## OUTPUTS: decoded_posteriors_h5_files
+        decoded_posteriors_h5_files
+
+        # # a_posterior_hdf5_path = Path("C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/output/collected_outputs/2025-08-14_0330PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-(decoded_posteriors)_tbin-0.05.h5").resolve()
+        # a_posterior_hdf5_path = Path("K:/scratch/collected_outputs/2025-08-14_0340PM-kdiba_gor01_two_2006-6-12_16-53-46__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_0.2-(decoded_posteriors)_tbin-0.05.h5").resolve()
+
+        # decoded_posteriors_h5_files = [a_posterior_hdf5_path]
+
+
+        # 2026-10-20 7pm: With Laps __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        dataset_type_fields = ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+        decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+
+        def _build_epoch_field_dict(_out_dict, epochs_name: str):
+            ''' extract both exported PBE and Laps posteriors from h5 posterior '''
+            missing = [dn for dn in decoder_names if (dn not in _out_dict) or (epochs_name not in _out_dict[dn])]
+            if missing:
+                raise KeyError(f"H5 is missing '{epochs_name}' for decoders {missing}. Regenerated post-export files should have both 'laps' and 'ripple'.")
+            epoch_only = {dn: _out_dict[dn][epochs_name] for dn in decoder_names}
+            return {
+                field: {dn: list(epoch_only[dn][field]) for dn in decoder_names}
+                for field in dataset_type_fields
+            }
+
+        all_sessions_hdf_load_path_to_sess_key_dict: Dict[Path, str] = {}
+        all_sessions_exported_posteriors_raw_dict = {}
+        all_sessions_exported_ripple_data_only_dict = {}
+        all_sessions_exported_laps_data_only_dict = {}
+
+        for hdf_load_path in decoded_posteriors_h5_files:
+            _out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=Path(hdf_load_path).resolve(), debug_print=False) # _out_dict: Dict[types.DecoderName, Dict[KnownEpochsName, Dict]]
+            session_key = '/' + '/'.join(session_key_parts)  # e.g. '/kdiba/gor01/two/2006-6-12_16-53-46'
+            all_sessions_hdf_load_path_to_sess_key_dict[hdf_load_path] = session_key
+            all_sessions_exported_posteriors_raw_dict[session_key] = _out_dict
+            all_sessions_exported_ripple_data_only_dict[session_key] = _build_epoch_field_dict(_out_dict, 'ripple')
+            all_sessions_exported_laps_data_only_dict[session_key] = _build_epoch_field_dict(_out_dict, 'laps')
+
+
+        ## OUTPUTS: all_sessions_exported_posteriors_raw_dict, all_sessions_exported_ripple_data_only_dict, all_sessions_exported_laps_data_only_dict
+
+        # all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict = LoadedPosteriorContainer.load_batch_hdf5_exports(exported_posterior_data_h5_files=decoded_posteriors_h5_files)
+        ## OUTPUTS: all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
+
+        # Decoded ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+
+        ## OUTPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict
+        # INPUTS: sessions_t_delta_tuple
+        t_delta_df, t_delta_dict, (earliest_delta_aligned_t_start, latest_delta_aligned_t_end) = sessions_t_delta_tuple ## UNPACK
+
+        time_bin_size: float = 0.025 # 25ms
+        use_most_likely_pos_only_pseudo_occupancy: bool = True ## when `use_most_likely_pos_only_pseudo_occupancy == True`, only the most probable position from the most probable decoder is used.
+        full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict = Figure5.compute_decoded_occupancy(all_sessions_exported_posteriors_dict=all_sessions_exported_posteriors_dict,
+                    all_sessions_exported_ripple_data_only_dict=all_sessions_exported_ripple_data_only_dict, all_sessions_exported_laps_data_only_dict=all_sessions_exported_laps_data_only_dict,
+                    t_delta_dict=t_delta_dict, time_bin_size=time_bin_size, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy)
+
+
+        # Measured ___________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        measured_x_col: str = 'binned_x_meas'
+
+        # 'x_meas' ia only non-NA for `masked_time_bin_fill_type='nan_filled'`
+        end_kwargs = dict(trained_compute_epochs='laps', custom_replay_name='withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0')
+
+
+        ## INPUTS: filtered_all_sessions_laps_time_bin_df
+        active_filtered_all_sessions_laps_time_bin_df: pd.DataFrame = deepcopy(all_sessions_laps_time_bin_df) # deepcopy(filtered_all_sessions_laps_time_bin_df)
+        # active_filtered_all_sessions_laps_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_time_bin_df']) # deepcopy(all_sessions_laps_time_bin_df)
+        active_filtered_all_sessions_laps_time_bin_df = active_filtered_all_sessions_laps_time_bin_df[active_filtered_all_sessions_laps_time_bin_df[measured_x_col].notna()]
+        active_filtered_all_sessions_laps_time_bin_df =  active_filtered_all_sessions_laps_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='nan_filled', **end_kwargs)
+        # active_filtered_all_sessions_laps_time_bin_df
+
+        active_filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = deepcopy(all_sessions_ripple_time_bin_df) # deepcopy(filtered_all_sessions_laps_time_bin_df)
+        # active_filtered_all_sessions_laps_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_time_bin_df']) # deepcopy(all_sessions_laps_time_bin_df)
+        active_filtered_all_sessions_ripple_time_bin_df = active_filtered_all_sessions_ripple_time_bin_df[active_filtered_all_sessions_ripple_time_bin_df[measured_x_col].notna()]
+        active_filtered_all_sessions_ripple_time_bin_df =  active_filtered_all_sessions_ripple_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='nan_filled', **end_kwargs)
+        # active_filtered_all_sessions_ripple_time_bin_df
+
+        active_measured_positions_dfs_dict = {'laps': active_filtered_all_sessions_laps_time_bin_df, 'PBEs': active_filtered_all_sessions_ripple_time_bin_df}
+        for epoch_name, df in active_measured_positions_dfs_dict.items():
+            assert 'pre_post_delta_category' in df
+
+        ## OUTPUTS: active_measured_positions_dfs_dict
+
+
+        ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
+        _fig5_outs = Figure5.main(full_epoch_occupancy_seconds_dict_dict=full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict=full_epoch_occupancy_fractional_dict_dict,
+                                                                        active_measured_positions_dfs_dict=active_measured_positions_dfs_dict,
+                                                                        time_bin_size=time_bin_size, measured_x_col = 'binned_x_meas',
+                                                                    )
+
+    """
+    # @function_attributes(short_name=None, tags=['occupancy', 'fig-5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-21 07:17', related_items=[])
+    @classmethod
+    def _process_result(cls, p_x_given_n_dict: Dict[types.DecoderName, List[NDArray]], most_likely_positions_dict: Optional[Dict[types.DecoderName, List[NDArray]]]=None, t_bin_centers_flat: Optional[NDArray]=None, curr_session_t_delta: Optional[float]=None, use_most_likely_pos_only_pseudo_occupancy: bool = False, debug_print: bool = False):
+        """ compute the occupancy by summing over the posteriors from the most-likely decoder """
+        # p_x_given_n_dict
+        # t_bin_centers
+        if debug_print:
+                print(f'type(most_likely_positions_dict): {type(most_likely_positions_dict)}, type(p_x_given_n_dict): {type(p_x_given_n_dict)}')
+
+        assert p_x_given_n_dict is not None
+        p_x_given_n_flat = np.stack([np.concatenate(a_p_x_given_n, axis=-1) for a_p_x_given_n in p_x_given_n_dict.values()])  # .shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins) -- comes in as 4 independent 1D decoders, not a pseduo2D. Summing each time bin over all pos gives ~4.0, not 1.0
+        # np.nansum(p_x_given_n_flat, axis=1) #.shape -- all ones because it's normalized to each decoder independently, have to undo this normalization (like we would when building the Pseudo2D representation from 4 separate decoded probabilities
+        # _decoder_rel_renormalized_p_x_given_n_flat = p_x_given_n_flat.copy() # deepcopy(p_x_given_n_flat)
+        # _decoder_rel_renormalized_p_x_given_n_flat = _decoder_rel_renormalized_p_x_given_n_flat / np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=0, keepdims=True) #.shape - (59, 639) -- sum over each decoder to find out the likelihood of each
+        # # decoder_rel_renormalized_p_x_given_n_flat.shape # (4, 59, 639)
+        # # np.nansum(decoder_rel_renormalized_p_x_given_n_flat, axis=1).shape #.shape -- (4, 639)
+        # most_likely_decoder_idx = np.argmax(np.nanmax(_decoder_rel_renormalized_p_x_given_n_flat, axis=1), axis=0) #.shape -- (639,) - (n_time_bins, ) # SyntaxError('invalid syntax', ('<string>', 2, 48, 'p_x_given_n_flat_from_most_likely_decoder_flat = np.squeeze(_decoder_rel_renormalized_p_x_given_n_flat[most_likely_decoder_idx, :, :]) # .shape (59, 639) - (n_pos_bins, n_time_bins)\n'))
+        if debug_print:
+            print(f'np.shape(p_x_given_n_flat): {np.shape(p_x_given_n_flat)}')
+
+        _decoder_rel_renormalized_p_x_given_n_flat = p_x_given_n_flat.copy() # deepcopy(p_x_given_n_flat)
+        _decoder_rel_renormalized_p_x_given_n_flat = _decoder_rel_renormalized_p_x_given_n_flat / np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=0, keepdims=True) #.shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins) # .shape - (59, 639) -- sum over each decoder to find out the likelihood of each
+        # decoder_rel_renormalized_p_x_given_n_flat.shape # (4, 59, 639)
+        if debug_print:
+            print(f'np.shape(_decoder_rel_renormalized_p_x_given_n_flat): {np.shape(_decoder_rel_renormalized_p_x_given_n_flat)}')
+
+        # np.nansum(decoder_rel_renormalized_p_x_given_n_flat, axis=1).shape #.shape -- (4, 639)
+        # most_likely_decoder_idx = np.argmax(np.nansum(p_x_given_n_flat, axis=1), axis=0) #.shape -- (639,) - (n_time_bins, ) # SyntaxError('invalid syntax', ('<string>', 2, 48, 'p_x_given_n_flat_from_most_likely_decoder_flat = np.squeeze(_decoder_rel_renormalized_p_x_given_n_flat[most_likely_decoder_idx, :, :]) # .shape (59, 639) - (n_pos_bins, n_time_bins)\n'))
+        most_likely_decoder_idx = np.squeeze(np.argmax(np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=1), axis=0)) #.shape -- (639,) - (n_time_bins, ) - sum over all positions first
+        if debug_print:
+            print(f'np.shape(most_likely_decoder_idx): {np.shape(most_likely_decoder_idx)}')
+
+        p_x_given_n_flat_from_most_likely_decoder_flat = np.vstack([np.atleast_1d(_decoder_rel_renormalized_p_x_given_n_flat[a_most_likely_idx, :, i]) for i, a_most_likely_idx in enumerate(most_likely_decoder_idx)]).T # .shape (59, 639) - (n_pos_bins, n_time_bins)
+        # p_x_given_n_flat_from_most_likely_decoder_flat = np.squeeze(_decoder_rel_renormalized_p_x_given_n_flat[most_likely_decoder_idx, :, :]) # .shape (59, 639) - (n_pos_bins, n_time_bins)
+        if debug_print:
+            print(f'np.shape(p_x_given_n_flat_from_most_likely_decoder_flat): {np.shape(p_x_given_n_flat_from_most_likely_decoder_flat)}')
+
+
+        if (curr_session_t_delta is not None) and (t_bin_centers_flat is not None):
+            ## split pre/post delta
+            n_t_bins: int = len(t_bin_centers_flat)
+            # Assert.shape_equals(p_x_given_n_flat_from_most_likely_decoder_flat, t_bin_centers_flat)
+            assert n_t_bins == np.shape(p_x_given_n_flat_from_most_likely_decoder_flat)[-1], f"n_t_bins: {n_t_bins} != np.shape(p_x_given_n_flat_from_most_likely_decoder_flat)[-1]: {np.shape(p_x_given_n_flat_from_most_likely_decoder_flat)[-1]}"
+            is_pre_delta = (t_bin_centers_flat < curr_session_t_delta)
+            ## sum up these posteriors to get the REALIO:
+            
+            if use_most_likely_pos_only_pseudo_occupancy:
+                most_likely_pos_idxs = np.argmax(p_x_given_n_flat_from_most_likely_decoder_flat, axis=0) ## most likely positions for each t_bin
+                active_p_x_given_n_flat_from_most_likely_decoder_flat = np.zeros_like(p_x_given_n_flat_from_most_likely_decoder_flat)
+                # active_p_x_given_n_flat_from_most_likely_decoder_flat[most_likely_pos_idxs] = 1.0 ## wrong, sets entire line
+                t_idx = np.arange(n_t_bins)
+                active_p_x_given_n_flat_from_most_likely_decoder_flat[most_likely_pos_idxs, t_idx] = 1.0
+
+            else:
+                active_p_x_given_n_flat_from_most_likely_decoder_flat = p_x_given_n_flat_from_most_likely_decoder_flat
+            # _temp_occupancy = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1)
+            _temp_occupancy = {
+                                'pre-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, is_pre_delta], axis=-1),
+                                'post-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, ~is_pre_delta], axis=-1),
+                                'all': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1),
+                            }
+        else:
+            ## old method of not using a dict
+            ## sum up these posteriors to get the REALIO:
+            _temp_occupancy = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1)
+            if debug_print:
+                print(f'np.shape(_temp_occupancy): {np.shape(_temp_occupancy)}')
+
+
+        if most_likely_positions_dict is not None:
+            most_likely_positions_flat = np.stack([np.concatenate(a_most_likely_positions) for a_most_likely_positions in most_likely_positions_dict.values()]) # (4, 639) - (n_decoders, n_time_bins)
+            assert (most_likely_decoder_idx is not None), f"most_likely_decoder_idx must exist, always provide p_x_given_n_dict"
+            most_likely_positions_from_most_likely_decoder_flat = np.concatenate([np.atleast_1d(most_likely_positions_flat[a_most_likely_idx, i]) for i, a_most_likely_idx in enumerate(most_likely_decoder_idx)]) ## one for each time bin #.shape (639,)
+        else:
+            most_likely_positions_from_most_likely_decoder_flat = None
+
+        return (most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy)
+
+
+    @classmethod
+    def compute_decoded_occupancy(cls, all_sessions_exported_posteriors_dict, all_sessions_exported_ripple_data_only_dict, all_sessions_exported_laps_data_only_dict, t_delta_dict, 
+            time_bin_size: float = 0.025, use_most_likely_pos_only_pseudo_occupancy: bool = True, **kwargs):
+        ## INPUTS: time_bin_size, 
+        # a_posterior_container: LoadedPosteriorContainer = all_sessions_exported_posteriors_dict['/kdiba/gor01/two/2006-6-12_16-53-46']
+
+        _temp_out_occupancy_result_dict = {'laps': [], 'PBEs': []}
+
+        most_likely_positions_from_most_likely_decoder_classification_df = []
+        for a_sess_path, a_posterior_container in all_sessions_exported_posteriors_dict.items():
+            # a_sess_name: '/kdiba/vvp01/two/2006-4-10_12-58-3'
+            # print(f'a_sess_path: "{a_sess_path}"')
+            a_sess_ctxt: IdentifyingContext = IdentifyingContext.try_init_from_session_key(a_sess_path.removeprefix('/'), separator='/')
+            if '/' in a_sess_ctxt.session_name:
+                print(f'WARN: / detected in a_sess_ctxt.session_name: a_sess_ctxt: {a_sess_ctxt}\n\ta_sess_path: "{a_sess_path}"')
+                _old_session_name: str = a_sess_ctxt.session_name
+                session_name, *extra_parameters = _old_session_name.split('/')
+                session_name
+                print(f'\textra_parameters: {extra_parameters}, _old_session_name: "{_old_session_name}" -> new_session_name: "{session_name}"')
+                a_sess_ctxt = a_sess_ctxt.overwriting_context(session_name=session_name)
+
+            a_sess_global_uid = a_sess_ctxt.get_description_as_session_global_uid() # kdiba|gor01|one|2006-6-08_14-26-15
+            a_session_key: str = a_sess_path # all_sessions_hdf_load_path_to_sess_key_dict[a_sess_path]
+
+            curr_session_t_delta: float = t_delta_dict.get(a_sess_ctxt.get_description(separator='_'), {}).get('t_delta', None)
+            assert curr_session_t_delta is not None, f"curr_session_t_delta is None for context: {a_sess_ctxt}!"
+            # Handle both Laps and PBEs:
+            # _a_sess_laps_PBEs_dict = {'laps': a_posterior_container.ripple_data_field_dict, 'PBEs': a_posterior_container.ripple_data_field_dict}
+            _a_sess_laps_PBEs_dict = {'laps': all_sessions_exported_laps_data_only_dict.get(a_session_key, None), 'PBEs': all_sessions_exported_ripple_data_only_dict.get(a_session_key, None)}
+
+            for an_epoch_name, a_result in _a_sess_laps_PBEs_dict.items():
+                if a_result is None:
+                    print(F'WARN: "{an_epoch_name}" is None for a_sess_path: "{a_sess_path}". Skipping.')
+                    continue
+                else:
+                    ## build occupancy by summing over the 'most_likely_positions':
+                    t_bin_centers_flat: NDArray = np.concatenate(list(a_result['t_bin_centers'].values())[0]) ## they're all the same for each decoder, so just get the first decoder's values
+                    # print(f'np.shape(t_bin_centers_flat): {np.shape(t_bin_centers_flat)}, t_bin_centers_flat: {t_bin_centers_flat}')
+                    most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(p_x_given_n_dict=a_result['p_x_given_n'], t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta)
+                    _temp_out_occupancy_result_dict[an_epoch_name].append(_temp_occupancy)
+            ## END for an_epoch....
+
+            # list(a_posterior_container.ripple_data_field_dict.keys()) # list(a_posterior_container.ripple_data_field_dict.keys()): ['p_x_given_n', 'p_x_given_n_grey', 'most_likely_positions', 'most_likely_position_indicies', 'time_bin_edges', 't_bin_centers']
+
+            most_likely_positions_dict: Dict[types.DecoderName, List[NDArray]] = a_posterior_container.ripple_data_field_dict['most_likely_positions']
+            p_x_given_n_dict: Dict[types.DecoderName, List[NDArray]] = a_posterior_container.ripple_data_field_dict['p_x_given_n']
+            t_bin_centers: List[NDArray] = list(a_posterior_container.ripple_data_field_dict['t_bin_centers'].values())[0] ## they're all the same for each decoder, so just get the first decoder's values
+            t_bin_centers_flat: NDArray = np.concatenate(t_bin_centers)
+            n_time_bins: int = len(t_bin_centers_flat)
+
+            most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(most_likely_positions_dict=most_likely_positions_dict, p_x_given_n_dict=p_x_given_n_dict, t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta)
+            
+            a_most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = long_track_inst.build_x_position_classification_df(x_arr=most_likely_positions_from_most_likely_decoder_flat)
+            ## Add in the other important columns
+            a_most_likely_positions_from_most_likely_decoder_classification_df['t_bin_center'] = deepcopy(t_bin_centers_flat)
+            a_most_likely_positions_from_most_likely_decoder_classification_df = a_most_likely_positions_from_most_likely_decoder_classification_df.across_session_identity.add_session_df_columns(session_name=a_sess_global_uid, curr_session_t_delta=curr_session_t_delta, time_col='t_bin_center')
+            a_most_likely_positions_from_most_likely_decoder_classification_df['session_uid'] = a_sess_global_uid
+            a_most_likely_positions_from_most_likely_decoder_classification_df = a_most_likely_positions_from_most_likely_decoder_classification_df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_uid', separator='|')
+            # a_most_likely_positions_from_most_likely_decoder_classification_df['session_name'] = a_sess_ctxt.session_name # '2006-6-08_14-26-15' -- makes logical sense but isn't what the other df does
+            a_most_likely_positions_from_most_likely_decoder_classification_df['session_name'] = a_sess_ctxt.get_description(separator='_') # 'kdiba_gor01_one_2006-6-08_14-26-15' -- matches the active_plot_df
+            
+            # Always apply the transformation
+            # a_most_likely_positions_from_most_likely_decoder_classification_df = a_most_likely_positions_from_most_likely_decoder_classification_df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_name')
+            # FAT_df = FAT_df.across_session_identity.split_session_key_col_to_fmt_animal_exper_cols(session_key_col='session_name')
+
+            most_likely_positions_from_most_likely_decoder_classification_df.append(a_most_likely_positions_from_most_likely_decoder_classification_df)
+            # FINAL OUTPUT: most_likely_positions_from_most_likely_decoder_flat
+
+        most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = pd.concat(most_likely_positions_from_most_likely_decoder_classification_df)
+        most_likely_positions_from_most_likely_decoder_classification_df
+
+        ## OUTPUTS: most_likely_positions_from_most_likely_decoder_classification_df, _temp_out_occupancy_result_dict
+
+        ## Decoded Occupancies:
+        laps_pbe_epoch_names = ['pre-delta', 'post-delta', 'all']
+        full_epoch_occupancy_seconds_dict_dict = {}
+        full_epoch_occupancy_fractional_dict_dict = {}
+
+        for pre_post_delta_period in laps_pbe_epoch_names:
+            # pre_post_delta_period = 'pre-delta'
+            full_epoch_occupancy_n_time_bins_dict = {laps_pbe_epoch_name:np.nansum(np.vstack([v[pre_post_delta_period] for v in v_list]), axis=0) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # .shape vstack: {'laps': (11, 59), 'PBEs': (11, 59)}, in units of # time bins
+            # full_epoch_occupancy_n_time_bins_dict
+            full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name:(np.nansum(np.vstack([v[pre_post_delta_period] for v in v_list]), axis=0)* float(time_bin_size)) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # {laps_pbe_epoch_name:{pre_post_delta_period:(v * float(time_bin_size)) for pre_post_delta_period, v in v_dict.items()} for laps_pbe_epoch_name, v_dict in full_epoch_occupancy_n_time_bins_dict.items()} #{k:v*time_bin_size for k, v in full_epoch_occupancy_n_time_bins_dict.items()} ## in units of seconds
+            # full_epoch_occupancy_seconds_dict
+            full_epoch_occupancy_fractional_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name:v/np.nansum(v) for laps_pbe_epoch_name, v in full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period].items()}
+            # full_epoch_occupancy_fractional_dict = {k:v/np.nansum(v) for k, v in full_epoch_occupancy_n_time_bins_dict.items()} ## normalize over all positions
+            # full_epoch_occupancy_fractional_dict
+
+        ## OUTPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict
+
+        return (full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict)
+
+
+
+    @classmethod
+    def main(cls, full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, 
+                active_measured_positions_dfs_dict,
+                time_bin_size, measured_x_col: str = 'binned_x_meas', enable_figure: bool = True,
+                **kwargs,
+        ):
+        """
+
+
+        """
+        if enable_figure:
+            import matplotlib.pyplot as plt
+            from neuropy.plotting.placemaps import perform_plot_occupancy
+
+        ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
+        pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
+        n_pos = len(full_epoch_occupancy_seconds_dict_dict['pre-delta']['laps'])  # 59; matches decoded
+        xbin_bin_ids = np.arange(n_pos) + 1  # binned_x_meas is 1-indexed
+
+        def occupancy_vector_from_binned_x(df, measured_x_col=measured_x_col, xbin_bin_ids=xbin_bin_ids):
+            """One occupancy vector (seconds) from FAT time-bin rows."""
+            sub = df.dropna(subset=[measured_x_col])
+            bin_ids = sub[measured_x_col].astype(int)
+            if 'time_bin_size' in sub.columns:
+                occ_seconds = sub.groupby(bin_ids)['time_bin_size'].sum()
+            else:
+                occ_seconds = bin_ids.value_counts() * float(time_bin_size)
+            occ_seconds = occ_seconds.reindex(xbin_bin_ids, fill_value=0.0).to_numpy(dtype=float)
+            return occ_seconds
+
+        ## INPUTS: active_measured_positions_dfs_dict
+        # --- convert to Figure 5 occupancy dicts (laps only; no PBEs in this FAT slice) ---
+        measured_epoch_occupancy_seconds_dict_dict = {}
+        measured_epoch_occupancy_fractional_dict_dict = {}
+
+        ## This is about building MEASURED position occupancies:
+        laps_pbe_epoch_names = list(full_epoch_occupancy_seconds_dict_dict['pre-delta'].keys()) # ['laps', 'PBEs']
+        for a_lap_pbe_epoch_name in laps_pbe_epoch_names:
+            measured_df = active_measured_positions_dfs_dict[a_lap_pbe_epoch_name]
+
+            df_by_pre_post = measured_df.pho.partition_df_dict('pre_post_delta_category')
+            df_by_pre_post['all'] = deepcopy(measured_df)
+
+            for pre_post in pre_post_all_epoch_names:
+                occ_s = occupancy_vector_from_binned_x(df_by_pre_post[pre_post])
+                if pre_post not in measured_epoch_occupancy_seconds_dict_dict:
+                    measured_epoch_occupancy_seconds_dict_dict[pre_post] = {a_lap_pbe_epoch_name: occ_s}
+                else:
+                    measured_epoch_occupancy_seconds_dict_dict[pre_post].update(**{a_lap_pbe_epoch_name: occ_s})
+
+                if pre_post not in measured_epoch_occupancy_fractional_dict_dict:
+                    measured_epoch_occupancy_fractional_dict_dict[pre_post] = {a_lap_pbe_epoch_name: occ_s / np.nansum(occ_s)}
+                else:
+                    measured_epoch_occupancy_fractional_dict_dict[pre_post].update(**{a_lap_pbe_epoch_name: occ_s / np.nansum(occ_s)})
+
+            ## END for pre_post in pre_post_all_epoch_names...
+        ## END for a_lap_pbe_epoch_name in laps_pbe_epoch_names...
+
+
+        if enable_figure:
+
+            ## single figure mode
+            fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=f'Figure 5 - measured vs decoded')
+            # ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta'], ['PBEs_pre-delta', 'PBEs_post-delta']], sharex=True, sharey=True)
+            ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta', 'laps_all'], ['PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']], sharex=True, sharey=True)
+
+            # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
+            _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=True)
+
+
+            for lap_PBEs_plus_pre_post, ax in ax_dict.items():
+                a_lap_pbe_epoch_name, pre_post = lap_PBEs_plus_pre_post.split('_')
+                n_pos = len(measured_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name])
+                # xbin_edges = np.linspace(loaded_track_limits['long_xlim'][0], loaded_track_limits['long_xlim'][1], n_pos + 1) ## I think always using 'long*' here is why both tracks are stretched to the long track length, but it would make since because they both use the same pos bins right? Oh, the bins aren't right from the bounds alone.
+                # xbin_centers = 0.5 * (xbin_edges[:-1] + xbin_edges[1:])
+
+                xbin_edges = None
+                xbin_centers = None
+
+                # decoded_active = full_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name]
+                # measured_active = measured_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name]
+
+                decoded_active = full_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name]
+                measured_active = measured_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name]
+
+                decoded_total_s: float = np.nansum(full_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name])
+                measured_total_s: float = np.nansum(measured_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name])
+
+                perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
+                                    label='measured', **_plot_kwargs)
+                perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
+                                    label='decoded', **_plot_kwargs, alpha=0.9)
+                ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
+            ## END for pre_post, ax in ax_dict.items()...
+
+            plt.suptitle(f'Figure 5 — measured x vs decoded occupancy')
+            plt.legend(['measured', 'decoded'])
+            # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
+        else:
+            fig = None
+            ax_dict = None
+
+        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict)
+
+
 # ==================================================================================================================== #
 # 2023-06-29 - Build Properly sorted ratemaps with potentially missing entries                                         #
 # ==================================================================================================================== #
