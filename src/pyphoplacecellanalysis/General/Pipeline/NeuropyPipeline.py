@@ -535,6 +535,11 @@ class NeuropyPipeline(PipelineWithInputStage, PipelineWithLoadableStage, Filtere
                 if (a_sess.basepath != Path(basedir)):
                     did_add_property = True
                     a_sess.config.basepath = Path(basedir)
+                ## filePrefix drives raw-file-adjacent saves (e.g. `<session>.non_pbe.npy`); keep it under the (possibly relocated) basedir even if the pickled parent still exists elsewhere (e.g. read-only Turbo)
+                a_file_prefix = getattr(a_sess, 'filePrefix', None)
+                if (a_file_prefix is not None) and (Path(a_file_prefix).parent != Path(basedir)):
+                    did_add_property = True
+                    a_sess.filePrefix = Path(basedir).joinpath(Path(a_file_prefix).name)
                 if desired_time_variable_name != a_sess.spikes_df.spikes.time_variable_name:
                     if debug_print:
                         print(f'a_sess.spikes_df.spikes.time_variable_name: {a_sess.spikes_df.spikes.time_variable_name}')

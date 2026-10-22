@@ -3331,11 +3331,12 @@ class PipelineWithComputedPipelineStageMixin:
                 self.sess.config.basepath = deepcopy(updated_session_basepath)
                 did_fixup_any_missing_path = True    
                 
+        ## filePrefix: with force_update, relocate onto the basedir even if the old parent still exists (e.g. pickled on read-only Turbo, now running from scratch). Do not `.resolve()` — that follows symlinks back to the old root.
         has_invalid_filePrefix: bool = (self.sess.filePrefix is None) or (not self.sess.filePrefix.parent.exists())
-        if (self.sess.filePrefix is not None) and has_invalid_filePrefix:
+        if (self.sess.filePrefix is not None) and (has_invalid_filePrefix or force_update):
             updated_session_filePrefix = deepcopy(self.sess.basepath).joinpath(self.sess.filePrefix.name)
             if updated_session_filePrefix != self.sess.filePrefix:
-                self.sess.filePrefix = updated_session_filePrefix.resolve()
+                self.sess.filePrefix = updated_session_filePrefix
                 did_fixup_any_missing_path = True
             
 
@@ -3348,10 +3349,10 @@ class PipelineWithComputedPipelineStageMixin:
                     a_sess.config.basepath = deepcopy(updated_session_basepath)
                     did_fixup_any_missing_path = True
             has_invalid_filePrefix: bool = (a_sess.filePrefix is None) or (not a_sess.filePrefix.parent.exists())
-            if (a_sess.filePrefix is not None) and has_invalid_filePrefix:
+            if (a_sess.filePrefix is not None) and (has_invalid_filePrefix or force_update):
                 updated_session_filePrefix = deepcopy(a_sess.basepath).joinpath(a_sess.filePrefix.name)
                 if updated_session_filePrefix != a_sess.filePrefix:
-                    a_sess.filePrefix = updated_session_filePrefix.resolve()
+                    a_sess.filePrefix = updated_session_filePrefix
                     did_fixup_any_missing_path = True
                     
         ## END for a_name, a_se...
