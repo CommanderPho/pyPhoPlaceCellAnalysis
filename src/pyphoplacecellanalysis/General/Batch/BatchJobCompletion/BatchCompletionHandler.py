@@ -422,10 +422,12 @@ class BatchSessionCompletionHandler:
 
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=['cls._update_pipeline_missing_preprocessing_parameters', 'cls._post_fix_filtered_contexts', 'ComputationKWargParameters', 'PostHocPipelineFixup'], used_by=['on_load_local', 'on_complete_success_execution_session'], creation_date='2025-02-19 19:09', related_items=[])
     @classmethod
-    def post_compute_validate(cls, curr_active_pipeline) -> bool:
+    def post_compute_validate(cls, curr_active_pipeline) -> Tuple[bool, bool]:
         """ 2023-05-16 - Ensures that the laps are used for the placefield computation epochs, the number of bins are the same between the long and short tracks. 
         
-        NOTE: returns `was_updated`, not `is_valid` or something similar.
+        NOTE: returns `(was_updated, needs_global_recompute)`, not `is_valid` or something similar.
+            was_updated: True if anything on the pipeline changed and it should be re-saved (includes metadata-only fixes like basepaths / non-PBE epoch tables).
+            needs_global_recompute: True only if an input to the computed results changed (preprocessing parameters, filtered contexts, grid_bin_bounds, laps overrides, directional configs), so the global computations must be recomputed.
 
         Several sessions are failing here. 
         
@@ -435,10 +437,11 @@ class BatchSessionCompletionHandler:
         
         is_kdiba_session: bool = (curr_active_pipeline.active_sess_config.format_name.lower() in ['kdiba'])
         
+        needs_global_recompute: bool = False
         if (is_kdiba_session):
             if not LongShortPipelineTests(curr_active_pipeline=curr_active_pipeline).validate():
                 print(f'ERROR!! Pipeline is invalid according to LongShortPipelineTests!!')
-                return False
+                return False, False
         
             # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
             was_updated = cls._update_pipeline_missing_preprocessing_parameters(curr_active_pipeline)
@@ -446,6 +449,7 @@ class BatchSessionCompletionHandler:
 
             ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
             was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
+            needs_global_recompute = was_updated # preprocessing-parameter / filtered-context fixes change computation inputs
 
             # long_epoch_name, short_epoch_name, global_epoch_name = curr_active_pipeline.find_LongShortGlobal_epoch_names()
             # long_epoch_context, short_epoch_context, global_epoch_context = [curr_active_pipeline.filtered_contexts[a_name] for a_name in (long_epoch_name, short_epoch_name, global_epoch_name)]
@@ -459,7 +463,9 @@ class BatchSessionCompletionHandler:
             
 
             ## call `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`'s fixup function:
-            was_updated = was_updated or PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=False, is_dry_run=False)
+            did_fixup_any_change, did_fixup_computation_affecting_change = PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=False, is_dry_run=False)
+            was_updated = was_updated or did_fixup_any_change
+            needs_global_recompute = needs_global_recompute or did_fixup_computation_affecting_change # metadata-only fixups (basepaths, non-PBE epoch tables) require a re-save but NOT a global recompute
         else:
             ## Bapun-type session
             # 2023-05-24 - Adds the previously missing `sess.config.preprocessing_parameters` to each session (filtered and base) in the pipeline.
@@ -468,6 +474,7 @@ class BatchSessionCompletionHandler:
 
             ## BUG 2023-05-25 - Found ERROR for a loaded pipeline where for some reason the filtered_contexts[long_epoch_name]'s actual context was the same as the short maze ('...maze2'). Unsure how this happened.
             was_updated = was_updated or cls._post_fix_filtered_contexts(curr_active_pipeline) #TODO 2024-11-01 19:39: - [ ] This is where things go amiss it seems
+            needs_global_recompute = was_updated
 
 
 
@@ -478,7 +485,7 @@ class BatchSessionCompletionHandler:
             print(f'\tdone. Pipeline needs resave!')
             was_updated = was_updated | True
 
-        return was_updated
+        return was_updated, needs_global_recompute
 
     
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
@@ -807,10 +814,13 @@ class BatchSessionCompletionHandler:
 
 
         was_updated = False
+        needs_global_recompute = False
 
         # ## Post Compute Validate 2023-05-16:
         try:
-            was_updated = was_updated | self.post_compute_validate(curr_active_pipeline)
+            _validate_was_updated, _validate_needs_global_recompute = self.post_compute_validate(curr_active_pipeline)
+            was_updated = was_updated | _validate_was_updated
+            needs_global_recompute = needs_global_recompute | _validate_needs_global_recompute
         except Exception as e:
             exception_info = sys.exc_info()
             an_err = CapturedException(e, exception_info)
@@ -839,9 +849,11 @@ class BatchSessionCompletionHandler:
             print(f'\tWARNING: self.force_global_recompute was False but self.force_reload_all was true. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
 
-        if was_updated and (not self.force_global_recompute):
-            print(f'\tWARNING: self.force_global_recompute was False but pipeline was_updated. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
+        if needs_global_recompute and (not self.force_global_recompute):
+            print(f'\tWARNING: self.force_global_recompute was False but pipeline computation inputs were updated by post_compute_validate. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
+        elif was_updated and (not needs_global_recompute):
+            print(f'\tpost_compute_validate made metadata-only changes (was_updated: {was_updated}); pipeline was re-saved but global results are NOT invalidated, so self.force_global_recompute is left unchanged ({self.force_global_recompute}).')
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
         ## Try to ensure the 2023-09-29 LxC and SxCs are "refined" by the rate remapping firing rate:

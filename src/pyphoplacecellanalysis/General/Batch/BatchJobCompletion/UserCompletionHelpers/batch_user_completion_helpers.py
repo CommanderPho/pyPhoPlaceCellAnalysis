@@ -517,7 +517,7 @@ def perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function(self
     laps_obj.update_lap_dir_from_net_displacement(pos_input=curr_active_pipeline.sess.position)
     laps_obj.update_maze_id_if_needed(t_start=t_start, t_delta=t_delta, t_end=t_end)
     laps_df = laps_obj.to_dataframe()
-    assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {print(list(laps_df.columns))}"
+    assert 'maze_id' in laps_df.columns, f"laps_df is still missing the 'maze_id' column after calling `laps_obj.update_maze_id_if_needed(...)`. laps_df.columns: {list(laps_df.columns)}"
 
     # # BEGIN BLOCK ________________________________________________________________________________________________________ #
 
@@ -2671,8 +2671,14 @@ class PostHocPipelineFixup:
     # ==================================================================================================================== #
     @function_attributes(short_name=None, tags=['MAIN', 'epochs', 'sessions'], input_requires=[], output_provides=[], uses=[], used_by=['run_as_batch_user_completion_function'], creation_date='2025-02-19 15:00', related_items=[])
     @classmethod
-    def FINAL_UPDATE_ALL(cls, curr_active_pipeline, force_recompute:bool=True, is_dry_run: bool=False) -> bool:
-        """ perform all known fixes to the pipeline and return whether any fixes were needed/performed """
+    def FINAL_UPDATE_ALL(cls, curr_active_pipeline, force_recompute:bool=True, is_dry_run: bool=False) -> Tuple[bool, bool]:
+        """ perform all known fixes to the pipeline and return whether any fixes were needed/performed
+
+        Returns:
+            (did_any_change, did_any_computation_affecting_change)
+                did_any_change: True if anything on the pipeline was modified (incl. metadata-only fixes like basepaths / non-PBE epoch tables) and the pipeline should be re-saved.
+                did_any_computation_affecting_change: True only if an input to the local placefield/decoding computations changed (grid_bin_bounds, laps overrides, directional pipeline configs) and the local results were recomputed. Metadata-only fixes do NOT invalidate computed results.
+        """
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DirectionalLapsHelpers, DirectionalLapsResult
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`:')
         print(f'starting `PostHocPipelineFixup.FINAL_UPDATE_ALL(...)`...')
@@ -2687,13 +2693,15 @@ class PostHocPipelineFixup:
 
         (did_any_grid_bin_change, change_dict), correct_grid_bin_bounds = PostHocPipelineFixup.FINAL_FIX_GRID_BIN_BOUNDS(curr_active_pipeline=curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run, defer_required_compute=True)
 
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or did_override_any_laps)
+        ## Only changes to computation inputs invalidate the local computed results. Basepath/non-PBE epoch fixes are metadata-only and must not trigger a placefield recompute.
+        did_any_computation_affecting_change: bool = (did_any_grid_bin_change or did_override_any_laps)
+        did_any_change = (did_any_computation_affecting_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change)
         
-        if (did_any_change or force_recompute):
+        if (did_any_computation_affecting_change or force_recompute):
             if force_recompute:
-                print(f'(force_recompute==True), (did_any_change: {did_any_change}) recomputing...')
+                print(f'(force_recompute==True), (did_any_computation_affecting_change: {did_any_computation_affecting_change}) recomputing...')
             else:
-                print(f'at least one grid_bin_bound was changed, recomputing...')
+                print(f'computation inputs changed (did_any_grid_bin_change: {did_any_grid_bin_change}, did_override_any_laps: {did_override_any_laps}), recomputing...')
 
             if (not is_dry_run):
                 ## if not dry_run, do the recomputations:
@@ -2704,8 +2712,8 @@ class PostHocPipelineFixup:
                 print(f'\tWARNING: is_dry_run is true so no recompute will be done.')
                 
         else:
-            ## no changes and not force_recompute
-            print(f'No grid bin bounds were changed. Everything should be up-to-date!')
+            ## no computation-affecting changes and not force_recompute
+            print(f'No grid bin bounds or laps were changed. Computed results are up-to-date! (metadata-only changes: did_fixup_any_missing_basepath: {did_fixup_any_missing_basepath}, did_any_non_pbe_epochs_change: {did_any_non_pbe_epochs_change})')
             
         # Fix the computation epochs to be constrained to the proper long/short intervals:
         # was_directional_pipeline_modified = DirectionalLapsResult.fix_computation_epochs_if_needed(curr_active_pipeline=curr_active_pipeline)
@@ -2714,9 +2722,10 @@ class PostHocPipelineFixup:
         
         # curr_active_pipeline, directional_lap_specific_configs = DirectionalLapsHelpers.split_to_directional_laps(curr_active_pipeline=curr_active_pipeline, add_created_configs_to_pipeline=True)
 
-        did_any_change = (did_any_grid_bin_change or did_fixup_any_missing_basepath or did_any_non_pbe_epochs_change or was_directional_pipeline_modified or did_override_any_laps)
-        print(f'\tPostHocPipelineFixup.FINAL_UPDATE_ALL(...): did_any_change: {did_any_change}')
-        return did_any_change
+        did_any_computation_affecting_change = (did_any_computation_affecting_change or was_directional_pipeline_modified)
+        did_any_change = (did_any_change or was_directional_pipeline_modified)
+        print(f'\tPostHocPipelineFixup.FINAL_UPDATE_ALL(...): did_any_change: {did_any_change}, did_any_computation_affecting_change: {did_any_computation_affecting_change}')
+        return did_any_change, did_any_computation_affecting_change
 
 
     @metadata_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=['kdiba_session_post_fixup_completion_function'], creation_date='2025-02-19 07:24', related_items=[])
@@ -2729,9 +2738,9 @@ class PostHocPipelineFixup:
         print(f'\t !!!||||||||||||||||||> RUNNING `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`:')
         print(f'starting `PostHocPipelineFixup.run_as_batch_user_completion_function(...)`...')
 
-        did_any_change: bool = PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
+        did_any_change, did_any_computation_affecting_change = PostHocPipelineFixup.FINAL_UPDATE_ALL(curr_active_pipeline, force_recompute=force_recompute, is_dry_run=is_dry_run)
         
-        print(f'\tPostHocPipelineFixup.run_as_batch_user_completion_function(...): did_any_change: {did_any_change}')
+        print(f'\tPostHocPipelineFixup.run_as_batch_user_completion_function(...): did_any_change: {did_any_change}, did_any_computation_affecting_change: {did_any_computation_affecting_change}')
 
         loaded_track_limits = curr_active_pipeline.sess.config.loaded_track_limits
         a_config_dict = curr_active_pipeline.sess.config.to_dict()
@@ -2744,6 +2753,7 @@ class PostHocPipelineFixup:
         'config_dict': a_config_dict, #'t_end': t_end 
         # 'did_any_grid_bin_change': did_any_grid_bin_change, 'did_fixup_any_missing_basepath': did_fixup_any_missing_basepath, 'did_any_non_pbe_epochs_change': did_any_non_pbe_epochs_change, 'was_directional_pipeline_modified': was_directional_pipeline_modified,
         'did_any_change': did_any_change,
+        'did_any_computation_affecting_change': did_any_computation_affecting_change,
         }
         print(f'\t\tcallback will be assigned to `across_session_results_extended_dict[{PostHocPipelineFixup.across_session_results_extended_dict_data_name}]`:')
         print(f'\t\t\tcallback_outputs: {callback_outputs}')

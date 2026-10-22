@@ -222,7 +222,8 @@ class Figure5:
                 print(f'type(most_likely_positions_dict): {type(most_likely_positions_dict)}, type(p_x_given_n_dict): {type(p_x_given_n_dict)}')
 
         assert p_x_given_n_dict is not None
-        p_x_given_n_flat = np.stack([np.concatenate(a_p_x_given_n, axis=-1) for a_p_x_given_n in p_x_given_n_dict.values()])  # .shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins) -- comes in as 4 independent 1D decoders, not a pseduo2D. Summing each time bin over all pos gives ~4.0, not 1.0
+        decoder_names = list(p_x_given_n_dict.keys())
+        p_x_given_n_flat = np.stack([np.concatenate(p_x_given_n_dict[a_decoder_name], axis=-1) for a_decoder_name in decoder_names])  # .shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins) -- comes in as 4 independent 1D decoders, not a pseduo2D. Summing each time bin over all pos gives ~4.0, not 1.0
         # np.nansum(p_x_given_n_flat, axis=1) #.shape -- all ones because it's normalized to each decoder independently, have to undo this normalization (like we would when building the Pseudo2D representation from 4 separate decoded probabilities
         # _decoder_rel_renormalized_p_x_given_n_flat = p_x_given_n_flat.copy() # deepcopy(p_x_given_n_flat)
         # _decoder_rel_renormalized_p_x_given_n_flat = _decoder_rel_renormalized_p_x_given_n_flat / np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=0, keepdims=True) #.shape - (59, 639) -- sum over each decoder to find out the likelihood of each
@@ -232,23 +233,32 @@ class Figure5:
         if debug_print:
             print(f'np.shape(p_x_given_n_flat): {np.shape(p_x_given_n_flat)}')
 
+        ## Pseudo2D-style joint P(x, d | t): normalize over (decoder, pos) per time bin, not P(d | x, t) via axis=0
         _decoder_rel_renormalized_p_x_given_n_flat = p_x_given_n_flat.copy() # deepcopy(p_x_given_n_flat)
-        _decoder_rel_renormalized_p_x_given_n_flat = _decoder_rel_renormalized_p_x_given_n_flat / np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=0, keepdims=True) #.shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins) # .shape - (59, 639) -- sum over each decoder to find out the likelihood of each
+        _joint_denom = np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=(0, 1), keepdims=True) #.shape (1, 1, n_time_bins) -- sum over decoder AND pos so each time bin totals ~1.0
+        _joint_denom = np.where(_joint_denom == 0, np.nan, _joint_denom)
+        _decoder_rel_renormalized_p_x_given_n_flat = _decoder_rel_renormalized_p_x_given_n_flat / _joint_denom #.shape (4, 59, 639) - (n_decoders, n_pos_bins, n_time_bins)
         # decoder_rel_renormalized_p_x_given_n_flat.shape # (4, 59, 639)
         if debug_print:
             print(f'np.shape(_decoder_rel_renormalized_p_x_given_n_flat): {np.shape(_decoder_rel_renormalized_p_x_given_n_flat)}')
+            print(f'np.nanmean(P_d): {np.nanmean(np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=1), axis=1)}')  # ~uniform if 1D posteriors were independently normalized
 
         # np.nansum(decoder_rel_renormalized_p_x_given_n_flat, axis=1).shape #.shape -- (4, 639)
         # most_likely_decoder_idx = np.argmax(np.nansum(p_x_given_n_flat, axis=1), axis=0) #.shape -- (639,) - (n_time_bins, ) # SyntaxError('invalid syntax', ('<string>', 2, 48, 'p_x_given_n_flat_from_most_likely_decoder_flat = np.squeeze(_decoder_rel_renormalized_p_x_given_n_flat[most_likely_decoder_idx, :, :]) # .shape (59, 639) - (n_pos_bins, n_time_bins)\n'))
-        most_likely_decoder_idx = np.squeeze(np.argmax(np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=1), axis=0)) #.shape -- (639,) - (n_time_bins, ) - sum over all positions first
+        most_likely_decoder_idx = np.atleast_1d(np.squeeze(np.argmax(np.nansum(_decoder_rel_renormalized_p_x_given_n_flat, axis=1), axis=0))) #.shape -- (639,) - (n_time_bins, ) - sum over all positions first
         if debug_print:
             print(f'np.shape(most_likely_decoder_idx): {np.shape(most_likely_decoder_idx)}')
 
-        p_x_given_n_flat_from_most_likely_decoder_flat = np.vstack([np.atleast_1d(_decoder_rel_renormalized_p_x_given_n_flat[a_most_likely_idx, :, i]) for i, a_most_likely_idx in enumerate(most_likely_decoder_idx)]).T # .shape (59, 639) - (n_pos_bins, n_time_bins)
+        ## occupancy from the original 1D posterior of d*, then renormalize over position (not from P(d | x))
+        p_x_given_n_flat_from_most_likely_decoder_flat = np.vstack([np.atleast_1d(p_x_given_n_flat[a_most_likely_idx, :, i]) for i, a_most_likely_idx in enumerate(most_likely_decoder_idx)]).T # .shape (59, 639) - (n_pos_bins, n_time_bins)
         # p_x_given_n_flat_from_most_likely_decoder_flat = np.squeeze(_decoder_rel_renormalized_p_x_given_n_flat[most_likely_decoder_idx, :, :]) # .shape (59, 639) - (n_pos_bins, n_time_bins)
+        _winner_pos_denom = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat, axis=0, keepdims=True)
+        _winner_pos_denom = np.where(_winner_pos_denom == 0, np.nan, _winner_pos_denom)
+        p_x_given_n_flat_from_most_likely_decoder_flat = p_x_given_n_flat_from_most_likely_decoder_flat / _winner_pos_denom
         if debug_print:
             print(f'np.shape(p_x_given_n_flat_from_most_likely_decoder_flat): {np.shape(p_x_given_n_flat_from_most_likely_decoder_flat)}')
 
+        is_valid_t = np.isfinite(_joint_denom).reshape(-1)  # drop empty/NaN time bins from occupancy
 
         if (curr_session_t_delta is not None) and (t_bin_centers_flat is not None):
             ## split pre/post delta
@@ -264,25 +274,26 @@ class Figure5:
                 # active_p_x_given_n_flat_from_most_likely_decoder_flat[most_likely_pos_idxs] = 1.0 ## wrong, sets entire line
                 t_idx = np.arange(n_t_bins)
                 active_p_x_given_n_flat_from_most_likely_decoder_flat[most_likely_pos_idxs, t_idx] = 1.0
+                active_p_x_given_n_flat_from_most_likely_decoder_flat[:, ~is_valid_t] = 0.0
 
             else:
                 active_p_x_given_n_flat_from_most_likely_decoder_flat = p_x_given_n_flat_from_most_likely_decoder_flat
             # _temp_occupancy = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1)
             _temp_occupancy = {
-                                'pre-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, is_pre_delta], axis=-1),
-                                'post-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, ~is_pre_delta], axis=-1),
-                                'all': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1),
+                                'pre-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, is_pre_delta & is_valid_t], axis=-1),
+                                'post-delta': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, (~is_pre_delta) & is_valid_t], axis=-1),
+                                'all': np.nansum(active_p_x_given_n_flat_from_most_likely_decoder_flat[:, is_valid_t], axis=-1),
                             }
         else:
             ## old method of not using a dict
             ## sum up these posteriors to get the REALIO:
-            _temp_occupancy = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat, axis=-1)
+            _temp_occupancy = np.nansum(p_x_given_n_flat_from_most_likely_decoder_flat[:, is_valid_t], axis=-1)
             if debug_print:
                 print(f'np.shape(_temp_occupancy): {np.shape(_temp_occupancy)}')
 
 
         if most_likely_positions_dict is not None:
-            most_likely_positions_flat = np.stack([np.concatenate(a_most_likely_positions) for a_most_likely_positions in most_likely_positions_dict.values()]) # (4, 639) - (n_decoders, n_time_bins)
+            most_likely_positions_flat = np.stack([np.concatenate(most_likely_positions_dict[a_decoder_name]) for a_decoder_name in decoder_names]) # (4, 639) - (n_decoders, n_time_bins)
             assert (most_likely_decoder_idx is not None), f"most_likely_decoder_idx must exist, always provide p_x_given_n_dict"
             most_likely_positions_from_most_likely_decoder_flat = np.concatenate([np.atleast_1d(most_likely_positions_flat[a_most_likely_idx, i]) for i, a_most_likely_idx in enumerate(most_likely_decoder_idx)]) ## one for each time bin #.shape (639,)
         else:
@@ -329,7 +340,7 @@ class Figure5:
                     ## build occupancy by summing over the 'most_likely_positions':
                     t_bin_centers_flat: NDArray = np.concatenate(list(a_result['t_bin_centers'].values())[0]) ## they're all the same for each decoder, so just get the first decoder's values
                     # print(f'np.shape(t_bin_centers_flat): {np.shape(t_bin_centers_flat)}, t_bin_centers_flat: {t_bin_centers_flat}')
-                    most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(p_x_given_n_dict=a_result['p_x_given_n'], t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta)
+                    most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(p_x_given_n_dict=a_result['p_x_given_n'], t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy)
                     _temp_out_occupancy_result_dict[an_epoch_name].append(_temp_occupancy)
             ## END for an_epoch....
 
@@ -341,7 +352,7 @@ class Figure5:
             t_bin_centers_flat: NDArray = np.concatenate(t_bin_centers)
             n_time_bins: int = len(t_bin_centers_flat)
 
-            most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(most_likely_positions_dict=most_likely_positions_dict, p_x_given_n_dict=p_x_given_n_dict, t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta)
+            most_likely_positions_from_most_likely_decoder_flat, _temp_occupancy = cls._process_result(most_likely_positions_dict=most_likely_positions_dict, p_x_given_n_dict=p_x_given_n_dict, t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy)
             
             a_most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = long_track_inst.build_x_position_classification_df(x_arr=most_likely_positions_from_most_likely_decoder_flat)
             ## Add in the other important columns
@@ -358,6 +369,7 @@ class Figure5:
 
             most_likely_positions_from_most_likely_decoder_classification_df.append(a_most_likely_positions_from_most_likely_decoder_classification_df)
             # FINAL OUTPUT: most_likely_positions_from_most_likely_decoder_flat
+        ## END for a_sess_path, a_posterior_container in all_sessions_exported_posteriors_dict.items()....
 
         most_likely_positions_from_most_likely_decoder_classification_df: pd.DataFrame = pd.concat(most_likely_positions_from_most_likely_decoder_classification_df)
         most_likely_positions_from_most_likely_decoder_classification_df

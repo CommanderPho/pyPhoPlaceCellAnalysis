@@ -357,14 +357,17 @@ def _get_custom_filenames_from_computation_metadata(epochs_source: str='normal_c
         for k in ('global_computation_pkl', 'pipeline_h5'):
             if k in custom_save_filenames:
                 p = Path(custom_save_filenames[k])
-                custom_save_filenames[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
+                if '-tbin_' not in p.stem: # never double-append
+                    custom_save_filenames[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
             if k in custom_save_filepaths:
                 v = custom_save_filepaths[k]
                 if isinstance(v, str):
                     p = Path(v)
-                    custom_save_filepaths[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
+                    if '-tbin_' not in p.stem:
+                        custom_save_filepaths[k] = f"{p.stem}{tbin_suffix}{p.suffix}"
                 elif isinstance(v, Path):
-                    custom_save_filepaths[k] = v.with_name(f"{v.stem}{tbin_suffix}{v.suffix}")
+                    if '-tbin_' not in v.stem:
+                        custom_save_filepaths[k] = v.with_name(f"{v.stem}{tbin_suffix}{v.suffix}")
         ## END for k in ('global_computation_pkl', 'pipeline_h5')...
         return custom_save_filenames, custom_save_filepaths
 

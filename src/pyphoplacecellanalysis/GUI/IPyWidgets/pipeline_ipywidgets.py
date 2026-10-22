@@ -862,7 +862,7 @@ class PipelinePickleFileSelectorWidget:
                                                     update_global_variable_fn=self.on_update_global_variable_callback) # , active_pickle_filename = 'loadedSessPickle_withParameters.pkl'
 
         ## Post Compute Validate 2023-05-16:
-        was_updated = BatchSessionCompletionHandler.post_compute_validate(curr_active_pipeline) ## TODO: need to potentially re-save if was_updated. This will fail because constained versions not ran yet.
+        was_updated, needs_global_recompute = BatchSessionCompletionHandler.post_compute_validate(curr_active_pipeline) ## TODO: need to potentially re-save if was_updated. This will fail because constained versions not ran yet.
         if was_updated:
             print(f'was_updated: {was_updated}')
             try:
