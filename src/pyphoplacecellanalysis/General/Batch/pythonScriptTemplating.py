@@ -1364,12 +1364,15 @@ class GreatlakesTurboToScratchHelpers:
     SCRATCH_ANCHOR_PATH: Path = Path('/scratch')  # GL indicator; Data/Output dirs may need creating
     TURBO_PATH_MARKERS: Tuple[str, ...] = ('/nfs/turbo/', '/cloud/turbo/')
 
-    ## Tiny read-only session-root sidecars that post-load code re-reads next to the pickle (e.g. `FINAL_FIX_GRID_BIN_BOUNDS` -> `{session}.position_info.mat`). Never .dat/.eeg/.clu/.fet, spikes.mat/spikeII.mat, .h5, or unused pickles.
+    ## Tiny read-only session-root sidecars that post-load code re-reads next to the pickle (e.g. `FINAL_FIX_GRID_BIN_BOUNDS` -> `{session}.position_info.mat`). Never .dat/.eeg/.clu/.fet, .h5, or unused pickles.
     READONLY_SESSION_SIDECAR_SUFFIXES: Tuple[str, ...] = ('.position_info.mat', '.epochs_info.mat', '.xml',
                                                           '.laps_info.mat', '.replay_info.mat', '.RippleDatabase.mat',
                                                           '.probegroup.npy', '.pbe.npy', '.ripple.npy', '.mua.npy', '.position.npy')
     READONLY_SESSION_SIDECAR_STANDALONE_NAMES: Tuple[str, ...] = ('RippleDatabase.mat',)  # folder listing uses the bare name; loader uses `{session}.RippleDatabase.mat`
     REQUIRED_SESSION_SIDECAR_SUFFIXES: Tuple[str, ...] = ('.position_info.mat',)  # FINAL post-load asserts these exist
+    ## kdiba clean_run (`should_force_reload_all=True`): `KDibaOldDataSessionFormat.get_session_spec` required_files. `{session}.spikes.mat` is preferred (loader tries it first, then falls back to `{session}.spikeII.mat`). ~90–100MB each; copy, do not symlink (Turbo is R/O; leftover-symlink cleanup).
+    CLEAN_RUN_REQUIRED_SESSION_SUFFIXES: Tuple[str, ...] = ('.xml', '.spikeII.mat', '.position_info.mat', '.epochs_info.mat')
+    CLEAN_RUN_PREFERRED_SESSION_SUFFIXES: Tuple[str, ...] = ('.spikes.mat',)
 
 
     @classmethod
@@ -1468,7 +1471,7 @@ class GreatlakesTurboToScratchHelpers:
 
     @classmethod
     def stage_mutable_session_outputs_to_scratch(cls, turbo_session_folders: List[ConcreteSessionFolder], source_data_root: Path, scratch_data_root: Path, load_only_relpath: str, writable_relpath: str, skip_if_dest_newer_or_equal: bool = True) -> Tuple[List[ConcreteSessionFolder], Dict[IdentifyingContext, Path], Dict[Path, Path]]:
-        """Copy the local pickle, the writable global pickle, and the tiny read-only session-root sidecars (`READONLY_SESSION_SIDECAR_SUFFIXES`) as real files. Never symlink to Turbo, never stage .h5."""
+        """Copy the local pickle, the writable global pickle, tiny read-only sidecars (`READONLY_SESSION_SIDECAR_SUFFIXES`), and kdiba clean_run source files (`CLEAN_RUN_REQUIRED_SESSION_SUFFIXES` + preferred `.spikes.mat`) as real files. Never symlink to Turbo, never stage .h5 / .dat / .eeg."""
         source_data_root = Path(source_data_root)
         scratch_data_root = Path(scratch_data_root)
         cls.ensure_scratch_kdiba_layout_symlink(scratch_data_root)
@@ -1514,10 +1517,12 @@ class GreatlakesTurboToScratchHelpers:
                 else:
                     print(f'  skipped global: {write_dest} (dest mtime newer)')
 
-            ## Tiny read-only sidecars re-read next to the pickle by post-load code (e.g. `{session}.position_info.mat` in FINAL_FIX_GRID_BIN_BOUNDS):
+            ## Tiny read-only sidecars re-read next to the pickle by post-load code (e.g. `{session}.position_info.mat` in FINAL_FIX_GRID_BIN_BOUNDS), plus kdiba clean_run source files (`{session}.spikeII.mat` required; `{session}.spikes.mat` preferred):
             session_name: str = turbo_basedir.name  # matches `KDibaOldDataSessionFormat.get_session_name(basedir)`
-            sidecar_names: List[str] = [f'{session_name}{a_suffix}' for a_suffix in cls.READONLY_SESSION_SIDECAR_SUFFIXES] + list(cls.READONLY_SESSION_SIDECAR_STANDALONE_NAMES)
-            required_sidecar_names: List[str] = [f'{session_name}{a_suffix}' for a_suffix in cls.REQUIRED_SESSION_SIDECAR_SUFFIXES]
+            _sidecar_suffixes_in_order: List[str] = list(cls.READONLY_SESSION_SIDECAR_SUFFIXES) + list(cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES) + list(cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES)
+            sidecar_names: List[str] = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in _sidecar_suffixes_in_order] + list(cls.READONLY_SESSION_SIDECAR_STANDALONE_NAMES)))
+            required_sidecar_names: List[str] = list(dict.fromkeys([f'{session_name}{a_suffix}' for a_suffix in (cls.REQUIRED_SESSION_SIDECAR_SUFFIXES + cls.CLEAN_RUN_REQUIRED_SESSION_SUFFIXES)]))
+            preferred_sidecar_names: List[str] = [f'{session_name}{a_suffix}' for a_suffix in cls.CLEAN_RUN_PREFERRED_SESSION_SUFFIXES]
             n_sidecars_copied: int = 0
             n_sidecars_skipped: int = 0
             missing_sidecar_names: List[str] = []
@@ -1526,8 +1531,12 @@ class GreatlakesTurboToScratchHelpers:
                 sidecar_dest = scratch_basedir.joinpath(a_sidecar_name)
                 if not sidecar_src.is_file():
                     missing_sidecar_names.append(a_sidecar_name)
-                    if a_sidecar_name in required_sidecar_names:
+                    if a_sidecar_name.endswith('.position_info.mat') and (a_sidecar_name in required_sidecar_names):
                         print(f'  WARN: required sidecar missing on turbo (FINAL post-load will fail without it): {sidecar_src}')
+                    elif a_sidecar_name in required_sidecar_names:
+                        print(f'  WARN: required clean_run source missing on turbo (SessionFolderSpec / should_force_reload_all will fail without it): {sidecar_src}')
+                    elif a_sidecar_name in preferred_sidecar_names:
+                        print(f'  WARN: preferred clean_run spikes source missing on turbo (load falls back to .spikeII.mat): {sidecar_src}')
                     continue
                 sidecar_status = cls.copy_or_skip_mutable_file(sidecar_src, sidecar_dest, skip_if_dest_newer_or_equal=skip_if_dest_newer_or_equal)
                 if sidecar_status == 'copied':
