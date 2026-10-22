@@ -5388,3 +5388,4 @@ def figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_co
     across_session_results_extended_dict['figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function'] = callback_outputs
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     return across_session_results_extended_dict
+

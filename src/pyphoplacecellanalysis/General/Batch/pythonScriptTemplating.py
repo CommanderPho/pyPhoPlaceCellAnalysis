@@ -160,9 +160,11 @@ class ProcessingScriptPhases(Enum):
     
 
 
-    def get_custom_user_completion_functions_dict(self, extra_run_functions=None) -> Dict:
+    def get_custom_user_completion_functions_dict(self, extra_run_functions=None, *, is_kdiba_session: bool=True) -> Dict:
         """ get the extra user_completion functions
-        
+
+        Spyglass/clusterless decoder completions are included for non-kdiba batches only.
+        `is_kdiba_session` is required (this phase enum does not carry session format).
         """
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
@@ -219,15 +221,25 @@ class ProcessingScriptPhases(Enum):
                 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
                 'compute_and_export_cell_first_spikes_characteristics_completion_function': compute_and_export_cell_first_spikes_characteristics_completion_function,
+                
+                'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56
                 'save_custom_session_files_completion_function': save_custom_session_files_completion_function, # session pkl/h5 + optional posteriors H5 (enable_save_h5 / should_write_posterior_h5)
-                'generalized_decode_epochs_dict_and_export_results_completion_function': generalized_decode_epochs_dict_and_export_results_completion_function, # Not yet implemented 2025-03-10 19:56 
-                'compute_and_pickle_clusterless_decoder_completion_function': compute_and_pickle_clusterless_decoder_completion_function,
-                'compute_and_pickle_spyglass_clusterless_decoder_completion_function': compute_and_pickle_spyglass_clusterless_decoder_completion_function,
-                'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function,
                 'figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function': figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function,
-                'figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function,
                 # 'generalized_export_figures_customizazble_completion_function': generalized_export_figures_customizazble_completion_function
             }
+
+
+            ## Only add SpyglassDecoder functions if NOT a kdiba session
+            if not is_kdiba_session:
+                phase3_SpyglassDecoder_any_run_custom_user_completion_functions_dict = {
+                    'compute_and_pickle_clusterless_decoder_completion_function': compute_and_pickle_clusterless_decoder_completion_function,
+                    'compute_and_pickle_spyglass_clusterless_decoder_completion_function': compute_and_pickle_spyglass_clusterless_decoder_completion_function,
+                    'figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function,
+                    'figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function': figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function,
+                }
+                phase3_any_run_custom_user_completion_functions_dict = phase3_any_run_custom_user_completion_functions_dict | phase3_SpyglassDecoder_any_run_custom_user_completion_functions_dict
+
+
 
             if self.value == ProcessingScriptPhases.clean_run.value:
                 phase_any_run_custom_user_completion_functions_dict = phase_any_run_custom_user_completion_functions_dict | phase0_any_run_custom_user_completion_functions_dict
