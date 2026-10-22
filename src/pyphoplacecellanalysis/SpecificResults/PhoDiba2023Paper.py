@@ -486,6 +486,21 @@ class Figure5:
 
         ## OUTPUTS: most_likely_positions_from_most_likely_decoder_classification_df, _temp_out_occupancy_result_dict
 
+        def _sum_period_occupancy(v_list, pre_post_delta_period, scale: float = 1.0):
+            """Sum occupancy across sessions. Decoder-split values stay `{decoder_name: (n_pos,)}`; otherwise a single `(n_pos,)` vector."""
+            sample = v_list[0][pre_post_delta_period]
+            if isinstance(sample, dict):
+                decoder_names = list(sample.keys())
+                return {decoder_name: (np.nansum(np.vstack([v[pre_post_delta_period][decoder_name] for v in v_list]), axis=0) * scale) for decoder_name in decoder_names}
+            return np.nansum(np.vstack([v[pre_post_delta_period] for v in v_list]), axis=0) * scale
+
+
+        def _normalize_occupancy(v):
+            if isinstance(v, dict):
+                return {decoder_name: (arr / np.nansum(arr)) for decoder_name, arr in v.items()}
+            return v / np.nansum(v)
+
+
         ## Decoded Occupancies:
         laps_pbe_epoch_names = ['pre-delta', 'post-delta', 'all']
         full_epoch_occupancy_seconds_dict_dict = {}
@@ -493,18 +508,18 @@ class Figure5:
 
         for pre_post_delta_period in laps_pbe_epoch_names:
             # pre_post_delta_period = 'pre-delta'
-            full_epoch_occupancy_n_time_bins_dict = {laps_pbe_epoch_name:np.nansum(np.vstack([v[pre_post_delta_period] for v in v_list]), axis=0) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # .shape vstack: {'laps': (11, 59), 'PBEs': (11, 59)}, in units of # time bins
+            full_epoch_occupancy_n_time_bins_dict = {laps_pbe_epoch_name: _sum_period_occupancy(v_list, pre_post_delta_period, scale=1.0) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # .shape vstack: {'laps': (11, 59), 'PBEs': (11, 59)}, in units of # time bins; decoder-split: {'laps': {decoder: (59,)}}
             # full_epoch_occupancy_n_time_bins_dict
-            full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name:(np.nansum(np.vstack([v[pre_post_delta_period] for v in v_list]), axis=0)* float(time_bin_size)) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # {laps_pbe_epoch_name:{pre_post_delta_period:(v * float(time_bin_size)) for pre_post_delta_period, v in v_dict.items()} for laps_pbe_epoch_name, v_dict in full_epoch_occupancy_n_time_bins_dict.items()} #{k:v*time_bin_size for k, v in full_epoch_occupancy_n_time_bins_dict.items()} ## in units of seconds
+            full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name: _sum_period_occupancy(v_list, pre_post_delta_period, scale=float(time_bin_size)) for laps_pbe_epoch_name, v_list in _temp_out_occupancy_result_dict.items()} # {laps_pbe_epoch_name:{pre_post_delta_period:(v * float(time_bin_size)) for pre_post_delta_period, v in v_dict.items()} for laps_pbe_epoch_name, v_dict in full_epoch_occupancy_n_time_bins_dict.items()} #{k:v*time_bin_size for k, v in full_epoch_occupancy_n_time_bins_dict.items()} ## in units of seconds
             # full_epoch_occupancy_seconds_dict
-            full_epoch_occupancy_fractional_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name:v/np.nansum(v) for laps_pbe_epoch_name, v in full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period].items()}
+            full_epoch_occupancy_fractional_dict_dict[pre_post_delta_period] = {laps_pbe_epoch_name: _normalize_occupancy(v) for laps_pbe_epoch_name, v in full_epoch_occupancy_seconds_dict_dict[pre_post_delta_period].items()}
             # full_epoch_occupancy_fractional_dict = {k:v/np.nansum(v) for k, v in full_epoch_occupancy_n_time_bins_dict.items()} ## normalize over all positions
             # full_epoch_occupancy_fractional_dict
+        ## END for pre_post_delta_period in laps_pbe_epoch_names....
 
         ## OUTPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict
 
         return (full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict)
-
 
 
     @classmethod
@@ -523,7 +538,11 @@ class Figure5:
 
         ## INPUTS: full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, time_bin_size, measured_x_col: str = 'binned_x_meas'
         pre_post_all_epoch_names = ['pre-delta', 'post-delta', 'all']
-        n_pos = len(full_epoch_occupancy_seconds_dict_dict['pre-delta']['laps'])  # 59; matches decoded
+        _laps_pre_occupancy = full_epoch_occupancy_seconds_dict_dict['pre-delta']['laps']
+        if isinstance(_laps_pre_occupancy, dict):
+            n_pos = len(next(iter(_laps_pre_occupancy.values())))  # 59; decoder-split {decoder_name: (n_pos,)}
+        else:
+            n_pos = len(_laps_pre_occupancy)  # 59; matches decoded
         xbin_bin_ids = np.arange(n_pos) + 1  # binned_x_meas is 1-indexed
 
         def occupancy_vector_from_binned_x(df, measured_x_col=measured_x_col, xbin_bin_ids=xbin_bin_ids):
@@ -592,18 +611,26 @@ class Figure5:
                 decoded_active = full_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name]
                 measured_active = measured_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name]
 
-                decoded_total_s: float = np.nansum(full_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name])
                 measured_total_s: float = np.nansum(measured_epoch_occupancy_seconds_dict_dict[pre_post][a_lap_pbe_epoch_name])
 
                 perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                     label='measured', **_plot_kwargs)
-                perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
-                                    label='decoded', **_plot_kwargs, alpha=0.9)
+                if isinstance(decoded_active, dict):
+                    decoded_total_s: float = float(np.nansum([np.nansum(arr) for arr in decoded_active.values()]))
+                    for decoder_name, decoder_occ in decoded_active.items():
+                        perform_plot_occupancy(decoder_occ, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
+                                            label=f'decoded[{decoder_name}]', **_plot_kwargs, alpha=0.9)
+                    ## END for decoder_name, decoder_occ in decoded_active.items()....
+
+                else:
+                    decoded_total_s: float = np.nansum(decoded_active)
+                    perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
+                                        label='decoded', **_plot_kwargs, alpha=0.9)
                 ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
-            ## END for pre_post, ax in ax_dict.items()...
+                ax.legend()
+            ## END for lap_PBEs_plus_pre_post, ax in ax_dict.items()...
 
             plt.suptitle(f'Figure 5 — measured x vs decoded occupancy')
-            plt.legend(['measured', 'decoded'])
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
             fig = None
