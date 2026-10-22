@@ -571,8 +571,10 @@ class BatchSessionCompletionHandler:
     def _try_save_global_computations_if_needed(self, curr_active_pipeline, curr_session_context, newly_computed_values):
         if (len(newly_computed_values) > 0):
             print(f'newly_computed_values: {newly_computed_values}. Saving global results...')
-            if (self.saving_mode.value == 'skip_saving'):
+            if (self.saving_mode.value == 'skip_saving') and (self.global_computations_options.should_save == SavingOptions.NEVER):
                 print(f'WARNING: supposed to skip_saving because of self.saving_mode: {self.saving_mode} but supposedly has new global results! Figure out if these are actually new.')
+            elif (self.saving_mode.value == 'skip_saving'):
+                print(f'saving_mode is SKIP_SAVING (local pickle skipped); still saving global results because global_computations_options.should_save == {self.global_computations_options.should_save}')
             if self.global_computations_options.should_save != SavingOptions.NEVER:
                 try:
                     # curr_active_pipeline.global_computation_results.persist_time = datetime.now()
@@ -828,21 +830,24 @@ class BatchSessionCompletionHandler:
             raise
 
         ## Save the pipeline since that's disabled by default now:
-        if was_updated and (self.session_computations_options.should_save != SavingOptions.NEVER):
-            # override the saving mode:
-            print(f'\tWARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
-            self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
+        if self.session_computations_options.should_save == SavingOptions.NEVER:
+            print(f'\tskipping local pipeline pickle save because session_computations_options.should_save == SavingOptions.NEVER (was_updated: {was_updated}).')
+        else:
+            if was_updated:
+                # override the saving mode:
+                print(f'\tWARNING: basic pipleine was updated by post_compute_validate and needs to be saved to be correct.Overriding self.save_mode to ensure pipeline is saved!')
+                self.saving_mode = PipelineSavingScheme.TEMP_THEN_OVERWRITE
 
-        try:
-            # self.session_computations_options.override_file
-            curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
-        except Exception as e:
-            ## TODO: catch/log saving error and indicate that it isn't saved.
-            exception_info = sys.exc_info()
-            e = CapturedException(e, exception_info)
-            print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
-            if self.fail_on_exception:
-                raise e.exc
+            try:
+                # self.session_computations_options.override_file
+                curr_active_pipeline.save_pipeline(saving_mode=self.saving_mode, active_pickle_filename=self.session_computations_options.override_output_file) # AttributeError: 'PfND_TimeDependent' object has no attribute '_included_thresh_neurons_indx'
+            except Exception as e:
+                ## TODO: catch/log saving error and indicate that it isn't saved.
+                exception_info = sys.exc_info()
+                e = CapturedException(e, exception_info)
+                print(f'ERROR SAVING PIPELINE for curr_session_context: {curr_session_context}. error: {e}')
+                if self.fail_on_exception:
+                    raise e.exc
 
         ## GLOBAL FUNCTION:
         if self.force_reload_all and (not self.force_global_recompute):
@@ -853,7 +858,7 @@ class BatchSessionCompletionHandler:
             print(f'\tWARNING: self.force_global_recompute was False but pipeline computation inputs were updated by post_compute_validate. The global properties must be recomputed when the local functions change, so self.force_global_recompute will be set to True and computation will continue.')
             self.force_global_recompute = True
         elif was_updated and (not needs_global_recompute):
-            print(f'\tpost_compute_validate made metadata-only changes (was_updated: {was_updated}); pipeline was re-saved but global results are NOT invalidated, so self.force_global_recompute is left unchanged ({self.force_global_recompute}).')
+            print(f'\tpost_compute_validate made metadata-only changes (was_updated: {was_updated}); local pipeline pickle skip/save follows session_computations_options.should_save ({self.session_computations_options.should_save}); global results are NOT invalidated, so self.force_global_recompute is left unchanged ({self.force_global_recompute}).')
 
         newly_computed_values = self.try_compute_global_computations_if_needed(curr_active_pipeline, curr_session_context=curr_session_context)
         ## Try to ensure the 2023-09-29 LxC and SxCs are "refined" by the rate remapping firing rate:

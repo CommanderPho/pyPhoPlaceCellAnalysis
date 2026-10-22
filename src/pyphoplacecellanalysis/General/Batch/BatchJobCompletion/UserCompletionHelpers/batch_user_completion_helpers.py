@@ -2808,10 +2808,12 @@ def kdiba_session_post_fixup_completion_function(self, global_data_root_parent_p
 
 @function_attributes(short_name=None, tags=['save_custom', 'versioning', 'backup', 'export', 'hdf5', 'h5'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-10-28 14:25', related_items=[])
 def save_custom_session_files_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, export_filename_extra_suffix_parts: Optional[List[str]]=None,
-        enable_save_pipeline_pkl: bool=True, enable_save_global_computations_pkl: bool=True, enable_save_h5: bool=True, should_write_posterior_h5: bool=True,
+        enable_save_pipeline_pkl: bool=False, enable_save_global_computations_pkl: bool=True, enable_save_h5: bool=True, should_write_posterior_h5: bool=True,
     ) -> dict:
     """ Saves a copy of this pipeline's files (pkl, HDF5) with custom suffix derived from parameters.
     Also optionally exports decoded-posteriors HDF5 into collected_outputs (formerly export_session_h5_file_completion_function).
+
+    enable_save_pipeline_pkl defaults to False so the shared qclu/frate local loadedSessPickle is not rewritten (tbin goes on global pickle / h5 only). Pass True to opt in.
 
     Session pipeline H5: via custom_save_pipeline_as(..., enable_save_h5=True) under session output/ with custom-suffix names.
     Posteriors H5: PosteriorExporting under self.collected_outputs_path with data_identifier_str='(decoded_posteriors)'.

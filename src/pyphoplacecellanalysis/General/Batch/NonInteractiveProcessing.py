@@ -289,19 +289,22 @@ def batch_load_session(global_data_root_parent_path: Path, active_data_mode_name
     if update_global_variable_fn:
         update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
         
-    try:
-        curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=active_pickle_filename, override_pickle_path=kwargs.get('override_pickle_path', None))
-    except Exception as e:
-        exception_info = sys.exc_info()
-        an_error = CapturedException(e, exception_info, curr_active_pipeline)
-        print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {an_error}')
-        if update_global_variable_fn:
-            update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
-        if fail_on_exception:
-            raise
+    if skip_save_on_initial_load:
+        print(f'skip_save_on_initial_load is True so not saving at the end of batch_load_session')
+    else:
+        try:
+            curr_active_pipeline.save_pipeline(saving_mode=saving_mode, active_pickle_filename=active_pickle_filename, override_pickle_path=kwargs.get('override_pickle_path', None))
+        except Exception as e:
+            exception_info = sys.exc_info()
+            an_error = CapturedException(e, exception_info, curr_active_pipeline)
+            print(f'WARNING: Failed to save pipeline via `curr_active_pipeline.save_pipeline(...)` with error: {an_error}')
+            if update_global_variable_fn:
+                update_global_variable_fn('curr_active_pipeline', curr_active_pipeline)
+            if fail_on_exception:
+                raise
 
-    if not saving_mode.shouldSave:
-        print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
+        if not saving_mode.shouldSave:
+            print(f'saving_mode.shouldSave == False, so not saving at the end of batch_load_session')
 
     ## Load pickled global computations:
     # If previously pickled global results were saved, they will typically no longer be relevent if the pipeline was recomputed. We need a system of invalidating/versioning the global results when the other computations they depend on change.
