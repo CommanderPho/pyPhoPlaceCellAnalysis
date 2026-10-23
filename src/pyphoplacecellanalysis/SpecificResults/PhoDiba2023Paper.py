@@ -65,6 +65,146 @@ _bak_rcParams = mpl.rcParams.copy()
 # %matplotlib qt
 
 
+
+
+from copy import deepcopy
+from typing import List, Optional, Sequence, Tuple
+import numpy as np
+import pandas as pd
+
+DECODER_NAMES: Tuple[str, str, str, str] = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
+DEFAULT_MLD_SCORE_COL_NAMES: Tuple[str, ...] = (
+    'mseq_len_ratio_ignoring_intrusions_and_repeats',
+    'mseq_len_ignoring_intrusions_and_repeats',
+    'mseq_tcov',
+)
+
+
+@pd.api.extensions.register_dataframe_accessor("pho_mld")
+class MostLikelyDecoderDataframeAccessor:
+    """ Adds most-likely-decoder (mld) index/name and `mld_{score}` columns on per-epoch DFs such as `all_sessions_ripple_df`.
+
+    Most-likely decoder is argmax over the four decoder posterior columns, in this order:
+        ('long_LR', 'long_RL', 'short_LR', 'short_RL')  # `mld_decoder_index` is pandas Int64, values 0..3 (NA if all four probs are missing/zero)
+    Falls back to ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL'), then P_LR*P_Long / P_RL*P_Short.
+
+    Prompt:
+
+        # Write a dataframe accessor that adds in the following to per_epoch dfs such as 'all_sessions_ripple_df'
+        ## Add in, if missing: 
+
+        # 1. the most likely decoder ("mld") index based on ('long_LR', 'long_RL', 'short_LR', 'short_RL') 
+
+        # 2. the 'mld_' versions for ('mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_tcov')
+
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import MostLikelyDecoderDataframeAccessor
+
+        all_sessions_ripple_df = all_sessions_ripple_df.pho_mld.adding_mld_columns()
+        all_sessions_ripple_df[['mld_decoder_index', 'mld_decoder_name', 'mld_mseq_tcov']]
+    """
+    decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
+    default_score_col_names: Tuple[str, ...] = DEFAULT_MLD_SCORE_COL_NAMES
+    p_decoder_col_names: Tuple[str, str, str, str] = ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL')
+
+
+    def __init__(self, pandas_obj: pd.DataFrame):
+        self._validate(pandas_obj)
+        self._df = pandas_obj
+
+
+    @staticmethod
+    def _validate(obj):
+        if not isinstance(obj, pd.DataFrame):
+            raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
+
+
+    @classmethod
+    def resolve_decoder_probability_columns(cls, df: pd.DataFrame) -> List[str]:
+        if all((c in df.columns) for c in cls.decoder_names):
+            return list(cls.decoder_names)
+        if all((c in df.columns) for c in cls.p_decoder_col_names):
+            return list(cls.p_decoder_col_names)
+        needed = ('P_LR', 'P_RL', 'P_Long', 'P_Short')
+        if all((c in df.columns) for c in needed):
+            return list(needed)
+        raise KeyError(f'Could not find decoder probability columns. Need {cls.decoder_names}, {cls.p_decoder_col_names}, or {needed}. Have: {list(df.columns)}')
+
+
+    @classmethod
+    def _build_decoder_probability_matrix(cls, df: pd.DataFrame) -> Tuple[np.ndarray, List[str]]:
+        prob_cols: List[str] = cls.resolve_decoder_probability_columns(df)
+        if tuple(prob_cols) == ('P_LR', 'P_RL', 'P_Long', 'P_Short'):
+            p_lr, p_rl, p_long, p_short = (df[c].to_numpy(dtype=float) for c in prob_cols)
+            probs = np.column_stack((p_lr * p_long, p_rl * p_long, p_lr * p_short, p_rl * p_short))
+            return probs, list(cls.p_decoder_col_names)
+        return df[prob_cols].to_numpy(dtype=float), prob_cols
+
+
+    @classmethod
+    def compute_mld_decoder_index(cls, df: pd.DataFrame) -> Tuple[pd.Series, np.ndarray]:
+        """ Returns integer index (0..3, pandas Int64 with NA) and decoder-name array; NA/'' where all four probs are missing or zero. """
+        probs, _prob_cols = cls._build_decoder_probability_matrix(df)
+        n_rows: int = np.shape(probs)[0]
+        is_invalid = np.isnan(probs).all(axis=1) | (np.nansum(np.abs(probs), axis=1) <= 0.0)
+        valid = np.logical_not(is_invalid)
+        mld_idx = pd.Series(pd.NA, index=np.arange(n_rows), dtype='Int64')
+        if np.any(valid):
+            mld_idx.loc[valid] = np.nanargmax(probs[valid, :], axis=1).astype(int)
+        mld_names = np.full((n_rows,), '', dtype=object)
+        if np.any(valid):
+            mld_names[valid] = np.asarray(cls.decoder_names)[mld_idx.loc[valid].to_numpy(dtype=int)]
+        return mld_idx, mld_names
+
+
+    @classmethod
+    def take_score_for_mld_index(cls, df: pd.DataFrame, score_col_name: str, mld_idx: Union[np.ndarray, pd.Series, pd.api.extensions.ExtensionArray]) -> np.ndarray:
+        decoder_score_cols: List[str] = [f'{score_col_name}_{a_decoder_name}' for a_decoder_name in cls.decoder_names]
+        missing = [c for c in decoder_score_cols if c not in df.columns]
+        if len(missing) > 0:
+            raise KeyError(f'missing decoder-suffixed columns for "{score_col_name}": {missing}')
+        score_mat = df[decoder_score_cols].to_numpy(dtype=float)
+        n_rows: int = np.shape(score_mat)[0]
+        mld_idx = pd.array(mld_idx, dtype='Int64')
+        out = np.full((n_rows,), np.nan, dtype=float)
+        valid = np.asarray(pd.notna(mld_idx), dtype=bool)
+        if np.any(valid):
+            row_i = np.arange(n_rows)[valid]
+            col_i = np.asarray(mld_idx[valid], dtype=int)
+            out[valid] = score_mat[row_i, col_i]
+        return out
+
+
+    @classmethod
+    def add_mld_columns(cls, df: pd.DataFrame, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+        """ Adds, if missing: `mld_decoder_index` (Int64 0..3), `mld_decoder_name`, and `mld_{score}` for each score_col_name. """
+        if score_col_names is None:
+            score_col_names = cls.default_score_col_names
+        out_df: pd.DataFrame = deepcopy(df)
+        need_index: bool = overwrite_existing or ('mld_decoder_index' not in out_df.columns)
+        if need_index or ('mld_decoder_name' not in out_df.columns):
+            mld_idx, mld_names = cls.compute_mld_decoder_index(out_df)
+            if overwrite_existing or ('mld_decoder_index' not in out_df.columns):
+                out_df['mld_decoder_index'] = pd.array(mld_idx, dtype='Int64')
+            if overwrite_existing or ('mld_decoder_name' not in out_df.columns):
+                out_df['mld_decoder_name'] = mld_names
+        else:
+            mld_idx = pd.array(out_df['mld_decoder_index'], dtype='Int64')
+        for a_score_col_name in score_col_names:
+            out_col: str = f'mld_{a_score_col_name}'
+            if (not overwrite_existing) and (out_col in out_df.columns):
+                continue
+            out_df[out_col] = cls.take_score_for_mld_index(out_df, score_col_name=a_score_col_name, mld_idx=mld_idx)
+        ## END for a_score_col_name in score_col_names...
+        return out_df
+
+
+    def adding_mld_columns(self, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
+        return self.add_mld_columns(df=self._df, score_col_names=score_col_names, overwrite_existing=overwrite_existing)
+
+
+
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-22 - Extract out Figure 5 Meas v. Decoded Occupancy code                                                                                                                                                                                                                     #
 # ==================================================================================================================================================================================================================================================================================== #
@@ -565,13 +705,14 @@ class Figure5:
                 active_measured_positions_dfs_dict,
                 time_bin_size, measured_x_col: str = 'binned_x_meas', 
                 enable_figure: bool = True, num=f'Figure 5 - measured vs decoded', plot_pos_bin_axes: bool = False, should_max_normalize: bool = True,
-                split_by_session: bool = False,
+                split_by_session: bool = False, pdf_export_path: Optional[Union[str, Path]] = None,
                 **kwargs,
         ):
         """Plots measured vs decoded occupancy.
 
         When `split_by_session=True`, `full_epoch_occupancy_seconds_dict_dict` must be session-nested (from `compute_decoded_occupancy(..., split_by_session=True)`).
         Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
+        Also writes per-session PDFs and a single vertically stacked PDF (`pdf_export_path`, default `output/Figure5_measured_vs_decoded_by_session.pdf`).
         """
         if enable_figure:
             import matplotlib.pyplot as plt
@@ -770,7 +911,26 @@ class Figure5:
                 session_figs = None
                 session_ax_dicts = None
 
-            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict)
+            merged_pdf_path = None
+            if enable_figure and (session_figs is not None) and (len(session_figs) > 0):
+                from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers
+                if pdf_export_path is None:
+                    pdf_export_path = Path('output') / 'Figure5_measured_vs_decoded_by_session.pdf'
+                merged_pdf_path = Path(pdf_export_path).resolve()
+                merged_pdf_path.parent.mkdir(parents=True, exist_ok=True)
+                per_session_pdf_dir = merged_pdf_path.parent.joinpath(merged_pdf_path.stem)
+                per_session_pdf_dir.mkdir(parents=True, exist_ok=True)
+                per_session_pdf_paths = []
+                with mpl.rc_context({'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42}):
+                    for session_name, sess_fig in session_figs.items():
+                        sess_stem: str = str(session_name).replace('/', '_').replace('\\', '_').replace('|', '_').replace(':', '_')
+                        sess_pdf_path = per_session_pdf_dir.joinpath(f'{sess_stem}.pdf')
+                        sess_fig.savefig(sess_pdf_path, format='pdf', bbox_inches='tight', dpi=220)
+                        per_session_pdf_paths.append(sess_pdf_path)
+                    ## END for session_name, sess_fig in session_figs.items()....
+                merged_pdf_path = PDFHelpers.concatenate_pdfs_vertically(per_session_pdf_paths, merged_pdf_path)
+
+            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), merged_pdf_path
 
         assert (not is_session_nested), "session-nested occupancy requires split_by_session=True"
 
@@ -791,7 +951,7 @@ class Figure5:
             fig = None
             ax_dict = None
 
-        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict)
+        return (fig, ax_dict), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict), None
 
 
 # ==================================================================================================================== #
