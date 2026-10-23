@@ -32,7 +32,7 @@ from pyphocorehelpers.gui.Jupyter.simple_widgets import fullwidth_path_widget, c
 
 
 from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import PipelineSavingScheme # used in perform_pipeline_save
-from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata
+from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import _get_custom_filenames_from_computation_metadata, parse_decoding_time_bin_size_str
 
 # AbstractDataFileDialog
 
@@ -1173,77 +1173,117 @@ class PipelinePickleFileSelectorWidget:
     
 
 
-    @function_attributes(short_name=None, tags=['matching', 'pipeline', 'file'], input_requires=[], output_provides=[], uses=[], used_by=['try_select_first_valid_files'], creation_date='2025-02-11 02:40', related_items=[])
-    def try_determine_matching_global_file(self, local_file_name: str) -> Tuple[str, Optional[int]]:
-        """ try to find corresponding global file: for the specified local_file_name 
-        """
-        selected_context_suffix_only: str = local_file_name.removeprefix('loadedSessPickle') # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
-        ## try to find corresponding global file:
-        corresponding_global_file_name: str = f'global_computation_results{selected_context_suffix_only}.pkl'
-        corresponding_global_section_index = None
-        try:
-            corresponding_global_section_index = self.active_global_file_names_list.index(corresponding_global_file_name)
-            if corresponding_global_section_index == -1:
-                corresponding_global_section_index = None
-            # else:
-            #     # return corresponding_global_section_index
-            #     pass
-        except ValueError as e:
-            # index not found
-            corresponding_global_section_index = None
-            # return None
-        except Exception as e:
-            raise e
-        # corresponding_global_section_indicies = [self.active_global_file_names_list.index(corresponding_global_file_name)]
-        return corresponding_global_file_name, corresponding_global_section_index
-    
-    @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
-    def try_select_first_valid_files(self, require_global_file: bool=False) -> bool:
-        """
-        Try selecting the first non-temporary local pickle.
+    @staticmethod
+    def _pickle_basename_without_ext(file_name: str) -> str:
+        """ Basename without a trailing `.pkl`. Do not use Path.stem — `frateThresh_2.0.pkl` would lose the `.0`. """
+        name: str = Path(file_name).name
+        if name.lower().endswith('.pkl'):
+            return name[:-len('.pkl')]
+        return name
 
-        Skips `TEMP_THEN_OVERWRITE` datetime-prefixed temps like `20260730150642-loadedSessPickle.pkl`
-        (incomplete pickles left behind when saving never finished), preferring canonical names
-        such as `loadedSessPickle.pkl`.
+
+    @staticmethod
+    def _has_required_qclu_frate_suffix(custom_suffix: str) -> bool:
+        """ Local batch pickles are `loadedSessPickle_withNormalComputedReplays-qclu_[...]-frateThresh_2.0.pkl` (no `-tbin_`). """
+        if not custom_suffix:
+            return False
+        if ('-tbin_' in custom_suffix) or ('_tbin_' in custom_suffix):
+            return False
+        return ('qclu_' in custom_suffix) and ('frateThresh_' in custom_suffix)
+
+
+    @staticmethod
+    def _is_decoding_time_bin_filename_remainder(remainder: str) -> bool:
+        """ True for `-tbin_25ms` / `_tbin_75ms` / `-tbin_laps25ms_ripple75ms`. """
+        if not remainder:
+            return False
+        if not (remainder.startswith('-tbin_') or remainder.startswith('_tbin_')):
+            return False
+        return parse_decoding_time_bin_size_str(remainder) is not None
+
+
+    @function_attributes(short_name=None, tags=['matching', 'pipeline', 'file', 'tbin'], input_requires=[], output_provides=[], uses=['parse_decoding_time_bin_size_str'], used_by=['try_select_first_valid_files'], creation_date='2025-02-11 02:40', related_items=[])
+    def try_determine_matching_global_file(self, local_file_name: str) -> Tuple[str, Optional[int]]:
+        """ Find the corresponding global pickle for `local_file_name`.
+
+        Requires the batch naming convention:
+        - local: `loadedSessPickle{qclu/frate suffix}.pkl` (no `-tbin_`)
+        - global: `global_computation_results{same suffix}-tbin_25ms.pkl` (time-bin suffix required)
+
+        Does not match unsuffixed `global_computation_results.pkl` or the leftover non-tbin twin.
+        If several tbin variants exist, the first in the browser list is used (newest-first).
+        """
+        local_basename: str = self._pickle_basename_without_ext(local_file_name)
+        selected_context_suffix_only: str = local_basename.removeprefix('loadedSessPickle') # '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0'
+        expected_global_prefix: str = f'global_computation_results{selected_context_suffix_only}'
+        corresponding_global_file_name: str = f'{expected_global_prefix}-tbin_*.pkl'
+        if not self._has_required_qclu_frate_suffix(selected_context_suffix_only):
+            return corresponding_global_file_name, None
+
+        corresponding_global_section_index = None
+        for i, a_global_file_name in enumerate(self.active_global_file_names_list):
+            global_basename: str = self._pickle_basename_without_ext(a_global_file_name)
+            if not global_basename.startswith(expected_global_prefix):
+                continue
+            remainder: str = global_basename[len(expected_global_prefix):]
+            if not self._is_decoding_time_bin_filename_remainder(remainder):
+                continue
+            corresponding_global_file_name = a_global_file_name
+            corresponding_global_section_index = i
+            break
+        ## END for i, a_global_file_name in enumerate(self.active_global_file_names_list)...
+
+        return corresponding_global_file_name, corresponding_global_section_index
+
+
+    @function_attributes(short_name=None, tags=['select-first', 'startup', 'select', 'gui', 'tbin'], input_requires=[], output_provides=[], uses=['try_determine_matching_global_file'], used_by=[], creation_date='2025-02-11 02:40', related_items=[])
+    def try_select_first_valid_files(self, require_global_file: bool=True) -> bool:
+        """
+        Select the newest canonical batch local pickle and its matching `-tbin_*` global pickle.
+
+        Skips:
+        - `TEMP_THEN_OVERWRITE` datetime-prefixed temps like `20260730150642-loadedSessPickle.pkl`
+        - unsuffixed `loadedSessPickle.pkl` / `global_computation_results.pkl`
+        - locals missing `qclu_` + `frateThresh_`
+        - globals that match the qclu/frate suffix but lack `-tbin_XXms`
         """
         local_file_names_list = self.active_local_file_names_list
         if len(local_file_names_list) < 1:
             print(f'have 0 local files, cannot select first.')
             return False
 
-        ## Prefer non-temporary files (no leading YYYYMMDDHHMMSS- from build_unique_filename)
         selected_local_section_index: Optional[int] = None
+        corresponding_global_file_name: Optional[str] = None
+        corresponding_global_section_index: Optional[int] = None
         for i, a_local_file_name in enumerate(local_file_names_list):
             if parse_unique_file_name(a_local_file_name) is not None:
                 # e.g. '20260730150642-loadedSessPickle.pkl' — skip potentially incomplete temp pickle
+                continue
+            local_basename: str = self._pickle_basename_without_ext(a_local_file_name)
+            custom_suffix: str = local_basename.removeprefix('loadedSessPickle')
+            if not self._has_required_qclu_frate_suffix(custom_suffix):
+                continue
+            corresponding_global_file_name, corresponding_global_section_index = self.try_determine_matching_global_file(local_file_name=a_local_file_name)
+            if (corresponding_global_section_index is None) and require_global_file:
                 continue
             selected_local_section_index = i
             break
         ## END for i, a_local_file_name in enumerate(local_file_names_list)...
 
         if selected_local_section_index is None:
-            print(f'have no non-temporary local files (all appear datetime-prefixed), cannot select first.')
+            print(f'have no canonical qclu/frate local pickles with a matching -tbin_ global pickle, cannot select first.')
             return False
 
         ## otherwise it's safe to set the selection
         self.local_file_browser_widget.selection = [selected_local_section_index]
-        # self.global_file_browser_widget.selection = [0]
-        first_selected_local_path: Path = Path(self.selected_local_pkl_files[0])
-        selected_local_file_name: str = first_selected_local_path.stem # 'loadedSessPickle_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_4.0'
-        ## try to find corresponding global file:
-        corresponding_global_file_name, corresponding_global_section_index = self.try_determine_matching_global_file(local_file_name=selected_local_file_name)
         if corresponding_global_section_index is None:
-            # failed to find
             self.global_file_browser_widget.selection = [] ## clear global selection
-            if require_global_file:
-                return False # failed
-            else:
-                return True # success without global file
-        else:
-            corresponding_global_section_indicies = [corresponding_global_section_index] # single list
+            return (not require_global_file)
 
-        ## set selection to corresponding
-        self.global_file_browser_widget.selection = corresponding_global_section_indicies
+        ## set selection to corresponding `-tbin_*` global
+        self.global_file_browser_widget.selection = [corresponding_global_section_index]
+        if self.debug_print:
+            print(f'selected local: {local_file_names_list[selected_local_section_index]!r}; global: {corresponding_global_file_name!r}')
         return True
 
 

@@ -411,7 +411,8 @@ def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], j
 # -------------------------------------------------------------------------------------------------------------------- #
 # Generate clean/continued/final scripts once, then submit one afterok chain per session so fast sessions advance      #
 # without a global phase barrier. Failed phases cancel only that session's later jobs; retry_from_*.sh resumes from    #
-# the failed phase without re-running completed earlier phases (pickles kept).                                          #
+# the failed phase without re-running completed earlier phases (pickles kept). Windows uses sequential python.exe       #
+# chains (submit_phase_chains_*.ps1 / retry_from_*.ps1) instead of bash/sbatch.                                          #
 # Public: build_session_phase_script_map, write_chained_submit_script, write_cancel_phase_chain_script,                   #
 #         write_all_retry_from_phase_scripts, print_chain_status_hint, submit_slurm_script (optional auto-submit).       #
 # ==================================================================================================================== #
@@ -456,12 +457,35 @@ def _subfn_bash_direct_run_lines(phase_script_paths: List[Tuple[str, str]], inde
     return lines
 
 
-def _subfn_phase_chain_lines(phase_script_paths: List[Tuple[str, str]], phase_chain_backend: str, indent: str = '') -> List[str]:
+def _subfn_ps_quote(value: Union[str, Path]) -> str:
+    """Single-quote a path for PowerShell (`'` -> `''`)."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _subfn_powershell_direct_run_lines(phase_script_paths: List[Tuple[str, str]], python_executable: Union[str, Path], indent: str = '') -> List[str]:
+    """Shared by write_chained_submit_script / write_all_retry_from_phase_scripts: sequential PowerShell python.exe lines (Windows)."""
+    if len(phase_script_paths) == 0:
+        return []
+    py_quoted = _subfn_ps_quote(python_executable)
+    lines: List[str] = []
+    for phase_name, script_path in phase_script_paths:
+        lines.append(f'{indent}Write-Host "Running {phase_name}: {script_path}"')
+        lines.append(f'{indent}& {py_quoted} {_subfn_ps_quote(script_path)}')
+        lines.append(f'{indent}if ($LASTEXITCODE -ne 0) {{ throw "{phase_name} failed with exit $LASTEXITCODE" }}')
+    ## END for phase_name, script_path in phase_script_paths...
+    return lines
+
+
+def _subfn_phase_chain_lines(phase_script_paths: List[Tuple[str, str]], phase_chain_backend: str, indent: str = '', python_executable: Optional[Union[str, Path]] = None) -> List[str]:
     if phase_chain_backend == 'bash':
         return _subfn_bash_direct_run_lines(phase_script_paths, indent=indent)
     if phase_chain_backend == 'slurm':
         return _subfn_bash_sbatch_chain_lines(phase_script_paths, indent=indent)
-    raise ValueError(f"phase_chain_backend must be 'slurm' or 'bash', got {phase_chain_backend!r}")
+    if phase_chain_backend == 'powershell':
+        if python_executable is None:
+            python_executable = sys.executable
+        return _subfn_powershell_direct_run_lines(phase_script_paths, python_executable=python_executable, indent=indent)
+    raise ValueError(f"phase_chain_backend must be 'slurm', 'bash', or 'powershell', got {phase_chain_backend!r}")
 
 
 def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
@@ -476,11 +500,11 @@ def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
     return job_id
 
 
-def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCollection'], script_kind: str = 'run', script_collection_key: Literal['slurm', 'bash'] = 'slurm') -> Dict[str, Dict[str, str]]:
+def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCollection'], script_kind: str = 'run', script_collection_key: Literal['slurm', 'bash', 'python'] = 'slurm') -> Dict[str, Dict[str, str]]:
     """Align per-phase BatchScriptsCollection run/fig script paths by session.
 
     phase_collections: mapping phase_name -> BatchScriptsCollection from generate_batch_single_session_scripts.
-    script_collection_key: 'slurm' -> output_slurm_scripts; 'bash' -> output_non_slurm_bash_scripts.
+    script_collection_key: 'slurm' -> output_slurm_scripts; 'bash' -> output_non_slurm_bash_scripts; 'python' -> output_python_scripts (Windows).
     Returns: session_key -> {phase_name: script_path_str}
     """
     def _subfn_session_key_str(curr_session_context: Union[IdentifyingContext, str]) -> str:
@@ -497,8 +521,20 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
         elif script_collection_key == 'bash':
             script_paths = list((collection.output_non_slurm_bash_scripts or {}).get(script_kind, []) or [])
             paths_label = 'output_non_slurm_bash_scripts'
+        elif script_collection_key == 'python':
+            path_idx = 1 if script_kind == 'figs' else 0
+            script_paths = []
+            for item in list(collection.output_python_scripts or []):
+                if isinstance(item, (list, tuple)):
+                    script_paths.append(item[path_idx])
+                elif path_idx == 0:
+                    script_paths.append(item)
+                else:
+                    raise ValueError(f"phase={phase_name!r}: output_python_scripts item is not a (run, figs) pair: {item!r}")
+            ## END for item in list(collection.output_python_scripts or [])...
+            paths_label = 'output_python_scripts'
         else:
-            raise ValueError(f"script_collection_key must be 'slurm' or 'bash', got {script_collection_key!r}")
+            raise ValueError(f"script_collection_key must be 'slurm', 'bash', or 'python', got {script_collection_key!r}")
         if len(contexts) != len(script_paths):
             raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len({paths_label}[{script_kind!r}])={len(script_paths)}")
         for ctx, script_path in zip(contexts, script_paths):
@@ -510,11 +546,12 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
 
 
 def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]], out_path: Union[str, Path], phases_ordered: List[str],
-                                manifest_path: Optional[Union[str, Path]] = None, batch_date_to_use: Optional[str] = None, phase_chain_backend: Literal['slurm', 'bash'] = 'slurm') -> Tuple[Path, Path]:
-    """Write a bash script that runs or submits per-session phase chains, plus a JSON manifest of script paths.
+                                manifest_path: Optional[Union[str, Path]] = None, batch_date_to_use: Optional[str] = None, phase_chain_backend: Literal['slurm', 'bash', 'powershell'] = 'slurm',
+                                python_executable: Optional[Union[str, Path]] = None) -> Tuple[Path, Path]:
+    """Write a submit script that runs or submits per-session phase chains, plus a JSON manifest of script paths.
 
     phase_chain_backend: 'slurm' submits afterok chains (sessions in parallel on the cluster); 'bash' runs one session
-    at a time with sequential phase scripts (Lab linux_standalone).
+    at a time with sequential phase scripts (Lab linux_standalone); 'powershell' runs sequential python.exe per session (Windows).
 
     Returns (submit_script_path, manifest_path).
     """
@@ -525,6 +562,53 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
         manifest_path = Path(manifest_path)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if phase_chain_backend == 'powershell':
+        py_exe = Path(python_executable).resolve() if python_executable is not None else Path(sys.executable).resolve()
+        ps_lines: List[str] = [
+            '# Per-session sequential phase chains (Windows PowerShell; no Slurm).',
+            '# One session at a time; within a session, phases run in order. A failed phase skips later phases for that session.',
+            '# Retry a failed phase with retry_from_*.ps1 — do not re-run completed earlier phases.',
+            '$ErrorActionPreference = "Continue"',
+            '',
+        ]
+        if batch_date_to_use:
+            ps_lines.append(f'# batch: {batch_date_to_use}')
+            ps_lines.append('')
+        for session_key, phase_paths in session_phase_scripts.items():
+            ordered: List[Tuple[str, str]] = []
+            for phase_name in phases_ordered:
+                if phase_name not in phase_paths:
+                    continue
+                ordered.append((phase_name, phase_paths[phase_name]))
+            ## END for phase_name in phases_ordered...
+            if len(ordered) == 0:
+                continue
+            ps_lines.append(f'Write-Host "=== session: {session_key} ==="')
+            ps_lines.append('try {')
+            ps_lines.append('    $ErrorActionPreference = "Stop"')
+            ps_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='powershell', indent='    ', python_executable=py_exe))
+            ps_lines.append('}')
+            ps_lines.append('catch {')
+            ps_lines.append(f'    Write-Host "Session failed (later phases skipped for this session): {session_key}"')
+            ps_lines.append('    Write-Host $_')
+            ps_lines.append('}')
+            ps_lines.append('')
+        ## END for session_key, phase_paths in session_phase_scripts.items()...
+        ps_lines.append('Write-Host "All session phase chains completed."')
+        out_path.write_text('\n'.join(ps_lines) + '\n', encoding='utf-8')
+        manifest: Dict[str, Any] = {
+            'batch_date_to_use': batch_date_to_use,
+            'phases_ordered': list(phases_ordered),
+            'execution_backend': phase_chain_backend,
+            'python_executable': str(py_exe),
+            'sessions': session_phase_scripts,
+            'submit_script': str(out_path),
+        }
+        manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+        print(f'Wrote chained submit script: {out_path}')
+        print(f'Wrote phase-chain manifest: {manifest_path}')
+        return out_path, manifest_path
+
     if phase_chain_backend == 'bash':
         bash_lines: List[str] = [
             '#!/bin/bash',
@@ -709,7 +793,7 @@ def write_cancel_phase_chain_script(submit_script_path: Union[str, Path], cancel
 
 def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path], start_phase: str,
                                        out_dir: Union[str, Path], phases_ordered: Optional[List[str]] = None) -> List[Path]:
-    """Write one retry_from_<start_phase>_<session>.sh per session under out_dir."""
+    """Write one retry_from_<start_phase>_<session>.sh (or .ps1 on Windows) per session under out_dir."""
     def _subfn_write_retry_from_phase_script(manifest_dict: Dict[str, Any], session_key: str, start_phase_name: str,
                                              retry_out_path: Path, phases_ordered_list: List[str]) -> Path:
         """Write a bash script that re-chains from start_phase onward for one session (skips completed earlier phases)."""
@@ -732,6 +816,20 @@ def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path
 
         execution_backend = str(manifest_dict.get('execution_backend') or 'slurm')
         retry_out_path.parent.mkdir(parents=True, exist_ok=True)
+        if execution_backend == 'powershell':
+            py_exe = manifest_dict.get('python_executable') or sys.executable
+            ps_lines = [
+                f'# Retry session {session_key} from phase {start_phase_name} (sequential PowerShell).',
+                '# Earlier phases are intentionally not re-run; their pickles remain on disk.',
+                '$ErrorActionPreference = "Stop"',
+                '',
+                f'Write-Host "=== retry session: {session_key} from {start_phase_name} ==="',
+            ]
+            ps_lines.extend(_subfn_phase_chain_lines(ordered, phase_chain_backend='powershell', indent='', python_executable=py_exe))
+            ps_lines.append('Write-Host "Retry chain completed."')
+            retry_out_path.write_text('\n'.join(ps_lines) + '\n', encoding='utf-8')
+            print(f'Wrote retry script: {retry_out_path}')
+            return retry_out_path
         if execution_backend == 'bash':
             bash_lines = [
                 '#!/bin/bash',
@@ -772,16 +870,23 @@ def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
+    execution_backend = str(manifest_dict.get('execution_backend') or 'slurm')
+    _retry_ext = '.ps1' if execution_backend == 'powershell' else '.sh'
     for session_key in (manifest_dict.get('sessions') or {}).keys():
         safe_session = re.sub(r'[^A-Za-z0-9._-]+', '_', session_key)
-        retry_path = out_dir / f'retry_from_{start_phase}_{safe_session}.sh'
+        retry_path = out_dir / f'retry_from_{start_phase}_{safe_session}{_retry_ext}'
         written.append(_subfn_write_retry_from_phase_script(manifest_dict, session_key=session_key, start_phase_name=start_phase, retry_out_path=retry_path, phases_ordered_list=phases_ordered))
     ## END for session_key in (manifest_dict.get('sessions') or {}).keys()...
     return written
 
 
-def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backend: Literal['slurm', 'bash'] = 'slurm') -> None:
-    """Print monitoring hints for chained phase jobs (Slurm) or sequential bash runs (Lab)."""
+def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backend: Literal['slurm', 'bash', 'powershell'] = 'slurm') -> None:
+    """Print monitoring hints for chained phase jobs (Slurm), sequential bash runs (Lab), or PowerShell (Windows)."""
+    if execution_backend == 'powershell':
+        print('Monitor Windows phase chains:')
+        print('  Watch the terminal running submit_phase_chains_*.ps1, or tail per-session log files next to each run_*.py.')
+        print('On failure: identify the failed phase, then powershell -File retry_from_<phase>_<session>.ps1 (earlier pickles kept).')
+        return
     if execution_backend == 'bash':
         print('Monitor linux_standalone phase chains:')
         print('  Watch the terminal running submit_phase_chains_*.sh, or tail per-session log files next to each run_*.sh.')
