@@ -76,6 +76,7 @@ DECODER_NAMES: Tuple[str, str, str, str] = ('long_LR', 'long_RL', 'short_LR', 's
 DEFAULT_MLD_SCORE_COL_NAMES: Tuple[str, ...] = (
     'mseq_len_ratio_ignoring_intrusions_and_repeats',
     'mseq_len_ignoring_intrusions_and_repeats',
+    'mseq_len_ignoring_intrusions',
     'mseq_tcov',
 )
 
@@ -88,25 +89,41 @@ class MostLikelyDecoderDataframeAccessor:
         ('long_LR', 'long_RL', 'short_LR', 'short_RL')  # `mld_decoder_index` is pandas Int64, values 0..3 (NA if all four probs are missing/zero)
     Falls back to ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL'), then P_LR*P_Long / P_RL*P_Short.
 
+    Also adds independent Long/Short direction winners (LR vs RL within each track).
+    This is not the old `long_best_*` helper: that used one shared `P_LR` vs `P_RL` for both tracks. These Long/Short columns argmax within each track on its own.
+
+    | Column | Meaning |
+    |---|---|
+    | `mld_decoder_index` | 0..3 among all four decoders |
+    | `mld_{score}` | that one decoder's score |
+    | `mld_long_decoder_index` | **Int64** 0=LR, 1=RL within Long |
+    | `mld_long_decoder_name` | `'long_LR'` or `'long_RL'` |
+    | `mld_long_{score}` | Long's LR/RL winner's score |
+    | `mld_short_decoder_index` | **Int64** 0=LR, 1=RL within Short |
+    | `mld_short_decoder_name` | `'short_LR'` or `'short_RL'` |
+    | `mld_short_{score}` | Short's LR/RL winner's score |
+    | `HIGHEST_{score}` | max of `{score}` across all four decoders (ignores mld; NaN only if all four are NaN) |
+
     Prompt:
 
         # Write a dataframe accessor that adds in the following to per_epoch dfs such as 'all_sessions_ripple_df'
-        ## Add in, if missing: 
+        ## Add in, if missing:
 
-        # 1. the most likely decoder ("mld") index based on ('long_LR', 'long_RL', 'short_LR', 'short_RL') 
+        # 1. the most likely decoder ("mld") index based on ('long_LR', 'long_RL', 'short_LR', 'short_RL')
 
         # 2. the 'mld_' versions for ('mseq_len_ratio_ignoring_intrusions_and_repeats', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_tcov')
-
 
     Usage:
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import MostLikelyDecoderDataframeAccessor
 
         all_sessions_ripple_df = all_sessions_ripple_df.pho_mld.adding_mld_columns()
-        all_sessions_ripple_df[['mld_decoder_index', 'mld_decoder_name', 'mld_mseq_tcov']]
+        all_sessions_ripple_df[['mld_decoder_index', 'mld_decoder_name', 'mld_mseq_tcov', 'mld_long_decoder_index', 'mld_long_mseq_tcov', 'mld_short_decoder_index', 'mld_short_mseq_tcov']]
     """
     decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
     default_score_col_names: Tuple[str, ...] = DEFAULT_MLD_SCORE_COL_NAMES
     p_decoder_col_names: Tuple[str, str, str, str] = ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL')
+    long_decoder_names: Tuple[str, str] = ('long_LR', 'long_RL')
+    short_decoder_names: Tuple[str, str] = ('short_LR', 'short_RL')
 
 
     def __init__(self, pandas_obj: pd.DataFrame):
@@ -143,9 +160,8 @@ class MostLikelyDecoderDataframeAccessor:
 
 
     @classmethod
-    def compute_mld_decoder_index(cls, df: pd.DataFrame) -> Tuple[pd.Series, np.ndarray]:
-        """ Returns integer index (0..3, pandas Int64 with NA) and decoder-name array; NA/'' where all four probs are missing or zero. """
-        probs, _prob_cols = cls._build_decoder_probability_matrix(df)
+    def _argmax_index_and_names(cls, probs: np.ndarray, name_options: Sequence[str]) -> Tuple[pd.Series, np.ndarray]:
+        """ Argmax along axis=1; returns pandas Int64 index (NA if a row is all-missing/zero) and the corresponding names. """
         n_rows: int = np.shape(probs)[0]
         is_invalid = np.isnan(probs).all(axis=1) | (np.nansum(np.abs(probs), axis=1) <= 0.0)
         valid = np.logical_not(is_invalid)
@@ -154,13 +170,38 @@ class MostLikelyDecoderDataframeAccessor:
             mld_idx.loc[valid] = np.nanargmax(probs[valid, :], axis=1).astype(int)
         mld_names = np.full((n_rows,), '', dtype=object)
         if np.any(valid):
-            mld_names[valid] = np.asarray(cls.decoder_names)[mld_idx.loc[valid].to_numpy(dtype=int)]
+            mld_names[valid] = np.asarray(list(name_options))[mld_idx.loc[valid].to_numpy(dtype=int)]
         return mld_idx, mld_names
 
 
     @classmethod
-    def take_score_for_mld_index(cls, df: pd.DataFrame, score_col_name: str, mld_idx: Union[np.ndarray, pd.Series, pd.api.extensions.ExtensionArray]) -> np.ndarray:
-        decoder_score_cols: List[str] = [f'{score_col_name}_{a_decoder_name}' for a_decoder_name in cls.decoder_names]
+    def compute_mld_decoder_index(cls, df: pd.DataFrame) -> Tuple[pd.Series, np.ndarray]:
+        """ Returns 4-way integer index (0..3, pandas Int64 with NA) and decoder-name array; NA/'' where all four probs are missing or zero. """
+        probs, _prob_cols = cls._build_decoder_probability_matrix(df)
+        return cls._argmax_index_and_names(probs, cls.decoder_names)
+
+
+    @classmethod
+    def compute_mld_long_short_direction_indices(cls, df: pd.DataFrame) -> Tuple[pd.Series, np.ndarray, pd.Series, np.ndarray]:
+        """ Independent LR-vs-RL argmax within Long and within Short (directions need not match).
+
+        Returns:
+            mld_long_decoder_index: Int64 0=LR, 1=RL (NA if both long probs missing/zero)
+            mld_long_decoder_name: 'long_LR' | 'long_RL' | ''
+            mld_short_decoder_index: Int64 0=LR, 1=RL
+            mld_short_decoder_name: 'short_LR' | 'short_RL' | ''
+        """
+        probs, _prob_cols = cls._build_decoder_probability_matrix(df)
+        long_idx, long_names = cls._argmax_index_and_names(probs[:, 0:2], cls.long_decoder_names)
+        short_idx, short_names = cls._argmax_index_and_names(probs[:, 2:4], cls.short_decoder_names)
+        return long_idx, long_names, short_idx, short_names
+
+
+    @classmethod
+    def take_score_for_mld_index(cls, df: pd.DataFrame, score_col_name: str, mld_idx: Union[np.ndarray, pd.Series, pd.api.extensions.ExtensionArray], decoder_names: Optional[Sequence[str]] = None) -> np.ndarray:
+        if decoder_names is None:
+            decoder_names = cls.decoder_names
+        decoder_score_cols: List[str] = [f'{score_col_name}_{a_decoder_name}' for a_decoder_name in decoder_names]
         missing = [c for c in decoder_score_cols if c not in df.columns]
         if len(missing) > 0:
             raise KeyError(f'missing decoder-suffixed columns for "{score_col_name}": {missing}')
@@ -177,13 +218,25 @@ class MostLikelyDecoderDataframeAccessor:
 
 
     @classmethod
+    def take_highest_score_across_decoders(cls, df: pd.DataFrame, score_col_name: str, decoder_names: Optional[Sequence[str]] = None) -> np.ndarray:
+        """ Row-wise max of `{score_col_name}_{decoder}` over all decoders, independent of which decoder is most likely. NaN only where every decoder is NaN. """
+        if decoder_names is None:
+            decoder_names = cls.decoder_names
+        decoder_score_cols: List[str] = [f'{score_col_name}_{a_decoder_name}' for a_decoder_name in decoder_names]
+        missing = [c for c in decoder_score_cols if c not in df.columns]
+        if len(missing) > 0:
+            raise KeyError(f'missing decoder-suffixed columns for "{score_col_name}": {missing}')
+        return df[decoder_score_cols].astype(float).max(axis=1, skipna=True).to_numpy(dtype=float)
+
+
+    @classmethod
     def add_mld_columns(cls, df: pd.DataFrame, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
-        """ Adds, if missing: `mld_decoder_index` (Int64 0..3), `mld_decoder_name`, and `mld_{score}` for each score_col_name. """
+        """ Adds, if missing: 4-way `mld_*` columns, independent Long/Short direction `mld_long_*` / `mld_short_*` columns, and `HIGHEST_*` (max over all four decoders) columns. """
         if score_col_names is None:
             score_col_names = cls.default_score_col_names
         out_df: pd.DataFrame = deepcopy(df)
-        need_index: bool = overwrite_existing or ('mld_decoder_index' not in out_df.columns)
-        if need_index or ('mld_decoder_name' not in out_df.columns):
+        need_four_way: bool = overwrite_existing or ('mld_decoder_index' not in out_df.columns) or ('mld_decoder_name' not in out_df.columns)
+        if need_four_way:
             mld_idx, mld_names = cls.compute_mld_decoder_index(out_df)
             if overwrite_existing or ('mld_decoder_index' not in out_df.columns):
                 out_df['mld_decoder_index'] = pd.array(mld_idx, dtype='Int64')
@@ -191,11 +244,31 @@ class MostLikelyDecoderDataframeAccessor:
                 out_df['mld_decoder_name'] = mld_names
         else:
             mld_idx = pd.array(out_df['mld_decoder_index'], dtype='Int64')
+        need_long_short: bool = overwrite_existing or any((c not in out_df.columns) for c in ('mld_long_decoder_index', 'mld_long_decoder_name', 'mld_short_decoder_index', 'mld_short_decoder_name'))
+        if need_long_short:
+            long_idx, long_names, short_idx, short_names = cls.compute_mld_long_short_direction_indices(out_df)
+            if overwrite_existing or ('mld_long_decoder_index' not in out_df.columns):
+                out_df['mld_long_decoder_index'] = pd.array(long_idx, dtype='Int64')
+            if overwrite_existing or ('mld_long_decoder_name' not in out_df.columns):
+                out_df['mld_long_decoder_name'] = long_names
+            if overwrite_existing or ('mld_short_decoder_index' not in out_df.columns):
+                out_df['mld_short_decoder_index'] = pd.array(short_idx, dtype='Int64')
+            if overwrite_existing or ('mld_short_decoder_name' not in out_df.columns):
+                out_df['mld_short_decoder_name'] = short_names
+        else:
+            long_idx = pd.array(out_df['mld_long_decoder_index'], dtype='Int64')
+            short_idx = pd.array(out_df['mld_short_decoder_index'], dtype='Int64')
+        score_specs = (('mld', mld_idx, cls.decoder_names), ('mld_long', long_idx, cls.long_decoder_names), ('mld_short', short_idx, cls.short_decoder_names))
         for a_score_col_name in score_col_names:
-            out_col: str = f'mld_{a_score_col_name}'
-            if (not overwrite_existing) and (out_col in out_df.columns):
-                continue
-            out_df[out_col] = cls.take_score_for_mld_index(out_df, score_col_name=a_score_col_name, mld_idx=mld_idx)
+            for a_prefix, an_idx, a_decoder_names in score_specs:
+                out_col: str = f'{a_prefix}_{a_score_col_name}'
+                if (not overwrite_existing) and (out_col in out_df.columns):
+                    continue
+                out_df[out_col] = cls.take_score_for_mld_index(out_df, score_col_name=a_score_col_name, mld_idx=an_idx, decoder_names=a_decoder_names)
+            ## END for a_prefix, an_idx, a_decoder_names in score_specs...
+            highest_col: str = f'HIGHEST_{a_score_col_name}'
+            if overwrite_existing or (highest_col not in out_df.columns):
+                out_df[highest_col] = cls.take_highest_score_across_decoders(out_df, score_col_name=a_score_col_name)
         ## END for a_score_col_name in score_col_names...
         return out_df
 
