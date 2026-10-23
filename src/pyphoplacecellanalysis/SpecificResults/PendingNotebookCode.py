@@ -14663,7 +14663,8 @@ class MeasuredVsDecodedOccupancy:
     """
     @function_attributes(short_name=None, tags=['MAIN'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-05-15 19:57', related_items=[])
     @classmethod
-    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, track_templates: TrackTemplates, figure_title: str='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False, **kwargs):
+    def analyze_and_plot_meas_vs_decoded_occupancy(cls, best_matching_context: IdentifyingContext, a_result: DecodedFilterEpochsResult, a_decoder: BasePositionDecoder, a_decoded_marginal_posterior_df: pd.DataFrame, track_templates: TrackTemplates, figure_title: str='Laps', plot_in_same_figure:bool=True, should_max_normalize: bool=False, skip_plotting_measured: bool=False, debug_print=False,
+        include_only_track_body_time_bins: bool = False, **kwargs):
         """ analyze and plot
 
         

@@ -414,7 +414,7 @@ class Figure5:
 
     @classmethod
     def compute_decoded_occupancy(cls, all_sessions_exported_posteriors_dict, all_sessions_exported_ripple_data_only_dict, all_sessions_exported_laps_data_only_dict, t_delta_dict, 
-            time_bin_size: float = 0.025, use_most_likely_pos_only_pseudo_occupancy: bool = True, **kwargs):
+            time_bin_size: float = 0.025, use_all_decoders_simultaneously_occupancy: bool = True, use_most_likely_pos_only_pseudo_occupancy: bool = False, **kwargs):
         ## INPUTS: time_bin_size, 
         # a_posterior_container: LoadedPosteriorContainer = all_sessions_exported_posteriors_dict['/kdiba/gor01/two/2006-6-12_16-53-46']
 
@@ -450,7 +450,7 @@ class Figure5:
                     ## build occupancy by summing over the 'most_likely_positions':
                     t_bin_centers_flat: NDArray = np.concatenate(list(a_result['t_bin_centers'].values())[0]) ## they're all the same for each decoder, so just get the first decoder's values
                     # print(f'np.shape(t_bin_centers_flat): {np.shape(t_bin_centers_flat)}, t_bin_centers_flat: {t_bin_centers_flat}')
-                    _temp_occupancy = cls._process_result(p_x_given_n_dict=a_result['p_x_given_n'], t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy, **kwargs)
+                    _temp_occupancy = cls._process_result(p_x_given_n_dict=a_result['p_x_given_n'], t_bin_centers_flat=t_bin_centers_flat, curr_session_t_delta=curr_session_t_delta, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy, use_all_decoders_simultaneously_occupancy=use_all_decoders_simultaneously_occupancy, **kwargs)
                     _temp_out_occupancy_result_dict[an_epoch_name].append(_temp_occupancy)
             ## END for an_epoch....
 
@@ -523,9 +523,10 @@ class Figure5:
 
 
     @classmethod
-    def main(cls, full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict, 
+    def main(cls, full_epoch_occupancy_seconds_dict_dict, 
                 active_measured_positions_dfs_dict,
-                time_bin_size, measured_x_col: str = 'binned_x_meas', enable_figure: bool = True,
+                time_bin_size, measured_x_col: str = 'binned_x_meas', 
+                enable_figure: bool = True, num=f'Figure 5 - measured vs decoded', plot_pos_bin_axes: bool = False, should_max_normalize: bool = True,
                 **kwargs,
         ):
         """
@@ -588,14 +589,23 @@ class Figure5:
         if enable_figure:
 
             ## single figure mode
-            fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=f'Figure 5 - measured vs decoded')
+            fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=num)
             # ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta'], ['PBEs_pre-delta', 'PBEs_post-delta']], sharex=True, sharey=True)
             ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta', 'laps_all'], ['PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']], sharex=True, sharey=True)
 
             # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
-            _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=True)
+            _plot_kwargs = dict(plot_pos_bin_axes=plot_pos_bin_axes, should_max_normalize=should_max_normalize)
+            decoder_color_dict: Dict[types.DecoderName, str] = {'long_LR': '#0099ff', 'long_RL': '#1b115a', 'short_LR': '#f51616', 'short_RL': '#891111'}
 
+            def _color_last_occupancy_stairs(ax, color):
+                """`perform_plot_occupancy` drops `color` via `overriding_dict_with`; color the last stairs patch instead. Also drops the hardcoded `hatch='//'`."""
+                patch = ax.patches[-1]
+                patch.set_hatch('')
+                patch.set_edgecolor(color)
+                patch.set_facecolor('none')
 
+            legend_handles = None
+            legend_labels = None
             for lap_PBEs_plus_pre_post, ax in ax_dict.items():
                 a_lap_pbe_epoch_name, pre_post = lap_PBEs_plus_pre_post.split('_')
                 n_pos = len(measured_epoch_occupancy_fractional_dict_dict[pre_post][a_lap_pbe_epoch_name])
@@ -615,21 +625,29 @@ class Figure5:
 
                 perform_plot_occupancy(measured_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                     label='measured', **_plot_kwargs)
+                _color_last_occupancy_stairs(ax, 'black')
                 if isinstance(decoded_active, dict):
                     decoded_total_s: float = float(np.nansum([np.nansum(arr) for arr in decoded_active.values()]))
+                    _decoded_legend_labels = [f'decoded[{decoder_name}]' for decoder_name in decoded_active.keys()]
                     for decoder_name, decoder_occ in decoded_active.items():
                         perform_plot_occupancy(decoder_occ, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                             label=f'decoded[{decoder_name}]', **_plot_kwargs, alpha=0.9)
+                        _color_last_occupancy_stairs(ax, decoder_color_dict[decoder_name])
                     ## END for decoder_name, decoder_occ in decoded_active.items()....
 
                 else:
                     decoded_total_s: float = np.nansum(decoded_active)
+                    _decoded_legend_labels = ['decoded']
                     perform_plot_occupancy(decoded_active, xbin_centers=xbin_centers, xbin_edges=xbin_edges, fig=fig, ax=ax,
                                         label='decoded', **_plot_kwargs, alpha=0.9)
+                    _color_last_occupancy_stairs(ax, 'C0')
                 ax.set_title(f"{pre_post} | {a_lap_pbe_epoch_name}  (decoded={decoded_total_s:0.1f}s, measured={measured_total_s:0.1f}s)")
-                ax.legend()
-            ## END for lap_PBEs_plus_pre_post, ax in ax_dict.items()...
+                if legend_handles is None:
+                    legend_handles, _ignored_labels = ax.get_legend_handles_labels()
+                    legend_labels = ['measured'] + _decoded_legend_labels  # perform_plot_occupancy hardcodes stairs label='1D Placefield Occupancy'
+            ## END for lap_PBEs_plus_pre_post, ax in ax_dict.items()....
 
+            fig.legend(legend_handles, legend_labels, loc='outside right', frameon=True)
             plt.suptitle(f'Figure 5 — measured x vs decoded occupancy')
             # _out_figs_dict[a_lap_pbe_epoch_name] = (fig, ax_dict)
         else:
