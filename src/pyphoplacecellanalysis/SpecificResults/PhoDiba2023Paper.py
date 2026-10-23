@@ -173,7 +173,7 @@ class Figure5:
 
         time_bin_size: float = 0.025 # 25ms
         use_most_likely_pos_only_pseudo_occupancy: bool = True ## when `use_most_likely_pos_only_pseudo_occupancy == True`, only the most probable position from the most probable decoder is used.
-        split_by_session: bool = False ## True: keep occupancy per session (no cross-session sum) so `main(..., split_by_session=True)` can plot one 2x3 subfigure per session
+        split_by_session: bool = False ## True: keep occupancy per session (no cross-session sum) so `main(..., split_by_session=True)` opens one 2x3 figure per session
         full_epoch_occupancy_seconds_dict_dict, full_epoch_occupancy_fractional_dict_dict = Figure5.compute_decoded_occupancy(all_sessions_exported_posteriors_dict=all_sessions_exported_posteriors_dict,
                     all_sessions_exported_ripple_data_only_dict=all_sessions_exported_ripple_data_only_dict, all_sessions_exported_laps_data_only_dict=all_sessions_exported_laps_data_only_dict,
                     t_delta_dict=t_delta_dict, time_bin_size=time_bin_size, use_most_likely_pos_only_pseudo_occupancy=use_most_likely_pos_only_pseudo_occupancy, split_by_session=split_by_session)
@@ -571,7 +571,7 @@ class Figure5:
         """Plots measured vs decoded occupancy.
 
         When `split_by_session=True`, `full_epoch_occupancy_seconds_dict_dict` must be session-nested (from `compute_decoded_occupancy(..., split_by_session=True)`).
-        Returns one tall figure with a stacked 2x3 subfigure per session, plus session-keyed measured occupancy dicts.
+        Returns one 2x3 figure per session (keyed dicts), plus session-keyed measured occupancy dicts.
         """
         if enable_figure:
             import matplotlib.pyplot as plt
@@ -645,7 +645,7 @@ class Figure5:
             return measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict
 
         def _plot_occupancy_mosaic(fig, decoded_seconds_dict_dict, measured_seconds_dict_dict):
-            """2x3 laps/PBEs × pre/post/all mosaic on `fig` (Figure or SubFigure)."""
+            """2x3 laps/PBEs × pre/post/all mosaic on `fig`."""
             # ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta'], ['PBEs_pre-delta', 'PBEs_post-delta']], sharex=True, sharey=True)
             ax_dict = fig.subplot_mosaic([['laps_pre-delta', 'laps_post-delta', 'laps_all'], ['PBEs_pre-delta', 'PBEs_post-delta', 'PBEs_all']], sharex=True, sharey=True)
             # _plot_kwargs = dict(plot_pos_bin_axes=False, should_max_normalize=False)
@@ -733,17 +733,10 @@ class Figure5:
 
             measured_epoch_occupancy_seconds_dict_dict = {}
             measured_epoch_occupancy_fractional_dict_dict = {}
+            session_figs = {}
             session_ax_dicts = {}
-            fig = None
-            subfigs = None
-            if enable_figure:
-                n_sessions: int = len(session_names)
-                fig = plt.figure(layout='constrained', figsize=[18, 4 * n_sessions], dpi=220, clear=True, num=num)
-                subfigs = fig.subfigures(n_sessions, 1, wspace=0.07)
-                if n_sessions == 1:
-                    subfigs = [subfigs]
 
-            for i, session_name in enumerate(session_names):
+            for session_name in session_names:
                 sess_decoded_seconds = full_epoch_occupancy_seconds_dict_dict[session_name]
                 if 'pre-delta' not in sess_decoded_seconds:
                     print(f'WARN: skip session "{session_name}" — no decoded occupancy.')
@@ -766,18 +759,18 @@ class Figure5:
                 measured_epoch_occupancy_fractional_dict_dict[session_name] = sess_measured_frac
 
                 if enable_figure:
-                    subfig = subfigs[i]
-                    ax_dict = _plot_occupancy_mosaic(subfig, sess_decoded_seconds, sess_measured_seconds)
-                    subfig.suptitle(session_name)
+                    sess_fig = plt.figure(layout='constrained', figsize=[18, 4], dpi=220, clear=True, num=f'{num} | {session_name}')
+                    ax_dict = _plot_occupancy_mosaic(sess_fig, sess_decoded_seconds, sess_measured_seconds)
+                    sess_fig.suptitle(f'Figure 5 — measured vs decoded occupancy | {session_name}')
+                    session_figs[session_name] = sess_fig
                     session_ax_dicts[session_name] = ax_dict
-            ## END for i, session_name in enumerate(session_names)....
+            ## END for session_name in session_names....
 
-            if enable_figure:
-                fig.suptitle(f'Figure 5 — measured x vs decoded occupancy (by session)')
-            else:
+            if not enable_figure:
+                session_figs = None
                 session_ax_dicts = None
 
-            return (fig, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict)
+            return (session_figs, session_ax_dicts), (measured_epoch_occupancy_seconds_dict_dict, measured_epoch_occupancy_fractional_dict_dict)
 
         assert (not is_session_nested), "session-nested occupancy requires split_by_session=True"
 
