@@ -16,6 +16,7 @@ from flexitext import flexitext ## flexitext version
 from neuropy.utils.mixins.enum_helpers import ExtendedEnum # used in TrackAssignmentState
 from neuropy.core.epoch import Epoch, ensure_dataframe
 from neuropy.core.user_annotations import UserAnnotationsManager, SessionCellExclusivityRecord
+from neuropy.utils.indexing_helpers import PandasHelpers
 
 from pyphocorehelpers.mixins.key_value_hashable import KeyValueHashableObject
 from pyphocorehelpers.indexing_helpers import partition # needed by `AssigningEpochs` to partition the dataframe by aclus
@@ -276,6 +277,53 @@ class MostLikelyDecoderDataframeAccessor:
     def adding_mld_columns(self, score_col_names: Optional[Sequence[str]] = None, overwrite_existing: bool = False) -> pd.DataFrame:
         return self.add_mld_columns(df=self._df, score_col_names=score_col_names, overwrite_existing=overwrite_existing)
 
+
+    @classmethod
+    def add_parent_epoch_heuristic_columns_to_time_bin_df(cls, an_epoch_time_bin_df: pd.DataFrame, a_paired_epoch_df: pd.DataFrame, columns_to_add: Optional[List[str]] = None) -> pd.DataFrame:
+        """ Left-merge selected per-epoch heuristic columns onto a per-time-bin DF as `parent_epoch_{col}`.
+
+        Does not modify `a_paired_epoch_df`. Does not rewrite stored `session_name` / `custom_replay_name` on the time-bin DF;
+        `_` vs `-` is normalized only on temporary join-key copies that are dropped after the merge.
+        """
+        if columns_to_add is None:
+            columns_to_add = ['mld_mseq_tcov', 'mld_mseq_len_ignoring_intrusions', 'HIGHEST_mseq_tcov', 'HIGHEST_mseq_len_ignoring_intrusions']
+        missing_src = [c for c in columns_to_add if c not in a_paired_epoch_df.columns]
+        if len(missing_src) > 0:
+            raise KeyError(f'a_paired_epoch_df missing columns_to_add: {missing_src}')
+        epoch_src_keys = ['session_name', 'custom_replay_name', 'time_bin_size', 'label']
+        missing_join = [c for c in epoch_src_keys if c not in a_paired_epoch_df.columns]
+        if len(missing_join) > 0:
+            raise KeyError(f'a_paired_epoch_df missing join keys: {missing_join}')
+        missing_tbin = [c for c in ['session_name', 'custom_replay_name', 'time_bin_size'] if c not in an_epoch_time_bin_df.columns]
+        if len(missing_tbin) > 0:
+            raise KeyError(f'an_epoch_time_bin_df missing join keys: {missing_tbin}')
+        out_df: pd.DataFrame = deepcopy(an_epoch_time_bin_df)
+        if 'parent_epoch_label' not in out_df.columns:
+            if 'ripple_idx' in out_df.columns:
+                out_df['parent_epoch_label'] = out_df['ripple_idx']
+            else:
+                raise KeyError("an_epoch_time_bin_df needs 'parent_epoch_label' (or 'ripple_idx') to join to a_paired_epoch_df['label']")
+        dest_rename = {c: f'parent_epoch_{c}' for c in columns_to_add}
+        already_present = [dest for dest in dest_rename.values() if dest in out_df.columns]
+        cols_needed = [c for c, dest in dest_rename.items() if dest not in already_present]
+        if len(cols_needed) == 0:
+            return out_df
+        tmp_session_col: str = '__join_session_name'
+        tmp_replay_col: str = '__join_custom_replay_name'
+        right = deepcopy(a_paired_epoch_df.loc[:, epoch_src_keys + cols_needed])
+        right[tmp_session_col] = right['session_name'].astype(str).str.replace('_', '-', regex=False)
+        right[tmp_replay_col] = right['custom_replay_name'].astype(str).str.replace('_', '-', regex=False)
+        out_df[tmp_session_col] = out_df['session_name'].astype(str).str.replace('_', '-', regex=False)
+        out_df[tmp_replay_col] = out_df['custom_replay_name'].astype(str).str.replace('_', '-', regex=False)
+        right = right.drop(columns=['session_name', 'custom_replay_name'])  # keep left's original identity columns
+        right = right.drop_duplicates(subset=[tmp_session_col, tmp_replay_col, 'time_bin_size', 'label'], keep='first')
+        right = right.rename(columns={'label': 'parent_epoch_label', **{c: dest_rename[c] for c in cols_needed}})
+        merge_on = [tmp_session_col, tmp_replay_col, 'time_bin_size', 'parent_epoch_label']
+        n_before: int = len(out_df)
+        out_df = PandasHelpers.safe_merge(out_df, right, how='left', on=merge_on)
+        assert len(out_df) == n_before, f'merge duplicated rows: {n_before} -> {len(out_df)}'
+        out_df = out_df.drop(columns=[tmp_session_col, tmp_replay_col])
+        return out_df
 
 
 # ==================================================================================================================================================================================================================================================================================== #
