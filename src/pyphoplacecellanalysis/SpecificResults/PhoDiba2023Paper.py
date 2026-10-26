@@ -109,8 +109,7 @@ class FigureS8:
     plotly_helpers: PlotlyHelpers = None
     PUB_FIG_SIZE: Dict = dict(width=792, height=320)
     figures_parent_folder: Path = None
-
-
+    _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
     @classmethod
     def _post_hoc_format_figure(cls, a_fig: go.Figure) -> go.Figure:
@@ -118,8 +117,8 @@ class FigureS8:
         a_fig = a_fig.update_layout(
             template=cls.template,
             **cls.PUB_FIG_SIZE,
-            paper_bgcolor="white",
-            plot_bgcolor="white",
+            paper_bgcolor=cls._transparent_bgcolor,
+            plot_bgcolor=cls._transparent_bgcolor,
             showlegend=False,
             font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
             title_font=dict(**cls._pub_font, size=text_sizes_px["titles"]),
@@ -150,24 +149,38 @@ class FigureS8:
     #     return image_save_path
 
     @classmethod
+    def _write_transparent_pdf_from_svg(cls, svg_path: Path, pdf_path: Path) -> Path:
+        """Kaleido `write_image(..., format='pdf')` composites onto an opaque white canvas. Convert a transparent SVG instead."""
+        import cairosvg
+        cairosvg.svg2pdf(url=str(svg_path), write_to=str(pdf_path))
+        return pdf_path
+
+
+    @classmethod
     def _save_publication_figs(cls, a_fig: go.Figure, a_fig_context, figures_parent_folder: Path, export_suffix: str, basename: Optional[str] = None, _out_paths: Optional[Dict]=None,
-                                should_export_svg: bool = False,
+                                should_export_svg: bool = True, should_export_pdf: Optional[bool] = None,
                             ) -> Path:
         if basename is None:
             basename = a_fig_context.get_description()
 
         if _out_paths is None:
             _out_paths = {}
-        # ## save .pdf
-        image_save_path = figures_parent_folder.joinpath(f'{basename}.pdf')
-        a_fig.write_image(image_save_path) # , textmode="text"
-        _out_paths[f'{export_suffix}/pdf'] = image_save_path
+        if should_export_pdf is None:
+            should_export_pdf = (not should_export_svg)  # SVG mode: skip PDF; PDF mode: skip SVG unless both requested
 
+        export_fig = deepcopy(a_fig)
+        export_fig.update_layout(paper_bgcolor=cls._transparent_bgcolor, plot_bgcolor=cls._transparent_bgcolor)
+
+        svg_save_path = figures_parent_folder.joinpath(f'{basename}.svg')
+        if should_export_svg or should_export_pdf:
+            export_fig.write_image(svg_save_path, format="svg")  # Kaleido SVG does honor transparent bg
         if should_export_svg:
-            ## save .svg
-            image_save_path = figures_parent_folder.joinpath(f'{basename}.svg')
-            a_fig.write_image(image_save_path, format="svg") # , textmode="text"
-            _out_paths[f'{export_suffix}/svg'] = image_save_path
+            _out_paths[f'{export_suffix}/svg'] = svg_save_path
+
+        if should_export_pdf:
+            pdf_save_path = figures_parent_folder.joinpath(f'{basename}.pdf')
+            cls._write_transparent_pdf_from_svg(svg_save_path, pdf_save_path)
+            _out_paths[f'{export_suffix}/pdf'] = pdf_save_path
 
         return _out_paths
 
@@ -177,7 +190,9 @@ class FigureS8:
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
     @classmethod
-    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True, should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True):
+    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
+                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True,
+        ):
         """
 
         """
@@ -222,7 +237,7 @@ class FigureS8:
 
         ## Constrained
 
-        active = base_df
+        active = deepcopy(base_df)
         for k in constraint_keys:
             mask = predicates[k](active).astype(bool)
             active = deepcopy(active[mask])
@@ -270,7 +285,7 @@ class FigureS8:
 
 
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder):
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False):
         """
 
         """
@@ -418,6 +433,10 @@ class FigureS8:
                 else:
                     a_constraint_keys = deepcopy(constraint_keys)
 
+
+                if not should_concatenate_figures:
+                    export_suffix = f"{export_suffix}{output_suffix}"
+
                 _out_figs_dict_dict[export_suffix], _out_paths[export_suffix] = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                                                                                                 should_export_initially_filtered = False,
                                                                                                                 should_export_iteratively_constrainted = False,
@@ -429,26 +448,28 @@ class FigureS8:
 
 
             # _out_paths
-            _out_figs_dict_dict['Laps']['Final']
-            _out_figs_dict_dict['PBEs']['Final']
+            # _out_figs_dict_dict['Laps']['Final']
+            # _out_figs_dict_dict['PBEs']['Final']
 
             _out_figs_dict_dict_dict[export_suffix] = _out_figs_dict_dict
             _out_paths_dict[export_suffix] = _out_paths
 
-            for k in list(_out_paths['Laps'].keys()):
-                # k: str = 'Final' or 'Initial'
-                pdf_paths = [
-                    _out_paths['Laps'][k]['Laps/pdf'],
-                    _out_paths['PBEs'][k]['PBEs/pdf'],
-                ]
 
-                _final_fig4_pdf = PDFHelpers.concatenate_pdfs_vertically(
-                    pdf_paths=pdf_paths,
-                    output_path=figures_parent_folder.joinpath(f'fig4_Laps_PBEs_{k}{output_suffix}.pdf'),
-                    padding=0,  # points; use e.g. 10 if you want a gap
-                )
-                
-                print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
+            if should_concatenate_figures:
+                for k in list(_out_paths['Laps'].keys()):
+                    # k: str = 'Final' or 'Initial'
+                    pdf_paths = [
+                        _out_paths['Laps'][k]['Laps/pdf'],
+                        _out_paths['PBEs'][k]['PBEs/pdf'],
+                    ]
+
+                    _final_fig4_pdf = PDFHelpers.concatenate_pdfs_vertically(
+                        pdf_paths=pdf_paths,
+                        output_path=figures_parent_folder.joinpath(f'fig4_Laps_PBEs_{k}{output_suffix}.pdf'),
+                        padding=0,  # points; use e.g. 10 if you want a gap
+                    )
+                    
+                    print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
 
         ## for output_suffix, base_df_dict in base_df_dict_dict.items()...
 
