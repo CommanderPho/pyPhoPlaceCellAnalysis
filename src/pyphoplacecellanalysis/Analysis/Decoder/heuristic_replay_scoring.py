@@ -492,7 +492,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
     @function_attributes(short_name=None, tags=['sequence'], input_requires=[], output_provides=[], uses=['partition_subsequences_ignoring_repeated_similar_positions', 'partition_subsequences', 'merge_intrusions', 'rebuild_sequence_info_df'], used_by=['bin_wise_continuous_sequence_sort_score_fn'], creation_date='2024-11-27 11:12', related_items=[])
     @classmethod
-    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False) -> "SubsequencesPartitioningResult":
+    def init_from_positions_list(cls, a_most_likely_positions_list: NDArray, pos_bin_edges: NDArray, max_ignore_bins: int = 2, same_thresh: float = 4, max_jump_distance_cm: Optional[float]=None, flat_time_window_centers=None, flat_time_window_edges=None, debug_print:bool=False, enable_debug_step_logging: bool=True) -> "SubsequencesPartitioningResult":
         """ main initializer """
         
         if isinstance(a_most_likely_positions_list, list):
@@ -503,7 +503,7 @@ class SubsequencesPartitioningResult(ComputedResult):
                             )
         
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
-        partition_result.compute(debug_print=debug_print)
+        partition_result.compute(debug_print=debug_print, enable_debug_step_logging=enable_debug_step_logging)
 
         return partition_result
     
@@ -2632,7 +2632,7 @@ class SubsequencesPartitioningResultScoringComputations:
     @classmethod
     @function_attributes(short_name=None, tags=['bin-wise', 'bin-size', 'New Simplified', 'score', 'replay', 'sequence_length'], input_requires=[], output_provides=[],
                           uses=['SubsequencesPartitioningResult'], used_by=[], creation_date='2024-03-12 01:05', related_items=['SubsequencesPartitioningResult'])
-    def _META_build_epoch_SubsequencesPartitioningResult(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0) -> SubsequencesPartitioningResult:
+    def _META_build_epoch_SubsequencesPartitioningResult(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float, pos_bin_edges: NDArray, max_ignore_bins:int=2, same_thresh_cm: Optional[float]=6.0, same_thresh_fraction_of_track: Optional[float] = None, max_jump_distance_cm: float = 60.0, enable_debug_step_logging: bool=True) -> SubsequencesPartitioningResult:
         """ 
         partition_result: SubsequencesPartitioningResult = HeuristicReplayScoring._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=an_epoch_idx, a_decoder_track_length=a_decoder_track_length, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=same_thresh_fraction_of_track, max_jump_distance_cm=max_jump_distance_cm)
         
@@ -2666,7 +2666,7 @@ class SubsequencesPartitioningResultScoringComputations:
         
         ## Begin computations:
         return SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-                                                                                                                    flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges))
+                                                                                                                    flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges), enable_debug_step_logging=enable_debug_step_logging)
     
     
     @function_attributes(short_name=None, tags=['bin_wise', 'all_fns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 22:15', related_items=[])
@@ -3332,6 +3332,87 @@ class HeuristicReplayScoring:
                                         total_variation=total_variation, integral_second_derivative=integral_second_derivative, stddev_of_diff=stddev_of_diff,
                                         position_derivatives_df=position_derivatives_df)
         
+
+    @classmethod
+    def _safe_scalar_score(cls, value) -> float:
+        """NaN-safe float for shuffle score arrays."""
+        try:
+            scalar = float(value)
+        except (TypeError, ValueError):
+            return np.nan
+        if not np.isfinite(scalar):
+            return np.nan
+        return scalar
+
+
+    @classmethod
+    @function_attributes(short_name=None, tags=['heuristic', 'shuffle', 'computation'], input_requires=[], output_provides=[],
+                         uses=['SubsequencesPartitioningResultScoringComputations._META_build_epoch_SubsequencesPartitioningResult', 'SubsequencesPartitioningResultScoringComputations._compute_forwardicity_tuple_from_partition_result', 'cls.build_all_bin_wise_computation_fn_dict'],
+                         used_by=['DecodedEpochScoreShuffle._shuffle_and_decode_scores'], creation_date='2026-10-26 00:00', related_items=[])
+    def compute_shuffle_heuristic_score_arrays(cls, track_templates: TrackTemplates, a_decoded_filter_epochs_decoder_result_dict: Dict[str, DecodedFilterEpochsResult], use_bin_units_instead_of_realworld: bool=False, max_ignore_bins: float=2, same_thresh_cm: float=6.0, max_jump_distance_cm: float=60.0, decoder_names: Optional[List[str]]=None, **kwargs) -> Dict[str, NDArray]:
+        """Lightweight heuristic scores for shuffle nulls.
+
+        Builds **one** SubsequencesPartitioningResult per decoder×epoch, extracts partition scalars (including one shared forwardicity tuple), and MAP-only scores (`travel`, `coverage`, `avg_jump_cm`).
+
+        Does **not** call `compute_pho_heuristic_replay_scores` (OLDER re-partition path) and does **not** mutate `filter_epochs`.
+
+        Returns:
+            Dict[metric_name, NDArray] with each array shape (n_epochs, n_decoders).
+        """
+        if decoder_names is None:
+            decoder_names = list(a_decoded_filter_epochs_decoder_result_dict.keys())
+        n_decoders: int = len(decoder_names)
+        first_result = a_decoded_filter_epochs_decoder_result_dict[decoder_names[0]]
+        n_epochs: int = int(first_result.num_filter_epochs)
+        xbin_edges: NDArray = deepcopy(track_templates.long_LR_decoder.xbin)
+        decoder_track_length_dict = track_templates.get_track_length_dict()
+
+        partition_score_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
+        partition_metric_names: List[str] = [name for name in partition_score_fn_dict.keys() if name not in FORWARDICITY_SCORE_COL_NAMES]
+        map_score_fn_dict = cls.build_all_bin_wise_computation_fn_dict()
+        map_metric_names: List[str] = list(map_score_fn_dict.keys())
+        all_metric_names: List[str] = partition_metric_names + list(FORWARDICITY_SCORE_COL_NAMES) + map_metric_names
+        metric_arrays: Dict[str, NDArray] = {metric_name: np.full((n_epochs, n_decoders), np.nan, dtype=float) for metric_name in all_metric_names}
+
+        for decoder_idx, a_name in enumerate(decoder_names):
+            a_result = a_decoded_filter_epochs_decoder_result_dict[a_name]
+            if a_result is None:
+                continue
+            a_decoder_track_length: float = decoder_track_length_dict.get(a_name, decoder_track_length_dict['long_LR'])
+            n_this_epochs: int = int(a_result.num_filter_epochs)
+            for an_epoch_idx in np.arange(n_this_epochs):
+                try:
+                    partition_result = SubsequencesPartitioningResultScoringComputations._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, enable_debug_step_logging=False)
+                except Exception:
+                    continue
+                for score_computation_name in partition_metric_names:
+                    computation_fn = partition_score_fn_dict[score_computation_name]
+                    try:
+                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(computation_fn(partition_result=partition_result, a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges))
+                    except Exception:
+                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = np.nan
+                ## END for score_computation_name in partition_metric_names....
+
+                try:
+                    forwardicity, ratio_major_aligned_bins, ratio_decoder_aligned_bins = SubsequencesPartitioningResultScoringComputations._compute_forwardicity_tuple_from_partition_result(partition_result=partition_result, decoder_name=a_name)
+                    metric_arrays['forwardicity'][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(forwardicity)
+                    metric_arrays['ratio_major_aligned_bins'][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(ratio_major_aligned_bins)
+                    metric_arrays['ratio_decoder_aligned_bins'][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(ratio_decoder_aligned_bins)
+                except Exception:
+                    pass
+                for score_computation_name, computation_fn in map_score_fn_dict.items():
+                    try:
+                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(computation_fn(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length))
+                    except Exception:
+                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = np.nan
+                ## END for score_computation_name, computation_fn in map_score_fn_dict.items()....
+
+            ## END for an_epoch_idx in np.arange(n_this_epochs)....
+
+        ## END for decoder_idx, a_name in enumerate(decoder_names)....
+
+        return metric_arrays
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['heuristic', 'MAIN', 'computation'], input_requires=[], output_provides=[], uses=['cls.compute_pho_heuristic_replay_scores', 'cls.build_all_score_computations_fn_dict'], used_by=['_decoded_epochs_heuristic_scoring'], creation_date='2024-03-12 00:59', related_items=[])

@@ -507,7 +507,7 @@ class SpecificComputationValidator:
         
         Usage:
             provided_global_keys, provided_local_keys = SpecificComputationValidator.find_provided_result_keys(remaining_comp_specifiers_dict=remaining_comp_specifiers_dict,
-                                                                                                probe_fn_names=['perform_wcorr_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
+                                                                                                probe_fn_names=['perform_wcorr_shuffle_analysis', 'perform_epoch_score_shuffle_analysis',  'merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring'],
                                                                                                 )
             provided_global_keys # ['DirectionalMergedDecoders', 'DirectionalDecodersEpochsEvaluations', 'SequenceBased']
 

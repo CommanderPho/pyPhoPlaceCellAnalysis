@@ -743,7 +743,7 @@ class BatchCompletionHelpers:
 	
 	@function_attributes(short_name=None, tags=['output'], input_requires=[], output_provides=[], uses=[], used_by=['cls.overwrite_replay_epochs_and_recompute'], creation_date='2024-06-27 00:00', related_items=[])
 	@classmethod
-	def finalize_output_shuffled_wcorr(cls, a_curr_active_pipeline, decoder_names, custom_suffix: str):
+	def finalize_output_shuffled_epoch_scores(cls, a_curr_active_pipeline, decoder_names, custom_suffix: str):
 		"""
 		Gets the shuffled wcorr results and outputs the final histogram for this session
 
@@ -851,7 +851,7 @@ class BatchCompletionHelpers:
 		custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv		
 
 		# standalone save
-		out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_wcorr_ripple_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
+		out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_epoch_score_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
 		_prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
 		if _prev_standalone_pkl_filename != standalone_pkl_filename:
 			print(f'standalone_pkl_filename:\n\t"{standalone_pkl_filename}"')
@@ -900,6 +900,8 @@ class BatchCompletionHelpers:
 		# export_files_dict
 
 		return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path)
+
+	finalize_output_shuffled_wcorr = finalize_output_shuffled_epoch_scores
 
 
 	@function_attributes(short_name=None, tags=['plotting', 'histogram', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-06-27 22:43', related_items=[])

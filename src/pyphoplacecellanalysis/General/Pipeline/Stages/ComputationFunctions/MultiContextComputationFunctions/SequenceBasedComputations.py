@@ -68,8 +68,10 @@ import re
 from pyphocorehelpers.Filesystem.path_helpers import BaseMatchParser
 
 @define(slots=False)
-class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
-    """ Parses basenames produced by `WCorrShuffle.save_data(...)`
+class ExportedEpochScoreShufflesPickleFilenameParser(BaseMatchParser):
+    """ Parses basenames produced by `DecodedEpochScoreShuffle.save_data(...)`
+
+    Accepts both historical `*_wcorr_ripple_shuffle_data_*` names and new `*_epoch_score_shuffle_data_*` names.
 
     test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
         "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
@@ -115,7 +117,10 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
                 del parsed_output_dict[key]
 
         return parsed_output_dict
-    
+
+
+ExportedWCorrShufflesPickleFilenameParser = ExportedEpochScoreShufflesPickleFilenameParser
+
 
 # from datetime import datetime
 # from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
@@ -161,21 +166,40 @@ class ExportedWCorrShufflesPickleFilenameParser(BaseMatchParser):
     
 
 
+DEFAULT_SHUFFLE_DECODER_NAMES: List[str] = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+SCORE_EXTREME_MODE: Dict[str, str] = {
+    'wcorr': 'abs_greater',
+    'radon_score': 'greater',
+    'radon_velocity': 'abs_greater',
+    'coverage': 'greater',
+    'mseq_len': 'greater',
+    'mseq_len_ignoring_intrusions': 'greater',
+    'mseq_len_ignoring_intrusions_and_repeats': 'greater',
+    'mseq_len_ratio_ignoring_intrusions_and_repeats': 'greater',
+    'mseq_tcov': 'greater',
+    'mseq_dtrav': 'greater',
+    'forwardicity': 'greater',
+    'ratio_major_aligned_bins': 'greater',
+    'ratio_decoder_aligned_bins': 'greater',
+    'avg_jump_cm': 'less',
+    'travel': 'less',
+}
+
+
 @define(slots=False, repr=False, eq=False)
-class WCorrShuffle(ComputedResult):
-    """ Performs shufflings to test wcorr
-    
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle
+class DecodedEpochScoreShuffle(ComputedResult):
+    """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, heuristics, optional radon).
 
-    wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
-        directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result, directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle, WCorrShuffle
+
+    wcorr_tool: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
+        directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
         global_epoch_name=global_epoch_name)
-
 
     Which epochs does it test? Just replay? where did it get these from?
 
     """
-    _VersionedResultMixin_version: str = "2024.05.30_0" # to be updated in your IMPLEMENTOR to indicate its version
+    _VersionedResultMixin_version: str = "2026.10.26_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     curr_active_pipeline = non_serialized_field(default=None, repr=False) # required to continue computations
     track_templates = non_serialized_field(default=None, repr=False) # required to continue computations
@@ -185,15 +209,19 @@ class WCorrShuffle(ComputedResult):
 
     real_decoder_ripple_weighted_corr_arr: NDArray = serialized_field(default=None, repr=False, metadata={'shape': ('n_epochs', 'n_decoders')})
     real_decoder_ripple_filter_epochs_decoder_result_dict: Optional[DecodedEpochsResultsDict] = serialized_field(default=None, repr=False, metadata={'description': 'real (non-shuffled) ripple decode results for the same filtered epochs used by the shuffles; always retained (not gated by enable_saving_entire_decoded_shuffle_result).'})
+    real_score_arrays: Dict[str, NDArray] = serialized_field(default=Factory(dict), repr=False, metadata={'description': 'metric -> (n_epochs, n_decoders) real scores. Always includes wcorr when present.'})
 
     all_templates_decode_kwargs: Dict = non_serialized_field(default=Factory(dict), repr=False)
 
     output_extracted_result_wcorrs_list: List = serialized_field(default=Factory(list), repr=False)
+    output_extracted_score_arrays_list: List[Dict[str, NDArray]] = serialized_field(default=Factory(list), repr=False, metadata={'description': 'per-shuffle dict of metric -> (n_epochs, 4) arrays'})
     output_all_shuffles_decoded_results_list: List[DecodedEpochsResultsDict] = serialized_field(default=Factory(list), repr=False, metadata={'description': 'optionally (depending on `enable_saving_entire_decoded_shuffle_result`) produced decoding results that can allow reuse across multiple computation types (other than wcorr). Takes MUCH more memeory.'}) ## Opt
     
-    enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
+    enable_saving_entire_decoded_shuffle_result: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
+    enable_heuristic_shuffle_scoring: bool = serialized_attribute_field(default=True, is_computable=False, repr=True)
+    enable_radon_shuffle_scoring: bool = serialized_attribute_field(default=False, is_computable=False, repr=True)
 
-    result_version: str = serialized_attribute_field(default='2024.05.30_0', is_computable=False, repr=False) # this field specfies the version of the result. 
+    result_version: str = serialized_attribute_field(default='2026.10.26_0', is_computable=False, repr=False) # this field specfies the version of the result. 
 
     @property
     def n_epochs(self):
@@ -204,11 +232,16 @@ class WCorrShuffle(ComputedResult):
     @property
     def n_completed_shuffles(self):
         """The n_completed_shuffles property."""
+        if (self.output_extracted_score_arrays_list is not None) and (len(self.output_extracted_score_arrays_list) > 0):
+            return len(self.output_extracted_score_arrays_list)
         return len(self.output_extracted_result_wcorrs_list)
 
     @property
     def all_shuffles_wcorr_array(self) -> NDArray:
         """The wcorrs for each shuffle. .shape: (n_shuffles, n_epochs, 4) """
+        stacked = self._stack_shuffle_metric('wcorr')
+        if stacked is not None:
+            return stacked
         _out_wcorr = []
         total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
         assert total_n_shuffles > 0
@@ -219,6 +252,8 @@ class WCorrShuffle(ComputedResult):
             a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
             a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()            
             _out_wcorr.append(a_shuffle_wcorr_arr)
+        ## END for a_decoder_ripple_weighted_corr_df_dict in self.output_extracted_result_wcorrs_list....
+
         return np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
 
 
@@ -384,6 +419,128 @@ class WCorrShuffle(ComputedResult):
         std_dev = np.std(data)
         z_scores = (real_v - mean) / std_dev
         return z_scores
+
+
+    @classmethod
+    def _wcorr_df_dict_to_array(cls, decoder_ripple_weighted_corr_df_dict: Dict, decoder_names: Optional[List[str]]=None) -> NDArray:
+        """Convert per-decoder wcorr DataFrames to (n_epochs, n_decoders)."""
+        if decoder_names is None:
+            decoder_names = list(decoder_ripple_weighted_corr_df_dict.keys())
+        decoder_ripple_weighted_corr_dict = {k: decoder_ripple_weighted_corr_df_dict[k]['wcorr'].to_numpy() for k in decoder_names}
+        a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict)
+        return a_decoder_ripple_weighted_corr_df.to_numpy()
+
+
+    @classmethod
+    def _array_to_wcorr_df_dict(cls, wcorr_arr: NDArray, decoder_names: Optional[List[str]]=None) -> Dict[str, pd.DataFrame]:
+        """Inverse of `_wcorr_df_dict_to_array` for old consumers that iterate DF dicts."""
+        if decoder_names is None:
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        return {a_name: pd.DataFrame({'wcorr': wcorr_arr[:, decoder_idx]}) for decoder_idx, a_name in enumerate(decoder_names)}
+
+
+    @classmethod
+    def post_compute_metric(cls, real_arr: NDArray, shuffle_stack: NDArray, extreme_mode: str = 'greater') -> Tuple[NDArray, NDArray, NDArray]:
+        """Generic p / z / n_more_extreme for one metric.
+
+        Args:
+            real_arr: (n_epochs, n_decoders)
+            shuffle_stack: (n_shuffles, n_epochs, n_decoders)
+            extreme_mode: 'abs_greater' | 'greater' | 'less'
+
+        Returns:
+            p, z, n_more_extreme each (n_epochs, n_decoders)
+        """
+        if extreme_mode == 'abs_greater':
+            is_more_extreme = np.abs(shuffle_stack) > np.abs(real_arr)
+        elif extreme_mode == 'less':
+            is_more_extreme = shuffle_stack < real_arr
+        else:
+            is_more_extreme = shuffle_stack > real_arr
+        n_more_extreme = np.sum(is_more_extreme, axis=0)
+        valid_shuffle_indicies = np.logical_not(np.isnan(shuffle_stack))
+        n_valid_shuffles = np.sum(valid_shuffle_indicies, axis=0)
+        p = n_more_extreme.astype('float') / np.maximum(n_valid_shuffles.astype('float'), 1.0)
+        n_epochs, n_decoders = np.shape(real_arr)
+        z = np.full((n_epochs, n_decoders), np.nan, dtype=float)
+        for epoch_idx in np.arange(n_epochs):
+            for decoder_idx in np.arange(n_decoders):
+                a_single_decoder_epoch_all_shuffles = np.squeeze(shuffle_stack[:, epoch_idx, decoder_idx])
+                z[epoch_idx, decoder_idx] = cls.compute_z_score(a_single_decoder_epoch_all_shuffles, real_arr[epoch_idx, decoder_idx])
+            ## END for decoder_idx in np.arange(n_decoders)....
+
+        ## END for epoch_idx in np.arange(n_epochs)....
+
+        return p, z, n_more_extreme
+
+
+    @classmethod
+    def compute_shuffle_radon_score_arrays(cls, decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict, track_templates: TrackTemplates, decoder_names: Optional[List[str]]=None) -> Dict[str, NDArray]:
+        """Extract radon `score` (and `velocity`) as (n_epochs, n_decoders) arrays. Neighbors extras are discarded."""
+        if decoder_names is None:
+            decoder_names = list(decoder_ripple_filter_epochs_decoder_result_dict.keys())
+        first_result = decoder_ripple_filter_epochs_decoder_result_dict[decoder_names[0]]
+        n_epochs: int = int(first_result.num_filter_epochs)
+        n_decoders: int = len(decoder_names)
+        radon_score_arr = np.full((n_epochs, n_decoders), np.nan, dtype=float)
+        radon_velocity_arr = np.full((n_epochs, n_decoders), np.nan, dtype=float)
+        for decoder_idx, a_name in enumerate(decoder_names):
+            a_result = decoder_ripple_filter_epochs_decoder_result_dict[a_name]
+            if a_result is None:
+                continue
+            a_decoder = track_templates.get_decoders_dict()[a_name]
+            if getattr(a_decoder.pf, 'bin_info', None) is not None:
+                pos_bin_size = float(a_decoder.pf.bin_info['xstep'])
+            else:
+                pos_bin_size = float(np.diff(a_decoder.pf.xbin_centers).mean())
+            try:
+                epochs_linear_fit_df, _extra_outputs = a_result.compute_radon_transforms(pos_bin_size=pos_bin_size, xbin_centers=a_decoder.xbin_centers, enable_return_neighbors_arr=False)
+                radon_score_arr[:, decoder_idx] = np.asarray(epochs_linear_fit_df['score'].to_numpy(), dtype=float)
+                radon_velocity_arr[:, decoder_idx] = np.asarray(epochs_linear_fit_df['velocity'].to_numpy(), dtype=float)
+            except Exception as e:
+                print(f'WARN: compute_shuffle_radon_score_arrays failed for decoder {a_name}: {e}')
+        ## END for decoder_idx, a_name in enumerate(decoder_names)....
+
+        return {'radon_score': radon_score_arr, 'radon_velocity': radon_velocity_arr}
+
+
+    def _ensure_real_score_arrays(self, decoder_names: Optional[List[str]]=None):
+        """Populate `real_score_arrays` from stored real decode + wcorr, scoring heuristics/radon once."""
+        if self.real_score_arrays is None:
+            self.real_score_arrays = {}
+        if (self.real_decoder_ripple_weighted_corr_arr is not None) and ('wcorr' not in self.real_score_arrays):
+            self.real_score_arrays['wcorr'] = np.asarray(self.real_decoder_ripple_weighted_corr_arr)
+        if self.real_decoder_ripple_filter_epochs_decoder_result_dict is None:
+            return
+        if decoder_names is None:
+            if self.track_templates is not None:
+                decoder_names = deepcopy(self.track_templates.get_decoder_names())
+            else:
+                decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        if self.enable_heuristic_shuffle_scoring and (self.track_templates is not None):
+            from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+            heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=self.track_templates, a_decoded_filter_epochs_decoder_result_dict=self.real_decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
+            self.real_score_arrays.update(heuristic_arrays)
+        if self.enable_radon_shuffle_scoring and (self.track_templates is not None):
+            radon_arrays = self.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=self.real_decoder_ripple_filter_epochs_decoder_result_dict, track_templates=self.track_templates, decoder_names=decoder_names)
+            self.real_score_arrays.update(radon_arrays)
+
+
+    def _stack_shuffle_metric(self, metric_name: str) -> Optional[NDArray]:
+        """Stack one metric across shuffles → (n_shuffles, n_epochs, n_decoders)."""
+        if (self.output_extracted_score_arrays_list is None) or (len(self.output_extracted_score_arrays_list) == 0):
+            if metric_name == 'wcorr':
+                return self.get_all_shuffles_wcorr_array()
+            return None
+        stacked = []
+        for a_shuffle_scores in self.output_extracted_score_arrays_list:
+            if metric_name in a_shuffle_scores:
+                stacked.append(a_shuffle_scores[metric_name])
+        ## END for a_shuffle_scores in self.output_extracted_score_arrays_list....
+
+        if len(stacked) == 0:
+            return None
+        return np.stack(stacked)
 
 
     @staticmethod
@@ -697,78 +854,66 @@ class WCorrShuffle(ComputedResult):
         
 
     @classmethod
-    def _shuffle_and_decode_wcorrs(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2):
-        """ We shuffle the cell idenitities and decodes new posteriors from the shuffled values.
+    def _shuffle_and_decode_scores(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2, spikes_df: Optional[pd.DataFrame]=None, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False, enable_saving_entire_decoded_shuffle_result: bool=False):
+        """Shuffle cell identities, decode ripples, extract enabled score metrics.
 
-        Only computes for the ripples, not the laps
+        Only computes for the ripples, not the laps. Merged-decoder shuffle is skipped because `skip_merged_decoding=True`.
+        `is_pre_compute_mode` is left off (known to produce identical shuffles).
 
-        Usage:
-            from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import shuffle_and_decode_wcorrs
-
-            num_shuffles: int = 10
-            _updated_output_extracted_result_wcorrs_list = shuffle_and_decode_wcorrs(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, all_templates_decode_kwargs=all_templates_decode_kwargs, num_shuffles=num_shuffles)
-
-
+        Returns:
+            wcorr_df_dicts, score_arrays_list, optional_full_decoded_list
         """
-        # ==================================================================================================================== #
-        # BEGIN FUNCTION BODY                                                                                                  #
-        # ==================================================================================================================== #
+        from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
 
-        is_pre_compute_mode: bool = False #TODO 2024-05-30 10:00: - [ ] is_pre_compute_mode seems to produce the same shuffles each time :[
-
-        ## INPUTS: num_shuffles
-        
-        ## INPUTS: alt_directional_merged_decoders_result, num_shuffles, 
-        ## Requires: `output_extracted_result_wcorrs_list`
-        # output_extracted_result_wcorrs_list = [] 
+        decoder_names: List[str] = deepcopy(track_templates.get_decoder_names())
         _updated_output_extracted_result_wcorrs_list = []
+        _updated_output_extracted_score_arrays_list: List[Dict[str, NDArray]] = []
         _updated_output_extracted_full_decoded_results_list = []
 
         shuffled_aclus, shuffle_IDXs = build_shuffled_ids(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder.neuron_IDs, num_shuffles=num_shuffles, seed=None)
-
-        if is_pre_compute_mode:
-            # spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
-            spikes_df = deepcopy(get_proper_global_spikes_df(curr_active_pipeline))
-            laps_pre_computed_filter_epochs_dict, ripple_pre_computed_filter_epochs_dict = cls._pre_build_all_templates_decoding_epochs(spikes_df=spikes_df, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=deepcopy(track_templates.get_decoders_dict()), **all_templates_decode_kwargs)
-
+        if spikes_df is None:
+            spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
 
         ## FOR EACH SHUFFLE:
         for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus):
             print(f'a_shuffle_IDXs: {a_shuffle_IDXs}, a_shuffle_aclus: {a_shuffle_aclus}')
 
-            ## Shuffle the neuron_ids for a `alt_directional_merged_decoders_result` - `DirectionalPseudo2DDecodersResult `:
-            alt_directional_merged_decoders_result.all_directional_pf1D_Decoder = cls._shuffle_pf1D_decoder(alt_directional_merged_decoders_result.all_directional_pf1D_Decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=a_shuffle_aclus)
-
             ## Filter the global shuffle to each decoder's own neuron_IDs. decoder_neuron_IDs_list is the ratemap ids, which can be longer than neuron_IDs.
             shuffled_decoder_specific_neuron_ids_dict = {a_name: a_shuffle_aclus[np.isin(a_shuffle_aclus, np.asarray(a_decoder.neuron_IDs))] for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
-            ## Shuffle the four 1D decoders as well so they can be passed in.
-            shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name:cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
+            ## Shuffle the four 1D decoders. Do not shuffle the merged decoder (unused under skip_merged_decoding=True).
+            shuffled_decoders_dict: Dict[str, BasePositionDecoder] = {a_name: cls._shuffle_pf1D_decoder(a_decoder, shuffle_IDXs=a_shuffle_IDXs, shuffle_aclus=shuffled_decoder_specific_neuron_ids_dict[a_name]) for a_name, a_decoder in track_templates.get_decoders_dict().items()}
 
-            ## Decode epochs for all four decoders:
-            if is_pre_compute_mode:
-                decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict = cls._all_templates_perform_pre_built_specific_epochs_decoding(laps_pre_computed_filter_epochs_dict=deepcopy(laps_pre_computed_filter_epochs_dict),
-                                                                                                                                                                                ripple_pre_computed_filter_epochs_dict=deepcopy(ripple_pre_computed_filter_epochs_dict),
-                                                                                                                                                                                shuffled_decoders_dict=shuffled_decoders_dict, **all_templates_decode_kwargs)
-            
-            else:
-                _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=deepcopy(curr_active_pipeline.sess.spikes_df), a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
-                                                                                                                                                                        skip_merged_decoding=True, **all_templates_decode_kwargs)
+            _, (decoder_laps_filter_epochs_decoder_result_dict, decoder_ripple_filter_epochs_decoder_result_dict) = cls._try_all_templates_decode(spikes_df=spikes_df, a_directional_merged_decoders_result=alt_directional_merged_decoders_result, shuffled_decoders_dict=shuffled_decoders_dict,
+                                                                                                                                                                    skip_merged_decoding=True, **all_templates_decode_kwargs)
 
-            ## Weighted Correlation
-            # decoder_laps_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_laps_filter_epochs_decoder_result_dict))
-            decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=deepcopy(decoder_ripple_filter_epochs_decoder_result_dict))
+            decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
+            a_shuffle_score_arrays: Dict[str, NDArray] = {'wcorr': cls._wcorr_df_dict_to_array(decoder_ripple_weighted_corr_df_dict, decoder_names=decoder_names)}
+            if enable_heuristic_shuffle_scoring:
+                heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
+                a_shuffle_score_arrays.update(heuristic_arrays)
+            if enable_radon_shuffle_scoring:
+                radon_arrays = cls.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, track_templates=track_templates, decoder_names=decoder_names)
+                a_shuffle_score_arrays.update(radon_arrays)
 
-            ## Build the output tuple:
-            # output_extracted_result_wcorrs[i] = decoder_ripple_weighted_corr_df_dict # only wcorr
             _updated_output_extracted_result_wcorrs_list.append(decoder_ripple_weighted_corr_df_dict)
-            _updated_output_extracted_full_decoded_results_list.append(decoder_ripple_filter_epochs_decoder_result_dict)
+            _updated_output_extracted_score_arrays_list.append(a_shuffle_score_arrays)
+            if enable_saving_entire_decoded_shuffle_result:
+                _updated_output_extracted_full_decoded_results_list.append(decoder_ripple_filter_epochs_decoder_result_dict)
+        ## END for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus)....
 
-        return _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list
+        return _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list
 
 
-    def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None) -> List:
-        """ Computes new shuffles and adds them to `self.output_extracted_result_wcorrs_list`
+    @classmethod
+    def _shuffle_and_decode_wcorrs(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2):
+        """Compat wrapper around `_shuffle_and_decode_scores` that returns the historical 2-tuple."""
+        wcorrs_list, _score_arrays_list, full_decoded_list = cls._shuffle_and_decode_scores(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates, alt_directional_merged_decoders_result=alt_directional_merged_decoders_result, all_templates_decode_kwargs=all_templates_decode_kwargs, num_shuffles=num_shuffles, enable_heuristic_shuffle_scoring=False, enable_radon_shuffle_scoring=False, enable_saving_entire_decoded_shuffle_result=True)
+        return wcorrs_list, full_decoded_list
+
+
+    def compute_shuffles(self, num_shuffles: int=100, curr_active_pipeline=None, track_templates=None, enable_heuristic_shuffle_scoring: Optional[bool]=None, enable_radon_shuffle_scoring: Optional[bool]=None) -> List:
+        """ Computes new shuffles and adds them to `self.output_extracted_result_wcorrs_list` / `self.output_extracted_score_arrays_list`
         """
         if (self.curr_active_pipeline is None):
             if (curr_active_pipeline is None):
@@ -806,12 +951,24 @@ class WCorrShuffle(ComputedResult):
 
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
-        _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_wcorrs(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
+        if enable_heuristic_shuffle_scoring is not None:
+            self.enable_heuristic_shuffle_scoring = enable_heuristic_shuffle_scoring
+        if enable_radon_shuffle_scoring is not None:
+            self.enable_radon_shuffle_scoring = enable_radon_shuffle_scoring
+
+        self._ensure_real_score_arrays(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
+
+        spikes_df = self.active_spikes_df if (self.active_spikes_df is not None) and (len(self.active_spikes_df) > 0) else deepcopy(self.curr_active_pipeline.sess.spikes_df)
+        _updated_output_extracted_result_wcorrs_list, _updated_output_extracted_score_arrays_list, _updated_output_extracted_full_decoded_results_list = self._shuffle_and_decode_scores(curr_active_pipeline=self.curr_active_pipeline, track_templates=self.track_templates,
                                                                                   alt_directional_merged_decoders_result=deepcopy(self.curr_active_pipeline.global_computation_results.computed_data['DirectionalMergedDecoders']),
                                                                                   all_templates_decode_kwargs=self.all_templates_decode_kwargs,
-                                                                                  num_shuffles=num_shuffles)
+                                                                                  num_shuffles=num_shuffles, spikes_df=spikes_df,
+                                                                                  enable_heuristic_shuffle_scoring=self.enable_heuristic_shuffle_scoring,
+                                                                                  enable_radon_shuffle_scoring=self.enable_radon_shuffle_scoring,
+                                                                                  enable_saving_entire_decoded_shuffle_result=self.enable_saving_entire_decoded_shuffle_result)
 
         self.output_extracted_result_wcorrs_list.extend(_updated_output_extracted_result_wcorrs_list)
+        self.output_extracted_score_arrays_list.extend(_updated_output_extracted_score_arrays_list)
         if self.enable_saving_entire_decoded_shuffle_result:
             self.output_all_shuffles_decoded_results_list.extend(_updated_output_extracted_full_decoded_results_list)
 
@@ -876,28 +1033,18 @@ class WCorrShuffle(ComputedResult):
         
         n_decoders: int = 4
         
-        _out_wcorr = []
-        _out_shuffle_is_more_extreme = []
-
-        total_n_shuffles: int = len(self.output_extracted_result_wcorrs_list)
+        total_n_shuffles: int = self.n_completed_shuffles
         print(f'total_n_shuffles: {total_n_shuffles}')
 
-        ## USES: self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr
+        _out_shuffle_wcorr_arr = self._stack_shuffle_metric('wcorr')
+        if _out_shuffle_wcorr_arr is None:
+            _out_wcorr = []
+            for a_decoder_ripple_weighted_corr_df_dict in self.output_extracted_result_wcorrs_list:
+                _out_wcorr.append(self._wcorr_df_dict_to_array(a_decoder_ripple_weighted_corr_df_dict, decoder_names=decoder_names))
+            ## END for a_decoder_ripple_weighted_corr_df_dict in self.output_extracted_result_wcorrs_list....
 
-        for i, a_decoder_ripple_weighted_corr_df_dict in enumerate(self.output_extracted_result_wcorrs_list):
-            decoder_ripple_weighted_corr_dict = {k:v['wcorr'].to_numpy() for k, v in a_decoder_ripple_weighted_corr_df_dict.items()}
-            a_decoder_ripple_weighted_corr_df = pd.DataFrame(decoder_ripple_weighted_corr_dict) ## (n_epochs, 4)
-            a_shuffle_wcorr_arr = a_decoder_ripple_weighted_corr_df.to_numpy()
-            a_shuffle_is_more_extreme = np.abs(a_shuffle_wcorr_arr) > np.abs(self.real_decoder_ripple_weighted_corr_arr)
-            
-            _out_wcorr.append(a_shuffle_wcorr_arr)
-            _out_shuffle_is_more_extreme.append(a_shuffle_is_more_extreme)
+            _out_shuffle_wcorr_arr = np.stack(_out_wcorr)
 
-
-        # ==================================================================================================================== #
-        # Process Outputs                                                                                                      #
-        # ==================================================================================================================== #
-        _out_shuffle_wcorr_arr = np.stack(_out_wcorr) # .shape ## (n_shuffles, n_epochs, 4)
         n_epochs: int = np.shape(_out_shuffle_wcorr_arr)[1]
         if debug_print:
             print(f'n_epochs: {n_epochs}')
@@ -910,20 +1057,11 @@ class WCorrShuffle(ComputedResult):
             self.filtered_epochs_df = self.filtered_epochs_df[self.filtered_epochs_df['duration'] >= minimum_event_duration]
             assert n_epochs == len(self.filtered_epochs_df), f"EVEN AFTER TRYING TO FILTER: n_epochs: {n_epochs} != len(filtered_epochs_df): {len(self.filtered_epochs_df)}"
 
-
-        _out_shuffle_is_more_extreme = np.stack(_out_shuffle_is_more_extreme) # .shape ## (n_shuffles, n_epochs, 4)
+        _out_p, _out_shuffle_wcorr_Zscore_val, total_n_shuffles_more_extreme_than_real = self.post_compute_metric(self.real_decoder_ripple_weighted_corr_arr, _out_shuffle_wcorr_arr, extreme_mode=SCORE_EXTREME_MODE['wcorr'])
         if debug_print:
             print(f'np.shape(_out_shuffle_wcorr_arr): {np.shape(_out_shuffle_wcorr_arr)}')
-            print(f'np.shape(_out_shuffle_is_more_extreme): {np.shape(_out_shuffle_is_more_extreme)}')
-
-        total_n_shuffles_more_extreme_than_real = np.sum(_out_shuffle_is_more_extreme, axis=0) # sum only over the number of shuffles # (n_epochs, 4)
-        if debug_print:
             print(f'np.shape(total_n_shuffles_more_extreme_than_real): {np.shape(total_n_shuffles_more_extreme_than_real)}')
-
-        valid_shuffle_indicies = np.logical_not(np.isnan(_out_shuffle_wcorr_arr)) ## (n_shuffles, n_epochs, 4)
-        n_valid_shuffles = np.sum(valid_shuffle_indicies, axis=0) # sum only over epochs to get n_shuffles for each epoch for each decoder # (n_epochs, 4)
-        if debug_print:
-            print(f'np.shape(n_valid_shuffles): {np.shape(n_valid_shuffles)}')
+            print(f'np.shape(_out_shuffle_wcorr_Zscore_val): {np.shape(_out_shuffle_wcorr_Zscore_val)}')
 
         _long_short_keys = ['long', 'short']
 
@@ -931,22 +1069,7 @@ class WCorrShuffle(ComputedResult):
 
         for k in _long_short_keys:
             total_n_shuffles_more_extreme_than_real_LSdict[k] = np.array([total_n_shuffles_more_extreme_than_real[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df[f'{k}_best_dir_decoder_IDX'].to_numpy())])
-
-        _out_shuffle_wcorr_Zscore_val = np.zeros((n_epochs, 4)) # (n_epochs, 4)
-
-        for epoch_idx in np.arange(n_epochs):    
-
-            for decoder_idx in np.arange(n_decoders):
-                a_single_decoder_epoch_all_shuffles_wcorr = np.squeeze(_out_shuffle_wcorr_arr[:, epoch_idx, decoder_idx]) # all shuffles and decoders for this epoch
-                # a_single_decoder_epoch_z_scores = self.compute_z_scores(a_single_decoder_epoch_all_shuffles_wcorr)
-                a_single_decoder_epoch_z_score: float = self.compute_z_score(a_single_decoder_epoch_all_shuffles_wcorr, self.real_decoder_ripple_weighted_corr_arr[epoch_idx, decoder_idx])
-                # (n_shuffles, n_epochs, 4)
-                _out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] = a_single_decoder_epoch_z_score
-        # end for
-
-        # compute_z_scores
-        if debug_print:
-            print(f'np.shape(_out_shuffle_wcorr_Zscore_val): {np.shape(_out_shuffle_wcorr_Zscore_val)}')
+        ## END for k in _long_short_keys....
 
         _out_shuffle_wcorr_ZScore_LONG = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df['long_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
         _out_shuffle_wcorr_ZScore_SHORT = np.array([_out_shuffle_wcorr_Zscore_val[epoch_idx, decoder_idx] for epoch_idx, decoder_idx in enumerate(self.filtered_epochs_df['short_best_dir_decoder_IDX'].to_numpy())]) # (n_epochs,)
@@ -954,15 +1077,8 @@ class WCorrShuffle(ComputedResult):
         if debug_print:
             print(f'np.shape(_out_shuffle_wcorr_ZScore_LONG): {np.shape(_out_shuffle_wcorr_ZScore_LONG)}')
             print(f'np.shape(_out_shuffle_wcorr_ZScore_SHORT): {np.shape(_out_shuffle_wcorr_ZScore_SHORT)}')
+            print(f'np.shape(_out_p): {np.shape(_out_p)}')
 
-        ## OUTPUTS: _out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT
-        ## OUTPUTS: _out_shuffle_wcorr_arr_ZScores_LONG, _out_shuffle_wcorr_arr_ZScores_SHORT
-
-        _out_p = total_n_shuffles_more_extreme_than_real.astype('float') / n_valid_shuffles.astype('float') # (n_epochs, 4)
-        if debug_print:
-            print(f'np.shape(_out_p): {np.shape(_out_p)}') # (640, 4) - (n_shuffles, 4)
-
-        
         total_n_shuffles_more_extreme_than_real_df: pd.DataFrame = pd.DataFrame(total_n_shuffles_more_extreme_than_real, columns=decoder_names)
         total_n_shuffles_more_extreme_than_real_dict = dict(zip(decoder_names, total_n_shuffles_more_extreme_than_real.T))
 
@@ -1022,8 +1138,20 @@ class WCorrShuffle(ComputedResult):
 
         # all_shuffles_wcorr_df
 
+        extra_real_metric_frames: List[pd.DataFrame] = []
+        if self.real_score_arrays:
+            for metric_name, real_arr in self.real_score_arrays.items():
+                if metric_name == 'wcorr':
+                    continue
+                if real_arr is None:
+                    continue
+                extra_col_names = [f"{metric_name}_{str(n)}" for n in decoder_names]
+                extra_real_metric_frames.append(pd.DataFrame(np.asarray(real_arr), columns=extra_col_names))
+            ## END for metric_name, real_arr in self.real_score_arrays.items()....
+
         # Concatenate dataframes along columns
-        wcorr_ripple_shuffle_all_df: pd.DataFrame = pd.concat([deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df], axis=1)
+        concat_frames = [deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, *extra_real_metric_frames]
+        wcorr_ripple_shuffle_all_df: pd.DataFrame = pd.concat(concat_frames, axis=1)
         wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.drop(columns=['start_t']) ## drop redundant column
         ## Drop rows missing critical data and then convert datatypes:
         wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['start', 'stop'], how='any', inplace=False)
@@ -1033,6 +1161,38 @@ class WCorrShuffle(ComputedResult):
         ## OUTPUTS: wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
         # return wcorr_ripple_shuffle_all_df, real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, all_shuffles_wcorr_df
         return wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df
+
+
+    def build_all_shuffles_long_scores_dataframe(self, decoder_names: Optional[List[types.DecoderName]]=None) -> pd.DataFrame:
+        """Long-format shuffle scores: metric, epoch_idx, shuffle_idx, decoder_idx, shuffle_value."""
+        if decoder_names is None:
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        frames: List[pd.DataFrame] = []
+        metric_names: List[str] = []
+        if (self.output_extracted_score_arrays_list is not None) and (len(self.output_extracted_score_arrays_list) > 0):
+            metric_names = list(self.output_extracted_score_arrays_list[0].keys())
+        elif (self.output_extracted_result_wcorrs_list is not None) and (len(self.output_extracted_result_wcorrs_list) > 0):
+            metric_names = ['wcorr']
+        for metric_name in metric_names:
+            shuffle_stack = self._stack_shuffle_metric(metric_name)
+            if shuffle_stack is None:
+                continue
+            n_shuffles, n_epochs, n_decoders = np.shape(shuffle_stack)
+            epoch_indices = np.repeat(np.arange(n_epochs), n_shuffles * n_decoders)
+            shuffle_indices = np.tile(np.repeat(np.arange(n_shuffles), n_decoders), n_epochs)
+            decoder_indices = np.tile(np.arange(n_decoders), n_shuffles * n_epochs)
+            frames.append(pd.DataFrame({
+                'metric': metric_name,
+                'epoch_idx': epoch_indices,
+                'shuffle_idx': shuffle_indices,
+                'decoder_idx': decoder_indices,
+                'shuffle_value': shuffle_stack.flatten(),
+            }))
+        ## END for metric_name in metric_names....
+
+        if len(frames) == 0:
+            return pd.DataFrame(columns=['metric', 'epoch_idx', 'shuffle_idx', 'decoder_idx', 'shuffle_value'])
+        return pd.concat(frames, axis=0, ignore_index=True)
 
 
     def save_data(self, filepath):
@@ -1063,7 +1223,7 @@ class WCorrShuffle(ComputedResult):
         except (BaseException, AssertionError):
             all_shuffles_wcorr_array = []
 
-        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array, self.real_decoder_ripple_filter_epochs_decoder_result_dict))
+        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array, self.real_decoder_ripple_filter_epochs_decoder_result_dict, self.output_extracted_score_arrays_list, self.real_score_arrays))
         
 
     def save_data_mat(self, filepath, **additional_mat_elements):
@@ -1098,9 +1258,12 @@ class WCorrShuffle(ComputedResult):
         """
         ## Get the unique shuffle rows:
         unique_all_shuffles_wcorr_array, unique_indices = np.unique(self.all_shuffles_wcorr_array, axis=0, return_index=True)
-        self.output_extracted_result_wcorrs_list = [self.output_extracted_result_wcorrs_list[i] for i in unique_indices]
-        assert len(self.output_extracted_result_wcorrs_list) == len(unique_indices), f"len(wcorr_ripple_shuffle.output_extracted_result_wcorrs_list): {len(self.output_extracted_result_wcorrs_list)} != len(unique_indices): {len(unique_indices)}"
-        if self.enable_saving_entire_decoded_shuffle_result:
+        if (self.output_extracted_result_wcorrs_list is not None) and (len(self.output_extracted_result_wcorrs_list) > 0):
+            self.output_extracted_result_wcorrs_list = [self.output_extracted_result_wcorrs_list[i] for i in unique_indices]
+            assert len(self.output_extracted_result_wcorrs_list) == len(unique_indices), f"len(wcorr_ripple_shuffle.output_extracted_result_wcorrs_list): {len(self.output_extracted_result_wcorrs_list)} != len(unique_indices): {len(unique_indices)}"
+        if (self.output_extracted_score_arrays_list is not None) and (len(self.output_extracted_score_arrays_list) > 0):
+            self.output_extracted_score_arrays_list = [self.output_extracted_score_arrays_list[i] for i in unique_indices]
+        if self.enable_saving_entire_decoded_shuffle_result and (self.output_all_shuffles_decoded_results_list is not None) and (len(self.output_all_shuffles_decoded_results_list) > 0):
             self.output_all_shuffles_decoded_results_list = [self.output_all_shuffles_decoded_results_list[i] for i in unique_indices]
 
     
@@ -1117,8 +1280,16 @@ class WCorrShuffle(ComputedResult):
             if self.enable_saving_entire_decoded_shuffle_result:
                 self.output_all_shuffles_decoded_results_list.extend(loaded_output_all_shuffles_decoded_results_list)
             # 4-tuple rest: [all_shuffles_wcorr_array]; 5-tuple rest: [all_shuffles_wcorr_array, real_decoder_ripple_filter_epochs_decoder_result_dict]
+            # 7-tuple rest: [all_shuffles_wcorr_array, real_decode_dict, score_arrays_list, real_score_arrays]
             if (len(loaded_results_list) >= 2) and (self.real_decoder_ripple_filter_epochs_decoder_result_dict is None) and (loaded_results_list[1] is not None):
                 self.real_decoder_ripple_filter_epochs_decoder_result_dict = loaded_results_list[1]
+            if (len(loaded_results_list) >= 3) and (loaded_results_list[2] is not None):
+                self.output_extracted_score_arrays_list.extend(loaded_results_list[2])
+            elif loaded_output_extracted_result_wcorrs_list:
+                decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+                self.output_extracted_score_arrays_list.extend([{'wcorr': self._wcorr_df_dict_to_array(a_df_dict, decoder_names=decoder_names)} for a_df_dict in loaded_output_extracted_result_wcorrs_list])
+            if (len(loaded_results_list) >= 4) and (loaded_results_list[3] is not None) and (not self.real_score_arrays):
+                self.real_score_arrays = loaded_results_list[3]
             ## #TODO 2024-06-04 03:37: - [ ] remove duplicates
             self.ensure_all_shuffles_unique()
 
@@ -1145,15 +1316,17 @@ class WCorrShuffle(ComputedResult):
 
         """
         from pyphocorehelpers.Filesystem.path_helpers import discover_data_files
-        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedEpochScoreShufflesPickleFilenameParser
 
         if isinstance(save_directory, str):
             save_directory = Path(save_directory).resolve()
         assert save_directory.exists(), f"filepath: '{save_directory}' does not exist."
 
         found_pickle_paths = discover_data_files(basedir=save_directory , glob_pattern='*_wcorr_ripple_shuffle_data_*.pkl', recursive=True)
+        found_pickle_paths.extend(discover_data_files(basedir=save_directory , glob_pattern='*_epoch_score_shuffle_data_*.pkl', recursive=True))
+        found_pickle_paths = list(dict.fromkeys(found_pickle_paths))
 
-        a_wcorr_filename_parser: ExportedWCorrShufflesPickleFilenameParser = ExportedWCorrShufflesPickleFilenameParser()
+        a_wcorr_filename_parser: ExportedEpochScoreShufflesPickleFilenameParser = ExportedEpochScoreShufflesPickleFilenameParser()
 
         # test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
         #                   "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
@@ -1221,6 +1394,8 @@ class WCorrShuffle(ComputedResult):
         output_all_shuffles_decoded_results_list = loaded[2]
         # loaded[3] may be all_shuffles_wcorr_array (not needed to rebuild the object)
         real_decoder_ripple_filter_epochs_decoder_result_dict = loaded[4] if len(loaded) >= 5 else None
+        output_extracted_score_arrays_list = loaded[5] if len(loaded) >= 6 else None
+        real_score_arrays = loaded[6] if len(loaded) >= 7 else None
         _obj = cls.init_from_templates(curr_active_pipeline=curr_active_pipeline, track_templates=track_templates,
                                         directional_decoders_epochs_decode_result=directional_decoders_epochs_decode_result,
                                         global_epoch_name=global_epoch_name)
@@ -1229,6 +1404,15 @@ class WCorrShuffle(ComputedResult):
         _obj.output_all_shuffles_decoded_results_list = output_all_shuffles_decoded_results_list
         if real_decoder_ripple_filter_epochs_decoder_result_dict is not None:
             _obj.real_decoder_ripple_filter_epochs_decoder_result_dict = real_decoder_ripple_filter_epochs_decoder_result_dict
+        if output_extracted_score_arrays_list is not None:
+            _obj.output_extracted_score_arrays_list = output_extracted_score_arrays_list
+        elif output_extracted_result_wcorrs_list:
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+            _obj.output_extracted_score_arrays_list = [{'wcorr': cls._wcorr_df_dict_to_array(a_df_dict, decoder_names=decoder_names)} for a_df_dict in output_extracted_result_wcorrs_list]
+        if real_score_arrays is not None:
+            _obj.real_score_arrays = real_score_arrays
+        elif real_decoder_ripple_weighted_corr_arr is not None:
+            _obj.real_score_arrays = {'wcorr': np.asarray(real_decoder_ripple_weighted_corr_arr)}
         return _obj
 
 
@@ -1253,10 +1437,32 @@ class WCorrShuffle(ComputedResult):
         for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
             if a_field_name not in state:
                 state[a_field_name] = a_default_restore_value
+        ## END for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items()....
+
+        if 'real_score_arrays' not in state:
+            state['real_score_arrays'] = {}
+        if (state.get('real_decoder_ripple_weighted_corr_arr') is not None) and ('wcorr' not in state['real_score_arrays']):
+            state['real_score_arrays']['wcorr'] = np.asarray(state['real_decoder_ripple_weighted_corr_arr'])
+        if 'output_extracted_score_arrays_list' not in state:
+            state['output_extracted_score_arrays_list'] = []
+        if (not state['output_extracted_score_arrays_list']) and state.get('output_extracted_result_wcorrs_list'):
+            decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+            try:
+                state['output_extracted_score_arrays_list'] = [{'wcorr': DecodedEpochScoreShuffle._wcorr_df_dict_to_array(a_df_dict, decoder_names=decoder_names)} for a_df_dict in state['output_extracted_result_wcorrs_list']]
+            except Exception:
+                state['output_extracted_score_arrays_list'] = []
+        if 'enable_heuristic_shuffle_scoring' not in state:
+            state['enable_heuristic_shuffle_scoring'] = True
+        if 'enable_radon_shuffle_scoring' not in state:
+            state['enable_radon_shuffle_scoring'] = False
+        if 'enable_saving_entire_decoded_shuffle_result' not in state:
+            state['enable_saving_entire_decoded_shuffle_result'] = False
+        if 'result_version' not in state:
+            state['result_version'] = '2026.10.26_0'
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
-        # super(WCorrShuffle, self).__init__() # from
+        # super(DecodedEpochScoreShuffle, self).__init__() # from
 
 
     ## Plotting
@@ -1348,7 +1554,10 @@ class WCorrShuffle(ComputedResult):
         filtered_epochs_df, active_spikes_df = filter_and_update_epochs_and_spikes(self.curr_active_pipeline, global_epoch_name, self.track_templates, epoch_id_key_name='ripple_epoch_id', no_interval_fill_value=-1)
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
-        export_df_dict = {'ripple_WCorrShuffle_df': wcorr_ripple_shuffle_all_df}
+        all_shuffles_scores_df: pd.DataFrame = self.build_all_shuffles_long_scores_dataframe(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
+        export_df_dict = {'ripple_WCorrShuffle_df': wcorr_ripple_shuffle_all_df, 'ripple_EpochScoreShuffle_df': wcorr_ripple_shuffle_all_df}
+        if (all_shuffles_scores_df is not None) and (len(all_shuffles_scores_df) > 0):
+            export_df_dict['ripple_EpochScoreShuffle_long_df'] = all_shuffles_scores_df
         desired_ripple_decoding_time_bin_size: float = self.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
         print(f'{desired_ripple_decoding_time_bin_size = }')
 
@@ -1362,6 +1571,10 @@ class WCorrShuffle(ComputedResult):
         # export_files_dict # {'ripple_wcorr_shuffle_all_df': WindowsPath('K:/scratch/collected_outputs/2024-06-04_0820AM-kdiba_gor01_one_2006-6-09_1-22-43-(ripple_wcorr_shuffle_all_df)_tbin-0.025.csv')}
 
         return export_files_dict
+
+
+WCorrShuffle = DecodedEpochScoreShuffle
+
 
 @define(slots=False, repr=False, eq=False)
 class SequenceBasedComputationsContainer(ComputedResult):
@@ -1382,7 +1595,16 @@ class SequenceBasedComputationsContainer(ComputedResult):
     """
     _VersionedResultMixin_version: str = "2024.05.27_0" # to be updated in your IMPLEMENTOR to indicate its version
     
-    wcorr_ripple_shuffle: Optional[WCorrShuffle] = serialized_field(default=None, repr=False)
+    wcorr_ripple_shuffle: Optional[DecodedEpochScoreShuffle] = serialized_field(default=None, repr=False)
+
+    @property
+    def ripple_score_shuffle(self) -> Optional[DecodedEpochScoreShuffle]:
+        """Preferred name for `wcorr_ripple_shuffle`."""
+        return self.wcorr_ripple_shuffle
+
+    @ripple_score_shuffle.setter
+    def ripple_score_shuffle(self, value: Optional[DecodedEpochScoreShuffle]):
+        self.wcorr_ripple_shuffle = value
     # RL_ripple: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     # LR_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
     # RL_laps: Optional[RankOrderResult] = serialized_field(default=None, repr=False)
@@ -1426,6 +1648,9 @@ class SequenceBasedComputationsContainer(ComputedResult):
         # For `VersionedResultMixin`
         self._VersionedResultMixin__setstate__(state)
 
+        if ('wcorr_ripple_shuffle' not in state) and ('ripple_score_shuffle' in state):
+            state['wcorr_ripple_shuffle'] = state.pop('ripple_score_shuffle')
+
         self.__dict__.update(state)
 
 
@@ -1442,9 +1667,10 @@ def validate_has_sequence_based_results(curr_active_pipeline, computation_filter
     if seq_results is None:
         return False
     
-    wcorr_ripple_shuffle: WCorrShuffle = seq_results.wcorr_ripple_shuffle
+    wcorr_ripple_shuffle: DecodedEpochScoreShuffle = seq_results.wcorr_ripple_shuffle
     if wcorr_ripple_shuffle is None:
         return False
+    return True
 
 
 
@@ -1455,29 +1681,26 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
     _computationPrecidence = 1005
     _is_global = True
 
-    @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D'],
-                        input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'WCorrShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
+    @function_attributes(short_name='epoch_score_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'heuristic', 'session', 'pf1D'],
+                        input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'DecodedEpochScoreShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
         requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
         validate_computation_test=validate_has_sequence_based_results, is_global=True)
-    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False):
-        """ Performs the computation of the spearman and pearson correlations for the ripple and lap epochs.
+    def perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False):
+        """Performs cell-identity shuffles and scores decoded ripple epochs (wcorr, heuristics, optional radon).
 
         Requires:
             ['sess']
 
         Provides:
             global_computation_results.computed_data['SequenceBased']
-                ['SequenceBased'].odd_ripple
-                ['RankOrder'].even_ripple
-                ['RankOrder'].odd_laps
-                ['RankOrder'].even_laps
+                ['SequenceBased'].ripple_score_shuffle / .wcorr_ripple_shuffle
 
 
         """
         if include_includelist is not None:
-            print(f'WARN: perform_wcorr_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
+            print(f'WARN: perform_epoch_score_shuffle_analysis(...): include_includelist: {include_includelist} is specified but include_includelist is currently ignored! Continuing with defaults.')
 
-        print(f'perform_wcorr_shuffle_analysis(..., num_shuffles={num_shuffles})')
+        print(f'perform_epoch_score_shuffle_analysis(..., num_shuffles={num_shuffles}, enable_heuristic_shuffle_scoring={enable_heuristic_shuffle_scoring}, enable_radon_shuffle_scoring={enable_radon_shuffle_scoring})')
 
         # Needs to store the parameters
         # num_shuffles:int=1000
@@ -1497,11 +1720,15 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
         # global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
         if (not hasattr(global_computation_results.computed_data['SequenceBased'], 'wcorr_ripple_shuffle') or (global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle is None)):
             # initialize a new wcorr result            
-            wcorr_tool: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=owning_pipeline_reference, enable_saving_entire_decoded_shuffle_result=False)
+            wcorr_tool: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.init_from_templates(curr_active_pipeline=owning_pipeline_reference, enable_saving_entire_decoded_shuffle_result=False)
+            wcorr_tool.enable_heuristic_shuffle_scoring = enable_heuristic_shuffle_scoring
+            wcorr_tool.enable_radon_shuffle_scoring = enable_radon_shuffle_scoring
             global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle = wcorr_tool
         else:
             ## get the existing one:
             wcorr_tool = global_computation_results.computed_data['SequenceBased'].wcorr_ripple_shuffle
+            wcorr_tool.enable_heuristic_shuffle_scoring = enable_heuristic_shuffle_scoring
+            wcorr_tool.enable_radon_shuffle_scoring = enable_radon_shuffle_scoring
         
 
         n_completed_shuffles: int = wcorr_tool.n_completed_shuffles
@@ -1512,7 +1739,7 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
             desired_new_num_shuffles: int = max((num_shuffles - wcorr_tool.n_completed_shuffles), 0)
             print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
             ## add some more shuffles to it:
-            wcorr_tool.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=owning_pipeline_reference)
+            wcorr_tool.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=owning_pipeline_reference, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
 
         # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
         # wcorr_tool.save_data(filepath='temp100.pkl')
@@ -1533,7 +1760,15 @@ class SequenceBasedComputationsGlobalComputationFunctions(AllFunctionEnumerating
             
         """
         return global_computation_results
-    
+
+
+    @function_attributes(short_name='wcorr_shuffle_analysis', tags=['directional_pf', 'laps', 'wcorr', 'session', 'pf1D', 'compat'],
+                        input_requires=['DirectionalLaps', 'RankOrder', 'global_computation_results.computation_config.rank_order_shuffle_analysis.minimum_inclusion_fr_Hz', 'global_computation_results.computation_config.rank_order_shuffle_analysis.included_qclu_values'], output_provides=['SequenceBased'], uses=['SequenceBasedComputationsContainer', 'DecodedEpochScoreShuffle'], used_by=[], creation_date='2024-05-27 14:31', related_items=[],
+        requires_global_keys=['DirectionalLaps', 'DirectionalMergedDecoders', 'RankOrder', 'DirectionalDecodersEpochsEvaluations'], provides_global_keys=['SequenceBased'],
+        validate_computation_test=validate_has_sequence_based_results, is_global=True)
+    def perform_wcorr_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=None, debug_print=False, num_shuffles:int=1024, drop_previous_result_and_compute_fresh:bool=False, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False):
+        """Compat wrapper for `perform_epoch_score_shuffle_analysis`."""
+        return SequenceBasedComputationsGlobalComputationFunctions.perform_epoch_score_shuffle_analysis(owning_pipeline_reference, global_computation_results, computation_results, active_configs, include_includelist=include_includelist, debug_print=debug_print, num_shuffles=num_shuffles, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
 
 
     @function_attributes(short_name='temporal_sequentiality_measures', tags=['NOT-FINISHED', 'NOT-TESTED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-12-24 12:34', related_items=[])
