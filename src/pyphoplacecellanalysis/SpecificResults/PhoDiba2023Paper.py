@@ -88,33 +88,39 @@ class FigureS8:
     """
 
     """
+    plotly_helpers: PlotlyHelpers = None
+    PUB_FIG_SIZE: Dict = dict(width=792, height=320)
+    figures_parent_folder: Path = None
+
+
+
     @classmethod
     def _post_hoc_format_figure(cls, a_fig: go.Figure) -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
         a_fig = a_fig.update_layout(
-            template=template,
-            **PUB_FIG_SIZE,
+            template=cls.template,
+            **cls.PUB_FIG_SIZE,
             paper_bgcolor="white",
             plot_bgcolor="white",
             showlegend=False,
-            font=dict(**_pub_font, size=text_sizes_px["insets"]),
-            title_font=dict(**_pub_font, size=text_sizes_px["titles"]),
-            legend_font=dict(**_pub_font, size=text_sizes_px["axes"]),
-            legend_title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
+            font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
+            title_font=dict(**cls._pub_font, size=text_sizes_px["titles"]),
+            legend_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            legend_title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
         )
         a_fig = a_fig.update_xaxes(
-            title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
-            tickfont=dict(**_pub_font, size=text_sizes_px["axes"]),
+            title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             linewidth=1,
         )
         a_fig = a_fig.update_yaxes(
-            title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
-            tickfont=dict(**_pub_font, size=text_sizes_px["axes"]),
+            title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             linewidth=1,
         )
         # Annotations (supertitle/footer) hardcode size=25/40 and ignore the template
         if a_fig.layout.annotations:
-            a_fig = a_fig.update_annotations(font=dict(**_pub_font, size=text_sizes_px["titles"]))
+            a_fig = a_fig.update_annotations(font=dict(**cls._pub_font, size=text_sizes_px["titles"]))
         return a_fig
 
 
@@ -153,7 +159,7 @@ class FigureS8:
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
     @classmethod
-    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True, should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True):
+    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True, should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True):
         """
 
         """
@@ -173,26 +179,26 @@ class FigureS8:
         _out_figs_dict = {}
         _out_paths_dict = {}
 
-        plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
-        plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+        # plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+        # plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
 
         # Unconstrained ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Initial"
         if should_export_initially_filtered:    
-            new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+            new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                 data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Initial", filter=k),
                 concatenated_ripple_df=base_df,
                 **_plot_kwargs,
             )
-            new_fig = _post_hoc_format_figure(new_fig)
+            new_fig = cls._post_hoc_format_figure(new_fig)
             # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
-            new_fig.update_layout(**PUB_FIG_SIZE)
+            new_fig.update_layout(**cls.PUB_FIG_SIZE)
             _out_figs_dict[k] = new_fig
             if should_save:
                 basename: str = f'ScatterOverTime_{export_suffix}_{k}'
                 if k not in _out_paths_dict:
                     _out_paths_dict[k] = {}
-                _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+                _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
 
         print(f"after {k}: {len(base_df)} rows")
 
@@ -205,38 +211,38 @@ class FigureS8:
             print(f"\tafter {k}: {len(active)} rows")
 
             if should_export_iteratively_constrainted:
-                new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+                new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                     data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix=f"FILTERED | {k}", filter=k),
                     concatenated_ripple_df=active,
                     **_plot_kwargs,
                 )
-                new_fig = _post_hoc_format_figure(new_fig)
-                new_fig.update_layout(**PUB_FIG_SIZE)
+                new_fig = cls._post_hoc_format_figure(new_fig)
+                new_fig.update_layout(**cls.PUB_FIG_SIZE)
                 _out_figs_dict[k] = new_fig
                 if should_save:
                     # _out_paths_dict[k] = _save_publication_figs(new_fig, new_fig_context, figures_parent_folder)
                     if k not in _out_paths_dict:
                         _out_paths_dict[k] = {}
-                    _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
+                    _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
         ## END for k in constraint_keys...
 
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Final"
-        new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+        new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
             data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Final", filter=k),
             concatenated_ripple_df=active,
             **_plot_kwargs,
         )
-        new_fig = _post_hoc_format_figure(new_fig)
+        new_fig = cls._post_hoc_format_figure(new_fig)
         # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
-        new_fig.update_layout(**PUB_FIG_SIZE)
+        new_fig.update_layout(**cls.PUB_FIG_SIZE)
         _out_figs_dict[k] = new_fig
         if should_save:
             basename: str = f'ScatterOverTime_{export_suffix}'
             if k not in _out_paths_dict:
                 _out_paths_dict[k] = {}
-            _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+            _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
 
         print(f"after {k}: {len(base_df)} rows")
 
@@ -246,36 +252,34 @@ class FigureS8:
 
 
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers):
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder):
         """
 
         """
+        cls.plotly_helpers = plotly_helpers
+
         # --- publication export setup -------------------------------------------------
-        plotly_helpers.export_png = False
-        plotly_helpers.export_html = False
-        plotly_helpers.is_publication = True
-
-
+        cls.plotly_helpers.export_png = False
+        cls.plotly_helpers.export_html = False
+        cls.plotly_helpers.is_publication = True
 
         # Match publication canvas used by _build_plot_callback (not the 1800x480 default)
         # plotly_helpers.resolution_multiplier = 792.0 / 1800.0  # -> ~792 x ~211; or set explicitly below ## plotly_helpers.resolution_multiplier: 0.44
-        plotly_helpers.resolution_multiplier = 1.0
-        print(f'plotly_helpers.resolution_multiplier: {plotly_helpers.resolution_multiplier}')
+        cls.plotly_helpers.resolution_multiplier = 1.0
+        print(f'plotly_helpers.resolution_multiplier: {cls.plotly_helpers.resolution_multiplier}')
 
-        template = plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
-        pio.templates.default = template
+        cls.template = cls.plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
+        pio.templates.default = cls.template
 
-        PUB_FIG_SIZE = dict(width=792, height=320)  # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
+        cls.PUB_FIG_SIZE = dict(width=792, height=320)  # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
         # PUB_FIG_SIZE = dict(width=594, height=240) ## actual = (446, 179.4512)
         # PUB_FIG_SIZE = dict(width=(594+148), height=(240+60)) ## corrections: (148, 60), PUB_FIG_SIZE: {'width': 742, 'height': 300}, actual = (557, 224.5)
-        print(f'PUB_FIG_SIZE: {PUB_FIG_SIZE}') 
+        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}') 
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
 
-        _pub_font = dict(family="Arial", color="black")
+        cls._pub_font = dict(family="Arial", color="black")
 
-        # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-23').resolve()
-        figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time/Inputs/2026-10-23').resolve()
-        figures_parent_folder.mkdir(exist_ok=True)
+        cls.figures_parent_folder = deepcopy(figures_parent_folder)
 
         # ## INPUTS: df_filter, additional_filter_predicates, figures_parent_folder
         # export_suffix: str = "Laps"
@@ -301,7 +305,6 @@ class FigureS8:
         #         (df[_heuristic_col(df, 'HIGHEST_mseq_tcov')] >= heuristic_filter_requirements['mld_mseq_tcov']),
         #     ).astype(bool)),
         # })
-
 
         # # keep same column constraints as the widget (replay / tbin / etc.)
         # base_df = base_df.pho.constrain_df_cols(**active_filter_constraints)
@@ -338,16 +341,16 @@ class FigureS8:
         # base_df_dict = {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
         #     'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
         # }
-
+        should_drop_constrained_columns: bool = False
 
         is_heuristic_filtered: bool = False
         # is_heuristic_filtered: bool = True
 
-        base_df_dict_dict = {'_perTimeBin':  {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
-                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        base_df_dict_dict = {'_perTimeBin':  {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_time_bin_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_time_bin_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
             },
-        '_perEpochs': {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
-                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        '_perEpochs': {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
             },
         }
 
@@ -370,6 +373,7 @@ class FigureS8:
 
         ## INPUTS: base_df_dict_dict, base_constraint_keys_dict
         for output_suffix, base_df_dict in base_df_dict_dict.items():
+            ## output_suffix: ['Laps', 'PBEs']
             ## same for laps/PBEs
             title_suffix: str = ''
             base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration", 'is_heuristic_passing']
@@ -388,6 +392,7 @@ class FigureS8:
             _out_paths = {}
 
             for export_suffix, base_df in base_df_dict.items():
+                ## export_suffix: ['_perTimeBin', '_perEpochs']
                 if isinstance(constraint_keys, dict):
                     ## separate for laps/PBEs
                     a_constraint_keys = constraint_keys[export_suffix] 
@@ -395,7 +400,7 @@ class FigureS8:
                 else:
                     a_constraint_keys = deepcopy(constraint_keys)
 
-                _out_figs_dict_dict[export_suffix], _out_paths[export_suffix] = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates,
+                _out_figs_dict_dict[export_suffix], _out_paths[export_suffix] = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                                                                                                 should_export_initially_filtered = False,
                                                                                                                 should_export_iteratively_constrainted = False,
                                                                                                                 export_suffix=export_suffix,
