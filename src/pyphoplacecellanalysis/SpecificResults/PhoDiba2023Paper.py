@@ -120,18 +120,23 @@ class FigureS8:
     @classmethod
     def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True) -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
-        a_fig = a_fig.update_layout(
+        layout_kwargs = dict(
             template=cls.template,
             **cls.PUB_FIG_SIZE,
             paper_bgcolor=cls._transparent_bgcolor,
             plot_bgcolor=cls._transparent_bgcolor,
             showlegend=showlegend,
-            legend=dict(title_text='Heuristic filter', x=0.99, y=0.99, xanchor='right', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0),
             font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
             title_font=dict(**cls._pub_font, size=text_sizes_px["titles"]),
-            legend_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
-            legend_title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
+            legend_font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
+            legend_title_font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
+            margin=dict(l=50, r=40, t=36, b=50),
         )
+        if showlegend:
+            # Horizontal legend below the x-axis titles — paper (0.99, 0.99) sat on the right histogram
+            layout_kwargs['legend'] = dict(title_text='Heuristic-Passing', orientation='h', x=0.5, y=-0.28, xanchor='center', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0, itemsizing='constant', tracegroupgap=0)
+            layout_kwargs['margin'] = dict(l=50, r=40, t=36, b=88)
+        a_fig = a_fig.update_layout(**layout_kwargs)
         a_fig = a_fig.update_xaxes(
             title_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
@@ -142,9 +147,7 @@ class FigureS8:
             tickfont=dict(**cls._pub_font, size=text_sizes_px["axes"]),
             linewidth=1,
         )
-        # Annotations (supertitle/footer) hardcode size=25/40 and ignore the template
-        if a_fig.layout.annotations:
-            a_fig = a_fig.update_annotations(font=dict(**cls._pub_font, size=text_sizes_px["titles"]))
+        # Do not bump all annotations to title size — Pre-Δ / Post-Δ / axis labels are annotations and become unreadable.
         return a_fig
 
 
@@ -215,7 +218,8 @@ class FigureS8:
 
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
-        main_title: str = f"Short-track Decoded Likelihood during {export_suffix}{title_suffix}" # export_suffix: 'Laps'/'PBEs'
+        plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
+        main_title: str = f"Short-track Decoded Likelihood during {plot_kind}" # keep the center subplot title short so it does not collide with Pre-Δ / Post-Δ
 
         _plot_kwargs = dict(
             is_publication_ready_figure=True,
@@ -310,7 +314,7 @@ class FigureS8:
 
 
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False):
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False):
         """
 
         """
@@ -450,7 +454,9 @@ class FigureS8:
                     a_constraint_keys = deepcopy(constraint_keys)
 
 
-                should_overlay_heuristic_filter: bool = export_suffix.startswith('PBEs')
+                
+                should_overlay_heuristic_filter: bool = (enable_heuristic_filtered_outputs and export_suffix.startswith('PBEs'))
+
                 title_suffix: str = ' (heuristic False vs True)' if should_overlay_heuristic_filter else ''
 
                 if not should_concatenate_figures:
