@@ -209,7 +209,7 @@ class FigureS8:
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
     @classmethod
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
-                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True,
+                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False,
         ):
         """
 
@@ -217,17 +217,18 @@ class FigureS8:
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         main_title: str = f"Short-track Decoded Likelihood during {export_suffix}{title_suffix}" # export_suffix: 'Laps'/'PBEs'
 
-        _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
         _plot_kwargs = dict(
             is_publication_ready_figure=True,
-            px_scatter_kwargs={"size_max": 2.0, **_heuristic_color_kwargs},
-            hist_kwargs=deepcopy(_heuristic_color_kwargs),
-            common_plot_kwargs=deepcopy(_heuristic_color_kwargs),
+            px_scatter_kwargs={"size_max": 2.0},
             should_save=False,  # save AFTER font/size fix (library saves too early)
             main_title=main_title,
             # epoch_label_mode='annotation_above', #TODO 2026-09-24 18:23: - [ ] where the labels sit
-
         )
+        if should_overlay_heuristic_filter:
+            _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
+            _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_heuristic_color_kwargs}
+            _plot_kwargs['hist_kwargs'] = deepcopy(_heuristic_color_kwargs)
+            _plot_kwargs['common_plot_kwargs'] = deepcopy(_heuristic_color_kwargs)
 
         _out_figs_dict = {}
         _out_paths_dict = {}
@@ -240,10 +241,10 @@ class FigureS8:
         if should_export_initially_filtered:    
             new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                 data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Initial", filter=k),
-                concatenated_ripple_df=cls._overlay_heuristic_filter_rows(base_df, additional_filter_predicates),
+                concatenated_ripple_df=cls._overlay_heuristic_filter_rows(base_df, additional_filter_predicates) if should_overlay_heuristic_filter else base_df,
                 **_plot_kwargs,
             )
-            new_fig = cls._post_hoc_format_figure(new_fig)
+            new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
             # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
             new_fig.update_layout(**cls.PUB_FIG_SIZE)
             _out_figs_dict[k] = new_fig
@@ -266,10 +267,10 @@ class FigureS8:
             if should_export_iteratively_constrainted:
                 new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                     data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix=f"FILTERED | {k}", filter=k),
-                    concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates),
+                    concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates) if should_overlay_heuristic_filter else active,
                     **_plot_kwargs,
                 )
-                new_fig = cls._post_hoc_format_figure(new_fig)
+                new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
                 new_fig.update_layout(**cls.PUB_FIG_SIZE)
                 _out_figs_dict[k] = new_fig
                 if should_save:
@@ -279,18 +280,19 @@ class FigureS8:
                     _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
         ## END for k in constraint_keys...
 
-        n_heuristic_pass: int = int(additional_filter_predicates['is_heuristic_passing'](active).astype(bool).sum())
-        print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
+        if should_overlay_heuristic_filter:
+            n_heuristic_pass: int = int(additional_filter_predicates['is_heuristic_passing'](active).astype(bool).sum())
+            print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
 
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Final"
         new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
             data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Final", filter=k),
-            concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates),
+            concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates) if should_overlay_heuristic_filter else active,
             **_plot_kwargs,
         )
-        new_fig = cls._post_hoc_format_figure(new_fig)
+        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
         # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
         new_fig.update_layout(**cls.PUB_FIG_SIZE)
         _out_figs_dict[k] = new_fig
@@ -428,8 +430,7 @@ class FigureS8:
         for output_suffix, base_df_dict in base_df_dict_dict.items():
             ## output_suffix: ['Laps', 'PBEs']
             ## same for laps/PBEs
-            title_suffix: str = ' (heuristic False vs True)'
-            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration"] — heuristic is overlaid, not dropped
+            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration"] — heuristic is overlaid on PBEs only, not dropped
 
             ## separate for laps/PBEs
             constraint_keys = {'Laps': deepcopy(base_constraint_keys),
@@ -449,6 +450,9 @@ class FigureS8:
                     a_constraint_keys = deepcopy(constraint_keys)
 
 
+                should_overlay_heuristic_filter: bool = export_suffix.startswith('PBEs')
+                title_suffix: str = ' (heuristic False vs True)' if should_overlay_heuristic_filter else ''
+
                 if not should_concatenate_figures:
                     export_suffix = f"{export_suffix}{output_suffix}"
 
@@ -458,6 +462,7 @@ class FigureS8:
                                                                                                                 export_suffix=export_suffix,
                                                                                                                 constraint_keys=a_constraint_keys,
                                                                                                                 title_suffix=title_suffix,
+                                                                                                                should_overlay_heuristic_filter=should_overlay_heuristic_filter,
                                                                                                             )
             ## END for export_suffix, base_df in base_df_dict.items()...
 
