@@ -86,6 +86,24 @@ from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for out
 @metadata_attributes(short_name=None, tags=['figure-s8', 's8'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
     """
+        Usage:
+            from pathlib import Path
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+            from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
+            from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for outputs
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
+
+            ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
+            plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+            plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+            # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-23').resolve()
+            figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time/Inputs/2026-10-23').resolve()
+            figures_parent_folder.mkdir(exist_ok=True)
+            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder)
+
 
     """
     plotly_helpers: PlotlyHelpers = None
