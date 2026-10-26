@@ -83,9 +83,10 @@ from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import Plotly
 from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
 from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for outputs
 
-@metadata_attributes(short_name=None, tags=['figure-s8', 's8'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
+@metadata_attributes(short_name=None, tags=['figure-s8', 's8', 'figure-4', 'fig4', 'figure-s6', 's6', 'figure', 'publication'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
-    """
+    """ Used to output Figure 4, Figure S6, Figure S8
+
         Usage:
             from pathlib import Path
             import plotly.graph_objects as go
