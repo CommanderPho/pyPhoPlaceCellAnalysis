@@ -81,7 +81,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
 from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
-from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for outputs
+from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelpers ## for outputs
 
 @metadata_attributes(short_name=None, tags=['figure-s8', 's8', 'figure-4', 'fig4', 'figure-s6', 's6', 'figure', 'publication'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
@@ -93,7 +93,7 @@ class FigureS8:
             import plotly.io as pio
             from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
             from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
-            from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for outputs
+            from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelpers ## for outputs
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
@@ -103,7 +103,7 @@ class FigureS8:
             # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-23').resolve()
             figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time/Inputs/2026-10-23').resolve()
             figures_parent_folder.mkdir(exist_ok=True)
-            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder)
+            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, split_by_column='animal')
 
 
     """
@@ -116,6 +116,7 @@ class FigureS8:
         'False': 'rgba(170,170,170,0.45)',
         'True': 'black',
     }
+    _PREFERRED_ANIMAL_ORDER = ('gor01', 'vvp01', 'pin01')
 
 
     @classmethod
@@ -209,14 +210,69 @@ class FigureS8:
             out_df.attrs['data_context'] = deepcopy(df.attrs['data_context'])
         return out_df
 
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Split On Animal Helpers                                                                                                                                                                                                                                                              #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
+    @classmethod
+    def _copy_df_preserving_context(cls, df: pd.DataFrame) -> pd.DataFrame:
+        out_df: pd.DataFrame = deepcopy(df)
+        if 'data_context' in df.attrs:
+            out_df.attrs['data_context'] = deepcopy(df.attrs['data_context'])
+        return out_df
+
+
+    @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
+    @classmethod
+    def _sorted_split_values(cls, values, split_by_column: str):
+        unique_values = [str(v) for v in values]
+        if split_by_column == 'animal':
+            preferred = [v for v in cls._PREFERRED_ANIMAL_ORDER if v in unique_values]
+            rest = sorted([v for v in unique_values if v not in preferred], key=str)
+            return preferred + rest
+        return sorted(unique_values, key=str)
+
+
+    @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
+    @classmethod
+    def _iter_split_plot_groups(cls, df: pd.DataFrame, split_by_column: Optional[str]):
+        """Yield `(group_key, group_df)`. `group_key` is None when not splitting."""
+        if split_by_column is None:
+            yield None, df
+            return
+        if split_by_column not in df.columns:
+            print(f'WARN: split_by_column={split_by_column!r} not in dataframe columns; plotting pooled')
+            yield None, df
+            return
+        unique_values = cls._sorted_split_values(df[split_by_column].dropna().unique(), split_by_column=split_by_column)
+        for a_value in unique_values:
+            group_df = cls._copy_df_preserving_context(df[df[split_by_column].astype(str) == a_value])
+            yield a_value, group_df
+        ## END for a_value in unique_values...
+
+
+    @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
+    @classmethod
+    def _plot_formatted_pre_post_scatter(cls, plot_df: pd.DataFrame, data_context, plot_kwargs: Dict, showlegend: bool):
+        new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
+            data_context=data_context,
+            concatenated_ripple_df=plot_df,
+            **plot_kwargs,
+        )
+        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=showlegend)
+        new_fig.update_layout(**cls.PUB_FIG_SIZE)
+        return new_fig, new_fig_context
+
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
     @classmethod
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
-                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False,
+                                                    should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
         ):
-        """
+        """Plot the constrained pre/post-delta scatter.
 
+        `split_by_column='animal'` plots one 1x3 row per animal and stacks those SVGs into `*_by_animal.svg`.
+        PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
@@ -238,26 +294,67 @@ class FigureS8:
         _out_figs_dict = {}
         _out_paths_dict = {}
 
-        # plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
-        # plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+        def _export_stage(k: str, source_df: pd.DataFrame, title_prefix: str, basename: Optional[str]):
+            """Plot pooled, or one 1x3 row per `split_by_column` value then stack those SVGs vertically."""
+            group_figs = {}
+            group_svg_paths = []
+            group_pdf_paths = []
+            if k not in _out_paths_dict:
+                _out_paths_dict[k] = {}
+
+            for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column):
+                plot_df = cls._overlay_heuristic_filter_rows(group_df, additional_filter_predicates) if should_overlay_heuristic_filter else group_df
+                context_kwargs = dict(title_prefix=title_prefix, filter=k)
+                if group_key is not None:
+                    context_kwargs[split_by_column] = group_key
+                    print(f"\t{k} {split_by_column}={group_key}: {len(group_df)} rows")
+                data_context = deepcopy(source_df.attrs["data_context"]).overwriting_context(**context_kwargs)
+                active_plot_kwargs = deepcopy(_plot_kwargs)
+                if group_key is not None:
+                    active_plot_kwargs['main_title'] = f"{main_title} | {group_key}"
+                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=should_overlay_heuristic_filter)
+                fig_key = group_key if group_key is not None else k
+                group_figs[fig_key] = new_fig
+                if should_save:
+                    if basename is None:
+                        save_basename = None
+                    elif group_key is not None:
+                        save_basename = f"{basename}_{group_key}"
+                    else:
+                        save_basename = basename
+                    saved_paths = cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=save_basename, _out_paths={})
+                    if group_key is not None:
+                        if f'{export_suffix}/svg' in saved_paths:
+                            _out_paths_dict[k][f'{export_suffix}/svg/{group_key}'] = saved_paths[f'{export_suffix}/svg']
+                            group_svg_paths.append(saved_paths[f'{export_suffix}/svg'])
+                        if f'{export_suffix}/pdf' in saved_paths:
+                            _out_paths_dict[k][f'{export_suffix}/pdf/{group_key}'] = saved_paths[f'{export_suffix}/pdf']
+                            group_pdf_paths.append(saved_paths[f'{export_suffix}/pdf'])
+                    else:
+                        _out_paths_dict[k] = _out_paths_dict[k] | saved_paths
+                ## END if should_save...
+            ## END for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column)...
+
+            if (split_by_column is not None) and (len(group_figs) > 0):
+                _out_figs_dict[k] = group_figs
+                stacked_basename = basename if basename is not None else f'ScatterOverTime_{export_suffix}_{k}'
+                if should_save and (len(group_svg_paths) > 0):
+                    stacked_svg_path = figures_parent_folder.joinpath(f'{stacked_basename}_by_{split_by_column}.svg')
+                    SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
+                    _out_paths_dict[k][f'{export_suffix}/svg'] = stacked_svg_path
+                    print(f'\tstacked {split_by_column} rows: "{stacked_svg_path.as_posix()}"')
+                if should_save and (len(group_pdf_paths) > 1):
+                    stacked_pdf_path = figures_parent_folder.joinpath(f'{stacked_basename}_by_{split_by_column}.pdf')
+                    PDFHelpers.concatenate_pdfs_vertically(pdf_paths=group_pdf_paths, output_path=stacked_pdf_path, padding=0)
+                    _out_paths_dict[k][f'{export_suffix}/pdf'] = stacked_pdf_path
+            else:
+                _out_figs_dict[k] = next(iter(group_figs.values())) if group_figs else None
+
 
         # Unconstrained ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Initial"
-        if should_export_initially_filtered:    
-            new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
-                data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Initial", filter=k),
-                concatenated_ripple_df=cls._overlay_heuristic_filter_rows(base_df, additional_filter_predicates) if should_overlay_heuristic_filter else base_df,
-                **_plot_kwargs,
-            )
-            new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
-            # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
-            new_fig.update_layout(**cls.PUB_FIG_SIZE)
-            _out_figs_dict[k] = new_fig
-            if should_save:
-                basename: str = f'ScatterOverTime_{export_suffix}_{k}'
-                if k not in _out_paths_dict:
-                    _out_paths_dict[k] = {}
-                _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+        if should_export_initially_filtered:
+            _export_stage(k, base_df, title_prefix="Initial", basename=f'ScatterOverTime_{export_suffix}_{k}')
 
         print(f"after {k}: {len(base_df)} rows")
 
@@ -270,19 +367,7 @@ class FigureS8:
             print(f"\tafter {k}: {len(active)} rows")
 
             if should_export_iteratively_constrainted:
-                new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
-                    data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix=f"FILTERED | {k}", filter=k),
-                    concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates) if should_overlay_heuristic_filter else active,
-                    **_plot_kwargs,
-                )
-                new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
-                new_fig.update_layout(**cls.PUB_FIG_SIZE)
-                _out_figs_dict[k] = new_fig
-                if should_save:
-                    # _out_paths_dict[k] = _save_publication_figs(new_fig, new_fig_context, figures_parent_folder)
-                    if k not in _out_paths_dict:
-                        _out_paths_dict[k] = {}
-                    _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
+                _export_stage(k, active, title_prefix=f"FILTERED | {k}", basename=None)
         ## END for k in constraint_keys...
 
         if should_overlay_heuristic_filter:
@@ -292,20 +377,7 @@ class FigureS8:
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Final"
-        new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
-            data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Final", filter=k),
-            concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates) if should_overlay_heuristic_filter else active,
-            **_plot_kwargs,
-        )
-        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=should_overlay_heuristic_filter)
-        # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
-        new_fig.update_layout(**cls.PUB_FIG_SIZE)
-        _out_figs_dict[k] = new_fig
-        if should_save:
-            basename: str = f'ScatterOverTime_{export_suffix}'
-            if k not in _out_paths_dict:
-                _out_paths_dict[k] = {}
-            _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+        _export_stage(k, active, title_prefix="Final", basename=f'ScatterOverTime_{export_suffix}')
 
         print(f"after {k}: {len(base_df)} rows")
 
@@ -315,7 +387,7 @@ class FigureS8:
 
 
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False):
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None):
         """
 
         """
@@ -334,7 +406,7 @@ class FigureS8:
         cls.template = cls.plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = cls.template
 
-        cls.PUB_FIG_SIZE = dict(width=792, height=320)  # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
+        cls.PUB_FIG_SIZE = dict(width=792, height=320) # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
         # PUB_FIG_SIZE = dict(width=594, height=240) ## actual = (446, 179.4512)
         # PUB_FIG_SIZE = dict(width=(594+148), height=(240+60)) ## corrections: (148, 60), PUB_FIG_SIZE: {'width': 742, 'height': 300}, actual = (557, 224.5)
         print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}') 
@@ -470,6 +542,7 @@ class FigureS8:
                                                                                                                 constraint_keys=a_constraint_keys,
                                                                                                                 title_suffix=title_suffix,
                                                                                                                 should_overlay_heuristic_filter=should_overlay_heuristic_filter,
+                                                                                                                split_by_column=split_by_column,
                                                                                                             )
             ## END for export_suffix, base_df in base_df_dict.items()...
 
