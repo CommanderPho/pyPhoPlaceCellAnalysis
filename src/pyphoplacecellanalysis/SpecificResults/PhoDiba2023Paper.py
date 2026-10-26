@@ -73,6 +73,379 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-26 - Factor out Figure S8                                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
+import plotly.graph_objects as go
+import plotly.io as pio
+from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import PlotlyFigureContainer
+from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
+from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers ## for outputs
+
+@metadata_attributes(short_name=None, tags=['figure-s8', 's8'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
+class FigureS8:
+    """
+
+    """
+    @classmethod
+    def _post_hoc_format_figure(cls, a_fig: go.Figure) -> go.Figure:
+        """Force publication fonts onto the figure object (templates are only fallbacks)."""
+        a_fig = a_fig.update_layout(
+            template=template,
+            **PUB_FIG_SIZE,
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            showlegend=False,
+            font=dict(**_pub_font, size=text_sizes_px["insets"]),
+            title_font=dict(**_pub_font, size=text_sizes_px["titles"]),
+            legend_font=dict(**_pub_font, size=text_sizes_px["axes"]),
+            legend_title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
+        )
+        a_fig = a_fig.update_xaxes(
+            title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
+            tickfont=dict(**_pub_font, size=text_sizes_px["axes"]),
+            linewidth=1,
+        )
+        a_fig = a_fig.update_yaxes(
+            title_font=dict(**_pub_font, size=text_sizes_px["axes"]),
+            tickfont=dict(**_pub_font, size=text_sizes_px["axes"]),
+            linewidth=1,
+        )
+        # Annotations (supertitle/footer) hardcode size=25/40 and ignore the template
+        if a_fig.layout.annotations:
+            a_fig = a_fig.update_annotations(font=dict(**_pub_font, size=text_sizes_px["titles"]))
+        return a_fig
+
+
+    # def _save_publication_svg(a_fig: go.Figure, a_fig_context, figures_parent_folder: Path, basename: Optional[str] = None) -> Path:
+    #     if basename is None:
+    #         basename = a_fig_context.get_description()
+    #     image_save_path = figures_parent_folder.joinpath(f"{basename}.svg")
+    #     a_fig.write_image(image_save_path, engine="kaleido", format="svg")
+    #     return image_save_path
+
+    @classmethod
+    def _save_publication_figs(cls, a_fig: go.Figure, a_fig_context, figures_parent_folder: Path, export_suffix: str, basename: Optional[str] = None, _out_paths: Optional[Dict]=None,
+                                should_export_svg: bool = False,
+                            ) -> Path:
+        if basename is None:
+            basename = a_fig_context.get_description()
+
+        if _out_paths is None:
+            _out_paths = {}
+        # ## save .pdf
+        image_save_path = figures_parent_folder.joinpath(f'{basename}.pdf')
+        a_fig.write_image(image_save_path) # , textmode="text"
+        _out_paths[f'{export_suffix}/pdf'] = image_save_path
+
+        if should_export_svg:
+            ## save .svg
+            image_save_path = figures_parent_folder.joinpath(f'{basename}.svg')
+            a_fig.write_image(image_save_path, format="svg") # , textmode="text"
+            _out_paths[f'{export_suffix}/svg'] = image_save_path
+
+        return _out_paths
+
+
+
+
+
+    ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
+    @classmethod
+    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True, should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True):
+        """
+
+        """
+        predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
+        main_title: str = f"Short-track Decoded Likelihood during {export_suffix}{title_suffix}" # export_suffix: 'Laps'/'PBEs'
+
+        _plot_kwargs = dict(
+            is_publication_ready_figure=True,
+            px_scatter_kwargs={"size_max": 2.0},
+            # px_scatter_kwargs={"size_max": 3.0}, ## bigger
+            should_save=False,  # save AFTER font/size fix (library saves too early)
+            main_title=main_title,
+            # epoch_label_mode='annotation_above', #TODO 2026-09-24 18:23: - [ ] where the labels sit
+
+        )
+
+        _out_figs_dict = {}
+        _out_paths_dict = {}
+
+        plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+        plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+
+        # Unconstrained ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        k = "Initial"
+        if should_export_initially_filtered:    
+            new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+                data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Initial", filter=k),
+                concatenated_ripple_df=base_df,
+                **_plot_kwargs,
+            )
+            new_fig = _post_hoc_format_figure(new_fig)
+            # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
+            new_fig.update_layout(**PUB_FIG_SIZE)
+            _out_figs_dict[k] = new_fig
+            if should_save:
+                basename: str = f'ScatterOverTime_{export_suffix}_{k}'
+                if k not in _out_paths_dict:
+                    _out_paths_dict[k] = {}
+                _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+
+        print(f"after {k}: {len(base_df)} rows")
+
+        ## Constrained
+
+        active = base_df
+        for k in constraint_keys:
+            mask = predicates[k](active).astype(bool)
+            active = deepcopy(active[mask])
+            print(f"\tafter {k}: {len(active)} rows")
+
+            if should_export_iteratively_constrainted:
+                new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+                    data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix=f"FILTERED | {k}", filter=k),
+                    concatenated_ripple_df=active,
+                    **_plot_kwargs,
+                )
+                new_fig = _post_hoc_format_figure(new_fig)
+                new_fig.update_layout(**PUB_FIG_SIZE)
+                _out_figs_dict[k] = new_fig
+                if should_save:
+                    # _out_paths_dict[k] = _save_publication_figs(new_fig, new_fig_context, figures_parent_folder)
+                    if k not in _out_paths_dict:
+                        _out_paths_dict[k] = {}
+                    _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
+        ## END for k in constraint_keys...
+
+        ## Get the FINAL Figure
+        # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        k = "Final"
+        new_fig, new_fig_context, *_ = plotly_helpers._perform_plot_pre_post_delta_scatter(
+            data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Final", filter=k),
+            concatenated_ripple_df=active,
+            **_plot_kwargs,
+        )
+        new_fig = _post_hoc_format_figure(new_fig)
+        # Also force size on the figure the helper already applied (1800x480 unless resolution_multiplier changed)
+        new_fig.update_layout(**PUB_FIG_SIZE)
+        _out_figs_dict[k] = new_fig
+        if should_save:
+            basename: str = f'ScatterOverTime_{export_suffix}'
+            if k not in _out_paths_dict:
+                _out_paths_dict[k] = {}
+            _out_paths_dict[k] = _out_paths_dict[k] | _save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=basename, _out_paths=_out_paths_dict[k])
+
+        print(f"after {k}: {len(base_df)} rows")
+
+        return _out_figs_dict, _out_paths_dict
+
+
+
+
+    @classmethod
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers):
+        """
+
+        """
+        # --- publication export setup -------------------------------------------------
+        plotly_helpers.export_png = False
+        plotly_helpers.export_html = False
+        plotly_helpers.is_publication = True
+
+
+
+        # Match publication canvas used by _build_plot_callback (not the 1800x480 default)
+        # plotly_helpers.resolution_multiplier = 792.0 / 1800.0  # -> ~792 x ~211; or set explicitly below ## plotly_helpers.resolution_multiplier: 0.44
+        plotly_helpers.resolution_multiplier = 1.0
+        print(f'plotly_helpers.resolution_multiplier: {plotly_helpers.resolution_multiplier}')
+
+        template = plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
+        pio.templates.default = template
+
+        PUB_FIG_SIZE = dict(width=792, height=320)  # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
+        # PUB_FIG_SIZE = dict(width=594, height=240) ## actual = (446, 179.4512)
+        # PUB_FIG_SIZE = dict(width=(594+148), height=(240+60)) ## corrections: (148, 60), PUB_FIG_SIZE: {'width': 742, 'height': 300}, actual = (557, 224.5)
+        print(f'PUB_FIG_SIZE: {PUB_FIG_SIZE}') 
+        # PUB_FIG_SIZE = dict() ## NO OVERRIDES
+
+        _pub_font = dict(family="Arial", color="black")
+
+        # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-23').resolve()
+        figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time/Inputs/2026-10-23').resolve()
+        figures_parent_folder.mkdir(exist_ok=True)
+
+        # ## INPUTS: df_filter, additional_filter_predicates, figures_parent_folder
+        # export_suffix: str = "Laps"
+        # base_df = deepcopy(df_filter.original_df_dict["all_sessions_laps_time_bin_df"])
+
+        # heuristic_filter_requirements = {
+        #     # 'mld_mseq_len_ignoring_intrusions_and_repeats': 4,
+        #     'mld_mseq_len_ignoring_intrusions': 4,
+        #     'mld_mseq_tcov': 0.1
+        # }
+        # # ['mld_mseq_len_ignoring_intrusions_and_repeats', 'mld_mseq_tcov']
+
+        # def _heuristic_col(df, col_name: str) -> str:
+        #     """ gets the appropriate heuristic column name for the per-time-bin or per-epoch df columns """
+        #     parent_col: str = f'parent_epoch_{col_name}'
+        #     if parent_col in df.columns:
+        #         return parent_col
+        #     return col_name  # per-epoch: HIGHEST_*; missing → KeyError, same as today
+
+        # additional_filter_predicates.update({
+        #     'is_heuristic_passing': (lambda df: np.logical_and(
+        #         (df[_heuristic_col(df, 'HIGHEST_mseq_len_ignoring_intrusions')] >= heuristic_filter_requirements['mld_mseq_len_ignoring_intrusions']),
+        #         (df[_heuristic_col(df, 'HIGHEST_mseq_tcov')] >= heuristic_filter_requirements['mld_mseq_tcov']),
+        #     ).astype(bool)),
+        # })
+
+
+        # # keep same column constraints as the widget (replay / tbin / etc.)
+        # base_df = base_df.pho.constrain_df_cols(**active_filter_constraints)
+        # _out_figs_dict, _out_paths_dict = _perform_plot_iteratively_constrained(
+        #     base_df=base_df,
+        #     additional_filter_predicates=additional_filter_predicates,
+        # )
+        # _out_figs_dict["Unfiltered"]
+
+        # active_filter_constraints = df_filter.get_df_filter_active_constraint_dict() ## live/dynamic
+        active_filter_constraints = {'trained_compute_epochs': 'laps',
+            'decoder_identifier': 'pseudo2D',
+            'masked_time_bin_fill_type': ('dropped',),
+            'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+            'time_bin_size': (0.075,),
+        }
+
+
+        # ## INPUTS: df_filter, additional_filter_predicates, 
+
+        # base_constraint_keys = []
+        # base_constraint_keys = ["is_long_duration"]
+
+        # output_suffix: str = '_perTimeBin'
+        # base_df_dict = {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        #     'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        # }
+        # base_constraint_keys.append("is_track_body")
+        # # constraint_keys = ("is_long_duration", "is_track_body")
+
+
+        # # # ['all_sessions_ripple_df', 'all_sessions_laps_df']
+        # output_suffix: str = '_perEpochs'
+        # base_df_dict = {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        #     'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+        # }
+
+
+        is_heuristic_filtered: bool = False
+        # is_heuristic_filtered: bool = True
+
+        base_df_dict_dict = {'_perTimeBin':  {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_time_bin_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+            },
+        '_perEpochs': {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+                'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_df']).pho.constrain_df_cols(**active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
+            },
+        }
+
+        # Add Heuristic Columns: _____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        base_df_dict_dict['_perEpochs']['PBEs'] = base_df_dict_dict['_perEpochs']['PBEs'].pho_mld.adding_mld_columns(overwrite_existing=True)
+        base_df_dict_dict['_perEpochs']['Laps'] = base_df_dict_dict['_perEpochs']['Laps'].pho_mld.adding_mld_columns(overwrite_existing=True)
+
+        ## Add the 'parent_epoch_*' prefixed heuristic columns to per-time_bin df from the per-epoch one:
+        columns_to_add = ['mld_mseq_tcov', 'mld_mseq_len_ignoring_intrusions', 'HIGHEST_mseq_tcov', 'HIGHEST_mseq_len_ignoring_intrusions']
+        base_df_dict_dict['_perTimeBin']['PBEs'] = MostLikelyDecoderDataframeAccessor.add_parent_epoch_heuristic_columns_to_time_bin_df(base_df_dict_dict['_perTimeBin']['PBEs'], base_df_dict_dict['_perEpochs']['PBEs'], columns_to_add=columns_to_add)
+        base_df_dict_dict['_perTimeBin']['Laps'] = MostLikelyDecoderDataframeAccessor.add_parent_epoch_heuristic_columns_to_time_bin_df(base_df_dict_dict['_perTimeBin']['Laps'], base_df_dict_dict['_perEpochs']['Laps'], columns_to_add=columns_to_add)
+
+        base_constraint_keys_dict = {'_perTimeBin':  ("is_long_duration", "is_track_body"),
+            '_perEpochs': ("is_long_duration", ),
+        }
+
+
+        _out_figs_dict_dict_dict = {}
+        _out_paths_dict = {}
+
+        ## INPUTS: base_df_dict_dict, base_constraint_keys_dict
+        for output_suffix, base_df_dict in base_df_dict_dict.items():
+            ## same for laps/PBEs
+            title_suffix: str = ''
+            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration", 'is_heuristic_passing']
+
+            ## separate for laps/PBEs
+            constraint_keys = {'Laps': deepcopy(base_constraint_keys),
+                'PBEs': deepcopy(base_constraint_keys),
+            }
+
+            if is_heuristic_filtered:
+                constraint_keys['PBEs'].append('is_heuristic_passing') ## only affects PBEs
+                output_suffix = f"{output_suffix}_heuristic_passing"
+                title_suffix = f"{title_suffix} (Heuristic Filtered)"
+
+            _out_figs_dict_dict = {}
+            _out_paths = {}
+
+            for export_suffix, base_df in base_df_dict.items():
+                if isinstance(constraint_keys, dict):
+                    ## separate for laps/PBEs
+                    a_constraint_keys = constraint_keys[export_suffix] 
+
+                else:
+                    a_constraint_keys = deepcopy(constraint_keys)
+
+                _out_figs_dict_dict[export_suffix], _out_paths[export_suffix] = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates,
+                                                                                                                should_export_initially_filtered = False,
+                                                                                                                should_export_iteratively_constrainted = False,
+                                                                                                                export_suffix=export_suffix,
+                                                                                                                constraint_keys=a_constraint_keys,
+                                                                                                                title_suffix=title_suffix,
+                                                                                                            )
+                    
+
+
+            # _out_paths
+            _out_figs_dict_dict['Laps']['Final']
+            _out_figs_dict_dict['PBEs']['Final']
+
+            _out_figs_dict_dict_dict[export_suffix] = _out_figs_dict_dict
+            _out_paths_dict[export_suffix] = _out_paths
+
+            for k in list(_out_paths['Laps'].keys()):
+                # k: str = 'Final' or 'Initial'
+                pdf_paths = [
+                    _out_paths['Laps'][k]['Laps/pdf'],
+                    _out_paths['PBEs'][k]['PBEs/pdf'],
+                ]
+
+                _final_fig4_pdf = PDFHelpers.concatenate_pdfs_vertically(
+                    pdf_paths=pdf_paths,
+                    output_path=figures_parent_folder.joinpath(f'fig4_Laps_PBEs_{k}{output_suffix}.pdf'),
+                    padding=0,  # points; use e.g. 10 if you want a gap
+                )
+                
+                print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
+
+        ## for output_suffix, base_df_dict in base_df_dict_dict.items()...
+
+
+        return _out_figs_dict_dict_dict, _out_paths_dict
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-23 - MostLikelyDecoder Column Creation                                                                                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+
 DECODER_NAMES: Tuple[str, str, str, str] = ('long_LR', 'long_RL', 'short_LR', 'short_RL')
 DEFAULT_MLD_SCORE_COL_NAMES: Tuple[str, ...] = (
     'mseq_len_ratio_ignoring_intrusions_and_repeats',
