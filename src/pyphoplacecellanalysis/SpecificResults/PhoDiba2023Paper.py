@@ -111,15 +111,22 @@ class FigureS8:
     figures_parent_folder: Path = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
+    _heuristic_filter_color_map: Dict[str, str] = {
+        'False': 'rgba(170,170,170,0.45)',
+        'True': 'black',
+    }
+
+
     @classmethod
-    def _post_hoc_format_figure(cls, a_fig: go.Figure) -> go.Figure:
+    def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True) -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
         a_fig = a_fig.update_layout(
             template=cls.template,
             **cls.PUB_FIG_SIZE,
             paper_bgcolor=cls._transparent_bgcolor,
             plot_bgcolor=cls._transparent_bgcolor,
-            showlegend=False,
+            showlegend=showlegend,
+            legend=dict(title_text='Heuristic filter', x=0.99, y=0.99, xanchor='right', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0),
             font=dict(**cls._pub_font, size=text_sizes_px["insets"]),
             title_font=dict(**cls._pub_font, size=text_sizes_px["titles"]),
             legend_font=dict(**cls._pub_font, size=text_sizes_px["axes"]),
@@ -185,7 +192,18 @@ class FigureS8:
         return _out_paths
 
 
-
+    @classmethod
+    def _overlay_heuristic_filter_rows(cls, df: pd.DataFrame, additional_filter_predicates) -> pd.DataFrame:
+        """Stack unfiltered (`False`) and heuristic-passing (`True`) copies so both appear on one figure."""
+        passing_mask = additional_filter_predicates['is_heuristic_passing'](df).astype(bool)
+        df_all = deepcopy(df)
+        df_all['heuristic_filter'] = 'False'
+        df_pass = deepcopy(df[passing_mask])
+        df_pass['heuristic_filter'] = 'True'
+        out_df: pd.DataFrame = pd.concat([df_all, df_pass], ignore_index=True)
+        if 'data_context' in df.attrs:
+            out_df.attrs['data_context'] = deepcopy(df.attrs['data_context'])
+        return out_df
 
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
@@ -199,10 +217,12 @@ class FigureS8:
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         main_title: str = f"Short-track Decoded Likelihood during {export_suffix}{title_suffix}" # export_suffix: 'Laps'/'PBEs'
 
+        _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
         _plot_kwargs = dict(
             is_publication_ready_figure=True,
-            px_scatter_kwargs={"size_max": 2.0},
-            # px_scatter_kwargs={"size_max": 3.0}, ## bigger
+            px_scatter_kwargs={"size_max": 2.0, **_heuristic_color_kwargs},
+            hist_kwargs=deepcopy(_heuristic_color_kwargs),
+            common_plot_kwargs=deepcopy(_heuristic_color_kwargs),
             should_save=False,  # save AFTER font/size fix (library saves too early)
             main_title=main_title,
             # epoch_label_mode='annotation_above', #TODO 2026-09-24 18:23: - [ ] where the labels sit
@@ -220,7 +240,7 @@ class FigureS8:
         if should_export_initially_filtered:    
             new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                 data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Initial", filter=k),
-                concatenated_ripple_df=base_df,
+                concatenated_ripple_df=cls._overlay_heuristic_filter_rows(base_df, additional_filter_predicates),
                 **_plot_kwargs,
             )
             new_fig = cls._post_hoc_format_figure(new_fig)
@@ -246,7 +266,7 @@ class FigureS8:
             if should_export_iteratively_constrainted:
                 new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
                     data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix=f"FILTERED | {k}", filter=k),
-                    concatenated_ripple_df=active,
+                    concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates),
                     **_plot_kwargs,
                 )
                 new_fig = cls._post_hoc_format_figure(new_fig)
@@ -259,12 +279,15 @@ class FigureS8:
                     _out_paths_dict[k] = _out_paths_dict[k] | cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=None, _out_paths=_out_paths_dict[k]) # basename=None ensures that the context is used
         ## END for k in constraint_keys...
 
+        n_heuristic_pass: int = int(additional_filter_predicates['is_heuristic_passing'](active).astype(bool).sum())
+        print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
+
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         k = "Final"
         new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
             data_context=deepcopy(base_df.attrs["data_context"]).overwriting_context(title_prefix="Final", filter=k),
-            concatenated_ripple_df=active,
+            concatenated_ripple_df=cls._overlay_heuristic_filter_rows(active, additional_filter_predicates),
             **_plot_kwargs,
         )
         new_fig = cls._post_hoc_format_figure(new_fig)
@@ -376,9 +399,6 @@ class FigureS8:
         # }
         should_drop_constrained_columns: bool = False
 
-        is_heuristic_filtered: bool = False
-        # is_heuristic_filtered: bool = True
-
         base_df_dict_dict = {'_perTimeBin':  {'Laps': deepcopy(df_filter.original_df_dict['all_sessions_laps_time_bin_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
                 'PBEs': deepcopy(df_filter.original_df_dict['all_sessions_ripple_time_bin_df']).pho.constrain_df_cols(should_drop_constrained_columns=should_drop_constrained_columns, **active_filter_constraints), # keep same column constraints as the widget (replay / tbin / etc.)
             },
@@ -408,18 +428,13 @@ class FigureS8:
         for output_suffix, base_df_dict in base_df_dict_dict.items():
             ## output_suffix: ['Laps', 'PBEs']
             ## same for laps/PBEs
-            title_suffix: str = ''
-            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration", 'is_heuristic_passing']
+            title_suffix: str = ' (heuristic False vs True)'
+            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration"] — heuristic is overlaid, not dropped
 
             ## separate for laps/PBEs
             constraint_keys = {'Laps': deepcopy(base_constraint_keys),
                 'PBEs': deepcopy(base_constraint_keys),
             }
-
-            if is_heuristic_filtered:
-                constraint_keys['PBEs'].append('is_heuristic_passing') ## only affects PBEs
-                output_suffix = f"{output_suffix}_heuristic_passing"
-                title_suffix = f"{title_suffix} (Heuristic Filtered)"
 
             _out_figs_dict_dict = {}
             _out_paths = {}
@@ -444,8 +459,7 @@ class FigureS8:
                                                                                                                 constraint_keys=a_constraint_keys,
                                                                                                                 title_suffix=title_suffix,
                                                                                                             )
-                    
-
+            ## END for export_suffix, base_df in base_df_dict.items()...
 
             # _out_paths
             # _out_figs_dict_dict['Laps']['Final']
@@ -470,8 +484,9 @@ class FigureS8:
                     )
                     
                     print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
+                ## END for k in list(_out_paths['Laps'].keys())...
 
-        ## for output_suffix, base_df_dict in base_df_dict_dict.items()...
+        ## END for output_suffix, base_df_dict in base_df_dict_dict.items()...
 
 
         return _out_figs_dict_dict_dict, _out_paths_dict
