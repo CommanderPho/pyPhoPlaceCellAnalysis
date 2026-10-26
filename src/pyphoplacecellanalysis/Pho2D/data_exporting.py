@@ -3,6 +3,7 @@ from __future__ import annotations # prevents having to specify types for typehi
 from typing import TYPE_CHECKING
 from copy import deepcopy
 from pathlib import Path
+import re
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
 from typing_extensions import TypeAlias
 import nptyping as ND
@@ -1772,26 +1773,46 @@ class LoadedPosteriorContainer:
     file_path: Optional[Path] = field(default=None)
     session_key_parts: List = field(default=Factory(list))
     custom_replay_parts: List = field(default=Factory(list))
-    
+    time_bin_size: Optional[float] = field(default=None)
+
     ripple_data_field_dict: Dict = field(default=Factory(dict))
 
     _decoder_names = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
-    
+    _TBIN_FILENAME_REGEX = re.compile(r'[_-]tbin-([0-9]*\.?[0-9]+)', re.IGNORECASE)
+
 
     @property
     def all_parts_tuple(self) -> Tuple:
         """The ripple_img_dict property."""
         return tuple([*self.session_key_parts, *self.custom_replay_parts])
-    
+
     @property
     def full_complete_context_key(self) -> str:
         """The 'kdiba/gor01/one/2006-6-08_14-26-15/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0' property."""
         return '/' + ('/'.join(list(self.all_parts_tuple))).lstrip('/') ## ensure starting forward-slash
-    
+
+    @property
+    def full_complete_context_key_with_tbin(self) -> str:
+        """Session/replay key plus `/tbin-{time_bin_size}` when known."""
+        if self.time_bin_size is None:
+            return self.full_complete_context_key
+        return f'{self.full_complete_context_key}/tbin-{self.time_bin_size}'
+
     @property
     def ripple_img_dict(self):
         """The ripple_img_dict property."""
         return self.ripple_data_field_dict['p_x_given_n_grey']
+
+
+    @classmethod
+    def parse_time_bin_size_from_path(cls, load_path: Optional[Union[Path, str]]) -> Optional[float]:
+        """Parse `_tbin-0.025` from a decoded-posteriors HDF5 filename."""
+        if load_path is None:
+            return None
+        match = cls._TBIN_FILENAME_REGEX.search(Path(load_path).name)
+        if match is None:
+            return None
+        return float(match.group(1))
 
 
     @classmethod
@@ -1815,8 +1836,9 @@ class LoadedPosteriorContainer:
                 a_decoder_name: [v for v in _out_ripple_only_dict[a_decoder_name][active_var_key]] for a_decoder_name in decoder_names
             }
 
-        _obj = cls(file_path=load_path, 
-                   ripple_data_field_dict=ripple_data_field_dict, session_key_parts=session_key_parts, custom_replay_parts=custom_replay_parts)
+        _obj = cls(file_path=load_path,
+                   ripple_data_field_dict=ripple_data_field_dict, session_key_parts=session_key_parts, custom_replay_parts=custom_replay_parts,
+                   time_bin_size=cls.parse_time_bin_size_from_path(load_path))
         # ripple_img_dict = ripple_data_field_dict['p_x_given_n_grey']
 
         return _obj
@@ -1831,9 +1853,13 @@ class LoadedPosteriorContainer:
         """
         exported_posterior_data_h5_files = [Path(v).resolve() for v in exported_posterior_data_h5_files] ## should parse who name and stuff... but we don't.
         all_sessions_exported_posteriors_list: List["LoadedPosteriorContainer"] = [cls.init_from_load_path(load_path=hdf_load_path) for hdf_load_path in exported_posterior_data_h5_files] ## need to export those globally unique identifiers for each aclu within a session
-        # _global_output_dict = {tuple([*v.session_key_parts, *v.custom_replay_parts]):v for v in all_sessions_exported_posteriors_list}
-        all_sessions_exported_posteriors_dict = {v.full_complete_context_key:v for v in all_sessions_exported_posteriors_list}
-        all_sessions_exported_posteriors_data_only_dict = {v.full_complete_context_key:deepcopy(v.ripple_data_field_dict) for v in all_sessions_exported_posteriors_list}
+        all_sessions_exported_posteriors_dict = {}
+        all_sessions_exported_posteriors_data_only_dict = {}
+        for v in all_sessions_exported_posteriors_list:
+            key: str = v.full_complete_context_key_with_tbin
+            all_sessions_exported_posteriors_dict[key] = v
+            all_sessions_exported_posteriors_data_only_dict[key] = deepcopy(v.ripple_data_field_dict)
+        ## END for v in all_sessions_exported_posteriors_list....
 
         return all_sessions_exported_posteriors_dict, all_sessions_exported_posteriors_data_only_dict
     
@@ -1845,41 +1871,426 @@ class LoadedPosteriorContainer:
 @metadata_attributes(short_name=None, tags=['export', 'posterior', 'datasource', 'plotting'], input_requires=[], output_provides=[], uses=[], used_by=['DataFrameFilter'], creation_date='2024-12-16 22:28', related_items=[])
 @define(slots=False, eq=False, repr=False)
 class PosteriorPlottingDatasource:
-    """ a datasource that provides posteriors
-    
+    """Datasource that looks up HDF5-loaded epoch posteriors for DataFrameFilter hover preview.
+
+    Keys are session/replay paths like `/kdiba/gor01/one/2006-6-09_1-22-43/withNormalComputedReplays-...`.
+    Each key maps to a list of tbin entries: `{time_bin_size, epoch_starts, p_x_given_n_grey, ...}`.
+
     from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorPlottingDatasource
-    
+
+    all_sessions_exported_posteriors_dict, _ = LoadedPosteriorContainer.load_batch_hdf5_exports(decoded_posteriors_h5_files)
+    posterior_datasource = PosteriorPlottingDatasource.from_loaded_containers(all_sessions_exported_posteriors_dict)
+
     """
+    DECODER_NAMES = ['long_LR', 'long_RL', 'short_LR', 'short_RL']
+    _TBIN_KEY_REGEX = re.compile(r'/tbin-([0-9]*\.?[0-9]+)$', re.IGNORECASE)
+
     data_field_dict: Dict = field(default=Factory(dict))
     plot_heatmap_fn: Callable = field(default=None)
 
-    def get_posterior_data(self, session_name: str, custom_replay_name: str, a_variable_name:str='p_x_given_n_grey', a_decoder_name: str='long_LR', last_selected_idx: Optional[int] = 0):
-        """ 
-        
+
+    @classmethod
+    def from_loaded_containers(cls, loaded, plot_heatmap_fn: Callable = None) -> "PosteriorPlottingDatasource":
+        """Wrap LoadedPosteriorContainer dicts/lists (or already-built datasources) into a hover lookup table."""
+        if loaded is None:
+            return cls(plot_heatmap_fn=plot_heatmap_fn)
+        if isinstance(loaded, cls):
+            if plot_heatmap_fn is not None and loaded.plot_heatmap_fn is None:
+                loaded.plot_heatmap_fn = plot_heatmap_fn
+            return loaded
+        obj = cls(plot_heatmap_fn=plot_heatmap_fn)
+        if isinstance(loaded, LoadedPosteriorContainer):
+            obj._ingest_container(loaded)
+            return obj
+        if isinstance(loaded, dict):
+            seen_ids = set()
+            for k, v in loaded.items():
+                if isinstance(v, LoadedPosteriorContainer):
+                    ident = id(v)
+                    if ident in seen_ids:
+                        continue
+                    seen_ids.add(ident)
+                    obj._ingest_container(v, fallback_key=str(k))
+                elif isinstance(v, dict):
+                    obj._ingest_raw_or_field_dict(v, context_key=str(k))
+            ## END for k, v in loaded.items()....
+
+            return obj
+        if isinstance(loaded, (list, tuple)):
+            for v in loaded:
+                if isinstance(v, LoadedPosteriorContainer):
+                    obj._ingest_container(v)
+                elif isinstance(v, dict):
+                    obj._ingest_raw_or_field_dict(v)
+            ## END for v in loaded....
+
+            return obj
+        raise TypeError(f'from_loaded_containers expected LoadedPosteriorContainer, dict, list, or PosteriorPlottingDatasource, got {type(loaded)}')
+
+
+    @classmethod
+    def _session_identity_leaf(cls, session_name: str) -> str:
+        """`kdiba_gor01_one_2006-6-09_1-22-43` or `/kdiba/gor01/one/2006-6-09_1-22-43` → `2006-6-09_1-22-43`."""
+        s = str(session_name).strip().strip('/')
+        if not s:
+            return s
+        if '/' in s:
+            s = s.split('/')[-1]
+        parts = s.split('_')
+        if (len(parts) >= 2) and parts[-2][:1].isdigit():
+            return '_'.join(parts[-2:])
+        return s
+
+
+    @classmethod
+    def build_session_path(cls, session_name: str, format_name: Optional[str] = None, animal: Optional[str] = None, exper_name: Optional[str] = None) -> str:
+        """Build `/format/animal/exper/session` when those columns exist; otherwise keep session_name as-is."""
+        session_name = str(session_name).strip()
+        leaf: str = cls._session_identity_leaf(session_name)
+        if format_name and animal and exper_name:
+            return '/' + '/'.join([str(format_name).strip('/'), str(animal).strip('/'), str(exper_name).strip('/'), leaf.strip('/')])
+        if session_name.count('/') >= 3:
+            return '/' + session_name.lstrip('/')
+        # `kdiba_gor01_one_2006-6-09_1-22-43` -> `/kdiba/gor01/one/2006-6-09_1-22-43`
+        parts = session_name.split('_')
+        if (len(parts) >= 4) and (not parts[0][:1].isdigit()):
+            return '/' + '/'.join(parts[:3] + ['_'.join(parts[3:])])
+        return '/' + (leaf or session_name).lstrip('/')
+
+
+    @classmethod
+    def _normalize_context_key(cls, key: str) -> str:
+        key = '/' + str(key).replace('\\', '/').lstrip('/')
+        while '//' in key:
+            key = key.replace('//', '/')
+        return key
+
+
+    @classmethod
+    def _split_context_key(cls, context_key: str) -> Tuple[str, Optional[float]]:
+        """Split `/session/replay/tbin-0.025` into (`/session/replay`, 0.025)."""
+        key = cls._normalize_context_key(context_key)
+        match = cls._TBIN_KEY_REGEX.search(key)
+        if match is None:
+            return key, None
+        return key[:match.start()], float(match.group(1))
+
+
+    @classmethod
+    def _epoch_start_from_edges_or_centers(cls, time_bin_edges, t_bin_centers) -> float:
+        if time_bin_edges is not None:
+            edges = np.asarray(time_bin_edges).ravel()
+            if edges.size > 0:
+                return float(edges[0])
+        if t_bin_centers is not None:
+            centers = np.asarray(t_bin_centers).ravel()
+            if centers.size > 0:
+                return float(centers[0])
+        return np.nan
+
+
+    @classmethod
+    def _as_ripple_data_field_dict(cls, maybe_dict: Dict, epochs_name: Optional[str] = None) -> Optional[Dict]:
+        """Normalize either a ripple_data_field_dict or a raw HDF5 `_out_dict` (decoder -> epochs_name -> fields)."""
+        if (not isinstance(maybe_dict, dict)) or (len(maybe_dict) == 0):
+            return None
+        if 'p_x_given_n_grey' in maybe_dict or 'p_x_given_n' in maybe_dict:
+            return maybe_dict
+        decoder_names = [dn for dn in cls.DECODER_NAMES if dn in maybe_dict and isinstance(maybe_dict[dn], dict)]
+        if len(decoder_names) == 0:
+            decoder_names = [k for k, v in maybe_dict.items() if isinstance(v, dict) and any(ek in v for ek in ('ripple', 'laps'))]
+        if len(decoder_names) == 0:
+            return None
+        sample = maybe_dict[decoder_names[0]]
+        if epochs_name is None:
+            epochs_name = 'ripple' if 'ripple' in sample else ('laps' if 'laps' in sample else None)
+        if epochs_name is None or (not isinstance(sample.get(epochs_name), dict)):
+            return None
+        field_names = list(sample[epochs_name].keys())
+        if ('p_x_given_n_grey' not in field_names) and ('p_x_given_n' not in field_names):
+            return None
+        out: Dict = {}
+        for field in field_names:
+            out[field] = {}
+            for decoder_name in decoder_names:
+                epoch_dict = maybe_dict.get(decoder_name, {}).get(epochs_name, {})
+                if field in epoch_dict:
+                    out[field][decoder_name] = list(epoch_dict[field])
+            ## END for decoder_name in decoder_names....
+        ## END for field in field_names....
+
+        return out
+
+
+    @classmethod
+    def _n_epochs_from_variable_dict(cls, variable_dict: Dict) -> int:
+        for decoder_name in cls.DECODER_NAMES:
+            values = variable_dict.get(decoder_name)
+            if values is not None:
+                return len(values)
+        ## END for decoder_name in cls.DECODER_NAMES....
+
+        if len(variable_dict) > 0:
+            return len(next(iter(variable_dict.values())))
+        return 0
+
+
+    def _ingest_raw_or_field_dict(self, maybe_dict: Dict, context_key: Optional[str] = None, time_bin_size: Optional[float] = None, file_path=None):
+        """Ingest a field-dict or a raw HDF5 `_out_dict` (decoder → ripple/laps → fields)."""
+        if (not isinstance(maybe_dict, dict)) or (len(maybe_dict) == 0):
+            return
+        if ('p_x_given_n_grey' in maybe_dict) or ('p_x_given_n' in maybe_dict):
+            self._ingest_data_field_dict(maybe_dict, context_key=context_key, time_bin_size=time_bin_size, file_path=file_path, epochs_name='ripple')
+            return
+        ingested_any: bool = False
+        for epochs_name in ('ripple', 'laps'):
+            converted = self._as_ripple_data_field_dict(maybe_dict, epochs_name=epochs_name)
+            if converted is None:
+                continue
+            self._ingest_data_field_dict(converted, context_key=context_key, time_bin_size=time_bin_size, file_path=file_path, epochs_name=epochs_name)
+            ingested_any = True
+        ## END for epochs_name in ('ripple', 'laps')....
+
+        if not ingested_any:
+            converted = self._as_ripple_data_field_dict(maybe_dict)
+            if converted is not None:
+                self._ingest_data_field_dict(converted, context_key=context_key, time_bin_size=time_bin_size, file_path=file_path)
+
+
+    def _ingest_data_field_dict(self, data_field_dict: Dict, context_key: Optional[str] = None, time_bin_size: Optional[float] = None, file_path=None, epochs_name: Optional[str] = None):
+        """Ingest a ripple_data_field_dict (`p_x_given_n_grey`, `time_bin_edges`, ...)."""
+        if not isinstance(data_field_dict, dict):
+            return
+        if 'p_x_given_n_grey' not in data_field_dict:
+            if 'p_x_given_n' in data_field_dict:
+                data_field_dict = dict(data_field_dict)
+                data_field_dict['p_x_given_n_grey'] = data_field_dict['p_x_given_n']
+            else:
+                return
+        session_replay_key: str = '/'
+        parsed_tbin: Optional[float] = time_bin_size
+        if context_key is not None:
+            session_replay_key, key_tbin = self._split_context_key(context_key)
+            if parsed_tbin is None:
+                parsed_tbin = key_tbin
+        grey = data_field_dict.get('p_x_given_n_grey', {})
+        edges = data_field_dict.get('time_bin_edges', {})
+        centers = data_field_dict.get('t_bin_centers', {})
+        n_epochs: int = self._n_epochs_from_variable_dict(grey)
+        epoch_starts = np.full((n_epochs,), np.nan, dtype=float)
+        epoch_stops = np.full((n_epochs,), np.nan, dtype=float)
+        ref_decoder = next((d for d in self.DECODER_NAMES if d in edges and len(edges[d]) > 0), None)
+        ref_center_decoder = next((d for d in self.DECODER_NAMES if d in centers and len(centers[d]) > 0), None)
+        ref_edges = edges.get(ref_decoder) if ref_decoder is not None else None
+        ref_centers = centers.get(ref_center_decoder) if ref_center_decoder is not None else None
+        for i in range(n_epochs):
+            e = ref_edges[i] if (ref_edges is not None and i < len(ref_edges)) else None
+            c = ref_centers[i] if (ref_centers is not None and i < len(ref_centers)) else None
+            epoch_starts[i] = self._epoch_start_from_edges_or_centers(e, c)
+            if e is not None:
+                e_arr = np.asarray(e).ravel()
+                if e_arr.size > 0:
+                    try:
+                        epoch_stops[i] = float(e_arr[-1])
+                    except Exception:
+                        pass
+            if (not np.isfinite(epoch_stops[i])) and (c is not None):
+                c_arr = np.asarray(c).ravel()
+                if c_arr.size > 0:
+                    try:
+                        epoch_stops[i] = float(c_arr[-1])
+                    except Exception:
+                        pass
+        ## END for i in range(n_epochs)....
+
+        if epochs_name is None:
+            key_leaf = str(session_replay_key).strip('/').split('/')[-1]
+            if key_leaf in ('ripple', 'laps'):
+                epochs_name = key_leaf
+            else:
+                epochs_name = 'ripple'
+        entry = {
+            'time_bin_size': parsed_tbin,
+            'epochs_name': epochs_name,
+            'epoch_starts': epoch_starts,
+            'epoch_stops': epoch_stops,
+            'p_x_given_n_grey': grey,
+            'p_x_given_n': data_field_dict.get('p_x_given_n', {}),
+            'time_bin_edges': edges,
+            't_bin_centers': centers,
+            'file_path': file_path,
+        }
+        self.data_field_dict.setdefault(session_replay_key, []).append(entry)
+
+
+    def _ingest_container(self, container: LoadedPosteriorContainer, fallback_key: Optional[str] = None):
+        context_key: str = container.full_complete_context_key
+        if (not context_key) or (context_key == '/'):
+            context_key = fallback_key or '/'
+        tbin = container.time_bin_size
+        if tbin is None:
+            tbin = LoadedPosteriorContainer.parse_time_bin_size_from_path(container.file_path)
+        if tbin is None and fallback_key is not None:
+            _, tbin = self._split_context_key(fallback_key)
+        self._ingest_data_field_dict(container.ripple_data_field_dict, context_key=context_key, time_bin_size=tbin, file_path=container.file_path)
+
+
+    def _fuzzy_find_entries(self, session_path: str, custom_replay_name: str) -> List[Dict]:
+        session_token: str = str(session_path).strip('/')
+        replay_token: str = str(custom_replay_name).strip('/') if custom_replay_name else ''
+        session_leaf: str = self._session_identity_leaf(session_path)
+        exact_replay: List[Dict] = []
+        session_only: List[Dict] = []
+        for key, entries in self.data_field_dict.items():
+            key_norm = str(key).strip('/')
+            session_in_key: bool = bool(session_token) and (session_token in key_norm)
+            leaf_in_key: bool = bool(session_leaf) and (session_leaf in key_norm)
+            if (not session_in_key) and (not leaf_in_key):
+                continue
+            if replay_token and (key_norm.endswith('/' + replay_token) or key_norm.endswith(replay_token) or (f'/{replay_token}/' in ('/' + key_norm + '/'))):
+                exact_replay.extend(entries)
+                continue
+            session_only.extend(entries)
+        ## END for key, entries in self.data_field_dict.items()....
+
+        return exact_replay if exact_replay else session_only
+
+
+    def _select_tbin_entry(self, entries: List[Dict], time_bin_size: Optional[float]) -> Optional[Dict]:
+        if not entries:
+            return None
+        if time_bin_size is None:
+            return entries[0] if len(entries) == 1 else entries[0]
+        target = float(time_bin_size)
+        for entry in entries:
+            entry_tbin = entry.get('time_bin_size')
+            if entry_tbin is None:
+                continue
+            if np.isclose(float(entry_tbin), target, atol=1e-6, rtol=1e-4):
+                return entry
+        ## END for entry in entries....
+
+        # Raw HDF5 session dicts often have no tbin on the key; use the only/first unknown entry.
+        unknown = [e for e in entries if e.get('time_bin_size') is None]
+        if unknown:
+            return unknown[0]
+        return entries[0]
+
+
+    def _match_epoch_index(self, epoch_starts: NDArray, start_t: float, time_bin_size: Optional[float], epoch_stops: Optional[NDArray] = None, time_bin_edges=None, t_bin_centers=None) -> Optional[int]:
+        starts = np.asarray(epoch_starts, dtype=float)
+        if starts.size == 0:
+            return None
+        tbin = float(time_bin_size) if time_bin_size is not None else 0.05
+        tolerance = max(0.5, 10.0 * tbin)
+        target = float(start_t)
+        # Prefer containment in [first_edge, last_edge] so per-time-bin rows still hit the parent epoch.
+        ref_edges = None
+        ref_centers = None
+        if isinstance(time_bin_edges, dict):
+            ref_edges = next((time_bin_edges[d] for d in self.DECODER_NAMES if d in time_bin_edges and len(time_bin_edges[d]) > 0), None)
+        elif time_bin_edges is not None:
+            ref_edges = time_bin_edges
+        if isinstance(t_bin_centers, dict):
+            ref_centers = next((t_bin_centers[d] for d in self.DECODER_NAMES if d in t_bin_centers and len(t_bin_centers[d]) > 0), None)
+        elif t_bin_centers is not None:
+            ref_centers = t_bin_centers
+        if ref_edges is not None:
+            for i in range(len(ref_edges)):
+                try:
+                    e_f = np.asarray(ref_edges[i], dtype=float).ravel()
+                except Exception:
+                    continue
+                finite = e_f[np.isfinite(e_f)]
+                if finite.size == 0:
+                    continue
+                lo = float(finite[0])
+                hi = float(finite[-1]) if finite.size > 1 else (lo + tbin)
+                if (lo - tolerance) <= target <= (hi + tolerance):
+                    return i
+            ## END for i in range(len(ref_edges))....
+        if epoch_stops is not None:
+            stops = np.asarray(epoch_stops, dtype=float)
+            n = min(starts.size, stops.size)
+            for i in range(n):
+                if (not np.isfinite(starts[i])) or (not np.isfinite(stops[i])):
+                    continue
+                lo = float(min(starts[i], stops[i]))
+                hi = float(max(starts[i], stops[i]))
+                if (lo - tolerance) <= target <= (hi + tolerance):
+                    return i
+            ## END for i in range(n)....
+        if ref_centers is not None:
+            for i in range(len(ref_centers)):
+                c = np.asarray(ref_centers[i]).ravel()
+                if c.size == 0:
+                    continue
+                try:
+                    c_f = c.astype(float)
+                except Exception:
+                    continue
+                if np.any(np.abs(c_f - target) <= tolerance):
+                    return i
+            ## END for i in range(len(ref_centers))....
+
+        valid = np.isfinite(starts)
+        if not np.any(valid):
+            return None
+        diffs = np.abs(starts - target)
+        diffs[~valid] = np.inf
+        idx = int(np.argmin(diffs))
+        if not np.isfinite(diffs[idx]) or (diffs[idx] > tolerance):
+            return None
+        return idx
+
+
+    def get_posterior_data(self, session_name: str, custom_replay_name: str, a_variable_name: str = 'p_x_given_n_grey', a_decoder_name: str = 'long_LR', last_selected_idx: Optional[int] = 0,
+                           start_t: Optional[float] = None, time_bin_size: Optional[float] = None, format_name: Optional[str] = None, animal: Optional[str] = None, exper_name: Optional[str] = None,
+                           return_all_decoders: bool = False, epochs_name: Optional[str] = None):
+        """Look up greyscale posterior image(s) for an epoch.
+
+        Prefer `start_t` (+ session/replay/tbin) over scatter `last_selected_idx`. Missing epoch returns None.
         """
-        '/kdiba_gor01_one_2006-6-09_1-22-43/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
-        '/kdiba/gor01/one/2006-6-09_1-22-43/withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0'
+        if session_name is None:
+            return None
+        session_path: str = self.build_session_path(session_name, format_name=format_name, animal=animal, exper_name=exper_name)
+        replay_part: str = str(custom_replay_name).strip('/') if custom_replay_name else ''
+        full_key: str = self._normalize_context_key(f'{session_path}/{replay_part}' if replay_part else session_path)
+        entries = self.data_field_dict.get(full_key)
+        if not entries:
+            entries = self.data_field_dict.get(self._normalize_context_key(session_path))
+        if not entries:
+            entries = self._fuzzy_find_entries(session_path, custom_replay_name)
+        if not entries:
+            return None
+        if epochs_name:
+            named = [e for e in entries if str(e.get('epochs_name') or 'ripple') == str(epochs_name)]
+            if named:
+                entries = named
+        entry = self._select_tbin_entry(entries, time_bin_size)
+        if entry is None:
+            return None
+        epoch_idx: Optional[int] = None
+        match_tbin = entry.get('time_bin_size') if time_bin_size is None else time_bin_size
+        if start_t is not None:
+            epoch_idx = self._match_epoch_index(entry.get('epoch_starts', np.array([])), float(start_t), match_tbin,
+                                                epoch_stops=entry.get('epoch_stops'), time_bin_edges=entry.get('time_bin_edges'), t_bin_centers=entry.get('t_bin_centers'))
+        elif last_selected_idx is not None:
+            epoch_idx = int(last_selected_idx)
+        if epoch_idx is None:
+            return None
+        variable_dict = entry.get(a_variable_name) or entry.get('p_x_given_n_grey') or entry.get('p_x_given_n') or {}
+        if return_all_decoders:
+            out = {}
+            for decoder_name in self.DECODER_NAMES:
+                imgs = variable_dict.get(decoder_name, [])
+                if epoch_idx < len(imgs):
+                    out[decoder_name] = imgs[epoch_idx]
+            ## END for decoder_name in self.DECODER_NAMES....
 
-        session_name = session_name.replace('_', '/', 3) # '/kdiba_gor01_one_2006-6-09_1-22-43' -> '/kdiba/gor01/one/2006-6-09_1-22-43'
-        # if last_selected_idx is None:
-        #     # df_filter.hover_posterior_data.ripple_img_dict
-        #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
-        full_key: str = f'/{session_name}/{custom_replay_name}'
-        assert full_key in self.data_field_dict, f"full_key: '{full_key}' was not in self.data_field_dict: {list(self.data_field_dict.keys())}"
-        a_heatmap_img = self.data_field_dict[full_key][a_variable_name][a_decoder_name][last_selected_idx]
-        return a_heatmap_img
+            return out if out else None
+        imgs = variable_dict.get(a_decoder_name, [])
+        if epoch_idx >= len(imgs):
+            return None
+        return imgs[epoch_idx]
 
-    # def _plot_hoverred_heatmap_preview_posterior(self, session_name: str, custom_replay_name: str, last_selected_idx: Optional[int] = 0):
-    #     # if last_selected_idx is None:
-    #     #     # df_filter.hover_posterior_data.ripple_img_dict
-    #     #     # df_filter.hover_posterior_preview_figure_widget.add_heatmap()
-    #     full_key: str = f'/{session_name}/{custom_replay_name}'
-    #     assert full_key in self.data_field_dict, f"full_key: '{full_key}' was not in self.data_field_dict: {list(self.data_field_dict.keys())}"
-    #     a_heatmap_img = self.data_field_dict[full_key]['long_LR'][last_selected_idx]
-        
-    #     # a_heatmap_img = df_filter.hover_posterior_data.ripple_img_dict['long_LR'][last_selected_idx]    
-        
-    #     ## update the plot
-    #     if self.plot_heatmap_fn is not None:
-    #         self.plot_heatmap_fn(
-    #     df_filter.hover_posterior_preview_figure_widget.add_heatmap(z=a_heatmap_img, showscale=False, name='selected_posterior', )
