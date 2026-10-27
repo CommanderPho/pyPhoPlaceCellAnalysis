@@ -9428,7 +9428,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wasserstein_distance
 
-@metadata_attributes(short_name=None, tags=['stats', 'fig4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-20 10:12', related_items=[])
+@metadata_attributes(short_name=None, tags=['stats', 'fig4', 'hierarchical-bootstrap', 'bootstrap', 'permutation', 'sampling'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-20 10:12', related_items=[])
 class PrePostDeltaDistributionComparison:
     """Compare pre/post-delta P_Short distributions using hierarchical moving blocks."""
 
@@ -9650,6 +9650,7 @@ class PrePostDeltaDistributionComparison:
 
         return np.quantile(bootstrap_distances, [0.025, 0.975])
 
+
     def _block_permutation_test(self, n_permutations):
         """Approximate null test by permuting labels of equal-length lap blocks within sessions.
 
@@ -9755,6 +9756,7 @@ class PrePostDeltaDistributionComparison:
             'n_blocks_pre': n_blocks_pre,
             'n_blocks_post': n_blocks_post,
         }
+
 
     def run(self, perform_block_permutation_test=False, n_permutations=2000):
         """Compute the effect, moving-block bootstrap interval, and optional block test."""
@@ -10139,7 +10141,39 @@ def estimate_block_length_laps_from_autocorrelation(
     recommendation_quantile=0.90,
     plot=False,
 ):
-    """Estimate a candidate moving-block length from lap-level P_Short autocorrelation."""
+    """Recommend a moving-block length (in laps) from residual lap-to-lap autocorrelation.
+
+    Within a lap, time bins are structurally dependent: they come from one continuous run.
+    Consecutive laps are not. Every lap is separated from the next by a non-lap period
+    in which the animal stops and receives reward. Across-lap dependence is therefore not
+    implied by the task; it is an empirical question (slow behavioral state, strategy, or
+    representational drift). `PrePostDeltaDistributionComparison` always resamples whole
+    laps, never individual time bins. This function asks whether those laps still need to
+    be grouped into longer moving blocks.
+
+    The input must already be one row per lap. Within each animal/session, laps are sorted
+    by `lap_order_col` and split into pre-delta or post-delta sequences. "Run" here means
+    an ordered sequence of the same condition with no missing scores, not continuous
+    running: adjacent laps in a run still have a reward/stop interval between them. A
+    missing score, a non-pre/post label, or a pre/post transition ends the current run so
+    the ACF is never computed across a condition change or a missing lap.
+
+    For each run long enough to support an ACF, the biased sample autocorrelation of
+    `value_col` is computed at successive lap lags. A run's decorrelation lag is the first
+    lag at which `consecutive_lags` consecutive |ACF| values all fall at or below
+    `acf_threshold`. If dependence is already gone at lag 1, iid resampling of laps
+    (`block_length_laps=1`) is supported. If the series is still correlated at the largest
+    lag examined, that run is marked censored.
+
+    The recommendation is a high quantile (default 90th percentile) of those per-run
+    decorrelation lags, in units of laps, for use as `block_length_laps`. A finite
+    `suggested_block_length_laps` is returned only when no informative run is censored;
+    otherwise only `provisional_block_length_laps` is filled. This is a diagnostic
+    heuristic, not a guarantee that a subsequent permutation or bootstrap test is valid.
+
+    Use `estimate_block_length_lap_t_bins_from_autocorrelation` instead when the table is
+    one row per time bin and each lap must first be summarized.
+    """
 
     import numpy as np
     import pandas as pd
