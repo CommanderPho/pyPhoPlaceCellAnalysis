@@ -1520,7 +1520,8 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         desired_total_num_shuffles = int(num_shuffles)
         minimum_required_unique_num_shuffles = int(num_shuffles)
 
-    newer_than: Optional[datetime] = datetime(2024, 11, 11)
+    # newer_than: Optional[datetime] = datetime(2024, 11, 11)
+    newer_than: Optional[datetime] = datetime(2026, 10, 26)
 
     allow_update_global_result: bool = False
     callback_outputs = {
