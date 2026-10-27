@@ -1137,6 +1137,11 @@ class DecodedEpochScoreShuffle(ComputedResult):
         wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_ripple_shuffle.build_all_shuffles_dataframes(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
         
         """
+        if decoder_names is None:
+            if self.track_templates is not None:
+                decoder_names = deepcopy(self.track_templates.get_decoder_names())
+            else:
+                decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
         (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute(decoder_names=decoder_names)
         n_shuffles, n_epochs, n_decoders = np.shape(all_shuffles_wcorr_array) # (1202, 136, 4)
         n_total_elements: int = n_epochs * n_shuffles * n_decoders
@@ -1269,7 +1274,11 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
         try:
             # all_shuffles_wcorr_array = self.get_all_shuffles_wcorr_array()
-            (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute()
+            if self.track_templates is not None:
+                decoder_names = deepcopy(self.track_templates.get_decoder_names())
+            else:
+                decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+            (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), all_shuffles_wcorr_array = self.post_compute(decoder_names=decoder_names)
 
         except (BaseException, AssertionError):
             all_shuffles_wcorr_array = []
@@ -1339,14 +1348,22 @@ class DecodedEpochScoreShuffle(ComputedResult):
             elif loaded_output_extracted_result_wcorrs_list:
                 decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
                 self.output_extracted_score_arrays_list.extend([{'wcorr': self._wcorr_df_dict_to_array(a_df_dict, decoder_names=decoder_names)} for a_df_dict in loaded_output_extracted_result_wcorrs_list])
-            if (len(loaded_results_list) >= 4) and (loaded_results_list[3] is not None) and (not self.real_score_arrays):
-                self.real_score_arrays = loaded_results_list[3]
+            if (len(loaded_results_list) >= 4) and (loaded_results_list[3] is not None):
+                loaded_real_score_arrays = loaded_results_list[3]
+                if not self.real_score_arrays:
+                    self.real_score_arrays = loaded_real_score_arrays
+                else:
+                    for metric_name, metric_arr in loaded_real_score_arrays.items():
+                        if metric_name not in self.real_score_arrays:
+                            self.real_score_arrays[metric_name] = metric_arr
+                    ## END for metric_name, metric_arr in loaded_real_score_arrays.items()....
             ## #TODO 2024-06-04 03:37: - [ ] remove duplicates
             self.ensure_all_shuffles_unique()
 
         except (BaseException, AssertionError) as e:
             print(f'error: {e}')
             raise e
+
 
     @function_attributes(short_name=None, tags=['discover', 'files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 04:43', related_items=[])
     def discover_load_and_append_shuffle_data_from_directory(self, save_directory, newer_than: Optional[datetime]=None, with_data_name: Optional[str]=None, debug_print=False):

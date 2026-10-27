@@ -9432,15 +9432,14 @@ from scipy.stats import wasserstein_distance
 class PrePostDeltaDistributionComparison:
     """Compare pre/post-delta P_Short distributions using hierarchical resampling.
 
-    Time bins within a lap are never resampled independently. `run(sampling_unit=...)`
-    chooses the remaining sampling unit:
+    Pass `sampling_unit` to the constructor. Cluster modes ignore parent-epoch identity.
 
-    - `'block'`: moving blocks of laps within each pre/post run (default).
-    - `'animal'` / `'session'`: copy each pre/post run intact and treat animals or
-      sessions as the paired units. Cluster modes do not resample laps or time bins.
-      The optional p-value is a sign-flip test of the signed mean difference, not
-      Wasserstein distance. Session-level tests treat sessions as exchangeable and
-      therefore ignore within-animal dependence.
+    - `'block'`: moving blocks of laps within each pre/post run (default). Time bins
+      within a lap are never resampled independently.
+    - `'animal'` / `'session'`: copy each session's pre and post values intact. Do not
+      group by lap or parent epoch. The optional p-value is a sign-flip test of the
+      signed mean difference, not Wasserstein distance. Session-level tests treat
+      sessions as exchangeable and therefore ignore within-animal dependence.
     """
 
     def __init__(self, filtered_all_sessions_laps_time_bin_df, value_col='P_Short',
@@ -9448,10 +9447,18 @@ class PrePostDeltaDistributionComparison:
                  session_col='session_name', lap_col='parent_epoch_id',
                  lap_order_col='parent_epoch_start_t',
                  pre_label='pre-delta', post_label='post-delta',
-                 block_length_laps=5, n_bootstrap=1000, random_state=None):
+                 block_length_laps=5, n_bootstrap=1000, random_state=None,
+                 sampling_unit='block'):
 
-        if block_length_laps < 1 or n_bootstrap < 1:
-            raise ValueError('block_length_laps and n_bootstrap must be >= 1.')
+        valid_sampling_units = ('block', 'animal', 'session')
+        if sampling_unit not in valid_sampling_units:
+            raise ValueError(
+                f'sampling_unit must be one of {valid_sampling_units}, got {sampling_unit!r}.'
+            )
+        if n_bootstrap < 1:
+            raise ValueError('n_bootstrap must be >= 1.')
+        if sampling_unit == 'block' and block_length_laps < 1:
+            raise ValueError('block_length_laps must be >= 1.')
 
         self.value_col = value_col
         self.condition_col = condition_col
@@ -9462,9 +9469,12 @@ class PrePostDeltaDistributionComparison:
         self.group_values = (pre_label, post_label)
         self.block_length_laps = int(block_length_laps)
         self.n_bootstrap = int(n_bootstrap)
+        self.sampling_unit = sampling_unit
         self.rng = np.random.default_rng(random_state)
 
-        required_cols = [value_col, condition_col, animal_col, session_col, lap_col, lap_order_col]
+        required_cols = [value_col, condition_col, animal_col, session_col]
+        if sampling_unit == 'block':
+            required_cols = required_cols + [lap_col, lap_order_col]
         missing_cols = set(required_cols).difference(filtered_all_sessions_laps_time_bin_df.columns)
         if missing_cols:
             raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
@@ -9478,7 +9488,6 @@ class PrePostDeltaDistributionComparison:
             raise ValueError(f'Data must contain both groups: {self.group_values}')
 
         data[value_col] = pd.to_numeric(data[value_col], errors='raise')
-        data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
 
         self._y = data[value_col].to_numpy(dtype=float)
         if not np.isfinite(self._y).all() or np.any((self._y < 0) | (self._y > 1)):
@@ -9486,6 +9495,35 @@ class PrePostDeltaDistributionComparison:
 
         data['_condition_code'] = (data[condition_col] == post_label).astype(np.int8)
         data['_animal_code'], self._animals = pd.factorize(data[animal_col], sort=False)
+        self._data = data
+        self._row_condition_code = data['_condition_code'].to_numpy()
+        self._animal_code_rows = data['_animal_code'].to_numpy()
+        self._n_animals = len(self._animals)
+
+        for animal_code in range(self._n_animals):
+            animal_mask = self._animal_code_rows == animal_code
+            if set(self._row_condition_code[animal_mask]) != {0, 1}:
+                raise ValueError(
+                    f'Animal {self._animals[animal_code]!r} lacks one condition.'
+                )
+        ## END for animal_code in range(self._n_animals)....
+
+        self._lap_table = None
+        self._values_by_lap = None
+        self._positions_by_lap = None
+        self._runs = None
+        self._values_by_session = None
+        self._sessions_by_profile = {}
+
+        if sampling_unit == 'block':
+            self._build_block_lap_structures(data, animal_col, session_col, lap_col, lap_order_col)
+        else:
+            self._build_cluster_session_structures(data, session_col)
+
+
+    def _build_block_lap_structures(self, data, animal_col, session_col, lap_col, lap_order_col):
+        """Group rows into laps and chronological pre/post runs for moving-block resampling."""
+        data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
         data['_lap_id'] = data.groupby(
             [animal_col, session_col, lap_col], sort=False, dropna=False
         ).ngroup().astype(np.int64)
@@ -9505,11 +9543,6 @@ class PrePostDeltaDistributionComparison:
         if self._lap_table['_n_lap_order_values'].ne(1).any():
             raise ValueError(f'{lap_order_col} must be constant within each lap.')
 
-        self._data = data
-        self._row_condition_code = data['_condition_code'].to_numpy()
-        self._animal_code_rows = data['_animal_code'].to_numpy()
-        self._n_animals = len(self._animals)
-
         # Cache every complete lap; no time bins are independently resampled.
         self._values_by_lap = {}
         self._positions_by_lap = {}
@@ -9518,6 +9551,7 @@ class PrePostDeltaDistributionComparison:
             positions = np.asarray(positions, dtype=np.int64)
             self._values_by_lap[int(lap_id)] = self._y[positions]
             self._positions_by_lap[int(lap_id)] = positions
+        ## END for lap_id, positions in data.groupby('_lap_id', sort=False).indices.items()....
 
         # Organize chronologically contiguous runs of laps by animal and session.
         # Separate runs ensure bootstrap blocks never cross a pre/post boundary.
@@ -9546,28 +9580,51 @@ class PrePostDeltaDistributionComparison:
                     current_lap_ids = []
 
                 current_lap_ids.append(int(lap_id))
+            ## END for lap_id, condition in session_laps[['_lap_id', '_condition_code']].itertuples....
 
             if current_lap_ids:
                 runs.append({'condition': current_condition, 'lap_ids': current_lap_ids})
 
             self._runs.setdefault(int(animal_code), {})[session] = runs
-
-        for animal_code in range(self._n_animals):
-            animal_mask = self._animal_code_rows == animal_code
-            if set(self._row_condition_code[animal_mask]) != {0, 1}:
-                raise ValueError(
-                    f'Animal {self._animals[animal_code]!r} lacks one condition.'
-                )
-
-        # Stratify session resampling by the conditions represented in each session.
-        self._sessions_by_profile = {}
+        ## END for (animal_code, session), session_laps in self._lap_table.groupby....
 
         for animal_code, sessions in self._runs.items():
             profiles = {}
             for session, runs in sessions.items():
                 profile = tuple(sorted({run['condition'] for run in runs}))
                 profiles.setdefault(profile, []).append(session)
+            ## END for session, runs in sessions.items()....
             self._sessions_by_profile[animal_code] = profiles
+        ## END for animal_code, sessions in self._runs.items()....
+
+
+    def _build_cluster_session_structures(self, data, session_col):
+        """Cache pre/post values per session without grouping by parent epoch."""
+        self._values_by_session = {}
+
+        for (animal_code, session), idx in data.groupby(
+                ['_animal_code', session_col], sort=False, dropna=False
+        ).indices.items():
+            idx = np.asarray(idx, dtype=np.int64)
+            cond = self._row_condition_code[idx]
+            y = self._y[idx]
+            values = {}
+            if np.any(cond == 0):
+                values[0] = y[cond == 0]
+            if np.any(cond == 1):
+                values[1] = y[cond == 1]
+            self._values_by_session.setdefault(int(animal_code), {})[session] = values
+        ## END for (animal_code, session), idx in data.groupby....
+
+        for animal_code, sessions in self._values_by_session.items():
+            profiles = {}
+            for session, values in sessions.items():
+                profile = tuple(sorted(values.keys()))
+                profiles.setdefault(profile, []).append(session)
+            ## END for session, values in sessions.items()....
+            self._sessions_by_profile[animal_code] = profiles
+        ## END for animal_code, sessions in self._values_by_session.items()....
+
 
     def _distance_for_labels(self, row_labels, row_mask=None):
         """Wasserstein-1 distance, weighting each animal equally."""
@@ -9593,6 +9650,7 @@ class PrePostDeltaDistributionComparison:
             u_weights=1.0 / pre_counts[pre_codes],
             v_weights=1.0 / post_counts[post_codes],
         ))
+
 
     def _moving_block_resample_lap_ids(self, lap_ids):
         """Resample overlapping blocks of adjacent laps within one uninterrupted run."""
@@ -9628,8 +9686,8 @@ class PrePostDeltaDistributionComparison:
         """Resample animals, sessions within animals, and optionally contiguous lap blocks.
 
         resample_within_run True draws overlapping lap blocks within each run. False copies
-        each pre/post run intact. mean_difference_unit `'animal'` or `'session'` also
-        returns a 95% CI for the mean of that unit's signed mean differences.
+        each session's cached pre/post values. mean_difference_unit `'animal'` or
+        `'session'` also returns a 95% CI for the mean of that unit's signed mean differences.
         """
         bootstrap_distances = []
         bootstrap_mean_diffs = []
@@ -9654,33 +9712,43 @@ class PrePostDeltaDistributionComparison:
                 ## END for sessions in self._sessions_by_profile[animal_code].values()....
 
                 for session in sampled_sessions:
-                    session_values = {0: [], 1: []}
-
-                    for run in self._runs[animal_code][session]:
-                        if resample_within_run:
+                    if resample_within_run:
+                        session_values = {0: [], 1: []}
+                        for run in self._runs[animal_code][session]:
                             sampled_lap_ids = self._moving_block_resample_lap_ids(
                                 run['lap_ids']
                             )
-                        else:
-                            sampled_lap_ids = run['lap_ids']
+                            run_values = [
+                                self._values_by_lap[lap_id] for lap_id in sampled_lap_ids
+                            ]
+                            session_values[run['condition']].extend(run_values)
+                            animal_values[run['condition']].extend(run_values)
+                        ## END for run in self._runs[animal_code][session]....
 
-                        run_values = [
-                            self._values_by_lap[lap_id] for lap_id in sampled_lap_ids
-                        ]
-                        session_values[run['condition']].extend(run_values)
-                        animal_values[run['condition']].extend(run_values)
-                    ## END for run in self._runs[animal_code][session]....
+                        if (
+                            mean_difference_unit == 'session'
+                            and session_values[0]
+                            and session_values[1]
+                        ):
+                            pre_session = np.concatenate(session_values[0])
+                            post_session = np.concatenate(session_values[1])
+                            session_mean_diffs.append(
+                                post_session.mean() - pre_session.mean()
+                            )
+                    else:
+                        cached = self._values_by_session[animal_code][session]
+                        for condition, values in cached.items():
+                            animal_values[condition].append(values)
+                        ## END for condition, values in cached.items()....
 
-                    if (
-                        mean_difference_unit == 'session'
-                        and session_values[0]
-                        and session_values[1]
-                    ):
-                        pre_session = np.concatenate(session_values[0])
-                        post_session = np.concatenate(session_values[1])
-                        session_mean_diffs.append(
-                            post_session.mean() - pre_session.mean()
-                        )
+                        if (
+                            mean_difference_unit == 'session'
+                            and 0 in cached and 1 in cached
+                            and cached[0].size and cached[1].size
+                        ):
+                            session_mean_diffs.append(
+                                cached[1].mean() - cached[0].mean()
+                            )
                 ## END for session in sampled_sessions....
 
                 pre_concat = np.concatenate(animal_values[0])
@@ -9734,29 +9802,22 @@ class PrePostDeltaDistributionComparison:
         """One paired-effect row per session that contains both pre and post bins."""
         rows = []
 
-        for animal_code, sessions in self._runs.items():
-            for session, runs in sessions.items():
-                session_values = {0: [], 1: []}
-
-                for run in runs:
-                    session_values[run['condition']].extend(
-                        self._values_by_lap[lap_id] for lap_id in run['lap_ids']
-                    )
-                ## END for run in runs....
-
-                if not session_values[0] or not session_values[1]:
+        for animal_code, sessions in self._values_by_session.items():
+            for session, values in sessions.items():
+                if 0 not in values or 1 not in values:
                     continue
-
-                pre = np.concatenate(session_values[0])
-                post = np.concatenate(session_values[1])
+                pre = values[0]
+                post = values[1]
+                if pre.size == 0 or post.size == 0:
+                    continue
                 row = {
                     'animal': self._animals[int(animal_code)],
                     'session': session,
                 }
                 row.update(self._effect_statistics(pre, post))
                 rows.append(row)
-            ## END for session, runs in sessions.items()....
-        ## END for animal_code, sessions in self._runs.items()....
+            ## END for session, values in sessions.items()....
+        ## END for animal_code, sessions in self._values_by_session.items()....
 
         return pd.DataFrame(rows)
 
@@ -9945,20 +10006,23 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit='block'):
+    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None):
         """Compute the effect, bootstrap interval, and optional permutation test.
 
-        sampling_unit `'block'` (default) resamples moving lap blocks and, if requested,
-        permutes within-session lap-block labels of Wasserstein-1. `'animal'` and
-        `'session'` copy each pre/post run intact, bootstrap the mean of unit-level
-        signed mean differences, and if requested run a paired sign-flip test of that
-        mean difference. Cluster modes do not resample laps or time bins. Session-level
-        tests treat sessions as exchangeable and therefore ignore within-animal dependence.
+        Uses `sampling_unit` from the constructor. Passing it here is optional and must
+        match. `'block'` resamples moving lap blocks and, if requested, permutes
+        within-session lap-block labels of Wasserstein-1. `'animal'` and `'session'` copy
+        each session's pre/post values intact and, if requested, run a paired sign-flip
+        test of the signed mean difference. Cluster modes do not group by parent epoch.
+        Session-level tests treat sessions as exchangeable and therefore ignore
+        within-animal dependence.
         """
-        valid_sampling_units = ('block', 'animal', 'session')
-        if sampling_unit not in valid_sampling_units:
+        if sampling_unit is None:
+            sampling_unit = self.sampling_unit
+        elif sampling_unit != self.sampling_unit:
             raise ValueError(
-                f'sampling_unit must be one of {valid_sampling_units}, got {sampling_unit!r}.'
+                f'sampling_unit={sampling_unit!r} does not match constructor '
+                f'sampling_unit={self.sampling_unit!r}. Pass sampling_unit to __init__.'
             )
 
         labels = self._row_condition_code
@@ -10006,8 +10070,17 @@ class PrePostDeltaDistributionComparison:
                 )
                 p_value_effect = 'mean_difference_post_minus_pre'
 
-        lap_counts = self._lap_table['_condition_code'].value_counts()
         bin_counts = self._data['_condition_code'].value_counts()
+        n_sessions = int(
+            self._data[['_animal_code', self.session_col]].drop_duplicates().shape[0]
+        )
+        if self._lap_table is None:
+            n_laps_pre = None
+            n_laps_post = None
+        else:
+            lap_counts = self._lap_table['_condition_code'].value_counts()
+            n_laps_pre = int(lap_counts.get(0, 0))
+            n_laps_post = int(lap_counts.get(1, 0))
         results = {
             'comparison': f'{self.group_values[0]} vs {self.group_values[1]}',
             'sampling_unit': sampling_unit,
@@ -10025,9 +10098,9 @@ class PrePostDeltaDistributionComparison:
             ),
             'permutation_results': permutation_results,
             'n_animals': self._n_animals,
-            'n_sessions': self._lap_table[['_animal_code', '_session']].drop_duplicates().shape[0],
-            'n_laps_pre': int(lap_counts.get(0, 0)),
-            'n_laps_post': int(lap_counts.get(1, 0)),
+            'n_sessions': n_sessions,
+            'n_laps_pre': n_laps_pre,
+            'n_laps_post': n_laps_post,
             'n_bins_pre': int(bin_counts.get(0, 0)),
             'n_bins_post': int(bin_counts.get(1, 0)),
             'block_length_laps': self.block_length_laps,
