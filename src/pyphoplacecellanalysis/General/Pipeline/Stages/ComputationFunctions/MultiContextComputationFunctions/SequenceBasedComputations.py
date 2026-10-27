@@ -474,6 +474,47 @@ class DecodedEpochScoreShuffle(ComputedResult):
         return p, z, n_more_extreme
 
 
+    def post_compute_all_metrics(self, decoder_names: Optional[List[types.DecoderName]]=None) -> Dict[str, Tuple[NDArray, NDArray, NDArray]]:
+        """p / z / n_more_extreme for every stored metric.
+
+        Returns:
+            metric_name -> (p, z, n_more_extreme), each (n_epochs, n_decoders).
+        """
+        if decoder_names is None:
+            if self.track_templates is not None:
+                decoder_names = deepcopy(self.track_templates.get_decoder_names())
+            else:
+                decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
+        metric_names: List[str] = []
+        if self.real_score_arrays:
+            metric_names = list(self.real_score_arrays.keys())
+        if (self.output_extracted_score_arrays_list is not None) and (len(self.output_extracted_score_arrays_list) > 0):
+            for a_name in self.output_extracted_score_arrays_list[0].keys():
+                if a_name not in metric_names:
+                    metric_names.append(a_name)
+            ## END for a_name in self.output_extracted_score_arrays_list[0].keys()....
+
+        if (len(metric_names) == 0) and (self.real_decoder_ripple_weighted_corr_arr is not None):
+            metric_names = ['wcorr']
+
+        out_stats: Dict[str, Tuple[NDArray, NDArray, NDArray]] = {}
+        for metric_name in metric_names:
+            shuffle_stack = self._stack_shuffle_metric(metric_name)
+            if shuffle_stack is None:
+                continue
+            if (self.real_score_arrays is not None) and (metric_name in self.real_score_arrays) and (self.real_score_arrays[metric_name] is not None):
+                real_arr = np.asarray(self.real_score_arrays[metric_name])
+            elif metric_name == 'wcorr':
+                real_arr = np.asarray(self.real_decoder_ripple_weighted_corr_arr)
+            else:
+                continue
+            extreme_mode: str = SCORE_EXTREME_MODE.get(metric_name, 'greater')
+            out_stats[metric_name] = self.post_compute_metric(real_arr, shuffle_stack, extreme_mode=extreme_mode)
+        ## END for metric_name in metric_names....
+
+        return out_stats
+
+
     @classmethod
     def compute_shuffle_radon_score_arrays(cls, decoder_ripple_filter_epochs_decoder_result_dict: DecodedEpochsResultsDict, track_templates: TrackTemplates, decoder_names: Optional[List[str]]=None) -> Dict[str, NDArray]:
         """Extract radon `score` (and `velocity`) as (n_epochs, n_decoders) arrays. Neighbors extras are discarded."""
@@ -1139,6 +1180,8 @@ class DecodedEpochScoreShuffle(ComputedResult):
         # all_shuffles_wcorr_df
 
         extra_real_metric_frames: List[pd.DataFrame] = []
+        extra_zp_frames: List[pd.DataFrame] = []
+        all_metric_stats: Dict[str, Tuple[NDArray, NDArray, NDArray]] = self.post_compute_all_metrics(decoder_names=decoder_names)
         if self.real_score_arrays:
             for metric_name, real_arr in self.real_score_arrays.items():
                 if metric_name == 'wcorr':
@@ -1147,10 +1190,15 @@ class DecodedEpochScoreShuffle(ComputedResult):
                     continue
                 extra_col_names = [f"{metric_name}_{str(n)}" for n in decoder_names]
                 extra_real_metric_frames.append(pd.DataFrame(np.asarray(real_arr), columns=extra_col_names))
+                if metric_name in all_metric_stats:
+                    p_arr, z_arr, n_more_extreme_arr = all_metric_stats[metric_name]
+                    extra_zp_frames.append(pd.DataFrame(np.asarray(z_arr), columns=[f"{metric_name}_z_{str(n)}" for n in decoder_names]))
+                    extra_zp_frames.append(pd.DataFrame(np.asarray(p_arr), columns=[f"{metric_name}_p_{str(n)}" for n in decoder_names]))
+                    extra_zp_frames.append(pd.DataFrame(np.asarray(n_more_extreme_arr), columns=[f"{metric_name}_n_extreme_{str(n)}" for n in decoder_names]))
             ## END for metric_name, real_arr in self.real_score_arrays.items()....
 
         # Concatenate dataframes along columns
-        concat_frames = [deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, *extra_real_metric_frames]
+        concat_frames = [deepcopy(self.filtered_epochs_df), real_decoder_ripple_wcorr_df, wcorr_ZScore_real_LR_df, *extra_real_metric_frames, *extra_zp_frames]
         wcorr_ripple_shuffle_all_df: pd.DataFrame = pd.concat(concat_frames, axis=1)
         wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.drop(columns=['start_t']) ## drop redundant column
         ## Drop rows missing critical data and then convert datatypes:
@@ -1198,16 +1246,19 @@ class DecodedEpochScoreShuffle(ComputedResult):
     def save_data(self, filepath):
         """ saves the important results to pickle
 
-        Payload (5-tuple; older pickles may omit trailing elements):
+        Payload (7-tuple; older pickles may omit trailing elements):
             (output_extracted_result_wcorrs_list,
              real_decoder_ripple_weighted_corr_arr,
              output_all_shuffles_decoded_results_list,
              all_shuffles_wcorr_array,
-             real_decoder_ripple_filter_epochs_decoder_result_dict)
+             real_decoder_ripple_filter_epochs_decoder_result_dict,
+             output_extracted_score_arrays_list,
+             real_score_arrays)
 
         Older layouts:
             3-tuple: (wcorrs_list, real_wcorr_arr, shuffle_decoded_list)
             4-tuple: above + all_shuffles_wcorr_array
+            5-tuple: above + real_decoder_ripple_filter_epochs_decoder_result_dict
 
         Examples:
             2024-05-31_1015AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
