@@ -320,7 +320,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
             'extended_pf_peak_information',
-            'perform_wcorr_shuffle_analysis',
+            'epoch_score_shuffle_analysis',
             'non_PBE_epochs_results',
             'generalized_specific_epochs_decoding',
         ]

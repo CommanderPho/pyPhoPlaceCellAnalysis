@@ -207,12 +207,12 @@ class BatchCompletionHelpers:
 		
 		If `did_change` == True,
 			['merged_directional_placefields', 'directional_decoders_evaluate_epochs', 'directional_decoders_epoch_heuristic_scoring']
-			['wcorr_shuffle_analysis']
+			['epoch_score_shuffle_analysis']
 
 			are updated
 
 		Otherwise:
-			['wcorr_shuffle_analysis'] can be updated
+			['epoch_score_shuffle_analysis'] can be updated
 
 		Usage:
 			from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import overwrite_replay_epochs_and_recompute
@@ -282,8 +282,8 @@ class BatchCompletionHelpers:
 			print(f'no changes!')
 			curr_active_pipeline.reload_default_computation_functions()
 		
-			## wcorr shuffle:
-			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+			## epoch score shuffle:
+			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['epoch_score_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh, 'enable_heuristic_shuffle_scoring': True, 'enable_radon_shuffle_scoring': False}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 		else:
 			print(f'replay epochs changed!')
@@ -373,8 +373,8 @@ class BatchCompletionHelpers:
 			## Pickle first thing after changes:
 			# custom_save_filepaths = helper_perform_pickle_pipeline(curr_active_pipeline=curr_active_pipeline, custom_save_filepaths=custom_save_filepaths)
 
-			## wcorr shuffle:
-			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['wcorr_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
+			## epoch score shuffle:
+			curr_active_pipeline.perform_specific_computation(computation_functions_name_includelist=['epoch_score_shuffle_analysis'], computation_kwargs_list=[{'num_shuffles': num_wcorr_shuffles, 'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh, 'enable_heuristic_shuffle_scoring': True, 'enable_radon_shuffle_scoring': False}], enabled_filter_names=None, fail_on_exception=fail_on_exception, debug_print=False)
 
 			## Pickle again after recomputing:
 			custom_save_filepaths = helper_perform_pickle_pipeline(a_curr_active_pipeline=curr_active_pipeline, custom_save_filenames=custom_save_filenames, custom_save_filepaths_dict=custom_save_filepaths,

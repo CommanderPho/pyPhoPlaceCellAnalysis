@@ -1480,8 +1480,7 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
 
 
 @function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'export', 'mat', 'pkl', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                   should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
+def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None) -> dict:
     """  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_wcorr_shuffles_completion_function
@@ -1517,6 +1516,9 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     # desired_total_num_shuffles: int = 4096
     desired_total_num_shuffles: int = 700
     minimum_required_unique_num_shuffles: int = 700
+    if num_shuffles is not None:
+        desired_total_num_shuffles = int(num_shuffles)
+        minimum_required_unique_num_shuffles = int(num_shuffles)
 
     newer_than: Optional[datetime] = datetime(2024, 11, 11)
 
@@ -1546,7 +1548,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version'])) # modernize the object
 
 
-    wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline) # do one more shuffle
+    wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=True) # do one more shuffle
     
     if not should_skip_previous_saved_shuffles:
         # try load previous compatible shuffles: _____________________________________________________________________________ #
@@ -1568,7 +1570,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         desired_new_num_shuffles: int = max((desired_total_num_shuffles - wcorr_shuffles.n_completed_shuffles), 0)
         print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
         ## add some more shuffles to it:
-        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline)
+        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=True)
 
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
