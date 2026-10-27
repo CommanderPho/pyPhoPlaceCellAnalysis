@@ -120,6 +120,17 @@ class FigureS8:
 
 
     @classmethod
+    def figures_intermediates_parent_folder(cls) -> Path:
+        """Where temporary/intermediate figures are written."""
+        if cls.figures_parent_folder is None
+            return None
+        else:
+            out_path = cls.figures_parent_folder.joinpath('_TEMP')
+            out_path.mkdir(exist_ok=True)
+            return out_path
+
+
+    @classmethod
     def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True) -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
         layout_kwargs = dict(
@@ -266,7 +277,7 @@ class FigureS8:
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
     @classmethod
-    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
+    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
         ):
         """Plot the constrained pre/post-delta scatter.
