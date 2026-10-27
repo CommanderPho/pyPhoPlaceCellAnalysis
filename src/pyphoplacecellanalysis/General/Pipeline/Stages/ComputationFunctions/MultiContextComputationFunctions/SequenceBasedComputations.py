@@ -935,7 +935,9 @@ class DecodedEpochScoreShuffle(ComputedResult):
         
 
     @classmethod
-    def _shuffle_and_decode_scores(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2, spikes_df: Optional[pd.DataFrame]=None, enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False, enable_saving_entire_decoded_shuffle_result: bool=False):
+    def _shuffle_and_decode_scores(cls, curr_active_pipeline, track_templates: TrackTemplates, alt_directional_merged_decoders_result: DirectionalPseudo2DDecodersResult, all_templates_decode_kwargs: Dict, num_shuffles: int = 2, spikes_df: Optional[pd.DataFrame]=None,
+            enable_heuristic_shuffle_scoring: bool=True, enable_radon_shuffle_scoring: bool=False, enable_saving_entire_decoded_shuffle_result: bool=False, force_disable_laps_decoding: bool = True,
+        ):
         """Shuffle cell identities, decode ripples, extract enabled score metrics.
 
         Only computes for the ripples, not the laps. Merged-decoder shuffle is skipped because `skip_merged_decoding=True`.
@@ -956,7 +958,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
             spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
 
         has_decode_kwargs_dict_copy: bool = False ## to make sure we don't overwrite the input kwargs
-        force_disable_laps_decoding: bool = True
+        
         if force_disable_laps_decoding:
             
             if (all_templates_decode_kwargs.get('desired_laps_decoding_time_bin_size', None) is not None):

@@ -1481,10 +1481,15 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
 
 @function_attributes(short_name=None, tags=['epoch_score', 'shuffle', 'export', 'mat', 'pkl', 'csv', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
 def compute_and_export_session_epoch_score_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-        should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None,
-        enable_heuristic_shuffle_scoring: Optional[bool]=True, enable_radon_shuffle_scoring: Optional[bool]=False,
+        should_skip_previous_saved_shuffles:bool=False, should_purge_existing_shuffled_result: bool = False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None,
+        enable_heuristic_shuffle_scoring: Optional[bool]=True, enable_radon_shuffle_scoring: Optional[bool]=False, enable_saving_entire_decoded_shuffle_result: bool=False,
     ) -> dict:
     """  Computes shuffled decoded-epoch scores (wcorr, heuristics, optional radon) and export them to several formats: .mat, .pkl, and .csv
+
+    `should_skip_previous_saved_shuffles`: skip loading compatible shuffle pkls from the session output directory.
+    `should_purge_existing_shuffled_result`: discard in-memory `SequenceBased.ripple_score_shuffle` and start from `init_from_templates` (also skips disk load).
+    `with_data_name`: full pickle `data_name` used for both load filtering and save (default `standalone_epoch_score_shuffle_data_only`). Must match `ExportedEpochScoreShufflesPickleFilenameParser` (`[A-Za-z0-9_,.\[\] \-]+`).
+    `enable_saving_entire_decoded_shuffle_result`: when True, each newly computed shuffle keeps its `DecodedFilterEpochsResult` dicts in `output_all_shuffles_decoded_results_list` and they are pickled by `save_data` (much larger). Only shuffles computed after the flag is on are stored; use `should_purge_existing_shuffled_result=True` for a full set.
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_epoch_score_shuffles_completion_function
     
@@ -1544,23 +1549,35 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
 
 
     # global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
-    if a_sequence_computation_container.ripple_score_shuffle is None:
+    if should_purge_existing_shuffled_result or (a_sequence_computation_container.ripple_score_shuffle is None):
+        if should_purge_existing_shuffled_result and (a_sequence_computation_container.ripple_score_shuffle is not None):
+            print(f'purged existing SequenceBased.ripple_score_shuffle (n_completed_shuffles: {a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles}) since `should_purge_existing_shuffled_result == True`')
         # initialize a new epoch-score shuffle result
-        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=False)
+        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result)
         a_sequence_computation_container.ripple_score_shuffle = epoch_score_shuffles
     else:
         ## get the existing one:
         epoch_score_shuffles = a_sequence_computation_container.ripple_score_shuffle
         epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.modernize_from_instance(epoch_score_shuffles) # modernize the object without flattening nested DecodedFilterEpochsResult values
 
+    epoch_score_shuffles.enable_saving_entire_decoded_shuffle_result = bool(enable_saving_entire_decoded_shuffle_result)
 
     epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring) # do one more shuffle
     
-    if not should_skip_previous_saved_shuffles:
+    if (not should_skip_previous_saved_shuffles) and (not should_purge_existing_shuffled_result):
         # try load previous compatible shuffles: _____________________________________________________________________________ #
         epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=load_shuffles_newer_than, with_data_name=with_data_name)
 
     n_completed_shuffles: int = epoch_score_shuffles.n_completed_shuffles
+
+    if n_completed_shuffles < desired_total_num_shuffles:   
+        print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
+        print(f'needed desired_total_num_shuffles: {desired_total_num_shuffles}.')
+        desired_new_num_shuffles: int = max((desired_total_num_shuffles - n_completed_shuffles), 0)
+        print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
+        ## add some more shuffles to it:
+        epoch_score_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
+        n_completed_shuffles = epoch_score_shuffles.n_completed_shuffles
 
     if (minimum_required_unique_num_shuffles is not None) and (n_completed_shuffles < minimum_required_unique_num_shuffles):
         ## skipping
@@ -1570,21 +1587,12 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         ## EXITS HERE:
         return across_session_results_extended_dict
 
-    if n_completed_shuffles < desired_total_num_shuffles:   
-        print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
-        print(f'needed desired_total_num_shuffles: {desired_total_num_shuffles}.')
-        desired_new_num_shuffles: int = max((desired_total_num_shuffles - epoch_score_shuffles.n_completed_shuffles), 0)
-        print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
-        ## add some more shuffles to it:
-        epoch_score_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
-
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
     # wcorr_tool.save_data(filepath='temp100.pkl')
 
     a_sequence_computation_container.ripple_score_shuffle = epoch_score_shuffles
 
-    n_completed_shuffles: int = epoch_score_shuffles.n_completed_shuffles
     print(f'loaded and computed shuffles with {n_completed_shuffles} unique shuffles')
     
     if allow_update_global_result:
@@ -1623,7 +1631,8 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         
 
     ## Pickle Saving:
-    standalone_filename: str = f'{get_now_day_str()}_standalone_epoch_score_shuffle_data_only_{a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles}.pkl'
+    shuffle_pkl_data_name: str = with_data_name if (with_data_name is not None) else 'standalone_epoch_score_shuffle_data_only'
+    standalone_filename: str = f'{get_now_day_str()}_{shuffle_pkl_data_name}_{a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles}.pkl'
     epoch_score_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
     print(f'epoch_score_shuffles_data_standalone_filepath: "{epoch_score_shuffles_data_standalone_filepath}"')
 
