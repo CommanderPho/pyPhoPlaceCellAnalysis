@@ -568,3 +568,30 @@ class TestHeuristicShuffleScoreArrays(unittest.TestCase):
         self.assertIs(decoded_result.filter_epochs, filter_epochs)
         pd.testing.assert_frame_equal(decoded_result.filter_epochs, filter_epochs_before)
         pd.testing.assert_frame_equal(filter_epochs, filter_epochs_before)
+
+
+try:
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
+except Exception:
+    DecoderDecodedEpochsResult = None
+
+
+@unittest.skipIf(DecoderDecodedEpochsResult is None, 'DecoderDecodedEpochsResult import requires optional GUI deps')
+class TestAssignBooleanColumnFromLocIndicies(unittest.TestCase):
+    """CSV export used `.iloc` with `.idxmin()` labels after dropna, raising IndexError (676 vs 669 rows)."""
+
+    def test_gapped_index_labels_do_not_use_iloc(self):
+        a_df = pd.DataFrame({'ripple_start_t': np.arange(4, dtype=float)}, index=[0, 1, 3, 676])
+        n_set = DecoderDecodedEpochsResult._assign_boolean_column_from_loc_indicies(a_df, column_name='is_user_annotated_epoch', loc_indicies=np.array([1, 676, 999]))
+        self.assertEqual(n_set, 2)
+        self.assertEqual(len(a_df), 4)
+        np.testing.assert_array_equal(a_df['is_user_annotated_epoch'].to_numpy(), np.array([False, True, False, True]))
+
+
+    def test_try_add_is_user_annotated_epoch_column_with_gapped_index(self):
+        starts = np.array([10.0, 20.0, 30.0, 40.0])
+        a_df = pd.DataFrame({'start': starts, 'stop': starts + 0.2, 'label': np.arange(4), 'ripple_start_t': starts}, index=[0, 1, 3, 676])
+        selected_times = np.array([[20.0, 20.2], [40.0, 40.2]])
+        did_update = DecoderDecodedEpochsResult.try_add_is_user_annotated_epoch_column(a_df, any_good_selected_epoch_times=selected_times, t_column_names=['ripple_start_t'])
+        self.assertTrue(did_update)
+        np.testing.assert_array_equal(a_df['is_user_annotated_epoch'].to_numpy(), np.array([False, True, False, True]))

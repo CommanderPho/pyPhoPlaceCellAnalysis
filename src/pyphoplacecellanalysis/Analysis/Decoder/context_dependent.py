@@ -2153,8 +2153,11 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                         
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_identifier}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        export_df['is_user_annotated_epoch'] = False
-                        export_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                        try:
+                            DecoderDecodedEpochsResult._assign_boolean_column_from_loc_indicies(export_df, column_name='is_user_annotated_epoch', loc_indicies=any_good_selected_epoch_indicies)
+                        except Exception as e:
+                            print(f'WARNING: trying to set is_user_annotated_epoch FAILED: {e}, leaving all False')
+                            export_df['is_user_annotated_epoch'] = False
                     else:
                         print(f'\t failed all methods for annotations')
 
@@ -2178,12 +2181,8 @@ class GenericDecoderDictDecodedEpochsDictResult(ComputedResult):
                         
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_identifier}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        export_df['is_valid_epoch'] = False
-
                         try:
-                            export_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
-                            # a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
-
+                            DecoderDecodedEpochsResult._assign_boolean_column_from_loc_indicies(export_df, column_name='is_valid_epoch', loc_indicies=any_good_selected_epoch_indicies)
                         except Exception as e:
                             print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
                             export_df['is_valid_epoch'] = True

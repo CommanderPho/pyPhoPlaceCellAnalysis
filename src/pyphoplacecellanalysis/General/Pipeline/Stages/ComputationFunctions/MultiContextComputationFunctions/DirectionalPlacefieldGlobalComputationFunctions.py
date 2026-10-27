@@ -4529,6 +4529,28 @@ class DecoderDecodedEpochsResult(ComputedResult):
 
 
     @classmethod
+    def _assign_boolean_column_from_loc_indicies(cls, a_df: pd.DataFrame, column_name: str, loc_indicies) -> int:
+        """Set `column_name` True at dataframe *index labels*.
+
+        `find_data_indicies_from_epoch_times` uses `.idxmin()`, which returns `.loc` labels, not positional `.iloc` rows.
+        After `dropna()` the frame can be shorter than those labels (e.g. label 676 vs 669 rows), so `.iloc` raises IndexError.
+        Returns the number of rows set to True.
+        """
+        a_df[column_name] = False
+        if loc_indicies is None:
+            return 0
+        loc_indicies = np.atleast_1d(loc_indicies)
+        loc_indicies = loc_indicies[pd.notna(loc_indicies)]
+        if len(loc_indicies) == 0:
+            return 0
+        existing_indicies = a_df.index.intersection(pd.Index(loc_indicies))
+        n_set: int = int(len(existing_indicies))
+        if n_set > 0:
+            a_df.loc[existing_indicies, column_name] = True
+        return n_set
+
+
+    @classmethod
     @function_attributes(short_name=None, tags=['user-annotations', 'column', 'epoch', 'is_valid_epoch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-04 00:00', related_items=[])
     def try_add_is_epoch_boolean_column(cls, a_df: pd.DataFrame, any_good_selected_epoch_times: NDArray, new_column_name:str='is_valid_epoch', t_column_names=None, atol:float=0.01, not_found_action='skip_index', debug_print=False) -> bool:
         """ tries to add a 'new_column_name' column to the dataframe. 
@@ -4548,10 +4570,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
             return False
 
         # print(f'\t succeded at getting indicies! for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-        a_df[new_column_name] = False
-        # a_df[new_column_name].iloc[any_good_selected_epoch_indicies] = True
-        a_df[new_column_name].loc[any_good_selected_epoch_indicies] = True
-        # a_df[new_column_name].loc[a_df.index.to_numpy()[any_good_selected_epoch_indicies]] = True # IndexError: index 392 is out of bounds for axis 0 with size 390
+        # `.idxmin()` returns loc labels; do not use `.iloc` (IndexError after dropna, e.g. 676 vs 669 rows)
+        cls._assign_boolean_column_from_loc_indicies(a_df, column_name=new_column_name, loc_indicies=any_good_selected_epoch_indicies)
         return True
 
 
@@ -4913,8 +4933,11 @@ class DecoderDecodedEpochsResult(ComputedResult):
                         
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} user selections) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        a_df['is_user_annotated_epoch'] = False
-                        a_df['is_user_annotated_epoch'].iloc[any_good_selected_epoch_indicies] = True
+                        try:
+                            cls._assign_boolean_column_from_loc_indicies(a_df, column_name='is_user_annotated_epoch', loc_indicies=any_good_selected_epoch_indicies)
+                        except Exception as e:
+                            print(f'WARNING: trying to set is_user_annotated_epoch FAILED: {e}, leaving all False')
+                            a_df['is_user_annotated_epoch'] = False
                     else:
                         print(f'\t failed all methods for annotations')
 
@@ -4938,12 +4961,8 @@ class DecoderDecodedEpochsResult(ComputedResult):
                         
                     if any_good_selected_epoch_indicies is not None:
                         print(f'\t succeded at getting {len(any_good_selected_epoch_indicies)} selected indicies (of {num_valid_epoch_times} valid filter epoch times) for {a_df_name}. got {len(any_good_selected_epoch_indicies)} indicies!')
-                        a_df['is_valid_epoch'] = False
-
                         try:
-                            a_df['is_valid_epoch'].iloc[any_good_selected_epoch_indicies] = True
-                            # a_df['is_valid_epoch'].loc[any_good_selected_epoch_indicies] = True
-
+                            cls._assign_boolean_column_from_loc_indicies(a_df, column_name='is_valid_epoch', loc_indicies=any_good_selected_epoch_indicies)
                         except Exception as e:
                             print(f'WARNING: trying to get whether the epochs are valid FAILED probably, 2024-06-28 custom computed epochs thing: {e}, just setting all to True')
                             a_df['is_valid_epoch'] = True
