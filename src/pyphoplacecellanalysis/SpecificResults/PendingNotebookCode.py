@@ -10688,7 +10688,7 @@ from typing import NewType
 
 SeriesLetter = NewType('SeriesLetter', str) # a letter in ['a', 'b', 'c', 'd'] coresponding to one of the four configurations
 AnimalName = NewType('AnimalName', str) # an animal name in ['gor01', 'vvp01', ''] coresponding to one of the three animals
-
+SessionName = NewType('SessionName', str) # an animal name in ['gor01', 'vvp01', ''] coresponding to one of the three animals
 
 def plot_fisher_z(sim_diffs, num_bootstrap_samples, curr_num_draws, extra_title: str='', ax=None):
     fig_title: str = f'{extra_title}fisherZ (from Teams) bootstrap: num_bootstrap_samples: {num_bootstrap_samples}, num_draws: {curr_num_draws}'
@@ -10935,7 +10935,6 @@ def fig4_hist_stats_pho(bags: Dict, num_bootstrap_samples: int = 10000, confiden
 
         # a_simulated_prob_by_bag = {k:(v[-1][0] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
         # a_simulated_prob_dist_by_bag = {k:(v[-1] / np.sum(v[-1])) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
-
 
         a_simulated_prob_by_bag = {k:(np.asarray(v[-1], dtype=float)[0] / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema
         a_simulated_prob_dist_by_bag = {k:(np.asarray(v[-1], dtype=float) / np.sum(np.asarray(v[-1], dtype=float))) for k, v in simulated_counts_by_bag.items()}  ## -1 refers to only the last sample, [0] refers to the top extrema

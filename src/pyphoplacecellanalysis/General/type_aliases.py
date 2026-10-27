@@ -51,3 +51,6 @@ type_to_df_column_name_mapping: Dict = dict(zip([KnownNamedDecoderTrainedCompute
 
 # FilterContextName = NewType('FilterContextName', str) 
 # ComputationFunctionName = NewType('ComputationFunctionName', str) 
+
+AnimalName = NewType('AnimalName', str) # an animal name in ['gor01', 'vvp01', ''] coresponding to one of the three animals
+SessionName = NewType('SessionName', str) # a recording session name in ['kdiba_gor01_one_2006-6-08_14-26-15', 'kdiba_gor01_one_2006-6-09_1-22-43', ...] coresponding to one of the recording sessions for a specific animal
