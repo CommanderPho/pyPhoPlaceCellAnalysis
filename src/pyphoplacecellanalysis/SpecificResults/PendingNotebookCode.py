@@ -9430,7 +9430,18 @@ from scipy.stats import wasserstein_distance
 
 @metadata_attributes(short_name=None, tags=['stats', 'fig4', 'hierarchical-bootstrap', 'bootstrap', 'permutation', 'sampling'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-20 10:12', related_items=[])
 class PrePostDeltaDistributionComparison:
-    """Compare pre/post-delta P_Short distributions using hierarchical moving blocks."""
+    """Compare pre/post-delta P_Short distributions using hierarchical resampling.
+
+    Time bins within a lap are never resampled independently. `run(sampling_unit=...)`
+    chooses the remaining sampling unit:
+
+    - `'block'`: moving blocks of laps within each pre/post run (default).
+    - `'animal'` / `'session'`: copy each pre/post run intact and treat animals or
+      sessions as the paired units. Cluster modes do not resample laps or time bins.
+      The optional p-value is a sign-flip test of the signed mean difference, not
+      Wasserstein distance. Session-level tests treat sessions as exchangeable and
+      therefore ignore within-animal dependence.
+    """
 
     def __init__(self, filtered_all_sessions_laps_time_bin_df, value_col='P_Short',
                  condition_col='pre_post_delta_category', animal_col='animal',
@@ -9612,15 +9623,24 @@ class PrePostDeltaDistributionComparison:
             pre, post, u_weights=pre_weights, v_weights=post_weights
         ))
 
-    def _hierarchical_bootstrap(self):
-        """Resample animals, sessions within animals, and contiguous lap blocks."""
+
+    def _hierarchical_bootstrap(self, resample_within_run=True, mean_difference_unit=None):
+        """Resample animals, sessions within animals, and optionally contiguous lap blocks.
+
+        resample_within_run True draws overlapping lap blocks within each run. False copies
+        each pre/post run intact. mean_difference_unit `'animal'` or `'session'` also
+        returns a 95% CI for the mean of that unit's signed mean differences.
+        """
         bootstrap_distances = []
+        bootstrap_mean_diffs = []
 
         for _ in range(self.n_bootstrap):
             sampled_animals = self.rng.choice(
                 self._n_animals, size=self._n_animals, replace=True
             )
             pre_by_animal, post_by_animal = [], []
+            animal_mean_diffs = []
+            session_mean_diffs = []
 
             for animal_code in sampled_animals:
                 animal_code = int(animal_code)
@@ -9631,24 +9651,191 @@ class PrePostDeltaDistributionComparison:
                     sampled_sessions.extend(
                         self.rng.choice(sessions, size=len(sessions), replace=True).tolist()
                     )
+                ## END for sessions in self._sessions_by_profile[animal_code].values()....
 
                 for session in sampled_sessions:
-                    for run in self._runs[animal_code][session]:
-                        sampled_lap_ids = self._moving_block_resample_lap_ids(
-                            run['lap_ids']
-                        )
-                        animal_values[run['condition']].extend(
-                            self._values_by_lap[lap_id] for lap_id in sampled_lap_ids
-                        )
+                    session_values = {0: [], 1: []}
 
-                pre_by_animal.append(np.concatenate(animal_values[0]))
-                post_by_animal.append(np.concatenate(animal_values[1]))
+                    for run in self._runs[animal_code][session]:
+                        if resample_within_run:
+                            sampled_lap_ids = self._moving_block_resample_lap_ids(
+                                run['lap_ids']
+                            )
+                        else:
+                            sampled_lap_ids = run['lap_ids']
+
+                        run_values = [
+                            self._values_by_lap[lap_id] for lap_id in sampled_lap_ids
+                        ]
+                        session_values[run['condition']].extend(run_values)
+                        animal_values[run['condition']].extend(run_values)
+                    ## END for run in self._runs[animal_code][session]....
+
+                    if (
+                        mean_difference_unit == 'session'
+                        and session_values[0]
+                        and session_values[1]
+                    ):
+                        pre_session = np.concatenate(session_values[0])
+                        post_session = np.concatenate(session_values[1])
+                        session_mean_diffs.append(
+                            post_session.mean() - pre_session.mean()
+                        )
+                ## END for session in sampled_sessions....
+
+                pre_concat = np.concatenate(animal_values[0])
+                post_concat = np.concatenate(animal_values[1])
+                pre_by_animal.append(pre_concat)
+                post_by_animal.append(post_concat)
+                if mean_difference_unit == 'animal':
+                    animal_mean_diffs.append(post_concat.mean() - pre_concat.mean())
+            ## END for animal_code in sampled_animals....
 
             bootstrap_distances.append(
                 self._distance_for_bootstrap_samples(pre_by_animal, post_by_animal)
             )
+            if mean_difference_unit == 'animal' and animal_mean_diffs:
+                bootstrap_mean_diffs.append(float(np.mean(animal_mean_diffs)))
+            elif mean_difference_unit == 'session' and session_mean_diffs:
+                bootstrap_mean_diffs.append(float(np.mean(session_mean_diffs)))
+        ## END for _ in range(self.n_bootstrap)....
 
-        return np.quantile(bootstrap_distances, [0.025, 0.975])
+        wasserstein_ci = tuple(np.quantile(bootstrap_distances, [0.025, 0.975]))
+        if mean_difference_unit is None or not bootstrap_mean_diffs:
+            mean_difference_ci = None
+        else:
+            mean_difference_ci = tuple(
+                np.quantile(bootstrap_mean_diffs, [0.025, 0.975])
+            )
+
+        return {
+            'wasserstein_1_bootstrap_95ci': wasserstein_ci,
+            'mean_difference_bootstrap_95ci': mean_difference_ci,
+        }
+
+
+    @staticmethod
+    def _effect_statistics(pre, post):
+        """Mean, median, and Wasserstein summaries for one paired pre/post sample."""
+        return {
+            'n_bins_pre': int(pre.size),
+            'n_bins_post': int(post.size),
+            'mean_pre': float(pre.mean()),
+            'mean_post': float(post.mean()),
+            'mean_difference_post_minus_pre': float(post.mean() - pre.mean()),
+            'median_pre': float(np.median(pre)),
+            'median_post': float(np.median(post)),
+            'median_difference_post_minus_pre': float(np.median(post) - np.median(pre)),
+            'wasserstein_1': float(wasserstein_distance(pre, post)),
+        }
+
+
+    def _session_effect_rows(self):
+        """One paired-effect row per session that contains both pre and post bins."""
+        rows = []
+
+        for animal_code, sessions in self._runs.items():
+            for session, runs in sessions.items():
+                session_values = {0: [], 1: []}
+
+                for run in runs:
+                    session_values[run['condition']].extend(
+                        self._values_by_lap[lap_id] for lap_id in run['lap_ids']
+                    )
+                ## END for run in runs....
+
+                if not session_values[0] or not session_values[1]:
+                    continue
+
+                pre = np.concatenate(session_values[0])
+                post = np.concatenate(session_values[1])
+                row = {
+                    'animal': self._animals[int(animal_code)],
+                    'session': session,
+                }
+                row.update(self._effect_statistics(pre, post))
+                rows.append(row)
+            ## END for session, runs in sessions.items()....
+        ## END for animal_code, sessions in self._runs.items()....
+
+        return pd.DataFrame(rows)
+
+
+    def _paired_sign_permutation_test(self, effects, n_permutations, sampling_unit):
+        """Two-sided sign-flip test that the mean of paired unit effects is zero.
+
+        Does not assume lap-block exchangeability. Session-level tests treat sessions as
+        exchangeable and therefore ignore within-animal dependence.
+        """
+        if n_permutations < 1:
+            raise ValueError('n_permutations must be >= 1.')
+
+        effects = np.asarray(effects, dtype=float)
+        n_units = int(effects.size)
+        if n_units < 1:
+            return {
+                'p_value': None,
+                'observed_mean_difference_post_minus_pre': None,
+                'null_mean_differences': None,
+                'effect': 'mean_difference_post_minus_pre',
+                'sampling_unit': sampling_unit,
+                'n_units': n_units,
+                'exact': False,
+                'method': None,
+                'status': 'Not testable: no paired units with both conditions.',
+            }
+
+        observed = float(effects.mean())
+        abs_observed = abs(observed)
+        n_exact = 1 << n_units
+        use_exact = (n_units <= 20) and (n_exact <= n_permutations)
+
+        if use_exact:
+            sign_bits = (
+                (np.arange(n_exact, dtype=np.uint32)[:, None] >> np.arange(n_units)) & 1
+            )
+            signs = 1.0 - 2.0 * sign_bits.astype(float)
+            null_means = signs @ effects / n_units
+            p_value = float(np.count_nonzero(np.abs(null_means) >= abs_observed) / n_exact)
+            method = 'exact'
+        else:
+            null_means = np.empty(n_permutations, dtype=float)
+            sign_choices = np.array([1.0, -1.0])
+
+            for i in range(n_permutations):
+                signs = self.rng.choice(sign_choices, size=n_units)
+                null_means[i] = float(np.mean(signs * effects))
+            ## END for i in range(n_permutations)....
+
+            p_value = (
+                1 + np.count_nonzero(np.abs(null_means) >= abs_observed)
+            ) / (n_permutations + 1)
+            method = 'monte_carlo'
+
+        if sampling_unit == 'session':
+            unit_status = (
+                'Session-level tests treat sessions as exchangeable and ignore '
+                'within-animal dependence.'
+            )
+        else:
+            unit_status = (
+                'Animal-level tests treat animals as independent experimental units.'
+            )
+
+        return {
+            'p_value': float(p_value),
+            'observed_mean_difference_post_minus_pre': observed,
+            'null_mean_differences': null_means,
+            'effect': 'mean_difference_post_minus_pre',
+            'sampling_unit': sampling_unit,
+            'n_units': n_units,
+            'exact': bool(use_exact),
+            'method': method,
+            'status': (
+                'ok; paired cluster sign-flip test of the mean difference. '
+                'Does not assume lap-block exchangeability. ' + unit_status
+            ),
+        }
 
 
     def _block_permutation_test(self, n_permutations):
@@ -9758,43 +9945,75 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-    def run(self, perform_block_permutation_test=False, n_permutations=2000):
-        """Compute the effect, moving-block bootstrap interval, and optional block test."""
+    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit='block'):
+        """Compute the effect, bootstrap interval, and optional permutation test.
+
+        sampling_unit `'block'` (default) resamples moving lap blocks and, if requested,
+        permutes within-session lap-block labels of Wasserstein-1. `'animal'` and
+        `'session'` copy each pre/post run intact, bootstrap the mean of unit-level
+        signed mean differences, and if requested run a paired sign-flip test of that
+        mean difference. Cluster modes do not resample laps or time bins. Session-level
+        tests treat sessions as exchangeable and therefore ignore within-animal dependence.
+        """
+        valid_sampling_units = ('block', 'animal', 'session')
+        if sampling_unit not in valid_sampling_units:
+            raise ValueError(
+                f'sampling_unit must be one of {valid_sampling_units}, got {sampling_unit!r}.'
+            )
+
         labels = self._row_condition_code
-        ci = self._hierarchical_bootstrap()
+        resample_within_run = sampling_unit == 'block'
+        mean_difference_unit = None if sampling_unit == 'block' else sampling_unit
+        bootstrap_result = self._hierarchical_bootstrap(
+            resample_within_run=resample_within_run,
+            mean_difference_unit=mean_difference_unit,
+        )
         animal_rows = []
 
         for animal_code, animal in enumerate(self._animals):
             animal_mask = self._animal_code_rows == animal_code
             pre = self._y[animal_mask & (labels == 0)]
             post = self._y[animal_mask & (labels == 1)]
-
-            animal_rows.append({
-                'animal': animal,
-                'n_bins_pre': pre.size,
-                'n_bins_post': post.size,
-                'mean_pre': pre.mean(),
-                'mean_post': post.mean(),
-                'mean_difference_post_minus_pre': post.mean() - pre.mean(),
-                'median_pre': np.median(pre),
-                'median_post': np.median(post),
-                'median_difference_post_minus_pre': np.median(post) - np.median(pre),
-                'wasserstein_1': wasserstein_distance(pre, post),
-            })
+            row = {'animal': animal}
+            row.update(self._effect_statistics(pre, post))
+            animal_rows.append(row)
+        ## END for animal_code, animal in enumerate(self._animals)....
 
         animal_summary = pd.DataFrame(animal_rows)
-        permutation_results = (
-            self._block_permutation_test(n_permutations)
-            if perform_block_permutation_test else None
+        session_summary = (
+            self._session_effect_rows() if sampling_unit == 'session' else None
         )
+
+        permutation_results = None
+        p_value_effect = None
+        if perform_block_permutation_test:
+            if sampling_unit == 'block':
+                permutation_results = self._block_permutation_test(n_permutations)
+                p_value_effect = 'wasserstein_1'
+            elif sampling_unit == 'animal':
+                permutation_results = self._paired_sign_permutation_test(
+                    animal_summary['mean_difference_post_minus_pre'].to_numpy(),
+                    n_permutations,
+                    sampling_unit='animal',
+                )
+                p_value_effect = 'mean_difference_post_minus_pre'
+            else:
+                permutation_results = self._paired_sign_permutation_test(
+                    session_summary['mean_difference_post_minus_pre'].to_numpy()
+                    if not session_summary.empty else np.array([], dtype=float),
+                    n_permutations,
+                    sampling_unit='session',
+                )
+                p_value_effect = 'mean_difference_post_minus_pre'
 
         lap_counts = self._lap_table['_condition_code'].value_counts()
         bin_counts = self._data['_condition_code'].value_counts()
-
-        return {
+        results = {
             'comparison': f'{self.group_values[0]} vs {self.group_values[1]}',
+            'sampling_unit': sampling_unit,
+            'p_value_effect': p_value_effect,
             'wasserstein_1': self._distance_for_labels(labels),
-            'wasserstein_1_bootstrap_95ci': tuple(ci),
+            'wasserstein_1_bootstrap_95ci': bootstrap_result['wasserstein_1_bootstrap_95ci'],
             'mean_difference_post_minus_pre': float(
                 animal_summary['mean_difference_post_minus_pre'].mean()
             ),
@@ -9814,6 +10033,14 @@ class PrePostDeltaDistributionComparison:
             'block_length_laps': self.block_length_laps,
             'animal_summary': animal_summary,
         }
+        if sampling_unit != 'block':
+            results['mean_difference_bootstrap_95ci'] = bootstrap_result[
+                'mean_difference_bootstrap_95ci'
+            ]
+        if session_summary is not None:
+            results['session_summary'] = session_summary
+
+        return results
 
 
 
