@@ -407,6 +407,45 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
 
     @classmethod
+    def _coerce_decoded_epochs_result_dict(cls, decoder_result_dict: Optional[DecodedEpochsResultsDict]) -> Optional[DecodedEpochsResultsDict]:
+        """Rebuild `DecodedFilterEpochsResult` values flattened to dicts by recursive `asdict` leftovers. Leave `None` and already-typed results alone."""
+        if decoder_result_dict is None:
+            return None
+        allowed_names = {a_field.name for a_field in attrs.fields(DecodedFilterEpochsResult)}
+        coerced_dict: DecodedEpochsResultsDict = {}
+        for a_name, a_result in decoder_result_dict.items():
+            if a_result is None:
+                coerced_dict[a_name] = None
+                continue
+            if not isinstance(a_result, dict):
+                coerced_dict[a_name] = a_result
+                continue
+            if 'num_filter_epochs' not in a_result:
+                coerced_dict[a_name] = a_result
+                continue
+            field_kwargs = {k: v for k, v in a_result.items() if k in allowed_names}
+            try:
+                coerced_dict[a_name] = DecodedFilterEpochsResult(**field_kwargs)
+            except Exception:
+                coerced_dict[a_name] = a_result
+        ## END for a_name, a_result in decoder_result_dict.items()....
+
+        return coerced_dict
+
+
+    @classmethod
+    def modernize_from_instance(cls, obj: Optional["DecodedEpochScoreShuffle"]) -> Optional["DecodedEpochScoreShuffle"]:
+        """Rebind onto the current class without recursively converting nested attrs objects to dicts."""
+        from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+        if obj is None:
+            return None
+        field_dict = obj if isinstance(obj, dict) else asdict(obj, recurse=False)
+        rebuilt = cls(**get_dict_subset(field_dict, subset_excludelist=['_VersionedResultMixin_version']))
+        rebuilt.real_decoder_ripple_filter_epochs_decoder_result_dict = cls._coerce_decoded_epochs_result_dict(rebuilt.real_decoder_ripple_filter_epochs_decoder_result_dict)
+        return rebuilt
+
+
+    @classmethod
     def compute_z_transformed_scores(cls, data: NDArray) -> NDArray:
         mean = np.mean(data)
         std_dev = np.std(data)
@@ -551,6 +590,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
             self.real_score_arrays = {}
         if (self.real_decoder_ripple_weighted_corr_arr is not None) and ('wcorr' not in self.real_score_arrays):
             self.real_score_arrays['wcorr'] = np.asarray(self.real_decoder_ripple_weighted_corr_arr)
+        self.real_decoder_ripple_filter_epochs_decoder_result_dict = self._coerce_decoded_epochs_result_dict(self.real_decoder_ripple_filter_epochs_decoder_result_dict)
         if self.real_decoder_ripple_filter_epochs_decoder_result_dict is None:
             return
         if decoder_names is None:
@@ -558,11 +598,11 @@ class DecodedEpochScoreShuffle(ComputedResult):
                 decoder_names = deepcopy(self.track_templates.get_decoder_names())
             else:
                 decoder_names = deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES)
-        if self.enable_heuristic_shuffle_scoring and (self.track_templates is not None):
+        if self.enable_heuristic_shuffle_scoring and (self.track_templates is not None) and ('travel' not in self.real_score_arrays):
             from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
             heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=self.track_templates, a_decoded_filter_epochs_decoder_result_dict=self.real_decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
             self.real_score_arrays.update(heuristic_arrays)
-        if self.enable_radon_shuffle_scoring and (self.track_templates is not None):
+        if self.enable_radon_shuffle_scoring and (self.track_templates is not None) and ('radon_score' not in self.real_score_arrays):
             radon_arrays = self.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=self.real_decoder_ripple_filter_epochs_decoder_result_dict, track_templates=self.track_templates, decoder_names=decoder_names)
             self.real_score_arrays.update(radon_arrays)
 

@@ -1548,7 +1548,7 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
     else:
         ## get the existing one:
         epoch_score_shuffles = a_sequence_computation_container.ripple_score_shuffle
-        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle(**get_dict_subset(epoch_score_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version'])) # modernize the object
+        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.modernize_from_instance(epoch_score_shuffles) # modernize the object without flattening nested DecodedFilterEpochsResult values
 
 
     epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=True) # do one more shuffle
@@ -1810,7 +1810,7 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
             wcorr_shuffle_results: SequenceBasedComputationsContainer = a_curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
             if wcorr_shuffle_results is not None:    
                 wcorr_shuffles: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
-                wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
+                wcorr_shuffles: WCorrShuffle = WCorrShuffle.modernize_from_instance(wcorr_shuffles)
                 a_curr_active_pipeline.global_computation_results.computed_data.SequenceBased.wcorr_ripple_shuffle = wcorr_shuffles
                 filtered_epochs_df: pd.DataFrame = deepcopy(wcorr_shuffles.filtered_epochs_df)
                 print(f'\t\twcorr_ripple_shuffle.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles}')

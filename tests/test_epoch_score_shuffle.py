@@ -21,6 +21,8 @@ except ModuleNotFoundError:
     sys.path.insert(0, str(root_project_folder.joinpath('src')))
 finally:
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+    from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
+    from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, WCorrShuffle
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
 
@@ -38,6 +40,30 @@ def _epochs_df(n_epochs: int) -> pd.DataFrame:
 
 def _wcorr_df_dict(wcorr_arr: np.ndarray):
     return DecodedEpochScoreShuffle._array_to_wcorr_df_dict(wcorr_arr, decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+
+
+def _minimal_decoded_result_dict(n_epochs: int = 2) -> dict:
+    return {
+        'num_filter_epochs': n_epochs,
+        'decoding_time_bin_size': 0.025,
+        'nbins': np.full(n_epochs, 2, dtype=int),
+        'filter_epochs': _epochs_df(n_epochs),
+    }
+
+
+def _decoded_result_mock(n_epochs: int = 2) -> "_DecodedResultMock":
+    n_time = 2
+    time_window_centers = np.array([0.025, 0.075])
+    time_bin_edges = np.array([0.0, 0.05, 0.10])
+    return _DecodedResultMock(
+        num_filter_epochs=n_epochs,
+        most_likely_positions_list=[np.array([0.0, 1.0]) for _epoch_idx in np.arange(n_epochs)],
+        p_x_given_n_list=[np.ones((2, n_time)) for _epoch_idx in np.arange(n_epochs)],
+        nbins=np.full(n_epochs, n_time, dtype=int),
+        time_window_centers=[time_window_centers.copy() for _epoch_idx in np.arange(n_epochs)],
+        time_bin_edges=[time_bin_edges.copy() for _epoch_idx in np.arange(n_epochs)],
+        filter_epochs=_epochs_df(n_epochs),
+    )
 
 
 def _make_shuffle_object(n_epochs: int = 3, n_decoders: int = 4, n_shuffles: int = 5, seed: int = 0) -> DecodedEpochScoreShuffle:
@@ -344,7 +370,9 @@ class TestPickleCompat(unittest.TestCase):
 
     def test_batch_reconstruct_from_to_dict_subset(self):
         obj = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=3)
-        rebuilt = WCorrShuffle(**get_dict_subset(obj.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
+        mock_result = _decoded_result_mock(n_epochs=2)
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = {name: mock_result for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+        rebuilt = DecodedEpochScoreShuffle.modernize_from_instance(obj)
 
         self.assertCountEqual(list(rebuilt.real_score_arrays.keys()), list(obj.real_score_arrays.keys()))
         np.testing.assert_allclose(rebuilt.real_score_arrays['wcorr'], obj.real_score_arrays['wcorr'])
@@ -353,6 +381,44 @@ class TestPickleCompat(unittest.TestCase):
         self.assertTrue(rebuilt.enable_heuristic_shuffle_scoring)
         self.assertEqual(rebuilt.n_completed_shuffles, obj.n_completed_shuffles)
         self.assertEqual(rebuilt.n_completed_shuffles, 3)
+        rebuilt_result = rebuilt.real_decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
+        self.assertFalse(isinstance(rebuilt_result, dict))
+        self.assertTrue(hasattr(rebuilt_result, 'num_filter_epochs'))
+        self.assertEqual(rebuilt_result.num_filter_epochs, 2)
+
+
+    def test_coerce_decoded_epochs_result_dict_rebuilds_from_num_filter_epochs_dict(self):
+        result_as_dict = _minimal_decoded_result_dict(n_epochs=2)
+        decoder_result_dict = {'long_LR': result_as_dict, 'long_RL': None, 'short_LR': _decoded_result_mock(n_epochs=2)}
+        coerced = DecodedEpochScoreShuffle._coerce_decoded_epochs_result_dict(decoder_result_dict)
+        self.assertIsInstance(coerced['long_LR'], DecodedFilterEpochsResult)
+        self.assertEqual(coerced['long_LR'].num_filter_epochs, 2)
+        self.assertIsNone(coerced['long_RL'])
+        self.assertTrue(hasattr(coerced['short_LR'], 'num_filter_epochs'))
+        self.assertEqual(coerced['short_LR'].num_filter_epochs, 2)
+
+
+    def test_ensure_real_score_arrays_coerces_dict_values_without_attribute_error(self):
+        obj = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=3)
+        obj.real_score_arrays = {'wcorr': np.asarray(obj.real_decoder_ripple_weighted_corr_arr)}
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = {name: _minimal_decoded_result_dict(n_epochs=2) for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+        obj.enable_heuristic_shuffle_scoring = True
+        obj.track_templates = _TemplatesMock(xbin=np.linspace(0.0, 200.0, 9), track_length_dict={'long_LR': 200.0, 'long_RL': 200.0, 'short_LR': 140.0, 'short_RL': 140.0})
+        obj._ensure_real_score_arrays(decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+        coerced_result = obj.real_decoder_ripple_filter_epochs_decoder_result_dict['long_LR']
+        self.assertTrue(hasattr(coerced_result, 'num_filter_epochs'))
+        self.assertEqual(int(coerced_result.num_filter_epochs), 2)
+
+
+    def test_ensure_real_score_arrays_skips_heuristic_scoring_when_travel_present(self):
+        obj = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=3)
+        self.assertIn('travel', obj.real_score_arrays)
+        obj.enable_heuristic_shuffle_scoring = True
+        obj.track_templates = _TemplatesMock(xbin=np.linspace(0.0, 200.0, 9), track_length_dict={'long_LR': 200.0, 'long_RL': 200.0, 'short_LR': 140.0, 'short_RL': 140.0})
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = {name: _decoded_result_mock(n_epochs=2) for name in DEFAULT_SHUFFLE_DECODER_NAMES}
+        with patch.object(HeuristicReplayScoring, 'compute_shuffle_heuristic_score_arrays') as mocked_heuristic:
+            obj._ensure_real_score_arrays(decoder_names=deepcopy(DEFAULT_SHUFFLE_DECODER_NAMES))
+            mocked_heuristic.assert_not_called()
 
 
     def test_load_and_append_7_tuple_merges_missing_real_score_keys(self):
