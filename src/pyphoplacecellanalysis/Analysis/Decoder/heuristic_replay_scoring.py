@@ -192,6 +192,7 @@ class SubsequencesPartitioningResult(ComputedResult):
     position_bins_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one entry for each entry in `flat_positions`"})
     position_changes_info_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "one change for each entry in `first_order_diff_lst`"})
     subsequences_df: pd.DataFrame = non_serialized_field(default=None, repr=False, metadata={'desc': "properties computed for the final subsequences. Produced by self.post_compute_subsequence_properties()"})
+    defer_initial_df_build: bool = non_serialized_field(default=False, repr=False, eq=False, metadata={'desc': "If True, skip the throwaway DataFrame rebuild in __attrs_post_init__ because compute() rebuilds immediately."})
     
     
 
@@ -207,7 +208,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         self._debug_steps_split_positions_arrays['initial'] = deepcopy([self.flat_positions]) ## a list containing only the flat positions
 
-        if (self.position_bins_info_df is None) or (self.position_changes_info_df is None):
+        if (not self.defer_initial_df_build) and ((self.position_bins_info_df is None) or (self.position_changes_info_df is None)):
             ## initialize new
             self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
 
@@ -446,7 +447,36 @@ class SubsequencesPartitioningResult(ComputedResult):
                 return (float(num_longest_subsequence_good_values) / float(total_num_all_good_values)) # longest_sequence_length_ratio: the ratio of the bins that form the longest contiguous sequence to the total num bins
             else:
                 return 0.0 # zero it out if they are all repeats
-            
+
+
+    def get_main_subsequence_scalar_scores(self) -> Dict[str, float]:
+        """Extract partition scalars from the ranked main subsequence in one pass.
+
+        Matches `get_longest_sequence_length` / `bin_wise_main_subsequence_*` arithmetic, including the `int(...)` casts, `total > 0 else 0.0` ratio guard, and the `<=` assert.
+        """
+        assert self.subsequences_df is not None
+        main_subsequence_df = self.subsequences_df[self.subsequences_df['is_main']]
+        mseq_len = main_subsequence_df['len'].to_numpy()[0]
+        mseq_len_ignoring_intrusions = main_subsequence_df['len_excluding_intrusions'].to_numpy()[0]
+        mseq_len_ignoring_intrusions_and_repeats = main_subsequence_df['len_excluding_both'].to_numpy()[0]
+        mseq_tcov = main_subsequence_df['track_coverage_score'].to_numpy()[0]
+        mseq_dtrav = main_subsequence_df['total_distance_traveled'].to_numpy()[0]
+        all_subsequence_values_count_dict = self.subsequences_df[['n_intrusion_bins', 'len', 'len_excluding_repeats', 'len_excluding_intrusions', 'len_excluding_both']].sum(axis='index').to_dict()
+        total_num_all_good_values = all_subsequence_values_count_dict['len_excluding_both']
+        if total_num_all_good_values > 0:
+            assert mseq_len_ignoring_intrusions_and_repeats <= total_num_all_good_values, f"num_longest_subsequence_good_values: {mseq_len_ignoring_intrusions_and_repeats}, total_num_all_good_values: {total_num_all_good_values}"
+            mseq_len_ratio_ignoring_intrusions_and_repeats = (float(mseq_len_ignoring_intrusions_and_repeats) / float(total_num_all_good_values))
+        else:
+            mseq_len_ratio_ignoring_intrusions_and_repeats = 0.0
+        return {
+            'mseq_len': int(mseq_len),
+            'mseq_len_ignoring_intrusions': int(mseq_len_ignoring_intrusions),
+            'mseq_len_ignoring_intrusions_and_repeats': int(mseq_len_ignoring_intrusions_and_repeats),
+            'mseq_len_ratio_ignoring_intrusions_and_repeats': mseq_len_ratio_ignoring_intrusions_and_repeats,
+            'mseq_tcov': mseq_tcov,
+            'mseq_dtrav': mseq_dtrav,
+        }
+
 
     @function_attributes(short_name=None, tags=['time_bin'], input_requires=[], output_provides=[], uses=['.flat_time_window_edges', '.flat_time_window_centers'], used_by=[], creation_date='2024-12-12 09:39', related_items=[])
     def get_flat_time_bins_info(self):
@@ -499,7 +529,7 @@ class SubsequencesPartitioningResult(ComputedResult):
             a_most_likely_positions_list = np.array(a_most_likely_positions_list)
         
         partition_result = cls(flat_positions=deepcopy(a_most_likely_positions_list), pos_bin_edges=deepcopy(pos_bin_edges), max_ignore_bins=max_ignore_bins, same_thresh=same_thresh, max_jump_distance_cm=max_jump_distance_cm, flat_time_window_centers=flat_time_window_centers, flat_time_window_edges=flat_time_window_edges,
-                               first_order_diff_lst=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None,          
+                               first_order_diff_lst=None, diff_split_indicies=None, split_indicies=None, low_magnitude_change_indicies=None, defer_initial_df_build=True,
                             )
         
         ## 2024-05-09 Smarter method that can handle relatively constant decoded positions with jitter:
@@ -1000,7 +1030,7 @@ class SubsequencesPartitioningResult(ComputedResult):
         split_lengths = [len(v) for v in original_active_split_positions_arrays]
         original_split_indicies = np.cumsum(split_lengths)
         split_subsequence_flatindicies_list = [v for v in NumpyHelpers.split(self.flat_position_indicies, original_split_indicies) if len(v) > 0] # exclude empty subsequences
-        Assert.same_length(split_subsequence_flatindicies_list, original_active_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
+        assert len(split_subsequence_flatindicies_list) == len(original_active_split_positions_arrays), f"must have same number of position_subsequences and time_subsequences, got {len(split_subsequence_flatindicies_list)} vs {len(original_active_split_positions_arrays)}"
         assert np.all(np.array([len(v) for v in split_subsequence_flatindicies_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
         
         if debug_print:
@@ -1090,8 +1120,6 @@ class SubsequencesPartitioningResult(ComputedResult):
         HISTORY: 2024-11-27 08:18 based off of `_compute_sequences_spanning_ignored_intrusions`
         
         """        
-        from pyphocorehelpers.indexing_helpers import partition_df_dict
-
         # ==================================================================================================================== #
         # BEGIN FUNCTION BODY                                                                                                  #
         # ==================================================================================================================== #
@@ -1111,16 +1139,19 @@ class SubsequencesPartitioningResult(ComputedResult):
         main_subsequence_idx = main_subsequence_only_df['subsequence_idx'].to_numpy()[0]
         # main_subsequence_only_df['flat_idx_first', 'flat_idx_last', 'flat_idx_first']
 
-        non_intrusion_position_bins_info_df: pd.DataFrame = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
-
-        if len(non_intrusion_position_bins_info_df) > 0:
-            partitioned_df_dict = partition_df_dict(non_intrusion_position_bins_info_df, partitionColumn='subsequence_idx') ## WARNING: some subsequences are ALL INTRUSIONS, meaning they get eliminated here
-            non_intrusion_main_subsequence_df = partitioned_df_dict[main_subsequence_idx]
-            if len(non_intrusion_main_subsequence_df) > 0:
-                non_intrusion_main_subsequence_changes_info_df = SubsequencesPartitioningResult._compute_position_changes_info_df(position_bins_info_df=non_intrusion_main_subsequence_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=False)
-                ## find where additional splits are needed:
-                exceeding_jump_distance_df = non_intrusion_main_subsequence_changes_info_df[non_intrusion_main_subsequence_changes_info_df['exceeds_jump_distance']] ## want to insert the split after `next_bin_flat_idxs` --> at index 4
-                exceeding_jump_distance_split_indicies = exceeding_jump_distance_df['next_bin_flat_idxs'].to_numpy()
+        subseq_idx_arr = self.position_bins_info_df['subsequence_idx'].to_numpy()
+        is_intrusion_arr = self.position_bins_info_df['is_intrusion'].to_numpy()
+        pos_arr = self.position_bins_info_df['pos'].to_numpy()
+        flat_idx_arr = self.position_bins_info_df['flat_idx'].to_numpy()
+        non_intrusion_mask = np.logical_not(is_intrusion_arr)
+        if np.any(non_intrusion_mask):
+            main_non_intrusion_mask = (subseq_idx_arr == main_subsequence_idx) & non_intrusion_mask
+            if not np.any(main_non_intrusion_mask):
+                raise KeyError(main_subsequence_idx) ## same as partition_df_dict[main_subsequence_idx] when main is all-intrusion
+            main_non_intrusion_pos = pos_arr[main_non_intrusion_mask]
+            main_non_intrusion_flat_idx = flat_idx_arr[main_non_intrusion_mask]
+            if (self.max_jump_distance_cm is not None) and (len(main_non_intrusion_pos) > 1):
+                exceeding_jump_distance_split_indicies = main_non_intrusion_flat_idx[1:][np.abs(np.diff(main_non_intrusion_pos)) > self.max_jump_distance_cm]
 
 
         # partition_result.split_indicies
@@ -1169,7 +1200,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
         """
         ## INPUTS: split_first_order_diff_arrays, continuous_sequence_lengths, max_ignore_bins
-        Assert.same_length(subsequence_list, continuous_sequence_lengths)
+        assert len(subsequence_list) == len(continuous_sequence_lengths), f"subsequence_list and continuous_sequence_lengths must be the same length, got {len(subsequence_list)} vs {len(continuous_sequence_lengths)}"
         
         left_congruent_flanking_index = None
         left_congruent_flanking_sequence = None
@@ -1268,12 +1299,12 @@ class SubsequencesPartitioningResult(ComputedResult):
         # # Set `partition_result.split_positions_arrays` ______________________________________________________________________ #
         # active_split_indicies = deepcopy(partition_result.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
         # active_split_indicies = deepcopy(partition_result.diff_split_indicies) - 1 ## this is what it should be, but all the splits are +1 later than they should be
-        active_split_indicies = deepcopy(self.split_indicies) ## this is what it should be, but all the splits are +1 later than they should be
+        active_split_indicies = self.split_indicies ## this is what it should be, but all the splits are +1 later than they should be
         split_most_likely_positions_arrays = NumpyHelpers.split(self.flat_positions, active_split_indicies)
         ## Drop empty subsequences
         split_most_likely_positions_arrays = [x for x in split_most_likely_positions_arrays if len(x) > 0] ## only non-empty subsequences
         self.split_positions_arrays = split_most_likely_positions_arrays
-        self.split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, deepcopy(self.split_indicies)) # exclude empty subsequences
+        self.split_position_flatindicies_arrays = NumpyHelpers.split(self.flat_position_indicies, self.split_indicies) # exclude empty subsequences
 
         if enable_debug_step_logging:
             self._debug_steps_split_positions_arrays['partition_ignoring_repeated'] = deepcopy(self.split_positions_arrays)
@@ -1305,10 +1336,8 @@ class SubsequencesPartitioningResult(ComputedResult):
         ## Drop empty subsequences
         self.merged_split_positions_arrays = [x for x in self.merged_split_positions_arrays if len(x) > 0] ## only non-zero entries
 
-        self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df()
-        if first_order_diff_value_exceeeding_jump_distance_indicies is not None:
-            self.position_changes_info_df['exceeds_jump_distance'] = False
-            self.position_changes_info_df.loc[first_order_diff_value_exceeeding_jump_distance_indicies, 'exceeds_jump_distance'] = True
+        should_compute_position_changes_info_df: bool = (self.max_jump_distance_cm is None)
+        self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df = self.rebuild_sequence_info_df(should_compute_position_changes_info_df=should_compute_position_changes_info_df)
 
         if self.max_jump_distance_cm is not None:
             ## updates self.merged_*
@@ -1355,22 +1384,19 @@ class SubsequencesPartitioningResult(ComputedResult):
         positions_times_fns_dict = {fn.__name__:fn for fn in _positions_times_fns}
 
 
-        xbin_edges: NDArray = deepcopy(self.pos_bin_edges)
+        xbin_edges: NDArray = self.pos_bin_edges
         num_pos_bins: int = self.n_pos_bins
         same_thresh_cm = self.same_thresh
         max_ignore_bins = self.max_ignore_bins
         max_jump_distance_cm = self.max_jump_distance_cm
                 
         # computation_fn_kwargs_dict: passed to each score function to specify additional required parameters
+        _shared_score_kwargs = dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=xbin_edges)
         computation_fn_kwargs_dict = {
-            'main_contiguous_subsequence_len': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-            'continuous_seq_len_ratio_no_repeats': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-            'continuous_seq_sort': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-            'sweep_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, num_pos_bins=num_pos_bins, pos_bin_edges=deepcopy(xbin_edges)),
-            'track_coverage_score':  dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-            'total_distance_traveled': dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges)),
-        } | {k:deepcopy(dict(same_thresh_cm=same_thresh_cm, max_ignore_bins=max_ignore_bins, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, pos_bin_edges=deepcopy(xbin_edges))) for k in ['mseq_len', 'mseq_len_ignoring_intrusions', 'mseq_len_ignoring_intrusions_and_repeats', 'mseq_len_ratio_ignoring_intrusions_and_repeats',
-                                                                                                                                                                                                                            'mseq_tcov', 'mseq_dtrav']}
+            'track_coverage_score': _shared_score_kwargs,
+            'total_distance_traveled': _shared_score_kwargs,
+            'sweep_score': dict(num_pos_bins=num_pos_bins, **_shared_score_kwargs),
+        }
 
 
         # bin_width, (x_starts, x_centers, x_ends), x_bins = self.get_flat_time_bins_info()
@@ -1379,12 +1405,12 @@ class SubsequencesPartitioningResult(ComputedResult):
             times = np.arange(self.total_num_subsequence_bins) # +1 ## it seems like we actually have left-edges only or centers, not true edges??
         else:
             assert self.flat_time_window_centers is not None
-            times = deepcopy(self.flat_time_window_centers)
+            times = self.flat_time_window_centers
 
         all_score_computations_fn_dict = (positions_fns_dict | positions_times_fns_dict)
 
         all_subsequences_scores_dict = {}
-        merged_split_positions_arrays = deepcopy(self.merged_split_positions_arrays)
+        merged_split_positions_arrays = self.merged_split_positions_arrays
     
         is_non_intrusion_bin = np.logical_not(self.position_bins_info_df['is_intrusion'].to_numpy())
         # non_intrusion_pos_bins_df = self.position_bins_info_df[np.logical_not(self.position_bins_info_df['is_intrusion'])]
@@ -1392,16 +1418,16 @@ class SubsequencesPartitioningResult(ComputedResult):
         # non_intrusion_times = non_intrusion_pos_bins_df['t_bin_center'].to_numpy()
         # non_intrusion_pos = non_intrusion_pos_bins_df['pos'].to_numpy()
 
-        Assert.same_length(times, self.flat_positions)
+        assert len(times) == len(self.flat_positions), f"times and flat_positions must be the same length, got {len(times)} vs {len(self.flat_positions)}"
         
         split_lengths = [len(v) for v in merged_split_positions_arrays]
         split_indicies = np.cumsum(split_lengths)
         split_subsequence_times_list = [v for v in NumpyHelpers.split(times, split_indicies) if len(v) > 0] # exclude empty subsequences
-        Assert.same_length(split_subsequence_times_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
+        assert len(split_subsequence_times_list) == len(merged_split_positions_arrays), f"must have same number of position_subsequences and time_subsequences, got {len(split_subsequence_times_list)} vs {len(merged_split_positions_arrays)}"
         assert np.all(np.array([len(v) for v in split_subsequence_times_list]) == split_lengths) #, f"times and positions for each subsequence must match!"
         
         split_subsequence_is_non_intrusion_bin_list = [v for v in NumpyHelpers.split(is_non_intrusion_bin, split_indicies) if len(v) > 0] # exclude empty subsequences
-        Assert.same_length(split_subsequence_is_non_intrusion_bin_list, merged_split_positions_arrays) # must have same number of position_subsequences and time_subsequences
+        assert len(split_subsequence_is_non_intrusion_bin_list) == len(merged_split_positions_arrays), f"must have same number of position_subsequences and time_subsequences, got {len(split_subsequence_is_non_intrusion_bin_list)} vs {len(merged_split_positions_arrays)}"
         assert np.all(np.array([len(v) for v in split_subsequence_is_non_intrusion_bin_list]) == split_lengths)
         
 
@@ -1438,7 +1464,7 @@ class SubsequencesPartitioningResult(ComputedResult):
 
             all_subsequences_scores_dict[a_subsequence_idx] = {'subsequence_idx': a_subsequence_idx, 'len': total_num_values, 'len_excluding_repeats': total_num_values_excluding_repeats, 'len_excluding_intrusions': total_num_values_excluding_intrusions, 'len_excluding_both': total_num_values_excluding_intrusions_and_repeats, 'n_repeated_bins': total_num_repeated_values,
                                                                 'positions': a_subsequence.tolist()} 
-            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=deepcopy(a_subsequence_times), **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
+            all_subsequences_scores_dict[a_subsequence_idx] = all_subsequences_scores_dict[a_subsequence_idx] | {score_computation_name:computation_fn(a_subsequence, times=a_subsequence_times, **computation_fn_kwargs_dict.get(score_computation_name, {})) for score_computation_name, computation_fn in all_score_computations_fn_dict.items()}
 
         ## END for a_subseq....
 
@@ -1447,21 +1473,32 @@ class SubsequencesPartitioningResult(ComputedResult):
         
         ## once done with all scores for this decoder, have `_a_separate_decoder_new_scores_dict`:
         all_subsequences_scores_df = pd.DataFrame.from_dict(all_subsequences_scores_dict, orient='index')
-        ## add the ['main_rank', 'is_main'] columns
-        all_subsequences_scores_df: pd.DataFrame = all_subsequences_scores_df.sort_values([*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx'], ascending=False).reset_index(drop=True)
-        all_subsequences_scores_df['main_rank'] = all_subsequences_scores_df.index.to_numpy() ## adds the 'subsequence_main_rank' column
+        n_subseq: int = len(all_subsequences_scores_df)
+        ## add the ['main_rank', 'is_main'] columns via the same descending multi-key order as sort_values (subsequence_idx is unique so later keys never apply)
+        rank_keys = [*main_subsequence_ranking_columns, 'subsequence_idx', 'total_distance_traveled', 'track_coverage_score', 'subsequence_idx']
+        lex_keys = tuple(-np.asarray(all_subsequences_scores_df[col].to_numpy()) for col in reversed(rank_keys))
+        order = np.lexsort(lex_keys)
+        main_rank = np.empty(n_subseq, dtype=np.int64)
+        main_rank[order] = np.arange(n_subseq, dtype=np.int64)
+        all_subsequences_scores_df['main_rank'] = main_rank ## adds the 'subsequence_main_rank' column
         all_subsequences_scores_df['is_main'] = (all_subsequences_scores_df['main_rank'] == 0)
-        all_subsequences_scores_df = all_subsequences_scores_df.sort_values(['subsequence_idx'], ascending=True, inplace=False).reset_index(drop=True) ## restore normal ascending subsequence_index order
+        all_subsequences_scores_df = all_subsequences_scores_df.reset_index(drop=True)
 
-        computed_subseq_properties_df = deepcopy(self.position_bins_info_df).groupby(['subsequence_idx']).agg(flat_idx_first=('flat_idx', 'first'), flat_idx_last=('flat_idx', 'last'),
-                                                                                                    start_t=('t_bin_start', 'first'), end_t=('t_bin_end', 'last'),
-                                                                                                    n_intrusion_bins=('is_intrusion', 'sum')).reset_index()
+        split_lengths_arr = np.asarray(split_lengths, dtype=np.int64)
+        starts = np.cumsum(split_lengths_arr) - split_lengths_arr
+        flat_idx_all = self.position_bins_info_df['flat_idx'].to_numpy()
+        t_bin_start_all = self.position_bins_info_df['t_bin_start'].to_numpy()
+        t_bin_end_all = self.position_bins_info_df['t_bin_end'].to_numpy()
+        is_intrusion_all = self.position_bins_info_df['is_intrusion'].to_numpy()
+        all_subsequences_scores_df['flat_idx_first'] = flat_idx_all[starts]
+        all_subsequences_scores_df['flat_idx_last'] = flat_idx_all[starts + split_lengths_arr - 1]
+        all_subsequences_scores_df['start_t'] = t_bin_start_all[starts]
+        all_subsequences_scores_df['end_t'] = t_bin_end_all[starts + split_lengths_arr - 1]
+        all_subsequences_scores_df['n_intrusion_bins'] = np.add.reduceat(is_intrusion_all.astype(np.int64), starts)
 
 
         ## Proper method is to remove the intrusions, and then look for repeats
 
-        ## merge into `all_subsequences_scores_df`:
-        all_subsequences_scores_df = all_subsequences_scores_df.merge(computed_subseq_properties_df, how='left', on='subsequence_idx') ## requires that the output dataframe has all rows that were in `subsequences_df`, filling in NaNs when no corresponding values are found in the right df
         ## move all the length-related columns to the end
         all_subsequences_scores_df = PandasHelpers.reordering_columns_relative(all_subsequences_scores_df, column_names=list(filter(lambda column: ((column == 'len') or column.startswith('len_')), all_subsequences_scores_df.columns)), relative_mode='end')
 
@@ -1472,92 +1509,94 @@ class SubsequencesPartitioningResult(ComputedResult):
         """ `position_bins_info_df` is not altered 
         
         """
-        prev_bin_flat_idxs = position_bins_info_df['flat_idx'].to_numpy()[:-1]
-        next_bin_flat_idxs = position_bins_info_df['flat_idx'].to_numpy()[1:]
+        pos = position_bins_info_df['pos'].to_numpy()
+        flat_idx = position_bins_info_df['flat_idx'].to_numpy()
+        pos_diff = np.diff(pos)
+        prev_bin_flat_idxs = flat_idx[:-1]
+        next_bin_flat_idxs = flat_idx[1:]
         split_line_flat_t = position_bins_info_df['t_bin_end'].to_numpy()[:-1].astype(float) # all but the last end, as this isn't a valid one
-        
-        position_changes_info_df = pd.DataFrame({'pos_diff': np.diff(position_bins_info_df['pos']),
-                                                'prev_bin_flat_idx': prev_bin_flat_idxs, 'next_bin_flat_idxs': next_bin_flat_idxs, 't': split_line_flat_t, # np.diff(position_bins_info_df['t_bin_center']),
-        })
+        direction = np.sign(pos_diff).astype(int)
+        exceeds_same_thresh = (np.abs(pos_diff) > same_thresh)
+        n_changes: int = len(pos_diff)
+        if n_changes == 0:
+            did_accum_dir_change = np.array([], dtype=bool)
+        else:
+            shifted_direction = np.empty(n_changes, dtype=float)
+            shifted_direction[0] = np.nan
+            if n_changes > 1:
+                shifted_direction[1:] = direction[:-1]
+            did_accum_dir_change = (direction != shifted_direction) & (direction != 0)
+        should_split = np.logical_and(did_accum_dir_change, exceeds_same_thresh)
+        columns = {
+            'pos_diff': pos_diff,
+            'prev_bin_flat_idx': prev_bin_flat_idxs,
+            'next_bin_flat_idxs': next_bin_flat_idxs,
+            't': split_line_flat_t, # np.diff(position_bins_info_df['t_bin_center']),
+            'direction': direction,
+            'exceeds_same_thresh': exceeds_same_thresh,
+            'did_accum_dir_change': did_accum_dir_change,
+            'should_split': should_split,
+        }
         # position_changes_info_df['split_reason'] = '' # str column descripting why the split occured
-        position_changes_info_df['direction'] = np.sign(position_changes_info_df['pos_diff']).astype(int)
-        position_changes_info_df['exceeds_same_thresh'] = (np.abs(position_changes_info_df['pos_diff']) > same_thresh)
-        position_changes_info_df['did_accum_dir_change'] = (position_changes_info_df['direction'] != position_changes_info_df['direction'].shift()) & (position_changes_info_df['direction'] != 0)
-        position_changes_info_df['should_split'] = np.logical_and(position_changes_info_df['did_accum_dir_change'], position_changes_info_df['exceeds_same_thresh'])
         if (max_jump_distance_cm is not None):
-            position_changes_info_df['exceeds_jump_distance'] = (np.abs(position_changes_info_df['pos_diff']) > max_jump_distance_cm)
+            exceeds_jump_distance = (np.abs(pos_diff) > max_jump_distance_cm)
+            columns['exceeds_jump_distance'] = exceeds_jump_distance
             if additional_split_on_exceeding_jump_distance:
-                position_changes_info_df['should_split'] = np.logical_or(position_changes_info_df['should_split'], position_changes_info_df['exceeds_jump_distance'])
-
-
-        ## Get prev/next positions: ['prev_pos', 'next_pos']
-        if (position_changes_info_df is not None) and (position_bins_info_df is not None):
-            lookup_column_map_dict = {'prev_bin_flat_idx':'flat_idx', 'next_bin_flat_idxs':'flat_idx'} # {df.column_name: lookup_properties_map_df.column_name}
-            _temp_position_bins_info_df = deepcopy(position_bins_info_df)
-            for df_col_name, lookup_properties_map_df_col_name in lookup_column_map_dict.items():
-                assert lookup_properties_map_df_col_name in _temp_position_bins_info_df.columns
-                _temp_position_bins_info_df[df_col_name] = _temp_position_bins_info_df[lookup_properties_map_df_col_name]
-                
-            # position_bins_info_df['prev_bin_flat_idx'] = position_bins_info_df['flat_idx']
-            # print(list(position_bins_info_df.columns)) # ['pos', 'orig_subsequence_idx', 'is_intrusion', 'subsequence_idx', 'flat_idx', 't_bin_start', 't_bin_center', 't_bin_end', 'prev_bin_flat_idx']
-
-            # 'prev_bin_flat_idx' ________________________________________________________________________________________________ #
-            desired_post_add_renamed_dict = {'pos':'prev_pos'}
-            # included_lookup_column_names = list(lookup_column_map_dict.keys()) + ['pos',]  #['pos', 'prev_bin_flat_idx']
-            included_lookup_column_names = ['pos', 'prev_bin_flat_idx']
-            position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='prev_bin_flat_idx')
-            position_changes_info_df = position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
-
-            # 'next_bin_flat_idxs' _______________________________________________________________________________________________ #
-            desired_post_add_renamed_dict = {'pos':'next_pos'}
-            included_lookup_column_names = ['pos', 'next_bin_flat_idxs']
-            position_changes_info_df = PandasHelpers.add_explicit_dataframe_columns_from_lookup_df(position_changes_info_df, lookup_properties_map_df=_temp_position_bins_info_df[included_lookup_column_names], join_column_name='next_bin_flat_idxs')
-            position_changes_info_df = position_changes_info_df.rename(columns=desired_post_add_renamed_dict, inplace=False)
-
-
+                columns['should_split'] = np.logical_or(should_split, exceeds_jump_distance)
+        ## Get prev/next positions: ['prev_pos', 'next_pos'] -- identical to the previous left-merge on unique flat_idx
+        columns['prev_pos'] = pos[:-1]
+        columns['next_pos'] = pos[1:]
+        position_changes_info_df = pd.DataFrame(columns)
+        if n_changes == 0:
+            ## empty left-merge used to move join keys next to the looked-up pos columns
+            empty_col_order = ['pos_diff', 't', 'direction', 'exceeds_same_thresh', 'did_accum_dir_change', 'should_split']
+            if (max_jump_distance_cm is not None):
+                empty_col_order.append('exceeds_jump_distance')
+            empty_col_order += ['prev_bin_flat_idx', 'prev_pos', 'next_bin_flat_idxs', 'next_pos']
+            position_changes_info_df = position_changes_info_df[empty_col_order]
         return position_changes_info_df
 
 
     @function_attributes(short_name=None, tags=['df', 'compute'], input_requires=[], output_provides=[], uses=['post_compute_subsequence_properties'], used_by=['compute'], creation_date='2024-12-12 03:47', related_items=[])
-    def rebuild_sequence_info_df(self, additional_split_on_exceeding_jump_distance:bool=False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def rebuild_sequence_info_df(self, additional_split_on_exceeding_jump_distance:bool=False, should_compute_position_changes_info_df: bool=True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Rebuilds the sequence_info_df using the new subsequences.
         Updates: self.position_bins_info_df, self.position_changes_info_df, self.subsequences_df
         
         """
-        # Initialize the dataframe
-        self.position_bins_info_df = pd.DataFrame({'pos': self.flat_positions})
-        
-        
+        n_flat: int = self.n_flat_position_bins
+        columns = {'pos': self.flat_positions}
+
         if self.flat_time_window_centers is not None:
             assert len(self.flat_time_window_centers) == len(self.flat_positions)
-            self.position_bins_info_df['t_center'] = self.flat_time_window_centers
+            columns['t_center'] = self.flat_time_window_centers
 
         # Assign original subsequence indices
         if self.split_positions_arrays is not None:
-            self.position_bins_info_df['orig_subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.split_positions_arrays)])
-            # Mark intrusions based on max_ignore_bins
-            is_intrusion: List[bool] = [len(v) <= self.max_ignore_bins for v in self.split_positions_arrays]
-            intrusion_dict = {idx: val for idx, val in enumerate(is_intrusion)}
-            self.position_bins_info_df['is_intrusion'] = self.position_bins_info_df['orig_subsequence_idx'].map(intrusion_dict)
+            split_lengths = np.array([len(v) for v in self.split_positions_arrays], dtype=np.int64)
+            orig_subsequence_idx = np.repeat(np.arange(len(self.split_positions_arrays), dtype=np.int64), split_lengths)
+            is_intrusion_per_subseq = np.array([len(v) <= self.max_ignore_bins for v in self.split_positions_arrays], dtype=bool)
+            columns['orig_subsequence_idx'] = orig_subsequence_idx
+            columns['is_intrusion'] = np.repeat(is_intrusion_per_subseq, split_lengths)
 
         # Assign merged subsequence indices
         if self.merged_split_positions_arrays is not None:
-            self.position_bins_info_df['subsequence_idx'] = flatten([[i] * len(v) for i, v in enumerate(self.merged_split_positions_arrays)])
+            merged_lengths = np.array([len(v) for v in self.merged_split_positions_arrays], dtype=np.int64)
+            columns['subsequence_idx'] = np.repeat(np.arange(len(self.merged_split_positions_arrays), dtype=np.int64), merged_lengths)
 
-
-        self.position_bins_info_df['flat_idx'] = self.position_bins_info_df.index.astype(int, copy=True)
+        columns['flat_idx'] = np.arange(n_flat, dtype=np.int64)
         ## add time bins
         bin_width, (t_bin_starts, t_bin_centers, t_bin_ends), x_bins = self.get_flat_time_bins_info()
-        Assert.len_equals(t_bin_starts, required_length=self.n_flat_position_bins)
-        Assert.len_equals(t_bin_centers, required_length=self.n_flat_position_bins)
-        Assert.len_equals(t_bin_ends, required_length=self.n_flat_position_bins)
-        self.position_bins_info_df['t_bin_start'] = t_bin_starts.astype(float)
-        self.position_bins_info_df['t_bin_center'] = t_bin_centers.astype(float)
-        self.position_bins_info_df['t_bin_end'] = t_bin_ends.astype(float)
+        assert len(t_bin_starts) == n_flat, f"t_bin_starts must be of length {n_flat} but instead len(t_bin_starts): {len(t_bin_starts)}.\n{t_bin_starts}"
+        assert len(t_bin_centers) == n_flat, f"t_bin_centers must be of length {n_flat} but instead len(t_bin_centers): {len(t_bin_centers)}.\n{t_bin_centers}"
+        assert len(t_bin_ends) == n_flat, f"t_bin_ends must be of length {n_flat} but instead len(t_bin_ends): {len(t_bin_ends)}.\n{t_bin_ends}"
+        columns['t_bin_start'] = np.asarray(t_bin_starts, dtype=float)
+        columns['t_bin_center'] = np.asarray(t_bin_centers, dtype=float)
+        columns['t_bin_end'] = np.asarray(t_bin_ends, dtype=float)
+        self.position_bins_info_df = pd.DataFrame(columns)
 
         ## build first_order_diff_df
-        if self.first_order_diff_lst is not None:
-            Assert.len_equals(self.first_order_diff_lst, len(self.flat_positions))            
+        if should_compute_position_changes_info_df and (self.first_order_diff_lst is not None):
+            assert len(self.first_order_diff_lst) == len(self.flat_positions), f"first_order_diff_lst must be of length {len(self.flat_positions)} but instead len(first_order_diff_lst): {len(self.first_order_diff_lst)}.\n{self.first_order_diff_lst}"
             self.position_changes_info_df = self._compute_position_changes_info_df(position_bins_info_df=self.position_bins_info_df, same_thresh=self.same_thresh, max_jump_distance_cm=self.max_jump_distance_cm, additional_split_on_exceeding_jump_distance=additional_split_on_exceeding_jump_distance)
 
         # Subsequences Dataframe _____________________________________________________________________________________________ #
@@ -2621,10 +2660,12 @@ def main_sequence_positions(partition_result) -> NDArray:
     if not np.any(is_main):
         return np.array([], dtype=float)
 
-    main_subsequence_idx = subsequences_df.loc[is_main, 'subsequence_idx'].iloc[0]
-    is_main_bin = (position_bins_info_df['subsequence_idx'] == main_subsequence_idx) & np.logical_not(position_bins_info_df['is_intrusion'])
-    main_bins_df = position_bins_info_df.loc[is_main_bin].sort_values('flat_idx')
-    return main_bins_df['pos'].to_numpy(dtype=float)
+    main_subsequence_idx = subsequences_df['subsequence_idx'].to_numpy()[is_main][0]
+    subseq_idx_arr = position_bins_info_df['subsequence_idx'].to_numpy()
+    is_intrusion_arr = position_bins_info_df['is_intrusion'].to_numpy()
+    pos_arr = position_bins_info_df['pos'].to_numpy(dtype=float)
+    is_main_bin = (subseq_idx_arr == main_subsequence_idx) & np.logical_not(is_intrusion_arr)
+    return pos_arr[is_main_bin]
 
 
 
@@ -3369,6 +3410,7 @@ class HeuristicReplayScoring:
         partition_score_fn_dict = SubsequencesPartitioningResultScoringComputations.build_all_bin_wise_subseq_partitioning_computation_fn_dict()
         partition_metric_names: List[str] = [name for name in partition_score_fn_dict.keys() if name not in FORWARDICITY_SCORE_COL_NAMES]
         map_score_fn_dict = cls.build_all_bin_wise_computation_fn_dict()
+        map_score_fn_items = list(map_score_fn_dict.items())
         map_metric_names: List[str] = list(map_score_fn_dict.keys())
         all_metric_names: List[str] = partition_metric_names + list(FORWARDICITY_SCORE_COL_NAMES) + map_metric_names
         metric_arrays: Dict[str, NDArray] = {metric_name: np.full((n_epochs, n_decoders), np.nan, dtype=float) for metric_name in all_metric_names}
@@ -3384,10 +3426,17 @@ class HeuristicReplayScoring:
                     partition_result = SubsequencesPartitioningResultScoringComputations._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, enable_debug_step_logging=False) ## 2026-10-27 - longest/slowest result
                 except Exception:
                     continue
+                try:
+                    precomputed_partition_scores = partition_result.get_main_subsequence_scalar_scores()
+                except Exception:
+                    precomputed_partition_scores = {}
                 for score_computation_name in partition_metric_names:
-                    computation_fn = partition_score_fn_dict[score_computation_name]
                     try:
-                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(computation_fn(partition_result=partition_result, a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges))
+                        if score_computation_name in precomputed_partition_scores:
+                            value = precomputed_partition_scores[score_computation_name]
+                        else:
+                            value = partition_score_fn_dict[score_computation_name](partition_result=partition_result, a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges)
+                        metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(value)
                     except Exception:
                         metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = np.nan
                 ## END for score_computation_name in partition_metric_names....
@@ -3399,12 +3448,12 @@ class HeuristicReplayScoring:
                     metric_arrays['ratio_decoder_aligned_bins'][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(ratio_decoder_aligned_bins)
                 except Exception:
                     pass
-                for score_computation_name, computation_fn in map_score_fn_dict.items():
+                for score_computation_name, computation_fn in map_score_fn_items:
                     try:
                         metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = cls._safe_scalar_score(computation_fn(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length))
                     except Exception:
                         metric_arrays[score_computation_name][an_epoch_idx, decoder_idx] = np.nan
-                ## END for score_computation_name, computation_fn in map_score_fn_dict.items()....
+                ## END for score_computation_name, computation_fn in map_score_fn_items....
 
             ## END for an_epoch_idx in np.arange(n_this_epochs)....
 
