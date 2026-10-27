@@ -122,7 +122,7 @@ class FigureS8:
     @classmethod
     def figures_intermediates_parent_folder(cls) -> Path:
         """Where temporary/intermediate figures are written."""
-        if cls.figures_parent_folder is None
+        if cls.figures_parent_folder is None:
             return None
         else:
             out_path = cls.figures_parent_folder.joinpath('_TEMP')
@@ -194,7 +194,12 @@ class FigureS8:
         export_fig = deepcopy(a_fig)
         export_fig.update_layout(paper_bgcolor=cls._transparent_bgcolor, plot_bgcolor=cls._transparent_bgcolor)
 
-        svg_save_path = figures_parent_folder.joinpath(f'{basename}.svg')
+        svg_output_folder = figures_parent_folder
+        if should_export_pdf and (not should_export_svg):
+            intermediates_folder = cls.figures_intermediates_parent_folder()
+            if intermediates_folder is not None:
+                svg_output_folder = intermediates_folder  # SVG is only a conversion source for the PDF
+        svg_save_path = svg_output_folder.joinpath(f'{basename}.svg')
         if should_export_svg or should_export_pdf:
             export_fig.write_image(svg_save_path, format="svg")  # Kaleido SVG does honor transparent bg
         if should_export_svg:
@@ -333,7 +338,12 @@ class FigureS8:
                         save_basename = f"{basename}_{group_key}"
                     else:
                         save_basename = basename
-                    saved_paths = cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=save_basename, _out_paths={})
+                    save_folder = figures_parent_folder
+                    if group_key is not None:
+                        intermediates_folder = cls.figures_intermediates_parent_folder()
+                        if intermediates_folder is not None:
+                            save_folder = intermediates_folder  # pre-concatenated per-group SVGs/PDFs
+                    saved_paths = cls._save_publication_figs(new_fig, new_fig_context, save_folder, export_suffix=export_suffix, basename=save_basename, _out_paths={})
                     if group_key is not None:
                         if f'{export_suffix}/svg' in saved_paths:
                             _out_paths_dict[k][f'{export_suffix}/svg/{group_key}'] = saved_paths[f'{export_suffix}/svg']
