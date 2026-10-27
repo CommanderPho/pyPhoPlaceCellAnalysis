@@ -976,8 +976,8 @@ class DecodedFilterEpochsResult(HDF_SerializationMixin, AttrsBasedClassHelperMix
 
     @property
     def time_window_centers(self) -> List[NDArray]:
-        """ for compatibility """
-        return deepcopy([self.time_bin_containers[an_epoch_idx].centers for an_epoch_idx in np.arange(self.num_filter_epochs)])
+        """ for compatibility. Returns a new list of views into each epoch's container centers (not a deepcopy of all epochs). """
+        return [a_container.centers for a_container in self.time_bin_containers]
 
     @property
     def flat_time_window_centers(self) -> NDArray:

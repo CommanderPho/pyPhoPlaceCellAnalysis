@@ -4543,10 +4543,10 @@ class DecoderDecodedEpochsResult(ComputedResult):
         loc_indicies = loc_indicies[pd.notna(loc_indicies)]
         if len(loc_indicies) == 0:
             return 0
-        existing_indicies = a_df.index.intersection(pd.Index(loc_indicies))
-        n_set: int = int(len(existing_indicies))
+        match_mask = a_df.index.isin(loc_indicies)
+        n_set: int = int(np.count_nonzero(match_mask))
         if n_set > 0:
-            a_df.loc[existing_indicies, column_name] = True
+            a_df.loc[match_mask, column_name] = True
         return n_set
 
 

@@ -2446,7 +2446,7 @@ class SequenceScoringComputations:
         final_args.append(positions)
 
         if needs_times:
-            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+            time_window_centers = HeuristicReplayScoring._epoch_time_window_centers(a_result, an_epoch_idx)
             times = deepcopy(time_window_centers)
             final_args.append(times)
 
@@ -2644,7 +2644,7 @@ class SubsequencesPartitioningResultScoringComputations:
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        time_window_centers = HeuristicReplayScoring._epoch_time_window_centers(a_result, an_epoch_idx)
         time_bin_edges = a_result.time_bin_edges[an_epoch_idx] # (30, )
         
         if (n_time_bins == 1) and (len(time_window_centers) == 1):
@@ -2666,7 +2666,7 @@ class SubsequencesPartitioningResultScoringComputations:
         
         ## Begin computations:
         return SubsequencesPartitioningResult.init_from_positions_list(a_most_likely_positions_list, pos_bin_edges=pos_bin_edges, max_ignore_bins=max_ignore_bins, same_thresh=same_thresh_cm, max_jump_distance_cm=max_jump_distance_cm,
-                                                                                                                    flat_time_window_centers=deepcopy(time_window_centers), flat_time_window_edges=deepcopy(time_bin_edges), enable_debug_step_logging=enable_debug_step_logging)
+                                                                                                                    flat_time_window_centers=np.asarray(time_window_centers, dtype=float).copy(), flat_time_window_edges=np.asarray(time_bin_edges, dtype=float).copy(), enable_debug_step_logging=enable_debug_step_logging)
     
     
     @function_attributes(short_name=None, tags=['bin_wise', 'all_fns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-25 22:15', related_items=[])
@@ -2783,6 +2783,16 @@ class HeuristicReplayScoring:
 
     """
 
+
+    @classmethod
+    def _epoch_time_window_centers(cls, a_result, an_epoch_idx: int) -> NDArray:
+        """O(1) per-epoch centers. Prefer `time_bin_containers[i].centers` over `time_window_centers[i]` (which rebuilds all epochs)."""
+        time_bin_containers = getattr(a_result, 'time_bin_containers', None)
+        if time_bin_containers is not None:
+            return time_bin_containers[an_epoch_idx].centers
+        return a_result.time_window_centers[an_epoch_idx]
+
+
     @classmethod
     @function_attributes(short_name='jump', tags=['bin-by-bin', 'score', 'replay'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-03-07 17:50', related_items=[])
     def bin_by_bin_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> Tuple[NDArray, NDArray]:
@@ -2791,8 +2801,7 @@ class HeuristicReplayScoring:
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
-        # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        time_window_centers = cls._epoch_time_window_centers(a_result, an_epoch_idx)
         n_track_position_bins: int = np.shape(a_p_x_given_n)[0]
         max_indicies = np.argmax(a_p_x_given_n, axis=0)
         a_first_order_diff = np.diff(max_indicies, n=1, prepend=[max_indicies[0]]) # max index change
@@ -2822,7 +2831,7 @@ class HeuristicReplayScoring:
     def bin_by_bin_position_jump_distance(cls, a_result: DecodedFilterEpochsResult, an_epoch_idx: int, a_decoder_track_length: float) -> Tuple[NDArray, NDArray]:
         """ Bin-wise most-likely position difference. Contiguous trajectories have small deltas between adjacent time bins, while non-contiguous ones can jump wildly (up to the length of the track)
         """
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
+        time_window_centers = cls._epoch_time_window_centers(a_result, an_epoch_idx)
         a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
@@ -2984,9 +2993,6 @@ class HeuristicReplayScoring:
             ## only a single bin, return 0.0 (perfect, no jumps)
             return 0.0
         else:
-            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-            time_window_centers = a_result.time_window_centers[an_epoch_idx]
-
             # compute the 1st-order diff of all positions
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]])
             
@@ -3012,9 +3018,6 @@ class HeuristicReplayScoring:
         a_p_x_given_n = a_result.p_x_given_n_list[an_epoch_idx] # np.shape(a_p_x_given_n): (62, 9)
         n_time_bins: int = a_result.nbins[an_epoch_idx]
         n_pos_bins: int = np.shape(a_p_x_given_n)[0]
-
-        # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-        time_window_centers = a_result.time_window_centers[an_epoch_idx]
 
         cum_pos_bin_probs = np.nansum(a_p_x_given_n, axis=1) # sum over the time bins, leaving the accumulated probability per pos bin.
         
@@ -3050,9 +3053,6 @@ class HeuristicReplayScoring:
             ## only a single bin, return 0.0 (perfect, no jumps)
             return 0.0
         else:
-            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-            time_window_centers = a_result.time_window_centers[an_epoch_idx]
-
             # compute the 1st-order diff of all positions
             a_first_order_diff = np.diff(a_most_likely_positions_list, n=1, prepend=[a_most_likely_positions_list[0]]) # bin_by_bin_jump_distance
             ## average jump distance 
@@ -3206,8 +3206,7 @@ class HeuristicReplayScoring:
                 a_most_likely_positions_list = a_most_likely_positions_list.flatten() # WTF is this, shouldn't we only get the x component or is it 2D for a different reason?
 
         else:
-            # time_window_centers = a_result.time_bin_containers[an_epoch_idx].centers
-            time_window_centers = a_result.time_window_centers[an_epoch_idx]
+            time_window_centers = cls._epoch_time_window_centers(a_result, an_epoch_idx)
             a_most_likely_positions_list = a_result.most_likely_positions_list[an_epoch_idx]
             
 
@@ -3382,7 +3381,7 @@ class HeuristicReplayScoring:
             n_this_epochs: int = int(a_result.num_filter_epochs)
             for an_epoch_idx in np.arange(n_this_epochs):
                 try:
-                    partition_result = SubsequencesPartitioningResultScoringComputations._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, enable_debug_step_logging=False)
+                    partition_result = SubsequencesPartitioningResultScoringComputations._META_build_epoch_SubsequencesPartitioningResult(a_result=a_result, an_epoch_idx=int(an_epoch_idx), a_decoder_track_length=a_decoder_track_length, pos_bin_edges=xbin_edges, max_ignore_bins=int(max_ignore_bins), same_thresh_cm=same_thresh_cm, same_thresh_fraction_of_track=None, max_jump_distance_cm=max_jump_distance_cm, enable_debug_step_logging=False) ## 2026-10-27 - longest/slowest result
                 except Exception:
                     continue
                 for score_computation_name in partition_metric_names:

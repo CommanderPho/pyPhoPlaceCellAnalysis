@@ -1480,7 +1480,10 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
 
 
 @function_attributes(short_name=None, tags=['epoch_score', 'shuffle', 'export', 'mat', 'pkl', 'csv', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_epoch_score_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict, should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None) -> dict:
+def compute_and_export_session_epoch_score_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None,
+        enable_heuristic_shuffle_scoring: Optional[bool]=True, enable_radon_shuffle_scoring: Optional[bool]=False,
+    ) -> dict:
     """  Computes shuffled decoded-epoch scores (wcorr, heuristics, optional radon) and export them to several formats: .mat, .pkl, and .csv
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_epoch_score_shuffles_completion_function
@@ -1521,7 +1524,7 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         minimum_required_unique_num_shuffles = int(num_shuffles)
 
     # newer_than: Optional[datetime] = datetime(2024, 11, 11)
-    newer_than: Optional[datetime] = datetime(2026, 10, 26)
+    load_shuffles_newer_than: Optional[datetime] = datetime(2026, 10, 26)
 
     allow_update_global_result: bool = False
     callback_outputs = {
@@ -1551,11 +1554,11 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.modernize_from_instance(epoch_score_shuffles) # modernize the object without flattening nested DecodedFilterEpochsResult values
 
 
-    epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=True) # do one more shuffle
+    epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring) # do one more shuffle
     
     if not should_skip_previous_saved_shuffles:
         # try load previous compatible shuffles: _____________________________________________________________________________ #
-        epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=newer_than, with_data_name=with_data_name)
+        epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=load_shuffles_newer_than, with_data_name=with_data_name)
 
     n_completed_shuffles: int = epoch_score_shuffles.n_completed_shuffles
 
@@ -1573,7 +1576,7 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         desired_new_num_shuffles: int = max((desired_total_num_shuffles - epoch_score_shuffles.n_completed_shuffles), 0)
         print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
         ## add some more shuffles to it:
-        epoch_score_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=True)
+        epoch_score_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
 
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)

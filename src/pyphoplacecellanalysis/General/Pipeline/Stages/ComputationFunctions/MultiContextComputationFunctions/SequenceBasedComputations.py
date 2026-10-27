@@ -955,6 +955,31 @@ class DecodedEpochScoreShuffle(ComputedResult):
         if spikes_df is None:
             spikes_df = deepcopy(curr_active_pipeline.sess.spikes_df)
 
+        has_decode_kwargs_dict_copy: bool = False ## to make sure we don't overwrite the input kwargs
+        force_disable_laps_decoding: bool = True
+        if force_disable_laps_decoding:
+            
+            if (all_templates_decode_kwargs.get('desired_laps_decoding_time_bin_size', None) is not None):
+                if (not has_decode_kwargs_dict_copy):
+                    all_templates_decode_kwargs = deepcopy(all_templates_decode_kwargs)
+                    has_decode_kwargs_dict_copy = True
+                all_templates_decode_kwargs['desired_laps_decoding_time_bin_size'] = None ## set to None
+
+            if (all_templates_decode_kwargs.get('desired_shared_decoding_time_bin_size', None) is not None):
+                if (not has_decode_kwargs_dict_copy):
+                    all_templates_decode_kwargs = deepcopy(all_templates_decode_kwargs)
+                    has_decode_kwargs_dict_copy = True
+
+                desired_ripple_decoding_time_bin_size: float = all_templates_decode_kwargs.get('desired_ripple_decoding_time_bin_size', None)
+                if desired_ripple_decoding_time_bin_size is None:
+                    ## set
+                    all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size'] = all_templates_decode_kwargs['desired_shared_decoding_time_bin_size']
+                all_templates_decode_kwargs['desired_shared_decoding_time_bin_size'] = None ## set to None
+
+                # desired_ripple_decoding_time_bin_size: float = all_templates_decode_kwargs.get('desired_ripple_decoding_time_bin_size', None)
+                # print(f'{desired_ripple_decoding_time_bin_size = }')
+
+
         ## FOR EACH SHUFFLE:
         for i, a_shuffle_IDXs, a_shuffle_aclus in zip(np.arange(num_shuffles), shuffle_IDXs, shuffled_aclus):
             print(f'a_shuffle_IDXs: {a_shuffle_IDXs}, a_shuffle_aclus: {a_shuffle_aclus}')
@@ -971,7 +996,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
             decoder_ripple_weighted_corr_df_dict = compute_weighted_correlations(decoder_decoded_epochs_result_dict=decoder_ripple_filter_epochs_decoder_result_dict)
             a_shuffle_score_arrays: Dict[str, NDArray] = {'wcorr': cls._wcorr_df_dict_to_array(decoder_ripple_weighted_corr_df_dict, decoder_names=decoder_names)}
             if enable_heuristic_shuffle_scoring:
-                heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names)
+                heuristic_arrays = HeuristicReplayScoring.compute_shuffle_heuristic_score_arrays(track_templates=track_templates, a_decoded_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, decoder_names=decoder_names) # 2026-10-27 - Extremely slow, ~minutes
                 a_shuffle_score_arrays.update(heuristic_arrays)
             if enable_radon_shuffle_scoring:
                 radon_arrays = cls.compute_shuffle_radon_score_arrays(decoder_ripple_filter_epochs_decoder_result_dict=decoder_ripple_filter_epochs_decoder_result_dict, track_templates=track_templates, decoder_names=decoder_names)
@@ -1647,6 +1672,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
         assert ((self.curr_active_pipeline is not None) and  (self.track_templates is not None))
 
         from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import DecoderDecodedEpochsResult
 
         wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = self.build_all_shuffles_dataframes(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
 
