@@ -1886,6 +1886,7 @@ class PrePostDeltaDistributionComparison:
     def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
                                          pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
                                          laps_p_value: Optional[float] = None, pbe_p_value: Optional[float] = None,
+                                         pbe_heuristic_passing_results=None, pbe_heuristic_p_value: Optional[float] = None,
                                          ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
                                          group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
@@ -1896,40 +1897,78 @@ class PrePostDeltaDistributionComparison:
         `laps_results` / `pbe_results` may be `run()` result dicts (must include `session_summary`) or `session_summary` DataFrames.
         Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
 
+        When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
+        or a parent results dict with a single such key). Heuristic-passing session means are drawn as a black offset series on the PBE bars.
+
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
 
             out = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
                 pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
                 pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
+                pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
             )
             out['fig']
         """
+        from matplotlib.lines import Line2D
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars
 
-        def _coerce_session_summary(obj, explicit_p_value, name: str) -> Tuple[pd.DataFrame, Optional[float]]:
+        def _coerce_session_summary(obj, explicit_p_value, name: str, required: bool = True) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
+            if obj is None:
+                if required:
+                    raise ValueError(f'{name} is required.')
+                return None, None
             if isinstance(obj, pd.DataFrame):
                 summary = obj
                 p_value = explicit_p_value
             elif isinstance(obj, dict):
                 if ('session_summary' not in obj) or (obj['session_summary'] is None):
-                    raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                    if required:
+                        raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                    return None, None
                 summary = obj['session_summary']
                 p_value = explicit_p_value if explicit_p_value is not None else obj.get('p_value')
             else:
                 raise TypeError(f'{name} must be a run() result dict or a session_summary DataFrame, got {type(obj)!r}.')
             if not isinstance(summary, pd.DataFrame) or summary.empty:
-                raise ValueError(f'{name} session_summary is empty.')
+                if required:
+                    raise ValueError(f'{name} session_summary is empty.')
+                return None, None
             missing_cols = [c for c in (pre_col, post_col) if c not in summary.columns]
             if missing_cols:
                 raise ValueError(f'{name} session_summary is missing columns: {missing_cols}.')
             work = summary.dropna(subset=[pre_col, post_col]).copy().reset_index(drop=True)
             if work.empty:
-                raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+                if required:
+                    raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+                return None, None
             return work, p_value
+
+        def _unwrap_heuristic_passing_obj(obj):
+            """Accept a run() dict, a session_summary DataFrame, or a parent results dict with one `*_PBEs_heuristic_passing` key."""
+            if obj is None or isinstance(obj, pd.DataFrame):
+                return obj
+            if isinstance(obj, dict) and ('session_summary' in obj):
+                return obj
+            if isinstance(obj, dict):
+                keys = [k for k in obj.keys() if str(k).endswith('_PBEs_heuristic_passing')]
+                if len(keys) == 1:
+                    return obj[keys[0]]
+                if len(keys) > 1:
+                    raise ValueError(
+                        f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
+                        f'results_dict["_perTimeBin_PBEs_heuristic_passing"].'
+                    )
+                if 'session_summary' not in obj:
+                    return None
+            return obj
 
         laps_session_summary, laps_p_value = _coerce_session_summary(laps_results, laps_p_value, 'laps_results')
         pbe_session_summary, pbe_p_value = _coerce_session_summary(pbe_results, pbe_p_value, 'pbe_results')
+        pbe_heuristic_session_summary, pbe_heuristic_p_value = _coerce_session_summary(
+            _unwrap_heuristic_passing_obj(pbe_heuristic_passing_results), pbe_heuristic_p_value,
+            'pbe_heuristic_passing_results', required=False,
+        )
 
         y_values = [
             laps_session_summary[pre_col].to_numpy(dtype=float),
@@ -1947,7 +1986,10 @@ class PrePostDeltaDistributionComparison:
         has_animal: bool = (animal_col in laps_session_summary.columns) and (animal_col in pbe_session_summary.columns)
         filled_markers = ['o', '^', '8', 's', 'p', 'd', 'P', 'X']
         if has_animal:
-            unique_animals = pd.unique(pd.concat([laps_session_summary[animal_col], pbe_session_summary[animal_col]], ignore_index=True))
+            animal_frames = [laps_session_summary, pbe_session_summary]
+            if (pbe_heuristic_session_summary is not None) and (animal_col in pbe_heuristic_session_summary.columns):
+                animal_frames.append(pbe_heuristic_session_summary)
+            unique_animals = pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))
             marker_mapping = {animal: filled_markers[i % len(filled_markers)] for i, animal in enumerate(unique_animals)}
         else:
             marker_mapping = {}
@@ -1967,7 +2009,8 @@ class PrePostDeltaDistributionComparison:
             active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
 
         if debug_print:
-            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}')
+            n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
+            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
 
         render = PaperFigureTwo.create_plot(
             x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, defer_show,
@@ -1988,11 +2031,57 @@ class PrePostDeltaDistributionComparison:
 
             ## END for pair_i in (0, 2)...
 
-        y_max = float(np.nanmax(np.concatenate(y_values)))
+        heuristic_y_pre = None
+        heuristic_y_post = None
+        if pbe_heuristic_session_summary is not None:
+            heuristic_color = 'black'  # matches FigureS8 heuristic-passing overlay
+            bar_width = 0.3
+            x_offset = 0.15
+            heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
+            heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
+            heuristic_x_values = []
+            for bar_i, y_i in ((2, heuristic_y_pre), (3, heuristic_y_post)):
+                x_values = (bar_i + x_offset) + (np.random.random(y_i.size) * bar_width - bar_width / 2) * 0.45
+                if has_animal and (animal_col in pbe_heuristic_session_summary.columns):
+                    for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy()):
+                        ax.scatter(xv, yv, color=heuristic_color, marker=marker_mapping.get(animal, 'D'), zorder=4, edgecolors='black', linewidths=0.5, s=28)
+                    ## END for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy())...
+
+                else:
+                    ax.scatter(x_values, y_i, color=heuristic_color, marker='D', zorder=4, edgecolors='black', linewidths=0.5, s=28)
+                heuristic_x_values.append(x_values)
+            ## END for bar_i, y_i in ((2, heuristic_y_pre), (3, heuristic_y_post))...
+
+            ax.errorbar(
+                [2 + x_offset, 3 + x_offset],
+                [float(np.nanmean(heuristic_y_pre)), float(np.nanmean(heuristic_y_post))],
+                yerr=[float(np.nanstd(heuristic_y_pre)), float(np.nanstd(heuristic_y_post))],
+                fmt='D', color=heuristic_color, ecolor=heuristic_color, capsize=3, zorder=5, markersize=5,
+            )
+            if enable_paired_lines:
+                for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post):
+                    ax.plot([x0, x1], [y0, y1], color=heuristic_color, alpha=0.35, zorder=3, linewidth=0.8)
+                ## END for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post)...
+
+            ax.legend(
+                handles=[
+                    Line2D([0], [0], marker='o', color='none', markerfacecolor=PaperFigureTwo.get_bar_colors()[2][:3], markeredgecolor=PaperFigureTwo.get_bar_colors()[2][:3], label=f'All {group_labels[1]}'),
+                    Line2D([0], [0], marker='D', color=heuristic_color, markerfacecolor=heuristic_color, label='Heuristic-passing'),
+                ],
+                frameon=False, loc='upper left',
+            )
+
+        y_stack = list(y_values)
+        if heuristic_y_pre is not None:
+            y_stack.extend([heuristic_y_pre, heuristic_y_post])
+        y_max = float(np.nanmax(np.concatenate(y_stack)))
         if laps_p_value is not None:
             add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
         if pbe_p_value is not None:
             add_significance_bars(ax, pbe_p_value, x1=2, x2=3, y=y_max)
+        if (pbe_heuristic_session_summary is not None) and (pbe_heuristic_p_value is not None):
+            heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
+            add_significance_bars(ax, pbe_heuristic_p_value, x1=2, x2=3, y=heuristic_bracket_y)
 
         saved_path = None
         if save_figure:
@@ -2009,9 +2098,11 @@ class PrePostDeltaDistributionComparison:
             render=render,
             laps_session_summary=laps_session_summary,
             pbe_session_summary=pbe_session_summary,
+            pbe_heuristic_session_summary=pbe_heuristic_session_summary,
             y_values=y_values,
             laps_p_value=laps_p_value,
             pbe_p_value=pbe_p_value,
+            pbe_heuristic_p_value=pbe_heuristic_p_value,
             saved_path=saved_path,
         )
 
