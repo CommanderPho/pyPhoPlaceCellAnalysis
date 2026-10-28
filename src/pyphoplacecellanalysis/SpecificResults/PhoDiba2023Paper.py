@@ -3251,9 +3251,10 @@ class FigureS8:
                 print(f'fig_name: {fig_name}, fig_config_dict: {fig_config_dict}')
                 figures_parent_folder = Path(fig_config_dict.pop('figures_parent_folder'))
                 figures_parent_folder.mkdir(exist_ok=True, parents=True)
+                split_by_column = fig_config_dict.pop('split_by_column', None)
 
                 _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
-                                should_concatenate_figures=should_concatenate_figures, split_by_column=fig_config_dict.pop('split_by_column', None),
+                                should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
                                 should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values,
                                 **{**kwargs, **fig_config_dict},
                 )
@@ -3273,18 +3274,80 @@ class FigureS8:
                     fignum: str = f'{fig_name}-pre_post_delta_effect-{metric}'
                     # _summary_figure_path = figures_parent_folder.joinpath(f'{fignum}.svg')
 
-                    if ('_perTimeBin_Laps' not in pre_post_delta_stats_results_dict) or ('_perTimeBin_PBEs' not in pre_post_delta_stats_results_dict):
+                    def _subfn_iter_summary_four_bar_specs(results_dict: Dict, grainularity: str = '_perTimeBin'):
+                        """Yield `(group_key, laps_key, pbes_key, heuristic_key)` for pooled or split-by-group stats."""
+                        heuristic_suffix: str = '_heuristic_passing'
+                        laps_base: str = f'{grainularity}_Laps'
+                        pbes_base: str = f'{grainularity}_PBEs'
+                        if (laps_base in results_dict) and (pbes_base in results_dict):
+                            heuristic_key: str = f'{pbes_base}{heuristic_suffix}'
+                            yield None, laps_base, pbes_base, heuristic_key if heuristic_key in results_dict else None
+                            return
+
+                        laps_prefix: str = f'{laps_base}_'
+                        group_names = []
+                        for k in results_dict.keys():
+                            if k.startswith(laps_prefix) and (not str(k).endswith(heuristic_suffix)):
+                                group_name = k[len(laps_prefix):]
+                                if f'{pbes_base}_{group_name}' in results_dict:
+                                    group_names.append(group_name)
+                        ## END for k in results_dict.keys()...
+
+                        ordered_groups = cls._sorted_split_values(group_names, split_by_column=(split_by_column or 'animal'))
+                        for group_name in ordered_groups:
+                            laps_key: str = f'{laps_base}_{group_name}'
+                            pbes_key: str = f'{pbes_base}_{group_name}'
+                            heuristic_key: str = f'{pbes_key}{heuristic_suffix}'
+                            yield group_name, laps_key, pbes_key, heuristic_key if heuristic_key in results_dict else None
+                        ## END for group_name in ordered_groups...
+
+                    summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity='_perTimeBin'))
+                    if len(summary_specs) == 0:
                         print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure (fignum: "{fignum}"). Skipping for fig_name: "{fig_name}"')
-                        # WARN: keys missing from pre_post_delta_stats_results_dict. Keys: ['_perTimeBin_Laps_gor01', '_perTimeBin_Laps_vvp01', '_perTimeBin_Laps_pin01', '_perTimeBin_PBEs_gor01', '_perTimeBin_PBEs_gor01_heuristic_passing', '_perTimeBin_PBEs_vvp01', '_perTimeBin_PBEs_vvp01_heuristic_passing', '_perTimeBin_PBEs_pin01', '_perTimeBin_PBEs_pin01_heuristic_passing', '_perEpochs_Laps_gor01', '_perEpochs_Laps_vvp01', '_perEpochs_Laps_pin01', '_perEpochs_PBEs_gor01', '_perEpochs_PBEs_gor01_heuristic_passing', '_perEpochs_PBEs_vvp01', '_perEpochs_PBEs_vvp01_heuristic_passing', '_perEpochs_PBEs_pin01', '_perEpochs_PBEs_pin01_heuristic_passing'] required for summary figure (fignum: "Figure S9-pre_post_delta_effect-P_Short"). Skipping for fig_name: "Figure S9"
                     else:
-                        _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
-                            pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
-                            pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
-                            pbe_heuristic_passing_results = pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing', None),
-                            fignum=fignum,
-                            save_figure=True, export_folder=figures_parent_folder,
-                        )
-                        _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
+                        fig_summary_dict = {}
+                        group_svg_paths = []
+                        group_pdf_paths = []
+                        for group_name, laps_key, pbes_key, heuristic_key in summary_specs:
+                            active_fignum: str = fignum if group_name is None else f'{fignum}-{group_name}'
+                            save_folder = figures_parent_folder
+                            if group_name is not None:
+                                intermediates_folder = cls.figures_intermediates_parent_folder()
+                                if intermediates_folder is not None:
+                                    save_folder = intermediates_folder
+                            plot_kwargs = dict(fignum=active_fignum, fig_file_name=active_fignum, save_figure=True, export_folder=save_folder)
+                            if group_name is not None:
+                                plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
+                            _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
+                                pre_post_delta_stats_results_dict[laps_key],
+                                pre_post_delta_stats_results_dict[pbes_key],
+                                pbe_heuristic_passing_results=None if heuristic_key is None else pre_post_delta_stats_results_dict.get(heuristic_key, None),
+                                **plot_kwargs,
+                            )
+                            fig_summary_dict[group_name if group_name is not None else 'all'] = _out_extra_plot
+                            for a_path in (_out_extra_plot.get('saved_paths') or []):
+                                a_path = Path(a_path)
+                                if a_path.suffix.lower() == '.svg':
+                                    group_svg_paths.append(a_path)
+                                elif a_path.suffix.lower() == '.pdf':
+                                    group_pdf_paths.append(a_path)
+                            ## END for a_path in (_out_extra_plot.get('saved_paths') or [])...
+
+                        ## END for group_name, laps_key, pbes_key, heuristic_key in summary_specs...
+
+                        if (len(summary_specs) == 1) and (summary_specs[0][0] is None):
+                            _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict['all']
+                        else:
+                            if len(group_svg_paths) > 1:
+                                stacked_svg_path = figures_parent_folder.joinpath(f'{fignum}_by_{split_by_column or "animal"}.svg')
+                                SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
+                                fig_summary_dict['stacked_svg'] = stacked_svg_path
+                                print(f'\tstacked {split_by_column or "animal"} summary rows: "{stacked_svg_path.as_posix()}"')
+                            if len(group_pdf_paths) > 1:
+                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fignum}_by_{split_by_column or "animal"}.pdf')
+                                PDFHelpers.concatenate_pdfs_vertically(pdf_paths=group_pdf_paths, output_path=stacked_pdf_path, padding=0)
+                                fig_summary_dict['stacked_pdf'] = stacked_pdf_path
+                            _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict
                 ## END if should_compute_stats
 
                 if store_debug_values:
