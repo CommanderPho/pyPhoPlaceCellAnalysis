@@ -1881,7 +1881,7 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars'], used_by=[], creation_date='2026-10-28 08:32', related_items=['compute_ordinal_mode_shift'])
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars', 'FigureCollector', 'PhoPublicationFigureHelper', 'build_and_write_to_file'], used_by=[], creation_date='2026-10-28 08:32', related_items=['compute_ordinal_mode_shift'])
     @classmethod
     def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
                                          pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
@@ -1890,7 +1890,8 @@ class PrePostDeltaDistributionComparison:
                                          ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
                                          group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
-                                         fig_file_name: str = 'figure4_summary_four_bar', fignum=None, active_context: Optional[IdentifyingContext] = None,
+                                         fig_file_name: str = 'figure4_summary_four_bar', write_vector_format: bool = True, write_png: bool = False, write_svg: bool = True,
+                                         fignum=None, active_context: Optional[IdentifyingContext] = None,
                                          enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
         """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
 
@@ -1900,6 +1901,9 @@ class PrePostDeltaDistributionComparison:
         When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
         or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
         each PBE column is split into two half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
+
+        Saving uses `FigureCollector` plus `PhoPublicationFigureHelper.rc_context_kwargs`. When `save_figure=True`, writes PDF/PNG
+        via `build_and_write_to_file` (or `AcrossSessionsVisualizations.output_figure` if `export_folder` is omitted) and SVG via `fig.savefig`.
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
@@ -1913,7 +1917,10 @@ class PrePostDeltaDistributionComparison:
             out['fig']
         """
         from matplotlib.patches import Patch
-        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
 
         def _coerce_session_summary(obj, explicit_p_value, name: str, required: bool = True) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
             if obj is None:
@@ -2026,6 +2033,7 @@ class PrePostDeltaDistributionComparison:
         heuristic_y_pre = None
         heuristic_y_post = None
         pbe_half_offset = 0.0
+        dpi = kwargs.pop('dpi', 220)
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
@@ -2061,64 +2069,89 @@ class PrePostDeltaDistributionComparison:
             n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
             print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
 
-        render = PaperFigureTwo.create_plot(
-            x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, True,
-            prepare_for_publication=prepare_for_publication,
-            publication_group_labels=group_labels, metric_name='Session Means',
-            title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
-            **create_plot_kwargs,
-        )
-        fig = render.fig
-        ax = render.ax
-        x_values_list, plotted_y_values = render.plot_data
-
-        if enable_paired_lines:
-            if has_heuristic:
-                pair_specs = [(0, 1, 'gray', 0.3), (2, 4, 'gray', 0.3), (3, 5, heuristic_color, 0.45)]
-            else:
-                pair_specs = [(0, 1, 'gray', 0.3), (2, 3, 'gray', 0.3)]
-            for i0, i1, line_color, line_alpha in pair_specs:
-                for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
-                    ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
-                ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
-
-            ## END for i0, i1, line_color, line_alpha in pair_specs...
-
-        y_max = float(np.nanmax(np.concatenate(y_values)))
-        if laps_p_value is not None:
-            add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
-        if pbe_p_value is not None:
-            add_significance_bars(ax, pbe_p_value, x1=(2.0 - pbe_half_offset), x2=(3.0 - pbe_half_offset), y=y_max)
-        if has_heuristic and (pbe_heuristic_p_value is not None):
-            heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
-            add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
-
-        if has_heuristic:
-            pbe_legend_color = PaperFigureTwo.get_bar_colors()[2][:3]
-            ax.legend(
-                handles=[
-                    Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
-                    Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
-                ],
-                frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
-            )
-
-        if not defer_show:
-            plt.show()
-
+        collector = None
+        saved_paths: List[Path] = []
         saved_path = None
-        if save_figure:
-            if export_folder is None:
-                raise ValueError('export_folder is required when save_figure=True.')
-            export_folder = Path(export_folder)
-            export_folder.mkdir(parents=True, exist_ok=True)
-            saved_path = export_folder / f'{fig_file_name}.pdf'
-            fig.savefig(saved_path)
+        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+            prepare_for_publication=prepare_for_publication,
+            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+        )
+        with mpl.rc_context(publication_rc):
+            with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                render = PaperFigureTwo.create_plot(
+                    x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, True,
+                    prepare_for_publication=prepare_for_publication,
+                    publication_group_labels=group_labels, metric_name='Session Means',
+                    title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
+                    **create_plot_kwargs,
+                )
+                collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+                fig = render.fig
+                ax = render.ax
+                x_values_list, plotted_y_values = render.plot_data
+
+                if enable_paired_lines:
+                    if has_heuristic:
+                        pair_specs = [(0, 1, 'gray', 0.3), (2, 4, 'gray', 0.3), (3, 5, heuristic_color, 0.45)]
+                    else:
+                        pair_specs = [(0, 1, 'gray', 0.3), (2, 3, 'gray', 0.3)]
+                    for i0, i1, line_color, line_alpha in pair_specs:
+                        for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                            ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
+                        ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
+
+                    ## END for i0, i1, line_color, line_alpha in pair_specs...
+
+                y_max = float(np.nanmax(np.concatenate(y_values)))
+                if laps_p_value is not None:
+                    add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
+                if pbe_p_value is not None:
+                    add_significance_bars(ax, pbe_p_value, x1=(2.0 - pbe_half_offset), x2=(3.0 - pbe_half_offset), y=y_max)
+                if has_heuristic and (pbe_heuristic_p_value is not None):
+                    heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
+                    add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
+
+                if has_heuristic:
+                    pbe_legend_color = PaperFigureTwo.get_bar_colors()[2][:3]
+                    ax.legend(
+                        handles=[
+                            Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
+                            Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+                        ],
+                        frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                    )
+
+                if save_figure:
+                    save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
+                    fig_man = None
+                    if export_folder is not None:
+                        export_folder = Path(export_folder)
+                        export_folder.mkdir(parents=True, exist_ok=True)
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder)
+                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                    else:
+                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                        saved_paths = list(saved_paths or [])
+                        fig_man = AcrossSessionsVisualizations._fig_out_man
+                    if write_svg:
+                        if saved_paths:
+                            svg_path = Path(saved_paths[0]).with_suffix('.svg')
+                        else:
+                            if fig_man is None:
+                                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                            svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                        fig.savefig(svg_path, format='svg', transparent=True)
+                        saved_paths.append(svg_path)
+                    saved_path = saved_paths[0] if saved_paths else None
+
+                if not defer_show:
+                    plt.show()
 
         return dict(
             fig=fig,
             ax=ax,
             render=render,
+            collector=collector,
             laps_session_summary=laps_session_summary,
             pbe_session_summary=pbe_session_summary,
             pbe_heuristic_session_summary=pbe_heuristic_session_summary,
@@ -2127,6 +2160,7 @@ class PrePostDeltaDistributionComparison:
             pbe_p_value=pbe_p_value,
             pbe_heuristic_p_value=pbe_heuristic_p_value,
             saved_path=saved_path,
+            saved_paths=saved_paths,
         )
 
 
