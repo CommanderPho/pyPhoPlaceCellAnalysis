@@ -671,7 +671,7 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None) -> Dict:
+    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None, perform_ordinal_mode_model: bool = True, ordinal_mode_kwargs: Optional[Dict] = None) -> Dict:
         """Compute the effect, bootstrap interval, and optional permutation test.
 
         Uses `sampling_unit` from the constructor. Passing it here is optional and must
@@ -681,6 +681,10 @@ class PrePostDeltaDistributionComparison:
         test of the signed mean difference. Cluster modes do not group by parent epoch.
         Session-level tests treat sessions as exchangeable and therefore ignore
         within-animal dependence.
+
+        When `perform_ordinal_mode_model` is True (default), also fits a session-level
+        proportional-odds model of low/mid/high `P_Short` and stores it under
+        `ordinal_mode_model`.
         """
         if sampling_unit is None:
             sampling_unit = self.sampling_unit
@@ -777,6 +781,14 @@ class PrePostDeltaDistributionComparison:
             ]
         if session_summary is not None:
             results['session_summary'] = session_summary
+
+        if perform_ordinal_mode_model:
+            _ordinal_kwargs = dict(value_col=self.value_col, condition_col=self.condition_col, animal_col=self.animal_col, session_col=self.session_col, pre_label=self.group_values[0], post_label=self.group_values[1], n_bootstrap=self.n_bootstrap, n_permutations=n_permutations, random_state=int(self.rng.integers(0, 2**31 - 1)))
+            _ordinal_kwargs.update(ordinal_mode_kwargs or {})
+            try:
+                results['ordinal_mode_model'] = self.compute_ordinal_mode_shift(self._data, **_ordinal_kwargs)
+            except (ValueError, np.linalg.LinAlgError) as e:
+                results['ordinal_mode_model'] = {'status': f'failed: {e}'}
 
         return results
 
@@ -1529,7 +1541,7 @@ class PrePostDeltaDistributionComparison:
 
 
 
-    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'mode-ratio'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 07:30', related_items=[])
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'mode-ratio'], input_requires=[], output_provides=[], uses=[], used_by=['compute_ordinal_mode_shift'], creation_date='2026-10-28 07:30', related_items=[])
     @classmethod
     def compute_mode_ratio(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', low_threshold: float = 0.25, high_threshold: float = 0.75) -> pd.DataFrame:
         """ computes the ratio of >25% quantile and <75% quantile (the histogram's modes)
@@ -1581,6 +1593,292 @@ class PrePostDeltaDistributionComparison:
         if not rows:
             return pd.DataFrame(columns=[condition_col, 'n', 'n_low', 'n_high', 'n_mid', 'frac_low', 'frac_high', 'mode_ratio', 'low_threshold', 'high_threshold'])
         return pd.DataFrame(rows)
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'ordinal', 'proportional-odds', 'mode-ratio'], input_requires=[], output_provides=[], uses=['OrderedModel', 'compute_mode_ratio'], used_by=['run'], creation_date='2026-10-28 08:00', related_items=['compute_mode_ratio'])
+    @classmethod
+    def compute_ordinal_mode_shift(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name',
+                                   pre_label='pre-delta', post_label='post-delta', low_threshold: float = 0.25, high_threshold: float = 0.75,
+                                   distr: str = 'logit', min_bins_per_condition: int = 10, n_bootstrap: int = 1000, n_permutations: int = 2000, random_state=None) -> Dict:
+        """Session-level proportional-odds model of low/mid/high P_Short on pre vs post-delta.
+
+        Bins `value_col` into an ordered category: low (`< low_threshold`), mid, high (`> high_threshold`).
+        Each session is fit with `OrderedModel(category ~ is_post)`. The headline effect is the unweighted
+        mean of session slopes `beta_s` (cumulative log-odds shift toward higher P_Short). `exp(beta)` is
+        the proportional odds ratio.
+
+        Inference treats sessions as units nested in animals, matching `sampling_unit='session'`:
+        a sign-flip test on `beta_s` and a hierarchical bootstrap (animals, then sessions within animal).
+        Time-bin dependence is not modeled as independent Bernoulli trials.
+
+        The proportional-odds assumption is that the post-delta shift is the same for the low-to-mid and
+        mid-to-high cutpoints; check `session_summary` category fractions. With few animals, an animal-level
+        sign-flip has a high p-value floor (0.25 for n=3), so the test is at the session level.
+
+        A pooled `OrderedModel` with session fixed effects is reported as `pooled_beta_session_fe` with a
+        naive SE flagged as anti-conservative. Threshold sensitivity is left to the caller via `low_threshold`
+        / `high_threshold`.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            ordinal_results = PrePostDeltaDistributionComparison.compute_ordinal_mode_shift(filtered_all_sessions_laps_time_bin_df)
+        """
+        from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+        required_cols = [value_col, condition_col, animal_col, session_col]
+        missing_cols = set(required_cols).difference(df.columns)
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+        if not (0.0 <= low_threshold < high_threshold <= 1.0):
+            raise ValueError('Require 0 <= low_threshold < high_threshold <= 1.')
+        if min_bins_per_condition < 1:
+            raise ValueError('min_bins_per_condition must be >= 1.')
+        if n_bootstrap < 1:
+            raise ValueError('n_bootstrap must be >= 1.')
+        if n_permutations < 1:
+            raise ValueError('n_permutations must be >= 1.')
+
+        work = df.loc[df[condition_col].isin([pre_label, post_label]), required_cols].copy()
+        work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+        work = work.dropna(subset=required_cols).reset_index(drop=True)
+        if work.empty or set(work[condition_col].unique()) != {pre_label, post_label}:
+            raise ValueError(f'Data must contain both groups: {(pre_label, post_label)}')
+
+        category_levels = ('low', 'mid', 'high')
+        work['category'] = np.select(
+            [work[value_col] < low_threshold, work[value_col] > high_threshold],
+            ['low', 'high'],
+            default='mid',
+        )
+        work['category'] = pd.Categorical(work['category'], categories=list(category_levels), ordered=True)
+        work['is_post'] = (work[condition_col] == post_label).astype(float)
+        work['_session_key'] = work[animal_col].astype(str) + '|' + work[session_col].astype(str)
+
+        def _cat_counts(series: pd.Series) -> Dict[str, int]:
+            counts = series.value_counts()
+            return {name: int(counts.get(name, 0)) for name in category_levels}
+
+        def _fit_is_post_slope(endog: pd.Series, is_post: pd.Series) -> Tuple[float, float, bool]:
+            observed = [name for name in category_levels if int((endog == name).sum()) > 0]
+            endog_series = pd.Series(pd.Categorical(np.asarray(endog), categories=observed, ordered=True), name='category')
+            exog = pd.DataFrame({'is_post': np.asarray(is_post, dtype=np.float64)})
+            model = OrderedModel(endog_series, exog, distr=distr)
+            fit = model.fit(method='bfgs', disp=False)
+            converged = bool(fit.mle_retvals.get('converged', False))
+            return float(fit.params['is_post']), float(fit.bse['is_post']), converged
+
+        session_rows = []
+        for (animal, session), sess in work.groupby([animal_col, session_col], dropna=False, sort=False):
+            pre_mask = sess[condition_col] == pre_label
+            post_mask = sess[condition_col] == post_label
+            n_pre = int(pre_mask.sum())
+            n_post = int(post_mask.sum())
+            pre_counts = _cat_counts(sess.loc[pre_mask, 'category'])
+            post_counts = _cat_counts(sess.loc[post_mask, 'category'])
+            n_cats = int(sess['category'].nunique(dropna=True))
+            row = {
+                'animal': animal,
+                'session': session,
+                'n_pre': n_pre,
+                'n_post': n_post,
+                'n_low_pre': pre_counts['low'],
+                'n_mid_pre': pre_counts['mid'],
+                'n_high_pre': pre_counts['high'],
+                'n_low_post': post_counts['low'],
+                'n_mid_post': post_counts['mid'],
+                'n_high_post': post_counts['high'],
+                'frac_low_pre': (pre_counts['low'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_mid_pre': (pre_counts['mid'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_high_pre': (pre_counts['high'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_low_post': (post_counts['low'] / n_post) if n_post > 0 else np.nan,
+                'frac_mid_post': (post_counts['mid'] / n_post) if n_post > 0 else np.nan,
+                'frac_high_post': (post_counts['high'] / n_post) if n_post > 0 else np.nan,
+                'beta': np.nan,
+                'se': np.nan,
+                'converged': False,
+                'quasi_separated': False,
+                'used_for_inference': False,
+                'status': 'ok',
+            }
+            if n_pre < min_bins_per_condition or n_post < min_bins_per_condition:
+                row['status'] = (
+                    f'too_few_bins: n_pre={n_pre}, n_post={n_post}, '
+                    f'min_bins_per_condition={min_bins_per_condition}'
+                )
+                session_rows.append(row)
+                continue
+            if n_cats < 2:
+                row['status'] = f'too_few_categories: n_categories={n_cats}'
+                session_rows.append(row)
+                continue
+            try:
+                beta, se, converged = _fit_is_post_slope(sess['category'], sess['is_post'])
+            except Exception as e:
+                row['status'] = f'fit_failed: {e}'
+                session_rows.append(row)
+                continue
+            quasi_separated = bool(np.isfinite(beta) and abs(beta) > 20.0)
+            row['beta'] = beta
+            row['se'] = se
+            row['converged'] = converged
+            row['quasi_separated'] = quasi_separated
+            if not converged:
+                row['status'] = 'not_converged'
+            elif quasi_separated:
+                row['status'] = 'quasi_separated'
+            else:
+                row['used_for_inference'] = True
+                row['status'] = 'ok'
+            session_rows.append(row)
+        ## END for (animal, session), sess in work.groupby([animal_col, session_col], dropna=False, sort=False)....
+
+        session_summary = pd.DataFrame(session_rows)
+        if session_summary.empty:
+            valid = session_summary
+        else:
+            valid = session_summary.loc[session_summary['used_for_inference']].copy()
+        n_sessions_used = int(len(valid))
+        n_sessions_skipped = int(len(session_summary) - n_sessions_used)
+        n_animals_used = int(valid['animal'].nunique()) if n_sessions_used > 0 else 0
+        rng = np.random.default_rng(random_state)
+
+        if n_sessions_used > 0:
+            animal_summary = (
+                valid.groupby('animal', sort=False, dropna=False)['beta']
+                .mean()
+                .rename('mean_beta_post_minus_pre')
+                .reset_index()
+            )
+        else:
+            animal_summary = pd.DataFrame(columns=['animal', 'mean_beta_post_minus_pre'])
+
+        mean_beta = float(valid['beta'].mean()) if n_sessions_used > 0 else np.nan
+        odds_ratio = float(np.exp(mean_beta)) if np.isfinite(mean_beta) else np.nan
+
+        if n_sessions_used < 1:
+            p_value = None
+            p_value_method = None
+            beta_ci = None
+            odds_ratio_ci = None
+            infer_status = 'Not testable: no eligible sessions.'
+        else:
+            effects = valid['beta'].to_numpy(dtype=float)
+            n_units = int(effects.size)
+            observed = float(effects.mean())
+            abs_observed = abs(observed)
+            n_exact = 1 << n_units
+            use_exact = (n_units <= 20) and (n_exact <= n_permutations)
+            if use_exact:
+                sign_bits = (
+                    (np.arange(n_exact, dtype=np.uint32)[:, None] >> np.arange(n_units)) & 1
+                )
+                signs = 1.0 - 2.0 * sign_bits.astype(float)
+                null_means = signs @ effects / n_units
+                p_value = float(np.count_nonzero(np.abs(null_means) >= abs_observed) / n_exact)
+                p_value_method = 'exact'
+            else:
+                null_means = np.empty(n_permutations, dtype=float)
+                sign_choices = np.array([1.0, -1.0])
+                for i in range(n_permutations):
+                    signs = rng.choice(sign_choices, size=n_units)
+                    null_means[i] = float(np.mean(signs * effects))
+                ## END for i in range(n_permutations)....
+
+                p_value = (
+                    1 + np.count_nonzero(np.abs(null_means) >= abs_observed)
+                ) / (n_permutations + 1)
+                p_value_method = 'monte_carlo'
+
+            betas_by_animal = {
+                animal: group['beta'].to_numpy(dtype=float)
+                for animal, group in valid.groupby('animal', sort=False, dropna=False)
+            }
+            animals = list(betas_by_animal.keys())
+            n_animals_boot = len(animals)
+            bootstrap_means = np.empty(n_bootstrap, dtype=float)
+            for i in range(n_bootstrap):
+                sampled_animals = rng.choice(animals, size=n_animals_boot, replace=True)
+                sampled_betas = []
+                for animal in sampled_animals:
+                    animal_betas = betas_by_animal[animal]
+                    sampled_betas.extend(
+                        rng.choice(animal_betas, size=len(animal_betas), replace=True).tolist()
+                    )
+                ## END for animal in sampled_animals....
+
+                bootstrap_means[i] = float(np.mean(sampled_betas))
+            ## END for i in range(n_bootstrap)....
+
+            beta_ci = tuple(np.quantile(bootstrap_means, [0.025, 0.975]))
+            odds_ratio_ci = tuple(float(np.exp(v)) for v in beta_ci)
+            infer_status = (
+                'ok; session-level proportional-odds (ordinal logit) of low/mid/high P_Short. '
+                'Sign-flip p-value and hierarchical bootstrap treat sessions as units nested in animals. '
+                'Does not treat time bins as independent. '
+                'Session-level tests treat sessions as exchangeable and ignore within-animal dependence. '
+                'Proportional-odds assumes the same post-delta shift for low-to-mid and mid-to-high cutpoints.'
+            )
+
+        pooled_beta = np.nan
+        pooled_se = np.nan
+        try:
+            observed = [name for name in category_levels if int((work['category'] == name).sum()) > 0]
+            if len(observed) < 2:
+                pooled_status = 'failed: fewer than 2 categories in pooled data.'
+            else:
+                session_dummies = pd.get_dummies(work['_session_key'], drop_first=True, dtype=np.float64)
+                pooled_exog = pd.concat([work[['is_post']].astype(np.float64), session_dummies], axis=1)
+                pooled_endog = pd.Series(pd.Categorical(work['category'].to_numpy(), categories=observed, ordered=True), name='category')
+                pooled_model = OrderedModel(pooled_endog, pooled_exog, distr=distr)
+                pooled_fit = pooled_model.fit(method='bfgs', disp=False)
+                pooled_beta = float(pooled_fit.params['is_post'])
+                pooled_se = float(pooled_fit.bse['is_post'])
+                pooled_status = 'ok; naive SE is anti-conservative because time bins are dependent.'
+        except Exception as e:
+            pooled_status = f'failed: {e}'
+
+        frac_rows = []
+        for condition, group in work.groupby(condition_col, dropna=False, sort=False):
+            n = int(len(group))
+            counts = _cat_counts(group['category'])
+            frac_rows.append({
+                condition_col: condition,
+                'n': n,
+                'frac_low': (counts['low'] / n) if n > 0 else np.nan,
+                'frac_mid': (counts['mid'] / n) if n > 0 else np.nan,
+                'frac_high': (counts['high'] / n) if n > 0 else np.nan,
+            })
+        ## END for condition, group in work.groupby(condition_col, dropna=False, sort=False)....
+
+        category_fractions = pd.DataFrame(frac_rows)
+        mode_ratio_df = cls.compute_mode_ratio(
+            work, value_col=value_col, condition_col=condition_col,
+            low_threshold=low_threshold, high_threshold=high_threshold,
+        )
+
+        return {
+            'mean_beta_post_minus_pre': mean_beta,
+            'odds_ratio': odds_ratio,
+            'beta_bootstrap_95ci': beta_ci,
+            'odds_ratio_bootstrap_95ci': odds_ratio_ci,
+            'p_value': p_value,
+            'p_value_method': p_value_method,
+            'n_sessions_used': n_sessions_used,
+            'n_sessions_skipped': n_sessions_skipped,
+            'n_animals_used': n_animals_used,
+            'animal_summary': animal_summary,
+            'session_summary': session_summary,
+            'pooled_beta_session_fe': pooled_beta,
+            'pooled_se_naive': pooled_se,
+            'pooled_status': pooled_status,
+            'category_fractions': category_fractions,
+            'mode_ratio': mode_ratio_df,
+            'low_threshold': low_threshold,
+            'high_threshold': high_threshold,
+            'distr': distr,
+            'status': infer_status,
+        }
 
 
 
