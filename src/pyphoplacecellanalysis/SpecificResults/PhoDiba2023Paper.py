@@ -2358,9 +2358,13 @@ class PrePostDeltaDistributionComparison:
                 Line2D([0], [0], color=heuristic_color, linewidth=1.6, label='Heuristic-passing KDE'),
                 Line2D([0], [0], color=heuristic_color, linewidth=1.4, linestyle='--', label='Heuristic-passing ECDF'),
             ])
-        fig.legend(handles=legend_handles, loc='upper center', ncol=max(len(legend_handles), 1), frameon=False, fontsize=label_fs, bbox_to_anchor=(0.5, 1.02))
-        fig.suptitle(r'Decoded $P_{\mathrm{Short}}$ distributions', fontsize=title_fs + 2, y=1.08)
-        fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.90])
+        fig.tight_layout()
+        legend_top = 0.82 if (heuristic_pre is not None) else 0.86
+        fig.subplots_adjust(top=legend_top)
+        fig.legend(
+            handles=legend_handles, loc='lower center', bbox_to_anchor=(0.5, legend_top),
+            ncol=max(len(legend_handles), 1), frameon=False, fontsize=label_fs,
+        )
 
         if not defer_show:
             plt.show()
@@ -3009,6 +3013,7 @@ class FigureS8:
                 title_suffix: str = ' (heuristic filtered)' if should_overlay_heuristic_filter else ''
 
                 epoch_kind: str = an_epoch_name  # 'Laps' or 'PBEs' — keep un-suffixed for stats keys
+                active_key: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_Laps'
                 if not should_concatenate_figures:
                     an_epoch_name = f"{an_epoch_name}{a_grainularity}"
 
@@ -3031,7 +3036,6 @@ class FigureS8:
                 # print(bad.head())
                 # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
                 if should_compute_stats or enable_add_stats_to_figures:
-                    active_key: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_Laps'
                     for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items():
                         result_key: str = active_key if group_key is None else f'{active_key}_{group_key}'
                         comparison_all, results_all = group_stats.get('all', (None, None))
