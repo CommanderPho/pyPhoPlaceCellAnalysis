@@ -2122,92 +2122,7 @@ class PrePostDeltaDistributionComparison:
         )
 
 
-    @classmethod
-    def _extract_pre_post_values(cls, obj, value_col: str = 'P_Short', condition_col: str = 'pre_post_delta_category', pre_label: str = 'pre-delta', post_label: str = 'post-delta', name: str = 'data') -> Tuple[np.ndarray, np.ndarray]:
-        """Raw pre/post `value_col` arrays from a comparison instance or a labeled DataFrame."""
-        if isinstance(obj, cls):
-            y = np.asarray(obj._y, dtype=float)
-            cond = np.asarray(obj._row_condition_code)
-            pre = y[cond == 0]
-            post = y[cond == 1]
-        elif isinstance(obj, pd.DataFrame):
-            missing_cols = [c for c in (value_col, condition_col) if c not in obj.columns]
-            if missing_cols:
-                raise ValueError(f'{name} is missing columns: {missing_cols}.')
-            work = obj[[value_col, condition_col]].copy()
-            work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
-            work = work.dropna(subset=[value_col])
-            pre = work.loc[work[condition_col] == pre_label, value_col].to_numpy(dtype=float)
-            post = work.loc[work[condition_col] == post_label, value_col].to_numpy(dtype=float)
-        elif isinstance(obj, dict) and ('session_summary' in obj):
-            raise ValueError(
-                f'{name} is a run() result dict without raw {value_col} values; '
-                f'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
-            )
-        else:
-            raise TypeError(f'{name} must be a PrePostDeltaDistributionComparison or DataFrame, got {type(obj)!r}.')
-        pre = pre[np.isfinite(pre)]
-        post = post[np.isfinite(post)]
-        if (pre.size == 0) or (post.size == 0):
-            raise ValueError(f'{name} must contain both pre and post {value_col} values.')
-        return pre, post
-
-
-    @classmethod
-    def _unwrap_heuristic_distribution_obj(cls, obj, pbe_data):
-        """Accept a comparison, DataFrame, or parent dict; pick the PBE heuristic sibling when both grainularities exist."""
-        if obj is None or isinstance(obj, cls) or isinstance(obj, pd.DataFrame):
-            return obj
-        if isinstance(obj, dict):
-            if 'session_summary' in obj:
-                raise ValueError(
-                    'pbe_heuristic_passing is a run() result dict without raw values; '
-                    'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
-                )
-            keys = [k for k in obj.keys() if str(k).endswith('_PBEs_heuristic_passing')]
-            if len(keys) == 1:
-                return obj[keys[0]]
-            if len(keys) > 1:
-                for k, v in obj.items():
-                    if v is pbe_data:
-                        sibling = f'{k}_heuristic_passing'
-                        if sibling in obj:
-                            return obj[sibling]
-                ## END for k, v in obj.items()...
-
-                raise ValueError(
-                    f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
-                    f'comparison_dict["_perTimeBin_PBEs_heuristic_passing"].'
-                )
-            return None
-        return obj
-
-
-    @classmethod
-    def _reflected_bounded_kde(cls, values: np.ndarray, grid: np.ndarray, bw_factor: float) -> np.ndarray:
-        """Scott-bandwidth KDE with reflection at 0 and 1, renormalized on [0, 1]."""
-        values = np.asarray(values, dtype=float)
-        values = values[np.isfinite(values)]
-        if values.size < 2:
-            return np.full(grid.shape, np.nan)
-        unique = np.unique(values)
-        if unique.size < 2:
-            return np.full(grid.shape, np.nan)
-        reflected = np.concatenate([values, -values, (2.0 - values)])
-        try:
-            kde = stats.gaussian_kde(reflected, bw_method='scott')
-            kde.set_bandwidth(bw_method=float(kde.factor) * float(bw_factor))
-            dens = np.asarray(kde(grid), dtype=float)
-        except Exception:
-            return np.full(grid.shape, np.nan)
-        trapz_fn = getattr(np, 'trapezoid', np.trapz)
-        area = float(trapz_fn(dens, grid))
-        if (not np.isfinite(area)) or (area <= 0.0):
-            return np.full(grid.shape, np.nan)
-        return dens / area
-
-
-    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'histogram', 'kde', 'ecdf', 'bimodal'], input_requires=[], output_provides=[], uses=['_extract_pre_post_values', '_reflected_bounded_kde'], used_by=[], creation_date='2026-10-28 10:19', related_items=['plot_fig2_style_summary_four_bar', 'compute_mode_ratio'])
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'histogram', 'kde', 'ecdf', 'bimodal'], input_requires=[], output_provides=[], uses=['_subfn_extract_pre_post_values', '_subfn_unwrap_heuristic_distribution_obj', '_subfn_reflected_bounded_kde'], used_by=[], creation_date='2026-10-28 10:19', related_items=['plot_fig2_style_summary_four_bar', 'compute_mode_ratio'])
     @classmethod
     def plot_four_distribution_hist_ecdf(cls, laps_data, pbe_data,
                                          value_col: str = 'P_Short', condition_col: str = 'pre_post_delta_category',
@@ -2235,14 +2150,92 @@ class PrePostDeltaDistributionComparison:
         from matplotlib.lines import Line2D
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo
 
+        def _subfn_extract_pre_post_values(obj, name: str = 'data') -> Tuple[np.ndarray, np.ndarray]:
+            """Raw pre/post `value_col` arrays from a comparison instance or a labeled DataFrame."""
+            if isinstance(obj, cls):
+                y = np.asarray(obj._y, dtype=float)
+                cond = np.asarray(obj._row_condition_code)
+                pre = y[cond == 0]
+                post = y[cond == 1]
+            elif isinstance(obj, pd.DataFrame):
+                missing_cols = [c for c in (value_col, condition_col) if c not in obj.columns]
+                if missing_cols:
+                    raise ValueError(f'{name} is missing columns: {missing_cols}.')
+                work = obj[[value_col, condition_col]].copy()
+                work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+                work = work.dropna(subset=[value_col])
+                pre = work.loc[work[condition_col] == pre_label, value_col].to_numpy(dtype=float)
+                post = work.loc[work[condition_col] == post_label, value_col].to_numpy(dtype=float)
+            elif isinstance(obj, dict) and ('session_summary' in obj):
+                raise ValueError(
+                    f'{name} is a run() result dict without raw {value_col} values; '
+                    f'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
+                )
+            else:
+                raise TypeError(f'{name} must be a PrePostDeltaDistributionComparison or DataFrame, got {type(obj)!r}.')
+            pre = pre[np.isfinite(pre)]
+            post = post[np.isfinite(post)]
+            if (pre.size == 0) or (post.size == 0):
+                raise ValueError(f'{name} must contain both pre and post {value_col} values.')
+            return pre, post
+
+        def _subfn_unwrap_heuristic_distribution_obj(obj):
+            """Accept a comparison, DataFrame, or parent dict; pick the PBE heuristic sibling when both grainularities exist."""
+            if obj is None or isinstance(obj, cls) or isinstance(obj, pd.DataFrame):
+                return obj
+            if isinstance(obj, dict):
+                if 'session_summary' in obj:
+                    raise ValueError(
+                        'pbe_heuristic_passing is a run() result dict without raw values; '
+                        'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
+                    )
+                keys = [k for k in obj.keys() if str(k).endswith('_PBEs_heuristic_passing')]
+                if len(keys) == 1:
+                    return obj[keys[0]]
+                if len(keys) > 1:
+                    for k, v in obj.items():
+                        if v is pbe_data:
+                            sibling = f'{k}_heuristic_passing'
+                            if sibling in obj:
+                                return obj[sibling]
+                    ## END for k, v in obj.items()...
+
+                    raise ValueError(
+                        f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
+                        f'comparison_dict["_perTimeBin_PBEs_heuristic_passing"].'
+                    )
+                return None
+            return obj
+
+        def _subfn_reflected_bounded_kde(values: np.ndarray, grid: np.ndarray, bw_factor: float) -> np.ndarray:
+            """Scott-bandwidth KDE with reflection at 0 and 1, renormalized on [0, 1]."""
+            values = np.asarray(values, dtype=float)
+            values = values[np.isfinite(values)]
+            if values.size < 2:
+                return np.full(grid.shape, np.nan)
+            unique = np.unique(values)
+            if unique.size < 2:
+                return np.full(grid.shape, np.nan)
+            reflected = np.concatenate([values, -values, (2.0 - values)])
+            try:
+                kde = stats.gaussian_kde(reflected, bw_method='scott')
+                kde.set_bandwidth(bw_method=float(kde.factor) * float(bw_factor))
+                dens = np.asarray(kde(grid), dtype=float)
+            except Exception:
+                return np.full(grid.shape, np.nan)
+            trapz_fn = getattr(np, 'trapezoid', np.trapz)
+            area = float(trapz_fn(dens, grid))
+            if (not np.isfinite(area)) or (area <= 0.0):
+                return np.full(grid.shape, np.nan)
+            return dens / area
+
         if n_bins < 2:
             raise ValueError('n_bins must be >= 2.')
         if (not kde_bw_factors) or any((f <= 0.0) for f in kde_bw_factors):
             raise ValueError('kde_bw_factors must be a non-empty sequence of positive floats.')
 
-        extract_kwargs = dict(value_col=value_col, condition_col=condition_col, pre_label=pre_label, post_label=post_label)
-        laps_pre, laps_post = cls._extract_pre_post_values(laps_data, name='laps_data', **extract_kwargs)
-        pbe_pre, pbe_post = cls._extract_pre_post_values(pbe_data, name='pbe_data', **extract_kwargs)
+        laps_pre, laps_post = _subfn_extract_pre_post_values(laps_data, name='laps_data')
+        pbe_pre, pbe_post = _subfn_extract_pre_post_values(pbe_data, name='pbe_data')
         arrays = [laps_pre, laps_post, pbe_pre, pbe_post]
         col_titles = [
             f'{group_labels[0]} pre-$\\Delta$',
@@ -2254,9 +2247,9 @@ class PrePostDeltaDistributionComparison:
         heuristic_color = '#2ca02c'
         heuristic_pre = None
         heuristic_post = None
-        heuristic_obj = cls._unwrap_heuristic_distribution_obj(pbe_heuristic_passing, pbe_data)
+        heuristic_obj = _subfn_unwrap_heuristic_distribution_obj(pbe_heuristic_passing)
         if heuristic_obj is not None:
-            heuristic_pre, heuristic_post = cls._extract_pre_post_values(heuristic_obj, name='pbe_heuristic_passing', **extract_kwargs)
+            heuristic_pre, heuristic_post = _subfn_extract_pre_post_values(heuristic_obj, name='pbe_heuristic_passing')
 
         if debug_print:
             print(f'laps pre/post n={laps_pre.size}/{laps_post.size}, pbe pre/post n={pbe_pre.size}/{pbe_post.size}')
@@ -2278,7 +2271,7 @@ class PrePostDeltaDistributionComparison:
             density_max = max(density_max, float(np.nanmax(hist_dens)) if hist_dens.size else 0.0)
             panel_kdes = []
             for bw_factor in kde_bw_factors:
-                dens = cls._reflected_bounded_kde(values, grid, bw_factor)
+                dens = _subfn_reflected_bounded_kde(values, grid, bw_factor)
                 panel_kdes.append(dens)
                 if np.isfinite(dens).any():
                     density_max = max(density_max, float(np.nanmax(dens)))
@@ -2290,7 +2283,7 @@ class PrePostDeltaDistributionComparison:
             for hvals in (heuristic_pre, heuristic_post):
                 h_hist, _ = np.histogram(hvals, bins=bin_edges, density=True)
                 density_max = max(density_max, float(np.nanmax(h_hist)) if h_hist.size else 0.0)
-                h_kde = cls._reflected_bounded_kde(hvals, grid, 1.0)
+                h_kde = _subfn_reflected_bounded_kde(hvals, grid, 1.0)
                 if np.isfinite(h_kde).any():
                     density_max = max(density_max, float(np.nanmax(h_kde)))
             ## END for hvals in (heuristic_pre, heuristic_post)...
@@ -2327,7 +2320,7 @@ class PrePostDeltaDistributionComparison:
             if (heuristic_pre is not None) and (i in (2, 3)):
                 hvals = heuristic_pre if (i == 2) else heuristic_post
                 ax_dens.hist(hvals, bins=bin_edges, density=True, histtype='step', color=heuristic_color, linewidth=1.3, zorder=4)
-                ax_dens.plot(grid, cls._reflected_bounded_kde(hvals, grid, 1.0), color=heuristic_color, linewidth=1.6, zorder=4)
+                ax_dens.plot(grid, _subfn_reflected_bounded_kde(hvals, grid, 1.0), color=heuristic_color, linewidth=1.6, zorder=4)
                 h_sorted = np.sort(hvals)
                 h_ecdf = np.arange(1, h_sorted.size + 1, dtype=float) / float(h_sorted.size)
                 ax_ecdf.plot(h_sorted, h_ecdf, color=heuristic_color, linewidth=1.4, linestyle='--', zorder=4)
@@ -5419,16 +5412,35 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         title_subtitle = kwargs.pop('title_subtitle', None)
         metric_name_override = kwargs.pop('metric_name', None)
         xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
+        bar_x = kwargs.pop('bar_x', None)
+        bar_width = kwargs.pop('bar_width', None)
+        bar_colors = kwargs.pop('bar_colors', None)
+        xtick_positions = kwargs.pop('xtick_positions', None)
+        xtick_labels = kwargs.pop('xtick_labels', None)
         text_formatter.top_margin = top_margin
         text_formatter.left_margin = left_margin
         text_formatter.bottom_margin = bottom_margin
-        x = np.arange(len(x_labels))
-        width = 0.3
+        n_bars: int = len(y_values)
+        x = np.arange(n_bars, dtype=float) if bar_x is None else np.asarray(bar_x, dtype=float)
+        if len(x) != n_bars:
+            raise ValueError(f'bar_x length {len(x)} != n_bars {n_bars}.')
+        if bar_width is None:
+            widths = np.full(n_bars, 0.3, dtype=float)
+        else:
+            widths = np.broadcast_to(np.asarray(bar_width, dtype=float), (n_bars,)).astype(float).copy()
+        palette = list(cls.get_bar_colors())
+        if bar_colors is None:
+            edgecolors = [palette[i % len(palette)] for i in range(n_bars)]
+        else:
+            edgecolors = list(bar_colors)
+            if len(edgecolors) != n_bars:
+                raise ValueError(f'bar_colors length {len(edgecolors)} != n_bars {n_bars}.')
 
         fig, ax = plt.subplots()
         text_formatter.setup_margins(fig)
 
-        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
+        bar_tick_label = x_labels if (len(x_labels) == n_bars) else None
+        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors)
 
         scatter_plots = []
         x_values_list = []
@@ -5439,8 +5451,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             print(f'_output: {_output}')
 
 
-        for i in range(len(x)):
-            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
+        for i in range(n_bars):
+            width_i = float(widths[i])
+            x_values = (x[i] + np.random.random(y_values[i].size) * width_i - width_i / 2)
             scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
             had_custom_marker_handling = False
             user_markers = scatter_props_kwargs.get('marker', None)
@@ -5451,7 +5464,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
                     scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
                     for point_index, a_marker in enumerate(user_markers):
-                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=edgecolors[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
                         scatter_plot.append(a_sub_scatter_plot)
                     ## END for point_index, a_marker in enumerate(user_markers)...
 
@@ -5459,11 +5472,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
             if not had_custom_marker_handling:
                 # No special marker or just a scalar specific marker value, no need to loop
-                scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                scatter_plot = ax.scatter(x_values, y_values[i], color=edgecolors[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
     
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
-        ## END for i in range(len(x))...
+        ## END for i in range(n_bars)...
 
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -5483,8 +5496,13 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             text_objects['footer'] = footer_text_obj
             
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(x_labels)
+        if xtick_positions is None:
+            xtick_positions = x
+        if xtick_labels is None:
+            xtick_labels = x_labels
+        ax.set_xticks(xtick_positions)
+        if len(np.atleast_1d(xtick_positions)) == len(xtick_labels):
+            ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
             text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels)
 
