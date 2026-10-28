@@ -382,7 +382,7 @@ class BatchCompletionHelpers:
 
 		try:
 			decoder_names = deepcopy(TrackTemplates.get_decoder_names())
-			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = cls.finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline, decoder_names=decoder_names, custom_suffix=custom_suffix)
+			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_EpochScoreShuffle_df_export_CSV_path) = cls.finalize_output_shuffled_wcorr(a_curr_active_pipeline=curr_active_pipeline, decoder_names=decoder_names, custom_suffix=custom_suffix)
 			custom_save_filepaths['standalone_wcorr_pkl'] = standalone_pkl_filepath
 			custom_save_filepaths['standalone_mat_pkl'] = standalone_mat_filepath
 			print(f'completed overwrite_replay_epochs_and_recompute(...). custom_save_filepaths: {custom_save_filepaths}\n')
@@ -751,7 +751,7 @@ class BatchCompletionHelpers:
 			from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import finalize_output_shuffled_wcorr
 
 			decoder_names = deepcopy(track_templates.get_decoder_names())
-			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
+			wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_EpochScoreShuffle_df_export_CSV_path) = finalize_output_shuffled_wcorr(curr_active_pipeline=curr_active_pipeline,
 																																			decoder_names=decoder_names, custom_suffix=custom_suffix)
 		"""
 		from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import WCorrShuffle, SequenceBasedComputationsContainer
@@ -880,8 +880,8 @@ class BatchCompletionHelpers:
 														source='compute_diba_quiescent_style_replay_events',
 														custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
 														)
-			ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-			print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
+			ripple_EpochScoreShuffle_df_export_CSV_path = export_files_dict['ripple_EpochScoreShuffle_df']
+			print(f'Successfully exported ripple_EpochScoreShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
 			# callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
 		except Exception as e:
 			raise e
@@ -899,7 +899,7 @@ class BatchCompletionHelpers:
 		# export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
 		# export_files_dict
 
-		return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_WCorrShuffle_df_export_CSV_path)
+		return wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df, (standalone_pkl_filepath, standalone_mat_filepath, ripple_EpochScoreShuffle_df_export_CSV_path)
 
 	finalize_output_shuffled_wcorr = finalize_output_shuffled_epoch_scores
 

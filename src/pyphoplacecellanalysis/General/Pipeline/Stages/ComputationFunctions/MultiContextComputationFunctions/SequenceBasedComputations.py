@@ -1691,9 +1691,9 @@ class DecodedEpochScoreShuffle(ComputedResult):
         filtered_valid_epoch_times = filtered_epochs_df[['start', 'stop']].to_numpy()
 
         all_shuffles_scores_df: pd.DataFrame = self.build_all_shuffles_long_scores_dataframe(decoder_names=deepcopy(self.track_templates.get_decoder_names()))
-        export_df_dict = {'ripple_WCorrShuffle_df': wcorr_ripple_shuffle_all_df, 'ripple_EpochScoreShuffle_df': wcorr_ripple_shuffle_all_df}
+        export_df_dict = {'ripple_EpochScoreShuffle_df': wcorr_ripple_shuffle_all_df}
         if (all_shuffles_scores_df is not None) and (len(all_shuffles_scores_df) > 0):
-            export_df_dict['ripple_EpochScoreShuffle_long_df'] = all_shuffles_scores_df
+            export_df_dict['ripple_EpochScoreShuffle_ByShuffle_df'] = all_shuffles_scores_df
         desired_ripple_decoding_time_bin_size: float = self.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
         print(f'{desired_ripple_decoding_time_bin_size = }')
 

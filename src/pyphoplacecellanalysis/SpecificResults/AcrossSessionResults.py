@@ -3431,10 +3431,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_merged_complete_epoch_stats_df_dict = {}
     
 
-    final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_WCorrShuffle_df': {},
+    final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_EpochScoreShuffle_df': {},
+                                                            'ripple_WCorrShuffle_df': {},
                                                             'perfmnc_session': {},
                                            }
-    final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_WCorrShuffle_df': None,
+    final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_EpochScoreShuffle_df': None,
+                                                                'ripple_WCorrShuffle_df': None,
                                                                 'perfmnc_session': None,
                                       }
     
@@ -3536,11 +3538,13 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict      
-            elif file_type == 'ripple_WCorrShuffle_df':
+            elif file_type in ('ripple_EpochScoreShuffle_df', 'ripple_WCorrShuffle_df'):
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type == 'ripple_EpochScoreShuffle_ByShuffle_df':
+                pass ## per-shuffle nulls are not loaded in the paper pipeline
             elif file_type == 'perfmnc_session':
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=None, **additional_columns_dict)
@@ -3574,6 +3578,15 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         ## END FOR    
     if debug_print:
         print(f'done with main processing loop')
+    ## Prefer ripple_EpochScoreShuffle_df; fill missing session keys from legacy ripple_WCorrShuffle_df
+    epoch_score_shuffle_dict = final_sessions_loaded_extra_df_dict.get('ripple_EpochScoreShuffle_df', {})
+    legacy_wcorr_shuffle_dict = final_sessions_loaded_extra_df_dict.get('ripple_WCorrShuffle_df', {})
+    for a_loaded_dict_key, a_df in legacy_wcorr_shuffle_dict.items():
+        if a_loaded_dict_key not in epoch_score_shuffle_dict:
+            epoch_score_shuffle_dict[a_loaded_dict_key] = a_df
+    ## END for a_loaded_dict_key, a_df in legacy_wcorr_shuffle_dict.items()....
+
+    final_sessions_loaded_extra_df_dict['ripple_EpochScoreShuffle_df'] = epoch_score_shuffle_dict
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
     # #TODO 2024-09-27 09:48: - [ ] ERROR: the basic dataframes are now missing their 'time_bin_size' columns somehow!!
     ## Build across_sessions join dataframes:
@@ -4557,6 +4570,54 @@ class AcrossSessionHelpers:
     
     
     """
+    @function_attributes(short_name=None, tags=['shuffle', 'columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 12:48', related_items=['_subfn_perform_add_merged_complete_epoch_stats_df'])
+    @classmethod
+    def prepare_epoch_score_shuffle_transfer_columns(cls, shuffle_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+        """Adds `best_overall_*_z` columns and returns shuffle-score transfer column names (z/p/n_extreme), not raw `{metric}_{decoder}` scores."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+
+        shuffle_df = deepcopy(shuffle_df)
+        decoder_names: List[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
+        metric_names: List[str] = list(SCORE_EXTREME_MODE.keys())
+        transfer_col_names: List[str] = []
+
+        for col in ('wcorr_z_long', 'wcorr_z_short'):
+            if col in shuffle_df.columns:
+                transfer_col_names.append(col)
+        ## END for col in ('wcorr_z_long', 'wcorr_z_short')....
+
+        if ('wcorr_z_long' in shuffle_df.columns) and ('wcorr_z_short' in shuffle_df.columns):
+            if 'best_overall_wcorr_z' not in shuffle_df.columns:
+                shuffle_df['best_overall_wcorr_z'] = np.nanmax(np.abs(shuffle_df[['wcorr_z_long', 'wcorr_z_short']]), axis=1)
+            transfer_col_names.append('best_overall_wcorr_z')
+
+        for metric_name in metric_names:
+            z_cols = [f'{metric_name}_z_{decoder_name}' for decoder_name in decoder_names if (f'{metric_name}_z_{decoder_name}' in shuffle_df.columns)]
+            for kind in ('z', 'p', 'n_extreme'):
+                for decoder_name in decoder_names:
+                    col = f'{metric_name}_{kind}_{decoder_name}'
+                    if col in shuffle_df.columns:
+                        transfer_col_names.append(col)
+                ## END for decoder_name in decoder_names....
+            ## END for kind in ('z', 'p', 'n_extreme')....
+            if (len(z_cols) > 0) and (metric_name != 'wcorr'):
+                best_col: str = f'best_overall_{metric_name}_z'
+                if best_col not in shuffle_df.columns:
+                    shuffle_df[best_col] = np.nanmax(np.abs(shuffle_df[z_cols]), axis=1)
+                transfer_col_names.append(best_col)
+        ## END for metric_name in metric_names....
+
+        seen_col_names = set()
+        unique_transfer_col_names: List[str] = []
+        for col in transfer_col_names:
+            if col not in seen_col_names:
+                seen_col_names.add(col)
+                unique_transfer_col_names.append(col)
+        ## END for col in transfer_col_names....
+
+        return shuffle_df, unique_transfer_col_names
+
+
     @function_attributes(short_name=None, tags=['merge', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-18 11:33', related_items=[])
     @classmethod
     def _subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame,

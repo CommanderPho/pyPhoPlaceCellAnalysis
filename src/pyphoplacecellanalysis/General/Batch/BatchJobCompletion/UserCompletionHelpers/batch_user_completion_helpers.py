@@ -1535,9 +1535,8 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
     callback_outputs = {
         'epoch_score_shuffles_data_output_filepath': None, #'t_end': t_end   
         'standalone_MAT_filepath': None,
-        'ripple_WCorrShuffle_df_export_CSV_path': None,
         'ripple_EpochScoreShuffle_df_export_CSV_path': None,
-        'ripple_EpochScoreShuffle_long_df_export_CSV_path': None,
+        'ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path': None,
     }
 
 
@@ -1610,22 +1609,19 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
         active_context, (curr_session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context() ## #TODO 2024-11-08 10:29: - [ ] complete instead of basic session context
         # session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
         session_name: str = curr_active_pipeline.session_name
-        export_files_dict = epoch_score_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn) # "2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv"
-        ripple_WCorrShuffle_df_export_CSV_path = export_files_dict.get('ripple_WCorrShuffle_df')
+        export_files_dict = epoch_score_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn) # "2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_EpochScoreShuffle_df)_tbin-0.025.csv"
         ripple_EpochScoreShuffle_df_export_CSV_path = export_files_dict.get('ripple_EpochScoreShuffle_df')
-        ripple_EpochScoreShuffle_long_df_export_CSV_path = export_files_dict.get('ripple_EpochScoreShuffle_long_df')
+        ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path = export_files_dict.get('ripple_EpochScoreShuffle_ByShuffle_df')
         print(f'Successfully exported epoch-score shuffle CSVs with epoch_score_shuffles.n_completed_shuffles: {epoch_score_shuffles.n_completed_shuffles} unique shuffles.')
-        print(f'\tripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}"')
         print(f'\tripple_EpochScoreShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_df_export_CSV_path}"')
-        print(f'\tripple_EpochScoreShuffle_long_df_export_CSV_path: "{ripple_EpochScoreShuffle_long_df_export_CSV_path}"')
-        callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
+        print(f'\tripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path}"')
         callback_outputs['ripple_EpochScoreShuffle_df_export_CSV_path'] = ripple_EpochScoreShuffle_df_export_CSV_path
-        callback_outputs['ripple_EpochScoreShuffle_long_df_export_CSV_path'] = ripple_EpochScoreShuffle_long_df_export_CSV_path
+        callback_outputs['ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path'] = ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
         print(f"ERROR: encountered exception {err} while trying to perform ripple_score_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
-        ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
+        ripple_EpochScoreShuffle_df_export_CSV_path = None # set to None because it failed.
         if self.fail_on_exception:
             raise err.exc
         
@@ -1914,8 +1910,8 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
                                                                 source='compute_diba_quiescent_style_replay_events',
                                                                 custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
                                                                 )
-                ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-                print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
+                ripple_EpochScoreShuffle_df_export_CSV_path = export_files_dict['ripple_EpochScoreShuffle_df']
+                print(f'Successfully exported ripple_EpochScoreShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
                 replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
                 # callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
             except Exception as e:
