@@ -151,7 +151,15 @@ class ProcessingScriptPhases(Enum):
             return True
         else:
             return False
-        
+
+
+    @property
+    def chained_submit_script_kind(self) -> str:
+        """'figs' for figure_run chained submit (figures_*.py / figs wrappers); 'run' otherwise."""
+        if self.is_figure_phase:
+            return 'figs'
+        return 'run'
+
 
     @property
     def phase_job_suffix(self) -> str:
@@ -357,6 +365,8 @@ class ProcessingScriptPhases(Enum):
             _out_run_config.update(dict(create_slurm_scripts=True, should_create_vscode_workspace=False))
 
         _out_run_config['phase_job_suffix'] = self.phase_job_suffix
+        _out_run_config['should_generate_run_scripts'] = (not self.is_figure_phase)
+        _out_run_config['should_generate_figure_scripts'] = self.is_figure_phase
 
         return _out_run_config
 
@@ -504,6 +514,7 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
     """Align per-phase BatchScriptsCollection run/fig script paths by session.
 
     phase_collections: mapping phase_name -> BatchScriptsCollection from generate_batch_single_session_scripts.
+    script_kind: default sibling for unknown phase names ('run' or 'figs'). Known `ProcessingScriptPhases` names use `chained_submit_script_kind` (`figure_run` -> 'figs'). If that sibling is empty, falls back to the other when its path count matches the sessions.
     script_collection_key: 'slurm' -> output_slurm_scripts; 'bash' -> output_non_slurm_bash_scripts; 'python' -> output_python_scripts (Windows).
     Returns: session_key -> {phase_name: script_path_str}
     """
@@ -512,31 +523,45 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
             return curr_session_context.get_description()
         return str(curr_session_context)
 
-    session_phase_scripts: Dict[str, Dict[str, str]] = {}
-    for phase_name, collection in phase_collections.items():
-        contexts = list(collection.included_session_contexts or [])
+    def _subfn_script_kind_for_phase(phase_name: str, requested_kind: str) -> str:
+        try:
+            return ProcessingScriptPhases(phase_name).chained_submit_script_kind
+        except ValueError:
+            return requested_kind
+
+    def _subfn_paths_for_kind(collection: 'BatchScriptsCollection', kind: str) -> Tuple[List, str]:
         if script_collection_key == 'slurm':
-            script_paths = list((collection.output_slurm_scripts or {}).get(script_kind, []) or [])
-            paths_label = 'output_slurm_scripts'
-        elif script_collection_key == 'bash':
-            script_paths = list((collection.output_non_slurm_bash_scripts or {}).get(script_kind, []) or [])
-            paths_label = 'output_non_slurm_bash_scripts'
-        elif script_collection_key == 'python':
-            path_idx = 1 if script_kind == 'figs' else 0
+            return list((collection.output_slurm_scripts or {}).get(kind, []) or []), 'output_slurm_scripts'
+        if script_collection_key == 'bash':
+            return list((collection.output_non_slurm_bash_scripts or {}).get(kind, []) or []), 'output_non_slurm_bash_scripts'
+        if script_collection_key == 'python':
+            path_idx = 1 if kind == 'figs' else 0
             script_paths = []
             for item in list(collection.output_python_scripts or []):
                 if isinstance(item, (list, tuple)):
-                    script_paths.append(item[path_idx])
-                elif path_idx == 0:
+                    chosen_path = item[path_idx] if len(item) > path_idx else None
+                    if chosen_path is not None:
+                        script_paths.append(chosen_path)
+                elif (path_idx == 0) and (item is not None):
                     script_paths.append(item)
-                else:
-                    raise ValueError(f"phase={phase_name!r}: output_python_scripts item is not a (run, figs) pair: {item!r}")
             ## END for item in list(collection.output_python_scripts or [])...
-            paths_label = 'output_python_scripts'
-        else:
-            raise ValueError(f"script_collection_key must be 'slurm', 'bash', or 'python', got {script_collection_key!r}")
-        if len(contexts) != len(script_paths):
-            raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len({paths_label}[{script_kind!r}])={len(script_paths)}")
+            return script_paths, 'output_python_scripts'
+        raise ValueError(f"script_collection_key must be 'slurm', 'bash', or 'python', got {script_collection_key!r}")
+
+    session_phase_scripts: Dict[str, Dict[str, str]] = {}
+    for phase_name, collection in phase_collections.items():
+        contexts = list(collection.included_session_contexts or [])
+        n_contexts: int = len(contexts)
+        preferred_kind: str = _subfn_script_kind_for_phase(phase_name, script_kind)
+        other_kind: str = 'figs' if preferred_kind == 'run' else 'run'
+        script_paths, paths_label = _subfn_paths_for_kind(collection, preferred_kind)
+        phase_script_kind: str = preferred_kind
+        if len(script_paths) != n_contexts:
+            alt_paths, alt_label = _subfn_paths_for_kind(collection, other_kind)
+            if len(alt_paths) == n_contexts:
+                script_paths, paths_label, phase_script_kind = alt_paths, alt_label, other_kind
+            else:
+                raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={n_contexts} != len({paths_label}[{preferred_kind!r}])={len(script_paths)} (also {alt_label}[{other_kind!r}]={len(alt_paths)})")
         for ctx, script_path in zip(contexts, script_paths):
             session_key = _subfn_session_key_str(ctx)
             session_phase_scripts.setdefault(session_key, {})[phase_name] = str(Path(script_path))
@@ -909,12 +934,14 @@ def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backe
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
+         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = False, should_generate_run_notebooks: bool = False,
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
          batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, session_global_data_root_parent_paths: Optional[Dict[IdentifyingContext, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
+
+    Writes only the sibling needed for the active stage: `run_*.py` when `should_generate_run_scripts`, `figures_*.py` when `should_generate_figure_scripts` or `should_perform_figure_generation_to_file` (figure_run). `output_python_scripts` remains a list of `(run_path_or_None, figs_path_or_None)` pairs.
 
     output_directory
     use_separate_run_directories:bool = True - If True, separate directories are made in `output_directory` containing each script for all sessions.
@@ -980,6 +1007,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
  
     assert ('force_recompute_override_computation_kwargs_dict' not in renderer_script_generation_kwargs), f"pass 'force_recompute_override_computation_kwargs_dict' explicitly to the call!!"
     renderer_script_generation_kwargs['force_recompute_override_computation_kwargs_dict'] = (force_recompute_override_computation_kwargs_dict or {})
+
+    should_write_run_python_script: bool = bool(should_generate_run_scripts)
+    should_write_figures_python_script: bool = bool(should_generate_figure_scripts or should_perform_figure_generation_to_file)
+    if (not should_write_run_python_script) and (not should_write_figures_python_script):
+        raise ValueError("generate_batch_single_session_scripts: neither run nor figures scripts enabled (should_generate_run_scripts=False and should_generate_figure_scripts/should_perform_figure_generation_to_file=False)")
     
     # if script_generation_kwargs is None:
     # 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
@@ -1050,69 +1082,74 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         run_specific_batch_kwargs_for_run_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': (getattr(curr_session_context, 'format_name', None) == 'bapun')}
         run_specific_batch_kwargs_for_figures_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': False}
 
-        # Create two separate scripts:
+        # Write only the sibling for this stage: run_*.py for compute phases, figures_*.py when figure_run / should_perform_figure_generation_to_file.
+        python_script_path = None
+        python_figures_script_path = None
+
         # Run Script _________________________________________________________________________________________________________ #
-        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
-        with open(python_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
-                                                    curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                    curr_session_complete_identifier=curr_session_complete_identifier,
-                                                    job_suffix=job_suffix,
-                                                    curr_session_basedir=curr_session_basedir, 
-                                                    batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                    should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                    fail_on_exception=fail_on_exception,
-                                                    **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
-                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
-            # script_file.write(script_content)
-            script_file.write(script_content.encode())
-        # output_python_scripts.append(python_script_path)
+        if should_write_run_python_script:
+            python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
+            with open(python_script_path, 'wb') as script_file:
+                script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
+                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                        curr_session_complete_identifier=curr_session_complete_identifier,
+                                                        job_suffix=job_suffix,
+                                                        curr_session_basedir=curr_session_basedir, 
+                                                        batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                        custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
+                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        fail_on_exception=fail_on_exception,
+                                                        **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
+                                                        run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
+                # script_file.write(script_content)
+                script_file.write(script_content.encode())
+            # output_python_scripts.append(python_script_path)
 
         # Figures Script _____________________________________________________________________________________________________ #
-        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
-        with open(python_figures_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
-                                                    curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                    curr_session_complete_identifier=curr_session_complete_identifier,
-                                                    job_suffix=job_suffix,
-                                                    curr_session_basedir=curr_session_basedir,
-                                                    batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                    should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                    **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
-                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
+        if should_write_figures_python_script:
+            python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
+            with open(python_figures_script_path, 'wb') as script_file:
+                script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
+                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                        curr_session_complete_identifier=curr_session_complete_identifier,
+                                                        job_suffix=job_suffix,
+                                                        curr_session_basedir=curr_session_basedir,
+                                                        batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                        custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
+                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
+                                                        run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
 
 
-            # script_file.write(script_content)
-            script_file.write(script_content.encode())
+                # script_file.write(script_content)
+                script_file.write(script_content.encode())
 
         # output_python_display_scripts.append(python_figures_script_path)
         output_python_scripts.append((python_script_path, python_figures_script_path))
 
         # Create the SLURM script
         if create_slurm_scripts:
-            if should_generate_run_scripts:
+            if should_write_run_python_script:
                 slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='run', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['run'].append(slurm_run_script_path)
 
-            if should_generate_figure_scripts or should_perform_figure_generation_to_file:
+            if should_write_figures_python_script:
                 slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='figs', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['figs'].append(slurm_figure_script_path)
 
 
         ## Create the non-slurm bash script:
         if create_non_slurm_bash_scripts:
-            if should_generate_run_scripts:
+            if should_write_run_python_script:
                 bash_run_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='run', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['run'].append(bash_run_script_path)
 
-            if should_generate_figure_scripts or should_perform_figure_generation_to_file:
+            if should_write_figures_python_script:
                 bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='figs', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['figs'].append(bash_figure_script_path)
 
 
-        if should_generate_run_notebooks:
+        if should_generate_run_notebooks and (python_script_path is not None):
             script_path = Path(python_script_path).resolve()
             _temp_notebook_python_script_path = Path(os.path.join(curr_batch_script_rundir, f'_TEMP_NOTEBOOK_run_{curr_session_context}.py'))
             with open(_temp_notebook_python_script_path, 'wb') as script_file:
@@ -1148,22 +1185,26 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
              
         ## END if should_generate_run_notebooks..
             
-    ## end for curr_session_context in include....
+    ## END for curr_session_context in included_session_contexts....
+
+
     
     ## Generate VSCode Workspace for it
+    vscode_workspace_path = None
     if should_create_vscode_workspace:
-        output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        if vscode_default_interpreter_path is not None:
-            python_executable = Path(vscode_default_interpreter_path).expanduser()
-        elif os.name == 'nt':
-            python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
-        else:
-            python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
+        output_compute_python_scripts = [x[0] for x in output_python_scripts if x[0] is not None]
+        if len(output_compute_python_scripts) == 0:
+            output_compute_python_scripts = [x[1] for x in output_python_scripts if (isinstance(x, (list, tuple)) and (x[1] is not None))]
+        if len(output_compute_python_scripts) > 0:
+            if vscode_default_interpreter_path is not None:
+                python_executable = Path(vscode_default_interpreter_path).expanduser()
+            elif os.name == 'nt':
+                python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
+            else:
+                python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
 
-        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable, batch_scripts_root_directory=batch_scripts_root_directory)
-        print(f'vscode_workspace_path: {vscode_workspace_path}')
-    else:
-        vscode_workspace_path = None
+            vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable, batch_scripts_root_directory=batch_scripts_root_directory)
+            print(f'vscode_workspace_path: {vscode_workspace_path}')
 
 
     return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_jupyter_notebooks=output_jupyter_notebooks, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path, batch_scripts_root_directory=batch_scripts_root_directory)
@@ -1206,10 +1247,13 @@ def display_generated_scripts_ipywidget(included_session_contexts, output_python
 
     _out_path_widgets = []
     for a_ctxt, a_python_script in zip(included_session_contexts, output_python_scripts):
-        a_computation_script_path = Path(a_python_script[0]).resolve()
-        a_generate_figures_script_path = Path(a_python_script[1]).resolve()
+        a_script_path = a_python_script[0] if (isinstance(a_python_script, (list, tuple)) and (a_python_script[0] is not None)) else (a_python_script[1] if isinstance(a_python_script, (list, tuple)) else a_python_script)
+        if a_script_path is None:
+            continue
+        a_computation_script_path = Path(a_script_path).resolve()
     
         _out_path_widgets.append(fullwidth_path_widget(a_computation_script_path, a_computation_script_path.name, box_layout_kwargs=dict(display='flex', flex_flow='row', align_items='stretch', width='auto')))
+    ## END for a_ctxt, a_python_script in zip(included_session_contexts, output_python_scripts)...
 
     return widgets.VBox(_out_path_widgets, display='flex', flex_flow='column', align_items='stretch')
 
