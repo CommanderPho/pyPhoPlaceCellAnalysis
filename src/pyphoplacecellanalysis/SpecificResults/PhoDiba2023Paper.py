@@ -598,10 +598,333 @@ class FigureS8:
         return _out_figs_dict_dict_dict, _out_paths_dict
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-27 - Figure 4/S6/S8 Stats                                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
+## INPUTS: pre_df, post_df
+@function_attributes(short_name=None, tags=['stats', 'figure4', 'interrupted-timeseries-analysis', 'timeseries'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:02', related_items=[])
+def stats_interrupted_timeseries_analysis(pre_df: pd.DataFrame, post_df: pd.DataFrame, should_plot: bool = True, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', debug_print: bool=True):
+    """ Applies Interrupted Timeseries Analysis (ITA) to the pre/post delta data, treating delta as the intervention
+
+    Lopez Bernal et al., “Interrupted Time Series Regression for the Evaluation of Public Health Interventions.”
+
+    Usage:
+
+        time_variable_name: str = 'delta_aligned_start_t'
+        variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+        df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+        pre_df  = df[df[time_variable_name] <= 0]
+        post_df = df[df[time_variable_name] > 0]
+        (its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                                    variable_name=variable_name, time_variable_name=time_variable_name,
+                                    )
+        intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
+
+
+    """
+    # Combine pre- and post-intervention observations
+    pre_df = pre_df.copy()
+    post_df = post_df.copy()
+
+    pre_df['intervention'] = 0
+    post_df['intervention'] = 1
+
+    its_df = pd.concat([pre_df, post_df], ignore_index=True)
+    its_df = its_df.sort_values(time_variable_name)
+
+    # Corrected ITS interaction: (T - T0) * intervention, where T0 = 0
+    its_df['time_interaction'] = (its_df[time_variable_name] * its_df['intervention'])
+
+    X = sm.add_constant(its_df[[time_variable_name, 'intervention', 'time_interaction']])
+
+    # Fit the model
+    its_model = sm.OLS(its_df[variable_name], X).fit()
+    if debug_print:
+        print(its_model.summary())
+
+    intercept = its_model.params['const']
+    pre_slope = its_model.params[time_variable_name]
+    level_change = its_model.params['intervention']
+    slope_change = its_model.params['time_interaction']
+
+    post_slope = pre_slope + slope_change
+    if debug_print:
+        print(f"Pre-intervention slope: {pre_slope:.6f}")
+        print(f"Immediate level change: {level_change:.6f}")
+        print(f"Slope change: {slope_change:.6f}")
+        print(f"Post-intervention slope: {post_slope:.6f}")
+
+    outputs = (its_model, (intercept, pre_slope, level_change, slope_change, post_slope))
+
+    if should_plot:
+        import matplotlib.pyplot as plt
+
+        fig = plt.figure(num='Interrupted Time Series stats model', clear=True)
+        plt.scatter(pre_df[time_variable_name], pre_df[variable_name], label='Pre-intervention', alpha=0.6)
+        plt.scatter(post_df[time_variable_name], post_df[variable_name], label='Post-intervention', alpha=0.6)
+
+        # Plot each fitted segment separately
+        pre_mask = its_df['intervention'] == 0
+        post_mask = its_df['intervention'] == 1
+
+        plt.plot(its_df.loc[pre_mask, time_variable_name], its_model.predict(X.loc[pre_mask]), color='red', label='Segmented regression')
+
+        plt.plot(its_df.loc[post_mask, time_variable_name], its_model.predict(X.loc[post_mask]), color='red')
+
+        plt.axvline(0.0, color='black', linestyle='--', label='Intervention')
+        plt.xlabel(time_variable_name)
+        plt.ylabel(variable_name)
+        plt.legend()
+        plt.show()
+
+    return outputs
+
+
+@function_attributes(short_name=None, tags=['UNUSED', 'stats', 'figure4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 15:35', related_items=[])
+def linear_fit(a_df: pd.DataFrame):
+    """ a simple linear fit to the pre/post period df separately.
+
+    Usage:
+        pre_df, pre_tuple = linear_fit(a_df=pre_df)
+        post_df, post_tuple = linear_fit(a_df=post_df)
+
+        pre_slope, pre_intercept, pre_r_value, pre_p_value, pre_std_err = pre_tuple
+        post_slope, post_intercept, post_r_value, post_p_value, post_std_err = post_tuple
+
+        pre_slope, post_slope
+
+
+    """
+    from scipy.stats import linregress
+    x = a_df[time_variable_name]
+    y = a_df[variable_name]
+    slope, intercept, r_value, p_value, std_err = linregress(x, y)
+    a_df['best_fit'] = intercept + (slope * x)
+    return (a_df, (slope, intercept, r_value, p_value, std_err))
+
+
+time_variable_name: str = 'delta_aligned_start_t'
+variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+pre_df  = df[df[time_variable_name] <= 0]
+post_df = df[df[time_variable_name] > 0]
+(its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                            variable_name=variable_name, time_variable_name=time_variable_name,
+                            )
+intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
 
 
 
+# Old Bootstrapped Extrema Bins ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
 
+from copy import deepcopy
+from typing import Dict
+
+import numpy as np
+import pandas as pd
+from neuropy.utils.indexing_helpers import transpose_nested_dict
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import (
+    SeriesLetter, AnimalName,
+    compute_hist_variables, fig4_hist_stats_pho,
+    plot_fisher_z, plot_earthmovers, plot_kldivergence,
+    plot_by_animal_split_histogram_figure, plot_by_session_split_histogram_figure,
+)
+
+## INPUTS: df_filter
+laps_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_time_bin_df'])
+ripple_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_time_bin_df'])
+
+variable_name: str = df_filter.active_plot_variable_name  # usually 'P_Short'
+nbins: int = 11
+bin_edges = np.linspace(0.0, 1.0, nbins + 1)
+a_time_bin_size: float = float(np.atleast_1d(df_filter.time_bin_size)[0])  # or hardcode 0.075
+
+
+def _split_pre_post(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df = df.dropna(subset=[variable_name, 'delta_aligned_start_t'], how='any')
+    pre_df = df[df['delta_aligned_start_t'] <= 0].copy()
+    post_df = df[df['delta_aligned_start_t'] > 0].copy()
+    return pre_df, post_df
+
+
+laps_pre_df, laps_post_df = _split_pre_post(laps_df)
+ripple_pre_df, ripple_post_df = _split_pre_post(ripple_df)
+
+hist_samples_df_dict: Dict[SeriesLetter, pd.DataFrame] = {
+    'a': laps_pre_df,      # PreLaps
+    'b': laps_post_df,     # PostLaps
+    'c': ripple_pre_df,    # PrePBEs
+    'd': ripple_post_df,   # PostPBEs
+}
+
+hist_counts_dict = {
+    k: np.histogram(df[variable_name].to_numpy(), bins=bin_edges)[0]
+    for k, df in hist_samples_df_dict.items()
+}
+hist_count_extremas_only_dict = {k: np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+hist_count_extrema_ratios = {k: (float(v[0]) / float(v[-1])) for k, v in hist_counts_dict.items()}
+hist_densities_dict = {k: (v.astype(float) / np.sum(v)) for k, v in hist_counts_dict.items()}
+
+## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+hist_counts_dict
+hist_count_extremas_only_dict
+
+## Per-animal bags (Animal -> Letter -> DF)
+hist_animal_split_samples_df_dict: Dict[SeriesLetter, Dict[AnimalName, pd.DataFrame]] = {
+    a_letter: a_df.pho.partition_df_dict('animal') for a_letter, a_df in hist_samples_df_dict.items()
+}
+hist_animal_split_samples_df_dict: Dict[AnimalName, Dict[SeriesLetter, pd.DataFrame]] = transpose_nested_dict(hist_animal_split_samples_df_dict)
+
+animal_bags: Dict[AnimalName, Dict[SeriesLetter, np.ndarray]] = {}
+for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+    _counts, hist_count_extremas_only_dict, _ratios, _dens, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+    animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+## END for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items()...
+
+# OUTPUTS: animal_bags
+animal_bags
+
+# animal_bags: {'gor01': {'a': array([6436,  198], dtype=int64),
+#   'b': array([ 748, 3032], dtype=int64),
+#   'c': array([431, 165], dtype=int64),
+#   'd': array([401, 402], dtype=int64)},
+#  'pin01': {'a': array([1178,   72], dtype=int64),
+#   'b': array([ 88, 470], dtype=int64),
+#   'c': array([329,  74], dtype=int64),
+#   'd': array([131,  91], dtype=int64)},
+#  'vvp01': {'a': array([430,  23], dtype=int64),
+#   'b': array([ 76, 206], dtype=int64),
+#   'c': array([37, 10], dtype=int64),
+#   'd': array([11,  8], dtype=int64)}}
+
+
+# np.sum(sim_diffs_dict['KLDIV'] <= 0.0) / num_bootstrap_samples   # fraction with non-positive change
+# # plus exploratory: stats.ttest_1samp(...)
+# plot_earthmovers(sim_diffs_dict['EARTHMOVERS'], ...)
+# plot_kldivergence(sim_diffs_dict['KLDIV'], ...)
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-26 - Animal/Session but not epoch Hierarchical Bootstrapping                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+
+from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
+
+
+end_kwargs = dict(trained_compute_epochs='laps')
+# end_kwargs = dict(trained_compute_epochs='non_pbe')
+
+filtered_all_sessions_laps_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_time_bin_df']) # deepcopy(all_sessions_laps_time_bin_df)
+filtered_all_sessions_laps_time_bin_df: pd.DataFrame =  filtered_all_sessions_laps_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+filtered_all_sessions_laps_time_bin_df
+
+filtered_all_sessions_ripple_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_time_bin_df']) # deepcopy(all_sessions_ripple_time_bin_df)
+filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = filtered_all_sessions_ripple_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+filtered_all_sessions_ripple_time_bin_df
+
+
+## INPUTS: all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df
+filtered_all_sessions_laps_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_df']) # deepcopy(all_sessions_laps_time_bin_df)
+filtered_all_sessions_laps_df: pd.DataFrame =  filtered_all_sessions_laps_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+filtered_all_sessions_laps_df
+
+filtered_all_sessions_ripple_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_df']) # deepcopy(all_sessions_ripple_time_bin_df)
+filtered_all_sessions_ripple_df: pd.DataFrame = filtered_all_sessions_ripple_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+filtered_all_sessions_ripple_df
+
+
+# { 
+#        'filtered_all_sessions_ripple_df': deepcopy(df_filter.filtered_all_sessions_ripple_df),
+#         'filtered_all_sessions_ripple_time_bin_df': deepcopy(df_filter.filtered_all_sessions_ripple_time_bin_df),
+#         'filtered_all_sessions_laps_df': deepcopy(df_filter.filtered_all_sessions_laps_df),
+#         'filtered_all_sessions_laps_time_bin_df' : deepcopy(df_filter.filtered_all_sessions_laps_time_bin_df),
+# }
+
+
+## OUTPUTS: filtered_all_sessions_laps_time_bin_df, filtered_all_sessions_ripple_time_bin_df, (filtered_all_sessions_laps_df, filtered_all_sessions_ripple_df)
+
+
+from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PrePostDeltaDistributionComparison
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
+pre_post_delta_distribution_comparison_dict = {}
+pre_post_delta_results_dict = {}
+
+_class_kwargs = dict(n_bootstrap=10000, random_state=1337, sampling_unit='session')
+_run_kwargs = dict(perform_block_permutation_test=True,
+                    # sampling_unit='animal',  # or 'session'
+                    sampling_unit='session',
+                )
+
+grainularity_options = ['by-time-bin', 'by-epoch']
+_filter_dfs_dict = {'by-epoch': {'Laps': filtered_all_sessions_laps_df, 'PBEs': filtered_all_sessions_ripple_df},
+                    'by-time-bin': {'Laps': filtered_all_sessions_laps_time_bin_df, 'PBEs': filtered_all_sessions_ripple_time_bin_df}}
+
+for a_grainularity, a_dict in _filter_dfs_dict.items():
+
+    for an_epoch_name, df in a_dict.items():
+        # for an_epoch_name, df in {'Laps': filtered_all_sessions_laps_time_bin_df, 'PBEs': filtered_all_sessions_ripple_time_bin_df}.items():
+        # for an_epoch_name, df in {'Laps': filtered_all_sessions_laps_df, 'PBEs': filtered_all_sessions_ripple_df}.items():
+        # active_key: str = an_epoch_name
+
+        active_key: str = '_'.join([a_grainularity, an_epoch_name])
+        # g = filtered_all_sessions_ripple_time_bin_df.groupby(['animal', 'session_name', 'parent_epoch_id'], dropna=False)['pre_post_delta_category']
+        # bad = g.nunique()
+        # bad = bad[bad > 1]
+        # print(bad.head())
+        # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
+
+        pre_post_delta_distribution_comparison_dict[active_key] = PrePostDeltaDistributionComparison(df, **_class_kwargs)
+        pre_post_delta_results_dict[active_key] = pre_post_delta_distribution_comparison_dict[active_key].run(**_run_kwargs)
+
+        print({
+            k: v for k, v in pre_post_delta_results_dict[active_key].items()
+            if k not in ('animal_summary', 'permutation_results', 'session_summary')
+        })
+
+        # display(pre_post_delta_results_dict[an_epoch_name]['animal_summary'])
+        # pre_post_delta_results_dict[an_epoch_name]['session_summary']
+
+    ## END for an_epoch_name, df in ...
+
+## END for a_grainularity, a_dict in _filter_dfs_dict.items()...
+
+## OUTPUTS: pre_post_delta_distribution_comparison_dict, pre_post_delta_results_dict
+# {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.34990765382605804, 'wasserstein_1_bootstrap_95ci': (0.2892773195070399, 0.4116581170350606), 'mean_difference_post_minus_pre': 0.34990765382605865, 'median_difference_post_minus_pre': 0.5671199119523261, 'p_value': 0.0009995002498750624, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 252, 'n_bins_post': 218, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.2894704007111565, 0.411809699351879)}
+# {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.2289006107063542, 'wasserstein_1_bootstrap_95ci': (0.13084789106492914, 0.31555707604088457), 'mean_difference_post_minus_pre': 0.22890061070575576, 'median_difference_post_minus_pre': 0.49047066443769377, 'p_value': 0.0014992503748125937, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 494, 'n_bins_post': 480, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.08607401931188968, 0.2986915300711381)}
+# {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.46730290285742065, 'wasserstein_1_bootstrap_95ci': (0.34951288392966806, 0.559555311766802), 'mean_difference_post_minus_pre': 0.4673029028574142, 'median_difference_post_minus_pre': 0.731446287686231, 'p_value': 0.0009995002498750624, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 12271, 'n_bins_post': 8330, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.3497991770372044, 0.5664152666835826)}
+# {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.1506443390419763, 'wasserstein_1_bootstrap_95ci': (0.09257872542339074, 0.19319929389259136), 'mean_difference_post_minus_pre': 0.15064433904014948, 'median_difference_post_minus_pre': 0.25815120846333883, 'p_value': 0.001999000499750125, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 1614, 'n_bins_post': 1615, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.09447508799250623, 0.18319471501909232)}
+
+
+output_keys = ['wasserstein_1', 'wasserstein_1_bootstrap_95ci', 'mean_difference_post_minus_pre', 'mean_difference_bootstrap_95ci', 'p_value']
+{k:get_dict_subset(v, output_keys) for k, v in pre_post_delta_results_dict.items()}
+
+# {'by-epoch_Laps': {'wasserstein_1': 0.34990765382605804,
+#   'wasserstein_1_bootstrap_95ci': (0.2892773195070399, 0.4116581170350606),
+#   'mean_difference_post_minus_pre': 0.34990765382605865,
+#   'mean_difference_bootstrap_95ci': (0.2894704007111565, 0.411809699351879),
+#   'p_value': 0.0009995002498750624},
+#  'by-epoch_PBEs': {'wasserstein_1': 0.2289006107063542,
+#   'wasserstein_1_bootstrap_95ci': (0.13084789106492914, 0.31555707604088457),
+#   'mean_difference_post_minus_pre': 0.22890061070575576,
+#   'mean_difference_bootstrap_95ci': (0.08607401931188968, 0.2986915300711381),
+#   'p_value': 0.0014992503748125937},
+#  'by-time-bin_Laps': {'wasserstein_1': 0.46730290285742065,
+#   'wasserstein_1_bootstrap_95ci': (0.34951288392966806, 0.559555311766802),
+#   'mean_difference_post_minus_pre': 0.4673029028574142,
+#   'mean_difference_bootstrap_95ci': (0.3497991770372044, 0.5664152666835826),
+#   'p_value': 0.0009995002498750624},
+#  'by-time-bin_PBEs': {'wasserstein_1': 0.1506443390419763,
+#   'wasserstein_1_bootstrap_95ci': (0.09257872542339074, 0.19319929389259136),
+#   'mean_difference_post_minus_pre': 0.15064433904014948,
+#   'mean_difference_bootstrap_95ci': (0.09447508799250623, 0.18319471501909232),
+#   'p_value': 0.001999000499750125}}
 
 
 
