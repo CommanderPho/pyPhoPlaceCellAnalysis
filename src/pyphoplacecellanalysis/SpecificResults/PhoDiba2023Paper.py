@@ -1945,7 +1945,11 @@ class PrePostDeltaDistributionComparison:
             return work, p_value
 
         def _unwrap_heuristic_passing_obj(obj):
-            """Accept a run() dict, a session_summary DataFrame, or a parent results dict with one `*_PBEs_heuristic_passing` key."""
+            """Accept a run() dict, a session_summary DataFrame, or a parent results dict.
+
+            Both `_perTimeBin` and `_perEpochs` keys always exist. When several
+            `*_PBEs_heuristic_passing` entries are present, pick the sibling of `pbe_results`.
+            """
             if obj is None or isinstance(obj, pd.DataFrame):
                 return obj
             if isinstance(obj, dict) and ('session_summary' in obj):
@@ -1955,6 +1959,13 @@ class PrePostDeltaDistributionComparison:
                 if len(keys) == 1:
                     return obj[keys[0]]
                 if len(keys) > 1:
+                    for k, v in obj.items():
+                        if v is pbe_results:
+                            sibling = f'{k}_heuristic_passing'
+                            if sibling in obj:
+                                return obj[sibling]
+                    ## END for k, v in obj.items()...
+
                     raise ValueError(
                         f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
                         f'results_dict["_perTimeBin_PBEs_heuristic_passing"].'
@@ -2013,7 +2024,7 @@ class PrePostDeltaDistributionComparison:
             print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
 
         render = PaperFigureTwo.create_plot(
-            x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, defer_show,
+            x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, True,
             prepare_for_publication=prepare_for_publication,
             publication_group_labels=group_labels, metric_name='Session Means',
             title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
@@ -2033,8 +2044,8 @@ class PrePostDeltaDistributionComparison:
 
         heuristic_y_pre = None
         heuristic_y_post = None
+        heuristic_color = '#2ca02c'
         if pbe_heuristic_session_summary is not None:
-            heuristic_color = 'black'  # matches FigureS8 heuristic-passing overlay
             bar_width = 0.3
             x_offset = 0.15
             heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
@@ -2044,11 +2055,11 @@ class PrePostDeltaDistributionComparison:
                 x_values = (bar_i + x_offset) + (np.random.random(y_i.size) * bar_width - bar_width / 2) * 0.45
                 if has_animal and (animal_col in pbe_heuristic_session_summary.columns):
                     for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy()):
-                        ax.scatter(xv, yv, color=heuristic_color, marker=marker_mapping.get(animal, 'D'), zorder=4, edgecolors='black', linewidths=0.5, s=28)
+                        ax.scatter(xv, yv, color=heuristic_color, marker=marker_mapping.get(animal, 'D'), zorder=4, edgecolors=heuristic_color, linewidths=0.6, s=36)
                     ## END for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy())...
 
                 else:
-                    ax.scatter(x_values, y_i, color=heuristic_color, marker='D', zorder=4, edgecolors='black', linewidths=0.5, s=28)
+                    ax.scatter(x_values, y_i, color=heuristic_color, marker='D', zorder=4, edgecolors=heuristic_color, linewidths=0.6, s=36)
                 heuristic_x_values.append(x_values)
             ## END for bar_i, y_i in ((2, heuristic_y_pre), (3, heuristic_y_post))...
 
@@ -2056,20 +2067,12 @@ class PrePostDeltaDistributionComparison:
                 [2 + x_offset, 3 + x_offset],
                 [float(np.nanmean(heuristic_y_pre)), float(np.nanmean(heuristic_y_post))],
                 yerr=[float(np.nanstd(heuristic_y_pre)), float(np.nanstd(heuristic_y_post))],
-                fmt='D', color=heuristic_color, ecolor=heuristic_color, capsize=3, zorder=5, markersize=5,
+                fmt='D', color=heuristic_color, ecolor=heuristic_color, capsize=3, zorder=5, markersize=6,
             )
             if enable_paired_lines:
                 for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post):
-                    ax.plot([x0, x1], [y0, y1], color=heuristic_color, alpha=0.35, zorder=3, linewidth=0.8)
+                    ax.plot([x0, x1], [y0, y1], color=heuristic_color, alpha=0.45, zorder=3, linewidth=0.9)
                 ## END for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post)...
-
-            ax.legend(
-                handles=[
-                    Line2D([0], [0], marker='o', color='none', markerfacecolor=PaperFigureTwo.get_bar_colors()[2][:3], markeredgecolor=PaperFigureTwo.get_bar_colors()[2][:3], label=f'All {group_labels[1]}'),
-                    Line2D([0], [0], marker='D', color=heuristic_color, markerfacecolor=heuristic_color, label='Heuristic-passing'),
-                ],
-                frameon=False, loc='upper left',
-            )
 
         y_stack = list(y_values)
         if heuristic_y_pre is not None:
@@ -2081,7 +2084,19 @@ class PrePostDeltaDistributionComparison:
             add_significance_bars(ax, pbe_p_value, x1=2, x2=3, y=y_max)
         if (pbe_heuristic_session_summary is not None) and (pbe_heuristic_p_value is not None):
             heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
-            add_significance_bars(ax, pbe_heuristic_p_value, x1=2, x2=3, y=heuristic_bracket_y)
+            add_significance_bars(ax, pbe_heuristic_p_value, x1=2, x2=3, y=heuristic_bracket_y, color=heuristic_color)
+
+        if pbe_heuristic_session_summary is not None:
+            ax.legend(
+                handles=[
+                    Line2D([0], [0], marker='o', color='none', markerfacecolor=PaperFigureTwo.get_bar_colors()[2][:3], markeredgecolor=PaperFigureTwo.get_bar_colors()[2][:3], label=f'All {group_labels[1]}'),
+                    Line2D([0], [0], marker='D', color=heuristic_color, markerfacecolor=heuristic_color, label='Heuristic-passing'),
+                ],
+                frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+            )
+
+        if not defer_show:
+            plt.show()
 
         saved_path = None
         if save_figure:
@@ -4648,7 +4663,7 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08, color: str = 'black'):
     """Add significance bars to a boxplot.
 
     When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
@@ -4671,7 +4686,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if text_additional_y_offset is None:
         text_additional_y_offset = 0.02 * y_scale
     _out_ann = {}
-    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
+    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color=color)
     
     # Annotate with asterisks based on p-value
     sig_astrisks_str: str = 'N.S.'
@@ -4685,7 +4700,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     label_y: float = float(y + y_offset + text_additional_y_offset)
     if sig_astrisks_str:
         label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center')
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center', color=color)
 
     # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
     _ymin, _ymax = ax.get_ylim()
