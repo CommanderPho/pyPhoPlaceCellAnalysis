@@ -1363,11 +1363,58 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'mode-ratio'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 07:30', related_items=[])
     @classmethod
-    def compute_mode_ratio(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category'):
+    def compute_mode_ratio(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', low_threshold: float = 0.25, high_threshold: float = 0.75) -> pd.DataFrame:
         """ computes the ratio of >25% quantile and <75% quantile
+
+        For each `condition_col` group, counts occupancy of the high mode (`value_col` > `high_threshold`, default 0.75)
+        versus the low mode (`value_col` < `low_threshold`, default 0.25). `mode_ratio` is n_high / n_low.
+        Values in [`low_threshold`, `high_threshold`] are the ambiguous middle and are excluded from the ratio.
+
+        P_Short is typically U-shaped on [0, 1]; this ratio is Short-preferring mode occupancy over Long-preferring mode occupancy.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            mode_ratio_df = PrePostDeltaDistributionComparison.compute_mode_ratio(filtered_all_sessions_laps_time_bin_df)
+
         """
+        if value_col not in df.columns:
+            raise ValueError(f'Missing required column: {value_col!r}')
+        if condition_col not in df.columns:
+            raise ValueError(f'Missing required column: {condition_col!r}')
+        if not (0.0 <= low_threshold < high_threshold <= 1.0):
+            raise ValueError('Require 0 <= low_threshold < high_threshold <= 1.')
+
+        work = df[[condition_col, value_col]].copy()
+        work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+        work = work.dropna(subset=[value_col])
+
+        rows = []
+        for condition, group in work.groupby(condition_col, dropna=False, sort=False):
+            values = group[value_col].to_numpy(dtype=float)
+            n = int(values.size)
+            n_low = int(np.sum(values < low_threshold))
+            n_high = int(np.sum(values > high_threshold))
+            n_mid = int(n - n_low - n_high)
+            rows.append({
+                condition_col: condition,
+                'n': n,
+                'n_low': n_low,
+                'n_high': n_high,
+                'n_mid': n_mid,
+                'frac_low': (n_low / n) if n > 0 else np.nan,
+                'frac_high': (n_high / n) if n > 0 else np.nan,
+                'mode_ratio': (n_high / n_low) if n_low > 0 else np.nan,
+                'low_threshold': low_threshold,
+                'high_threshold': high_threshold,
+            })
+        ## END for condition, group in work.groupby(condition_col, dropna=False, sort=False)...
+
+        if not rows:
+            return pd.DataFrame(columns=[condition_col, 'n', 'n_low', 'n_high', 'n_mid', 'frac_low', 'frac_high', 'mode_ratio', 'low_threshold', 'high_threshold'])
+        return pd.DataFrame(rows)
 
 
 
