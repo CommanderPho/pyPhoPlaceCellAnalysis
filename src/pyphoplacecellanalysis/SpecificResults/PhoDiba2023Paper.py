@@ -1890,7 +1890,7 @@ class PrePostDeltaDistributionComparison:
                                          ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
                                          group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
-                                         fig_file_name: str = 'figure4_summary_four_bar', active_context: Optional[IdentifyingContext] = None,
+                                         fig_file_name: str = 'figure4_summary_four_bar', fignum=None, active_context: Optional[IdentifyingContext] = None,
                                          enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
         """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
 
@@ -1908,6 +1908,7 @@ class PrePostDeltaDistributionComparison:
                 pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
                 pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
                 pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
+                fignum=f'{fig_name}-pre_post_delta_effect-{metric}',
             )
             out['fig']
         """
@@ -2026,14 +2027,17 @@ class PrePostDeltaDistributionComparison:
         heuristic_y_post = None
         pbe_half_offset = 0.0
         create_plot_kwargs = dict(kwargs)
+        if fignum is not None:
+            create_plot_kwargs.setdefault('fignum', fignum)
         if has_heuristic:
             heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
             heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
             full_width = 0.3
             half_width = full_width / 2.0
-            pbe_half_offset = half_width / 2.0
+            pair_gap = 0.03
+            pbe_half_offset = (half_width + pair_gap) / 2.0
             pbe_color = PaperFigureTwo.get_bar_colors()[2]
-            # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing.
+            # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing, with a tiny x-gap.
             y_values = [
                 y_values[0], y_values[1],
                 y_values[2], heuristic_y_pre,
@@ -2048,6 +2052,7 @@ class PrePostDeltaDistributionComparison:
                 bar_x=np.array([0.0, 1.0, 2.0 - pbe_half_offset, 2.0 + pbe_half_offset, 3.0 - pbe_half_offset, 3.0 + pbe_half_offset], dtype=float),
                 bar_width=np.array([full_width, full_width, half_width, half_width, half_width, half_width], dtype=float),
                 bar_colors=[PaperFigureTwo.get_bar_colors()[0], PaperFigureTwo.get_bar_colors()[1], pbe_color, heuristic_color, pbe_color, heuristic_color],
+                errorbar_colors=['k', 'k', 'k', heuristic_color, 'k', heuristic_color],
                 xtick_positions=np.arange(4),
                 xtick_labels=x_labels,
             ))
@@ -5418,8 +5423,13 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         bar_x = kwargs.pop('bar_x', None)
         bar_width = kwargs.pop('bar_width', None)
         bar_colors = kwargs.pop('bar_colors', None)
+        errorbar_colors = kwargs.pop('errorbar_colors', None)
         xtick_positions = kwargs.pop('xtick_positions', None)
         xtick_labels = kwargs.pop('xtick_labels', None)
+        fignum = kwargs.pop('fignum', None)
+        if fignum is None:
+            fignum = kwargs.pop('num', None)
+        clear_figure: bool = bool(kwargs.pop('clear', fignum is not None))
         text_formatter.top_margin = top_margin
         text_formatter.left_margin = left_margin
         text_formatter.bottom_margin = bottom_margin
@@ -5439,11 +5449,34 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             if len(edgecolors) != n_bars:
                 raise ValueError(f'bar_colors length {len(edgecolors)} != n_bars {n_bars}.')
 
-        fig, ax = plt.subplots()
+        subplots_kwargs = {}
+        if fignum is not None:
+            subplots_kwargs['num'] = fignum
+            subplots_kwargs['clear'] = clear_figure
+        fig, ax = plt.subplots(**subplots_kwargs)
         text_formatter.setup_margins(fig)
 
         bar_tick_label = x_labels if (len(x_labels) == n_bars) else None
-        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors)
+        means = [float(np.mean(yi)) for yi in y_values]
+        stds = [float(np.std(yi)) for yi in y_values]
+        # matplotlib ax.bar ecolor must be a single color; draw per-bar errorbars when a sequence is provided.
+        bar_error_kwargs = {}
+        per_bar_errorbar_colors = None
+        if errorbar_colors is not None:
+            ecolors = list(errorbar_colors) if (not isinstance(errorbar_colors, str)) else [errorbar_colors]
+            if len(ecolors) == 1:
+                bar_error_kwargs['ecolor'] = ecolors[0]
+            elif len(ecolors) == n_bars:
+                per_bar_errorbar_colors = ecolors
+            else:
+                raise ValueError(f'errorbar_colors length {len(ecolors)} != n_bars {n_bars}.')
+        yerr = None if (per_bar_errorbar_colors is not None) else stds
+        bars = ax.bar(x, means, yerr=yerr, capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors, **bar_error_kwargs)
+        if per_bar_errorbar_colors is not None:
+            for i in range(n_bars):
+                ax.errorbar(x[i], means[i], yerr=stds[i], fmt='none', ecolor=per_bar_errorbar_colors[i], capsize=5, zorder=3)
+            ## END for i in range(n_bars)...
+
 
         scatter_plots = []
         x_values_list = []
