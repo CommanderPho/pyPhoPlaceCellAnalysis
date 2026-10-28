@@ -2426,6 +2426,7 @@ class FigureS8:
     plotly_helpers: PlotlyHelpers = None
     PUB_FIG_SIZE: Dict = dict(width=792, height=320)
     figures_parent_folder: Path = None
+    last_debug_values: Optional[Dict] = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
     _heuristic_filter_color_map: Dict[str, str] = {
@@ -2677,11 +2678,14 @@ class FigureS8:
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
+                                                    store_debug_values: bool = False,
         ):
         """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
         `split_by_column='animal'` plots one 1x3 row per animal and stacks those SVGs into `*_by_animal.svg`.
         PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
+
+        When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
@@ -2708,6 +2712,21 @@ class FigureS8:
         _out_figs_dict = {}
         _out_paths_dict = {}
         _out_stats_dict = {}
+        _out_debug_dict: Dict[str, Any] = {}
+        if store_debug_values:
+            _out_debug_dict = {
+                'base_df': base_df,
+                'final_df': None,
+                'plot_df': None,
+                'heuristic_passing_df': None,
+                'n_rows': {'Initial': len(base_df)},
+                'constraint_keys': constraint_keys,
+                'should_overlay_heuristic_filter': should_overlay_heuristic_filter,
+                'split_by_column': split_by_column,
+                'export_suffix': export_suffix,
+            }
+            if split_by_column is not None:
+                _out_debug_dict['groups'] = {}
 
         def _export_stage(k: str, source_df: pd.DataFrame, title_prefix: str, basename: Optional[str]):
             """Plot pooled, or one 1x3 row per `split_by_column` value then stack those SVGs vertically."""
@@ -2719,6 +2738,11 @@ class FigureS8:
 
             for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column):
                 plot_df = cls._overlay_heuristic_filter_rows(group_df, additional_filter_predicates) if should_overlay_heuristic_filter else group_df
+                if store_debug_values and (k == 'Final'):
+                    if split_by_column is not None:
+                        _out_debug_dict.setdefault('groups', {})[group_key] = {'group_df': group_df, 'plot_df': plot_df, 'n_rows': len(group_df)}
+                    else:
+                        _out_debug_dict['plot_df'] = plot_df
                 context_kwargs = dict(title_prefix=title_prefix, filter=k)
                 if group_key is not None:
                     context_kwargs[split_by_column] = group_key
@@ -2800,14 +2824,20 @@ class FigureS8:
             mask = predicates[k](active).astype(bool)
             active = deepcopy(active[mask])
             print(f"\tafter {k}: {len(active)} rows")
+            if store_debug_values:
+                _out_debug_dict['n_rows'][k] = len(active)
 
             if should_export_iteratively_constrainted:
                 _export_stage(k, active, title_prefix=f"FILTERED | {k}", basename=None)
         ## END for k in constraint_keys...
 
         if should_overlay_heuristic_filter:
-            n_heuristic_pass: int = int(additional_filter_predicates['is_heuristic_passing'](active).astype(bool).sum())
+            passing_mask = additional_filter_predicates['is_heuristic_passing'](active).astype(bool)
+            n_heuristic_pass: int = int(passing_mask.sum())
             print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
+            if store_debug_values:
+                _out_debug_dict['n_rows']['heuristic_passing'] = n_heuristic_pass
+                _out_debug_dict['heuristic_passing_df'] = active[passing_mask]
 
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -2816,16 +2846,27 @@ class FigureS8:
 
         print(f"after {k}: {len(base_df)} rows")
 
-        return _out_figs_dict, _out_paths_dict, _out_stats_dict
+        if store_debug_values:
+            _out_debug_dict['final_df'] = active
+            _out_debug_dict['n_rows']['Final'] = len(active)
+            if _out_debug_dict.get('plot_df') is None:
+                if should_overlay_heuristic_filter:
+                    _out_debug_dict['plot_df'] = cls._overlay_heuristic_filter_rows(active, additional_filter_predicates)
+                else:
+                    _out_debug_dict['plot_df'] = active
+
+        return _out_figs_dict, _out_paths_dict, _out_stats_dict, _out_debug_dict
 
 
 
     @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
-            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, debug_print: bool = True,
+            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, debug_print: bool = True, store_debug_values: bool = False,
         ):
         """ Performs the main plotting and adds optional stats
+
+            When `store_debug_values=True`, a 4th return item holds the processed plot DFs (`base_df_dict_dict`, per-key `plot_data` with `final_df`/`plot_df`) and filter params. Also stored on `FigureS8.last_debug_values`.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -2843,11 +2884,15 @@ class FigureS8:
             figures_parent_folder.mkdir(exist_ok=True)
             should_compute_stats: bool = True
             enable_add_stats_to_figures: bool = True
-            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, should_concatenate_figures=False, enable_heuristic_filtered_outputs=enable_heuristic_filtered_outputs, split_by_column=None, should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures)
+            store_debug_values: bool = True
+            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, should_concatenate_figures=False, enable_heuristic_filtered_outputs=enable_heuristic_filtered_outputs, split_by_column=None, should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values)
 
 
-            if should_compute_stats:
+            if store_debug_values:
+                _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values = _out
+            else:
                 _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple = _out
+            if should_compute_stats:
                 pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs = _out_stats_tuple
                 _stats_output_keys = _stats_params_kwargs['output_keys']
                 # if should_compute_stats:
@@ -2967,6 +3012,15 @@ class FigureS8:
 
         _out_figs_dict_dict_dict = {}
         _out_paths_dict = {}
+        _out_debug_values: Dict[str, Any] = {}
+        if store_debug_values:
+            _out_debug_values = {
+                'active_filter_constraints': active_filter_constraints,
+                'base_constraint_keys_dict': base_constraint_keys_dict,
+                'columns_to_add': columns_to_add,
+                'base_df_dict_dict': base_df_dict_dict,
+                'plot_data': {},
+            }
 
         # Stats ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
         _stats_class_kwargs = dict(n_bootstrap=10000, random_state=1337, sampling_unit='session')
@@ -3017,7 +3071,7 @@ class FigureS8:
                 if not should_concatenate_figures:
                     an_epoch_name = f"{an_epoch_name}{a_grainularity}"
 
-                _out_figs_dict_dict[an_epoch_name], _out_paths[an_epoch_name], a_stage_stats_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                _out_figs_dict_dict[an_epoch_name], _out_paths[an_epoch_name], a_stage_stats_dict, a_stage_debug_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                                                                                                 should_export_initially_filtered = False,
                                                                                                                 should_export_iteratively_constrainted = False,
                                                                                                                 export_suffix=an_epoch_name,
@@ -3027,7 +3081,10 @@ class FigureS8:
                                                                                                                 split_by_column=split_by_column,
                                                                                                                 should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures,
                                                                                                                 stats_class_kwargs=_stats_class_kwargs, stats_run_kwargs=_stats_run_kwargs,
+                                                                                                                store_debug_values=store_debug_values,
                                                                                                             )
+                if store_debug_values:
+                    _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
 
                 # Flatten Final stats (computed on the plotted Final-constrained group_df, not unconstrained base_df)
                 # g = filtered_all_sessions_ripple_time_bin_df.groupby(['animal', 'session_name', 'parent_epoch_id'], dropna=False)['pre_post_delta_category']
@@ -3095,7 +3152,11 @@ class FigureS8:
         # if should_compute_stats:
         #     {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
 
-        return _out_figs_dict_dict_dict, _out_paths_dict, (pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs)
+        cls.last_debug_values = _out_debug_values if store_debug_values else None
+        _out_stats_tuple = (pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs)
+        if store_debug_values:
+            return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values
+        return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple
 
 
 
