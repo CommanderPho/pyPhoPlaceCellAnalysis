@@ -82,6 +82,7 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 import numpy as np
 import pandas as pd
 from scipy.stats import wasserstein_distance
+import statsmodels.api as sm
 
 @metadata_attributes(short_name=None, tags=['stats', 'fig4', 'hierarchical-bootstrap', 'bootstrap', 'permutation', 'sampling'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-20 10:12', related_items=[])
 class PrePostDeltaDistributionComparison:
@@ -98,6 +99,11 @@ class PrePostDeltaDistributionComparison:
 
 
     #TODO 2026-10-27 19:32: - [ ] NOTE: IMPORTANT!! Much of this class isn't used because we decided against doing block-level shuffles
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
 
     """
 
@@ -1363,10 +1369,170 @@ class PrePostDeltaDistributionComparison:
         }
 
 
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2026-10-26 - Interrupted Timeseries Analysis (ITA) Stats                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## INPUTS: pre_df, post_df
+    @function_attributes(short_name=None, tags=['Figure 4/S6/S8 Stats', 'stats', 'figure4', 'interrupted-timeseries-analysis', 'timeseries'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:02', related_items=[])
+    @classmethod
+    def stats_interrupted_timeseries_analysis(cls, pre_df: pd.DataFrame, post_df: pd.DataFrame, should_plot: bool = True, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', debug_print: bool=True):
+        """ Applies Interrupted Timeseries Analysis (ITA) to the pre/post delta data, treating delta as the intervention
+
+        Lopez Bernal et al., “Interrupted Time Series Regression for the Evaluation of Public Health Interventions.”
+
+        Usage:
+
+            time_variable_name: str = 'delta_aligned_start_t'
+            variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+            df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+            pre_df  = df[df[time_variable_name] <= 0]
+            post_df = df[df[time_variable_name] > 0]
+            (its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                                        variable_name=variable_name, time_variable_name=time_variable_name,
+                                        )
+            intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
+
+
+        """
+        # Combine pre- and post-intervention observations
+        pre_df = pre_df.copy()
+        post_df = post_df.copy()
+
+        pre_df['intervention'] = 0
+        post_df['intervention'] = 1
+
+        its_df = pd.concat([pre_df, post_df], ignore_index=True)
+        its_df = its_df.sort_values(time_variable_name)
+
+        # Corrected ITS interaction: (T - T0) * intervention, where T0 = 0
+        its_df['time_interaction'] = (its_df[time_variable_name] * its_df['intervention'])
+
+        X = sm.add_constant(its_df[[time_variable_name, 'intervention', 'time_interaction']])
+
+        # Fit the model
+        its_model = sm.OLS(its_df[variable_name], X).fit()
+        if debug_print:
+            print(its_model.summary())
+
+        intercept = its_model.params['const']
+        pre_slope = its_model.params[time_variable_name]
+        level_change = its_model.params['intervention']
+        slope_change = its_model.params['time_interaction']
+
+        post_slope = pre_slope + slope_change
+        if debug_print:
+            print(f"Pre-intervention slope: {pre_slope:.6f}")
+            print(f"Immediate level change: {level_change:.6f}")
+            print(f"Slope change: {slope_change:.6f}")
+            print(f"Post-intervention slope: {post_slope:.6f}")
+
+        outputs = (its_model, (intercept, pre_slope, level_change, slope_change, post_slope))
+
+        if should_plot:
+            import matplotlib.pyplot as plt
+
+            fig = plt.figure(num='Interrupted Time Series stats model', clear=True)
+            plt.scatter(pre_df[time_variable_name], pre_df[variable_name], label='Pre-intervention', alpha=0.6)
+            plt.scatter(post_df[time_variable_name], post_df[variable_name], label='Post-intervention', alpha=0.6)
+
+            # Plot each fitted segment separately
+            pre_mask = its_df['intervention'] == 0
+            post_mask = its_df['intervention'] == 1
+
+            plt.plot(its_df.loc[pre_mask, time_variable_name], its_model.predict(X.loc[pre_mask]), color='red', label='Segmented regression')
+
+            plt.plot(its_df.loc[post_mask, time_variable_name], its_model.predict(X.loc[post_mask]), color='red')
+
+            plt.axvline(0.0, color='black', linestyle='--', label='Intervention')
+            plt.xlabel(time_variable_name)
+            plt.ylabel(variable_name)
+            plt.legend()
+            plt.show()
+
+        return outputs
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'Figure 4/S6/S8 Stats', 'stats', 'figure4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 15:35', related_items=[])
+    @classmethod
+    def linear_fit(cls, a_df: pd.DataFrame, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t'):
+        """ a simple linear fit to the pre/post period df separately.
+
+        Usage:
+            pre_df, pre_tuple = linear_fit(a_df=pre_df)
+            post_df, post_tuple = linear_fit(a_df=post_df)
+
+            pre_slope, pre_intercept, pre_r_value, pre_p_value, pre_std_err = pre_tuple
+            post_slope, post_intercept, post_r_value, post_p_value, post_std_err = post_tuple
+
+            pre_slope, post_slope
+
+
+        """
+        from scipy.stats import linregress
+        x = a_df[time_variable_name]
+        y = a_df[variable_name]
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        a_df['best_fit'] = intercept + (slope * x)
+        return (a_df, (slope, intercept, r_value, p_value, std_err))
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'Figure 4/S6/S8 Stats', 'main', 'stats'], input_requires=[], output_provides=[], uses=['cls.stats_interrupted_timeseries_analysis'], used_by=[], creation_date='2026-10-28 07:36', related_items=[])
+    @classmethod
+    def run_interrupted_timeseries_analysis(cls, df_filter, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', **kwargs):
+        time_variable_name: str = 'delta_aligned_start_t'
+        variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+        df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+        pre_df  = df[df[time_variable_name] <= 0]
+        post_df = df[df[time_variable_name] > 0]
+        (its_model, its_tuple) = cls.stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                                    variable_name=variable_name, time_variable_name=time_variable_name,
+                                    )
+        intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
+
+        # OLS Regression Results                            
+        # ==============================================================================
+        # Dep. Variable:                P_Short   R-squared:                       0.056
+        # Model:                            OLS   Adj. R-squared:                  0.055
+        # Method:                 Least Squares   F-statistic:                     63.22
+        # Date:                Tue, 27 Oct 2026   Prob (F-statistic):           1.03e-39
+        # Time:                        03:43:24   Log-Likelihood:                -1573.6
+        # No. Observations:                3229   AIC:                             3155.
+        # Df Residuals:                    3225   BIC:                             3179.
+        # Df Model:                           3                                         
+        # Covariance Type:            nonrobust                                         
+        # =========================================================================================
+        #                             coef    std err          t      P>|t|      [0.025      0.975]
+        # -----------------------------------------------------------------------------------------
+        # const                     0.3753      0.017     22.461      0.000       0.343       0.408
+        # delta_aligned_start_t     0.0001   2.18e-05      5.140      0.000    6.92e-05       0.000
+        # intervention              0.0820      0.024      3.446      0.001       0.035       0.129
+        # time_interaction      -6.823e-05   3.32e-05     -2.053      0.040      -0.000   -3.05e-06
+        # ==============================================================================
+        # Omnibus:                   145406.152   Durbin-Watson:                   1.952
+        # Prob(Omnibus):                  0.000   Jarque-Bera (JB):              336.695
+        # Skew:                           0.415   Prob(JB):                     7.72e-74
+        # Kurtosis:                       1.653   Cond. No.                     3.15e+03
+        # ==============================================================================
+
+        # Notes:
+        # [1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+        # [2] The condition number is large, 3.15e+03. This might indicate that there are
+        # strong multicollinearity or other numerical problems.
+        # Pre-intervention slope: 0.000112
+        # Immediate level change: 0.082021
+        # Slope change: -0.000068
+        # Post-intervention slope: 0.000044
+        return (its_model, its_tuple)
+
+
+
+
+
     @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'mode-ratio'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 07:30', related_items=[])
     @classmethod
     def compute_mode_ratio(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', low_threshold: float = 0.25, high_threshold: float = 0.75) -> pd.DataFrame:
-        """ computes the ratio of >25% quantile and <75% quantile
+        """ computes the ratio of >25% quantile and <75% quantile (the histogram's modes)
 
         For each `condition_col` group, counts occupancy of the high mode (`value_col` > `high_threshold`, default 0.75)
         versus the low mode (`value_col` < `low_threshold`, default 0.25). `mode_ratio` is n_high / n_low.
@@ -1687,6 +1853,7 @@ class FigureS8:
         return fig
 
 
+    @function_attributes(short_name=None, tags=['private', 'stats'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 07:48', related_items=[])
     @classmethod
     def _compute_pre_post_delta_stats(cls, df: pd.DataFrame, class_kwargs: Dict, run_kwargs: Dict) -> Tuple[Optional[PrePostDeltaDistributionComparison], Optional[Dict]]:
         """Run PrePostDeltaDistributionComparison; skip a subset that lacks both pre and post."""
@@ -1700,12 +1867,13 @@ class FigureS8:
 
 
     ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
+    @function_attributes(short_name=None, tags=['private', 'secondary', 'figure', 'stats'], input_requires=[], output_provides=[], uses=['cls._compute_pre_post_delta_stats'], used_by=[], creation_date='2026-10-28 07:47', related_items=[])
     @classmethod
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
         ):
-        """Plot the constrained pre/post-delta scatter.
+        """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
         `split_by_column='animal'` plots one 1x3 row per animal and stacks those SVGs into `*_by_animal.svg`.
         PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
@@ -1847,9 +2015,9 @@ class FigureS8:
 
 
 
-
+    @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, debug_print: bool = True,
         ):
         """ Performs the main plotting and adds optional stats
@@ -1940,13 +2108,14 @@ class FigureS8:
         # )
         # _out_figs_dict["Unfiltered"]
 
-        # active_filter_constraints = df_filter.get_df_filter_active_constraint_dict() ## live/dynamic
-        active_filter_constraints = {'trained_compute_epochs': 'laps',
-            'decoder_identifier': 'pseudo2D',
-            'masked_time_bin_fill_type': ('dropped',),
-            'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
-            'time_bin_size': (0.075,),
-        }
+        if active_filter_constraints is None:
+            # active_filter_constraints = df_filter.get_df_filter_active_constraint_dict() ## live/dynamic
+            active_filter_constraints = {'trained_compute_epochs': 'laps',
+                'decoder_identifier': 'pseudo2D',
+                'masked_time_bin_fill_type': ('dropped',),
+                'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+                'time_bin_size': (0.075,),
+            }
 
 
         # ## INPUTS: df_filter, additional_filter_predicates, 
@@ -2036,7 +2205,7 @@ class FigureS8:
                 
                 should_overlay_heuristic_filter: bool = (enable_heuristic_filtered_outputs and an_epoch_name.startswith('PBEs'))
 
-                title_suffix: str = ' (heuristic False vs True)' if should_overlay_heuristic_filter else ''
+                title_suffix: str = ' (heuristic filtered)' if should_overlay_heuristic_filter else ''
 
                 if not should_concatenate_figures:
                     an_epoch_name = f"{an_epoch_name}{a_grainularity}"
@@ -2127,159 +2296,6 @@ class FigureS8:
 # ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-27 - Figure 4/S6/S8 Stats                                                                                                                                                                                                                                                    #
 # ==================================================================================================================================================================================================================================================================================== #
-
-import numpy as np
-import pandas as pd
-import statsmodels.api as sm
-
-# ==================================================================================================================================================================================================================================================================================== #
-# 2026-10-26 - Interrupted Timeseries Analysis (ITA) Stats                                                                                                                                                                                                                             #
-# ==================================================================================================================================================================================================================================================================================== #
-# ## INPUTS: pre_df, post_df
-# @function_attributes(short_name=None, tags=['stats', 'figure4', 'interrupted-timeseries-analysis', 'timeseries'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:02', related_items=[])
-# def stats_interrupted_timeseries_analysis(pre_df: pd.DataFrame, post_df: pd.DataFrame, should_plot: bool = True, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', debug_print: bool=True):
-#     """ Applies Interrupted Timeseries Analysis (ITA) to the pre/post delta data, treating delta as the intervention
-
-#     Lopez Bernal et al., “Interrupted Time Series Regression for the Evaluation of Public Health Interventions.”
-
-#     Usage:
-
-#         time_variable_name: str = 'delta_aligned_start_t'
-#         variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
-#         df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
-#         pre_df  = df[df[time_variable_name] <= 0]
-#         post_df = df[df[time_variable_name] > 0]
-#         (its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
-#                                     variable_name=variable_name, time_variable_name=time_variable_name,
-#                                     )
-#         intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
-
-
-#     """
-#     # Combine pre- and post-intervention observations
-#     pre_df = pre_df.copy()
-#     post_df = post_df.copy()
-
-#     pre_df['intervention'] = 0
-#     post_df['intervention'] = 1
-
-#     its_df = pd.concat([pre_df, post_df], ignore_index=True)
-#     its_df = its_df.sort_values(time_variable_name)
-
-#     # Corrected ITS interaction: (T - T0) * intervention, where T0 = 0
-#     its_df['time_interaction'] = (its_df[time_variable_name] * its_df['intervention'])
-
-#     X = sm.add_constant(its_df[[time_variable_name, 'intervention', 'time_interaction']])
-
-#     # Fit the model
-#     its_model = sm.OLS(its_df[variable_name], X).fit()
-#     if debug_print:
-#         print(its_model.summary())
-
-#     intercept = its_model.params['const']
-#     pre_slope = its_model.params[time_variable_name]
-#     level_change = its_model.params['intervention']
-#     slope_change = its_model.params['time_interaction']
-
-#     post_slope = pre_slope + slope_change
-#     if debug_print:
-#         print(f"Pre-intervention slope: {pre_slope:.6f}")
-#         print(f"Immediate level change: {level_change:.6f}")
-#         print(f"Slope change: {slope_change:.6f}")
-#         print(f"Post-intervention slope: {post_slope:.6f}")
-
-#     outputs = (its_model, (intercept, pre_slope, level_change, slope_change, post_slope))
-
-#     if should_plot:
-#         import matplotlib.pyplot as plt
-
-#         fig = plt.figure(num='Interrupted Time Series stats model', clear=True)
-#         plt.scatter(pre_df[time_variable_name], pre_df[variable_name], label='Pre-intervention', alpha=0.6)
-#         plt.scatter(post_df[time_variable_name], post_df[variable_name], label='Post-intervention', alpha=0.6)
-
-#         # Plot each fitted segment separately
-#         pre_mask = its_df['intervention'] == 0
-#         post_mask = its_df['intervention'] == 1
-
-#         plt.plot(its_df.loc[pre_mask, time_variable_name], its_model.predict(X.loc[pre_mask]), color='red', label='Segmented regression')
-
-#         plt.plot(its_df.loc[post_mask, time_variable_name], its_model.predict(X.loc[post_mask]), color='red')
-
-#         plt.axvline(0.0, color='black', linestyle='--', label='Intervention')
-#         plt.xlabel(time_variable_name)
-#         plt.ylabel(variable_name)
-#         plt.legend()
-#         plt.show()
-
-#     return outputs
-
-
-# @function_attributes(short_name=None, tags=['UNUSED', 'stats', 'figure4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 15:35', related_items=[])
-# def linear_fit(a_df: pd.DataFrame):
-#     """ a simple linear fit to the pre/post period df separately.
-
-#     Usage:
-#         pre_df, pre_tuple = linear_fit(a_df=pre_df)
-#         post_df, post_tuple = linear_fit(a_df=post_df)
-
-#         pre_slope, pre_intercept, pre_r_value, pre_p_value, pre_std_err = pre_tuple
-#         post_slope, post_intercept, post_r_value, post_p_value, post_std_err = post_tuple
-
-#         pre_slope, post_slope
-
-
-#     """
-#     from scipy.stats import linregress
-#     x = a_df[time_variable_name]
-#     y = a_df[variable_name]
-#     slope, intercept, r_value, p_value, std_err = linregress(x, y)
-#     a_df['best_fit'] = intercept + (slope * x)
-#     return (a_df, (slope, intercept, r_value, p_value, std_err))
-
-
-# time_variable_name: str = 'delta_aligned_start_t'
-# variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
-# df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
-# pre_df  = df[df[time_variable_name] <= 0]
-# post_df = df[df[time_variable_name] > 0]
-# (its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
-#                             variable_name=variable_name, time_variable_name=time_variable_name,
-#                             )
-# intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
-
-# OLS Regression Results                            
-# ==============================================================================
-# Dep. Variable:                P_Short   R-squared:                       0.056
-# Model:                            OLS   Adj. R-squared:                  0.055
-# Method:                 Least Squares   F-statistic:                     63.22
-# Date:                Tue, 27 Oct 2026   Prob (F-statistic):           1.03e-39
-# Time:                        03:43:24   Log-Likelihood:                -1573.6
-# No. Observations:                3229   AIC:                             3155.
-# Df Residuals:                    3225   BIC:                             3179.
-# Df Model:                           3                                         
-# Covariance Type:            nonrobust                                         
-# =========================================================================================
-#                             coef    std err          t      P>|t|      [0.025      0.975]
-# -----------------------------------------------------------------------------------------
-# const                     0.3753      0.017     22.461      0.000       0.343       0.408
-# delta_aligned_start_t     0.0001   2.18e-05      5.140      0.000    6.92e-05       0.000
-# intervention              0.0820      0.024      3.446      0.001       0.035       0.129
-# time_interaction      -6.823e-05   3.32e-05     -2.053      0.040      -0.000   -3.05e-06
-# ==============================================================================
-# Omnibus:                   145406.152   Durbin-Watson:                   1.952
-# Prob(Omnibus):                  0.000   Jarque-Bera (JB):              336.695
-# Skew:                           0.415   Prob(JB):                     7.72e-74
-# Kurtosis:                       1.653   Cond. No.                     3.15e+03
-# ==============================================================================
-
-# Notes:
-# [1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
-# [2] The condition number is large, 3.15e+03. This might indicate that there are
-# strong multicollinearity or other numerical problems.
-# Pre-intervention slope: 0.000112
-# Immediate level change: 0.082021
-# Slope change: -0.000068
-# Post-intervention slope: 0.000044
 
 
 
