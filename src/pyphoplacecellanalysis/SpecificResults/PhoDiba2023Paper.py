@@ -1898,7 +1898,8 @@ class PrePostDeltaDistributionComparison:
         Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
 
         When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
-        or a parent results dict with a single such key). Heuristic-passing session means are drawn as a black offset series on the PBE bars.
+        or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
+        each PBE column is split into two half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
 
         Usage:
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
@@ -1910,7 +1911,7 @@ class PrePostDeltaDistributionComparison:
             )
             out['fig']
         """
-        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars
 
         def _coerce_session_summary(obj, explicit_p_value, name: str, required: bool = True) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
@@ -2006,7 +2007,7 @@ class PrePostDeltaDistributionComparison:
             marker_mapping = {}
 
         def _bar_scatter_props(summary_df: pd.DataFrame):
-            if not has_animal:
+            if (not has_animal) or (animal_col not in summary_df.columns):
                 return {}
             return [{'marker': marker_mapping.get(a, 'o')} for a in summary_df[animal_col].to_numpy()]
 
@@ -2019,6 +2020,38 @@ class PrePostDeltaDistributionComparison:
         if active_context is None:
             active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
 
+        heuristic_color = '#2ca02c'
+        has_heuristic: bool = pbe_heuristic_session_summary is not None
+        heuristic_y_pre = None
+        heuristic_y_post = None
+        pbe_half_offset = 0.0
+        create_plot_kwargs = dict(kwargs)
+        if has_heuristic:
+            heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
+            heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
+            full_width = 0.3
+            half_width = full_width / 2.0
+            pbe_half_offset = half_width / 2.0
+            pbe_color = PaperFigureTwo.get_bar_colors()[2]
+            # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing.
+            y_values = [
+                y_values[0], y_values[1],
+                y_values[2], heuristic_y_pre,
+                y_values[3], heuristic_y_post,
+            ]
+            scatter_props = [
+                scatter_props[0], scatter_props[1],
+                scatter_props[2], _bar_scatter_props(pbe_heuristic_session_summary),
+                scatter_props[3], _bar_scatter_props(pbe_heuristic_session_summary),
+            ]
+            create_plot_kwargs.update(dict(
+                bar_x=np.array([0.0, 1.0, 2.0 - pbe_half_offset, 2.0 + pbe_half_offset, 3.0 - pbe_half_offset, 3.0 + pbe_half_offset], dtype=float),
+                bar_width=np.array([full_width, full_width, half_width, half_width, half_width, half_width], dtype=float),
+                bar_colors=[PaperFigureTwo.get_bar_colors()[0], PaperFigureTwo.get_bar_colors()[1], pbe_color, heuristic_color, pbe_color, heuristic_color],
+                xtick_positions=np.arange(4),
+                xtick_labels=x_labels,
+            ))
+
         if debug_print:
             n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
             print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
@@ -2028,69 +2061,39 @@ class PrePostDeltaDistributionComparison:
             prepare_for_publication=prepare_for_publication,
             publication_group_labels=group_labels, metric_name='Session Means',
             title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
-            **kwargs,
+            **create_plot_kwargs,
         )
         fig = render.fig
         ax = render.ax
         x_values_list, plotted_y_values = render.plot_data
 
         if enable_paired_lines:
-            for pair_i in (0, 2):
-                for x0, y0, x1, y1 in zip(x_values_list[pair_i], plotted_y_values[pair_i], x_values_list[pair_i + 1], plotted_y_values[pair_i + 1]):
-                    ax.plot([x0, x1], [y0, y1], color='gray', alpha=0.3, zorder=1, linewidth=0.8)
-                ## END for x0, y0, x1, y1 in zip(x_values_list[pair_i], plotted_y_values[pair_i], x_values_list[pair_i + 1], plotted_y_values[pair_i + 1])...
+            if has_heuristic:
+                pair_specs = [(0, 1, 'gray', 0.3), (2, 4, 'gray', 0.3), (3, 5, heuristic_color, 0.45)]
+            else:
+                pair_specs = [(0, 1, 'gray', 0.3), (2, 3, 'gray', 0.3)]
+            for i0, i1, line_color, line_alpha in pair_specs:
+                for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                    ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
+                ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
 
-            ## END for pair_i in (0, 2)...
+            ## END for i0, i1, line_color, line_alpha in pair_specs...
 
-        heuristic_y_pre = None
-        heuristic_y_post = None
-        heuristic_color = '#2ca02c'
-        if pbe_heuristic_session_summary is not None:
-            bar_width = 0.3
-            x_offset = 0.15
-            heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
-            heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
-            heuristic_x_values = []
-            for bar_i, y_i in ((2, heuristic_y_pre), (3, heuristic_y_post)):
-                x_values = (bar_i + x_offset) + (np.random.random(y_i.size) * bar_width - bar_width / 2) * 0.45
-                if has_animal and (animal_col in pbe_heuristic_session_summary.columns):
-                    for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy()):
-                        ax.scatter(xv, yv, color=heuristic_color, marker=marker_mapping.get(animal, 'D'), zorder=4, edgecolors=heuristic_color, linewidths=0.6, s=36)
-                    ## END for xv, yv, animal in zip(x_values, y_i, pbe_heuristic_session_summary[animal_col].to_numpy())...
-
-                else:
-                    ax.scatter(x_values, y_i, color=heuristic_color, marker='D', zorder=4, edgecolors=heuristic_color, linewidths=0.6, s=36)
-                heuristic_x_values.append(x_values)
-            ## END for bar_i, y_i in ((2, heuristic_y_pre), (3, heuristic_y_post))...
-
-            ax.errorbar(
-                [2 + x_offset, 3 + x_offset],
-                [float(np.nanmean(heuristic_y_pre)), float(np.nanmean(heuristic_y_post))],
-                yerr=[float(np.nanstd(heuristic_y_pre)), float(np.nanstd(heuristic_y_post))],
-                fmt='D', color=heuristic_color, ecolor=heuristic_color, capsize=3, zorder=5, markersize=6,
-            )
-            if enable_paired_lines:
-                for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post):
-                    ax.plot([x0, x1], [y0, y1], color=heuristic_color, alpha=0.45, zorder=3, linewidth=0.9)
-                ## END for x0, y0, x1, y1 in zip(heuristic_x_values[0], heuristic_y_pre, heuristic_x_values[1], heuristic_y_post)...
-
-        y_stack = list(y_values)
-        if heuristic_y_pre is not None:
-            y_stack.extend([heuristic_y_pre, heuristic_y_post])
-        y_max = float(np.nanmax(np.concatenate(y_stack)))
+        y_max = float(np.nanmax(np.concatenate(y_values)))
         if laps_p_value is not None:
             add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
         if pbe_p_value is not None:
-            add_significance_bars(ax, pbe_p_value, x1=2, x2=3, y=y_max)
-        if (pbe_heuristic_session_summary is not None) and (pbe_heuristic_p_value is not None):
+            add_significance_bars(ax, pbe_p_value, x1=(2.0 - pbe_half_offset), x2=(3.0 - pbe_half_offset), y=y_max)
+        if has_heuristic and (pbe_heuristic_p_value is not None):
             heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
-            add_significance_bars(ax, pbe_heuristic_p_value, x1=2, x2=3, y=heuristic_bracket_y, color=heuristic_color)
+            add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
 
-        if pbe_heuristic_session_summary is not None:
+        if has_heuristic:
+            pbe_legend_color = PaperFigureTwo.get_bar_colors()[2][:3]
             ax.legend(
                 handles=[
-                    Line2D([0], [0], marker='o', color='none', markerfacecolor=PaperFigureTwo.get_bar_colors()[2][:3], markeredgecolor=PaperFigureTwo.get_bar_colors()[2][:3], label=f'All {group_labels[1]}'),
-                    Line2D([0], [0], marker='D', color=heuristic_color, markerfacecolor=heuristic_color, label='Heuristic-passing'),
+                    Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
+                    Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
                 ],
                 frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
             )
