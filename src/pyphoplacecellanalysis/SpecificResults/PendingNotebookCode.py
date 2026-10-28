@@ -10006,7 +10006,7 @@ class PrePostDeltaDistributionComparison:
         }
 
 
-    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None):
+    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None) -> Dict:
         """Compute the effect, bootstrap interval, and optional permutation test.
 
         Uses `sampling_unit` from the constructor. Passing it here is optional and must
