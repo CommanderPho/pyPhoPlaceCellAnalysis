@@ -2448,6 +2448,11 @@ class FigureS8:
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
+            ## Figure 4 + S8 + S9 in one call (preferred):
+            figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
+                                                      earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+            ## Single figure:
             ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
             plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
             plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
@@ -3193,6 +3198,106 @@ class FigureS8:
             return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values
         return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple
 
+
+    @function_attributes(short_name=None, tags=['main', 'figure', 'output', 'batch'], input_requires=[], output_provides=[], uses=['cls.main', 'PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar'], used_by=[], creation_date='2026-10-28 16:33', related_items=['FigureS8.main'])
+    @classmethod
+    def main_all_figs(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict,
+                      earliest_delta_aligned_t_start: Optional[float] = None, latest_delta_aligned_t_end: Optional[float] = None,
+                      enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
+                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
+        """Produce Figure 4, Figure S8, and Figure S9 from a single notebook call.
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
+
+            figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
+                                                      earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+            # subset: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S9'])
+
+        Defaults write all three figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
+        """
+        if earliest_delta_aligned_t_start is not None:
+            plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+        if latest_delta_aligned_t_end is not None:
+            plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+
+        if figures_root is None:
+            figures_root = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources')
+        figures_root = Path(figures_root)
+        if figures_date is None:
+            figures_date = getattr(plotly_helpers, 'TODAY_DAY_DATE', None) or date.today().strftime('%Y-%m-%d')
+
+        if figures_config_dict is None:
+            figures_config_dict = {
+                'Figure 4': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure 4 - P_Short Scatter over Time/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': False,
+                },
+                'Figure S8': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': True,
+                },
+                'Figure S9': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S9 - Effect of Heuristic-filtering P_Short Scatter over Time - PerEpoch/Inputs/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': True, 'split_by_column': 'animal',
+                },
+            }
+        _figures_config_dict = deepcopy(figures_config_dict)
+
+        figures_out_dict = {}
+
+        for fig_name, fig_config_dict in _figures_config_dict.items():
+            if (enabled_figure_names is None) or (fig_name in enabled_figure_names):
+                print(f'fig_name: {fig_name}, fig_config_dict: {fig_config_dict}')
+                figures_parent_folder = Path(fig_config_dict.pop('figures_parent_folder'))
+                figures_parent_folder.mkdir(exist_ok=True, parents=True)
+
+                _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                                should_concatenate_figures=should_concatenate_figures, split_by_column=fig_config_dict.pop('split_by_column', None),
+                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values,
+                                **{**kwargs, **fig_config_dict},
+                )
+                if store_debug_values:
+                    _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values = _out
+                else:
+                    _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple = _out
+                    _out_debug_values = None
+                if should_compute_stats:
+                    pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs = _out_stats_tuple
+                    _stats_output_keys = _stats_params_kwargs['output_keys']
+                    # if should_compute_stats:
+                    # {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
+
+                    ## 2026-10-27 - Summary Statistics - Figure 2-like Box Plot
+                    metric: str = 'P_Short'
+                    fignum: str = f'{fig_name}-pre_post_delta_effect-{metric}'
+                    # _summary_figure_path = figures_parent_folder.joinpath(f'{fignum}.svg')
+
+                    if ('_perTimeBin_Laps' not in pre_post_delta_stats_results_dict) or ('_perTimeBin_PBEs' not in pre_post_delta_stats_results_dict):
+                        print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure (fignum: "{fignum}"). Skipping for fig_name: "{fig_name}"')
+                        # WARN: keys missing from pre_post_delta_stats_results_dict. Keys: ['_perTimeBin_Laps_gor01', '_perTimeBin_Laps_vvp01', '_perTimeBin_Laps_pin01', '_perTimeBin_PBEs_gor01', '_perTimeBin_PBEs_gor01_heuristic_passing', '_perTimeBin_PBEs_vvp01', '_perTimeBin_PBEs_vvp01_heuristic_passing', '_perTimeBin_PBEs_pin01', '_perTimeBin_PBEs_pin01_heuristic_passing', '_perEpochs_Laps_gor01', '_perEpochs_Laps_vvp01', '_perEpochs_Laps_pin01', '_perEpochs_PBEs_gor01', '_perEpochs_PBEs_gor01_heuristic_passing', '_perEpochs_PBEs_vvp01', '_perEpochs_PBEs_vvp01_heuristic_passing', '_perEpochs_PBEs_pin01', '_perEpochs_PBEs_pin01_heuristic_passing'] required for summary figure (fignum: "Figure S9-pre_post_delta_effect-P_Short"). Skipping for fig_name: "Figure S9"
+                    else:
+                        _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
+                            pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
+                            pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
+                            pbe_heuristic_passing_results = pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing', None),
+                            fignum=fignum,
+                            save_figure=True, export_folder=figures_parent_folder,
+                        )
+                        _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
+                ## END if should_compute_stats
+
+                if store_debug_values:
+                    _out = (_out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values)
+                else:
+                    _out = (_out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple)
+                figures_out_dict[fig_name] = _out
+            else:
+                print(f'skipping "{fig_name}" due to enabled_figure_names')
+        ## END for fig_name, fig_config_dict in _figures_config_dict.items()...
+
+        ## OUTPUTS: figures_out_dict
+        return figures_out_dict
 
 
 # ==================================================================================================================================================================================================================================================================================== #
