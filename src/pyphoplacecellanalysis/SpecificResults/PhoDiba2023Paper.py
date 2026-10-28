@@ -1595,7 +1595,7 @@ class PrePostDeltaDistributionComparison:
         return pd.DataFrame(rows)
 
 
-    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'ordinal', 'proportional-odds', 'mode-ratio'], input_requires=[], output_provides=[], uses=['OrderedModel', 'compute_mode_ratio'], used_by=['run'], creation_date='2026-10-28 08:00', related_items=['compute_mode_ratio'])
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'ordinal', 'proportional-odds', 'mode-ratio', 'AI'], input_requires=[], output_provides=[], uses=['OrderedModel', 'compute_mode_ratio'], used_by=['run'], creation_date='2026-10-28 08:00', related_items=['compute_mode_ratio'])
     @classmethod
     def compute_ordinal_mode_shift(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name',
                                    pre_label='pre-delta', post_label='post-delta', low_threshold: float = 0.25, high_threshold: float = 0.75,
@@ -1880,6 +1880,140 @@ class PrePostDeltaDistributionComparison:
             'status': infer_status,
         }
 
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars'], used_by=[], creation_date='2026-10-28 08:32', related_items=['compute_ordinal_mode_shift'])
+    @classmethod
+    def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
+                                         pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
+                                         laps_p_value: Optional[float] = None, pbe_p_value: Optional[float] = None,
+                                         ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
+                                         group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
+                                         defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
+                                         fig_file_name: str = 'figure4_summary_four_bar', active_context: Optional[IdentifyingContext] = None,
+                                         enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+        """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
+
+        `laps_results` / `pbe_results` may be `run()` result dicts (must include `session_summary`) or `session_summary` DataFrames.
+        Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            out = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
+                pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
+                pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
+            )
+            out['fig']
+        """
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars
+
+        def _coerce_session_summary(obj, explicit_p_value, name: str) -> Tuple[pd.DataFrame, Optional[float]]:
+            if isinstance(obj, pd.DataFrame):
+                summary = obj
+                p_value = explicit_p_value
+            elif isinstance(obj, dict):
+                if ('session_summary' not in obj) or (obj['session_summary'] is None):
+                    raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                summary = obj['session_summary']
+                p_value = explicit_p_value if explicit_p_value is not None else obj.get('p_value')
+            else:
+                raise TypeError(f'{name} must be a run() result dict or a session_summary DataFrame, got {type(obj)!r}.')
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                raise ValueError(f'{name} session_summary is empty.')
+            missing_cols = [c for c in (pre_col, post_col) if c not in summary.columns]
+            if missing_cols:
+                raise ValueError(f'{name} session_summary is missing columns: {missing_cols}.')
+            work = summary.dropna(subset=[pre_col, post_col]).copy().reset_index(drop=True)
+            if work.empty:
+                raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+            return work, p_value
+
+        laps_session_summary, laps_p_value = _coerce_session_summary(laps_results, laps_p_value, 'laps_results')
+        pbe_session_summary, pbe_p_value = _coerce_session_summary(pbe_results, pbe_p_value, 'pbe_results')
+
+        y_values = [
+            laps_session_summary[pre_col].to_numpy(dtype=float),
+            laps_session_summary[post_col].to_numpy(dtype=float),
+            pbe_session_summary[pre_col].to_numpy(dtype=float),
+            pbe_session_summary[post_col].to_numpy(dtype=float),
+        ]
+        x_labels = [
+            f'{group_labels[0]} pre-$\\Delta$',
+            f'{group_labels[0]} post-$\\Delta$',
+            f'{group_labels[1]} pre-$\\Delta$',
+            f'{group_labels[1]} post-$\\Delta$',
+        ]
+
+        has_animal: bool = (animal_col in laps_session_summary.columns) and (animal_col in pbe_session_summary.columns)
+        filled_markers = ['o', '^', '8', 's', 'p', 'd', 'P', 'X']
+        if has_animal:
+            unique_animals = pd.unique(pd.concat([laps_session_summary[animal_col], pbe_session_summary[animal_col]], ignore_index=True))
+            marker_mapping = {animal: filled_markers[i % len(filled_markers)] for i, animal in enumerate(unique_animals)}
+        else:
+            marker_mapping = {}
+
+        def _bar_scatter_props(summary_df: pd.DataFrame):
+            if not has_animal:
+                return {}
+            return [{'marker': marker_mapping.get(a, 'o')} for a in summary_df[animal_col].to_numpy()]
+
+        scatter_props = [
+            _bar_scatter_props(laps_session_summary),
+            _bar_scatter_props(laps_session_summary),
+            _bar_scatter_props(pbe_session_summary),
+            _bar_scatter_props(pbe_session_summary),
+        ]
+        if active_context is None:
+            active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
+
+        if debug_print:
+            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}')
+
+        render = PaperFigureTwo.create_plot(
+            x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, defer_show,
+            prepare_for_publication=prepare_for_publication,
+            publication_group_labels=group_labels, metric_name='Session Means',
+            title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
+            **kwargs,
+        )
+        fig = render.fig
+        ax = render.ax
+        x_values_list, plotted_y_values = render.plot_data
+
+        if enable_paired_lines:
+            for pair_i in (0, 2):
+                for x0, y0, x1, y1 in zip(x_values_list[pair_i], plotted_y_values[pair_i], x_values_list[pair_i + 1], plotted_y_values[pair_i + 1]):
+                    ax.plot([x0, x1], [y0, y1], color='gray', alpha=0.3, zorder=1, linewidth=0.8)
+                ## END for x0, y0, x1, y1 in zip(x_values_list[pair_i], plotted_y_values[pair_i], x_values_list[pair_i + 1], plotted_y_values[pair_i + 1])...
+
+            ## END for pair_i in (0, 2)...
+
+        y_max = float(np.nanmax(np.concatenate(y_values)))
+        if laps_p_value is not None:
+            add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
+        if pbe_p_value is not None:
+            add_significance_bars(ax, pbe_p_value, x1=2, x2=3, y=y_max)
+
+        saved_path = None
+        if save_figure:
+            if export_folder is None:
+                raise ValueError('export_folder is required when save_figure=True.')
+            export_folder = Path(export_folder)
+            export_folder.mkdir(parents=True, exist_ok=True)
+            saved_path = export_folder / f'{fig_file_name}.pdf'
+            fig.savefig(saved_path)
+
+        return dict(
+            fig=fig,
+            ax=ax,
+            render=render,
+            laps_session_summary=laps_session_summary,
+            pbe_session_summary=pbe_session_summary,
+            y_values=y_values,
+            laps_p_value=laps_p_value,
+            pbe_p_value=pbe_p_value,
+            saved_path=saved_path,
+        )
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -2315,7 +2449,7 @@ class FigureS8:
 
     @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, debug_print: bool = True,
         ):
         """ Performs the main plotting and adds optional stats
@@ -2505,6 +2639,7 @@ class FigureS8:
 
                 title_suffix: str = ' (heuristic filtered)' if should_overlay_heuristic_filter else ''
 
+                epoch_kind: str = an_epoch_name  # 'Laps' or 'PBEs' — keep un-suffixed for stats keys
                 if not should_concatenate_figures:
                     an_epoch_name = f"{an_epoch_name}{a_grainularity}"
 
@@ -2527,7 +2662,7 @@ class FigureS8:
                 # print(bad.head())
                 # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
                 if should_compute_stats or enable_add_stats_to_figures:
-                    active_key: str = '_'.join([a_grainularity, an_epoch_name])
+                    active_key: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_Laps'
                     for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items():
                         result_key: str = active_key if group_key is None else f'{active_key}_{group_key}'
                         comparison_all, results_all = group_stats.get('all', (None, None))
@@ -4793,7 +4928,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates') -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None) -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
         if not prepare_for_publication:
@@ -4803,15 +4938,18 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             title_font_size: int = 9*2
             subtitle_font_size: int = 7*2
 
+        if subtitle is None:
+            subtitle = ('for the '
+                        "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track")
+
         return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> {metric_name}\n"
-                f"<size:{subtitle_font_size}>for the "
-                "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track</></>"
+                f"<size:{subtitle_font_size}>{subtitle}</></>"
                 )
 
 
     @classmethod
-    def _apply_publication_grouped_xticklabels(cls, ax):
-        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, LdCs/SdCs under each pair. """
+    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, str] = ('LdCs', 'SdCs')):
+        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, group labels under each pair. """
         ax.set_xticks(np.arange(4))
         ax.set_xticklabels([r'pre-$\Delta$', r'post-$\Delta$', r'pre-$\Delta$', r'post-$\Delta$'])
         ax.tick_params(axis='x', length=0, pad=2)
@@ -4819,7 +4957,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         # Group labels centered under bars 0–1 and 2–3 (matplotlib multilevel-tick pattern)
         sec = ax.secondary_xaxis(location=0)
-        sec.set_xticks([0.5, 2.5], labels=['\n\nLdCs', '\n\nSdCs'])
+        sec.set_xticks([0.5, 2.5], labels=[f'\n\n{group_labels[0]}', f'\n\n{group_labels[1]}'])
         sec.tick_params('x', length=0)
         sec.spines['bottom'].set_visible(False)
         return sec
@@ -4843,6 +4981,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         left_margin: float = float(kwargs.pop('left_margin', text_formatter.left_margin))
         bottom_margin: float = float(kwargs.pop('bottom_margin', text_formatter.bottom_margin))
         title_top_margin: float = float(kwargs.pop('title_top_margin', top_margin + 0.02))
+        publication_group_labels = kwargs.pop('publication_group_labels', ('LdCs', 'SdCs'))
+        title_subtitle = kwargs.pop('title_subtitle', None)
+        metric_name_override = kwargs.pop('metric_name', None)
+        xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
         text_formatter.top_margin = top_margin
         text_formatter.left_margin = left_margin
         text_formatter.bottom_margin = bottom_margin
@@ -4889,16 +5031,16 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             x_values_list.append(x_values)
         ## END for i in range(len(x))...
 
-        ax.set_xlabel('Neuron Track Dominance Classification')
+        ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
 
-        metric_name: str = cls._metric_name_from_ylabel(ylabel)
+        metric_name: str = metric_name_override if metric_name_override is not None else cls._metric_name_from_ylabel(ylabel)
         _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
         active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
         title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
@@ -4910,7 +5052,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         ax.set_xticks(x)
         ax.set_xticklabels(x_labels)
         if prepare_for_publication:
-            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax)
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels)
 
         # Firing rates / participation fractions are non-negative; keep axis floor at 0
         _ymin, _ymax = ax.get_ylim()
