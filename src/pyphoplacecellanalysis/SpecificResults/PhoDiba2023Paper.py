@@ -95,6 +95,10 @@ class PrePostDeltaDistributionComparison:
       group by lap or parent epoch. The optional p-value is a sign-flip test of the
       signed mean difference, not Wasserstein distance. Session-level tests treat
       sessions as exchangeable and therefore ignore within-animal dependence.
+
+
+    #TODO 2026-10-27 19:32: - [ ] NOTE: IMPORTANT!! Much of this class isn't used because we decided against doing block-level shuffles
+
     """
 
     def __init__(self, filtered_all_sessions_laps_time_bin_df, value_col='P_Short',
@@ -771,7 +775,10 @@ class PrePostDeltaDistributionComparison:
         return results
 
 
-
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-27 - Relevant Only to 'block' resampling, which IS NOT DONE because blocks of laps are autocorrelated!                                                                                                                                                                       #
+# ==================================================================================================================================================================================================================================================================================== #
+@function_attributes(short_name=None, tags=['_DEPRICATED', 'block-only', 'NOT_USED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-27 19:32', related_items=[])
 def estimate_block_length_lap_t_bins_from_autocorrelation(
     filtered_all_sessions_laps_time_bin_df,
     value_col='P_Short',
@@ -1078,7 +1085,7 @@ def estimate_block_length_lap_t_bins_from_autocorrelation(
         'axes': ax,
     }
 
-
+@function_attributes(short_name=None, tags=['_DEPRICATED', 'block-only', 'NOT_USED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-27 19:32', related_items=[])
 def estimate_block_length_laps_from_autocorrelation(
     filtered_all_sessions_laps_df,
     value_col='P_Short',
