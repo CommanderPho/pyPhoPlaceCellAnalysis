@@ -4618,6 +4618,95 @@ class AcrossSessionHelpers:
         return shuffle_df, unique_transfer_col_names
 
 
+    @function_attributes(short_name=None, tags=['shuffle', 'FAT', 'merge'], input_requires=[], output_provides=[], uses=['prepare_epoch_score_shuffle_transfer_columns', 'ExportValueNameCleaner'], used_by=[], creation_date='2026-10-28 13:00', related_items=['prepare_epoch_score_shuffle_transfer_columns'])
+    @classmethod
+    def merge_epoch_score_shuffle_onto_fat_df(cls, fat_df: pd.DataFrame, shuffle_df: Optional[pd.DataFrame], debug_print: bool=True) -> pd.DataFrame:
+        """Left-merge wide epoch-score shuffle z/p/n_extreme columns onto FAT PBE rows by session, replay, time_bin_size, and epoch start.
+
+        Does not overwrite columns already on FAT. Laps / unmatched rows stay NaN. `per_time_bin` PBE rows match via `parent_epoch_start_t`.
+        """
+        if (fat_df is None) or (len(fat_df) == 0) or (shuffle_df is None) or (len(shuffle_df) == 0):
+            return fat_df
+
+        fat_df = deepcopy(fat_df)
+        n_rows_before: int = len(fat_df)
+        shuffle_df, transfer_col_names = cls.prepare_epoch_score_shuffle_transfer_columns(shuffle_df)
+        transfer_col_names = [c for c in transfer_col_names if c not in fat_df.columns]
+        if len(transfer_col_names) == 0:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: no new shuffle transfer columns to add; skipping.')
+            return fat_df
+
+        left_df: pd.DataFrame = deepcopy(fat_df)
+        right_df: pd.DataFrame = deepcopy(shuffle_df)
+        for a_df in (left_df, right_df):
+            if 'session_name' in a_df.columns:
+                a_df['session_name'] = a_df['session_name'].astype(str).str.replace('_', '-')
+            if 'custom_replay_name' in a_df.columns:
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].astype(str)
+                a_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=a_df['custom_replay_name'].to_list(), return_only_unique=False)
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].str.replace('_', '-')
+            if 'time_bin_size' in a_df.columns:
+                a_df['time_bin_size'] = pd.to_numeric(a_df['time_bin_size'], errors='coerce')
+        ## END for a_df in (left_df, right_df)....
+
+        left_join_col: Optional[str] = None
+        for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start'):
+            if a_candidate_col in left_df.columns:
+                left_join_col = a_candidate_col
+                break
+        ## END for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start')....
+
+        if left_join_col is None:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: FAT_df missing epoch-start join column; skipping.')
+            return fat_df
+        if 'start' not in right_df.columns:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: shuffle_df missing "start"; skipping.')
+            return fat_df
+
+        left_df['_shuffle_join_start'] = pd.to_numeric(left_df[left_join_col], errors='coerce')
+        right_df['_shuffle_join_start'] = pd.to_numeric(right_df['start'], errors='coerce')
+        join_keys: List[str] = ['_shuffle_join_start']
+        for a_key in ('session_name', 'custom_replay_name', 'time_bin_size'):
+            if (a_key in left_df.columns) and (a_key in right_df.columns):
+                join_keys.append(a_key)
+        ## END for a_key in ('session_name', 'custom_replay_name', 'time_bin_size')....
+
+        if 'known_named_decoding_epochs_type' in left_df.columns:
+            is_pbe_row = left_df['known_named_decoding_epochs_type'].isin(['pbe', 'ripple'])
+        else:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: FAT_df missing known_named_decoding_epochs_type; merging all rows.')
+            is_pbe_row = pd.Series(True, index=left_df.index)
+
+        n_pbe_rows: int = int(is_pbe_row.sum())
+        if n_pbe_rows == 0:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: no PBE/ripple rows on FAT_df; skipping.')
+            return fat_df
+
+        right_subset: pd.DataFrame = right_df[join_keys + transfer_col_names].drop_duplicates(subset=join_keys, keep='first')
+        left_pbe: pd.DataFrame = left_df.loc[is_pbe_row, join_keys].copy()
+        left_pbe = left_pbe.reset_index(names='_orig_index')
+        merged_pbe: pd.DataFrame = left_pbe.merge(right_subset, how='left', on=join_keys)
+        if len(merged_pbe) != len(left_pbe):
+            raise ValueError(f'merge_epoch_score_shuffle_onto_fat_df: left-merge changed PBE row count ({len(left_pbe)} -> {len(merged_pbe)}); refusing to apply')
+
+        for a_col in transfer_col_names:
+            fat_df[a_col] = np.nan
+            fat_df.loc[merged_pbe['_orig_index'].to_numpy(), a_col] = merged_pbe[a_col].to_numpy()
+        ## END for a_col in transfer_col_names....
+
+        if len(fat_df) != n_rows_before:
+            raise ValueError(f'merge_epoch_score_shuffle_onto_fat_df: FAT row count changed ({n_rows_before} -> {len(fat_df)}); refusing to apply')
+        n_matched: int = int(fat_df.loc[left_df.index[is_pbe_row], transfer_col_names[0]].notna().sum())
+        if debug_print:
+            print(f'merge_epoch_score_shuffle_onto_fat_df: matched {n_matched}/{n_pbe_rows} PBE/ripple rows using left start col "{left_join_col}" and join keys {join_keys}; added {len(transfer_col_names)} columns.')
+        return fat_df
+
+
     @function_attributes(short_name=None, tags=['merge', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-18 11:33', related_items=[])
     @classmethod
     def _subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame,
