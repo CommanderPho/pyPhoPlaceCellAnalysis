@@ -76,6 +76,215 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
 
 # ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-29 - Loading Exported score Shuffles                                                                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
+from collections import defaultdict
+from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+
+@pd.api.extensions.register_dataframe_accessor("pho_shuffles")
+class LoadedScoreShufflesDataframeAccessor:
+    """ Adds shuffle z-score and p-value columns (`z_{score}`, `p_{score}`) columns on per-epoch DFs such as `ripple_EpochScoreShuffle_df`.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
+
+        shuffle_p_alpha: float = 0.05
+        shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
+        high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+
+        if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
+            raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
+
+        if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+            additional_filter_predicates = {}
+        _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
+                    shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+        shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
+
+        discovered_shuffle_metrics_df
+        ripple_EpochScoreShuffle_df
+
+        additional_filter_predicates.update(shuffle_significance_predicates)
+
+        # ## Register on an existing `df_filter` (does not enable them; check the boxes to apply)
+        # if ('df_filter' in locals()) and (df_filter is not None):
+        #     df_filter.additional_filter_predicates.update(shuffle_significance_predicates)
+        #     df_filter._rebuild_predicate_widget()  # leave new boxes unchecked
+        #     df_filter.update_filters()
+        #     df_filter.display()  # required: rebuild replaces the checkbox widget held by the old HBox
+        #     print('Registered on df_filter. Enable e.g. sig_wcorr_z, sig_mseq_len_ignoring_intrusions_p, or sig_any_shuffle_p in the predicate list.')
+
+
+    """
+    # decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
+    # default_score_col_names: Tuple[str, ...] = DEFAULT_MLD_SCORE_COL_NAMES
+    # p_decoder_col_names: Tuple[str, str, str, str] = ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL')
+    # long_decoder_names: Tuple[str, str] = ('long_LR', 'long_RL')
+    # short_decoder_names: Tuple[str, str] = ('short_LR', 'short_RL')
+
+
+    def __init__(self, pandas_obj: pd.DataFrame):
+        self._validate(pandas_obj)
+        self._df = pandas_obj
+
+
+    @staticmethod
+    def _validate(obj):
+        if not isinstance(obj, pd.DataFrame):
+            raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
+
+
+
+    @classmethod
+    def process_loaded_shuffles(cls, ripple_EpochScoreShuffle_df: pd.DataFrame, additional_filter_predicates=None,
+        shuffle_p_alpha: float = 0.05, shuffle_z_threshold: float = 1.96, high_shuffle_quantile_threshold: float = 0.9,
+        **kwargs):
+        """ Load the Shuffles
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
+
+            shuffle_p_alpha: float = 0.05
+            shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
+            high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+
+            if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
+                raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
+
+            if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+                additional_filter_predicates = {}
+            _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
+                        shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+            shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
+
+            discovered_shuffle_metrics_df
+            ripple_EpochScoreShuffle_df
+
+            additional_filter_predicates.update(shuffle_significance_predicates)
+
+            # ## Register on an existing `df_filter` (does not enable them; check the boxes to apply)
+            # if ('df_filter' in locals()) and (df_filter is not None):
+            #     df_filter.additional_filter_predicates.update(shuffle_significance_predicates)
+            #     df_filter._rebuild_predicate_widget()  # leave new boxes unchecked
+            #     df_filter.update_filters()
+            #     df_filter.display()  # required: rebuild replaces the checkbox widget held by the old HBox
+            #     print('Registered on df_filter. Enable e.g. sig_wcorr_z, sig_mseq_len_ignoring_intrusions_p, or sig_any_shuffle_p in the predicate list.')
+
+        """
+        ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names = AcrossSessionHelpers.prepare_epoch_score_shuffle_transfer_columns(ripple_EpochScoreShuffle_df)
+        decoder_names: list[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
+
+
+        def _subfn_parse_shuffle_col(col: str):
+            """Return (metric, kind, decoder_or_best) for new-format shuffle columns, else None."""
+            if col in ('wcorr_z_long', 'wcorr_z_short'):
+                return ('wcorr', 'z', col.replace('wcorr_z_', ''))
+            if col == 'best_overall_wcorr_z':
+                return ('wcorr', 'z', 'best')
+            if col.startswith('best_overall_') and col.endswith('_z'):
+                return (col[len('best_overall_'):-len('_z')], 'z', 'best')
+            for kind in ('n_extreme', 'z', 'p'):  # n_extreme before z so it is not split as *_z_*
+                token: str = f'_{kind}_'
+                if token in col:
+                    metric_name, decoder_name = col.split(token, 1)
+                    if decoder_name in decoder_names:
+                        return (metric_name, kind, decoder_name)
+                ## END if token in col...
+            ## END for kind in ('n_extreme', 'z', 'p')...
+            return None
+
+
+        def _subfn_present_cols(df: pd.DataFrame, cols) -> list[str]:
+            return [c for c in cols if c in df.columns]
+
+
+        def _subfn_any_significant(df: pd.DataFrame, cols, mode: str, thresh: float) -> pd.Series:
+            """1D bool Series; missing columns or NaNs are not significant (False)."""
+            present_cols: list[str] = _subfn_present_cols(df, cols)
+            if len(present_cols) == 0:
+                return pd.Series(False, index=df.index)
+            values = np.asarray(df[present_cols].to_numpy(), dtype=float)
+            if mode == 'lt':
+                is_sig = values < float(thresh)
+            elif mode == 'eq':
+                is_sig = values == float(thresh)
+            elif mode == 'abs_ge':
+                is_sig = np.abs(values) >= float(thresh)
+            else:
+                raise ValueError(f'unknown significance mode: {mode}')
+            is_sig = np.where(np.isnan(values), False, is_sig)
+            return pd.Series(np.any(is_sig, axis=1), index=df.index).fillna(False).astype(bool)
+
+
+        metric_kind_cols: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+        for a_col in epoch_score_shuffle_transfer_col_names:
+            parsed = _subfn_parse_shuffle_col(a_col)
+            if parsed is None:
+                continue
+            metric_name, kind, _decoder_name = parsed
+            metric_kind_cols[metric_name][kind].append(a_col)
+        ## END for a_col in epoch_score_shuffle_transfer_col_names...
+
+        shuffle_significance_predicates: dict = {}
+        discovered_rows: list[dict] = []
+        all_p_cols: list[str] = []
+        all_z_cols: list[str] = []
+
+        for metric_name, kind_cols in metric_kind_cols.items():
+            p_cols: list[str] = list(kind_cols.get('p', []))
+            z_cols: list[str] = list(kind_cols.get('z', []))
+            n_extreme_cols: list[str] = list(kind_cols.get('n_extreme', []))
+            extreme_mode: str = SCORE_EXTREME_MODE.get(metric_name, 'greater')
+            discovered_rows.append({'metric': metric_name, 'extreme_mode': extreme_mode, 'n_p': len(p_cols), 'n_z': len(z_cols), 'n_n_extreme': len(n_extreme_cols), 'p_cols': p_cols, 'z_cols': z_cols})
+            if len(p_cols) > 0:
+                all_p_cols.extend(p_cols)
+                shuffle_significance_predicates[f'sig_{metric_name}_p'] = (lambda df, _cols=tuple(p_cols), _alpha=shuffle_p_alpha: _subfn_any_significant(df, _cols, mode='lt', thresh=_alpha))
+            if len(z_cols) > 0:
+                all_z_cols.extend(z_cols)
+                shuffle_significance_predicates[f'sig_{metric_name}_z'] = (lambda df, _cols=tuple(z_cols), _z=shuffle_z_threshold: _subfn_any_significant(df, _cols, mode='abs_ge', thresh=_z))
+            if len(n_extreme_cols) > 0:
+                shuffle_significance_predicates[f'sig_{metric_name}_zero_more_extreme'] = (lambda df, _cols=tuple(n_extreme_cols): _subfn_any_significant(df, _cols, mode='eq', thresh=0.0))
+        ## END for metric_name, kind_cols in metric_kind_cols.items()...
+
+        if len(all_p_cols) > 0:
+            shuffle_significance_predicates['sig_any_shuffle_p'] = (lambda df, _cols=tuple(all_p_cols), _alpha=shuffle_p_alpha: _subfn_any_significant(df, _cols, mode='lt', thresh=_alpha))
+        if len(all_z_cols) > 0:
+            shuffle_significance_predicates['sig_any_shuffle_z'] = (lambda df, _cols=tuple(all_z_cols), _z=shuffle_z_threshold: _subfn_any_significant(df, _cols, mode='abs_ge', thresh=_z))
+
+        ## Legacy rank-order quantile (merged_complete_epoch_stats), if present on the plot df
+        shuffle_significance_predicates['high_shuffle_percentile_score'] = (lambda df, _thresh=high_shuffle_quantile_threshold: _subfn_any_significant(df, ['best_overall_quantile'], mode='abs_ge', thresh=_thresh))
+
+        # if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+        #     additional_filter_predicates = {}
+        additional_filter_predicates.update(shuffle_significance_predicates)
+
+        discovered_shuffle_metrics_df: pd.DataFrame = pd.DataFrame(discovered_rows)
+        print(f'shuffle_p_alpha={shuffle_p_alpha}, shuffle_z_threshold={shuffle_z_threshold}')
+        print(f'added {len(shuffle_significance_predicates)} shuffle-significance predicates: {list(shuffle_significance_predicates.keys())}')
+        # display(discovered_shuffle_metrics_df[['metric', 'extreme_mode', 'n_p', 'n_z', 'n_n_extreme']])
+
+        ## Preview pass counts on the best available already-merged df (NaNs count as not significant)
+        _preview_df = None
+        for a_candidate in ('all_sessions_all_scores_ripple_df', 'all_sessions_MultiMeasure_ripple_df', 'all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df', 'all_sessions_laps_time_bin_df', 'FAT_df'):
+            if (a_candidate in locals()) and (locals()[a_candidate] is not None):
+                _preview_df = locals()[a_candidate]
+                _preview_name: str = a_candidate
+                break
+            ## END if (a_candidate in locals())...
+        ## END for a_candidate in (...)...
+        if _preview_df is not None:
+            _preview_counts = {k: int(np.nansum(np.asarray(fn(_preview_df), dtype=bool))) for k, fn in shuffle_significance_predicates.items()}
+            print(f'preview pass counts on {_preview_name} (n={len(_preview_df)}):')
+            display(pd.Series(_preview_counts, name='n_passing').sort_values(ascending=False).to_frame())
+
+
+        return (shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df)
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
 # 2026-10-20 - OpenAI Figure 4 Stats                                                                                                                                                                                                                                                   #
 # ==================================================================================================================================================================================================================================================================================== #
 
