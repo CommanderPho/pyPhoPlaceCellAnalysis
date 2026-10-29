@@ -2108,6 +2108,25 @@ class PrePostDeltaDistributionComparison:
         full_width = 0.3
         half_width = full_width / 2.0
         dpi = kwargs.pop('dpi', 220)
+        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
+        _fig3_label_rc = {
+            'xtick.labelsize': _fig3_sizes['tick_label'],
+            'ytick.labelsize': _fig3_sizes['tick_label'],
+            'axes.labelsize': _fig3_sizes['axis_label'],
+        }
+
+        def _apply_fig3_axis_label_sizes(ax, render=None):
+            tick_fs = _fig3_sizes['tick_label']
+            axis_fs = _fig3_sizes['axis_label']
+            ax.tick_params(axis='both', labelsize=tick_fs)
+            ax.xaxis.label.set_size(axis_fs)
+            ax.yaxis.label.set_size(axis_fs)
+            text_objects = {}
+            if render is not None:
+                text_objects = (getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}
+            sec = text_objects.get('publication_xgroup_axis')
+            if sec is not None:
+                sec.tick_params(axis='x', labelsize=tick_fs)
 
         def _save_panel_figure(fig, panel_fig_file_name: str) -> Tuple[List[Path], Optional[Path]]:
             panel_saved_paths: List[Path] = []
@@ -2146,6 +2165,10 @@ class PrePostDeltaDistributionComparison:
             if panel_fignum is not None:
                 panel_kwargs['fignum'] = panel_fignum
             panel_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+            if 'figsize' not in panel_kwargs:
+                rc_w, rc_h = mpl.rcParams['figure.figsize']
+                panel_kwargs['figsize'] = (float(rc_w) * 0.5, float(rc_h))
+            panel_kwargs.setdefault('bottom_margin', 0.26)
             y_pre = summary_df[pre_col].to_numpy(dtype=float)
             y_post = summary_df[post_col].to_numpy(dtype=float)
             panel_x_labels = [f'{group_label} pre-$\\Delta$', f'{group_label} post-$\\Delta$']
@@ -2199,6 +2222,7 @@ class PrePostDeltaDistributionComparison:
             collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
             fig = render.fig
             ax = render.ax
+            _apply_fig3_axis_label_sizes(ax, render)
             x_values_list, plotted_y_values = render.plot_data
             if enable_paired_lines:
                 for i0, i1, line_color, line_alpha in pair_specs:
@@ -2224,11 +2248,11 @@ class PrePostDeltaDistributionComparison:
                            label=_animal_legend_label(animal))
                     for animal in legend_animals
                 ]
-                animal_legend = ax.legend(
-                    handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
+                animal_legend = fig.legend(
+                    handles=animal_legend_handles, frameon=False, loc='lower center',
+                    bbox_to_anchor=(0.55, 0.03), bbox_transform=fig.transFigure,
                     ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
                 )
-                animal_legend.set_clip_on(False)
             if panel_has_heuristic:
                 ax.legend(
                     handles=[
@@ -2237,8 +2261,6 @@ class PrePostDeltaDistributionComparison:
                     ],
                     frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
                 )
-                if animal_legend is not None:
-                    ax.add_artist(animal_legend)
             panel_saved_paths, panel_saved_path = _save_panel_figure(fig, panel_fig_file_name)
             return dict(fig=fig, ax=ax, render=render, y_values=panel_y, saved_path=panel_saved_path, saved_paths=panel_saved_paths)
 
@@ -2250,7 +2272,7 @@ class PrePostDeltaDistributionComparison:
             publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
                 prepare_for_publication=prepare_for_publication,
                 **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
-            )
+            ) | _fig3_label_rc
             laps_suffix: str = str(group_labels[0]).replace(' ', '')
             pbe_suffix: str = str(group_labels[1]).replace(' ', '')
             laps_fignum = None if fignum is None else f'{fignum}-{laps_suffix}'
@@ -2334,7 +2356,7 @@ class PrePostDeltaDistributionComparison:
         publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
             prepare_for_publication=prepare_for_publication,
             **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
-        )
+        ) | _fig3_label_rc
         with mpl.rc_context(publication_rc):
             with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
                 render = PaperFigureTwo.create_plot(
@@ -2347,6 +2369,7 @@ class PrePostDeltaDistributionComparison:
                 collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
                 fig = render.fig
                 ax = render.ax
+                _apply_fig3_axis_label_sizes(ax, render)
                 x_values_list, plotted_y_values = render.plot_data
 
                 if enable_paired_lines:
@@ -5923,6 +5946,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         xtick_labels = kwargs.pop('xtick_labels', None)
         scatter_x_offsets = kwargs.pop('scatter_x_offsets', None)
         scatter_extra_kwargs = dict(kwargs.pop('scatter_kwargs', None) or {})
+        figsize = kwargs.pop('figsize', None)
         fignum = kwargs.pop('fignum', None)
         if fignum is None:
             fignum = kwargs.pop('num', None)
@@ -5951,10 +5975,14 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                 raise ValueError(f'scatter_x_offsets length {len(scatter_x_offsets)} != n_bars {n_bars}.')
 
         subplots_kwargs = {}
+        if figsize is not None:
+            subplots_kwargs['figsize'] = figsize
         if fignum is not None:
             subplots_kwargs['num'] = fignum
             subplots_kwargs['clear'] = clear_figure
         fig, ax = plt.subplots(**subplots_kwargs)
+        if figsize is not None:
+            fig.set_size_inches(float(figsize[0]), float(figsize[1]), forward=True)
         text_formatter.setup_margins(fig)
 
         bar_tick_label = x_labels if (len(x_labels) == n_bars) else None
