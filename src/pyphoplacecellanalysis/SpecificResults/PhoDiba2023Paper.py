@@ -2114,6 +2114,14 @@ class PrePostDeltaDistributionComparison:
             'ytick.labelsize': _fig3_sizes['tick_label'],
             'axes.labelsize': _fig3_sizes['axis_label'],
         }
+        _decoded_prefix: str = 'Decoded '
+        if str(title).startswith(_decoded_prefix):
+            title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
+        _summary_title_kwargs = dict(
+            title_font_size=_fig3_sizes['track_title'],
+            subtitle_font_size=_fig3_sizes['title_body'],
+            bold_epochs_name=False,
+        )
 
         def _apply_fig3_axis_label_sizes(ax, render=None):
             tick_fs = _fig3_sizes['tick_label']
@@ -2217,7 +2225,7 @@ class PrePostDeltaDistributionComparison:
                 prepare_for_publication=prepare_for_publication,
                 publication_group_labels=(group_label,), metric_name='Session Means',
                 title_subtitle=f'for {group_label}', xlabel='',
-                **panel_kwargs,
+                **{**_summary_title_kwargs, **panel_kwargs},
             )
             collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
             fig = render.fig
@@ -2364,7 +2372,7 @@ class PrePostDeltaDistributionComparison:
                     prepare_for_publication=prepare_for_publication,
                     publication_group_labels=group_labels, metric_name='Session Means',
                     title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
-                    **create_plot_kwargs,
+                    **{**_summary_title_kwargs, **create_plot_kwargs},
                 )
                 collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
                 fig = render.fig
@@ -5867,21 +5875,20 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None) -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True) -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
-        if not prepare_for_publication:
-            title_font_size: int = 22
-            subtitle_font_size: int = 14
-        else:
-            title_font_size: int = 9*2
-            subtitle_font_size: int = 7*2
+        if title_font_size is None:
+            title_font_size = 22 if (not prepare_for_publication) else (9 * 2)
+        if subtitle_font_size is None:
+            subtitle_font_size = 14 if (not prepare_for_publication) else (7 * 2)
 
         if subtitle is None:
             subtitle = ('for the '
                         "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track")
 
-        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> {metric_name}\n"
+        epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
+        return (f"<size:{title_font_size}>{epochs_bit} {metric_name}\n"
                 f"<size:{subtitle_font_size}>{subtitle}</></>"
                 )
 
@@ -5937,6 +5944,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         publication_group_labels = kwargs.pop('publication_group_labels', ('LdCs', 'SdCs'))
         title_subtitle = kwargs.pop('title_subtitle', None)
         metric_name_override = kwargs.pop('metric_name', None)
+        title_font_size = kwargs.pop('title_font_size', None)
+        subtitle_font_size = kwargs.pop('subtitle_font_size', None)
+        bold_epochs_name: bool = bool(kwargs.pop('bold_epochs_name', True))
         xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
         bar_x = kwargs.pop('bar_x', None)
         bar_width = kwargs.pop('bar_width', None)
@@ -6059,7 +6069,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
         active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
         title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle, title_font_size=title_font_size, subtitle_font_size=subtitle_font_size, bold_epochs_name=bold_epochs_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
