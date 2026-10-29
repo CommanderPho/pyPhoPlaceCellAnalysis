@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,8 +24,8 @@ finally:
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, WCorrShuffle
-    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, ExportedEpochScoreShufflesPickleFilenameParser, WCorrShuffle
+    from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
 
 
 def _epochs_df(n_epochs: int) -> pd.DataFrame:
@@ -506,6 +507,151 @@ class TestPickleCompat(unittest.TestCase):
         np.testing.assert_allclose(obj_7.real_score_arrays['coverage'], real_wcorr + 0.1)
         self.assertCountEqual(list(obj_7.output_extracted_score_arrays_list[0].keys()), ['wcorr', 'coverage'])
         np.testing.assert_allclose(obj_7.output_extracted_score_arrays_list[0]['coverage'], loaded_wcorr + 0.1)
+
+
+class TestShufflePickleFilenameSuffix(unittest.TestCase):
+    """Standalone shuffle pickle names must include custom_suffix + tbin; discovery is strict."""
+
+    MATCHING_SUFFIX: str = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms'
+    MATCHING_STEM: str = 'standalone_epoch_score_shuffle_data_only'
+
+
+    def test_parser_new_suffixed_name(self):
+        parser = ExportedEpochScoreShufflesPickleFilenameParser()
+        filename = '2026-10-29_1130AM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_standalone_epoch_score_shuffle_data_only_700.pkl'
+        parsed = parser.try_parse(filename)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['export_datetime'], datetime(2026, 10, 29, 11, 30))
+        self.assertEqual(parsed['data_name'], self.MATCHING_STEM)
+        self.assertEqual(parsed['custom_suffix'], self.MATCHING_SUFFIX)
+        self.assertAlmostEqual(parsed['decoding_time_bin_size'], 0.025)
+        self.assertEqual(parsed['num_shuffles'], 700)
+
+
+    def test_parser_legacy_unsuffixed_names(self):
+        parser = ExportedEpochScoreShufflesPickleFilenameParser()
+        parsed = parser.try_parse('2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl')
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['export_datetime'], datetime(2024, 6, 4, 4, 5))
+        self.assertEqual(parsed['data_name'], 'standalone_wcorr_ripple_shuffle_data_only')
+        self.assertIsNone(parsed['custom_suffix'])
+        self.assertIsNone(parsed['decoding_time_bin_size'])
+        self.assertEqual(parsed['num_shuffles'], 1206)
+
+        parsed_date_only = parser.try_parse('2024-05-30_standalone_wcorr_ripple_shuffle_data_only_1000.pkl')
+        self.assertIsNotNone(parsed_date_only)
+        self.assertEqual(parsed_date_only['export_datetime'], datetime(2024, 5, 30))
+        self.assertIsNone(parsed_date_only['custom_suffix'])
+
+
+    def test_parser_old_suffixed_name_without_tbin(self):
+        parser = ExportedEpochScoreShufflesPickleFilenameParser()
+        parsed = parser.try_parse('2024-06-28_0837PM_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0_standalone_wcorr_ripple_shuffle_data_only_29.pkl')
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed['data_name'], 'standalone_wcorr_ripple_shuffle_data_only')
+        self.assertEqual(parsed['custom_suffix'], '_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0')
+        self.assertIsNone(parsed['decoding_time_bin_size'])
+        self.assertEqual(parsed['num_shuffles'], 29)
+
+
+    def test_build_standalone_pickle_filename_round_trips_through_parser(self):
+        filename = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix=self.MATCHING_SUFFIX, n_completed_shuffles=700, data_name=self.MATCHING_STEM, date_str='2026-10-29_1130AM')
+        self.assertEqual(filename, '2026-10-29_1130AM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_standalone_epoch_score_shuffle_data_only_700.pkl')
+        parsed = ExportedEpochScoreShufflesPickleFilenameParser().try_parse(filename)
+        self.assertEqual(parsed['custom_suffix'], self.MATCHING_SUFFIX)
+        self.assertEqual(parsed['data_name'], self.MATCHING_STEM)
+        self.assertAlmostEqual(parsed['decoding_time_bin_size'], 0.025)
+        self.assertEqual(parsed['num_shuffles'], 700)
+
+
+    def test_get_ripple_decoding_time_bin_size_and_build_full_custom_suffix(self):
+        obj = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=1)
+        obj.all_templates_decode_kwargs = {'desired_ripple_decoding_time_bin_size': 0.025}
+        self.assertAlmostEqual(obj.get_ripple_decoding_time_bin_size(), 0.025)
+
+        obj.all_templates_decode_kwargs = {}
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = {'long_LR': {'decoding_time_bin_size': 0.075}}
+        self.assertAlmostEqual(obj.get_ripple_decoding_time_bin_size(), 0.075)
+
+        obj.all_templates_decode_kwargs = {'desired_ripple_decoding_time_bin_size': 0.025}
+        full = obj.build_full_custom_suffix(custom_suffix='_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0')
+        self.assertEqual(full, self.MATCHING_SUFFIX)
+        self.assertEqual(obj.build_full_custom_suffix(custom_suffix=full), full)
+
+        obj.all_templates_decode_kwargs = {}
+        obj.real_decoder_ripple_filter_epochs_decoder_result_dict = None
+        with self.assertRaises(ValueError):
+            obj.build_full_custom_suffix(custom_suffix='_withNormalComputedReplays-qclu_[1]-frateThresh_5.0')
+
+
+    def test_discover_strict_suffix_match_skips_tbin_qclu_and_unsuffixed(self):
+        real_wcorr = np.array([[0.2, -0.1, 0.4, 0.05], [0.3, 0.15, -0.25, 0.5]], dtype=float)
+        loaded_wcorr = real_wcorr + 0.08
+        payload = ([_wcorr_df_dict(loaded_wcorr)], real_wcorr, [], np.stack([loaded_wcorr], axis=0), None, [{'wcorr': loaded_wcorr}], {'wcorr': real_wcorr})
+        dummy_payload = ([_wcorr_df_dict(loaded_wcorr + 9.0)], real_wcorr + 9.0, [])
+        obj = DecodedEpochScoreShuffle(
+            filtered_epochs_df=_epochs_df(2),
+            real_decoder_ripple_weighted_corr_arr=real_wcorr,
+            real_score_arrays={'wcorr': real_wcorr},
+            output_extracted_result_wcorrs_list=[],
+            output_extracted_score_arrays_list=[],
+        )
+        matching_name = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix=self.MATCHING_SUFFIX, n_completed_shuffles=1, data_name=self.MATCHING_STEM, date_str='2026-10-29_1130AM')
+        tbin75_name = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix='_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_75ms', n_completed_shuffles=1, data_name=self.MATCHING_STEM, date_str='2026-10-29_1130AM')
+        qclu_name = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix='_withNormalComputedReplays-qclu_[1, 2]-frateThresh_5.0-tbin_25ms', n_completed_shuffles=1, data_name=self.MATCHING_STEM, date_str='2026-10-29_1130AM')
+        unsuffixed_name = '2026-10-27_standalone_epoch_score_shuffle_data_only_700.pkl'
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            saveData(tmp_path.joinpath(matching_name), payload)
+            saveData(tmp_path.joinpath(tbin75_name), dummy_payload)
+            saveData(tmp_path.joinpath(qclu_name), dummy_payload)
+            saveData(tmp_path.joinpath(unsuffixed_name), dummy_payload)
+            parsed = obj.discover_load_and_append_shuffle_data_from_directory(save_directory=tmp_path, with_custom_suffix=self.MATCHING_SUFFIX, with_data_name=self.MATCHING_STEM)
+
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(obj.n_completed_shuffles, 1)
+        np.testing.assert_allclose(obj.output_extracted_score_arrays_list[0]['wcorr'], loaded_wcorr)
+
+
+    def test_save_data_writes_8_tuple_and_load_accepts_matching_metadata(self):
+        src = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=2)
+        src.all_templates_decode_kwargs = {'desired_ripple_decoding_time_bin_size': 0.025}
+        dst = DecodedEpochScoreShuffle(
+            filtered_epochs_df=_epochs_df(2),
+            real_decoder_ripple_weighted_corr_arr=src.real_decoder_ripple_weighted_corr_arr,
+            real_score_arrays={},
+            output_extracted_result_wcorrs_list=[],
+            output_extracted_score_arrays_list=[],
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pkl_path = Path(tmp_dir).joinpath('shuffle_8tuple.pkl')
+            src.save_data(pkl_path, metadata={'custom_suffix': self.MATCHING_SUFFIX, 'ripple_decoding_time_bin_size': 0.025, 'data_name': self.MATCHING_STEM, 'n_shuffles': 2, 'session': None})
+            loaded = loadData(pkl_path)
+            self.assertEqual(len(loaded), 8)
+            self.assertIsInstance(loaded[7], dict)
+            self.assertEqual(loaded[7]['custom_suffix'], self.MATCHING_SUFFIX)
+            dst.load_and_append_shuffle_data(filepath=pkl_path, expected_custom_suffix=self.MATCHING_SUFFIX)
+
+        self.assertEqual(dst.n_completed_shuffles, 2)
+
+
+    def test_load_and_append_metadata_mismatch_raises(self):
+        real_wcorr = np.array([[0.12, -0.34, 0.56, -0.78], [0.9, 0.1, -0.2, 0.3]], dtype=float)
+        loaded_wcorr = real_wcorr + 0.07
+        metadata = {'custom_suffix': '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_75ms', 'ripple_decoding_time_bin_size': 0.075, 'data_name': self.MATCHING_STEM, 'n_shuffles': 1, 'session': None}
+        payload = ([_wcorr_df_dict(loaded_wcorr)], real_wcorr, [], np.stack([loaded_wcorr], axis=0), None, [{'wcorr': loaded_wcorr}], {'wcorr': real_wcorr}, metadata)
+        obj = DecodedEpochScoreShuffle(
+            filtered_epochs_df=_epochs_df(2),
+            real_decoder_ripple_weighted_corr_arr=real_wcorr,
+            real_score_arrays={'wcorr': real_wcorr},
+            output_extracted_result_wcorrs_list=[],
+            output_extracted_score_arrays_list=[],
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            pkl_path = Path(tmp_dir).joinpath('shuffle_8tuple_mismatch.pkl')
+            saveData(pkl_path, payload)
+            with self.assertRaises(AssertionError):
+                obj.load_and_append_shuffle_data(filepath=pkl_path, expected_custom_suffix=self.MATCHING_SUFFIX)
 
 
 class TestHeuristicShuffleScoreArrays(unittest.TestCase):

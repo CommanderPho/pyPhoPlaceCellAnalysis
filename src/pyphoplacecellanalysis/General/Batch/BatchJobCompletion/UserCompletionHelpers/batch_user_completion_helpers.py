@@ -1488,7 +1488,7 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
 
     `should_skip_previous_saved_shuffles`: skip loading compatible shuffle pkls from the session output directory.
     `should_purge_existing_shuffled_result`: discard in-memory `SequenceBased.ripple_score_shuffle` and start from `init_from_templates` (also skips disk load).
-    `with_data_name`: full pickle `data_name` used for both load filtering and save (default `standalone_epoch_score_shuffle_data_only`). Must match `ExportedEpochScoreShufflesPickleFilenameParser` (`[A-Za-z0-9_,.\[\] \-]+`).
+    `with_data_name`: pickle stem used for both load filtering and save (default `standalone_epoch_score_shuffle_data_only`). Does not include custom_suffix/tbin; those are always appended from the pipeline.
     `enable_saving_entire_decoded_shuffle_result`: when True, each newly computed shuffle keeps its `DecodedFilterEpochsResult` dicts in `output_all_shuffles_decoded_results_list` and they are pickled by `save_data` (much larger). Only shuffles computed after the flag is on are stored; use `should_purge_existing_shuffled_result=True` for a full set.
     
     from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_epoch_score_shuffles_completion_function
@@ -1561,11 +1561,14 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
 
     epoch_score_shuffles.enable_saving_entire_decoded_shuffle_result = bool(enable_saving_entire_decoded_shuffle_result)
 
+    full_custom_suffix: str = epoch_score_shuffles.build_full_custom_suffix(curr_active_pipeline=curr_active_pipeline)
+    print(f'full_custom_suffix: "{full_custom_suffix}"')
+
     epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring) # do one more shuffle
     
     if (not should_skip_previous_saved_shuffles) and (not should_purge_existing_shuffled_result):
         # try load previous compatible shuffles: _____________________________________________________________________________ #
-        epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=load_shuffles_newer_than, with_data_name=with_data_name)
+        epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=load_shuffles_newer_than, with_data_name=with_data_name, with_custom_suffix=full_custom_suffix, curr_active_pipeline=curr_active_pipeline)
 
     n_completed_shuffles: int = epoch_score_shuffles.n_completed_shuffles
 
@@ -1628,12 +1631,12 @@ def compute_and_export_session_epoch_score_shuffles_completion_function(self, gl
 
     ## Pickle Saving:
     shuffle_pkl_data_name: str = with_data_name if (with_data_name is not None) else 'standalone_epoch_score_shuffle_data_only'
-    standalone_filename: str = f'{get_now_day_str()}_{shuffle_pkl_data_name}_{a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles}.pkl'
+    standalone_filename: str = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix=full_custom_suffix, n_completed_shuffles=a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles, data_name=shuffle_pkl_data_name, date_str=get_now_rounded_time_str())
     epoch_score_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
     print(f'epoch_score_shuffles_data_standalone_filepath: "{epoch_score_shuffles_data_standalone_filepath}"')
 
     try:
-        epoch_score_shuffles.save_data(epoch_score_shuffles_data_standalone_filepath)
+        epoch_score_shuffles.save_data(epoch_score_shuffles_data_standalone_filepath, metadata={'custom_suffix': full_custom_suffix, 'ripple_decoding_time_bin_size': epoch_score_shuffles.get_ripple_decoding_time_bin_size(curr_active_pipeline=curr_active_pipeline), 'data_name': shuffle_pkl_data_name, 'n_shuffles': epoch_score_shuffles.n_completed_shuffles, 'session': curr_active_pipeline.get_session_context().to_dict()})
         was_write_good = True
         callback_outputs['epoch_score_shuffles_data_output_filepath'] = epoch_score_shuffles_data_standalone_filepath
 
@@ -1876,16 +1879,12 @@ def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_func
             #TODO 2024-11-19 03:33: - [ ] `custom_export_df_to_csv_fn`
             custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv
             
-            #TODO 2024-11-20 06:16: - [ ] I feel like these need the time_bin_size as a suffix
-            # standalone save (2024-11-19 03:40 Identical to `vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/General/Batch/BatchJobCompletion/UserCompletionHelpers/batch_completion_helpers.py:806`
-            out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_wcorr_ripple_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
-            _prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
-            if _prev_standalone_pkl_filename != standalone_pkl_filename:
-                print(f'standalone_pkl_filename:\n\t"{standalone_pkl_filename}"')
-                print(f'_prev_standalone_pkl_filename:\n\t"{_prev_standalone_pkl_filename}"')
-            # standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+            # standalone save (flat `{date}{full_suffix}_{data_name}_{n}.pkl`, including `-tbin_XXms`)
+            full_custom_suffix: str = wcorr_shuffles.build_full_custom_suffix(curr_active_pipeline=a_curr_active_pipeline, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size, custom_suffix=custom_suffix)
+            standalone_pkl_filename: str = WCorrShuffle.build_standalone_pickle_filename(full_custom_suffix=full_custom_suffix, n_completed_shuffles=wcorr_shuffles.n_completed_shuffles, data_name='standalone_wcorr_ripple_shuffle_data_only', date_str=get_now_rounded_time_str())
+            standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve()
             print(f'saving to "{standalone_pkl_filepath}"...')
-            wcorr_shuffles.save_data(standalone_pkl_filepath)
+            wcorr_shuffles.save_data(standalone_pkl_filepath, metadata={'custom_suffix': full_custom_suffix, 'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size, 'data_name': 'standalone_wcorr_ripple_shuffle_data_only', 'n_shuffles': wcorr_shuffles.n_completed_shuffles, 'session': a_curr_active_pipeline.get_session_context().to_dict()})
             ## INPUTS: wcorr_ripple_shuffle
             _prev_standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
             # standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"

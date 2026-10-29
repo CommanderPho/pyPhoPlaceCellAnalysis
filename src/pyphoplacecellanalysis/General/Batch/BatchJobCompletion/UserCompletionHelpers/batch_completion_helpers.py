@@ -850,15 +850,12 @@ class BatchCompletionHelpers:
 		#TODO 2024-11-19 03:33: - [ ] `custom_export_df_to_csv_fn`
 		custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv		
 
-		# standalone save
-		out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_epoch_score_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
-		_prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
-		if _prev_standalone_pkl_filename != standalone_pkl_filename:
-			print(f'standalone_pkl_filename:\n\t"{standalone_pkl_filename}"')
-			print(f'_prev_standalone_pkl_filename:\n\t"{_prev_standalone_pkl_filename}"')
-		# standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
+		# standalone save (flat `{date}{full_suffix}_{data_name}_{n}.pkl`, including `-tbin_XXms`)
+		full_custom_suffix: str = wcorr_shuffles.build_full_custom_suffix(curr_active_pipeline=a_curr_active_pipeline, custom_suffix=custom_suffix)
+		standalone_pkl_filename: str = WCorrShuffle.build_standalone_pickle_filename(full_custom_suffix=full_custom_suffix, n_completed_shuffles=wcorr_shuffles.n_completed_shuffles, data_name='standalone_epoch_score_shuffle_data_only', date_str=get_now_rounded_time_str())
+		standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve()
 		print(f'saving to "{standalone_pkl_filepath}"...')
-		wcorr_shuffles.save_data(standalone_pkl_filepath)
+		wcorr_shuffles.save_data(standalone_pkl_filepath, metadata={'custom_suffix': full_custom_suffix, 'ripple_decoding_time_bin_size': wcorr_shuffles.get_ripple_decoding_time_bin_size(curr_active_pipeline=a_curr_active_pipeline), 'data_name': 'standalone_epoch_score_shuffle_data_only', 'n_shuffles': wcorr_shuffles.n_completed_shuffles, 'session': a_curr_active_pipeline.get_session_context().to_dict()})
 		## INPUTS: wcorr_ripple_shuffle
 		_prev_standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
 		# standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"

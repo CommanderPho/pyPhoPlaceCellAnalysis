@@ -67,16 +67,24 @@ ShuffleIdx = NewType('ShuffleIdx', int)
 import re
 from pyphocorehelpers.Filesystem.path_helpers import BaseMatchParser
 
+DEFAULT_SHUFFLE_PICKLE_DATA_NAME: str = 'standalone_epoch_score_shuffle_data_only'
+LEGACY_SHUFFLE_PICKLE_DATA_NAME: str = 'standalone_wcorr_ripple_shuffle_data_only'
+_STANDALONE_SHUFFLE_DATA_NAME_PATTERN = re.compile(r'(standalone_[A-Za-z0-9_,.\[\] \-]*_data_only)$')
+_TBIN_TOKEN_PATTERN = re.compile(r'[-_]tbin[_-]([A-Za-z0-9_]+)')
+
+
 @define(slots=False)
 class ExportedEpochScoreShufflesPickleFilenameParser(BaseMatchParser):
     """ Parses basenames produced by `DecodedEpochScoreShuffle.save_data(...)`
 
     Accepts both historical `*_wcorr_ripple_shuffle_data_*` names and new `*_epoch_score_shuffle_data_*` names.
+    Post-splits the greedy `data_name` group into `{custom_suffix}_{stem}` when a `standalone_*_data_only` stem is present.
 
     test_filenames = ["2024-06-04_0405AM_standalone_wcorr_ripple_shuffle_data_only_1206.pkl",
         "2024-06-03_1035PM_standalone_wcorr_ripple_shuffle_data_only_1202.pkl",
         "2024-05-30_0755PM_standalone_wcorr_ripple_shuffle_data_only_1200.pkl",
         "2024-06-28_0837PM_withNewComputedReplays-qclu_[1, 2]-frateThresh_5.0_standalone_wcorr_ripple_shuffle_data_only_29.pkl",
+        "2026-10-29_1130AM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_standalone_epoch_score_shuffle_data_only_700.pkl",
         ]
 
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import ExportedWCorrShufflesPickleFilenameParser
@@ -115,8 +123,42 @@ class ExportedEpochScoreShufflesPickleFilenameParser(BaseMatchParser):
         for key in ['year', 'month', 'day', 'hour', 'minute', 'meridian']:
             if key in parsed_output_dict:
                 del parsed_output_dict[key]
+        ## END for key in ['year', 'month', 'day', 'hour', 'minute', 'meridian']...
+
+        data_name_stem, custom_suffix = self._split_data_name_and_custom_suffix(parsed_output_dict.get('data_name'))
+        parsed_output_dict['data_name'] = data_name_stem
+        parsed_output_dict['custom_suffix'] = custom_suffix
+        parsed_output_dict['decoding_time_bin_size'] = self._parse_tbin_from_custom_suffix(custom_suffix)
 
         return parsed_output_dict
+
+
+    @classmethod
+    def _split_data_name_and_custom_suffix(cls, raw_data_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+        """ Split greedy `data_name` into (`standalone_*_data_only` stem, `_custom_suffix` or None). """
+        if raw_data_name is None:
+            return None, None
+        stem_match = _STANDALONE_SHUFFLE_DATA_NAME_PATTERN.search(raw_data_name)
+        if stem_match is None:
+            return raw_data_name, None
+        stem: str = stem_match.group(1)
+        prefix: str = raw_data_name[:stem_match.start()].rstrip('_')
+        if not prefix:
+            return stem, None
+        custom_suffix: str = prefix if prefix.startswith('_') else f'_{prefix}'
+        return stem, custom_suffix
+
+
+    @classmethod
+    def _parse_tbin_from_custom_suffix(cls, custom_suffix: Optional[str]) -> Optional[float]:
+        """ Extract ripple decoding time_bin_size from a `-tbin_25ms` token in `custom_suffix`. """
+        if not custom_suffix:
+            return None
+        tbin_match = _TBIN_TOKEN_PATTERN.search(custom_suffix)
+        if tbin_match is None:
+            return None
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import parse_decoding_time_bin_size_str
+        return parse_decoding_time_bin_size_str(f"tbin_{tbin_match.group(1)}")
 
 
 ExportedWCorrShufflesPickleFilenameParser = ExportedEpochScoreShufflesPickleFilenameParser
@@ -1315,26 +1357,115 @@ class DecodedEpochScoreShuffle(ComputedResult):
         return pd.concat(frames, axis=0, ignore_index=True)
 
 
-    def save_data(self, filepath):
+    @classmethod
+    def normalize_custom_suffix(cls, custom_suffix: Optional[str]) -> Optional[str]:
+        """ Normalize a pipeline/filename custom_suffix to start with `_`, or None if empty. """
+        if custom_suffix is None:
+            return None
+        s: str = str(custom_suffix).strip()
+        if not s:
+            return None
+        if not s.startswith('_'):
+            s = f'_{s}'
+        return s
+
+
+    def get_ripple_decoding_time_bin_size(self, curr_active_pipeline=None) -> Optional[float]:
+        """ Ripple decoding time_bin_size from decode kwargs, stored real decode results, or pipeline params. """
+        kwargs_tbin = (self.all_templates_decode_kwargs or {}).get('desired_ripple_decoding_time_bin_size', None)
+        if kwargs_tbin is not None:
+            return float(kwargs_tbin)
+
+        result_dict = self.real_decoder_ripple_filter_epochs_decoder_result_dict or {}
+        for a_result in result_dict.values():
+            if a_result is None:
+                continue
+            tbin = getattr(a_result, 'decoding_time_bin_size', None)
+            if (tbin is None) and isinstance(a_result, dict):
+                tbin = a_result.get('decoding_time_bin_size', None)
+            if tbin is not None:
+                return float(tbin)
+        ## END for a_result in result_dict.values()...
+
+        pipeline = curr_active_pipeline if (curr_active_pipeline is not None) else self.curr_active_pipeline
+        if pipeline is not None:
+            from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import try_get_decoding_time_bin_sizes_from_parameters
+            all_params_dict = None
+            if hasattr(pipeline, 'get_all_parameters'):
+                try:
+                    all_params_dict = pipeline.get_all_parameters()
+                except Exception:
+                    all_params_dict = None
+            computation_config = getattr(getattr(pipeline, 'global_computation_results', None), 'computation_config', None)
+            _laps_tbin, ripple_tbin = try_get_decoding_time_bin_sizes_from_parameters(all_params_dict=all_params_dict, computation_config=computation_config)
+            if ripple_tbin is not None:
+                return float(ripple_tbin)
+        return None
+
+
+    def build_full_custom_suffix(self, curr_active_pipeline=None, ripple_decoding_time_bin_size: Optional[float]=None, custom_suffix: Optional[str]=None) -> str:
+        """ Pipeline `custom_suffix` plus `-tbin_XXms`. Raises if time_bin_size cannot be determined (never write unsuffixed shuffle pickles). """
+        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import build_decoding_time_bin_size_filename_suffix
+
+        pipeline = curr_active_pipeline if (curr_active_pipeline is not None) else self.curr_active_pipeline
+        if custom_suffix is None:
+            if pipeline is None:
+                raise ValueError('build_full_custom_suffix requires custom_suffix or curr_active_pipeline')
+            _filepaths, _filenames, custom_suffix = pipeline.get_custom_pipeline_filenames_from_parameters()
+        full_custom_suffix: Optional[str] = self.normalize_custom_suffix(custom_suffix)
+        if full_custom_suffix is None:
+            raise ValueError('custom_suffix is empty; refusing to write unsuffixed shuffle pickle')
+
+        if ripple_decoding_time_bin_size is None:
+            ripple_decoding_time_bin_size = self.get_ripple_decoding_time_bin_size(curr_active_pipeline=pipeline)
+        if ripple_decoding_time_bin_size is None:
+            raise ValueError('ripple_decoding_time_bin_size could not be determined; refusing to write unsuffixed shuffle pickle')
+
+        if ('-tbin_' in full_custom_suffix) or ('_tbin_' in full_custom_suffix):
+            return full_custom_suffix
+
+        tbin_suffix: str = build_decoding_time_bin_size_filename_suffix(ripple_decoding_time_bin_size=float(ripple_decoding_time_bin_size))
+        if not tbin_suffix:
+            raise ValueError(f'build_decoding_time_bin_size_filename_suffix returned empty for ripple_decoding_time_bin_size={ripple_decoding_time_bin_size}')
+        return f"{full_custom_suffix}{tbin_suffix}"
+
+
+    @classmethod
+    def build_standalone_pickle_filename(cls, full_custom_suffix: str, n_completed_shuffles: int, data_name: str = DEFAULT_SHUFFLE_PICKLE_DATA_NAME, date_str: Optional[str] = None) -> str:
+        """ `{YYYY-MM-DD_HHMMAM}{full_suffix}_{data_name}_{n_shuffles}.pkl` """
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+
+        if date_str is None:
+            date_str = get_now_rounded_time_str()
+        suffix: Optional[str] = cls.normalize_custom_suffix(full_custom_suffix)
+        if suffix is None:
+            raise ValueError('full_custom_suffix is empty; refusing to write unsuffixed shuffle pickle')
+        return f'{date_str}{suffix}_{data_name}_{int(n_completed_shuffles)}.pkl'
+
+
+    def save_data(self, filepath, metadata: Optional[Dict]=None):
         """ saves the important results to pickle
 
-        Payload (7-tuple; older pickles may omit trailing elements):
+        Payload (8-tuple; older pickles may omit trailing elements):
             (output_extracted_result_wcorrs_list,
              real_decoder_ripple_weighted_corr_arr,
              output_all_shuffles_decoded_results_list,
              all_shuffles_wcorr_array,
              real_decoder_ripple_filter_epochs_decoder_result_dict,
              output_extracted_score_arrays_list,
-             real_score_arrays)
+             real_score_arrays,
+             metadata)
 
         Older layouts:
             3-tuple: (wcorrs_list, real_wcorr_arr, shuffle_decoded_list)
             4-tuple: above + all_shuffles_wcorr_array
             5-tuple: above + real_decoder_ripple_filter_epochs_decoder_result_dict
+            7-tuple: above + score_arrays_list + real_score_arrays
 
         Examples:
             2024-05-31_1015AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
             2024-05-31_0900AM_standalone_wcorr_ripple_shuffle_data_only_2615.pkl
+            2026-10-29_1130AM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_standalone_epoch_score_shuffle_data_only_700.pkl
 
         """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
@@ -1350,7 +1481,21 @@ class DecodedEpochScoreShuffle(ComputedResult):
         except (BaseException, AssertionError):
             all_shuffles_wcorr_array = []
 
-        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array, self.real_decoder_ripple_filter_epochs_decoder_result_dict, self.output_extracted_score_arrays_list, self.real_score_arrays))
+        payload_metadata: Dict[str, Any] = {}
+        if metadata is not None:
+            payload_metadata.update(metadata)
+        if 'ripple_decoding_time_bin_size' not in payload_metadata:
+            payload_metadata['ripple_decoding_time_bin_size'] = self.get_ripple_decoding_time_bin_size()
+        if 'n_shuffles' not in payload_metadata:
+            payload_metadata['n_shuffles'] = self.n_completed_shuffles
+        if 'data_name' not in payload_metadata:
+            payload_metadata['data_name'] = DEFAULT_SHUFFLE_PICKLE_DATA_NAME
+        if 'custom_suffix' not in payload_metadata:
+            payload_metadata['custom_suffix'] = None
+        if 'session' not in payload_metadata:
+            payload_metadata['session'] = None
+
+        saveData(filepath, (self.output_extracted_result_wcorrs_list, self.real_decoder_ripple_weighted_corr_arr, self.output_all_shuffles_decoded_results_list, all_shuffles_wcorr_array, self.real_decoder_ripple_filter_epochs_decoder_result_dict, self.output_extracted_score_arrays_list, self.real_score_arrays, payload_metadata))
         
 
     def save_data_mat(self, filepath, **additional_mat_elements):
@@ -1394,7 +1539,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
             self.output_all_shuffles_decoded_results_list = [self.output_all_shuffles_decoded_results_list[i] for i in unique_indices]
 
     
-    def load_and_append_shuffle_data(self, filepath):
+    def load_and_append_shuffle_data(self, filepath, expected_custom_suffix: Optional[str]=None):
         """ loads previously pickled shuffles ensuring no duplicate shuffles exist """
         from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
         if isinstance(filepath, str):
@@ -1402,12 +1547,20 @@ class DecodedEpochScoreShuffle(ComputedResult):
         assert filepath.exists(), f"filepath: '{filepath}' does not exist."
         try:
             loaded_output_extracted_result_wcorrs_list, loaded_real_decoder_ripple_weighted_corr_arr, loaded_output_all_shuffles_decoded_results_list, *loaded_results_list = loadData(filepath)
+            # 8-tuple rest: [all_shuffles_wcorr_array, real_decode_dict, score_arrays_list, real_score_arrays, metadata]
+            if (len(loaded_results_list) >= 5) and isinstance(loaded_results_list[4], dict):
+                loaded_metadata = loaded_results_list[4]
+                loaded_suffix = self.normalize_custom_suffix(loaded_metadata.get('custom_suffix'))
+                expected_suffix = self.normalize_custom_suffix(expected_custom_suffix)
+                if (expected_suffix is not None) and (loaded_suffix is not None) and (loaded_suffix != expected_suffix):
+                    raise AssertionError(f"shuffle pickle custom_suffix mismatch for '{filepath}': loaded={loaded_suffix!r} expected={expected_suffix!r}")
             assert np.allclose(self.real_decoder_ripple_weighted_corr_arr, loaded_real_decoder_ripple_weighted_corr_arr, equal_nan=True), f"could not append shuffle results from loaded shuffle save at '{filepath}' because loaded_real_decoder_ripple_weighted_corr_arr != self.real_decoder_ripple_weighted_corr_arr\nloaded_real_decoder_ripple_weighted_corr_arr: {loaded_real_decoder_ripple_weighted_corr_arr}\nself.real_decoder_ripple_weighted_corr_arr: {self.real_decoder_ripple_weighted_corr_arr}\n"
             self.output_extracted_result_wcorrs_list.extend(loaded_output_extracted_result_wcorrs_list)
             if self.enable_saving_entire_decoded_shuffle_result:
                 self.output_all_shuffles_decoded_results_list.extend(loaded_output_all_shuffles_decoded_results_list)
             # 4-tuple rest: [all_shuffles_wcorr_array]; 5-tuple rest: [all_shuffles_wcorr_array, real_decoder_ripple_filter_epochs_decoder_result_dict]
             # 7-tuple rest: [all_shuffles_wcorr_array, real_decode_dict, score_arrays_list, real_score_arrays]
+            # 8-tuple rest: above + metadata dict
             if (len(loaded_results_list) >= 2) and (self.real_decoder_ripple_filter_epochs_decoder_result_dict is None) and (loaded_results_list[1] is not None):
                 self.real_decoder_ripple_filter_epochs_decoder_result_dict = loaded_results_list[1]
             if (len(loaded_results_list) >= 3) and (loaded_results_list[2] is not None):
@@ -1433,13 +1586,13 @@ class DecodedEpochScoreShuffle(ComputedResult):
 
 
     @function_attributes(short_name=None, tags=['discover', 'files'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-07-09 04:43', related_items=[])
-    def discover_load_and_append_shuffle_data_from_directory(self, save_directory, newer_than: Optional[datetime]=None, with_data_name: Optional[str]=None, debug_print=False):
+    def discover_load_and_append_shuffle_data_from_directory(self, save_directory, newer_than: Optional[datetime]=None, with_data_name: Optional[str]=None, with_custom_suffix: Optional[str]=None, curr_active_pipeline=None, debug_print=False):
         """ searches the save_directory for pickled shuffle results and attempts to sequentially load them.
-        
-        
-        wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
 
-        with_custom_suffix: Optional[str]=None
+        Strict: only files whose parsed `custom_suffix` exactly matches `with_custom_suffix` (including `-tbin_XXms`) are loaded.
+        Legacy unsuffixed pickles are skipped.
+
+        wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
 
         Usage:
 
@@ -1456,6 +1609,12 @@ class DecodedEpochScoreShuffle(ComputedResult):
         if isinstance(save_directory, str):
             save_directory = Path(save_directory).resolve()
         assert save_directory.exists(), f"filepath: '{save_directory}' does not exist."
+
+        if with_custom_suffix is None:
+            with_custom_suffix = self.build_full_custom_suffix(curr_active_pipeline=curr_active_pipeline)
+        expected_suffix: Optional[str] = self.normalize_custom_suffix(with_custom_suffix)
+        if expected_suffix is None:
+            raise ValueError('with_custom_suffix is empty; refusing to load unsuffixed shuffle pickles')
 
         found_pickle_paths = discover_data_files(basedir=save_directory , glob_pattern='*_wcorr_ripple_shuffle_data_*.pkl', recursive=True)
         found_pickle_paths.extend(discover_data_files(basedir=save_directory , glob_pattern='*_epoch_score_shuffle_data_*.pkl', recursive=True))
@@ -1487,10 +1646,19 @@ class DecodedEpochScoreShuffle(ComputedResult):
                         should_add = False
 
                 if with_data_name is not None:
-                    # ensure the 'date_name' contains the custom suffix
-                    # if not (with_data_name in final_parsed_output_dict['data_name']):
+                    # compare against the stem only (`standalone_epoch_score_shuffle_data_only` / legacy wcorr name)
                     if (with_data_name != final_parsed_output_dict['data_name']):
                         should_add = False
+                        if debug_print:
+                            print(f'skipping "{basename}": data_name {final_parsed_output_dict["data_name"]!r} != {with_data_name!r}')
+
+                parsed_suffix = self.normalize_custom_suffix(final_parsed_output_dict.get('custom_suffix'))
+                if parsed_suffix is None:
+                    should_add = False
+                    print(f'skipping "{basename}": missing custom_suffix (legacy unsuffixed pickle)')
+                elif parsed_suffix != expected_suffix:
+                    should_add = False
+                    print(f'skipping "{basename}": custom_suffix {parsed_suffix!r} != expected {expected_suffix!r}')
 
                 if should_add:
                     # a_valid_pkl_filepath = curr_active_pipeline.get_output_path().joinpath(a_filename).resolve()
@@ -1501,9 +1669,11 @@ class DecodedEpochScoreShuffle(ComputedResult):
                     
             else:
                 print(f'could not parse basename: {basename}')
+        ## END for a_filepath in found_pickle_paths...
 
         for a_valid_filepath in valid_filepaths:
-            self.load_and_append_shuffle_data(filepath=a_valid_filepath)
+            self.load_and_append_shuffle_data(filepath=a_valid_filepath, expected_custom_suffix=expected_suffix)
+        ## END for a_valid_filepath in valid_filepaths...
 
         print(f'wcorr_ripple_shuffle.n_completed_shuffles: {self.n_completed_shuffles}')
         return parsed_metadata_dict
