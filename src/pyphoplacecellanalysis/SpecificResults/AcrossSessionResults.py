@@ -3835,7 +3835,7 @@ class AcrossSessionsVisualizations:
     _fig_out_man: Optional[FileOutputManager] = None
 
     @classmethod
-    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, debug_print=True, **kwargs):
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, write_svg:bool=False, debug_print=True, **kwargs):
         """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
 
         def register_output_file(output_path, output_metadata=None):
@@ -3852,7 +3852,7 @@ class AcrossSessionsVisualizations:
     
         cls._fig_out_man = fig_out_man
         
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file, **kwargs)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, write_svg=write_svg, register_output_file_fn=register_output_file, **kwargs)
         return active_out_figure_paths, final_context
 
 
@@ -3982,7 +3982,7 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
 
-        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
 
         # Plot long|short firing rate index:
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -4106,7 +4106,7 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.matplotlib_helpers import fit_both_axes
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
 
-        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', False), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
         
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
