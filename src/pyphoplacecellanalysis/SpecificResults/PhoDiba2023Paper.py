@@ -2108,6 +2108,8 @@ class PrePostDeltaDistributionComparison:
         full_width = 0.3
         half_width = full_width / 2.0
         dpi = kwargs.pop('dpi', 220)
+        laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
+        pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
         _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
         _fig3_label_rc = {
             'xtick.labelsize': _fig3_sizes['tick_label'],
@@ -2297,12 +2299,16 @@ class PrePostDeltaDistributionComparison:
             ) | _fig3_label_rc
             laps_suffix: str = str(group_labels[0]).replace(' ', '')
             pbe_suffix: str = str(group_labels[1]).replace(' ', '')
-            laps_fignum = None if fignum is None else f'{fignum}-{laps_suffix}'
-            pbe_fignum = None if fignum is None else f'{fignum}-{pbe_suffix}'
+            if laps_fig_file_name is None:
+                laps_fig_file_name = f'{fig_file_name}-{laps_suffix}'
+            if pbe_fig_file_name is None:
+                pbe_fig_file_name = f'{fig_file_name}-{pbe_suffix}'
+            laps_fignum = None if fignum is None else laps_fig_file_name
+            pbe_fignum = None if fignum is None else pbe_fig_file_name
             with mpl.rc_context(publication_rc):
                 with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
-                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, f'{fig_file_name}-{laps_suffix}', collector)
-                    pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, f'{fig_file_name}-{pbe_suffix}', collector,
+                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector)
+                    pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, pbe_fig_file_name, collector,
                                                 heuristic_summary=pbe_heuristic_session_summary if has_heuristic else None, heuristic_p_value=pbe_heuristic_p_value)
                     if not defer_show:
                         plt.show()
@@ -2791,6 +2797,9 @@ class FigureS8:
         Final export (SVG/PDF page) for figure 4, S6, S8: (w: 5.3956 in, h: 2.18 in)
         Plotly layout canvas stays PUB_FIG_SIZE CSS px (792 x 320, same aspect). Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG so Illustrator/cairosvg honor the inch size (previously PDF came out at 0.75x).
 
+        layer_names = ['kdiba_4_figure4_summary_four_bar-Laps.vectorcraft', 'ScatterOverTime_Laps_perTimeBin.svg', 'ScatterOverTime_PBEs_perTimeBin.svg', 'kdiba_4_figure4_summary_four_bar-PBEs.vectorcraft']
+
+
     """
     plotly_helpers: PlotlyHelpers = None
     PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
@@ -3234,7 +3243,7 @@ class FigureS8:
     @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
-            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, debug_print: bool = True, store_debug_values: bool = False,
+            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = True, store_debug_values: bool = False,
         ):
         """ Performs the main plotting and adds optional stats
 
@@ -3255,7 +3264,7 @@ class FigureS8:
 
             figures_parent_folder.mkdir(exist_ok=True)
             should_compute_stats: bool = True
-            enable_add_stats_to_figures: bool = True
+            enable_add_stats_to_figures: bool = False
             store_debug_values: bool = True
             _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, should_concatenate_figures=False, enable_heuristic_filtered_outputs=enable_heuristic_filtered_outputs, split_by_column=None, should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values)
 
@@ -3535,7 +3544,7 @@ class FigureS8:
     def main_all_figs(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict,
                       earliest_delta_aligned_t_start: Optional[float] = None, latest_delta_aligned_t_end: Optional[float] = None,
                       enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
-                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = True, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
+                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
         """Produce Figure 4, Figure S8, and Figure S9 from a single notebook call.
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -3563,6 +3572,7 @@ class FigureS8:
                 'Figure 4': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure 4 - P_Short Scatter over Time/{figures_date}').resolve(),
                     'enable_heuristic_filtered_outputs': False,
+                    'enable_add_stats_to_figures': False,
                 },
                 'Figure S8': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/{figures_date}').resolve(),
@@ -3583,10 +3593,12 @@ class FigureS8:
                 figures_parent_folder = Path(fig_config_dict.pop('figures_parent_folder'))
                 figures_parent_folder.mkdir(exist_ok=True, parents=True)
                 split_by_column = fig_config_dict.pop('split_by_column', None)
+                fig_enable_add_stats_to_figures = fig_config_dict.pop('enable_add_stats_to_figures', enable_add_stats_to_figures)
+                fig_separate_laps_pbes_figures = fig_config_dict.pop('separate_laps_pbes_figures', separate_laps_pbes_figures)
 
                 _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                 should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
-                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values,
+                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
                                 **{**kwargs, **fig_config_dict},
                 )
                 if store_debug_values:
@@ -3601,9 +3613,14 @@ class FigureS8:
                     # {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
 
                     ## 2026-10-27 - Summary Statistics - Figure 2-like Box Plot
-                    metric: str = 'P_Short'
-                    fignum: str = f'{fig_name}-pre_post_delta_effect-{metric}'
-                    # _summary_figure_path = figures_parent_folder.joinpath(f'{fignum}.svg')
+                    grainularity: str = '_perTimeBin'
+                    grainularity_token: str = grainularity.lstrip('_')  # 'perTimeBin'
+
+                    def _subfn_summary_fig_file_name(kind: str, group_name: Optional[str] = None) -> str:
+                        basename: str = f'{fig_name}_SummaryStats_{kind}_{grainularity_token}'
+                        if group_name is not None:
+                            basename = f'{basename}_{group_name}'
+                        return basename
 
                     def _subfn_iter_summary_four_bar_specs(results_dict: Dict, grainularity: str = '_perTimeBin'):
                         """Yield `(group_key, laps_key, pbes_key, heuristic_key)` for pooled or split-by-group stats."""
@@ -3632,21 +3649,26 @@ class FigureS8:
                             yield group_name, laps_key, pbes_key, heuristic_key if heuristic_key in results_dict else None
                         ## END for group_name in ordered_groups...
 
-                    summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity='_perTimeBin'))
+                    summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity=grainularity))
                     if len(summary_specs) == 0:
-                        print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure (fignum: "{fignum}"). Skipping for fig_name: "{fig_name}"')
+                        print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure. Skipping for fig_name: "{fig_name}"')
                     else:
                         fig_summary_dict = {}
                         group_svg_paths = []
                         group_pdf_paths = []
                         for group_name, laps_key, pbes_key, heuristic_key in summary_specs:
-                            active_fignum: str = fignum if group_name is None else f'{fignum}-{group_name}'
+                            combined_basename: str = _subfn_summary_fig_file_name('all', group_name)
                             save_folder = figures_parent_folder
                             if group_name is not None:
                                 intermediates_folder = cls.figures_intermediates_parent_folder()
                                 if intermediates_folder is not None:
                                     save_folder = intermediates_folder
-                            plot_kwargs = dict(fignum=active_fignum, fig_file_name=active_fignum, save_figure=True, export_folder=save_folder)
+                            plot_kwargs = dict(fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=save_folder, separate_laps_pbes_figures=fig_separate_laps_pbes_figures,
+                                               active_context=IdentifyingContext(display_fn_name=combined_basename))
+                            if fig_separate_laps_pbes_figures:
+                                plot_kwargs['laps_fig_file_name'] = _subfn_summary_fig_file_name('Laps', group_name)
+                                plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
+                                plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name']
                             if group_name is not None:
                                 plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
@@ -3670,12 +3692,12 @@ class FigureS8:
                             _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict['all']
                         else:
                             if len(group_svg_paths) > 1:
-                                stacked_svg_path = figures_parent_folder.joinpath(f'{fignum}_by_{split_by_column or "animal"}.svg')
+                                stacked_svg_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{split_by_column or "animal"}.svg')
                                 SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
                                 fig_summary_dict['stacked_svg'] = stacked_svg_path
                                 print(f'\tstacked {split_by_column or "animal"} summary rows: "{stacked_svg_path.as_posix()}"')
                             if len(group_pdf_paths) > 1:
-                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fignum}_by_{split_by_column or "animal"}.pdf')
+                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{split_by_column or "animal"}.pdf')
                                 PDFHelpers.concatenate_pdfs_vertically(pdf_paths=group_pdf_paths, output_path=stacked_pdf_path, padding=0)
                                 fig_summary_dict['stacked_pdf'] = stacked_pdf_path
                             _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict
