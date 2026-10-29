@@ -2129,9 +2129,29 @@ def plot_short_v_long_pf1D_scalar_overlap_comparison(overlap_scalars_df, pf_neur
     return fig, ax
 
 
+def _subfn_resolve_outside_axes_element_flags(scatter_params: dict, omit_outside_axes_elements: bool = False,
+                                              include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None) -> Tuple[bool, bool, bool, bool, bool]:
+    """Resolve title/label chrome flags. `omit_outside_axes_elements=True` turns off title and axis labels unless those flags are set explicitly."""
+    omit_outside_axes_elements = bool(scatter_params.pop('omit_outside_axes_elements', omit_outside_axes_elements))
+    include_title = scatter_params.pop('include_title', include_title)
+    include_axis_labels = scatter_params.pop('include_axis_labels', include_axis_labels)
+    include_tick_labels = scatter_params.pop('include_tick_labels', include_tick_labels)
+    include_r_value_label = scatter_params.pop('include_r_value_label', include_r_value_label)
+    if include_title is None:
+        include_title = (not omit_outside_axes_elements)
+    if include_axis_labels is None:
+        include_axis_labels = (not omit_outside_axes_elements)
+    if include_tick_labels is None:
+        include_tick_labels = True
+    if include_r_value_label is None:
+        include_r_value_label = True
+    return omit_outside_axes_elements, bool(include_title), bool(include_axis_labels), bool(include_tick_labels), bool(include_r_value_label)
+
+
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True,  enable_axes_colored_guide_lines: bool = False,
-                                          enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True, **scatter_params):
+                                          enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True,
+                                          omit_outside_axes_elements: bool = False, include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
     Shows two histograms for the marginals along each axis
@@ -2143,6 +2163,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         enable_hover_labels = True # add interactive point hover labels using mplcursors
         enable_tiny_point_labels = True # add static tiny aclu labels beside each point
         enable_axes_colored_guide_lines - if true, draws colored red/blue lines along the -1 and 1 lines to associate the colors visually
+        omit_outside_axes_elements: if True, skip titles/footers/axis labels and extra mosaic/histogram panels so the saved figure is just the axes box (for VectorCraft compositing). Tick labels and in-axes R-value stay unless `include_tick_labels`/`include_r_value_label` are False.
+        include_title / include_axis_labels: default True, or False when `omit_outside_axes_elements=True`
+        include_tick_labels / include_r_value_label: default True
 
         
     """
@@ -2167,7 +2190,12 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
     fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indices_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', False)
-        
+    omit_outside_axes_elements, include_title, include_axis_labels, include_tick_labels, include_r_value_label = _subfn_resolve_outside_axes_element_flags(scatter_params, omit_outside_axes_elements=omit_outside_axes_elements, include_title=include_title, include_axis_labels=include_axis_labels, include_tick_labels=include_tick_labels, include_r_value_label=include_r_value_label)
+    if omit_outside_axes_elements:
+        enable_histograms = False
+        enable_subplot_mosaic_style = False
+        enable_diagonal_histogram = False
+
     if prepare_for_publication:
         x_y_axes_label_kwargs = dict(fontsize=7)
         if 's' not in scatter_params:
@@ -2262,36 +2290,42 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ylabel_kwargs = dict(loc='bottom')
 
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
-    ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
-    ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+    if include_axis_labels:
+        ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
+        ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+    else:
+        ax.set_xlabel('')
+        ax.set_ylabel('')
 
     ## Non-flexitext version:
     # plt.title('long ($L$)|short($S$) firing rate indices')
     # plt.suptitle(f'{active_context.get_description(separator="/")}')
 
-    # `flexitext` version:
-    if prepare_for_publication:
-        ## Default for publication:
-        text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
-        # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
-    else:
-        ## Default for non-publication:
-        # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.8, left_margin=0.15, right_margin=0.85, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
-        text_formatter = FormattedFigureText()
-        
     plt.title('')
     plt.suptitle('')
-    text_formatter.setup_margins(fig)
-    
+    if include_title:
+        # `flexitext` version:
+        if prepare_for_publication:
+            ## Default for publication:
+            text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
+            # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+        else:
+            ## Default for non-publication:
+            # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.8, left_margin=0.15, right_margin=0.85, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+            text_formatter = FormattedFigureText()
 
-    if (not prepare_for_publication):
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
-        ## Only include the footer label when not for publication
-        footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-    else:  
-        ## Publication Mode
-        ## Smaller fonts for publication -- Originally 18, now 9
-        flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
+        text_formatter.setup_margins(fig)
+
+        if (not prepare_for_publication):
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:22><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
+            ## Only include the footer label when not for publication
+            footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+        else:
+            ## Publication Mode
+            ## Smaller fonts for publication -- Originally 18, now 9
+            flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
+    elif omit_outside_axes_elements:
+        fig.subplots_adjust(top=1.0, left=0.0, right=1.0, bottom=0.0)
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
@@ -2320,9 +2354,9 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
             r_fit_color = artboard3_style['colors']['r_fit']
             r_fontsize = artboard3_style['sizes']['r_value']
-            _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+            _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize), include_r_value_label=include_r_value_label)
         else:
-            _out_regression_line_artist = _lin_reg.plot(ax=ax)
+            _out_regression_line_artist = _lin_reg.plot(ax=ax, include_r_value_label=include_r_value_label)
         
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
@@ -2513,8 +2547,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
     ax.set_yticks([-1, 0, 1])
     ax.set_xticks([-1, 0, 1])
-    ax.set_xticklabels(["-1.0", "0.0", "+1.0"])  # No x-axis tick labels
-    ax.set_yticklabels(["-1.0", "0.0", "+1.0"])  # No y-axis tick labels
+    if include_tick_labels:
+        ax.set_xticklabels(["-1.0", "0.0", "+1.0"])  # No x-axis tick labels
+        ax.set_yticklabels(["-1.0", "0.0", "+1.0"])  # No y-axis tick labels
+    else:
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.tick_params(labelbottom=False, labelleft=False)
 
 
     return fig, ax, scatter_plot
@@ -3068,12 +3107,14 @@ class RateRemappingPaginatedFigureController(PaginatedFigureController):
 # ==================================================================================================================== #
 
 @function_attributes(short_name=None, tags=['private','firing_rate'], input_requires=[], output_provides=[], uses=[], used_by=['_plot_session_long_short_track_firing_rate_figures'], creation_date='2023-05-25 00:01', related_items=[])
-def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, include_linear_regression_line:bool=True, enable_histograms: bool = False, **scatter_params):
+def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, active_context, xlabel_str: str = 'Laps Firing Rate (Hz)',  ylabel_str: str = 'PBE Firing Rate (Hz)', neurons_colors=None, is_centered=False, enable_tiny_point_labels=False, defer_render=False, prepare_for_publication: bool = False, include_linear_regression_line:bool=True, enable_histograms: bool = False,
+                                          omit_outside_axes_elements: bool = False, include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None, **scatter_params):
         """ 2023-05-25 - Plot long_replay|long_laps firing rate index 
         Each datapoint is a neuron.
 
         is_centered: bool - if True, the spines are centered at (0, 0)
         enable_histograms: if True, add top/right black marginals (no diagonal). Default False.
+        omit_outside_axes_elements: if True, skip titles/footers/axis labels and extra histogram panels so the saved figure is just the axes box.
 
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
         
@@ -3082,6 +3123,9 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
 
         prepare_for_publication = scatter_params.pop('prepare_for_publication', prepare_for_publication)
         enable_histograms = scatter_params.pop('enable_histograms', enable_histograms)
+        omit_outside_axes_elements, include_title, include_axis_labels, include_tick_labels, include_r_value_label = _subfn_resolve_outside_axes_element_flags(scatter_params, omit_outside_axes_elements=omit_outside_axes_elements, include_title=include_title, include_axis_labels=include_axis_labels, include_tick_labels=include_tick_labels, include_r_value_label=include_r_value_label)
+        if omit_outside_axes_elements:
+            enable_histograms = False
         artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
 
         if prepare_for_publication:
@@ -3110,7 +3154,8 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             # point_colors = 'black'
         
         point_hover_labels = [f'{i}' for i in list(laps_frs_dict.keys())] # point_hover_labels will be added as tooltip annotations to the datapoints. Don't do anything I don't think. , enable_hover_labels=False
-        fig_kwargs = dict(figsize=(1.68535, 1.4375), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'bbox_inches', 'pad_inches'])
+        fig_kwargs = dict(figsize=(1.68535, 1.4375), num=f'track_replay|track_laps frs_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
+        pop_dict_subset(scatter_params, ['bbox_inches', 'pad_inches']) # savefig-only; do not pass to plt.subplots
         print(f'fig_kwargs: {fig_kwargs}')
         # Always create a single axes first; append marginals after setup_margins so FormattedFigureText.subplots_adjust does not collapse a mosaic.
         fig, ax = plt.subplots(**fig_kwargs)
@@ -3127,44 +3172,49 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         x_values = np.asarray(list(laps_frs_dict.values()), dtype=float)
         y_values = np.asarray(list(replays_frs_dict.values()), dtype=float)
         scatter_plot = ax.scatter(x_values, y_values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
-        ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
-        ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+        if include_axis_labels:
+            ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
+            ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
+        else:
+            ax.set_xlabel('')
+            ax.set_ylabel('')
 
         # Non-flexitext title:
         # plt.title('Computed track_replay|track_laps firing rate')
         # plt.suptitle(f'{active_display_context.get_description(separator="/")}')
 
-        # `flexitext` version:
-        # `flexitext` version:
-        if prepare_for_publication:
-            ## Default for publication:
-            text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
-            # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
-        else:
-            ## Default for non-publication:
-            text_formatter = FormattedFigureText()
-            
         plt.title('')
         plt.suptitle('')
-        text_formatter.setup_margins(fig)
+        if include_title:
+            # `flexitext` version:
+            if prepare_for_publication:
+                ## Default for publication:
+                text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150)
+                # text_formatter = FormattedFigureText.init_from_margins(top_margin=0.9, left_margin=0.15, right_margin=0.95, bottom_margin=0.150) ## Note the margins provide the empty room to position the flexitext headers, and without adding them the fancy text would not fit.
+            else:
+                ## Default for non-publication:
+                text_formatter = FormattedFigureText()
 
-        ## Need to extract the track name ('maze1') for the title in this plot. 
-        track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
-        # TODO: do we want to convert this into "long" or "short"?
-        
-        
-        if not prepare_for_publication:
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
-            ## Only include the footer label when not for publication
-            footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
-        else:  
-            ## Publication Mode — Artboard 3.pdf title: colored track name + #231F20 body
-            track_key = 'short' if ('short' in str(track_name).lower()) else 'long'
-            track_color = artboard3_style['colors'][track_key]
-            title_body_color = artboard3_style['colors']['title_body']
-            track_title_size = artboard3_style['sizes']['track_title']
-            title_body_size = artboard3_style['sizes']['title_body']
-            flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></><size:{title_body_size}><color:{title_body_color}> laps|PBEs </><weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+            text_formatter.setup_margins(fig)
+
+            ## Need to extract the track name ('maze1') for the title in this plot. 
+            track_name = active_context.get_description(subset_includelist=['filter_name'], separator=' | ') # 'maze1'
+            # TODO: do we want to convert this into "long" or "short"?
+
+            if not prepare_for_publication:
+                flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:22><weight:bold>{track_name}</> laps|PBEs <weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+                ## Only include the footer label when not for publication
+                footer_text_obj = flexitext((text_formatter.left_margin*0.1), (text_formatter.bottom_margin*0.25), text_formatter._build_footer_string(active_context=active_context), va="top", xycoords="figure fraction")
+            else:
+                ## Publication Mode — Artboard 3.pdf title: colored track name + #231F20 body
+                track_key = 'short' if ('short' in str(track_name).lower()) else 'long'
+                track_color = artboard3_style['colors'][track_key]
+                title_body_color = artboard3_style['colors']['title_body']
+                track_title_size = artboard3_style['sizes']['track_title']
+                title_body_size = artboard3_style['sizes']['title_body']
+                flexitext(text_formatter.left_margin, text_formatter.top_margin, f'<size:{track_title_size}><color:{track_color}, weight:bold>{track_key}</></><size:{title_body_size}><color:{title_body_color}> laps|PBEs </><weight:bold>rate</></>', va="bottom", xycoords="figure fraction")
+        elif omit_outside_axes_elements:
+            fig.subplots_adjust(top=1.0, left=0.0, right=1.0, bottom=0.0)
 
         # add static tiny labels for the neuron_id beside each data point
         if enable_tiny_point_labels:
@@ -3194,9 +3244,12 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
             if prepare_for_publication:
                 r_fit_color = artboard3_style['colors']['r_fit']
                 r_fontsize = artboard3_style['sizes']['r_value']
-                _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize))
+                _out_regression_line_artist = _lin_reg.plot(ax=ax, color=r_fit_color, alpha=1.0, lw=0.5, r_text_kwargs=dict(color=r_fit_color, alpha=1.0, fontsize=r_fontsize), include_r_value_label=include_r_value_label)
             else:
-                _out_regression_line_artist = _lin_reg.plot(ax=ax)
+                _out_regression_line_artist = _lin_reg.plot(ax=ax, include_r_value_label=include_r_value_label)
+
+        if not include_tick_labels:
+            ax.tick_params(labelbottom=False, labelleft=False)
 
         if enable_histograms:
             from mpl_toolkits.axes_grid1 import make_axes_locatable

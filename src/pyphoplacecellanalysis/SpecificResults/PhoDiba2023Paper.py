@@ -6805,12 +6805,13 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model", "r_value")}, bases=(UnpackableMixin, object,))
 
 
-def _linear_regression_output_plot(self, ax, r_text_kwargs=None, **kwargs):
+def _linear_regression_output_plot(self, ax, r_text_kwargs=None, include_r_value_label: bool = True, **kwargs):
     """Plot regression line and R-value label. Line kwargs default to red/0.7/0.5; R text defaults to black/8pt. Pass r_text_kwargs to override the R label."""
     line_kwargs = dict(color='red', alpha=0.7, lw=0.5) | kwargs
     _r_text_kwargs = dict(fontsize=8, color='black', alpha=0.9, verticalalignment='top') | (r_text_kwargs or {})
     line_artists = ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **line_kwargs)
-    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
+    if include_r_value_label:
+        ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
     return line_artists[0]
 
 
