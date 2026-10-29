@@ -125,40 +125,31 @@ class ExportedEpochScoreShufflesPickleFilenameParser(BaseMatchParser):
                 del parsed_output_dict[key]
         ## END for key in ['year', 'month', 'day', 'hour', 'minute', 'meridian']...
 
-        data_name_stem, custom_suffix = self._split_data_name_and_custom_suffix(parsed_output_dict.get('data_name'))
+        # Split greedy `data_name` into (`standalone_*_data_only` stem, `_custom_suffix` or None).
+        raw_data_name = parsed_output_dict.get('data_name')
+        data_name_stem, custom_suffix = None, None
+        if raw_data_name is not None:
+            stem_match = _STANDALONE_SHUFFLE_DATA_NAME_PATTERN.search(raw_data_name)
+            if stem_match is None:
+                data_name_stem, custom_suffix = raw_data_name, None
+            else:
+                data_name_stem = stem_match.group(1)
+                prefix: str = raw_data_name[:stem_match.start()].rstrip('_')
+                if prefix:
+                    custom_suffix = prefix if prefix.startswith('_') else f'_{prefix}'
         parsed_output_dict['data_name'] = data_name_stem
         parsed_output_dict['custom_suffix'] = custom_suffix
-        parsed_output_dict['decoding_time_bin_size'] = self._parse_tbin_from_custom_suffix(custom_suffix)
+
+        # Extract ripple decoding time_bin_size from a `-tbin_25ms` token in `custom_suffix`.
+        decoding_time_bin_size = None
+        if custom_suffix:
+            tbin_match = _TBIN_TOKEN_PATTERN.search(custom_suffix)
+            if tbin_match is not None:
+                from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import parse_decoding_time_bin_size_str
+                decoding_time_bin_size = parse_decoding_time_bin_size_str(f"tbin_{tbin_match.group(1)}")
+        parsed_output_dict['decoding_time_bin_size'] = decoding_time_bin_size
 
         return parsed_output_dict
-
-
-    @classmethod
-    def _split_data_name_and_custom_suffix(cls, raw_data_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-        """ Split greedy `data_name` into (`standalone_*_data_only` stem, `_custom_suffix` or None). """
-        if raw_data_name is None:
-            return None, None
-        stem_match = _STANDALONE_SHUFFLE_DATA_NAME_PATTERN.search(raw_data_name)
-        if stem_match is None:
-            return raw_data_name, None
-        stem: str = stem_match.group(1)
-        prefix: str = raw_data_name[:stem_match.start()].rstrip('_')
-        if not prefix:
-            return stem, None
-        custom_suffix: str = prefix if prefix.startswith('_') else f'_{prefix}'
-        return stem, custom_suffix
-
-
-    @classmethod
-    def _parse_tbin_from_custom_suffix(cls, custom_suffix: Optional[str]) -> Optional[float]:
-        """ Extract ripple decoding time_bin_size from a `-tbin_25ms` token in `custom_suffix`. """
-        if not custom_suffix:
-            return None
-        tbin_match = _TBIN_TOKEN_PATTERN.search(custom_suffix)
-        if tbin_match is None:
-            return None
-        from pyphoplacecellanalysis.General.Pipeline.NeuropyPipeline import parse_decoding_time_bin_size_str
-        return parse_decoding_time_bin_size_str(f"tbin_{tbin_match.group(1)}")
 
 
 ExportedWCorrShufflesPickleFilenameParser = ExportedEpochScoreShufflesPickleFilenameParser
