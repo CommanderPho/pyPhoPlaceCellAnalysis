@@ -1893,8 +1893,10 @@ class PrePostDeltaDistributionComparison:
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
                                          fig_file_name: str = 'figure4_summary_four_bar', write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True,
                                          fignum=None, active_context: Optional[IdentifyingContext] = None,
-                                         enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+                                         enable_paired_lines: bool = True, separate_laps_pbes_figures: bool = False, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
         """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
+
+        Pass `separate_laps_pbes_figures=True` for two figures (Laps pre/post, PBE pre/post) instead of one 4-bar panel.
 
         `laps_results` / `pbe_results` may be `run()` result dicts (must include `session_summary`) or `session_summary` DataFrames.
         Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
@@ -1918,8 +1920,9 @@ class PrePostDeltaDistributionComparison:
                 pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
                 pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
                 fignum=f'{fig_name}-pre_post_delta_effect-{metric}',
+                separate_laps_pbes_figures=False,
             )
-            out['fig']
+            out['fig']  # Laps figure when separate_laps_pbes_figures=True; also out['pbe'] / out['figs']
         """
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
@@ -2105,6 +2108,182 @@ class PrePostDeltaDistributionComparison:
         full_width = 0.3
         half_width = full_width / 2.0
         dpi = kwargs.pop('dpi', 220)
+
+        def _save_panel_figure(fig, panel_fig_file_name: str) -> Tuple[List[Path], Optional[Path]]:
+            panel_saved_paths: List[Path] = []
+            if not save_figure:
+                return panel_saved_paths, None
+            save_context = active_context.overwriting_context(display_fn_name=panel_fig_file_name)
+            fig_man = None
+            export_folder_path = None if export_folder is None else Path(export_folder)
+            if export_folder_path is not None:
+                export_folder_path.mkdir(parents=True, exist_ok=True)
+                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder_path)
+                panel_saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+            else:
+                panel_saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                panel_saved_paths = list(panel_saved_paths or [])
+                fig_man = AcrossSessionsVisualizations._fig_out_man
+            if write_svg:
+                if panel_saved_paths:
+                    svg_path = Path(panel_saved_paths[0]).with_suffix('.svg')
+                else:
+                    if fig_man is None:
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                    svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                fig.savefig(svg_path, format='svg', transparent=True)
+                panel_saved_paths.append(svg_path)
+            return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
+
+        def _plot_one_panel(group_label: str, summary_df: pd.DataFrame, p_value: Optional[float],
+                            panel_fig_name: str, panel_fignum, panel_fig_file_name: str, collector,
+                            heuristic_summary=None, heuristic_p_value: Optional[float] = None) -> Dict[str, Any]:
+            """One 2-bar (or heuristic-split) pre/post panel for the separate-figures path."""
+            panel_has_heuristic: bool = heuristic_summary is not None
+            panel_kwargs = dict(kwargs)
+            panel_kwargs.pop('fignum', None)
+            panel_kwargs.pop('num', None)
+            if panel_fignum is not None:
+                panel_kwargs['fignum'] = panel_fignum
+            panel_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+            y_pre = summary_df[pre_col].to_numpy(dtype=float)
+            y_post = summary_df[post_col].to_numpy(dtype=float)
+            panel_x_labels = [f'{group_label} pre-$\\Delta$', f'{group_label} post-$\\Delta$']
+            if panel_has_heuristic:
+                pair_gap = 0.03
+                half_off = (half_width + pair_gap) / 2.0
+                h_pre = heuristic_summary[pre_col].to_numpy(dtype=float)
+                h_post = heuristic_summary[post_col].to_numpy(dtype=float)
+                panel_y = [y_pre, h_pre, y_post, h_post]
+                panel_scatter = [
+                    _bar_scatter_props(summary_df),
+                    _bar_scatter_props(heuristic_summary),
+                    _bar_scatter_props(summary_df),
+                    _bar_scatter_props(heuristic_summary),
+                ]
+                panel_kwargs.update(dict(
+                    bar_x=np.array([0.0 - half_off, 0.0 + half_off, 1.0 - half_off, 1.0 + half_off], dtype=float),
+                    bar_width=np.array([half_width, half_width, half_width, half_width], dtype=float),
+                    bar_colors=[summary_bar_color, heuristic_color, summary_bar_color, heuristic_color],
+                    errorbar_colors=['k', heuristic_color, 'k', heuristic_color],
+                    xtick_positions=np.arange(2),
+                    xtick_labels=panel_x_labels,
+                    scatter_x_offsets=[
+                        _animal_dodge_offsets(summary_df, half_width),
+                        _animal_dodge_offsets(heuristic_summary, half_width),
+                        _animal_dodge_offsets(summary_df, half_width),
+                        _animal_dodge_offsets(heuristic_summary, half_width),
+                    ],
+                ))
+                pair_specs = [(0, 2, 'gray', 0.3), (1, 3, heuristic_color, 0.45)]
+                all_sig_x = (0.0 - half_off, 1.0 - half_off)
+                heur_sig_x = (0.0 + half_off, 1.0 + half_off)
+            else:
+                panel_y = [y_pre, y_post]
+                panel_scatter = [_bar_scatter_props(summary_df), _bar_scatter_props(summary_df)]
+                panel_offsets = _animal_dodge_offsets(summary_df, full_width)
+                panel_kwargs.update(dict(
+                    bar_colors=[summary_bar_color, summary_bar_color],
+                    scatter_x_offsets=[panel_offsets, panel_offsets],
+                ))
+                pair_specs = [(0, 1, 'gray', 0.3)]
+                all_sig_x = (0.0, 1.0)
+                heur_sig_x = None
+            render = PaperFigureTwo.create_plot(
+                panel_x_labels, panel_y, panel_scatter, ylabel, title, panel_fig_name, active_context, True,
+                prepare_for_publication=prepare_for_publication,
+                publication_group_labels=(group_label,), metric_name='Session Means',
+                title_subtitle=f'for {group_label}', xlabel='',
+                **panel_kwargs,
+            )
+            collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+            fig = render.fig
+            ax = render.ax
+            x_values_list, plotted_y_values = render.plot_data
+            if enable_paired_lines:
+                for i0, i1, line_color, line_alpha in pair_specs:
+                    for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                        ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
+                    ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
+
+                ## END for i0, i1, line_color, line_alpha in pair_specs...
+
+            y_max = float(np.nanmax(np.concatenate(panel_y)))
+            if p_value is not None:
+                add_significance_bars(ax, p_value, x1=all_sig_x[0], x2=all_sig_x[1], y=y_max)
+            if panel_has_heuristic and (heuristic_p_value is not None) and (heur_sig_x is not None):
+                heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
+                add_significance_bars(ax, heuristic_p_value, x1=heur_sig_x[0], x2=heur_sig_x[1], y=heuristic_bracket_y, color=heuristic_color)
+            animal_legend = None
+            if has_animal and marker_mapping:
+                legend_animals = [a for a in preferred_animals if a in marker_mapping]
+                legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
+                animal_legend_handles = [
+                    Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
+                           markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                           label=_animal_legend_label(animal))
+                    for animal in legend_animals
+                ]
+                animal_legend = ax.legend(
+                    handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
+                    ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
+                )
+                animal_legend.set_clip_on(False)
+            if panel_has_heuristic:
+                ax.legend(
+                    handles=[
+                        Patch(facecolor='none', edgecolor=summary_bar_color, label=f'All {group_label}'),
+                        Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+                    ],
+                    frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                )
+                if animal_legend is not None:
+                    ax.add_artist(animal_legend)
+            panel_saved_paths, panel_saved_path = _save_panel_figure(fig, panel_fig_file_name)
+            return dict(fig=fig, ax=ax, render=render, y_values=panel_y, saved_path=panel_saved_path, saved_paths=panel_saved_paths)
+
+        if separate_laps_pbes_figures:
+            if debug_print:
+                n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
+                print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
+            collector = None
+            publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+                prepare_for_publication=prepare_for_publication,
+                **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+            )
+            laps_suffix: str = str(group_labels[0]).replace(' ', '')
+            pbe_suffix: str = str(group_labels[1]).replace(' ', '')
+            laps_fignum = None if fignum is None else f'{fignum}-{laps_suffix}'
+            pbe_fignum = None if fignum is None else f'{fignum}-{pbe_suffix}'
+            with mpl.rc_context(publication_rc):
+                with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, f'{fig_file_name}-{laps_suffix}', collector)
+                    pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, f'{fig_file_name}-{pbe_suffix}', collector,
+                                                heuristic_summary=pbe_heuristic_session_summary if has_heuristic else None, heuristic_p_value=pbe_heuristic_p_value)
+                    if not defer_show:
+                        plt.show()
+            combined_saved_paths = list(laps_panel['saved_paths'] or []) + list(pbe_panel['saved_paths'] or [])
+            return dict(
+                fig=laps_panel['fig'],
+                ax=laps_panel['ax'],
+                render=laps_panel['render'],
+                figs=[laps_panel['fig'], pbe_panel['fig']],
+                laps=laps_panel,
+                pbe=pbe_panel,
+                collector=collector,
+                laps_session_summary=laps_session_summary,
+                pbe_session_summary=pbe_session_summary,
+                pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+                y_values=y_values,
+                laps_p_value=laps_p_value,
+                pbe_p_value=pbe_p_value,
+                pbe_heuristic_p_value=pbe_heuristic_p_value,
+                animal_marker_mapping=marker_mapping,
+                animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+                saved_path=laps_panel['saved_path'],
+                saved_paths=combined_saved_paths,
+            )
+
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
@@ -5685,16 +5864,30 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, str] = ('LdCs', 'SdCs')):
-        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, group labels under each pair. """
-        ax.set_xticks(np.arange(4))
-        ax.set_xticklabels([r'pre-$\Delta$', r'post-$\Delta$', r'pre-$\Delta$', r'post-$\Delta$'])
+    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, ...] = ('LdCs', 'SdCs')):
+        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, group labels under each pair.
+
+        One group label → a single pre/post pair at x=0,1. Two group labels → the original 4-bar Figure 2 layout.
+        """
+        labels = tuple(group_labels)
+        n_groups: int = len(labels)
+        pre_post = [r'pre-$\Delta$', r'post-$\Delta$']
+        if n_groups <= 1:
+            ax.set_xticks(np.arange(2))
+            ax.set_xticklabels(pre_post)
+            group_tick_positions = [0.5]
+            group_tick_labels = [f'\n\n{labels[0]}'] if (n_groups == 1) else [f'\n\n']
+        else:
+            ax.set_xticks(np.arange(4))
+            ax.set_xticklabels(pre_post + pre_post)
+            group_tick_positions = [0.5, 2.5]
+            group_tick_labels = [f'\n\n{labels[0]}', f'\n\n{labels[1]}']
         ax.tick_params(axis='x', length=0, pad=2)
         ax.set_xlabel('')
 
-        # Group labels centered under bars 0–1 and 2–3 (matplotlib multilevel-tick pattern)
+        # Group labels centered under each pre/post pair (matplotlib multilevel-tick pattern)
         sec = ax.secondary_xaxis(location=0)
-        sec.set_xticks([0.5, 2.5], labels=[f'\n\n{group_labels[0]}', f'\n\n{group_labels[1]}'])
+        sec.set_xticks(group_tick_positions, labels=group_tick_labels)
         sec.tick_params('x', length=0)
         sec.spines['bottom'].set_visible(False)
         return sec
