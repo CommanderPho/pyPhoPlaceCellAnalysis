@@ -2176,7 +2176,7 @@ class PrePostDeltaDistributionComparison:
             if 'figsize' not in panel_kwargs:
                 rc_w, rc_h = mpl.rcParams['figure.figsize']
                 panel_kwargs['figsize'] = (float(rc_w) * 0.5, float(rc_h))
-            panel_kwargs.setdefault('bottom_margin', 0.26)
+            panel_kwargs.setdefault('bottom_margin', 0.20)
             y_pre = summary_df[pre_col].to_numpy(dtype=float)
             y_post = summary_df[post_col].to_numpy(dtype=float)
             panel_x_labels = [f'{group_label} pre-$\\Delta$', f'{group_label} post-$\\Delta$']
@@ -2256,9 +2256,23 @@ class PrePostDeltaDistributionComparison:
                            label=_animal_legend_label(animal))
                     for animal in legend_animals
                 ]
+                ax_pos = ax.get_position()
+                legend_x = (float(ax_pos.x0) + float(ax_pos.x1)) / 2.0
+                legend_y = float(ax_pos.y0) - 0.10
+                fig.canvas.draw()
+                renderer = fig.canvas.get_renderer() if (fig.canvas is not None) else None
+                if renderer is not None:
+                    inv = fig.transFigure.inverted()
+                    bboxes = [ax.get_tightbbox(renderer)]
+                    sec = ((getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}).get('publication_xgroup_axis')
+                    if sec is not None:
+                        bboxes.append(sec.get_tightbbox(renderer))
+                    label_bottoms = [float(inv.transform((0.0, b.y0))[1]) for b in bboxes if b is not None]
+                    if label_bottoms:
+                        legend_y = min(label_bottoms)
                 animal_legend = fig.legend(
-                    handles=animal_legend_handles, frameon=False, loc='lower center',
-                    bbox_to_anchor=(0.55, 0.03), bbox_transform=fig.transFigure,
+                    handles=animal_legend_handles, frameon=False, loc='upper center',
+                    bbox_to_anchor=(legend_x, legend_y - 0.008), bbox_transform=fig.transFigure,
                     ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
                 )
             if panel_has_heuristic:

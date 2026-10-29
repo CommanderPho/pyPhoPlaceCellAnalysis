@@ -9421,7 +9421,7 @@ def bapun_proper_linearize_tracks(curr_active_pipeline):
 
 
 # Moved to PhoDiba2023Paper (2026-10-27) to break circular import with FigureS8
-from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison, estimate_block_length_lap_t_bins_from_autocorrelation, estimate_block_length_laps_from_autocorrelation
+from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
 
 # ==================================================================================================================================================================================================================================================================================== #
 # 2025-11-05 - Factor out by-animal code                                                                                                                                                                                                                                               #
