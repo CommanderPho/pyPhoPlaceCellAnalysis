@@ -1885,12 +1885,13 @@ class PrePostDeltaDistributionComparison:
     @classmethod
     def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
                                          pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
+                                         animal_marker_mapping: Optional[Dict[str, str]] = None, animal_legend_labels: Optional[Dict[str, str]] = None,
                                          laps_p_value: Optional[float] = None, pbe_p_value: Optional[float] = None,
                                          pbe_heuristic_passing_results=None, pbe_heuristic_p_value: Optional[float] = None,
                                          ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
                                          group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
                                          defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
-                                         fig_file_name: str = 'figure4_summary_four_bar', write_vector_format: bool = True, write_png: bool = False, write_svg: bool = True,
+                                         fig_file_name: str = 'figure4_summary_four_bar', write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True,
                                          fignum=None, active_context: Optional[IdentifyingContext] = None,
                                          enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
         """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
@@ -1899,6 +1900,8 @@ class PrePostDeltaDistributionComparison:
         Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
 
         Groups are Laps/PBEs rather than Long/Short, so Fig2 blue/red bar colors are overridden to black (scatter points follow the bars).
+        Scatter markers use a fixed animal mapping (`gor01`=`o`, `vvp01`=`^`, `pin01`=`s`) with short legend names (`gor`, `vvp`, `pin`).
+        Points are dodged into animal columns with a shared pre/post x-offset so paired lines do not cross.
 
         When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
         or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
@@ -1918,6 +1921,7 @@ class PrePostDeltaDistributionComparison:
             )
             out['fig']
         """
+        from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
@@ -2006,20 +2010,82 @@ class PrePostDeltaDistributionComparison:
         ]
 
         has_animal: bool = (animal_col in laps_session_summary.columns) and (animal_col in pbe_session_summary.columns)
-        filled_markers = ['o', '^', '8', 's', 'p', 'd', 'P', 'X']
+        filled_markers = ['o', '^', 's', 'p', 'd', 'P', 'X']
+        preferred_animals = ('gor01', 'vvp01', 'pin01')
+        if animal_marker_mapping is None:
+            animal_marker_mapping = {'gor01': 'o', 'vvp01': '^', 'pin01': 's'}
+        else:
+            animal_marker_mapping = {str(k): v for k, v in dict(animal_marker_mapping).items()}
+        if animal_legend_labels is None:
+            animal_legend_labels = {'gor01': 'gor', 'vvp01': 'vvp', 'pin01': 'pin'}
+        else:
+            animal_legend_labels = {str(k): str(v) for k, v in dict(animal_legend_labels).items()}
+
+        def _animal_legend_label(animal) -> str:
+            key = str(animal)
+            if key in animal_legend_labels:
+                return animal_legend_labels[key]
+            stripped = key.rstrip('0123456789')
+            return stripped if stripped else key
+
+        unique_animals: List[str] = []
+        marker_mapping: Dict[str, str] = {}
         if has_animal:
             animal_frames = [laps_session_summary, pbe_session_summary]
             if (pbe_heuristic_session_summary is not None) and (animal_col in pbe_heuristic_session_summary.columns):
                 animal_frames.append(pbe_heuristic_session_summary)
-            unique_animals = pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))
-            marker_mapping = {animal: filled_markers[i % len(filled_markers)] for i, animal in enumerate(unique_animals)}
-        else:
-            marker_mapping = {}
+            unique_animals = [str(a) for a in pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))]
+            used_markers = set(animal_marker_mapping.values())
+            spare_markers = [m for m in filled_markers if m not in used_markers] or list(filled_markers)
+            spare_i = 0
+            for animal in unique_animals:
+                if animal in animal_marker_mapping:
+                    marker_mapping[animal] = animal_marker_mapping[animal]
+                else:
+                    marker_mapping[animal] = spare_markers[spare_i % len(spare_markers)]
+                    spare_i += 1
+            ## END for animal in unique_animals...
 
         def _bar_scatter_props(summary_df: pd.DataFrame):
             if (not has_animal) or (animal_col not in summary_df.columns):
                 return {}
-            return [{'marker': marker_mapping.get(a, 'o')} for a in summary_df[animal_col].to_numpy()]
+            return [{'marker': marker_mapping.get(str(a), 'o')} for a in summary_df[animal_col].to_numpy()]
+
+        def _animal_dodge_offsets(summary_df: pd.DataFrame, bar_width: float) -> np.ndarray:
+            """Stable within-bar x-offsets: animal columns, then a small deterministic spread per session."""
+            n = len(summary_df)
+            if n == 0:
+                return np.array([], dtype=float)
+            group_span = float(bar_width) * 0.70
+            if (n == 1) or (not has_animal) or (animal_col not in summary_df.columns):
+                if n == 1:
+                    return np.zeros(1, dtype=float)
+                return np.linspace(-group_span / 2.0, group_span / 2.0, n)
+            animals = summary_df[animal_col].map(str).to_numpy()
+            col_animals = [a for a in preferred_animals if np.any(animals == a)]
+            col_animals.extend([a for a in unique_animals if (a not in set(col_animals)) and np.any(animals == a)])
+            n_cols = max(len(col_animals), 1)
+            if n_cols == 1:
+                col_centers = np.array([0.0])
+            else:
+                col_centers = np.linspace(-group_span / 2.0, group_span / 2.0, n_cols)
+            animal_to_center = {a: col_centers[i] for i, a in enumerate(col_animals)}
+            col_gap = (group_span / max(n_cols - 1, 1)) if (n_cols > 1) else group_span
+            within_span = col_gap * 0.45
+            offsets = np.zeros(n, dtype=float)
+            for a in col_animals:
+                idx = np.flatnonzero(animals == a)
+                k = int(idx.size)
+                if k == 0:
+                    continue
+                center = animal_to_center[a]
+                if k == 1:
+                    offsets[idx] = center
+                else:
+                    offsets[idx] = center + np.linspace(-within_span / 2.0, within_span / 2.0, k)
+            ## END for a in col_animals...
+
+            return offsets
 
         scatter_props = [
             _bar_scatter_props(laps_session_summary),
@@ -2036,16 +2102,17 @@ class PrePostDeltaDistributionComparison:
         heuristic_y_pre = None
         heuristic_y_post = None
         pbe_half_offset = 0.0
+        full_width = 0.3
+        half_width = full_width / 2.0
         dpi = kwargs.pop('dpi', 220)
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
         create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
+        create_plot_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
         if has_heuristic:
             heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
             heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
-            full_width = 0.3
-            half_width = full_width / 2.0
             pair_gap = 0.03
             pbe_half_offset = (half_width + pair_gap) / 2.0
             pbe_color = summary_bar_color
@@ -2068,6 +2135,15 @@ class PrePostDeltaDistributionComparison:
                 xtick_positions=np.arange(4),
                 xtick_labels=x_labels,
             ))
+
+        laps_offsets = _animal_dodge_offsets(laps_session_summary, full_width)
+        if has_heuristic:
+            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, half_width)
+            heur_offsets = _animal_dodge_offsets(pbe_heuristic_session_summary, half_width)
+            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, heur_offsets, pbe_offsets, heur_offsets]
+        else:
+            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, full_width)
+            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, pbe_offsets]
 
         if debug_print:
             n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
@@ -2115,6 +2191,22 @@ class PrePostDeltaDistributionComparison:
                     heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
                     add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
 
+                animal_legend = None
+                if has_animal and marker_mapping:
+                    legend_animals = [a for a in preferred_animals if a in marker_mapping]
+                    legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
+                    animal_legend_handles = [
+                        Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
+                               markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                               label=_animal_legend_label(animal))
+                        for animal in legend_animals
+                    ]
+                    animal_legend = ax.legend(
+                        handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
+                        ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
+                    )
+                    animal_legend.set_clip_on(False)
+
                 if has_heuristic:
                     pbe_legend_color = summary_bar_color
                     ax.legend(
@@ -2124,6 +2216,8 @@ class PrePostDeltaDistributionComparison:
                         ],
                         frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
                     )
+                    if animal_legend is not None:
+                        ax.add_artist(animal_legend)
 
                 if save_figure:
                     save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
@@ -2163,6 +2257,8 @@ class PrePostDeltaDistributionComparison:
             laps_p_value=laps_p_value,
             pbe_p_value=pbe_p_value,
             pbe_heuristic_p_value=pbe_heuristic_p_value,
+            animal_marker_mapping=marker_mapping,
+            animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
             saved_path=saved_path,
             saved_paths=saved_paths,
         )
@@ -5632,6 +5728,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         errorbar_colors = kwargs.pop('errorbar_colors', None)
         xtick_positions = kwargs.pop('xtick_positions', None)
         xtick_labels = kwargs.pop('xtick_labels', None)
+        scatter_x_offsets = kwargs.pop('scatter_x_offsets', None)
+        scatter_extra_kwargs = dict(kwargs.pop('scatter_kwargs', None) or {})
         fignum = kwargs.pop('fignum', None)
         if fignum is None:
             fignum = kwargs.pop('num', None)
@@ -5654,6 +5752,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             edgecolors = list(bar_colors)
             if len(edgecolors) != n_bars:
                 raise ValueError(f'bar_colors length {len(edgecolors)} != n_bars {n_bars}.')
+        if scatter_x_offsets is not None:
+            scatter_x_offsets = list(scatter_x_offsets)
+            if len(scatter_x_offsets) != n_bars:
+                raise ValueError(f'scatter_x_offsets length {len(scatter_x_offsets)} != n_bars {n_bars}.')
 
         subplots_kwargs = {}
         if fignum is not None:
@@ -5695,7 +5797,14 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         for i in range(n_bars):
             width_i = float(widths[i])
-            x_values = (x[i] + np.random.random(y_values[i].size) * width_i - width_i / 2)
+            n_i = int(np.asarray(y_values[i]).size)
+            if scatter_x_offsets is not None:
+                offsets_i = np.asarray(scatter_x_offsets[i], dtype=float)
+                if offsets_i.size != n_i:
+                    raise ValueError(f'scatter_x_offsets[{i}] length {offsets_i.size} != n_points {n_i}.')
+                x_values = x[i] + offsets_i
+            else:
+                x_values = (x[i] + np.random.random(n_i) * width_i - width_i / 2) # spread points along x within the bar so they don't overlap
             scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
             had_custom_marker_handling = False
             user_markers = scatter_props_kwargs.get('marker', None)
@@ -5706,7 +5815,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
                     scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
                     for point_index, a_marker in enumerate(user_markers):
-                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=edgecolors[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=edgecolors[i], marker=user_markers[point_index], **scatter_extra_kwargs, **scatter_props_kwargs) # spread along x within the bar so points don't overlap.
                         scatter_plot.append(a_sub_scatter_plot)
                     ## END for point_index, a_marker in enumerate(user_markers)...
 
@@ -5714,7 +5823,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
             if not had_custom_marker_handling:
                 # No special marker or just a scalar specific marker value, no need to loop
-                scatter_plot = ax.scatter(x_values, y_values[i], color=edgecolors[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                scatter_plot = ax.scatter(x_values, y_values[i], color=edgecolors[i], **scatter_extra_kwargs, **scatter_props_kwargs) # spread along x within the bar so points don't overlap.
     
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
