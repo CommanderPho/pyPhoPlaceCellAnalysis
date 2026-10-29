@@ -423,7 +423,7 @@ def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], j
 # without a global phase barrier. Failed phases cancel only that session's later jobs; retry_from_*.sh resumes from    #
 # the failed phase without re-running completed earlier phases (pickles kept). Windows uses sequential python.exe       #
 # chains (submit_phase_chains_*.ps1 / retry_from_*.ps1) instead of bash/sbatch.                                          #
-# Public: build_session_phase_script_map, write_chained_submit_script, write_cancel_phase_chain_script,                   #
+# Public: build_session_phase_script_map, write_chained_submit_script,                                                   #
 #         write_all_retry_from_phase_scripts, print_chain_status_hint, submit_slurm_script (optional auto-submit).       #
 # ==================================================================================================================== #
 
@@ -496,6 +496,150 @@ def _subfn_phase_chain_lines(phase_script_paths: List[Tuple[str, str]], phase_ch
             python_executable = sys.executable
         return _subfn_powershell_direct_run_lines(phase_script_paths, python_executable=python_executable, indent=indent)
     raise ValueError(f"phase_chain_backend must be 'slurm', 'bash', or 'powershell', got {phase_chain_backend!r}")
+
+
+def _subfn_slurm_collect_chain_jids_lines() -> List[str]:
+    """Bash helpers that fill `$TMP_JIDS` from `$JOBIDS_FILE` plus live `squeue` matching this chain's sbatch script paths."""
+    return [
+        'add_jid() {',
+        '  local raw="${1:-}"',
+        '  raw="${raw%%;*}"',
+        '  raw="${raw%%.*}"',
+        '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
+        '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
+        '}',
+        '',
+        'collect_chain_jids() {',
+        '  TMP_JIDS="$(mktemp)"',
+        '  TMP_SCRIPTS="$(mktemp)"',
+        '  trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
+        '  if [[ -f "$JOBIDS_FILE" ]]; then',
+        '    echo "Reading recorded job ids: $JOBIDS_FILE"',
+        '    while IFS= read -r line || [[ -n "${line:-}" ]]; do',
+        '      line="${line%%#*}"',
+        '      add_jid "$line"',
+        '    done < "$JOBIDS_FILE"',
+        '  fi',
+        '  if [[ -f "$SUBMIT_SCRIPT" ]]; then',
+        '''    awk -F"'" '/sbatch --parsable/ { if ($2 ~ /\\.sh$/) print $2 }' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
+        '  fi',
+        '  if [[ -f "$MANIFEST_FILE" ]]; then',
+        """    grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
+        '  fi',
+        '  if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
+        '  if command -v squeue >/dev/null 2>&1; then',
+        '    while IFS=\'|\' read -r jid cmd; do',
+        '      [[ -z "${jid:-}" ]] && continue',
+        '      while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
+        '        [[ -z "${script_path:-}" ]] && continue',
+        '        if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
+        '      done < "$TMP_SCRIPTS"',
+        '    done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
+        '  else',
+        '    echo "WARN: squeue not found; using only recorded job ids (if any)."',
+        '  fi',
+        '  if [[ -s "$TMP_JIDS" ]]; then sort -u "$TMP_JIDS" -o "$TMP_JIDS"; fi',
+        '}',
+        '',
+    ]
+
+
+def _subfn_slurm_cancel_mode_lines(indent: str = '  ') -> List[str]:
+    """Bash body for `--cancel`: scancel collected chain job ids, continuing if a job is already gone."""
+    raw = [
+        'collect_chain_jids',
+        'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
+        'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+        '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
+        '  exit 0',
+        'fi',
+        'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
+        'cat "$TMP_JIDS"',
+        'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
+        '  [[ -z "${jid:-}" ]] && continue',
+        '  _err="$(scancel "$jid" 2>&1)"',
+        '  _rc=$?',
+        '  if [[ $_rc -eq 0 ]]; then',
+        '    echo "  canceled $jid"',
+        '  else',
+        '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
+        '  fi',
+        'done < "$TMP_JIDS"',
+        'echo "Done."',
+    ]
+    return [f'{indent}{line}' if line else line for line in raw]
+
+
+def _subfn_slurm_status_mode_lines(indent: str = '  ') -> List[str]:
+    """Bash body for `--status`: `sacct --allocations` for this chain's job ids (all states)."""
+    raw = [
+        'collect_chain_jids',
+        'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+        '  echo "No jobs found for this chain (not yet submitted, already finished, or .jobids missing)."',
+        '  exit 0',
+        'fi',
+        'jid_csv="$(paste -sd, "$TMP_JIDS")"',
+        'echo "Chain jobs ($(wc -l < "$TMP_JIDS" | tr -d \' \')): $jid_csv"',
+        'if command -v sacct >/dev/null 2>&1; then',
+        '  SLURM_TIME_FORMAT=standard sacct --allocations --jobs="$jid_csv" --format=Start,JobID,State,Elapsed,JobName%100,ExitCode',
+        'else',
+        '  echo "WARN: sacct not found."',
+        'fi',
+    ]
+    return [f'{indent}{line}' if line else line for line in raw]
+
+
+def _subfn_slurm_cli_dispatch_lines() -> List[str]:
+    """Bash: parse `--cancel`/`--status`/`--help`, run that mode, and exit (default continues to submit)."""
+    lines: List[str] = [
+        'print_usage() {',
+        '  echo "Usage: bash $0 [--cancel|--status|--help]"',
+        '  echo "  (no args)  submit per-session afterok chains"',
+        '  echo "  --status   print this chain\'s jobs via sacct"',
+        '  echo "  --cancel   scancel remaining jobs in this chain (safe if already gone)"',
+        '}',
+        '',
+        'MODE=submit',
+        'for _arg in "$@"; do',
+        '  case "$_arg" in',
+        '    --cancel)',
+        '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+        '      MODE=cancel',
+        '      ;;',
+        '    --status)',
+        '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+        '      MODE=status',
+        '      ;;',
+        '    -h|--help)',
+        '      print_usage',
+        '      exit 0',
+        '      ;;',
+        '    *)',
+        '      echo "ERROR: unknown argument: $_arg" >&2',
+        '      print_usage',
+        '      exit 1',
+        '      ;;',
+        '  esac',
+        'done',
+        '',
+        'if [[ "$MODE" == "cancel" ]]; then',
+        '  set +e',
+    ]
+    lines.extend(_subfn_slurm_cancel_mode_lines(indent='  '))
+    lines.extend([
+        '  exit 0',
+        'fi',
+        '',
+        'if [[ "$MODE" == "status" ]]; then',
+        '  set +e',
+    ])
+    lines.extend(_subfn_slurm_status_mode_lines(indent='  '))
+    lines.extend([
+        '  exit 0',
+        'fi',
+        '',
+    ])
+    return lines
 
 
 def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
@@ -578,6 +722,9 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
     phase_chain_backend: 'slurm' submits afterok chains (sessions in parallel on the cluster); 'bash' runs one session
     at a time with sequential phase scripts (Lab linux_standalone); 'powershell' runs sequential python.exe per session (Windows).
 
+    Slurm scripts accept `--cancel` / `--status` (this chain only; uses sibling `.jobids` plus live `squeue`). Default
+    (no args) truncates `.jobids` then submits. Those flags are not emitted for bash/powershell backends.
+
     Returns (submit_script_path, manifest_path).
     """
     out_path = Path(out_path)
@@ -649,15 +796,25 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
             '# Per-session Slurm phase chains (dependency=afterok).',
             '# A failed phase cancels only that session\'s later phases; earlier successful pickles are kept.',
             '# Retry a failed phase with retry_from_*.sh — do not re-run completed earlier phases.',
-            '# Cancel remaining jobs with the sibling cancel_phase_chains_*.sh (safe if jobs are already gone).',
+            '# Usage:',
+            '#   bash this_script.sh            # submit afterok chains',
+            '#   bash this_script.sh --status   # print this chain\'s jobs via sacct',
+            '#   bash this_script.sh --cancel   # scancel remaining jobs (safe if already gone)',
             'set -euo pipefail',
             '',
             '_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+            f'SUBMIT_SCRIPT="${{_SELF_DIR}}/{out_path.name}"',
             f'JOBIDS_FILE="${{_SELF_DIR}}/{out_path.with_suffix(".jobids").name}"',
+            f'MANIFEST_FILE="${{_SELF_DIR}}/{out_path.with_suffix(".json").name}"',
+            '',
+        ]
+        bash_lines.extend(_subfn_slurm_collect_chain_jids_lines())
+        bash_lines.extend(_subfn_slurm_cli_dispatch_lines())
+        bash_lines.extend([
             ': > "$JOBIDS_FILE"',
             'echo "Recording job ids to $JOBIDS_FILE"',
             '',
-        ]
+        ])
     if batch_date_to_use:
         bash_lines.append(f'# batch: {batch_date_to_use}')
         bash_lines.append('')
@@ -703,117 +860,9 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
     print(f'Wrote chained submit script: {out_path}')
     print(f'Wrote phase-chain manifest: {manifest_path}')
     if phase_chain_backend == 'slurm':
-        cancel_path = write_cancel_phase_chain_script(out_path)
-        print(f"Cancel remaining jobs: bash '{cancel_path}'")
+        print(f"Cancel remaining jobs: bash '{out_path}' --cancel")
+        print(f"Chain status: bash '{out_path}' --status")
     return out_path, manifest_path
-
-
-def write_cancel_phase_chain_script(submit_script_path: Union[str, Path], cancel_script_path: Optional[Union[str, Path]] = None) -> Path:
-    """Write a bash script that scancels remaining jobs created by `submit_phase_chains_*.sh`.
-
-    Looks up recorded `*.jobids` (written at submit time) and live `squeue` rows whose batch Command matches sbatch
-    script paths in the submit script / sibling JSON manifest. Continues if a job is already gone, completed, or canceled.
-
-    Usage:
-        bash '/scratch/.../Output/gen_scripts/cancel_phase_chains_2026-10-21_GL.sh'
-        bash cancel_phase_chains_2026-10-21_GL.sh '/scratch/.../submit_phase_chains_2026-10-21_GL.sh'
-    """
-    submit_script_path = Path(submit_script_path)
-    if cancel_script_path is None:
-        if submit_script_path.name.startswith('submit_phase_chains_'):
-            cancel_script_path = submit_script_path.with_name(submit_script_path.name.replace('submit_phase_chains_', 'cancel_phase_chains_', 1))
-        else:
-            cancel_script_path = submit_script_path.with_name(f'cancel_{submit_script_path.name}')
-    else:
-        cancel_script_path = Path(cancel_script_path)
-
-    cancel_script_path.parent.mkdir(parents=True, exist_ok=True)
-    default_submit_name: str = submit_script_path.name
-    bash_lines: List[str] = [
-        '#!/bin/bash',
-        '# Cancel remaining Slurm jobs created by the matching submit_phase_chains_*.sh.',
-        '# Safe: continues if a job is already gone, completed, or previously canceled.',
-        'set +e',
-        'set -u',
-        '',
-        '_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
-        f'DEFAULT_SUBMIT_SCRIPT="${{_SELF_DIR}}/{default_submit_name}"',
-        'SUBMIT_SCRIPT="${1:-$DEFAULT_SUBMIT_SCRIPT}"',
-        'if [[ "$SUBMIT_SCRIPT" != /* ]]; then SUBMIT_SCRIPT="${_SELF_DIR}/$(basename "$SUBMIT_SCRIPT")"; fi',
-        'JOBIDS_FILE="${SUBMIT_SCRIPT%.sh}.jobids"',
-        'MANIFEST_FILE="${SUBMIT_SCRIPT%.sh}.json"',
-        'TMP_JIDS="$(mktemp)"',
-        'TMP_SCRIPTS="$(mktemp)"',
-        'trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
-        '',
-        'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
-        '',
-        'add_jid() {',
-        '  local raw="${1:-}"',
-        '  raw="${raw%%;*}"',
-        '  raw="${raw%%.*}"',
-        '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
-        '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
-        '}',
-        '',
-        'if [[ -f "$JOBIDS_FILE" ]]; then',
-        '  echo "Reading recorded job ids: $JOBIDS_FILE"',
-        '  while IFS= read -r line || [[ -n "${line:-}" ]]; do',
-        '    line="${line%%#*}"',
-        '    add_jid "$line"',
-        '  done < "$JOBIDS_FILE"',
-        'fi',
-        '',
-        'if [[ -f "$SUBMIT_SCRIPT" ]]; then',
-        '''  awk -F"'" '/sbatch --parsable/ {print $2}' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
-        'fi',
-        'if [[ -f "$MANIFEST_FILE" ]]; then',
-        """  grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
-        'fi',
-        'if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
-        '',
-        'if command -v squeue >/dev/null 2>&1; then',
-        '  while IFS=\'|\' read -r jid cmd; do',
-        '    [[ -z "${jid:-}" ]] && continue',
-        '    while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
-        '      [[ -z "${script_path:-}" ]] && continue',
-        '      if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
-        '    done < "$TMP_SCRIPTS"',
-        '  done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
-        'else',
-        '  echo "WARN: squeue not found; canceling only recorded job ids (if any)."',
-        'fi',
-        '',
-        'if [[ ! -s "$TMP_JIDS" ]]; then',
-        '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
-        '  exit 0',
-        'fi',
-        '',
-        'sort -u "$TMP_JIDS" -o "$TMP_JIDS"',
-        'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
-        'cat "$TMP_JIDS"',
-        '',
-        'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
-        '  [[ -z "${jid:-}" ]] && continue',
-        '  _err="$(scancel "$jid" 2>&1)"',
-        '  _rc=$?',
-        '  if [[ $_rc -eq 0 ]]; then',
-        '    echo "  canceled $jid"',
-        '  else',
-        '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
-        '  fi',
-        'done < "$TMP_JIDS"',
-        '',
-        'echo "Done."',
-        '',
-    ]
-    cancel_script_path.write_text('\n'.join(bash_lines), encoding='utf-8')
-    try:
-        cancel_script_path.chmod(cancel_script_path.stat().st_mode | 0o111)
-    except OSError:
-        pass
-    print(f'Wrote cancel script: {cancel_script_path}')
-    return cancel_script_path
 
 
 def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path], start_phase: str,
@@ -918,15 +967,14 @@ def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backe
         print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
         return
     print('Monitor chained phase jobs:')
+    print("  bash submit_phase_chains_<stamp>.sh --status")
     print('  squeue -u $USER')
     if job_ids:
         job_id_str = ','.join(str(j) for j in job_ids)
         print(f'  squeue -j {job_id_str}')
         print(f'  sacct -j {job_id_str} --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
-    else:
-        print('  sacct -u $USER --starttime=now-2days --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
     print('Cancel remaining jobs from this batch (safe if already gone):')
-    print("  bash cancel_phase_chains_<date>.sh   # sibling of submit_phase_chains_*.sh")
+    print("  bash submit_phase_chains_<stamp>.sh --cancel")
     print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
 
 # END Batch process phase chaining ___________________________________________________________________________________ #
