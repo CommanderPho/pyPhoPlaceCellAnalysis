@@ -2786,9 +2786,15 @@ class FigureS8:
             _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, split_by_column='animal')
 
 
+
+    Sizes:
+        Final export (SVG/PDF page) for figure 4, S6, S8: (w: 5.3956 in, h: 2.18 in)
+        Plotly layout canvas stays PUB_FIG_SIZE CSS px (792 x 320, same aspect). Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG so Illustrator/cairosvg honor the inch size (previously PDF came out at 0.75x).
+
     """
     plotly_helpers: PlotlyHelpers = None
-    PUB_FIG_SIZE: Dict = dict(width=792, height=320)
+    PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
+    PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES (5.3956/8.25 == 2.18/(320/96))
     figures_parent_folder: Path = None
     last_debug_values: Optional[Dict] = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
@@ -2883,6 +2889,7 @@ class FigureS8:
         svg_save_path = svg_output_folder.joinpath(f'{basename}.svg')
         if should_export_svg or should_export_pdf:
             export_fig.write_image(svg_save_path, format="svg")  # Kaleido SVG does honor transparent bg
+            SVGHelpers.set_physical_size_inches(svg_save_path, width_in=cls.PUB_FIG_SIZE_INCHES['width'], height_in=cls.PUB_FIG_SIZE_INCHES['height'])
         if should_export_svg:
             _out_paths[f'{export_suffix}/svg'] = svg_save_path
 
@@ -3164,6 +3171,7 @@ class FigureS8:
                 if should_save and (len(group_svg_paths) > 0):
                     stacked_svg_path = figures_parent_folder.joinpath(f'{stacked_basename}_by_{split_by_column}.svg')
                     SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
+                    SVGHelpers.set_physical_size_inches(stacked_svg_path, width_in=cls.PUB_FIG_SIZE_INCHES['width'], height_in=(cls.PUB_FIG_SIZE_INCHES['height'] * len(group_svg_paths)))
                     _out_paths_dict[k][f'{export_suffix}/svg'] = stacked_svg_path
                     print(f'\tstacked {split_by_column} rows: "{stacked_svg_path.as_posix()}"')
                 if should_save and (len(group_pdf_paths) > 1):
@@ -3279,10 +3287,9 @@ class FigureS8:
         cls.template = cls.plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = cls.template
 
-        cls.PUB_FIG_SIZE = dict(width=792, height=320) # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
-        # PUB_FIG_SIZE = dict(width=594, height=240) ## actual = (446, 179.4512)
-        # PUB_FIG_SIZE = dict(width=(594+148), height=(240+60)) ## corrections: (148, 60), PUB_FIG_SIZE: {'width': 742, 'height': 300}, actual = (557, 224.5)
-        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}') 
+        cls.PUB_FIG_SIZE_INCHES = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
+        cls.PUB_FIG_SIZE = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES. Kaleido unitless px used to export at 0.75x (792x320 -> 594x240 pt)
+        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
 
         cls._pub_font = dict(family="Arial", color="black")
