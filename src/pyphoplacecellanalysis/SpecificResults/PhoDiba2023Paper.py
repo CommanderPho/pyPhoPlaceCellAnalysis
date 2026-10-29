@@ -1898,6 +1898,8 @@ class PrePostDeltaDistributionComparison:
         `laps_results` / `pbe_results` may be `run()` result dicts (must include `session_summary`) or `session_summary` DataFrames.
         Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
 
+        Groups are Laps/PBEs rather than Long/Short, so Fig2 blue/red bar colors are overridden to black (scatter points follow the bars).
+
         When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
         or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
         each PBE column is split into two half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
@@ -2029,6 +2031,7 @@ class PrePostDeltaDistributionComparison:
             active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
 
         heuristic_color = '#2ca02c'
+        summary_bar_color = 'k'  # Laps/PBEs are not Long/Short; do not use Fig2 blue/red
         has_heuristic: bool = pbe_heuristic_session_summary is not None
         heuristic_y_pre = None
         heuristic_y_post = None
@@ -2037,6 +2040,7 @@ class PrePostDeltaDistributionComparison:
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
             create_plot_kwargs.setdefault('fignum', fignum)
+        create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
         if has_heuristic:
             heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
             heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
@@ -2044,7 +2048,7 @@ class PrePostDeltaDistributionComparison:
             half_width = full_width / 2.0
             pair_gap = 0.03
             pbe_half_offset = (half_width + pair_gap) / 2.0
-            pbe_color = PaperFigureTwo.get_bar_colors()[2]
+            pbe_color = summary_bar_color
             # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing, with a tiny x-gap.
             y_values = [
                 y_values[0], y_values[1],
@@ -2059,7 +2063,7 @@ class PrePostDeltaDistributionComparison:
             create_plot_kwargs.update(dict(
                 bar_x=np.array([0.0, 1.0, 2.0 - pbe_half_offset, 2.0 + pbe_half_offset, 3.0 - pbe_half_offset, 3.0 + pbe_half_offset], dtype=float),
                 bar_width=np.array([full_width, full_width, half_width, half_width, half_width, half_width], dtype=float),
-                bar_colors=[PaperFigureTwo.get_bar_colors()[0], PaperFigureTwo.get_bar_colors()[1], pbe_color, heuristic_color, pbe_color, heuristic_color],
+                bar_colors=[summary_bar_color, summary_bar_color, pbe_color, heuristic_color, pbe_color, heuristic_color],
                 errorbar_colors=['k', 'k', 'k', heuristic_color, 'k', heuristic_color],
                 xtick_positions=np.arange(4),
                 xtick_labels=x_labels,
@@ -2112,7 +2116,7 @@ class PrePostDeltaDistributionComparison:
                     add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
 
                 if has_heuristic:
-                    pbe_legend_color = PaperFigureTwo.get_bar_colors()[2][:3]
+                    pbe_legend_color = summary_bar_color
                     ax.legend(
                         handles=[
                             Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
