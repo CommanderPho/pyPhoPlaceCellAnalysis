@@ -498,150 +498,6 @@ def _subfn_phase_chain_lines(phase_script_paths: List[Tuple[str, str]], phase_ch
     raise ValueError(f"phase_chain_backend must be 'slurm', 'bash', or 'powershell', got {phase_chain_backend!r}")
 
 
-def _subfn_slurm_collect_chain_jids_lines() -> List[str]:
-    """Bash helpers that fill `$TMP_JIDS` from `$JOBIDS_FILE` plus live `squeue` matching this chain's sbatch script paths."""
-    return [
-        'add_jid() {',
-        '  local raw="${1:-}"',
-        '  raw="${raw%%;*}"',
-        '  raw="${raw%%.*}"',
-        '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
-        '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
-        '}',
-        '',
-        'collect_chain_jids() {',
-        '  TMP_JIDS="$(mktemp)"',
-        '  TMP_SCRIPTS="$(mktemp)"',
-        '  trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
-        '  if [[ -f "$JOBIDS_FILE" ]]; then',
-        '    echo "Reading recorded job ids: $JOBIDS_FILE"',
-        '    while IFS= read -r line || [[ -n "${line:-}" ]]; do',
-        '      line="${line%%#*}"',
-        '      add_jid "$line"',
-        '    done < "$JOBIDS_FILE"',
-        '  fi',
-        '  if [[ -f "$SUBMIT_SCRIPT" ]]; then',
-        '''    awk -F"'" '/sbatch --parsable/ { if ($2 ~ /\\.sh$/) print $2 }' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
-        '  fi',
-        '  if [[ -f "$MANIFEST_FILE" ]]; then',
-        """    grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
-        '  fi',
-        '  if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
-        '  if command -v squeue >/dev/null 2>&1; then',
-        '    while IFS=\'|\' read -r jid cmd; do',
-        '      [[ -z "${jid:-}" ]] && continue',
-        '      while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
-        '        [[ -z "${script_path:-}" ]] && continue',
-        '        if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
-        '      done < "$TMP_SCRIPTS"',
-        '    done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
-        '  else',
-        '    echo "WARN: squeue not found; using only recorded job ids (if any)."',
-        '  fi',
-        '  if [[ -s "$TMP_JIDS" ]]; then sort -u "$TMP_JIDS" -o "$TMP_JIDS"; fi',
-        '}',
-        '',
-    ]
-
-
-def _subfn_slurm_cancel_mode_lines(indent: str = '  ') -> List[str]:
-    """Bash body for `--cancel`: scancel collected chain job ids, continuing if a job is already gone."""
-    raw = [
-        'collect_chain_jids',
-        'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
-        'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
-        '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
-        '  exit 0',
-        'fi',
-        'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
-        'cat "$TMP_JIDS"',
-        'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
-        '  [[ -z "${jid:-}" ]] && continue',
-        '  _err="$(scancel "$jid" 2>&1)"',
-        '  _rc=$?',
-        '  if [[ $_rc -eq 0 ]]; then',
-        '    echo "  canceled $jid"',
-        '  else',
-        '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
-        '  fi',
-        'done < "$TMP_JIDS"',
-        'echo "Done."',
-    ]
-    return [f'{indent}{line}' if line else line for line in raw]
-
-
-def _subfn_slurm_status_mode_lines(indent: str = '  ') -> List[str]:
-    """Bash body for `--status`: `sacct --allocations` for this chain's job ids (all states)."""
-    raw = [
-        'collect_chain_jids',
-        'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
-        '  echo "No jobs found for this chain (not yet submitted, already finished, or .jobids missing)."',
-        '  exit 0',
-        'fi',
-        'jid_csv="$(paste -sd, "$TMP_JIDS")"',
-        'echo "Chain jobs ($(wc -l < "$TMP_JIDS" | tr -d \' \')): $jid_csv"',
-        'if command -v sacct >/dev/null 2>&1; then',
-        '  SLURM_TIME_FORMAT=standard sacct --allocations --jobs="$jid_csv" --format=Start,JobID,State,Elapsed,JobName%100,ExitCode',
-        'else',
-        '  echo "WARN: sacct not found."',
-        'fi',
-    ]
-    return [f'{indent}{line}' if line else line for line in raw]
-
-
-def _subfn_slurm_cli_dispatch_lines() -> List[str]:
-    """Bash: parse `--cancel`/`--status`/`--help`, run that mode, and exit (default continues to submit)."""
-    lines: List[str] = [
-        'print_usage() {',
-        '  echo "Usage: bash $0 [--cancel|--status|--help]"',
-        '  echo "  (no args)  submit per-session afterok chains"',
-        '  echo "  --status   print this chain\'s jobs via sacct"',
-        '  echo "  --cancel   scancel remaining jobs in this chain (safe if already gone)"',
-        '}',
-        '',
-        'MODE=submit',
-        'for _arg in "$@"; do',
-        '  case "$_arg" in',
-        '    --cancel)',
-        '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
-        '      MODE=cancel',
-        '      ;;',
-        '    --status)',
-        '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
-        '      MODE=status',
-        '      ;;',
-        '    -h|--help)',
-        '      print_usage',
-        '      exit 0',
-        '      ;;',
-        '    *)',
-        '      echo "ERROR: unknown argument: $_arg" >&2',
-        '      print_usage',
-        '      exit 1',
-        '      ;;',
-        '  esac',
-        'done',
-        '',
-        'if [[ "$MODE" == "cancel" ]]; then',
-        '  set +e',
-    ]
-    lines.extend(_subfn_slurm_cancel_mode_lines(indent='  '))
-    lines.extend([
-        '  exit 0',
-        'fi',
-        '',
-        'if [[ "$MODE" == "status" ]]; then',
-        '  set +e',
-    ])
-    lines.extend(_subfn_slurm_status_mode_lines(indent='  '))
-    lines.extend([
-        '  exit 0',
-        'fi',
-        '',
-    ])
-    return lines
-
-
 def submit_slurm_script(slurm_script_path: Union[str, Path]) -> int:
     """Submit one Slurm script via `sbatch --parsable` and return the job id (optional auto-submit; generator writes chains instead)."""
     script_path = Path(slurm_script_path)
@@ -727,6 +583,146 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
 
     Returns (submit_script_path, manifest_path).
     """
+    def _subfn_slurm_collect_chain_jids_lines() -> List[str]:
+        """Bash helpers that fill `$TMP_JIDS` from `$JOBIDS_FILE` plus live `squeue` matching this chain's sbatch script paths."""
+        return [
+            'add_jid() {',
+            '  local raw="${1:-}"',
+            '  raw="${raw%%;*}"',
+            '  raw="${raw%%.*}"',
+            '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
+            '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
+            '}',
+            '',
+            'collect_chain_jids() {',
+            '  TMP_JIDS="$(mktemp)"',
+            '  TMP_SCRIPTS="$(mktemp)"',
+            '  trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
+            '  if [[ -f "$JOBIDS_FILE" ]]; then',
+            '    echo "Reading recorded job ids: $JOBIDS_FILE"',
+            '    while IFS= read -r line || [[ -n "${line:-}" ]]; do',
+            '      line="${line%%#*}"',
+            '      add_jid "$line"',
+            '    done < "$JOBIDS_FILE"',
+            '  fi',
+            '  if [[ -f "$SUBMIT_SCRIPT" ]]; then',
+            '''    awk -F"'" '/sbatch --parsable/ { if ($2 ~ /\\.sh$/) print $2 }' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
+            '  fi',
+            '  if [[ -f "$MANIFEST_FILE" ]]; then',
+            """    grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
+            '  fi',
+            '  if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
+            '  if command -v squeue >/dev/null 2>&1; then',
+            '    while IFS=\'|\' read -r jid cmd; do',
+            '      [[ -z "${jid:-}" ]] && continue',
+            '      while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
+            '        [[ -z "${script_path:-}" ]] && continue',
+            '        if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
+            '      done < "$TMP_SCRIPTS"',
+            '    done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
+            '  else',
+            '    echo "WARN: squeue not found; using only recorded job ids (if any)."',
+            '  fi',
+            '  if [[ -s "$TMP_JIDS" ]]; then sort -u "$TMP_JIDS" -o "$TMP_JIDS"; fi',
+            '}',
+            '',
+        ]
+
+    def _subfn_slurm_cancel_mode_lines(indent: str = '  ') -> List[str]:
+        """Bash body for `--cancel`: scancel collected chain job ids, continuing if a job is already gone."""
+        raw = [
+            'collect_chain_jids',
+            'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
+            'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+            '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
+            '  exit 0',
+            'fi',
+            'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
+            'cat "$TMP_JIDS"',
+            'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
+            '  [[ -z "${jid:-}" ]] && continue',
+            '  _err="$(scancel "$jid" 2>&1)"',
+            '  _rc=$?',
+            '  if [[ $_rc -eq 0 ]]; then',
+            '    echo "  canceled $jid"',
+            '  else',
+            '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
+            '  fi',
+            'done < "$TMP_JIDS"',
+            'echo "Done."',
+        ]
+        return [f'{indent}{line}' if line else line for line in raw]
+
+    def _subfn_slurm_status_mode_lines(indent: str = '  ') -> List[str]:
+        """Bash body for `--status`: `sacct --allocations` for this chain's job ids (all states)."""
+        raw = [
+            'collect_chain_jids',
+            'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+            '  echo "No jobs found for this chain (not yet submitted, already finished, or .jobids missing)."',
+            '  exit 0',
+            'fi',
+            'jid_csv="$(paste -sd, "$TMP_JIDS")"',
+            'echo "Chain jobs ($(wc -l < "$TMP_JIDS" | tr -d \' \')): $jid_csv"',
+            'if command -v sacct >/dev/null 2>&1; then',
+            '  SLURM_TIME_FORMAT=standard sacct --allocations --jobs="$jid_csv" --format=Start,JobID,State,Elapsed,JobName%100,ExitCode',
+            'else',
+            '  echo "WARN: sacct not found."',
+            'fi',
+        ]
+        return [f'{indent}{line}' if line else line for line in raw]
+
+    def _subfn_slurm_cli_dispatch_lines() -> List[str]:
+        """Bash: parse `--cancel`/`--status`/`--help`, run that mode, and exit (default continues to submit)."""
+        lines: List[str] = [
+            'print_usage() {',
+            '  echo "Usage: bash $0 [--cancel|--status|--help]"',
+            '  echo "  (no args)  submit per-session afterok chains"',
+            '  echo "  --status   print this chain\'s jobs via sacct"',
+            '  echo "  --cancel   scancel remaining jobs in this chain (safe if already gone)"',
+            '}',
+            '',
+            'MODE=submit',
+            'for _arg in "$@"; do',
+            '  case "$_arg" in',
+            '    --cancel)',
+            '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+            '      MODE=cancel',
+            '      ;;',
+            '    --status)',
+            '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+            '      MODE=status',
+            '      ;;',
+            '    -h|--help)',
+            '      print_usage',
+            '      exit 0',
+            '      ;;',
+            '    *)',
+            '      echo "ERROR: unknown argument: $_arg" >&2',
+            '      print_usage',
+            '      exit 1',
+            '      ;;',
+            '  esac',
+            'done',
+            '',
+            'if [[ "$MODE" == "cancel" ]]; then',
+            '  set +e',
+        ]
+        lines.extend(_subfn_slurm_cancel_mode_lines(indent='  '))
+        lines.extend([
+            '  exit 0',
+            'fi',
+            '',
+            'if [[ "$MODE" == "status" ]]; then',
+            '  set +e',
+        ])
+        lines.extend(_subfn_slurm_status_mode_lines(indent='  '))
+        lines.extend([
+            '  exit 0',
+            'fi',
+            '',
+        ])
+        return lines
+
     out_path = Path(out_path)
     if manifest_path is None:
         manifest_path = out_path.with_suffix('.json')
