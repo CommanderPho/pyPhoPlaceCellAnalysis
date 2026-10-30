@@ -2226,11 +2226,11 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             from mpl_toolkits.axisartist import floating_axes
             from mpl_toolkits.axisartist.grid_finder import FixedLocator, DictFormatter
 
-            def _subfn_make_diagonal_hist_axes(parent_ax, *, xlim, ylim, angle=-45, size=0.25, height_ratio=0.35):
+            def _subfn_make_diagonal_hist_axes(parent_ax, *, xlim, ylim, angle=-45, size=0.25, height_ratio=0.35, corner_offset: float = 0.01):
                 """
                 Create an empty rotated axes outside parent_ax.
 
-                Its baseline midpoint is anchored to parent_ax's upper-right corner.
+                Its baseline midpoint is anchored slightly outward from parent_ax's upper-right corner along the y=x diagonal.
 
                 Parameters
                 ----------
@@ -2242,6 +2242,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
                     Initial bounding-box width/height in figure-relative coordinates.
                 height_ratio : float
                     Height / baseline width before rotation.
+                corner_offset : float
+                    Outward shift from parent_ax's (1, 1) corner, in axes-fraction along the diagonal. 0 sits flush on the corner.
 
                 Returns
                 -------
@@ -2295,7 +2297,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
                 def fn_align():
                     fig.canvas.draw()
 
-                    target = parent_ax.transAxes.transform((1, 1))
+                    # Offset outward from the upper-right corner along the y=x diagonal.
+                    target = parent_ax.transAxes.transform((1.0 + corner_offset, 1.0 + corner_offset))
                     anchor = hist_ax.transData.transform((xmid, baseline_y[0]))
 
                     to_fig = fig.transFigure.inverted()
@@ -2693,7 +2696,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # lim = (int(xymax/binwidth) + 1)*binwidth
         # bins = np.arange(-lim, lim + binwidth, binwidth)
 
-        n_bins: int = 25
+        n_bins: int = 27 # Use n_bins=27 if you want ~0.074 width
         # bins = np.linspace(-1.0, 1.0, (n_bins + 1)) ## AI says: np.linspace(-active_limit_magnitude, active_limit_magnitude, (n_bins + 1))
         bins = np.linspace(-active_limit_magnitude, active_limit_magnitude, (n_bins + 1))
 
@@ -2709,7 +2712,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         if enable_diagonal_histogram:
             (diagonal_hist_artist_tuple, midline_artist), (xlims, ylims) = _subfn_build_diagonal_histogram(x_frs_index=x_frs_index.values, y_frs_index=y_frs_index.values, ax_histdiagonal=ax_histdiagonal, binwidth=binwidth)
 
-            print(f'xlims: {xlims}, ylims: {ylims}')
+            print(f'diagonal histogram xlims: {xlims}, ylims: {ylims}')
 
             if enable_inset_histdiagonal_ax:
                 # Read the plotted data bounds, not the floating frame's view limits.
