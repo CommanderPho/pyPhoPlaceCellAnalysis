@@ -2615,14 +2615,13 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # Set precise axis limits
         ax.set_xlim(-1.01, 1.01)  # Set x-axis limits from 0 to 1
         ax.set_ylim(-1.01, 1.01)  # Set y-axis limits from 0 to 1
-        
+
+    # Set aspect of the main Axes so a data unit on x equals a data unit on y, independent of figure size, labels, and cropping.
+    ax.set_aspect(1.)
 
     if enable_histograms:
         ## plot the left and top marginal histograms
         from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-        # Set aspect of the main Axes.
-        # ax.set_aspect(1.)
 
         if enable_subplot_mosaic_style:
             # extract the already created dict axes:
