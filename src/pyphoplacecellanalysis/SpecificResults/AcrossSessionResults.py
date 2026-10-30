@@ -1800,7 +1800,7 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
@@ -1811,7 +1811,7 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
 
-    def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None):
+    def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None, dry_run: bool = False):
         """ 
         Creates `across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}_{time_bin_size_str}.pkl`
         """
@@ -1834,11 +1834,14 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
                     assert curr_pkl.exists()
                     print(a_session_folder)
                     print(curr_pkl)
+                    if dry_run:
+                        across_sessions_recomputed_instantaneous_fr_dict[a_session_folder.context] = None
+                        continue
                     try:
                         across_sessions_recomputed_instantaneous_fr_dict[a_session_folder.context] = loadData(curr_pkl) # InstantaneousSpikeRateGroupsComputation
                     except BaseException as err:
                         print(f'encountered err: {err} when trying to unpickle. Skipping.')
-            # end for a_session_folder
+            ## END for a_session_folder in good_session_concrete_folders...
             # OUTPUT:  across_sessions_recomputed_instantaneous_fr_dict
             num_sessions = len(across_sessions_recomputed_instantaneous_fr_dict)
             print(f'num_sessions: {num_sessions}')
@@ -1847,8 +1850,11 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
 
             ## Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation)
             across_session_result_long_short_recomputed_inst_firing_rate_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}_{time_bin_size_str}.pkl'
-            AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_recomputed_instantaneous_fr_dict, global_data_root_parent_path=collected_outputs_path.resolve(),
-                                                            inst_fr_output_filename=across_session_result_long_short_recomputed_inst_firing_rate_filename)
+            if dry_run:
+                print(f'DRY-RUN: would save across_sessions inst-FR pickle to {collected_outputs_path.resolve().joinpath(across_session_result_long_short_recomputed_inst_firing_rate_filename)} ({num_sessions} session(s))')
+            else:
+                AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_recomputed_instantaneous_fr_dict, global_data_root_parent_path=collected_outputs_path.resolve(),
+                                                                inst_fr_output_filename=across_session_result_long_short_recomputed_inst_firing_rate_filename)
 
             ## Add to the dict dict
             across_sessions_recomputed_instantaneous_fr_dict_dict[time_bin_size] = across_sessions_recomputed_instantaneous_fr_dict
@@ -1865,11 +1871,11 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     if global_data_root_parent_path is not None:
         global_data_root_parent_path = Path(global_data_root_parent_path) # .resolve()
         if not global_data_root_parent_path.exists():
-            raise FileNotFoundError(f'global_data_root_parent_path does not exist: {global_data_root_parent_path}')
+            raise FileNotFoundError(f'user-provided `global_data_root_parent_path` does not exist: {global_data_root_parent_path}')
     else:
         known_global_data_root_parent_paths = [Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'/Volumes/MoverNew/data')] # , Path(r'/home/halechr/FastData'), Path(r'/home/halechr/turbo/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data')
         global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        assert global_data_root_parent_path.exists(), f"auto-discovered global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     # Hardcoded included_session_contexts:
     included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
     good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
@@ -1877,11 +1883,15 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     # Output Paths:
     target_dir: Path = collected_outputs_path
     custom_file_type_name: str = 'recomputed_inst_fr_comps'
-    out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=f'{RESULT_DATE_TO_USE}/{custom_file_type_name}')
+    if dry_run:
+        out_parent_path = target_dir.joinpath(f'{RESULT_DATE_TO_USE}/{custom_file_type_name}').resolve()
+        print(f'DRY-RUN: out_parent_path (not created): {out_parent_path}')
+    else:
+        out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=f'{RESULT_DATE_TO_USE}/{custom_file_type_name}')
 
-    moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=out_parent_path, RESULT_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=False)
+    moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=out_parent_path, RESULT_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=dry_run, debug_print=debug_print)
 
-    across_sessions_recomputed_instantaneous_fr_dict = _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders=good_session_concrete_folders, collected_outputs_path=collected_outputs_path, BATCH_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict)
+    across_sessions_recomputed_instantaneous_fr_dict = _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders=good_session_concrete_folders, collected_outputs_path=collected_outputs_path, BATCH_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=dry_run)
 
     return across_sessions_recomputed_instantaneous_fr_dict, moved_files_dict_files, (filelist_path, filedict_out_path)
 
