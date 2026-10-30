@@ -2524,6 +2524,24 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, edgecolors=edgecolors, **scatter_params) # , s=10, alpha=0.5
     scatter_plot.set_clip_on(False)
     scatter_plot.set_clip_path(None)
+
+    def _subfn_marker_pad_figure_fraction(fig, scatter_plot, extra_pts: float = 1.5):
+        """Figure-fraction pad equal to the marker radius so clip_on=False points at ±1 are not cropped by the canvas."""
+        fig_w, fig_h = fig.get_size_inches()
+        sizes = np.asarray(scatter_plot.get_sizes(), dtype=float)
+        s_max = float(np.nanmax(sizes)) if sizes.size else 36.0
+        radius_pts = float(np.sqrt(max(s_max, 0.0) / np.pi))
+        lws = np.asarray(scatter_plot.get_linewidths(), dtype=float)
+        lw_max = float(np.nanmax(lws)) if lws.size else 0.4
+        pad_in = (radius_pts + lw_max + extra_pts) / 72.0
+        return (pad_in / max(fig_w, 1e-6), pad_in / max(fig_h, 1e-6))
+
+    def _subfn_ensure_figure_pad_for_markers(fig, ax_scatter, scatter_plot):
+        pad_x, pad_y = _subfn_marker_pad_figure_fraction(fig, scatter_plot)
+        fig.subplots_adjust(left=max(fig.subplotpars.left, pad_x), bottom=max(fig.subplotpars.bottom, pad_y))
+        fig.canvas.draw()
+        ax_scatter.apply_aspect()
+
     if include_axis_labels:
         ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
         ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
@@ -2559,7 +2577,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             ## Smaller fonts for publication -- Originally 18, now 9
             flexitext(text_formatter.left_margin, text_formatter.top_margin, '<size:9><color:royalblue, weight:bold>long ($L$)</>|<color:crimson, weight:bold>short($S$)</> <weight:bold>firing rate indices</></>', va="bottom", xycoords="figure fraction")
     elif omit_outside_axes_elements:
-        fig.subplots_adjust(top=1.0, left=0.0, right=1.0, bottom=0.0)
+        pad_x, pad_y = _subfn_marker_pad_figure_fraction(fig, scatter_plot)
+        fig.subplots_adjust(top=1.0, left=pad_x, right=1.0, bottom=pad_y)
 
     # fig.set_size_inches([8.5, 7.25]) # size figure so the x and y labels aren't cut off
 
@@ -2788,9 +2807,12 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
         fig.canvas.draw()
         ax.apply_aspect()
+        _subfn_ensure_figure_pad_for_markers(fig, ax, scatter_plot)
         _subfn_align_marginal_histogram_axes(ax, ax_histx, ax_histy)
         if enable_inset_histdiagonal_ax and enable_diagonal_histogram:
             fn_diagonal_align()
+    else:
+        _subfn_ensure_figure_pad_for_markers(fig, ax, scatter_plot)
 
     # Scatter must draw above the marginal/diagonal axes (separate Axes, so collection zorder is not enough) and must not be clipped in SVG.
     scatter_plot.set_clip_on(False)
