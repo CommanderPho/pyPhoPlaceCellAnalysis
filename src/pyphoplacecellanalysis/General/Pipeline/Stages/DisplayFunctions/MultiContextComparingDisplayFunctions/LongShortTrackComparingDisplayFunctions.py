@@ -2167,9 +2167,10 @@ def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, b
     ax_histdiagonal.set_xticklabels([])
     ax_histdiagonal.tick_params(axis='y', which='both', length=0)
 
-    midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
+    # midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
+    midline_artist = ax_histdiagonal.vlines(x=0, ymin=ylims[0], ymax=ylims[1], colors="gray", linestyles="--", linewidth=0.6)
 
-    ax_histdiagonal.spines[['bottom']].set_visible(True)
+    # ax_histdiagonal.spines[['bottom']].set_visible(True)
     ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
     ax_histdiagonal.set_xticklabels(["$-\\sqrt{2}$", 0, "$\\sqrt{2}$"])
 
@@ -2192,7 +2193,7 @@ def _plot_diagonal_firing_rate_index_histogram(x_frs_index, y_frs_index, active_
 
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True,  enable_axes_colored_guide_lines: bool = False,
-                                          enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True,
+                                          enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, enable_inset_histdiagonal_ax: bool = True, include_linear_regression_line:bool=True,
                                           omit_outside_axes_elements: bool = False, include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
@@ -2209,13 +2210,167 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         include_title / include_axis_labels: default True, or False when `omit_outside_axes_elements=True`
         include_tick_labels / include_r_value_label: default True
         enable_diagonal_histogram: if False, the top-right mosaic cell is left empty (used when that histogram is exported as a separate SVG)
-
+        enable_inset_histdiagonal_ax: if True, uses `mpl_toolkits.axes_grid1.inset_locator.inset_axes` to position the diagonal histogram axes at the top-right of the parent axes
         
     """
     import matplotlib
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
     # from matplotlib.backends.backend_pgf import FigureCanvasPgf
     # matplotlib.backend_bases.register_backend('pdf', FigureCanvasPgf)
+
+    if (enable_inset_histdiagonal_ax and enable_diagonal_histogram):
+            from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+            from matplotlib.transforms import Affine2D
+            from mpl_toolkits.axisartist import floating_axes
+            from mpl_toolkits.axisartist.grid_finder import FixedLocator, DictFormatter
+
+            def _subfn_make_diagonal_hist_axes(parent_ax, *, xlim, ylim, angle=-45, size=0.25, height_ratio=0.35):
+                """
+                Create an empty rotated axes outside parent_ax.
+
+                Its baseline midpoint is anchored to parent_ax's upper-right corner.
+
+                Parameters
+                ----------
+                xlim, ylim : (float, float)
+                    Histogram data-coordinate bounds; usually ylim=(0, max_count).
+                angle : float
+                    Rotation in degrees.
+                size : float
+                    Initial bounding-box width/height in figure-relative coordinates.
+                height_ratio : float
+                    Height / baseline width before rotation.
+
+                Returns
+                -------
+                hist_ax : Axes
+                    Pass this to your existing histogram plotting function.
+                frame : FloatingAxes
+                    Controls the rotated boundary, ticks, and labels.
+                align : callable
+                    Call after plotting and final layout adjustments.
+                """
+                fig = parent_ax.figure
+
+                xmin, xmax = xlim
+                ymin, ymax = ylim
+                if xmax <= xmin or ymax <= ymin:
+                    raise ValueError("xlim and ylim must be strictly increasing.")
+
+                xmid = (xmin + xmax) / 2
+
+                transform = (
+                    Affine2D()
+                    .translate(-xmid, -ymin)
+                    .scale(
+                        1 / (xmax - xmin),
+                        height_ratio / (ymax - ymin),
+                    )
+                    .rotate_deg(angle)
+                )
+
+                helper = floating_axes.GridHelperCurveLinear(
+                    transform,
+                    extremes=(xmin, xmax, ymin, ymax),
+                )
+
+                frame = fig.add_axes(
+                    [0, 0, size, size],
+                    axes_class=floating_axes.FloatingAxes,
+                    grid_helper=helper,
+                )
+                frame.set_in_layout(False)
+                frame.patch.set_alpha(0)
+
+                # Keep only the baseline.
+                for side in ("left", "right", "top"):
+                    frame.axis[side].set_visible(False)
+
+                hist_ax = frame.get_aux_axes(transform)
+                baseline_y = [ymin]
+
+
+                def fn_align():
+                    fig.canvas.draw()
+
+                    target = parent_ax.transAxes.transform((1, 1))
+                    anchor = hist_ax.transData.transform((xmid, baseline_y[0]))
+
+                    to_fig = fig.transFigure.inverted()
+                    dx, dy = to_fig.transform(target) - to_fig.transform(anchor)
+
+                    frame.set_position(frame.get_position().translated(dx, dy))
+                    fig.canvas.draw_idle()
+
+
+                def fn_update_ylim(new_ylim):
+                    new_ymin, new_ymax = map(float, new_ylim)
+                    if not new_ymax > new_ymin:
+                        raise ValueError("ylim must be strictly increasing.")
+
+                    # Mutate the EXISTING transform: both frame and plotted artists
+                    # retain references to it.
+                    transform.clear()
+                    transform.translate(-xmid, -new_ymin)
+                    transform.scale(
+                        1 / (xmax - xmin),
+                        height_ratio / (new_ymax - new_ymin),
+                    )
+                    transform.rotate_deg(angle)
+
+                    # Update the coordinate bounds used for gridlines and ticks.
+                    helper.update_grid_finder(
+                        extreme_finder=floating_axes.ExtremeFinderFixed(
+                            (xmin, xmax, new_ymin, new_ymax)
+                        )
+                    )
+
+                    # Update the frame polygon, which also supplies clipping.
+                    frame.patch.set_xy([
+                        (xmin, new_ymin),
+                        (xmax, new_ymin),
+                        (xmax, new_ymax),
+                        (xmin, new_ymax),
+                    ])
+
+                    # Keep the fixed-axis tick positions consistent with the bounds.
+                    for side, value in {
+                        "left": xmin,
+                        "right": xmax,
+                        "bottom": new_ymin,
+                        "top": new_ymax,
+                    }.items():
+                        frame.axis[side].get_helper().value = value
+
+                    frame.adjust_axes_lim()
+
+                    # align() captures ymin from the constructor, so update it too.
+                    # See the small change below.
+                    baseline_y[0] = new_ymin
+                    fn_align()
+
+
+                bottom = frame.axis["bottom"]
+
+                bottom.line.set_linewidth(0.6)
+                bottom.major_ticks.set_linewidth(0.6)
+                bottom.major_ticks.set_ticksize(2)
+                bottom.minor_ticks.set_visible(False)
+
+                positions = [-np.sqrt(2), 0.0, np.sqrt(2)]
+                labels = {
+                    positions[0]: r"$-\sqrt{2}$",
+                    positions[1]: "0",
+                    positions[2]: r"$\sqrt{2}$",
+                }
+
+                frame.get_grid_helper().update_grid_finder(grid_locator1=FixedLocator(positions), tick_formatter1=DictFormatter(labels))
+
+                bottom.major_ticklabels.set_fontsize(8)
+
+                fn_align()
+                return hist_ax, frame, fn_align, fn_update_ylim
+
 
     # matplotlib.use('ps')
     # from matplotlib import rc
@@ -2302,7 +2457,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     
     if enable_subplot_mosaic_style:
         fig = plt.figure(**fig_kwargs) # layout="constrained", 
-        mosaic_top_right = "ax_histdiagonal" if enable_diagonal_histogram else "."
+
+        ## pre-2026-10-29 Subplot Mosaic Style:
+        mosaic_top_right = "ax_histdiagonal" if (enable_diagonal_histogram and (not enable_inset_histdiagonal_ax)) else "."
+
         ax_dict = fig.subplot_mosaic(
             [   
                 ["ax_histx", mosaic_top_right],
@@ -2317,6 +2475,23 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             gridspec_kw=dict(wspace=0, hspace=0) # `wspace=0`` is responsible for sticking the pf and the activity axes together with no spacing
         )
         ax = ax_dict["ax_scatter"]
+
+
+        ## 2026-10-30 New Inset Axes for the histdiagonal
+
+        ## 2026-10-30 New Inset Axes for the histdiagonal
+        if (enable_inset_histdiagonal_ax and enable_diagonal_histogram):
+
+            # ## Make the inset axes:
+            # ax_dict["ax_histdiagonal"] = inset_axes(
+            #     ax,
+            #     width="13%",
+            #     height="13%",
+            #     loc="upper right",
+            #     borderpad=1,
+            # )
+            ax_dict["ax_histdiagonal"], diagonal_frame, fn_diagonal_align, fn_diagonal_update_ylim = _subfn_make_diagonal_hist_axes(ax, xlim=(-np.sqrt(2), np.sqrt(2)), ylim=(0, 500), size=0.25)
+            
 
     else:
         # regular old subplot style
@@ -2474,9 +2649,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
                 ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
                 ax_histdiagonal.xaxis.set_ticks_position('none')  # Hide x-axis ticks
                 ax_histdiagonal.yaxis.set_ticks_position('none')  # Hide x-axis ticks
-                # Set the x and y axes to standard limits for easy visual comparison across sessions
-                ax_histdiagonal.set_xlim([-np.sqrt(2), np.sqrt(2)])
-                # ax_histdiagonal.set_ylim([-1.1, 1.1])
+                if (not enable_inset_histdiagonal_ax):
+                    # Set the x and y axes to standard limits for easy visual comparison across sessions
+                    ax_histdiagonal.set_xlim([-np.sqrt(2), np.sqrt(2)])
+                    # ax_histdiagonal.set_ylim([-1.1, 1.1])
                 
 
         else:
@@ -2508,6 +2684,15 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
         if enable_diagonal_histogram:
             (diagonal_hist_artist_tuple, midline_artist), (xlims, ylims) = _subfn_build_diagonal_histogram(x_frs_index=x_frs_index.values, y_frs_index=y_frs_index.values, ax_histdiagonal=ax_histdiagonal, binwidth=binwidth)
+
+            if enable_inset_histdiagonal_ax:
+                # Read the plotted data bounds, not the floating frame's view limits.
+                peak = ylims[-1] # hist_ax.dataLim.ymax
+                if not np.isfinite(peak) or peak <= 0:
+                    peak = 1.0
+
+                fn_diagonal_update_ylim((0.0, (1.10 * peak)))  # 10% headroom
+
 
         # Set the tick marks and labels as desired
         ax_histx.set_yticks([])

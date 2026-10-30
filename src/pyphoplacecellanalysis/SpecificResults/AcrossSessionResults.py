@@ -4102,6 +4102,7 @@ class AcrossSessionsVisualizations:
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
 
+
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_long_and_short_firing_rate_replays_v_laps_figure(cls, neuron_replay_stats_table: pd.DataFrame, num_sessions:int, save_figure=True, prepare_for_publication: bool = False, long_col_names:List[str]=['long_non_replay_mean', 'long_replay_mean'],
