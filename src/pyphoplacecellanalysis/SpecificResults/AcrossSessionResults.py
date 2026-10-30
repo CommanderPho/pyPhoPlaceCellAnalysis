@@ -3961,11 +3961,12 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies', '_plot_diagonal_firing_rate_index_histogram'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Uses: 'active_set_membership_from_user_annotations' to color points
+        `export_diagonal_histogram_svg=True` (default) writes the top-right y=x residual histogram as a separate SVG when `save_figure=True` and omits it from the main figure so it is not drawn twice. Override size with `diagonal_histogram_figsize`.
         
 
         Usage:
@@ -3980,9 +3981,13 @@ class AcrossSessionsVisualizations:
         """
         # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies, _plot_diagonal_firing_rate_index_histogram
 
         save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+        export_diagonal_histogram_svg: bool = bool(kwargs.pop('export_diagonal_histogram_svg', True))
+        diagonal_histogram_figsize = kwargs.pop('diagonal_histogram_figsize', None)
+        if export_diagonal_histogram_svg:
+            kwargs['enable_diagonal_histogram'] = False # draw it only on the separate SVG, not on the main figure
 
         # Plot long|short firing rate index:
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -4067,17 +4072,33 @@ class AcrossSessionsVisualizations:
         
         
         fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
+
+        diag_fig = None
+        diag_ax = None
+        if export_diagonal_histogram_svg and save_figure:
+            if diagonal_histogram_figsize is None:
+                _main_figsize = kwargs.get('figsize', fig.get_size_inches())
+                diagonal_histogram_figsize = (float(_main_figsize[0]) / 8.0, float(_main_figsize[1]) / 8.0)
+            diag_fig, diag_ax = _plot_diagonal_firing_rate_index_histogram(x_frs_index, y_frs_index, final_context, figsize=diagonal_histogram_figsize)
         
         def _perform_write_to_file_callback():
             active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)
-            return (active_out_figure_path,)
+            saved_paths = list(active_out_figure_path or [])
+            if export_diagonal_histogram_svg and (diag_fig is not None):
+                diag_context = final_context.overwriting_context(display_fn_name='across_sessions_firing_rate_index_diagonal_histogram')
+                diag_save_kwargs = dict(write_svg=True, write_png=False, write_vector_format=False, bbox_inches=save_figure_kwargs.get('bbox_inches', 'tight'), pad_inches=save_figure_kwargs.get('pad_inches', 0))
+                diag_paths, *_ = cls.output_figure(diag_context, diag_fig, **diag_save_kwargs)
+                saved_paths.extend(list(diag_paths or []))
+            return (saved_paths,)
 
         if save_figure:
             active_out_figure_paths = _perform_write_to_file_callback()
         else:
             active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig, ), axes=tuple(fig.axes), plot_data={'scatter_plot': scatter_plot}, context=final_context, saved_figures=active_out_figure_paths)
+        out_figures = (fig,) + ((diag_fig,) if diag_fig is not None else ())
+        out_axes = tuple(fig.axes) + ((diag_ax,) if diag_ax is not None else ())
+        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=out_figures, axes=out_axes, plot_data={'scatter_plot': scatter_plot, 'diagonal_histogram_fig': diag_fig, 'diagonal_histogram_ax': diag_ax}, context=final_context, saved_figures=active_out_figure_paths)
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
 
@@ -4107,6 +4128,7 @@ class AcrossSessionsVisualizations:
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
 
         save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', False), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
+        pop_dict_subset(kwargs, ['export_diagonal_histogram_svg', 'diagonal_histogram_figsize']) # scatter-only figure; ignore Fig3 index-histogram export kwargs
         
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context

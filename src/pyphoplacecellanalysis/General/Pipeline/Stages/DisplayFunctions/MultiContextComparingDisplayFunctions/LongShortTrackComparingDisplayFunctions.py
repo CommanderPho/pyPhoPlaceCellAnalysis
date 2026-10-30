@@ -2148,6 +2148,48 @@ def _subfn_resolve_outside_axes_element_flags(scatter_params: dict, omit_outside
     return omit_outside_axes_elements, bool(include_title), bool(include_axis_labels), bool(include_tick_labels), bool(include_r_value_label)
 
 
+def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth: float = 0.075):
+    """Plots the histogram along the y=x diagonal (top-right mosaic panel)."""
+    y_frs_index_rot = (y_frs_index - x_frs_index) / np.sqrt(2)
+    y = y_frs_index_rot
+
+    xymax = np.nanmax(np.abs(y))
+    lim = (int(xymax / binwidth) + 1) * binwidth
+
+    xlims = [-lim, (lim + binwidth)]
+    bins = np.arange(xlims[0], xlims[1], binwidth)
+    diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
+    max_num_bins = np.max(diagonal_hist_artist_tuple[0])
+    ylims = [0.0, float(max_num_bins)]
+
+    ax_histdiagonal.set_yticks([])
+    ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+    ax_histdiagonal.set_xticklabels([])
+    ax_histdiagonal.tick_params(axis='y', which='both', length=0)
+
+    midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
+
+    ax_histdiagonal.spines[['bottom']].set_visible(True)
+    ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
+    ax_histdiagonal.set_xticklabels(["$-\\sqrt{2}$", 0, "$\\sqrt{2}$"])
+
+    return ((diagonal_hist_artist_tuple, midline_artist), (xlims, ylims))
+
+
+def _plot_diagonal_firing_rate_index_histogram(x_frs_index, y_frs_index, active_context, figsize=(1.2, 1.2), binwidth: float = 0.075, **fig_kwargs):
+    """Standalone copy of the top-right diagonal histogram from `_plot_long_short_firing_rate_indicies`."""
+    fig_kwargs = dict(figsize=figsize, num=f'diagonal_hist_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(fig_kwargs, ['figsize', 'num', 'clear', 'dpi'])
+    fig, ax = plt.subplots(**fig_kwargs)
+    if isinstance(x_frs_index, dict):
+        x_frs_index = pd.Series(x_frs_index.values(), index=x_frs_index.keys(), copy=False)
+    if isinstance(y_frs_index, dict):
+        y_frs_index = pd.Series(y_frs_index.values(), index=y_frs_index.keys(), copy=False)
+    _subfn_build_diagonal_histogram(np.asarray(x_frs_index), np.asarray(y_frs_index), ax, binwidth=binwidth)
+    ax.set_xlim([-np.sqrt(2), np.sqrt(2)])
+    fig.subplots_adjust(top=1.0, left=0.0, right=1.0, bottom=0.0)
+    return fig, ax
+
+
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True,  enable_axes_colored_guide_lines: bool = False,
                                           enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, include_linear_regression_line:bool=True,
@@ -2163,9 +2205,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         enable_hover_labels = True # add interactive point hover labels using mplcursors
         enable_tiny_point_labels = True # add static tiny aclu labels beside each point
         enable_axes_colored_guide_lines - if true, draws colored red/blue lines along the -1 and 1 lines to associate the colors visually
-        omit_outside_axes_elements: if True, skip titles/footers/axis labels and extra mosaic/histogram panels so the saved figure is just the axes box (for VectorCraft compositing). Tick labels and in-axes R-value stay unless `include_tick_labels`/`include_r_value_label` are False.
+        omit_outside_axes_elements: if True, skip titles/footers/axis labels so the saved figure is the axes box plus marginal histograms (for VectorCraft compositing). Tick labels and in-axes R-value stay unless `include_tick_labels`/`include_r_value_label` are False.
         include_title / include_axis_labels: default True, or False when `omit_outside_axes_elements=True`
         include_tick_labels / include_r_value_label: default True
+        enable_diagonal_histogram: if False, the top-right mosaic cell is left empty (used when that histogram is exported as a separate SVG)
 
         
     """
@@ -2191,10 +2234,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indices_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', False)
     omit_outside_axes_elements, include_title, include_axis_labels, include_tick_labels, include_r_value_label = _subfn_resolve_outside_axes_element_flags(scatter_params, omit_outside_axes_elements=omit_outside_axes_elements, include_title=include_title, include_axis_labels=include_axis_labels, include_tick_labels=include_tick_labels, include_r_value_label=include_r_value_label)
-    if omit_outside_axes_elements:
-        enable_histograms = False
-        enable_subplot_mosaic_style = False
-        enable_diagonal_histogram = False
 
     if prepare_for_publication:
         x_y_axes_label_kwargs = dict(fontsize=7)
@@ -2263,9 +2302,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     
     if enable_subplot_mosaic_style:
         fig = plt.figure(**fig_kwargs) # layout="constrained", 
+        mosaic_top_right = "ax_histdiagonal" if enable_diagonal_histogram else "."
         ax_dict = fig.subplot_mosaic(
             [   
-                ["ax_histx", "ax_histdiagonal"],
+                ["ax_histx", mosaic_top_right],
                 ["ax_scatter", "ax_histy"],
             ],
             # set the height ratios between the rows
@@ -2413,62 +2453,6 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     if enable_histograms:
         ## plot the left and top marginal histograms
         from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-        def _subfn_build_diagonal_histogram(x_frs_index, y_frs_index, ax_histdiagonal, binwidth:float=0.075):
-            """ 2024-09-30 - Plots the histogram along the y=x diagonal line:
-            
-            """
-            ## Add the 'x_frs_index_rot' and 'y_frs_index_rot' columns by applying a rotation by +90 degrees:
-            # x_frs_index_rot = (x_frs_index + long_short_fr_indicies_analysis_table['y_frs_index'].copy())/np.sqrt(2)
-            y_frs_index_rot = (y_frs_index - x_frs_index)/np.sqrt(2)
-
-            # x = long_short_fr_indicies_analysis_table['x_frs_index_rot'].values
-            y = y_frs_index_rot # we only actually need the rotated y-axis values
-
-            # now determine nice limits by hand:
-            
-            # xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-            xymax = np.nanmax(np.abs(y))
-            lim = (int(xymax/binwidth) + 1)*binwidth
-            
-            xlims = [-lim, (lim + binwidth)]
-            # ylims = [np.nanmin(y), np.nanmax(y)]
-            bins = np.arange(xlims[0], xlims[1], binwidth)
-            # ax_histdiagonal.hist(x, bins=bins, color='black')
-            # diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='horizontal', color='black')
-            diagonal_hist_artist_tuple = ax_histdiagonal.hist(y, bins=bins, orientation='vertical', color='black')
-            max_num_bins = np.max(diagonal_hist_artist_tuple[0])
-            ylims = [0.0, float(max_num_bins)] ## determine the max number of bars dynamically from the histogram outputs
-            
-            # Set the tick marks and labels as desired
-            # ax_histdiagonal.set_xticks([])
-            ax_histdiagonal.set_yticks([])
-
-            ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-
-            # make some labels invisible
-            # ax_histdiagonal.xaxis.set_tick_params(labelbottom=False)
-            # ax_histdiagonal.yaxis.set_tick_params(labelleft=False)
-
-            # Set no tick labels for both axes
-            ax_histdiagonal.set_xticklabels([])  # No x-axis tick labels
-            # ax_histdiagonal.set_yticklabels([])  # No y-axis tick labels
-
-            # Optional: Completely disable ticks if you want to remove tick marks as well
-            # ax_histdiagonal.tick_params(axis='both', which='both', length=0)  # Hide all ticks
-            ax_histdiagonal.tick_params(axis='y', which='both', length=0)  # Hide all y-axis ticks
-            
-            # Vertical x=0.0 line
-            midline_artist = ax_histdiagonal.axvline(x=0, ymin=0, ymax=ylims[1], color='gray', linestyle='--')
-            
-            # Enable x-axis tick labels
-            ax_histdiagonal.spines[['bottom']].set_visible(True) # enable bottom bar
-            # ax_histdiagonal.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
-            ax_histdiagonal.set_xticks([-np.sqrt(2), 0, np.sqrt(2)])
-            ax_histdiagonal.set_xticklabels(["$-\sqrt{2}$", 0, "$\sqrt{2}$"])  
-
-            return ((diagonal_hist_artist_tuple, midline_artist), (xlims, ylims))
-
 
         # Set aspect of the main Axes.
         # ax.set_aspect(1.)
@@ -3114,7 +3098,7 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
 
         is_centered: bool - if True, the spines are centered at (0, 0)
         enable_histograms: if True, add top/right black marginals (no diagonal). Default False.
-        omit_outside_axes_elements: if True, skip titles/footers/axis labels and extra histogram panels so the saved figure is just the axes box.
+        omit_outside_axes_elements: if True, skip titles/footers/axis labels so the saved figure is the axes box plus any marginal histograms.
 
         Copied from same file as `_display_short_long_firing_rate_index_comparison()`
         
@@ -3124,8 +3108,6 @@ def _plot_single_track_firing_rate_compare(laps_frs_dict, replays_frs_dict, acti
         prepare_for_publication = scatter_params.pop('prepare_for_publication', prepare_for_publication)
         enable_histograms = scatter_params.pop('enable_histograms', enable_histograms)
         omit_outside_axes_elements, include_title, include_axis_labels, include_tick_labels, include_r_value_label = _subfn_resolve_outside_axes_element_flags(scatter_params, omit_outside_axes_elements=omit_outside_axes_elements, include_title=include_title, include_axis_labels=include_axis_labels, include_tick_labels=include_tick_labels, include_r_value_label=include_r_value_label)
-        if omit_outside_axes_elements:
-            enable_histograms = False
         artboard3_style = PhoPublicationFigureHelper.artboard3_fig3_style
 
         if prepare_for_publication:
