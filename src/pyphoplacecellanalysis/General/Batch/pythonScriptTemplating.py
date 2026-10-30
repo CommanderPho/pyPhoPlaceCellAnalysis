@@ -5,7 +5,6 @@ import json
 import platform
 import shutil
 import subprocess
-import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
 from datetime import datetime, timedelta
 import pathlib
@@ -30,6 +29,7 @@ from pyphocorehelpers.notebook_helpers import convert_script_to_notebook
 from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 from pyphoplacecellanalysis.General.Batch.concrete_session_folder import ConcreteSessionFolder
+from pyphoplacecellanalysis.Resources import templates_directory
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
 # BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
@@ -1069,7 +1069,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         included_session_contexts = list(session_batch_basedirs.keys())
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     python_template = env.get_template('python_template.py.j2')
     # base_python_template = env.get_template('slurm_python_template_base.py.j2')
@@ -1425,7 +1425,7 @@ def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, 
     # print(f'vscode_workspace_path: {vscode_workspace_path}')
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     template = env.get_template('vscode_workspace_template.code-workspace.j2')
     # Render the template with the provided variables
@@ -1483,7 +1483,7 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     print(f'ps_script_path: {ps_script_path}')
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     powershell_script_template = env.get_template('powershell_template.ps1.j2')
     # Render the template with the provided variables

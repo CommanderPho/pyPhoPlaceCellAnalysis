@@ -197,8 +197,8 @@ def build_vscode_log_browsing_workspace(logs_paths):
 	import sys
 	import os
 	import platform
-	import pkg_resources # for Slurm templating
-	from jinja2 import Environment, FileSystemLoader, Template 
+	from jinja2 import Environment, FileSystemLoader, Template
+	from pyphoplacecellanalysis.Resources import templates_directory
 
 	is_platform_windows: bool = False
 	if (platform.system() == 'Windows'):
@@ -229,7 +229,7 @@ def build_vscode_log_browsing_workspace(logs_paths):
 	print(f'vscode_workspace_path: {vscode_workspace_path}')
 
 	# Set up Jinja2 environment
-	template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+	template_path = templates_directory()
 	env = Environment(loader=FileSystemLoader(template_path))
 	template = env.get_template('vscode_logs_workspace_template.code-workspace.j2')
 	# Render the template with the provided variables

@@ -123,8 +123,8 @@ class GlobalComputationParametersAttrsClassTemplating:
         import sys
         import os
         import platform
-        import pkg_resources # for Slurm templating
         from jinja2 import Environment, FileSystemLoader # for Slurm templating
+        from pyphoplacecellanalysis.Resources import templates_directory
         
         # ## Default:
         # attrs_class_defn_template_filename: str = 'attrs_class_defn_template.py.j2' # used for the 
@@ -135,7 +135,7 @@ class GlobalComputationParametersAttrsClassTemplating:
         attrs_container_class_defn_template_filename: str = 'attrs_plus_param_container_class_defn_template.py.j2' ## used for the individual computation-specific parameter subclasses
 
         # Set up Jinja2 environment
-        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+        template_path = templates_directory()
         env = Environment(loader=FileSystemLoader(template_path))
         attrs_class_defn_template = env.get_template(attrs_class_defn_template_filename)
 
@@ -175,7 +175,7 @@ class GlobalComputationParametersAttrsClassTemplating:
         #         "ratemap_peaks_prominence2d_Parameters",
         #     ]            
         # Set up Jinja2 environment
-        template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+        template_path = templates_directory()
         env = Environment(loader=FileSystemLoader(template_path))
         # attrs_container_class_defn_template = env.get_template('attrs_container_class_defn_template.py.j2')
         # attrs_container_class_defn_str: str = attrs_container_class_defn_template.render(
