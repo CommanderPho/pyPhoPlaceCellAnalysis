@@ -1672,7 +1672,7 @@ class GreatlakesTurboToScratchHelpers:
         FORCE_SCRATCH_WRITES: bool = True  # set False when Turbo is writable again
         turbo_data_root, scratch_data_root, use_scratch_writes = GreatlakesTurboToScratchHelpers.detect_scratch_write_mode(force_scratch_writes=FORCE_SCRATCH_WRITES)
         if use_scratch_writes:
-            scripts_output_path, collected_outputs_path = GreatlakesTurboToScratchHelpers.build_scratch_output_paths()
+            scripts_output_path, collected_outputs_path, global_data_root_parent_path = GreatlakesTurboToScratchHelpers.build_scratch_output_paths()
         ...
         if FORCE_SCRATCH_WRITES:
             GreatlakesTurboToScratchHelpers.assert_output_paths_not_on_turbo(scripts_output_path, collected_outputs_path)
@@ -1898,14 +1898,14 @@ class GreatlakesTurboToScratchHelpers:
 
 
     @classmethod
-    def build_scratch_output_paths(cls, scratch_data_root: Optional[Path] = None) -> Tuple[Path, Path]:
+    def build_scratch_output_paths(cls, global_data_root: Optional[Path] = None) -> Tuple[Path, Path, Path]:
         """Returns `(scripts_output_path, collected_outputs_path)` under `<scratch>/Output/{gen_scripts,collected_outputs}`, creating them if needed."""
-        scratch_data_root = Path(scratch_data_root) if (scratch_data_root is not None) else cls.SCRATCH_DATA_ROOT
-        scripts_output_path: Path = scratch_data_root.joinpath('Output', 'gen_scripts')
+        global_data_root: Path = Path(global_data_root) if (global_data_root is not None) else cls.SCRATCH_DATA_ROOT
+        scripts_output_path: Path = global_data_root.joinpath('Output', 'gen_scripts')
         scripts_output_path.mkdir(parents=True, exist_ok=True)
-        collected_outputs_path: Path = scratch_data_root.joinpath('Output', 'collected_outputs')
+        collected_outputs_path: Path = global_data_root.joinpath('Output', 'collected_outputs')
         collected_outputs_path.mkdir(parents=True, exist_ok=True)
-        return scripts_output_path, collected_outputs_path
+        return scripts_output_path, collected_outputs_path, global_data_root
 
 
     @classmethod
