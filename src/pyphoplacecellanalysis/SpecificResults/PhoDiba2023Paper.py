@@ -79,8 +79,8 @@ from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 # 2026-10-29 - Loading Exported score Shuffles                                                                                                                                                                                                                                         #
 # ==================================================================================================================================================================================================================================================================================== #
 from collections import defaultdict
-from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
-from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+
+
 
 @pd.api.extensions.register_dataframe_accessor("pho_shuffles")
 class LoadedScoreShufflesDataframeAccessor:
@@ -172,6 +172,9 @@ class LoadedScoreShufflesDataframeAccessor:
             #     print('Registered on df_filter. Enable e.g. sig_wcorr_z, sig_mseq_len_ignoring_intrusions_p, or sig_any_shuffle_p in the predicate list.')
 
         """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+
         ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names = AcrossSessionHelpers.prepare_epoch_score_shuffle_transfer_columns(ripple_EpochScoreShuffle_df)
         decoder_names: list[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
 
