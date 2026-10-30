@@ -2426,7 +2426,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     laps_fri_label_str: str = r'$\left({' + Laps_fr_label + '_{' + f'{pre_delta_str}' + '}-' + Laps_fr_label + '_{' + f'{post_delta_str}' + r'}}\right)/\left({' + Laps_fr_label + '_{' + f'{post_delta_str}' + '} + ' + Laps_fr_label + '_{' + f'{pre_delta_str}' + r'}}\right)$'
     replays_fri_label_str: str = r'$\left({' + PBE_fr_label + '_{' + f'{pre_delta_str}' + '}-' + PBE_fr_label + '_{' + f'{post_delta_str}' + r'}}\right)/\left({' + PBE_fr_label + '_{' + f'{post_delta_str}' + '} + ' + PBE_fr_label + '_{' + f'{pre_delta_str}' + r'}}\right)$'
                                                 
-    scatter_params = dict(zorder=5) | scatter_params
+    scatter_params = dict(zorder=5, clip_on=False) | scatter_params
     
     # Optionally swap the x and y axes:
     if swap_xy_axis:
