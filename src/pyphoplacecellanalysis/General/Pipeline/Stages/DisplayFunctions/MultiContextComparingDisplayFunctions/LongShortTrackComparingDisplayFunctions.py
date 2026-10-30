@@ -2194,7 +2194,8 @@ def _plot_diagonal_firing_rate_index_histogram(x_frs_index, y_frs_index, active_
 @function_attributes(short_name='long_short_fr_indicies', tags=['private', 'long_short', 'long_short_firing_rate', 'firing_rate', 'display', 'matplotlib'], input_requires=[], output_provides=[], uses=[], used_by=['_display_short_long_firing_rate_index_comparison', 'AcrossSessionsVisualizations.across_sessions_firing_rate_index_figure'], creation_date='2023-03-28 14:20')
 def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_context, neurons_colors=None, debug_print=False, is_centered = False, enable_hover_labels=True, enable_tiny_point_labels=True, swap_xy_axis=False, include_axes_lines=True,  enable_axes_colored_guide_lines: bool = False,
                                           enable_histograms=True, enable_subplot_mosaic_style:bool=True, enable_diagonal_histogram: bool = True, enable_inset_histdiagonal_ax: bool = True, include_linear_regression_line:bool=True,
-                                          omit_outside_axes_elements: bool = False, include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None, **scatter_params):
+                                          omit_outside_axes_elements: bool = False, include_title: Optional[bool] = None, include_axis_labels: Optional[bool] = None, include_tick_labels: Optional[bool] = None, include_r_value_label: Optional[bool] = None, 
+                                          active_limit_magnitude: float = 1.00, **scatter_params):
     """ Plot long|short firing rate index 
     Each datapoint is a neuron.
     Shows two histograms for the marginals along each axis
@@ -2211,7 +2212,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         include_tick_labels / include_r_value_label: default True
         enable_diagonal_histogram: if False, the top-right mosaic cell is left empty (used when that histogram is exported as a separate SVG)
         enable_inset_histdiagonal_ax: if True, uses `mpl_toolkits.axes_grid1.inset_locator.inset_axes` to position the diagonal histogram axes at the top-right of the parent axes
-        
+        active_limit_magnitude: the [-active_limit_magnitude, +active_limit_magnitude] bounds for both the xlims and ylims. Other values have been: [1.0, 1.01, 1.1]
+    
     """
     import matplotlib
     from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PhoPublicationFigureHelper
@@ -2385,7 +2387,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
     # rc('text',usetex=True)
     # rc('text.latex', preamble=r'\usepackage{color}')
 
-    diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x')
+    diagonal_y_equals_x_line_kwargs = dict(linestyle='--', color='gray', label='y=x', linewidth=0.5)
     fig_kwargs = dict(figsize=(8.5, 7.25), num=f'long|short fr indices_{active_context.get_description(separator="/")}', clear=True) | pop_dict_subset(scatter_params, ['figsize', 'num', 'clear', 'dpi'])
     prepare_for_publication: bool = scatter_params.pop('prepare_for_publication', False)
     omit_outside_axes_elements, include_title, include_axis_labels, include_tick_labels, include_r_value_label = _subfn_resolve_outside_axes_element_flags(scatter_params, omit_outside_axes_elements=omit_outside_axes_elements, include_title=include_title, include_axis_labels=include_axis_labels, include_tick_labels=include_tick_labels, include_r_value_label=include_r_value_label)
@@ -2567,8 +2569,10 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         
 
     # Set the x and y axes to standard limits for easy visual comparison across sessions
-    ax.set_xlim([-1.1, 1.1])
-    ax.set_ylim([-1.1, 1.1])
+
+
+    ax.set_xlim([-active_limit_magnitude, active_limit_magnitude])
+    ax.set_ylim([-active_limit_magnitude, active_limit_magnitude])
     
     if is_centered:
         ## The "spines" are the vertical and horizontal "axis" bars where the tick marks are drawn.
@@ -2591,8 +2595,8 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # Plots axes lines at the zero and extremes of the x and y axis.
         
         # _boundary_line_kwargs = dict(linestyle='--', )
-        _boundary_line_kwargs = dict(linestyle='-', )
-        _line_kwargs = dict(zorder=-1000)
+        _boundary_line_kwargs = dict(linestyle='-', linewidth=0.1)
+        _line_kwargs = dict(zorder=-1000, linewidth=0.6)
 
         ax.axvline(x=0.0, color='grey', linestyle='-', **_line_kwargs)  # Vertical line at x = 0
         ax.axhline(y=0.0, color='grey', linestyle='-', **_line_kwargs)  # Horizontal line at y = 0
@@ -2601,11 +2605,11 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
             long_color = 'royalblue'
             short_color = 'crimson'
 
-            ax.axvline(x=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = -1
-            ax.axvline(x=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Vertical line at x = +1
+            ax.axvline(x=-1.0, color=long_color, **(_line_kwargs | _boundary_line_kwargs))  # Vertical line at x = -1
+            ax.axvline(x=1.0, color=short_color, **(_line_kwargs | _boundary_line_kwargs))  # Vertical line at x = +1
 
-            ax.axhline(y=-1.0, color=long_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = -1
-            ax.axhline(y=1.0, color=short_color, **_boundary_line_kwargs, **_line_kwargs)  # Horizontal line at y = +1
+            ax.axhline(y=-1.0, color=long_color, **(_line_kwargs | _boundary_line_kwargs))  # Horizontal line at y = -1
+            ax.axhline(y=1.0, color=short_color, **(_line_kwargs | _boundary_line_kwargs))  # Horizontal line at y = +1
 
         # Add y=x diagonal line:
         ax.plot(ax.get_xlim(), ax.get_ylim(), **diagonal_y_equals_x_line_kwargs)
@@ -2613,8 +2617,27 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         # Assuming you have an existing axis 'ax'
         # ax.margins(x=0.01, y=0.01)  # Adds 10% margin on x-axis and 20% margin on y-axis
         # Set precise axis limits
-        ax.set_xlim(-1.01, 1.01)  # Set x-axis limits from 0 to 1
-        ax.set_ylim(-1.01, 1.01)  # Set y-axis limits from 0 to 1
+        # active_limit_magnitude = 1.00 ## previously overrode to smaller magnitude
+        # active_limit_magnitude = 1.01
+        ax.set_xlim(-active_limit_magnitude, active_limit_magnitude)  # Set x-axis limits from 0 to 1
+        ax.set_ylim(-active_limit_magnitude, active_limit_magnitude)  # Set y-axis limits from 0 to 1
+
+
+    ## When we have the explicit lines we no longer need the ticks
+    # Set the tick marks and labels as desired
+    # ax.set_yticks([])
+    # ax.set_yticks([])
+    ax.spines[['left', 'bottom', 'right', 'top']].set_visible(False)
+    ax.xaxis.set_ticks_position('none')  # Hide x-axis ticks
+    ax.yaxis.set_ticks_position('none')  # Hide x-axis ticks
+
+    # # Set no tick labels for both axes
+    # ax.set_xticklabels([])  # No x-axis tick labels
+    # ax.set_yticklabels([])  # No y-axis tick labels
+
+    # Optional: Completely disable ticks if you want to remove tick marks as well
+    ax.tick_params(axis='both', which='both', length=0)  # Hide all ticks
+
 
     # Set aspect of the main Axes so a data unit on x equals a data unit on y, independent of figure size, labels, and cropping.
     ax.set_aspect(1.)
@@ -2664,17 +2687,29 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         x = x_frs_index.values
         y = y_frs_index.values
 
-        # now determine nice limits by hand:
+        # # now determine nice limits by hand:
         binwidth = 0.075
-        xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-        lim = (int(xymax/binwidth) + 1)*binwidth
+        # xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+        # lim = (int(xymax/binwidth) + 1)*binwidth
+        # bins = np.arange(-lim, lim + binwidth, binwidth)
 
-        bins = np.arange(-lim, lim + binwidth, binwidth)
-        ax_histx.hist(x, bins=bins, color='black')
-        ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
+        n_bins: int = 25
+        # bins = np.linspace(-1.0, 1.0, (n_bins + 1)) ## AI says: np.linspace(-active_limit_magnitude, active_limit_magnitude, (n_bins + 1))
+        bins = np.linspace(-active_limit_magnitude, active_limit_magnitude, (n_bins + 1))
+
+        ax_histx.hist(x, bins=bins, range=(-active_limit_magnitude, active_limit_magnitude), color='black')
+        ax.set_xlim(-active_limit_magnitude, active_limit_magnitude)
+
+        ax_histy.hist(y, bins=bins, range=(-active_limit_magnitude, active_limit_magnitude), orientation='horizontal', color='black')
+        ax.set_ylim(-active_limit_magnitude, active_limit_magnitude)
+
+        # ax_histx.hist(x, bins=bins, color='black')
+        # ax_histy.hist(y, bins=bins, orientation='horizontal', color='black')
 
         if enable_diagonal_histogram:
             (diagonal_hist_artist_tuple, midline_artist), (xlims, ylims) = _subfn_build_diagonal_histogram(x_frs_index=x_frs_index.values, y_frs_index=y_frs_index.values, ax_histdiagonal=ax_histdiagonal, binwidth=binwidth)
+
+            print(f'xlims: {xlims}, ylims: {ylims}')
 
             if enable_inset_histdiagonal_ax:
                 # Read the plotted data bounds, not the floating frame's view limits.
@@ -2715,6 +2750,22 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         ax.set_yticklabels([])
         ax.tick_params(labelbottom=False, labelleft=False)
 
+    if enable_histograms and enable_subplot_mosaic_style:
+        def _subfn_align_marginal_histogram_axes(ax_scatter, ax_histx, ax_histy):
+            """Snap histx/histy to the scatter box. `set_aspect(1.)` shrinks scatter inside its mosaic cell, but the histogram cells keep the original (non-square) span."""
+            scatter_pos = ax_scatter.get_position()
+            histx_pos = ax_histx.get_position()
+            histy_pos = ax_histy.get_position()
+            ax_histx.set_in_layout(False)
+            ax_histy.set_in_layout(False)
+            ax_histx.set_position([scatter_pos.x0, scatter_pos.y0 + scatter_pos.height, scatter_pos.width, histx_pos.height])
+            ax_histy.set_position([scatter_pos.x0 + scatter_pos.width, scatter_pos.y0, histy_pos.width, scatter_pos.height])
+
+        fig.canvas.draw()
+        ax.apply_aspect()
+        _subfn_align_marginal_histogram_axes(ax, ax_histx, ax_histy)
+        if enable_inset_histdiagonal_ax and enable_diagonal_histogram:
+            fn_diagonal_align()
 
     return fig, ax, scatter_plot
 
