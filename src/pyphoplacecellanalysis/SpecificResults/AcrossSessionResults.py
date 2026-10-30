@@ -1800,7 +1800,7 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list:List[float], debug_print = False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
@@ -1862,9 +1862,14 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve())) for time_bin_size in instantaneous_time_bin_size_seconds_list}
     print(f'custom_file_types_dict: {custom_file_types_dict}')
     
-    known_global_data_root_parent_paths = [Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'/Volumes/MoverNew/data')] # , Path(r'/home/halechr/FastData'), Path(r'/home/halechr/turbo/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data')
-    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+    if global_data_root_parent_path is not None:
+        global_data_root_parent_path = Path(global_data_root_parent_path) # .resolve()
+        if not global_data_root_parent_path.exists():
+            raise FileNotFoundError(f'global_data_root_parent_path does not exist: {global_data_root_parent_path}')
+    else:
+        known_global_data_root_parent_paths = [Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'/Volumes/MoverNew/data')] # , Path(r'/home/halechr/FastData'), Path(r'/home/halechr/turbo/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data')
+        global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     # Hardcoded included_session_contexts:
     included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
     good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
