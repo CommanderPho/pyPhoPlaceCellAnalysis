@@ -2501,7 +2501,29 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         xlabel_kwargs = dict(loc='left')
         ylabel_kwargs = dict(loc='bottom')
 
-    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, **scatter_params) # , s=10, alpha=0.5
+    def _subfn_replace_transparent_edgecolors(edgecolors, replacement_rgba):
+        """Keep opaque caller edges (LdC/SdC); replace fully-transparent edges with `replacement_rgba`."""
+        rgba = np.asarray(matplotlib.colors.to_rgba_array(edgecolors), dtype=float)
+        is_clear = rgba[:, 3] <= 1e-6
+        if np.any(is_clear):
+            rgba[is_clear] = replacement_rgba
+        return rgba
+
+    non_xxc_edge_rgba = np.asarray(matplotlib.colors.to_rgba('#C8C8C8'), dtype=float) # opaque light grey
+    edgecolors = scatter_params.pop('edgecolors', None)
+    if edgecolors is None:
+        edgecolors = non_xxc_edge_rgba
+    else:
+        edgecolors = _subfn_replace_transparent_edgecolors(edgecolors, non_xxc_edge_rgba)
+
+    scatter_params.setdefault('linewidths', 0.4)
+    scatter_params['clip_on'] = False
+    _zorder = scatter_params.get('zorder', 20)
+    scatter_params['zorder'] = 20 if (_zorder is None) else max(float(_zorder), 20)
+
+    scatter_plot = ax.scatter(x_frs_index.values, y_frs_index.values, c=point_colors, edgecolors=edgecolors, **scatter_params) # , s=10, alpha=0.5
+    scatter_plot.set_clip_on(False)
+    scatter_plot.set_clip_path(None)
     if include_axis_labels:
         ax.set_xlabel(xlabel_str, **x_y_axes_label_kwargs, **xlabel_kwargs)
         ax.set_ylabel(ylabel_str, **x_y_axes_label_kwargs, **ylabel_kwargs)
@@ -2769,6 +2791,19 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
         _subfn_align_marginal_histogram_axes(ax, ax_histx, ax_histy)
         if enable_inset_histdiagonal_ax and enable_diagonal_histogram:
             fn_diagonal_align()
+
+    # Scatter must draw above the marginal/diagonal axes (separate Axes, so collection zorder is not enough) and must not be clipped in SVG.
+    scatter_plot.set_clip_on(False)
+    scatter_plot.set_clip_path(None)
+    ax.set_zorder(10)
+    ax.patch.set_facecolor('none')
+    if enable_histograms:
+        ax_histx.set_zorder(1)
+        ax_histy.set_zorder(1)
+        ax_histx.patch.set_alpha(0)
+        ax_histy.patch.set_alpha(0)
+    if enable_subplot_mosaic_style and enable_inset_histdiagonal_ax and enable_diagonal_histogram:
+        diagonal_frame.set_zorder(2)
 
     return fig, ax, scatter_plot
 
