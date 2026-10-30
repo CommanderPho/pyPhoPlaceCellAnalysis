@@ -2481,15 +2481,7 @@ def _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, active_conte
 
         ## 2026-10-30 New Inset Axes for the histdiagonal
         if (enable_inset_histdiagonal_ax and enable_diagonal_histogram):
-
-            # ## Make the inset axes:
-            # ax_dict["ax_histdiagonal"] = inset_axes(
-            #     ax,
-            #     width="13%",
-            #     height="13%",
-            #     loc="upper right",
-            #     borderpad=1,
-            # )
+            ## Make the floating, rotated axes for the diagonal histogram:
             ax_dict["ax_histdiagonal"], diagonal_frame, fn_diagonal_align, fn_diagonal_update_ylim = _subfn_make_diagonal_hist_axes(ax, xlim=(-np.sqrt(2), np.sqrt(2)), ylim=(0, 500), size=0.25)
             
 
