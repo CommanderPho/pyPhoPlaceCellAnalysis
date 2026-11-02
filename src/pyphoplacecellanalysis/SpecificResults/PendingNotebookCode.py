@@ -12744,16 +12744,22 @@ class CellFieldRemappingModels:
         NOTE: Independent/unrelated to `cls.main_evaluate_remapping_models`
         , L_peak_col_name: str='long_LR_pf1D_peak', L_peak_col_name: str='short_LR_pf1D_peak'
         
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import CellFieldRemappingModels
+
+        ## add the correct 'has_considerable_remapping' column from ['long_LR_pf1D_peak', 'short_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_RL_pf1D_peak']:
         active_scatter_all_neuron_stats_table = CellFieldRemappingModels.fix_has_considerable_remapping_column(all_neuron_stats_table=active_scatter_all_neuron_stats_table)
         
         """
         active_scatter_all_neuron_stats_table: pd.DataFrame = deepcopy(all_neuron_stats_table).fillna(value=np.nan, inplace=False) ## fill all Pandas.NA values with np.nan so they can be correctly cast to floats
         # active_scatter_all_neuron_stats_table
 
-        if ('_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table):
-            active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = deepcopy(active_scatter_all_neuron_stats_table['has_considerable_remapping'])
-        else:
-            print(f'WARN: active_scatter_all_neuron_stats_table already contains the "_BAK_has_considerable_remapping", a backup has already been made and will not be overwritten!')
+        if ('has_considerable_remapping' in active_scatter_all_neuron_stats_table):
+            if ('_BAK_has_considerable_remapping' not in active_scatter_all_neuron_stats_table):
+                active_scatter_all_neuron_stats_table['_BAK_has_considerable_remapping'] = deepcopy(active_scatter_all_neuron_stats_table['has_considerable_remapping'])
+            else:
+                print(f'WARN: active_scatter_all_neuron_stats_table already contains the "_BAK_has_considerable_remapping", a backup has already been made and will not be overwritten!')
+
+        required_columns = ['long_LR_pf1D_peak', 'short_LR_pf1D_peak', 'long_RL_pf1D_peak', 'short_RL_pf1D_peak']
 
         active_scatter_all_neuron_stats_table['has_considerable_remapping'] = False ## start with False
 
