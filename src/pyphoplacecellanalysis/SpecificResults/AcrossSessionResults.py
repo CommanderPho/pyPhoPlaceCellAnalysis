@@ -3724,11 +3724,16 @@ class OldFileArchiver:
     @function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
     @classmethod
     def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"],
-                                                   always_delete_patterns=None, conditional_delete_patterns=None, conditional_delete_files_cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False):
+                                                   always_delete_patterns=None, conditional_delete_patterns=None, conditional_delete_files_cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False,
+                                                   session_rel_search_dir: Optional[str] = None):
         """ cleans up the temporary pickle files that are created during the session data loading process to recover space.
         
         cutoff_date: files older than this date will be removed regardless of whether they are temporary or not!!
             conditional_delete_files_cutoff_date = datetime(2023, 9, 1)  # Example cutoff date
+
+        session_rel_search_dir: when None (default), scan each session's root and ``output/`` separately (legacy).
+            When set (e.g. ``'output/'``, ``''``, ``'/'``), scan only the resolved folder under each session
+            (same relative-path rules as ``AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs``).
         
         Usage:
             from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
@@ -3743,6 +3748,15 @@ class OldFileArchiver:
             good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
             deleted_file_list = OldFileArchiver.remove_backup_files_from_session_data_folders(good_session_concrete_folders=good_session_concrete_folders, is_dryrun=True)
             deleted_file_list
+
+            ## Custom conditional globs under session output/ only (mtime before cutoff):
+            deleted_file_list = OldFileArchiver.remove_backup_files_from_session_data_folders(
+                good_session_concrete_folders=good_session_concrete_folders,
+                conditional_delete_patterns={'h5': '**/*.h5', 'csv': '**/*.csv', 'pkl': '**/*.pkl'},
+                conditional_delete_files_cutoff_date=datetime(2026, 10, 29),
+                session_rel_search_dir='output/',
+                is_dryrun=True,
+            )
 
         """	
         # a_folder = good_session_concrete_folders[0]
@@ -3760,73 +3774,84 @@ class OldFileArchiver:
                 cutoff_timestamp = conditional_delete_files_cutoff_date.astimezone(datetime.timezone.utc).timestamp()
         else:
             cutoff_timestamp = None
-            
+
+        # Define patterns once (outside the per-session loop)
+        if always_delete_patterns is None:
+            always_delete_patterns = {
+                '.pkltmp': '*.pkltmp',
+                '.pkl.bak': '*.pkl.bak',
+            }
+
+        if conditional_delete_patterns is None:
+            conditional_delete_patterns = {
+                # '.pkl': '*.pkl',
+                'pipeline.pkl': '*loadedSessPickle*.pkl',
+                'global.pkl': '*global_computation_results*.pkl',
+            }
+
+        def _resolve_session_search_folder(session_path: Path, rel_search_dir: str) -> Path:
+            """ '' / '.' / '/' → session root; otherwise join relative path under session.path """
+            _rel = (rel_search_dir or '').strip().strip('/\\')
+            if _rel in ('', '.'):
+                return session_path
+            return session_path.joinpath(_rel)
+
+
+        def _search_folders_for_session(a_folder: "ConcreteSessionFolder") -> List[Path]:
+            if session_rel_search_dir is None:
+                return [a_folder.path, a_folder.output_folder]
+            return [_resolve_session_search_folder(a_folder.path, session_rel_search_dir)]
+
+
+        # Function to collect files based on patterns and cutoff_date
+        def collect_files(folder: Path, patterns: dict, condition: str = 'always') -> List[Path]:
+            """ captures debug_print, cutoff_timestamp from the outer function """
+            files = []
+            for desc, pattern in patterns.items():
+                matched_files = list(folder.glob(pattern))
+                if debug_print:
+                    print(f'\tLooking for {desc} files with pattern "{pattern}": Found {len(matched_files)} files.')
+                for file_path in matched_files:
+                    if not file_path.is_file():
+                        continue
+                    if condition == 'conditional' and cutoff_timestamp is not None:
+                        try:
+                            file_mtime = file_path.stat().st_mtime
+                        except OSError as e:
+                            print(f'\t\tError accessing file "{file_path}": {e}')
+                            continue
+                        if file_mtime >= cutoff_timestamp:
+                            if debug_print:
+                                print(f'\t\tSkipping "{file_path.as_posix()}" (modified on {datetime.fromtimestamp(file_mtime)}) - newer than cutoff.')
+                            continue
+                    elif condition == 'conditional' and cutoff_timestamp is None:
+                        # If conditional pattern but no cutoff_date provided, skip deletion
+                        if debug_print:
+                            print(f'\t\tNo cutoff_date provided. Skipping "{file_path.as_posix()}".')
+                        continue
+                    files.append(file_path)
+                ## END for file_path in matched_files...
+            ## END for desc, pattern in patterns.items()...
+            return files
+
 
         for a_folder in good_session_concrete_folders:
-            # Define patterns to always delete
-            if always_delete_patterns is None:
-                always_delete_patterns = {
-                    '.pkltmp': '*.pkltmp',
-                    '.pkl.bak': '*.pkl.bak',
-                }
-            
-            # Define patterns to conditionally delete
-            if conditional_delete_patterns is None:
-                conditional_delete_patterns = {
-                    # '.pkl': '*.pkl',
-                    'pipeline.pkl': '*loadedSessPickle*.pkl',
-                    'global.pkl': '*global_computation_results*.pkl',
-                }
-            
-            # Function to collect files based on patterns and cutoff_date
-            def collect_files(folder: Path, patterns: dict, condition: str = 'always') -> List[Path]:
-                """ captures debug_print, cutoff_timestamp, and is_dryrun from the outer function """
-                files = []
-                for desc, pattern in patterns.items():
-                    matched_files = list(folder.glob(pattern))
+            always_files: List[Path] = []
+            conditional_files: List[Path] = []
+            for search_folder in _search_folders_for_session(a_folder):
+                if not search_folder.is_dir():
                     if debug_print:
-                        print(f'\tLooking for {desc} files with pattern "{pattern}": Found {len(matched_files)} files.')
-                    for file_path in matched_files:
-                        if condition == 'conditional' and cutoff_timestamp is not None:
-                            try:
-                                file_mtime = file_path.stat().st_mtime
-                            except OSError as e:
-                                print(f'\t\tError accessing file "{file_path}": {e}')
-                                continue
-                            if file_mtime >= cutoff_timestamp:
-                                if debug_print:
-                                    print(f'\t\tSkipping "{file_path.as_posix()}" (modified on {datetime.fromtimestamp(file_mtime)}) - newer than cutoff.')
-                                continue
-                        elif condition == 'conditional' and cutoff_timestamp is None:
-                            # If conditional pattern but no cutoff_date provided, skip deletion
-                            if debug_print:
-                                print(f'\t\tNo cutoff_date provided. Skipping "{file_path.as_posix()}".')
-                            continue
-                        files.append(file_path)
-                return files
+                        print(f'\tSkipping missing search folder: {search_folder.as_posix()}')
+                    continue
+                always_files.extend(collect_files(search_folder, always_delete_patterns, condition='always'))
+                conditional_files.extend(collect_files(search_folder, conditional_delete_patterns, condition='conditional'))
+            ## END for search_folder in _search_folders_for_session(a_folder)...
 
-            # Collect files to always delete from session folder
-            session_always_files = collect_files(a_folder.path, always_delete_patterns, condition='always')
             if debug_print:
-                print(f'\tSession folder: {len(session_always_files)} files marked for always deletion.')
+                print(f'\t{a_folder.path.as_posix()}: {len(always_files)} always + {len(conditional_files)} conditional file(s) marked for deletion.')
 
-            # Collect files to conditionally delete from session folder
-            session_conditional_files = collect_files(a_folder.path, conditional_delete_patterns, condition='conditional')
-            if debug_print:
-                print(f'\tSession folder: {len(session_conditional_files)} *.pkl files marked for conditional deletion.')
-
-            # Collect files to always delete from output folder
-            output_always_files = collect_files(a_folder.output_folder, always_delete_patterns, condition='always')
-            if debug_print:
-                print(f'\tOutput folder: {len(output_always_files)} files marked for always deletion.')
-
-            # Collect files to conditionally delete from output folder
-            output_conditional_files = collect_files(a_folder.output_folder, conditional_delete_patterns, condition='conditional')
-            if debug_print:
-                print(f'\tOutput folder: {len(output_conditional_files)} *.pkl files marked for conditional deletion.')
-
-            # Combine all files to delete
-            all_files_to_delete = session_always_files + session_conditional_files + output_always_files + output_conditional_files
+            # Combine and dedupe (recursive ** globs / dual legacy search can hit the same path twice)
+            all_files_to_delete = list(dict.fromkeys(always_files + conditional_files))
 
             for a_path in all_files_to_delete:
                 print(f'\tDeleting "{a_path.as_posix()}"...')
@@ -3838,8 +3863,10 @@ class OldFileArchiver:
                         print(f'\t\tFailed to delete "{a_path.as_posix()}": {e}')
                         continue
                 deleted_file_list.append(a_path)
-                        
+            ## END for a_path in all_files_to_delete...
+
             print(f'\tDone processing folder "{a_folder.path.as_posix()}".')
+        ## END for a_folder in good_session_concrete_folders...
 
         print(f'Total files {"would be " if is_dryrun else ""}deleted: {len(deleted_file_list)}')
         return deleted_file_list
