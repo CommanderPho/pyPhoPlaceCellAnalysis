@@ -856,14 +856,10 @@ class BatchCompletionHelpers:
 		standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve()
 		print(f'saving to "{standalone_pkl_filepath}"...')
 		wcorr_shuffles.save_data(standalone_pkl_filepath, metadata={'custom_suffix': full_custom_suffix, 'ripple_decoding_time_bin_size': wcorr_shuffles.get_ripple_decoding_time_bin_size(curr_active_pipeline=a_curr_active_pipeline), 'data_name': 'standalone_epoch_score_shuffle_data_only', 'n_shuffles': wcorr_shuffles.n_completed_shuffles, 'session': a_curr_active_pipeline.get_session_context().to_dict()})
-		## INPUTS: wcorr_ripple_shuffle
-		_prev_standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
-		# standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
-		out_path, standalone_mat_filename, standalone_mat_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_all_shuffles_wcorr_array', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.mat')
-		if _prev_standalone_mat_filename != standalone_mat_filename:
-			print(f'standalone_mat_filepath:\n\t"{standalone_mat_filepath}"')
-			print(f'_prev_standalone_mat_filename:\n\t"{_prev_standalone_mat_filename}"')
-		#TODO 2024-11-19 03:25: - [ ] Previously used `custom_suffix`
+		## INPUTS: wcorr_ripple_shuffle — flat `{date}{full_suffix}_standalone_all_shuffles_wcorr_array.mat`, including `-tbin_XXms`
+		standalone_mat_filename: str = WCorrShuffle.build_standalone_mat_filename(full_custom_suffix=full_custom_suffix, date_str=get_now_rounded_time_str())
+		standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve()
+		print(f'saving .mat to "{standalone_mat_filepath}"...')
 		wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
 
 		try:

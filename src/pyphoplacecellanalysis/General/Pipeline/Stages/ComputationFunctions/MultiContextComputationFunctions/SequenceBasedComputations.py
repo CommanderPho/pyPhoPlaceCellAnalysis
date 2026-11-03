@@ -69,6 +69,7 @@ from pyphocorehelpers.Filesystem.path_helpers import BaseMatchParser
 
 DEFAULT_SHUFFLE_PICKLE_DATA_NAME: str = 'standalone_epoch_score_shuffle_data_only'
 LEGACY_SHUFFLE_PICKLE_DATA_NAME: str = 'standalone_wcorr_ripple_shuffle_data_only'
+DEFAULT_STANDALONE_MAT_DATA_NAME: str = 'standalone_all_shuffles_wcorr_array'
 _STANDALONE_SHUFFLE_DATA_NAME_PATTERN = re.compile(r'(standalone_[A-Za-z0-9_,.\[\] \-]*_data_only)$')
 _TBIN_TOKEN_PATTERN = re.compile(r'[-_]tbin[_-]([A-Za-z0-9_]+)')
 
@@ -1434,6 +1435,19 @@ class DecodedEpochScoreShuffle(ComputedResult):
         return f'{date_str}{suffix}_{data_name}_{int(n_completed_shuffles)}.pkl'
 
 
+    @classmethod
+    def build_standalone_mat_filename(cls, full_custom_suffix: str, data_name: str = DEFAULT_STANDALONE_MAT_DATA_NAME, date_str: Optional[str] = None) -> str:
+        """ `{YYYY-MM-DD_HHMMAM}{full_suffix}_{data_name}.mat` """
+        from pyphocorehelpers.print_helpers import get_now_rounded_time_str
+
+        if date_str is None:
+            date_str = get_now_rounded_time_str()
+        suffix: Optional[str] = cls.normalize_custom_suffix(full_custom_suffix)
+        if suffix is None:
+            raise ValueError('full_custom_suffix is empty; refusing to write unsuffixed shuffle mat')
+        return f'{date_str}{suffix}_{data_name}.mat'
+
+
     def save_data(self, filepath, metadata: Optional[Dict]=None):
         """ saves the important results to pickle
 
@@ -1493,7 +1507,7 @@ class DecodedEpochScoreShuffle(ComputedResult):
         """ tries to export the wcorr_ripple_shuffle results to a .mat MATLAB file.
         Usage:
 
-            standalone_mat_filename: str = f'{get_now_rounded_time_str()}_standalone_all_shuffles_wcorr_array.mat' 
+            standalone_mat_filename: str = DecodedEpochScoreShuffle.build_standalone_mat_filename(full_custom_suffix=full_custom_suffix, date_str=get_now_rounded_time_str())
             standalone_mat_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve()
             wcorr_ripple_shuffle.save_data_mat(filepath=standalone_mat_filepath, **{'session': curr_active_pipeline.get_session_context().to_dict()})
         """

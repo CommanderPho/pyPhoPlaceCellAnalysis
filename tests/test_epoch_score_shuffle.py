@@ -564,6 +564,23 @@ class TestShufflePickleFilenameSuffix(unittest.TestCase):
         self.assertEqual(parsed['num_shuffles'], 700)
 
 
+    def test_build_standalone_mat_filename_includes_full_suffix_and_tbin(self):
+        date_str: str = '2026-11-02_0835PM'
+        mat_filename = DecodedEpochScoreShuffle.build_standalone_mat_filename(full_custom_suffix=self.MATCHING_SUFFIX, date_str=date_str)
+        self.assertEqual(mat_filename, '2026-11-02_0835PM_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_standalone_all_shuffles_wcorr_array.mat')
+        self.assertIn(self.MATCHING_SUFFIX, mat_filename)
+        self.assertIn('-tbin_25ms', mat_filename)
+        self.assertTrue(mat_filename.endswith('_standalone_all_shuffles_wcorr_array.mat'))
+
+        pkl_filename = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix=self.MATCHING_SUFFIX, n_completed_shuffles=700, data_name=self.MATCHING_STEM, date_str=date_str)
+        shared_prefix: str = f'{date_str}{self.MATCHING_SUFFIX}_'
+        self.assertTrue(mat_filename.startswith(shared_prefix))
+        self.assertTrue(pkl_filename.startswith(shared_prefix))
+
+        with self.assertRaises(ValueError):
+            DecodedEpochScoreShuffle.build_standalone_mat_filename(full_custom_suffix='')
+
+
     def test_get_ripple_decoding_time_bin_size_and_build_full_custom_suffix(self):
         obj = _make_shuffle_object(n_epochs=2, n_decoders=4, n_shuffles=1)
         obj.all_templates_decode_kwargs = {'desired_ripple_decoding_time_bin_size': 0.025}
