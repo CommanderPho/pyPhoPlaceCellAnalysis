@@ -2093,6 +2093,33 @@ class PrePostDeltaDistributionComparison:
         }
 
 
+    @classmethod
+    def time_bin_size_discrete_color_map(cls, time_bin_sizes) -> Dict[str, str]:
+        """Match Figure S3 scatter/hist colors: Plotly qualitative `Plotly[3:]` ordered by float t-bin size."""
+        import plotly.express as px
+        ordered: List[str] = []
+        seen = set()
+        for v in time_bin_sizes:
+            key = str(v)
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(key)
+        ## END for v in time_bin_sizes...
+
+        def _tbin_sort_key(s: str):
+            try:
+                return (0, float(s))
+            except ValueError:
+                return (1, s)
+
+        ordered = sorted(ordered, key=_tbin_sort_key)
+        color_sequence = list(px.colors.qualitative.Plotly[3:])
+        if len(color_sequence) == 0:
+            color_sequence = list(px.colors.qualitative.Plotly)
+        return {tbin: color_sequence[i % len(color_sequence)] for i, tbin in enumerate(ordered)}
+
+
     @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars', 'FigureCollector', 'PhoPublicationFigureHelper', 'build_and_write_to_file'], used_by=[], creation_date='2026-10-28 08:32', related_items=['compute_ordinal_mode_shift'])
     @classmethod
     def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
@@ -2699,6 +2726,357 @@ class PrePostDeltaDistributionComparison:
             laps_p_value=laps_p_value,
             pbe_p_value=pbe_p_value,
             pbe_heuristic_p_value=pbe_heuristic_p_value,
+            animal_marker_mapping=marker_mapping,
+            animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+            saved_path=saved_path,
+            saved_paths=saved_paths,
+        )
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar', 'time_bin_size', 'figure-s3'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars', 'FigureCollector', 'PhoPublicationFigureHelper', 'time_bin_size_discrete_color_map'], used_by=['FigureS8.main_all_figs'], creation_date='2026-11-03 07:51', related_items=['plot_fig2_style_summary_four_bar'])
+    @classmethod
+    def plot_fig2_style_summary_multi_tbin_bars(cls, results_by_tbin: Dict[str, Tuple[Any, Any]],
+                                         time_bin_color_map: Optional[Dict[str, str]] = None, pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
+                                         animal_marker_mapping: Optional[Dict[str, str]] = None, animal_legend_labels: Optional[Dict[str, str]] = None,
+                                         ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
+                                         group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
+                                         defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
+                                         fig_file_name: str = 'figure_s3_summary_multi_tbin_bars', write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True,
+                                         fignum=None, active_context: Optional[IdentifyingContext] = None,
+                                         enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+        """One Fig2-style panel with side-by-side bars per `time_bin_size` in each of Laps/PBEs × pre/post.
+
+        `results_by_tbin` maps t-bin key → `(laps_results, pbe_results)` run() dicts (or session_summary DataFrames).
+        Colors match Figure S3 scatter via `time_bin_size_discrete_color_map` / Plotly `Plotly[3:]`.
+        """
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
+
+        if (results_by_tbin is None) or (len(results_by_tbin) == 0):
+            raise ValueError('results_by_tbin must be a non-empty dict of tbin → (laps_results, pbe_results).')
+
+        def _coerce_session_summary(obj, explicit_p_value, name: str) -> Tuple[pd.DataFrame, Optional[float]]:
+            if obj is None:
+                raise ValueError(f'{name} is required.')
+            if isinstance(obj, pd.DataFrame):
+                summary = obj
+                p_value = explicit_p_value
+            elif isinstance(obj, dict):
+                if ('session_summary' not in obj) or (obj['session_summary'] is None):
+                    raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                summary = obj['session_summary']
+                p_value = explicit_p_value if explicit_p_value is not None else obj.get('p_value')
+            else:
+                raise TypeError(f'{name} must be a run() result dict or a session_summary DataFrame, got {type(obj)!r}.')
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                raise ValueError(f'{name} session_summary is empty.')
+            missing_cols = [c for c in (pre_col, post_col) if c not in summary.columns]
+            if missing_cols:
+                raise ValueError(f'{name} session_summary is missing columns: {missing_cols}.')
+            work = summary.dropna(subset=[pre_col, post_col]).copy().reset_index(drop=True)
+            if work.empty:
+                raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+            return work, p_value
+
+        def _tbin_sort_key(s: str):
+            try:
+                return (0, float(s))
+            except ValueError:
+                return (1, s)
+
+        ordered_tbins: List[str] = sorted([str(k) for k in results_by_tbin.keys()], key=_tbin_sort_key)
+        if time_bin_color_map is None:
+            time_bin_color_map = cls.time_bin_size_discrete_color_map(ordered_tbins)
+        else:
+            time_bin_color_map = {str(k): v for k, v in dict(time_bin_color_map).items()}
+
+        n_tbin: int = len(ordered_tbins)
+        laps_summaries: Dict[str, pd.DataFrame] = {}
+        pbe_summaries: Dict[str, pd.DataFrame] = {}
+        laps_p_values: Dict[str, Optional[float]] = {}
+        pbe_p_values: Dict[str, Optional[float]] = {}
+        for tbin in ordered_tbins:
+            pair = results_by_tbin[tbin]
+            if (not isinstance(pair, (tuple, list))) or (len(pair) != 2):
+                raise ValueError(f'results_by_tbin[{tbin!r}] must be a (laps_results, pbe_results) pair.')
+            laps_obj, pbe_obj = pair
+            laps_summaries[tbin], laps_p_values[tbin] = _coerce_session_summary(laps_obj, None, f'laps_results[{tbin}]')
+            pbe_summaries[tbin], pbe_p_values[tbin] = _coerce_session_summary(pbe_obj, None, f'pbe_results[{tbin}]')
+        ## END for tbin in ordered_tbins...
+
+        preferred_animals = ('gor01', 'vvp01', 'pin01')
+        filled_markers = ['o', '^', 's', 'p', 'd', 'P', 'X']
+        if animal_marker_mapping is None:
+            animal_marker_mapping = {'gor01': 'o', 'vvp01': '^', 'pin01': 's'}
+        else:
+            animal_marker_mapping = {str(k): v for k, v in dict(animal_marker_mapping).items()}
+        if animal_legend_labels is None:
+            animal_legend_labels = {'gor01': 'gor', 'vvp01': 'vvp', 'pin01': 'pin'}
+        else:
+            animal_legend_labels = {str(k): str(v) for k, v in dict(animal_legend_labels).items()}
+
+        def _animal_legend_label(animal) -> str:
+            key = str(animal)
+            if key in animal_legend_labels:
+                return animal_legend_labels[key]
+            stripped = key.rstrip('0123456789')
+            return stripped if stripped else key
+
+        animal_frames = list(laps_summaries.values()) + list(pbe_summaries.values())
+        has_animal: bool = all((animal_col in df.columns) for df in animal_frames)
+        unique_animals: List[str] = []
+        marker_mapping: Dict[str, str] = {}
+        if has_animal:
+            unique_animals = [str(a) for a in pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))]
+            used_markers = set(animal_marker_mapping.values())
+            spare_markers = [m for m in filled_markers if m not in used_markers] or list(filled_markers)
+            spare_i = 0
+            for animal in unique_animals:
+                if animal in animal_marker_mapping:
+                    marker_mapping[animal] = animal_marker_mapping[animal]
+                else:
+                    marker_mapping[animal] = spare_markers[spare_i % len(spare_markers)]
+                    spare_i += 1
+            ## END for animal in unique_animals...
+
+        def _bar_scatter_props(summary_df: pd.DataFrame):
+            if (not has_animal) or (animal_col not in summary_df.columns):
+                return {}
+            return [{'marker': marker_mapping.get(str(a), 'o')} for a in summary_df[animal_col].to_numpy()]
+
+        def _animal_dodge_offsets(summary_df: pd.DataFrame, bar_width: float) -> np.ndarray:
+            n = len(summary_df)
+            if n == 0:
+                return np.array([], dtype=float)
+            group_span = float(bar_width) * 0.70
+            if (n == 1) or (not has_animal) or (animal_col not in summary_df.columns):
+                if n == 1:
+                    return np.zeros(1, dtype=float)
+                return np.linspace(-group_span / 2.0, group_span / 2.0, n)
+            animals = summary_df[animal_col].map(str).to_numpy()
+            col_animals = [a for a in preferred_animals if np.any(animals == a)]
+            col_animals.extend([a for a in unique_animals if (a not in set(col_animals)) and np.any(animals == a)])
+            n_cols = max(len(col_animals), 1)
+            col_centers = np.array([0.0]) if (n_cols == 1) else np.linspace(-group_span / 2.0, group_span / 2.0, n_cols)
+            animal_to_center = {a: col_centers[i] for i, a in enumerate(col_animals)}
+            col_gap = (group_span / max(n_cols - 1, 1)) if (n_cols > 1) else group_span
+            within_span = col_gap * 0.45
+            offsets = np.zeros(n, dtype=float)
+            for a in col_animals:
+                idx = np.flatnonzero(animals == a)
+                k = int(idx.size)
+                if k == 0:
+                    continue
+                center = animal_to_center[a]
+                offsets[idx] = center if (k == 1) else (center + np.linspace(-within_span / 2.0, within_span / 2.0, k))
+            ## END for a in col_animals...
+            return offsets
+
+        # Bar layout: group-major [Laps-pre tbins | Laps-post tbins | PBEs-pre tbins | PBEs-post tbins]
+        group_centers = np.array([0.0, 1.0, 2.0, 3.0], dtype=float)
+        group_span = 0.72
+        bar_w = float(group_span / max(n_tbin, 1)) * 0.85
+        if n_tbin == 1:
+            within_offsets = np.array([0.0], dtype=float)
+        else:
+            within_offsets = np.linspace(-group_span / 2.0 + bar_w / 2.0, group_span / 2.0 - bar_w / 2.0, n_tbin)
+
+        x_labels = [
+            f'{group_labels[0]} pre-$\\Delta$',
+            f'{group_labels[0]} post-$\\Delta$',
+            f'{group_labels[1]} pre-$\\Delta$',
+            f'{group_labels[1]} post-$\\Delta$',
+        ]
+        y_values: List[np.ndarray] = []
+        scatter_props: List = []
+        scatter_x_offsets: List[np.ndarray] = []
+        bar_x_list: List[float] = []
+        bar_width_list: List[float] = []
+        bar_colors: List[str] = []
+        # Index maps for paired lines / significance: (laps_pre_i, laps_post_i), (pbe_pre_i, pbe_post_i)
+        laps_pre_idx = list(range(0, n_tbin))
+        laps_post_idx = list(range(n_tbin, 2 * n_tbin))
+        pbe_pre_idx = list(range(2 * n_tbin, 3 * n_tbin))
+        pbe_post_idx = list(range(3 * n_tbin, 4 * n_tbin))
+
+        for group_i, (summaries, col) in enumerate([
+            (laps_summaries, pre_col), (laps_summaries, post_col),
+            (pbe_summaries, pre_col), (pbe_summaries, post_col),
+        ]):
+            for j, tbin in enumerate(ordered_tbins):
+                summary_df = summaries[tbin]
+                color = time_bin_color_map.get(tbin, '#000000')
+                y_values.append(summary_df[col].to_numpy(dtype=float))
+                scatter_props.append(_bar_scatter_props(summary_df))
+                scatter_x_offsets.append(_animal_dodge_offsets(summary_df, bar_w))
+                bar_x_list.append(float(group_centers[group_i] + within_offsets[j]))
+                bar_width_list.append(bar_w)
+                bar_colors.append(color)
+            ## END for j, tbin in enumerate(ordered_tbins)...
+        ## END for group_i, (summaries, col) in enumerate(...)...
+
+        if active_context is None:
+            active_context = IdentifyingContext(format_name='kdiba', fig='S3', display_fn_name='pre_post_delta_summary_multi_tbin_bars')
+
+        dpi = kwargs.pop('dpi', 220)
+        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
+        _fig3_label_rc = {
+            'xtick.labelsize': _fig3_sizes['tick_label'],
+            'ytick.labelsize': _fig3_sizes['tick_label'],
+            'axes.labelsize': _fig3_sizes['axis_label'],
+        }
+        _decoded_prefix: str = 'Decoded '
+        if str(title).startswith(_decoded_prefix):
+            title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
+        _summary_title_kwargs = dict(
+            title_font_size=_fig3_sizes['track_title'],
+            subtitle_font_size=_fig3_sizes['title_body'],
+            bold_epochs_name=False,
+        )
+
+        create_plot_kwargs = dict(kwargs)
+        if fignum is not None:
+            create_plot_kwargs.setdefault('fignum', fignum)
+        create_plot_kwargs.update(dict(
+            bar_x=np.asarray(bar_x_list, dtype=float),
+            bar_width=np.asarray(bar_width_list, dtype=float),
+            bar_colors=list(bar_colors),
+            errorbar_colors=list(bar_colors),
+            xtick_positions=group_centers,
+            xtick_labels=x_labels,
+            scatter_x_offsets=scatter_x_offsets,
+            scatter_kwargs=dict(edgecolors='white', linewidths=0.4, zorder=4),
+        ))
+
+        if debug_print:
+            print(f'multi-tbin summary: n_tbin={n_tbin}, tbins={ordered_tbins}')
+
+        collector = None
+        saved_paths: List[Path] = []
+        saved_path = None
+        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+            prepare_for_publication=prepare_for_publication,
+            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+        ) | _fig3_label_rc
+        with mpl.rc_context(publication_rc):
+            with FigureCollector(name='fig_s3_summary_multi_tbin_bars', base_context=active_context) as collector:
+                render = PaperFigureTwo.create_plot(
+                    x_labels, y_values, scatter_props, ylabel, title, 'fig_s3_summary_multi_tbin_bars', active_context, True,
+                    prepare_for_publication=prepare_for_publication,
+                    publication_group_labels=group_labels, metric_name='Session Means',
+                    title_subtitle=f'for {group_labels[0]} and {group_labels[1]} by time bin size', xlabel='',
+                    **{**_summary_title_kwargs, **create_plot_kwargs},
+                )
+                collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+                fig = render.fig
+                ax = render.ax
+                bars = (getattr(render, 'plot_objects', None) or {}).get('bars')
+                if bars is not None:
+                    for i, a_bar in enumerate(bars):
+                        a_bar.set_facecolor(bar_colors[i])
+                        a_bar.set_alpha(0.85)
+                    ## END for i, a_bar in enumerate(bars)...
+                tick_fs = _fig3_sizes['tick_label']
+                axis_fs = _fig3_sizes['axis_label']
+                ax.tick_params(axis='both', labelsize=tick_fs)
+                ax.xaxis.label.set_size(axis_fs)
+                ax.yaxis.label.set_size(axis_fs)
+                x_values_list, plotted_y_values = render.plot_data
+
+                if enable_paired_lines:
+                    for i in range(n_tbin):
+                        for i0, i1 in ((laps_pre_idx[i], laps_post_idx[i]), (pbe_pre_idx[i], pbe_post_idx[i])):
+                            line_color = bar_colors[i0]
+                            for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                                ax.plot([x0, x1], [y0, y1], color=line_color, alpha=0.35, zorder=1, linewidth=0.8)
+                            ## END for x0, y0, x1, y1 in zip(...)...
+                        ## END for i0, i1 in (...)...
+                    ## END for i in range(n_tbin)...
+
+                y_max = float(np.nanmax(np.concatenate(y_values)))
+                for i, tbin in enumerate(ordered_tbins):
+                    laps_p = laps_p_values.get(tbin)
+                    pbe_p = pbe_p_values.get(tbin)
+                    x_laps_pre = bar_x_list[laps_pre_idx[i]]
+                    x_laps_post = bar_x_list[laps_post_idx[i]]
+                    x_pbe_pre = bar_x_list[pbe_pre_idx[i]]
+                    x_pbe_post = bar_x_list[pbe_post_idx[i]]
+                    bracket_y = y_max + (0.04 * i * max(abs(y_max), 1e-12))
+                    if laps_p is not None:
+                        add_significance_bars(ax, laps_p, x1=x_laps_pre, x2=x_laps_post, y=bracket_y, color=bar_colors[laps_pre_idx[i]])
+                    if pbe_p is not None:
+                        add_significance_bars(ax, pbe_p, x1=x_pbe_pre, x2=x_pbe_post, y=bracket_y, color=bar_colors[pbe_pre_idx[i]])
+                ## END for i, tbin in enumerate(ordered_tbins)...
+
+                tbin_legend_handles = [
+                    Patch(facecolor=time_bin_color_map.get(tbin, '#000000'), edgecolor=time_bin_color_map.get(tbin, '#000000'),
+                          alpha=0.85, label=f'{tbin} s')
+                    for tbin in ordered_tbins
+                ]
+                tbin_legend = ax.legend(
+                    handles=tbin_legend_handles, frameon=False, loc='upper left', title='Time bin size',
+                    ncol=min(n_tbin, 3), borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                )
+                tbin_legend.set_clip_on(False)
+
+                if has_animal and marker_mapping:
+                    legend_animals = [a for a in preferred_animals if a in marker_mapping]
+                    legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
+                    animal_legend_handles = [
+                        Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color='k',
+                               markerfacecolor='k', markeredgecolor='k', markersize=6,
+                               label=_animal_legend_label(animal))
+                        for animal in legend_animals
+                    ]
+                    animal_legend = ax.legend(
+                        handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
+                        ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
+                    )
+                    animal_legend.set_clip_on(False)
+                    ax.add_artist(tbin_legend)
+
+                if save_figure:
+                    save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
+                    fig_man = None
+                    if export_folder is not None:
+                        export_folder = Path(export_folder)
+                        export_folder.mkdir(parents=True, exist_ok=True)
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder)
+                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                    else:
+                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                        saved_paths = list(saved_paths or [])
+                        fig_man = AcrossSessionsVisualizations._fig_out_man
+                    if write_svg:
+                        if saved_paths:
+                            svg_path = Path(saved_paths[0]).with_suffix('.svg')
+                        else:
+                            if fig_man is None:
+                                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                            svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                        fig.savefig(svg_path, format='svg', transparent=True)
+                        saved_paths.append(svg_path)
+                    saved_path = saved_paths[0] if saved_paths else None
+
+                if not defer_show:
+                    plt.show()
+
+        return dict(
+            fig=fig,
+            ax=ax,
+            render=render,
+            collector=collector,
+            ordered_tbins=ordered_tbins,
+            time_bin_color_map=time_bin_color_map,
+            laps_summaries=laps_summaries,
+            pbe_summaries=pbe_summaries,
+            laps_p_values=laps_p_values,
+            pbe_p_values=pbe_p_values,
+            y_values=y_values,
             animal_marker_mapping=marker_mapping,
             animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
             saved_path=saved_path,
@@ -3940,6 +4318,24 @@ class FigureS8:
                     summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity=grainularity))
                     if len(summary_specs) == 0:
                         print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure. Skipping for fig_name: "{fig_name}"')
+                    elif fig_color_by_time_bin_size and (len(summary_specs) >= 1) and (summary_specs[0][0] is not None):
+                        # Figure S3: one panel with side-by-side bars per time_bin_size (colors match scatter)
+                        ordered_tbins = [group_name for group_name, _, _, _ in summary_specs if group_name is not None]
+                        results_by_tbin = {
+                            group_name: (pre_post_delta_stats_results_dict[laps_key], pre_post_delta_stats_results_dict[pbes_key])
+                            for group_name, laps_key, pbes_key, _heuristic_key in summary_specs
+                            if group_name is not None
+                        }
+                        combined_basename: str = f'{fig_name}_SummaryStats_{grainularity_token}_by_time_bin_size'
+                        _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_multi_tbin_bars(
+                            results_by_tbin,
+                            time_bin_color_map=PrePostDeltaDistributionComparison.time_bin_size_discrete_color_map(ordered_tbins),
+                            fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=figures_parent_folder,
+                            title='Decoded $P_{Short}$ by time bin size',
+                            active_context=IdentifyingContext(display_fn_name=combined_basename),
+                        )
+                        _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
+                        print(f'\tFigure S3 multi-tbin summary: "{combined_basename}" saved_paths={_out_extra_plot.get("saved_paths")}')
                     else:
                         fig_summary_dict = {}
                         group_svg_paths = []
@@ -3958,10 +4354,7 @@ class FigureS8:
                                 plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
                                 plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name']
                             if group_name is not None:
-                                if fig_color_by_time_bin_size:
-                                    plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | t_bin={group_name}s'
-                                else:
-                                    plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
+                                plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
                                 pre_post_delta_stats_results_dict[laps_key],
                                 pre_post_delta_stats_results_dict[pbes_key],
