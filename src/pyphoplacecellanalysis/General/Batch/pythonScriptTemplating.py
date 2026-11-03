@@ -11,7 +11,7 @@ import pathlib
 from pathlib import Path
 import attrs
 from attrs import define, field, Factory
-from typing import Any, List, Dict, Literal, Optional, Tuple, Union, Callable
+from typing import Any, List, Dict, Literal, NamedTuple, Optional, Tuple, Union, Callable
 # import numpy as np
 # import pandas as pd
 # from attrs import define, field, Factory
@@ -174,7 +174,7 @@ class ProcessingScriptPhases(Enum):
         Spyglass/clusterless decoder completions are included for non-kdiba batches only.
         `is_kdiba_session` is required (this phase enum does not carry session format).
         """
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_epoch_score_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_epoch_score_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
         
         if self.value == ProcessingScriptPhases.figure_run.value:
@@ -205,7 +205,6 @@ class ProcessingScriptPhases(Enum):
             # Unused:
             # _phase_rank_order_results_run_custom_user_completion_functions_dict = {
             #     "export_rank_order_results_completion_function": export_rank_order_results_completion_function, # ran 2024-09-26 3pm
-            #     'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
             #     'compute_and_export_session_epoch_score_shuffles_completion_function': compute_and_export_session_epoch_score_shuffles_completion_function,
             # }
             
@@ -214,7 +213,6 @@ class ProcessingScriptPhases(Enum):
                 # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function, # ran 2024-07-16 5am
                 # 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-09-26 3pm
                 # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-09-26 3pm
-                # 'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
                 # 'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                 # 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                 # 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
@@ -974,6 +972,85 @@ def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backe
     print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
 
 # END Batch process phase chaining ___________________________________________________________________________________ #
+
+
+class Spike3DBatchVenvPaths(NamedTuple):
+    spike3d_repo_root: Path
+    venv_activate_path: str
+    vscode_default_interpreter_path: str
+
+
+_DEFAULT_WINDOWS_SPIKE3D_VENV_ROOT = Path(r'H:/TEMP/Spike3DEnv_ExploreUpgrade/Spike3DWorkEnv/Spike3D/.venv')
+
+
+def resolve_spike3d_batch_venv_paths(batch_execution_target: str, *, windows_spike3d_venv_root: Optional[Union[str, Path]] = None, print_resolution: bool = True) -> Spike3DBatchVenvPaths:
+    """Derive Spike3D venv activate + interpreter paths from SPIKE3D_REPO_ROOT when exported (see GreatlakesBatchRunInstructions); else probe common layouts."""
+    _is_windows = (platform.system() == 'Windows')
+    if _is_windows:
+        _venv_bin_dir, _python_name = 'Scripts', 'python.exe'
+    else:
+        _venv_bin_dir, _python_name = 'bin', 'python'
+    _windows_venv_root = Path(windows_spike3d_venv_root).expanduser() if windows_spike3d_venv_root is not None else _DEFAULT_WINDOWS_SPIKE3D_VENV_ROOT
+    _venv_activate_candidates: List[Path] = []
+    if _is_windows:
+        _venv_activate_candidates.append(_windows_venv_root / _venv_bin_dir / 'activate')
+    else:
+        if 'SPIKE3D_REPO_ROOT' in os.environ:
+            _env_root = Path(os.environ['SPIKE3D_REPO_ROOT']).expanduser().resolve()
+            _venv_activate_candidates.append(_env_root / 'Spike3D' / '.venv' / _venv_bin_dir / 'activate')
+            _venv_activate_candidates.append(_env_root / '.venv' / _venv_bin_dir / 'activate')
+        _venv_activate_candidates.extend([
+            Path('/scratch/kdiba_root/kdiba99/halechr/repos/Spike3D_ExploreEnv/Spike3D/.venv') / _venv_bin_dir / 'activate',
+            Path.cwd().resolve() / '.venv' / _venv_bin_dir / 'activate',
+            Path('~/repos/Spike3D/.venv').expanduser() / _venv_bin_dir / 'activate',
+        ])
+    _venv_activate_path: Optional[str] = None
+    _vscode_python: Optional[str] = None
+    _spike3d_repo_root: Optional[Path] = None
+    for _cand_activate in _venv_activate_candidates:
+        _cand_activate = _cand_activate.expanduser().resolve()
+        _cand_python = (_cand_activate.parent / _python_name).resolve()
+        if _cand_activate.exists() and _cand_python.exists():
+            _venv_activate_path = str(_cand_activate)
+            _vscode_python = str(_cand_python)
+            _spike3d_repo_root = _cand_activate.parent.parent.resolve()
+            break
+        ## END if _cand_activate.exists()...
+    ## END for _cand_activate in _venv_activate_candidates...
+    if batch_execution_target == 'linux_standalone' and not _is_windows:
+        _lab_activate = Path('~/repos/Spike3D/.venv/bin/activate').expanduser().resolve()
+        _lab_python = (_lab_activate.parent / 'python').resolve()
+        if _lab_activate.exists() and _lab_python.exists():
+            _venv_activate_path = str(_lab_activate)
+            _vscode_python = str(_lab_python)
+            _spike3d_repo_root = _lab_activate.parent.parent.resolve()
+    assert _venv_activate_path is not None and Path(_venv_activate_path).exists(), f"Could not resolve Spike3D venv activate (tried {len(_venv_activate_candidates)} candidates)"
+    assert _vscode_python is not None and Path(_vscode_python).exists(), f"venv python missing for activate {_venv_activate_path}"
+    assert _spike3d_repo_root is not None
+    if print_resolution:
+        _from_env = 'SPIKE3D_REPO_ROOT' in os.environ
+        print(f'Using Spike3D venv dir: {_spike3d_repo_root} ({"SPIKE3D_REPO_ROOT set" if _from_env else "probed path"})')
+        print(f'batch_execution_target: {batch_execution_target}')
+        print(f'venv_activate_path: {_venv_activate_path}')
+        print(f'vscode_default_interpreter_path: {_vscode_python}')
+    return Spike3DBatchVenvPaths(spike3d_repo_root=_spike3d_repo_root, venv_activate_path=_venv_activate_path, vscode_default_interpreter_path=_vscode_python)
+
+
+def try_copy_to_clipboard(code_str: str, label: str) -> None:
+    """Copy if a clipboard exists; on headless SSH/ipython print a marked block of `code_str` for manual copy."""
+    from pyphocorehelpers.programming_helpers import copy_to_clipboard
+    try:
+        copy_to_clipboard(code_str, message_print=True)
+    except (NotImplementedError, OSError) as e:
+        _banner: str = '=' * 80
+        print(f'WARN: clipboard unavailable ({label}); copy the block below manually. ({type(e).__name__}: {e})')
+        print(_banner)
+        print(f'BEGIN COPY ({label})')
+        print(_banner)
+        print(code_str)
+        print(_banner)
+        print(f'END COPY ({label})')
+        print(_banner)
 
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
