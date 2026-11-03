@@ -3139,6 +3139,22 @@ class InstantaneousSpikeRateGroupsComputation(PickleSerializableMixin, HDF_Seria
 
 
     @classmethod
+    def build_recomputed_inst_fr_comps_filename(cls, full_custom_suffix: str, instantaneous_time_bin_size_seconds: float, extension: str, date_str: Optional[str] = None) -> str:
+        """ `{YYYY-MM-DD}{full_suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size}{extension}` """
+        from pyphocorehelpers.print_helpers import get_now_day_str
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle
+
+        if date_str is None:
+            date_str = get_now_day_str()
+        suffix: Optional[str] = DecodedEpochScoreShuffle.normalize_custom_suffix(full_custom_suffix)
+        if suffix is None:
+            raise ValueError('full_custom_suffix is empty; refusing to write unsuffixed recomputed_inst_fr_comps file')
+        if not extension.startswith('.'):
+            extension = f'.{extension}'
+        return f'{date_str}{suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size_seconds}{extension}'
+
+
+    @classmethod
     def _perform_compute_spike_rate_bars(cls, LxC_aclus: NDArray, SxC_aclus: NDArray, LxC_ThetaDeltaMinus: SpikeRateTrends, LxC_ThetaDeltaPlus: SpikeRateTrends, SxC_ThetaDeltaMinus: SpikeRateTrends, SxC_ThetaDeltaPlus: SpikeRateTrends,
                                           LxC_ReplayDeltaMinus: SpikeRateTrends, LxC_ReplayDeltaPlus: SpikeRateTrends, SxC_ReplayDeltaMinus: SpikeRateTrends, SxC_ReplayDeltaPlus: SpikeRateTrends,
                                           ):

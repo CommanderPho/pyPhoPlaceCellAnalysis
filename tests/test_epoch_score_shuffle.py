@@ -24,6 +24,7 @@ finally:
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
     from pyphoplacecellanalysis.Analysis.Decoder.heuristic_replay_scoring import HeuristicReplayScoring
     from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, DecodedEpochScoreShuffle, ExportedEpochScoreShufflesPickleFilenameParser, WCorrShuffle
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData, saveData
 
@@ -731,6 +732,23 @@ class TestHeuristicShuffleScoreArrays(unittest.TestCase):
         self.assertIs(decoded_result.filter_epochs, filter_epochs)
         pd.testing.assert_frame_equal(decoded_result.filter_epochs, filter_epochs_before)
         pd.testing.assert_frame_equal(filter_epochs, filter_epochs_before)
+
+
+class TestRecomputedInstFrCompsFilename(unittest.TestCase):
+    MATCHING_SUFFIX: str = '_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms'
+
+
+    def test_build_recomputed_inst_fr_comps_filename_includes_full_suffix_and_tbin(self):
+        date_str: str = '2026-11-02'
+        pkl_filename = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=self.MATCHING_SUFFIX, instantaneous_time_bin_size_seconds=1000.0, extension='.pkl', date_str=date_str)
+        h5_filename = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=self.MATCHING_SUFFIX, instantaneous_time_bin_size_seconds=1000.0, extension='h5', date_str=date_str)
+        self.assertEqual(pkl_filename, '2026-11-02_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_recomputed_inst_fr_comps_1000.0.pkl')
+        self.assertEqual(h5_filename, '2026-11-02_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_recomputed_inst_fr_comps_1000.0.h5')
+        self.assertIn(self.MATCHING_SUFFIX, pkl_filename)
+        self.assertIn('-tbin_25ms', pkl_filename)
+        self.assertTrue(pkl_filename.endswith('_recomputed_inst_fr_comps_1000.0.pkl'))
+        with self.assertRaises(ValueError):
+            InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix='', instantaneous_time_bin_size_seconds=1000.0, extension='.pkl', date_str=date_str)
 
 
 try:

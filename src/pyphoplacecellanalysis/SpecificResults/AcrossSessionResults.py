@@ -1596,7 +1596,7 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
         from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_session_folder_files_to_target_dir
 
-        custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_0.0005.h5').resolve())),
+        custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_recomputed_inst_fr_comps_0.0005.h5').resolve())),
                                 #   'PHONEW.evt': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{a_session_folder.context.session_name}.PHONEW.evt').resolve())),
                                 }
 
@@ -1800,23 +1800,39 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False, full_custom_suffix: Optional[str] = None):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
+
+    Prefers suffixed session files when `full_custom_suffix` is provided:
+        `{RESULT_DATE_TO_USE}{full_custom_suffix}_recomputed_inst_fr_comps_{time_bin_size}.pkl`
+    Falls back to legacy unsuffixed names when the suffixed path is missing.
     
     """
     from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
     from neuropy.core.user_annotations import UserAnnotationsManager
     from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
+
+    def _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, date_str: str, time_bin_size: float, custom_suffix: Optional[str] = None):
+        """ Try suffixed filename first (when provided), then legacy unsuffixed name. """
+        output_folder = a_session_folder.output_folder
+        if custom_suffix is not None and len(str(custom_suffix).strip()) > 0:
+            suffixed_name: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=custom_suffix, instantaneous_time_bin_size_seconds=time_bin_size, extension='.pkl', date_str=date_str)
+            found = get_file_path_if_file_exists(output_folder.joinpath(suffixed_name).resolve())
+            if found is not None:
+                return found
+        legacy_name: str = f'{date_str}_recomputed_inst_fr_comps_{time_bin_size}.pkl'
+        return get_file_path_if_file_exists(output_folder.joinpath(legacy_name).resolve())
 
     def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None, dry_run: bool = False):
         """ 
         Creates `across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}_{time_bin_size_str}.pkl`
         """
         if custom_file_types_dict is None:
-            custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{BATCH_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve()))}
+            custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder, _tbin=time_bin_size: _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, BATCH_DATE_TO_USE, _tbin, full_custom_suffix)) for time_bin_size in instantaneous_time_bin_size_seconds_list}
             
         ## build the `across_sessions_recomputed_instantaneous_fr_dict` by loading the individual results from the session folders
         across_sessions_recomputed_instantaneous_fr_dict_dict = {}
@@ -1865,7 +1881,7 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## INPUTS: RESULT_DATE_TO_USE, collected_outputs_path
     # instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025]
-    custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve())) for time_bin_size in instantaneous_time_bin_size_seconds_list}
+    custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder, _tbin=time_bin_size: _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, RESULT_DATE_TO_USE, _tbin, full_custom_suffix)) for time_bin_size in instantaneous_time_bin_size_seconds_list}
     print(f'custom_file_types_dict: {custom_file_types_dict}')
     
     if global_data_root_parent_path is not None:

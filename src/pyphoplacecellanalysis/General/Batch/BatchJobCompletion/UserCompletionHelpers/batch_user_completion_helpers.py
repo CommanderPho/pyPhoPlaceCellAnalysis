@@ -2091,10 +2091,10 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
     Output Files:
         if save_pickle:
-            PKL Output:     f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+            PKL Output:     `{date}{full_custom_suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size}.pkl`
         
         if save_hdf:
-            HDF5 Output:    f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+            HDF5 Output:    `{date}{full_custom_suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size}.h5`
         
         if save_across_session_hdf:
             Across Session HDF5 Output: f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
@@ -2115,6 +2115,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
@@ -2192,13 +2193,15 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = recomputed_inst_fr_comps_FAT_CSV_filepath
 
-
-
+        ## Build full computation suffix once for standalone .pkl/.h5 (pipeline custom_suffix + `-tbin_XXms`)
+        full_custom_suffix: Optional[str] = None
+        if _out_recomputed_inst_fr_comps is not None and (save_pickle or save_hdf):
+            full_custom_suffix = DecodedEpochScoreShuffle().build_full_custom_suffix(curr_active_pipeline=curr_active_pipeline)
 
         ## standalone saving:
         if (_out_recomputed_inst_fr_comps is not None) and save_pickle:
-            ## Pickle Saving:
-            standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+            ## Pickle Saving (flat `{date}{full_suffix}_recomputed_inst_fr_comps_{inst_tbin}.pkl`)
+            standalone_filename: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=full_custom_suffix, instantaneous_time_bin_size_seconds=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds, extension='.pkl', date_str=get_now_day_str())
             recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
             print(f'recomputed_inst_fr_comps_filepath: "{recomputed_inst_fr_comps_filepath}"')
 
@@ -2222,8 +2225,8 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         ## HDF5 output:
         if (_out_recomputed_inst_fr_comps is not None) and save_hdf:
-            ## Pickle Saving:
-            standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+            ## HDF5 Saving (flat `{date}{full_suffix}_recomputed_inst_fr_comps_{inst_tbin}.h5`)
+            standalone_h5_filename: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=full_custom_suffix, instantaneous_time_bin_size_seconds=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds, extension='.h5', date_str=get_now_day_str())
             recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
             print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
             try:
