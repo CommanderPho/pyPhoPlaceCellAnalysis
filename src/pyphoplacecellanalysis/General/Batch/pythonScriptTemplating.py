@@ -5,14 +5,13 @@ import json
 import platform
 import shutil
 import subprocess
-import pkg_resources # for Slurm templating
 from jinja2 import Environment, FileSystemLoader # for Slurm templating
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
 import attrs
 from attrs import define, field, Factory
-from typing import Any, List, Dict, Literal, Optional, Tuple, Union, Callable
+from typing import Any, List, Dict, Literal, NamedTuple, Optional, Tuple, Union, Callable
 # import numpy as np
 # import pandas as pd
 # from attrs import define, field, Factory
@@ -30,6 +29,7 @@ from pyphocorehelpers.notebook_helpers import convert_script_to_notebook
 from neuropy.utils.result_context import IdentifyingContext
 # from neuropy.core.session.Formats.BaseDataSessionFormats import find_local_session_paths
 from pyphoplacecellanalysis.General.Batch.concrete_session_folder import ConcreteSessionFolder
+from pyphoplacecellanalysis.Resources import templates_directory
 
 # included_session_contexts, output_python_scripts, output_slurm_scripts, powershell_script_path, vscode_workspace_path
 # BatchScriptsCollection = attrs.make_class("BatchScriptsCollection", {k:field() for k in ("included_session_contexts", "output_python_scripts", "output_jupyter_notebooks", "output_slurm_scripts", "output_non_slurm_bash_scripts", "vscode_workspace_path")}) # , "max_parallel_executions", "powershell_script_path"
@@ -151,7 +151,15 @@ class ProcessingScriptPhases(Enum):
             return True
         else:
             return False
-        
+
+
+    @property
+    def chained_submit_script_kind(self) -> str:
+        """'figs' for figure_run chained submit (figures_*.py / figs wrappers); 'run' otherwise."""
+        if self.is_figure_phase:
+            return 'figs'
+        return 'run'
+
 
     @property
     def phase_job_suffix(self) -> str:
@@ -166,7 +174,7 @@ class ProcessingScriptPhases(Enum):
         Spyglass/clusterless decoder completions are included for non-kdiba batches only.
         `is_kdiba_session` is required (this phase enum does not carry session format).
         """
-        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_wcorr_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
+        from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import export_rank_order_results_completion_function, figures_rank_order_results_completion_function, determine_session_t_delta_completion_function, perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, compute_and_export_session_epoch_score_shuffles_completion_function, compute_and_export_session_instantaneous_spike_rates_completion_function, compute_and_export_session_extended_placefield_peak_information_completion_function, backup_previous_session_files_completion_function, compute_and_export_session_trial_by_trial_performance_completion_function, save_custom_session_files_completion_function, compute_and_export_cell_first_spikes_characteristics_completion_function, figures_plot_cell_first_spikes_characteristics_completion_function, compute_and_pickle_clusterless_decoder_completion_function, figures_plot_bapun_clusterless_train_test_decoder_error_distance_completion_function, compute_and_pickle_spyglass_clusterless_decoder_completion_function, figures_plot_bapun_spyglass_clusterless_train_test_decoder_error_distance_completion_function
         from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import generalized_decode_epochs_dict_and_export_results_completion_function, figures_plot_generalized_decode_epochs_dict_and_export_results_completion_function #, generalized_export_figures_customizazble_completion_function
         
         if self.value == ProcessingScriptPhases.figure_run.value:
@@ -197,8 +205,7 @@ class ProcessingScriptPhases(Enum):
             # Unused:
             # _phase_rank_order_results_run_custom_user_completion_functions_dict = {
             #     "export_rank_order_results_completion_function": export_rank_order_results_completion_function, # ran 2024-09-26 3pm
-            #     'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
-            #     'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
+            #     'compute_and_export_session_epoch_score_shuffles_completion_function': compute_and_export_session_epoch_score_shuffles_completion_function,
             # }
             
 
@@ -206,7 +213,6 @@ class ProcessingScriptPhases(Enum):
                 # "compute_and_export_marginals_dfs_completion_function": compute_and_export_marginals_dfs_completion_function, # ran 2024-07-16 5am
                 # 'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function, # ran 2024-09-26 3pm
                 # 'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function, # ran 2024-09-26 3pm
-                # 'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function, # ran 2024-07-16 5am 
                 # 'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                 # 'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
                 # 'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function, 
@@ -320,7 +326,7 @@ class ProcessingScriptPhases(Enum):
             'directional_decoders_evaluate_epochs',
             'directional_decoders_epoch_heuristic_scoring',
             'extended_pf_peak_information',
-            'perform_wcorr_shuffle_analysis',
+            'epoch_score_shuffle_analysis',
             'non_PBE_epochs_results',
             'generalized_specific_epochs_decoding',
         ]
@@ -357,6 +363,8 @@ class ProcessingScriptPhases(Enum):
             _out_run_config.update(dict(create_slurm_scripts=True, should_create_vscode_workspace=False))
 
         _out_run_config['phase_job_suffix'] = self.phase_job_suffix
+        _out_run_config['should_generate_run_scripts'] = (not self.is_figure_phase)
+        _out_run_config['should_generate_figure_scripts'] = self.is_figure_phase
 
         return _out_run_config
 
@@ -413,7 +421,7 @@ def build_slurm_job_name(curr_session_context: Union[IdentifyingContext, str], j
 # without a global phase barrier. Failed phases cancel only that session's later jobs; retry_from_*.sh resumes from    #
 # the failed phase without re-running completed earlier phases (pickles kept). Windows uses sequential python.exe       #
 # chains (submit_phase_chains_*.ps1 / retry_from_*.ps1) instead of bash/sbatch.                                          #
-# Public: build_session_phase_script_map, write_chained_submit_script, write_cancel_phase_chain_script,                   #
+# Public: build_session_phase_script_map, write_chained_submit_script,                                                   #
 #         write_all_retry_from_phase_scripts, print_chain_status_hint, submit_slurm_script (optional auto-submit).       #
 # ==================================================================================================================== #
 
@@ -504,6 +512,7 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
     """Align per-phase BatchScriptsCollection run/fig script paths by session.
 
     phase_collections: mapping phase_name -> BatchScriptsCollection from generate_batch_single_session_scripts.
+    script_kind: default sibling for unknown phase names ('run' or 'figs'). Known `ProcessingScriptPhases` names use `chained_submit_script_kind` (`figure_run` -> 'figs'). If that sibling is empty, falls back to the other when its path count matches the sessions.
     script_collection_key: 'slurm' -> output_slurm_scripts; 'bash' -> output_non_slurm_bash_scripts; 'python' -> output_python_scripts (Windows).
     Returns: session_key -> {phase_name: script_path_str}
     """
@@ -512,31 +521,45 @@ def build_session_phase_script_map(phase_collections: Dict[str, 'BatchScriptsCol
             return curr_session_context.get_description()
         return str(curr_session_context)
 
-    session_phase_scripts: Dict[str, Dict[str, str]] = {}
-    for phase_name, collection in phase_collections.items():
-        contexts = list(collection.included_session_contexts or [])
+    def _subfn_script_kind_for_phase(phase_name: str, requested_kind: str) -> str:
+        try:
+            return ProcessingScriptPhases(phase_name).chained_submit_script_kind
+        except ValueError:
+            return requested_kind
+
+    def _subfn_paths_for_kind(collection: 'BatchScriptsCollection', kind: str) -> Tuple[List, str]:
         if script_collection_key == 'slurm':
-            script_paths = list((collection.output_slurm_scripts or {}).get(script_kind, []) or [])
-            paths_label = 'output_slurm_scripts'
-        elif script_collection_key == 'bash':
-            script_paths = list((collection.output_non_slurm_bash_scripts or {}).get(script_kind, []) or [])
-            paths_label = 'output_non_slurm_bash_scripts'
-        elif script_collection_key == 'python':
-            path_idx = 1 if script_kind == 'figs' else 0
+            return list((collection.output_slurm_scripts or {}).get(kind, []) or []), 'output_slurm_scripts'
+        if script_collection_key == 'bash':
+            return list((collection.output_non_slurm_bash_scripts or {}).get(kind, []) or []), 'output_non_slurm_bash_scripts'
+        if script_collection_key == 'python':
+            path_idx = 1 if kind == 'figs' else 0
             script_paths = []
             for item in list(collection.output_python_scripts or []):
                 if isinstance(item, (list, tuple)):
-                    script_paths.append(item[path_idx])
-                elif path_idx == 0:
+                    chosen_path = item[path_idx] if len(item) > path_idx else None
+                    if chosen_path is not None:
+                        script_paths.append(chosen_path)
+                elif (path_idx == 0) and (item is not None):
                     script_paths.append(item)
-                else:
-                    raise ValueError(f"phase={phase_name!r}: output_python_scripts item is not a (run, figs) pair: {item!r}")
             ## END for item in list(collection.output_python_scripts or [])...
-            paths_label = 'output_python_scripts'
-        else:
-            raise ValueError(f"script_collection_key must be 'slurm', 'bash', or 'python', got {script_collection_key!r}")
-        if len(contexts) != len(script_paths):
-            raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={len(contexts)} != len({paths_label}[{script_kind!r}])={len(script_paths)}")
+            return script_paths, 'output_python_scripts'
+        raise ValueError(f"script_collection_key must be 'slurm', 'bash', or 'python', got {script_collection_key!r}")
+
+    session_phase_scripts: Dict[str, Dict[str, str]] = {}
+    for phase_name, collection in phase_collections.items():
+        contexts = list(collection.included_session_contexts or [])
+        n_contexts: int = len(contexts)
+        preferred_kind: str = _subfn_script_kind_for_phase(phase_name, script_kind)
+        other_kind: str = 'figs' if preferred_kind == 'run' else 'run'
+        script_paths, paths_label = _subfn_paths_for_kind(collection, preferred_kind)
+        phase_script_kind: str = preferred_kind
+        if len(script_paths) != n_contexts:
+            alt_paths, alt_label = _subfn_paths_for_kind(collection, other_kind)
+            if len(alt_paths) == n_contexts:
+                script_paths, paths_label, phase_script_kind = alt_paths, alt_label, other_kind
+            else:
+                raise ValueError(f"phase={phase_name!r}: len(included_session_contexts)={n_contexts} != len({paths_label}[{preferred_kind!r}])={len(script_paths)} (also {alt_label}[{other_kind!r}]={len(alt_paths)})")
         for ctx, script_path in zip(contexts, script_paths):
             session_key = _subfn_session_key_str(ctx)
             session_phase_scripts.setdefault(session_key, {})[phase_name] = str(Path(script_path))
@@ -553,8 +576,151 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
     phase_chain_backend: 'slurm' submits afterok chains (sessions in parallel on the cluster); 'bash' runs one session
     at a time with sequential phase scripts (Lab linux_standalone); 'powershell' runs sequential python.exe per session (Windows).
 
+    Slurm scripts accept `--cancel` / `--status` (this chain only; uses sibling `.jobids` plus live `squeue`). Default
+    (no args) truncates `.jobids` then submits. Those flags are not emitted for bash/powershell backends.
+
     Returns (submit_script_path, manifest_path).
     """
+    def _subfn_slurm_collect_chain_jids_lines() -> List[str]:
+        """Bash helpers that fill `$TMP_JIDS` from `$JOBIDS_FILE` plus live `squeue` matching this chain's sbatch script paths."""
+        return [
+            'add_jid() {',
+            '  local raw="${1:-}"',
+            '  raw="${raw%%;*}"',
+            '  raw="${raw%%.*}"',
+            '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
+            '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
+            '}',
+            '',
+            'collect_chain_jids() {',
+            '  TMP_JIDS="$(mktemp)"',
+            '  TMP_SCRIPTS="$(mktemp)"',
+            '  trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
+            '  if [[ -f "$JOBIDS_FILE" ]]; then',
+            '    echo "Reading recorded job ids: $JOBIDS_FILE"',
+            '    while IFS= read -r line || [[ -n "${line:-}" ]]; do',
+            '      line="${line%%#*}"',
+            '      add_jid "$line"',
+            '    done < "$JOBIDS_FILE"',
+            '  fi',
+            '  if [[ -f "$SUBMIT_SCRIPT" ]]; then',
+            '''    awk -F"'" '/sbatch --parsable/ { if ($2 ~ /\\.sh$/) print $2 }' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
+            '  fi',
+            '  if [[ -f "$MANIFEST_FILE" ]]; then',
+            """    grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
+            '  fi',
+            '  if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
+            '  if command -v squeue >/dev/null 2>&1; then',
+            '    while IFS=\'|\' read -r jid cmd; do',
+            '      [[ -z "${jid:-}" ]] && continue',
+            '      while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
+            '        [[ -z "${script_path:-}" ]] && continue',
+            '        if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
+            '      done < "$TMP_SCRIPTS"',
+            '    done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
+            '  else',
+            '    echo "WARN: squeue not found; using only recorded job ids (if any)."',
+            '  fi',
+            '  if [[ -s "$TMP_JIDS" ]]; then sort -u "$TMP_JIDS" -o "$TMP_JIDS"; fi',
+            '}',
+            '',
+        ]
+
+    def _subfn_slurm_cancel_mode_lines(indent: str = '  ') -> List[str]:
+        """Bash body for `--cancel`: scancel collected chain job ids, continuing if a job is already gone."""
+        raw = [
+            'collect_chain_jids',
+            'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
+            'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+            '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
+            '  exit 0',
+            'fi',
+            'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
+            'cat "$TMP_JIDS"',
+            'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
+            '  [[ -z "${jid:-}" ]] && continue',
+            '  _err="$(scancel "$jid" 2>&1)"',
+            '  _rc=$?',
+            '  if [[ $_rc -eq 0 ]]; then',
+            '    echo "  canceled $jid"',
+            '  else',
+            '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
+            '  fi',
+            'done < "$TMP_JIDS"',
+            'echo "Done."',
+        ]
+        return [f'{indent}{line}' if line else line for line in raw]
+
+    def _subfn_slurm_status_mode_lines(indent: str = '  ') -> List[str]:
+        """Bash body for `--status`: `sacct --allocations` for this chain's job ids (all states)."""
+        raw = [
+            'collect_chain_jids',
+            'if [[ ! -s "${TMP_JIDS:-}" ]]; then',
+            '  echo "No jobs found for this chain (not yet submitted, already finished, or .jobids missing)."',
+            '  exit 0',
+            'fi',
+            'jid_csv="$(paste -sd, "$TMP_JIDS")"',
+            'echo "Chain jobs ($(wc -l < "$TMP_JIDS" | tr -d \' \')): $jid_csv"',
+            'if command -v sacct >/dev/null 2>&1; then',
+            '  SLURM_TIME_FORMAT=standard sacct --allocations --jobs="$jid_csv" --format=Start,JobID,State,Elapsed,JobName%100,ExitCode',
+            'else',
+            '  echo "WARN: sacct not found."',
+            'fi',
+        ]
+        return [f'{indent}{line}' if line else line for line in raw]
+
+    def _subfn_slurm_cli_dispatch_lines() -> List[str]:
+        """Bash: parse `--cancel`/`--status`/`--help`, run that mode, and exit (default continues to submit)."""
+        lines: List[str] = [
+            'print_usage() {',
+            '  echo "Usage: bash $0 [--cancel|--status|--help]"',
+            '  echo "  (no args)  submit per-session afterok chains"',
+            '  echo "  --status   print this chain\'s jobs via sacct"',
+            '  echo "  --cancel   scancel remaining jobs in this chain (safe if already gone)"',
+            '}',
+            '',
+            'MODE=submit',
+            'for _arg in "$@"; do',
+            '  case "$_arg" in',
+            '    --cancel)',
+            '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+            '      MODE=cancel',
+            '      ;;',
+            '    --status)',
+            '      if [[ "$MODE" != "submit" ]]; then echo "ERROR: --cancel and --status are mutually exclusive." >&2; print_usage; exit 1; fi',
+            '      MODE=status',
+            '      ;;',
+            '    -h|--help)',
+            '      print_usage',
+            '      exit 0',
+            '      ;;',
+            '    *)',
+            '      echo "ERROR: unknown argument: $_arg" >&2',
+            '      print_usage',
+            '      exit 1',
+            '      ;;',
+            '  esac',
+            'done',
+            '',
+            'if [[ "$MODE" == "cancel" ]]; then',
+            '  set +e',
+        ]
+        lines.extend(_subfn_slurm_cancel_mode_lines(indent='  '))
+        lines.extend([
+            '  exit 0',
+            'fi',
+            '',
+            'if [[ "$MODE" == "status" ]]; then',
+            '  set +e',
+        ])
+        lines.extend(_subfn_slurm_status_mode_lines(indent='  '))
+        lines.extend([
+            '  exit 0',
+            'fi',
+            '',
+        ])
+        return lines
+
     out_path = Path(out_path)
     if manifest_path is None:
         manifest_path = out_path.with_suffix('.json')
@@ -624,15 +790,25 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
             '# Per-session Slurm phase chains (dependency=afterok).',
             '# A failed phase cancels only that session\'s later phases; earlier successful pickles are kept.',
             '# Retry a failed phase with retry_from_*.sh — do not re-run completed earlier phases.',
-            '# Cancel remaining jobs with the sibling cancel_phase_chains_*.sh (safe if jobs are already gone).',
+            '# Usage:',
+            '#   bash this_script.sh            # submit afterok chains',
+            '#   bash this_script.sh --status   # print this chain\'s jobs via sacct',
+            '#   bash this_script.sh --cancel   # scancel remaining jobs (safe if already gone)',
             'set -euo pipefail',
             '',
             '_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+            f'SUBMIT_SCRIPT="${{_SELF_DIR}}/{out_path.name}"',
             f'JOBIDS_FILE="${{_SELF_DIR}}/{out_path.with_suffix(".jobids").name}"',
+            f'MANIFEST_FILE="${{_SELF_DIR}}/{out_path.with_suffix(".json").name}"',
+            '',
+        ]
+        bash_lines.extend(_subfn_slurm_collect_chain_jids_lines())
+        bash_lines.extend(_subfn_slurm_cli_dispatch_lines())
+        bash_lines.extend([
             ': > "$JOBIDS_FILE"',
             'echo "Recording job ids to $JOBIDS_FILE"',
             '',
-        ]
+        ])
     if batch_date_to_use:
         bash_lines.append(f'# batch: {batch_date_to_use}')
         bash_lines.append('')
@@ -678,117 +854,9 @@ def write_chained_submit_script(session_phase_scripts: Dict[str, Dict[str, str]]
     print(f'Wrote chained submit script: {out_path}')
     print(f'Wrote phase-chain manifest: {manifest_path}')
     if phase_chain_backend == 'slurm':
-        cancel_path = write_cancel_phase_chain_script(out_path)
-        print(f"Cancel remaining jobs: bash '{cancel_path}'")
+        print(f"Cancel remaining jobs: bash '{out_path}' --cancel")
+        print(f"Chain status: bash '{out_path}' --status")
     return out_path, manifest_path
-
-
-def write_cancel_phase_chain_script(submit_script_path: Union[str, Path], cancel_script_path: Optional[Union[str, Path]] = None) -> Path:
-    """Write a bash script that scancels remaining jobs created by `submit_phase_chains_*.sh`.
-
-    Looks up recorded `*.jobids` (written at submit time) and live `squeue` rows whose batch Command matches sbatch
-    script paths in the submit script / sibling JSON manifest. Continues if a job is already gone, completed, or canceled.
-
-    Usage:
-        bash '/scratch/.../Output/gen_scripts/cancel_phase_chains_2026-10-21_GL.sh'
-        bash cancel_phase_chains_2026-10-21_GL.sh '/scratch/.../submit_phase_chains_2026-10-21_GL.sh'
-    """
-    submit_script_path = Path(submit_script_path)
-    if cancel_script_path is None:
-        if submit_script_path.name.startswith('submit_phase_chains_'):
-            cancel_script_path = submit_script_path.with_name(submit_script_path.name.replace('submit_phase_chains_', 'cancel_phase_chains_', 1))
-        else:
-            cancel_script_path = submit_script_path.with_name(f'cancel_{submit_script_path.name}')
-    else:
-        cancel_script_path = Path(cancel_script_path)
-
-    cancel_script_path.parent.mkdir(parents=True, exist_ok=True)
-    default_submit_name: str = submit_script_path.name
-    bash_lines: List[str] = [
-        '#!/bin/bash',
-        '# Cancel remaining Slurm jobs created by the matching submit_phase_chains_*.sh.',
-        '# Safe: continues if a job is already gone, completed, or previously canceled.',
-        'set +e',
-        'set -u',
-        '',
-        '_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
-        f'DEFAULT_SUBMIT_SCRIPT="${{_SELF_DIR}}/{default_submit_name}"',
-        'SUBMIT_SCRIPT="${1:-$DEFAULT_SUBMIT_SCRIPT}"',
-        'if [[ "$SUBMIT_SCRIPT" != /* ]]; then SUBMIT_SCRIPT="${_SELF_DIR}/$(basename "$SUBMIT_SCRIPT")"; fi',
-        'JOBIDS_FILE="${SUBMIT_SCRIPT%.sh}.jobids"',
-        'MANIFEST_FILE="${SUBMIT_SCRIPT%.sh}.json"',
-        'TMP_JIDS="$(mktemp)"',
-        'TMP_SCRIPTS="$(mktemp)"',
-        'trap \'rm -f "$TMP_JIDS" "$TMP_SCRIPTS"\' EXIT',
-        '',
-        'echo "Cancel remaining jobs created by: $SUBMIT_SCRIPT"',
-        '',
-        'add_jid() {',
-        '  local raw="${1:-}"',
-        '  raw="${raw%%;*}"',
-        '  raw="${raw%%.*}"',
-        '  raw="$(printf \'%s\' "$raw" | tr -d \'[:space:]\')"',
-        '  if [[ "$raw" =~ ^[0-9]+$ ]]; then printf \'%s\\n\' "$raw" >> "$TMP_JIDS"; fi',
-        '}',
-        '',
-        'if [[ -f "$JOBIDS_FILE" ]]; then',
-        '  echo "Reading recorded job ids: $JOBIDS_FILE"',
-        '  while IFS= read -r line || [[ -n "${line:-}" ]]; do',
-        '    line="${line%%#*}"',
-        '    add_jid "$line"',
-        '  done < "$JOBIDS_FILE"',
-        'fi',
-        '',
-        'if [[ -f "$SUBMIT_SCRIPT" ]]; then',
-        '''  awk -F"'" '/sbatch --parsable/ {print $2}' "$SUBMIT_SCRIPT" >> "$TMP_SCRIPTS"''',
-        'fi',
-        'if [[ -f "$MANIFEST_FILE" ]]; then',
-        """  grep -oE '/[^"]+\\.sh' "$MANIFEST_FILE" >> "$TMP_SCRIPTS" 2>/dev/null""",
-        'fi',
-        'if [[ -s "$TMP_SCRIPTS" ]]; then sort -u "$TMP_SCRIPTS" -o "$TMP_SCRIPTS"; fi',
-        '',
-        'if command -v squeue >/dev/null 2>&1; then',
-        '  while IFS=\'|\' read -r jid cmd; do',
-        '    [[ -z "${jid:-}" ]] && continue',
-        '    while IFS= read -r script_path || [[ -n "${script_path:-}" ]]; do',
-        '      [[ -z "${script_path:-}" ]] && continue',
-        '      if [[ "$cmd" == *"$script_path"* ]]; then add_jid "$jid"; break; fi',
-        '    done < "$TMP_SCRIPTS"',
-        '  done < <(squeue -u "${USER}" -h -o \'%i|%o\' 2>/dev/null)',
-        'else',
-        '  echo "WARN: squeue not found; canceling only recorded job ids (if any)."',
-        'fi',
-        '',
-        'if [[ ! -s "$TMP_JIDS" ]]; then',
-        '  echo "No remaining jobs found (already finished, canceled, or never submitted)."',
-        '  exit 0',
-        'fi',
-        '',
-        'sort -u "$TMP_JIDS" -o "$TMP_JIDS"',
-        'echo "Canceling $(wc -l < "$TMP_JIDS" | tr -d \' \') job(s):"',
-        'cat "$TMP_JIDS"',
-        '',
-        'while IFS= read -r jid || [[ -n "${jid:-}" ]]; do',
-        '  [[ -z "${jid:-}" ]] && continue',
-        '  _err="$(scancel "$jid" 2>&1)"',
-        '  _rc=$?',
-        '  if [[ $_rc -eq 0 ]]; then',
-        '    echo "  canceled $jid"',
-        '  else',
-        '    echo "  skip $jid (${_err:-already gone, rc=$_rc})"',
-        '  fi',
-        'done < "$TMP_JIDS"',
-        '',
-        'echo "Done."',
-        '',
-    ]
-    cancel_script_path.write_text('\n'.join(bash_lines), encoding='utf-8')
-    try:
-        cancel_script_path.chmod(cancel_script_path.stat().st_mode | 0o111)
-    except OSError:
-        pass
-    print(f'Wrote cancel script: {cancel_script_path}')
-    return cancel_script_path
 
 
 def write_all_retry_from_phase_scripts(manifest: Union[Dict[str, Any], str, Path], start_phase: str,
@@ -893,28 +961,108 @@ def print_chain_status_hint(job_ids: Optional[List[int]] = None, execution_backe
         print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
         return
     print('Monitor chained phase jobs:')
+    print("  bash submit_phase_chains_<stamp>.sh --status")
     print('  squeue -u $USER')
     if job_ids:
         job_id_str = ','.join(str(j) for j in job_ids)
         print(f'  squeue -j {job_id_str}')
         print(f'  sacct -j {job_id_str} --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
-    else:
-        print('  sacct -u $USER --starttime=now-2days --format=JobID,JobName%40,State,ExitCode,Elapsed -P')
     print('Cancel remaining jobs from this batch (safe if already gone):')
-    print("  bash cancel_phase_chains_<date>.sh   # sibling of submit_phase_chains_*.sh")
+    print("  bash submit_phase_chains_<stamp>.sh --cancel")
     print('On failure: identify the failed phase, then bash retry_from_<phase>_<session>.sh (earlier pickles kept).')
 
 # END Batch process phase chaining ___________________________________________________________________________________ #
 
 
+class Spike3DBatchVenvPaths(NamedTuple):
+    spike3d_repo_root: Path
+    venv_activate_path: str
+    vscode_default_interpreter_path: str
+
+
+_DEFAULT_WINDOWS_SPIKE3D_VENV_ROOT = Path(r'H:/TEMP/Spike3DEnv_ExploreUpgrade/Spike3DWorkEnv/Spike3D/.venv')
+
+
+def resolve_spike3d_batch_venv_paths(batch_execution_target: str, *, windows_spike3d_venv_root: Optional[Union[str, Path]] = None, print_resolution: bool = True) -> Spike3DBatchVenvPaths:
+    """Derive Spike3D venv activate + interpreter paths from SPIKE3D_REPO_ROOT when exported (see GreatlakesBatchRunInstructions); else probe common layouts."""
+    _is_windows = (platform.system() == 'Windows')
+    if _is_windows:
+        _venv_bin_dir, _python_name = 'Scripts', 'python.exe'
+    else:
+        _venv_bin_dir, _python_name = 'bin', 'python'
+    _windows_venv_root = Path(windows_spike3d_venv_root).expanduser() if windows_spike3d_venv_root is not None else _DEFAULT_WINDOWS_SPIKE3D_VENV_ROOT
+    _venv_activate_candidates: List[Path] = []
+    if _is_windows:
+        _venv_activate_candidates.append(_windows_venv_root / _venv_bin_dir / 'activate')
+    else:
+        if 'SPIKE3D_REPO_ROOT' in os.environ:
+            _env_root = Path(os.environ['SPIKE3D_REPO_ROOT']).expanduser().resolve()
+            _venv_activate_candidates.append(_env_root / 'Spike3D' / '.venv' / _venv_bin_dir / 'activate')
+            _venv_activate_candidates.append(_env_root / '.venv' / _venv_bin_dir / 'activate')
+        _venv_activate_candidates.extend([
+            Path('/scratch/kdiba_root/kdiba99/halechr/repos/Spike3D_ExploreEnv/Spike3D/.venv') / _venv_bin_dir / 'activate',
+            Path.cwd().resolve() / '.venv' / _venv_bin_dir / 'activate',
+            Path('~/repos/Spike3D/.venv').expanduser() / _venv_bin_dir / 'activate',
+        ])
+    _venv_activate_path: Optional[str] = None
+    _vscode_python: Optional[str] = None
+    _spike3d_repo_root: Optional[Path] = None
+    for _cand_activate in _venv_activate_candidates:
+        _cand_activate = _cand_activate.expanduser().resolve()
+        _cand_python = (_cand_activate.parent / _python_name).resolve()
+        if _cand_activate.exists() and _cand_python.exists():
+            _venv_activate_path = str(_cand_activate)
+            _vscode_python = str(_cand_python)
+            _spike3d_repo_root = _cand_activate.parent.parent.resolve()
+            break
+        ## END if _cand_activate.exists()...
+    ## END for _cand_activate in _venv_activate_candidates...
+    if batch_execution_target == 'linux_standalone' and not _is_windows:
+        _lab_activate = Path('~/repos/Spike3D/.venv/bin/activate').expanduser().resolve()
+        _lab_python = (_lab_activate.parent / 'python').resolve()
+        if _lab_activate.exists() and _lab_python.exists():
+            _venv_activate_path = str(_lab_activate)
+            _vscode_python = str(_lab_python)
+            _spike3d_repo_root = _lab_activate.parent.parent.resolve()
+    assert _venv_activate_path is not None and Path(_venv_activate_path).exists(), f"Could not resolve Spike3D venv activate (tried {len(_venv_activate_candidates)} candidates)"
+    assert _vscode_python is not None and Path(_vscode_python).exists(), f"venv python missing for activate {_venv_activate_path}"
+    assert _spike3d_repo_root is not None
+    if print_resolution:
+        _from_env = 'SPIKE3D_REPO_ROOT' in os.environ
+        print(f'Using Spike3D venv dir: {_spike3d_repo_root} ({"SPIKE3D_REPO_ROOT set" if _from_env else "probed path"})')
+        print(f'batch_execution_target: {batch_execution_target}')
+        print(f'venv_activate_path: {_venv_activate_path}')
+        print(f'vscode_default_interpreter_path: {_vscode_python}')
+    return Spike3DBatchVenvPaths(spike3d_repo_root=_spike3d_repo_root, venv_activate_path=_venv_activate_path, vscode_default_interpreter_path=_vscode_python)
+
+
+def try_copy_to_clipboard(code_str: str, label: str) -> None:
+    """Copy if a clipboard exists; on headless SSH/ipython print a marked block of `code_str` for manual copy."""
+    from pyphocorehelpers.programming_helpers import copy_to_clipboard
+    try:
+        copy_to_clipboard(code_str, message_print=True)
+    except (NotImplementedError, OSError) as e:
+        _banner: str = '=' * 80
+        print(f'WARN: clipboard unavailable ({label}); copy the block below manually. ({type(e).__name__}: {e})')
+        print(_banner)
+        print(f'BEGIN COPY ({label})')
+        print(_banner)
+        print(code_str)
+        print(_banner)
+        print(f'END COPY ({label})')
+        print(_banner)
+
+
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = True, should_generate_run_notebooks: bool = False,
+         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = False, should_generate_run_notebooks: bool = False,
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
          batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, session_global_data_root_parent_paths: Optional[Dict[IdentifyingContext, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
+
+    Writes only the sibling needed for the active stage: `run_*.py` when `should_generate_run_scripts`, `figures_*.py` when `should_generate_figure_scripts` or `should_perform_figure_generation_to_file` (figure_run). `output_python_scripts` remains a list of `(run_path_or_None, figs_path_or_None)` pairs.
 
     output_directory
     use_separate_run_directories:bool = True - If True, separate directories are made in `output_directory` containing each script for all sessions.
@@ -980,6 +1128,11 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
  
     assert ('force_recompute_override_computation_kwargs_dict' not in renderer_script_generation_kwargs), f"pass 'force_recompute_override_computation_kwargs_dict' explicitly to the call!!"
     renderer_script_generation_kwargs['force_recompute_override_computation_kwargs_dict'] = (force_recompute_override_computation_kwargs_dict or {})
+
+    should_write_run_python_script: bool = bool(should_generate_run_scripts)
+    should_write_figures_python_script: bool = bool(should_generate_figure_scripts or should_perform_figure_generation_to_file)
+    if (not should_write_run_python_script) and (not should_write_figures_python_script):
+        raise ValueError("generate_batch_single_session_scripts: neither run nor figures scripts enabled (should_generate_run_scripts=False and should_generate_figure_scripts/should_perform_figure_generation_to_file=False)")
     
     # if script_generation_kwargs is None:
     # 	script_generation_kwargs = dict(should_force_reload_all=False, should_perform_figure_generation_to_file=False)
@@ -993,7 +1146,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         included_session_contexts = list(session_batch_basedirs.keys())
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     python_template = env.get_template('python_template.py.j2')
     # base_python_template = env.get_template('slurm_python_template_base.py.j2')
@@ -1050,69 +1203,74 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
         run_specific_batch_kwargs_for_run_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': (getattr(curr_session_context, 'format_name', None) == 'bapun')}
         run_specific_batch_kwargs_for_figures_script = rs_kwargs_base | {'preflight_bapun_batch_helpers_run_all': False}
 
-        # Create two separate scripts:
+        # Write only the sibling for this stage: run_*.py for compute phases, figures_*.py when figure_run / should_perform_figure_generation_to_file.
+        python_script_path = None
+        python_figures_script_path = None
+
         # Run Script _________________________________________________________________________________________________________ #
-        python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
-        with open(python_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
-                                                    curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                    curr_session_complete_identifier=curr_session_complete_identifier,
-                                                    job_suffix=job_suffix,
-                                                    curr_session_basedir=curr_session_basedir, 
-                                                    batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                    should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                    fail_on_exception=fail_on_exception,
-                                                    **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
-                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
-            # script_file.write(script_content)
-            script_file.write(script_content.encode())
-        # output_python_scripts.append(python_script_path)
+        if should_write_run_python_script:
+            python_script_path = os.path.join(curr_batch_script_rundir, f'run_{curr_session_complete_identifier}.py') # "run_kdiba_gor01_one_2006-6-07_11-26-53__withNormalComputedReplays-qclu_12-frateThresh_5.0_tbin_25ms_Clean.py"
+            with open(python_script_path, 'wb') as script_file:
+                script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
+                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                        curr_session_complete_identifier=curr_session_complete_identifier,
+                                                        job_suffix=job_suffix,
+                                                        curr_session_basedir=curr_session_basedir, 
+                                                        batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                        custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
+                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        fail_on_exception=fail_on_exception,
+                                                        **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
+                                                        run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
+                # script_file.write(script_content)
+                script_file.write(script_content.encode())
+            # output_python_scripts.append(python_script_path)
 
         # Figures Script _____________________________________________________________________________________________________ #
-        python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
-        with open(python_figures_script_path, 'wb') as script_file:
-            script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
-                                                    curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
-                                                    curr_session_complete_identifier=curr_session_complete_identifier,
-                                                    job_suffix=job_suffix,
-                                                    curr_session_basedir=curr_session_basedir,
-                                                    batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
-                                                    custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                    should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                    **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
-                                                    run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
+        if should_write_figures_python_script:
+            python_figures_script_path = os.path.join(curr_batch_script_rundir, f'figures_{curr_session_complete_identifier}.py')
+            with open(python_figures_script_path, 'wb') as script_file:
+                script_content = python_template.render(global_data_root_parent_path=curr_global_data_root_parent_path,
+                                                        curr_session_context=curr_session_context.get_initialization_code_string().strip("'"),
+                                                        curr_session_complete_identifier=curr_session_complete_identifier,
+                                                        job_suffix=job_suffix,
+                                                        curr_session_basedir=curr_session_basedir,
+                                                        batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
+                                                        custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
+                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
+                                                        run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
 
 
-            # script_file.write(script_content)
-            script_file.write(script_content.encode())
+                # script_file.write(script_content)
+                script_file.write(script_content.encode())
 
         # output_python_display_scripts.append(python_figures_script_path)
         output_python_scripts.append((python_script_path, python_figures_script_path))
 
         # Create the SLURM script
         if create_slurm_scripts:
-            if should_generate_run_scripts:
+            if should_write_run_python_script:
                 slurm_run_script_path = _subfn_build_slurm_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='run', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['run'].append(slurm_run_script_path)
 
-            if should_generate_figure_scripts or should_perform_figure_generation_to_file:
+            if should_write_figures_python_script:
                 slurm_figure_script_path = _subfn_build_slurm_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_slurm_script_name_prefix='figs', should_use_virtual_framebuffer=False, should_use_largemem=should_use_largemem, job_suffix=job_suffix, a_venv_activate_path=venv_activate_path)
                 output_slurm_scripts['figs'].append(slurm_figure_script_path)
 
 
         ## Create the non-slurm bash script:
         if create_non_slurm_bash_scripts:
-            if should_generate_run_scripts:
+            if should_write_run_python_script:
                 bash_run_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='run', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['run'].append(bash_run_script_path)
 
-            if should_generate_figure_scripts or should_perform_figure_generation_to_file:
+            if should_write_figures_python_script:
                 bash_figure_script_path = _subfn_build_non_slurm_bash_script(a_python_script_path=python_figures_script_path, curr_batch_script_rundir=curr_batch_script_rundir, a_curr_session_context=curr_session_context, a_curr_session_complete_identifier=curr_session_complete_identifier, a_bash_script_name_prefix='figs', a_venv_activate_path=venv_activate_path)
                 output_non_slurm_bash_scripts['figs'].append(bash_figure_script_path)
 
 
-        if should_generate_run_notebooks:
+        if should_generate_run_notebooks and (python_script_path is not None):
             script_path = Path(python_script_path).resolve()
             _temp_notebook_python_script_path = Path(os.path.join(curr_batch_script_rundir, f'_TEMP_NOTEBOOK_run_{curr_session_context}.py'))
             with open(_temp_notebook_python_script_path, 'wb') as script_file:
@@ -1148,22 +1306,26 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
              
         ## END if should_generate_run_notebooks..
             
-    ## end for curr_session_context in include....
+    ## END for curr_session_context in included_session_contexts....
+
+
     
     ## Generate VSCode Workspace for it
+    vscode_workspace_path = None
     if should_create_vscode_workspace:
-        output_compute_python_scripts = [x[0] for x in output_python_scripts]
-        if vscode_default_interpreter_path is not None:
-            python_executable = Path(vscode_default_interpreter_path).expanduser()
-        elif os.name == 'nt':
-            python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
-        else:
-            python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
+        output_compute_python_scripts = [x[0] for x in output_python_scripts if x[0] is not None]
+        if len(output_compute_python_scripts) == 0:
+            output_compute_python_scripts = [x[1] for x in output_python_scripts if (isinstance(x, (list, tuple)) and (x[1] is not None))]
+        if len(output_compute_python_scripts) > 0:
+            if vscode_default_interpreter_path is not None:
+                python_executable = Path(vscode_default_interpreter_path).expanduser()
+            elif os.name == 'nt':
+                python_executable = Path('C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/.venv_UV/Scripts/python').resolve()
+            else:
+                python_executable = Path('~/repos/Spike3D/.venv/bin/python').expanduser().resolve()
 
-        vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable, batch_scripts_root_directory=batch_scripts_root_directory)
-        print(f'vscode_workspace_path: {vscode_workspace_path}')
-    else:
-        vscode_workspace_path = None
+            vscode_workspace_path = build_vscode_workspace(output_compute_python_scripts, python_executable=python_executable, batch_scripts_root_directory=batch_scripts_root_directory)
+            print(f'vscode_workspace_path: {vscode_workspace_path}')
 
 
     return BatchScriptsCollection(included_session_contexts=included_session_contexts, output_python_scripts=output_python_scripts, output_jupyter_notebooks=output_jupyter_notebooks, output_slurm_scripts=output_slurm_scripts, output_non_slurm_bash_scripts=output_non_slurm_bash_scripts, vscode_workspace_path=vscode_workspace_path, batch_scripts_root_directory=batch_scripts_root_directory)
@@ -1206,10 +1368,13 @@ def display_generated_scripts_ipywidget(included_session_contexts, output_python
 
     _out_path_widgets = []
     for a_ctxt, a_python_script in zip(included_session_contexts, output_python_scripts):
-        a_computation_script_path = Path(a_python_script[0]).resolve()
-        a_generate_figures_script_path = Path(a_python_script[1]).resolve()
+        a_script_path = a_python_script[0] if (isinstance(a_python_script, (list, tuple)) and (a_python_script[0] is not None)) else (a_python_script[1] if isinstance(a_python_script, (list, tuple)) else a_python_script)
+        if a_script_path is None:
+            continue
+        a_computation_script_path = Path(a_script_path).resolve()
     
         _out_path_widgets.append(fullwidth_path_widget(a_computation_script_path, a_computation_script_path.name, box_layout_kwargs=dict(display='flex', flex_flow='row', align_items='stretch', width='auto')))
+    ## END for a_ctxt, a_python_script in zip(included_session_contexts, output_python_scripts)...
 
     return widgets.VBox(_out_path_widgets, display='flex', flex_flow='column', align_items='stretch')
 
@@ -1337,7 +1502,7 @@ def build_vscode_workspace(script_paths, python_executable: Optional[Union[str, 
     # print(f'vscode_workspace_path: {vscode_workspace_path}')
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     template = env.get_template('vscode_workspace_template.code-workspace.j2')
     # Render the template with the provided variables
@@ -1395,7 +1560,7 @@ def build_windows_powershell_run_script(script_paths, max_concurrent_jobs: int =
     print(f'ps_script_path: {ps_script_path}')
 
     # Set up Jinja2 environment
-    template_path = pkg_resources.resource_filename('pyphoplacecellanalysis.Resources', 'Templates')
+    template_path = templates_directory()
     env = Environment(loader=FileSystemLoader(template_path))
     powershell_script_template = env.get_template('powershell_template.ps1.j2')
     # Render the template with the provided variables
@@ -1584,7 +1749,7 @@ class GreatlakesTurboToScratchHelpers:
         FORCE_SCRATCH_WRITES: bool = True  # set False when Turbo is writable again
         turbo_data_root, scratch_data_root, use_scratch_writes = GreatlakesTurboToScratchHelpers.detect_scratch_write_mode(force_scratch_writes=FORCE_SCRATCH_WRITES)
         if use_scratch_writes:
-            scripts_output_path, collected_outputs_path = GreatlakesTurboToScratchHelpers.build_scratch_output_paths()
+            scripts_output_path, collected_outputs_path, global_data_root_parent_path = GreatlakesTurboToScratchHelpers.build_scratch_output_paths()
         ...
         if FORCE_SCRATCH_WRITES:
             GreatlakesTurboToScratchHelpers.assert_output_paths_not_on_turbo(scripts_output_path, collected_outputs_path)
@@ -1810,14 +1975,14 @@ class GreatlakesTurboToScratchHelpers:
 
 
     @classmethod
-    def build_scratch_output_paths(cls, scratch_data_root: Optional[Path] = None) -> Tuple[Path, Path]:
+    def build_scratch_output_paths(cls, global_data_root: Optional[Path] = None) -> Tuple[Path, Path, Path]:
         """Returns `(scripts_output_path, collected_outputs_path)` under `<scratch>/Output/{gen_scripts,collected_outputs}`, creating them if needed."""
-        scratch_data_root = Path(scratch_data_root) if (scratch_data_root is not None) else cls.SCRATCH_DATA_ROOT
-        scripts_output_path: Path = scratch_data_root.joinpath('Output', 'gen_scripts')
+        global_data_root: Path = Path(global_data_root) if (global_data_root is not None) else cls.SCRATCH_DATA_ROOT
+        scripts_output_path: Path = global_data_root.joinpath('Output', 'gen_scripts')
         scripts_output_path.mkdir(parents=True, exist_ok=True)
-        collected_outputs_path: Path = scratch_data_root.joinpath('Output', 'collected_outputs')
+        collected_outputs_path: Path = global_data_root.joinpath('Output', 'collected_outputs')
         collected_outputs_path.mkdir(parents=True, exist_ok=True)
-        return scripts_output_path, collected_outputs_path
+        return scripts_output_path, collected_outputs_path, global_data_root
 
 
     @classmethod

@@ -72,6 +72,3253 @@ from copy import deepcopy
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
+from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-29 - Loading Exported score Shuffles                                                                                                                                                                                                                                         #
+# ==================================================================================================================================================================================================================================================================================== #
+from collections import defaultdict
+
+
+
+@pd.api.extensions.register_dataframe_accessor("pho_shuffles")
+class LoadedScoreShufflesDataframeAccessor:
+    """ Adds shuffle z-score and p-value columns (`z_{score}`, `p_{score}`) columns on per-epoch DFs such as `ripple_EpochScoreShuffle_df`.
+
+    Usage:
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
+
+        shuffle_p_alpha: float = 0.05
+        shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
+        high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+
+        if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
+            raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
+
+        if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+            additional_filter_predicates = {}
+        _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
+                    shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+        shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
+
+        discovered_shuffle_metrics_df
+        ripple_EpochScoreShuffle_df
+
+        additional_filter_predicates.update(shuffle_significance_predicates)
+
+        # ## Register on an existing `df_filter` (does not enable them; check the boxes to apply)
+        # if ('df_filter' in locals()) and (df_filter is not None):
+        #     df_filter.additional_filter_predicates.update(shuffle_significance_predicates)
+        #     df_filter._rebuild_predicate_widget()  # leave new boxes unchecked
+        #     df_filter.update_filters()
+        #     df_filter.display()  # required: rebuild replaces the checkbox widget held by the old HBox
+        #     print('Registered on df_filter. Enable e.g. sig_wcorr_z, sig_mseq_len_ignoring_intrusions_p, or sig_any_shuffle_p in the predicate list.')
+
+
+    """
+    # decoder_names: Tuple[str, str, str, str] = DECODER_NAMES
+    # default_score_col_names: Tuple[str, ...] = DEFAULT_MLD_SCORE_COL_NAMES
+    # p_decoder_col_names: Tuple[str, str, str, str] = ('P_Long_LR', 'P_Long_RL', 'P_Short_LR', 'P_Short_RL')
+    # long_decoder_names: Tuple[str, str] = ('long_LR', 'long_RL')
+    # short_decoder_names: Tuple[str, str] = ('short_LR', 'short_RL')
+
+
+    def __init__(self, pandas_obj: pd.DataFrame):
+        self._validate(pandas_obj)
+        self._df = pandas_obj
+
+
+    @staticmethod
+    def _validate(obj):
+        if not isinstance(obj, pd.DataFrame):
+            raise ValueError(f"object must be a pandas Dataframe but is of type: {type(obj)}!\nobj: {obj}")
+
+
+
+    @classmethod
+    def process_loaded_shuffles(cls, ripple_EpochScoreShuffle_df: pd.DataFrame, additional_filter_predicates=None,
+        shuffle_p_alpha: float = 0.05, shuffle_z_threshold: float = 1.96, high_shuffle_quantile_threshold: float = 0.9,
+        **kwargs):
+        """ Load the Shuffles
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import LoadedScoreShufflesDataframeAccessor
+
+            shuffle_p_alpha: float = 0.05
+            shuffle_z_threshold: float = 1.96  # ~two-tailed p=0.05; |z| for both 'greater' and 'less' metrics
+            high_shuffle_quantile_threshold: float = 0.9  # legacy rank-order quantile, not EpochScoreShuffle p/z
+
+            if ('ripple_EpochScoreShuffle_df' not in locals()) or (ripple_EpochScoreShuffle_df is None):
+                raise ValueError('ripple_EpochScoreShuffle_df is not loaded. Run the across-session CSV load / shuffle-merge cell first.')
+
+            if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+                additional_filter_predicates = {}
+            _out = LoadedScoreShufflesDataframeAccessor.process_loaded_shuffles(ripple_EpochScoreShuffle_df=ripple_EpochScoreShuffle_df, df_filter=df_filter, additional_filter_predicates=additional_filter_predicates,
+                        shuffle_p_alpha=shuffle_p_alpha, shuffle_z_threshold=shuffle_z_threshold, high_shuffle_quantile_threshold=high_shuffle_quantile_threshold)
+            shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df = _out
+
+            discovered_shuffle_metrics_df
+            ripple_EpochScoreShuffle_df
+
+            additional_filter_predicates.update(shuffle_significance_predicates)
+
+            # ## Register on an existing `df_filter` (does not enable them; check the boxes to apply)
+            # if ('df_filter' in locals()) and (df_filter is not None):
+            #     df_filter.additional_filter_predicates.update(shuffle_significance_predicates)
+            #     df_filter._rebuild_predicate_widget()  # leave new boxes unchecked
+            #     df_filter.update_filters()
+            #     df_filter.display()  # required: rebuild replaces the checkbox widget held by the old HBox
+            #     print('Registered on df_filter. Enable e.g. sig_wcorr_z, sig_mseq_len_ignoring_intrusions_p, or sig_any_shuffle_p in the predicate list.')
+
+        """
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+
+        ripple_EpochScoreShuffle_df, epoch_score_shuffle_transfer_col_names = AcrossSessionHelpers.prepare_epoch_score_shuffle_transfer_columns(ripple_EpochScoreShuffle_df)
+        decoder_names: list[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
+
+
+        def _subfn_parse_shuffle_col(col: str):
+            """Return (metric, kind, decoder_or_best) for new-format shuffle columns, else None."""
+            if col in ('wcorr_z_long', 'wcorr_z_short'):
+                return ('wcorr', 'z', col.replace('wcorr_z_', ''))
+            if col == 'best_overall_wcorr_z':
+                return ('wcorr', 'z', 'best')
+            if col.startswith('best_overall_') and col.endswith('_z'):
+                return (col[len('best_overall_'):-len('_z')], 'z', 'best')
+            for kind in ('n_extreme', 'z', 'p'):  # n_extreme before z so it is not split as *_z_*
+                token: str = f'_{kind}_'
+                if token in col:
+                    metric_name, decoder_name = col.split(token, 1)
+                    if decoder_name in decoder_names:
+                        return (metric_name, kind, decoder_name)
+                ## END if token in col...
+            ## END for kind in ('n_extreme', 'z', 'p')...
+            return None
+
+
+        def _subfn_present_cols(df: pd.DataFrame, cols) -> list[str]:
+            return [c for c in cols if c in df.columns]
+
+
+        def _subfn_any_significant(df: pd.DataFrame, cols, mode: str, thresh: float) -> pd.Series:
+            """1D bool Series; missing columns or NaNs are not significant (False)."""
+            present_cols: list[str] = _subfn_present_cols(df, cols)
+            if len(present_cols) == 0:
+                return pd.Series(False, index=df.index)
+            values = np.asarray(df[present_cols].to_numpy(), dtype=float)
+            if mode == 'lt':
+                is_sig = values < float(thresh)
+            elif mode == 'eq':
+                is_sig = values == float(thresh)
+            elif mode == 'abs_ge':
+                is_sig = np.abs(values) >= float(thresh)
+            else:
+                raise ValueError(f'unknown significance mode: {mode}')
+            is_sig = np.where(np.isnan(values), False, is_sig)
+            return pd.Series(np.any(is_sig, axis=1), index=df.index).fillna(False).astype(bool)
+
+
+        metric_kind_cols: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+        for a_col in epoch_score_shuffle_transfer_col_names:
+            parsed = _subfn_parse_shuffle_col(a_col)
+            if parsed is None:
+                continue
+            metric_name, kind, _decoder_name = parsed
+            metric_kind_cols[metric_name][kind].append(a_col)
+        ## END for a_col in epoch_score_shuffle_transfer_col_names...
+
+        shuffle_significance_predicates: dict = {}
+        discovered_rows: list[dict] = []
+        all_p_cols: list[str] = []
+        all_z_cols: list[str] = []
+
+        for metric_name, kind_cols in metric_kind_cols.items():
+            p_cols: list[str] = list(kind_cols.get('p', []))
+            z_cols: list[str] = list(kind_cols.get('z', []))
+            n_extreme_cols: list[str] = list(kind_cols.get('n_extreme', []))
+            extreme_mode: str = SCORE_EXTREME_MODE.get(metric_name, 'greater')
+            discovered_rows.append({'metric': metric_name, 'extreme_mode': extreme_mode, 'n_p': len(p_cols), 'n_z': len(z_cols), 'n_n_extreme': len(n_extreme_cols), 'p_cols': p_cols, 'z_cols': z_cols})
+            if len(p_cols) > 0:
+                all_p_cols.extend(p_cols)
+                shuffle_significance_predicates[f'sig_{metric_name}_p'] = (lambda df, _cols=tuple(p_cols), _alpha=shuffle_p_alpha: _subfn_any_significant(df, _cols, mode='lt', thresh=_alpha))
+            if len(z_cols) > 0:
+                all_z_cols.extend(z_cols)
+                shuffle_significance_predicates[f'sig_{metric_name}_z'] = (lambda df, _cols=tuple(z_cols), _z=shuffle_z_threshold: _subfn_any_significant(df, _cols, mode='abs_ge', thresh=_z))
+            if len(n_extreme_cols) > 0:
+                shuffle_significance_predicates[f'sig_{metric_name}_zero_more_extreme'] = (lambda df, _cols=tuple(n_extreme_cols): _subfn_any_significant(df, _cols, mode='eq', thresh=0.0))
+        ## END for metric_name, kind_cols in metric_kind_cols.items()...
+
+        if len(all_p_cols) > 0:
+            shuffle_significance_predicates['sig_any_shuffle_p'] = (lambda df, _cols=tuple(all_p_cols), _alpha=shuffle_p_alpha: _subfn_any_significant(df, _cols, mode='lt', thresh=_alpha))
+        if len(all_z_cols) > 0:
+            shuffle_significance_predicates['sig_any_shuffle_z'] = (lambda df, _cols=tuple(all_z_cols), _z=shuffle_z_threshold: _subfn_any_significant(df, _cols, mode='abs_ge', thresh=_z))
+
+        ## Legacy rank-order quantile (merged_complete_epoch_stats), if present on the plot df
+        shuffle_significance_predicates['high_shuffle_percentile_score'] = (lambda df, _thresh=high_shuffle_quantile_threshold: _subfn_any_significant(df, ['best_overall_quantile'], mode='abs_ge', thresh=_thresh))
+
+        # if 'additional_filter_predicates' not in locals() or additional_filter_predicates is None:
+        #     additional_filter_predicates = {}
+        additional_filter_predicates.update(shuffle_significance_predicates)
+
+        discovered_shuffle_metrics_df: pd.DataFrame = pd.DataFrame(discovered_rows)
+        print(f'shuffle_p_alpha={shuffle_p_alpha}, shuffle_z_threshold={shuffle_z_threshold}')
+        print(f'added {len(shuffle_significance_predicates)} shuffle-significance predicates: {list(shuffle_significance_predicates.keys())}')
+        # display(discovered_shuffle_metrics_df[['metric', 'extreme_mode', 'n_p', 'n_z', 'n_n_extreme']])
+
+        ## Preview pass counts on the best available already-merged df (NaNs count as not significant)
+        _preview_df = None
+        for a_candidate in ('all_sessions_all_scores_ripple_df', 'all_sessions_MultiMeasure_ripple_df', 'all_sessions_ripple_df', 'all_sessions_ripple_time_bin_df', 'all_sessions_laps_time_bin_df', 'FAT_df'):
+            if (a_candidate in locals()) and (locals()[a_candidate] is not None):
+                _preview_df = locals()[a_candidate]
+                _preview_name: str = a_candidate
+                break
+            ## END if (a_candidate in locals())...
+        ## END for a_candidate in (...)...
+        if _preview_df is not None:
+            _preview_counts = {k: int(np.nansum(np.asarray(fn(_preview_df), dtype=bool))) for k, fn in shuffle_significance_predicates.items()}
+            print(f'preview pass counts on {_preview_name} (n={len(_preview_df)}):')
+            display(pd.Series(_preview_counts, name='n_passing').sort_values(ascending=False).to_frame())
+
+
+        return (shuffle_significance_predicates, discovered_shuffle_metrics_df, ripple_EpochScoreShuffle_df)
+
+
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-20 - OpenAI Figure 4 Stats                                                                                                                                                                                                                                                   #
+# ==================================================================================================================================================================================================================================================================================== #
+
+import numpy as np
+import pandas as pd
+from scipy.stats import wasserstein_distance
+import statsmodels.api as sm
+
+@metadata_attributes(short_name=None, tags=['stats', 'fig4', 'hierarchical-bootstrap', 'bootstrap', 'permutation', 'sampling'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-20 10:12', related_items=[])
+class PrePostDeltaDistributionComparison:
+    """Compare pre/post-delta P_Short distributions using hierarchical resampling.
+
+    Pass `sampling_unit` to the constructor. Cluster modes ignore parent-epoch identity.
+
+    - `'block'`: moving blocks of laps within each pre/post run (default). Time bins
+      within a lap are never resampled independently.
+    - `'animal'` / `'session'`: copy each session's pre and post values intact. Do not
+      group by lap or parent epoch. The optional p-value is a sign-flip test of the
+      signed mean difference, not Wasserstein distance. Session-level tests treat
+      sessions as exchangeable and therefore ignore within-animal dependence.
+
+
+    #TODO 2026-10-27 19:32: - [ ] NOTE: IMPORTANT!! Much of this class isn't used because we decided against doing block-level shuffles
+
+    Usage:
+
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+
+    """
+
+    def __init__(self, filtered_all_sessions_laps_time_bin_df, value_col='P_Short',
+                 condition_col='pre_post_delta_category', animal_col='animal',
+                 session_col='session_name', lap_col='parent_epoch_id',
+                 lap_order_col='parent_epoch_start_t',
+                 pre_label='pre-delta', post_label='post-delta',
+                 block_length_laps=5, n_bootstrap=1000, random_state=None,
+                 sampling_unit='block'):
+
+        valid_sampling_units = ('block', 'animal', 'session')
+        if sampling_unit not in valid_sampling_units:
+            raise ValueError(
+                f'sampling_unit must be one of {valid_sampling_units}, got {sampling_unit!r}.'
+            )
+        if n_bootstrap < 1:
+            raise ValueError('n_bootstrap must be >= 1.')
+        if sampling_unit == 'block' and block_length_laps < 1:
+            raise ValueError('block_length_laps must be >= 1.')
+
+        self.value_col = value_col
+        self.condition_col = condition_col
+        self.animal_col = animal_col
+        self.session_col = session_col
+        self.lap_col = lap_col
+        self.lap_order_col = lap_order_col
+        self.group_values = (pre_label, post_label)
+        self.block_length_laps = int(block_length_laps)
+        self.n_bootstrap = int(n_bootstrap)
+        self.sampling_unit = sampling_unit
+        self.rng = np.random.default_rng(random_state)
+
+        required_cols = [value_col, condition_col, animal_col, session_col]
+        if sampling_unit == 'block':
+            required_cols = required_cols + [lap_col, lap_order_col]
+        missing_cols = set(required_cols).difference(filtered_all_sessions_laps_time_bin_df.columns)
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+
+        data = filtered_all_sessions_laps_time_bin_df.loc[
+            filtered_all_sessions_laps_time_bin_df[condition_col].isin(self.group_values),
+            required_cols
+        ].dropna(subset=required_cols).copy().reset_index(drop=True)
+
+        if data.empty or set(data[condition_col].unique()) != set(self.group_values):
+            raise ValueError(f'Data must contain both groups: {self.group_values}')
+
+        data[value_col] = pd.to_numeric(data[value_col], errors='raise')
+
+        self._y = data[value_col].to_numpy(dtype=float)
+        if not np.isfinite(self._y).all() or np.any((self._y < 0) | (self._y > 1)):
+            raise ValueError(f'{value_col} must contain finite probabilities in [0, 1].')
+
+        data['_condition_code'] = (data[condition_col] == post_label).astype(np.int8)
+        data['_animal_code'], self._animals = pd.factorize(data[animal_col], sort=False)
+        self._data = data
+        self._row_condition_code = data['_condition_code'].to_numpy()
+        self._animal_code_rows = data['_animal_code'].to_numpy()
+        self._n_animals = len(self._animals)
+
+        for animal_code in range(self._n_animals):
+            animal_mask = self._animal_code_rows == animal_code
+            if set(self._row_condition_code[animal_mask]) != {0, 1}:
+                raise ValueError(
+                    f'Animal {self._animals[animal_code]!r} lacks one condition.'
+                )
+        ## END for animal_code in range(self._n_animals)....
+
+        self._lap_table = None
+        self._values_by_lap = None
+        self._positions_by_lap = None
+        self._runs = None
+        self._values_by_session = None
+        self._sessions_by_profile = {}
+
+        if sampling_unit == 'block':
+            self._build_block_lap_structures(data, animal_col, session_col, lap_col, lap_order_col)
+        else:
+            self._build_cluster_session_structures(data, session_col)
+
+
+    def _build_block_lap_structures(self, data, animal_col, session_col, lap_col, lap_order_col):
+        """Group rows into laps and chronological pre/post runs for moving-block resampling."""
+        data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
+        data['_lap_id'] = data.groupby(
+            [animal_col, session_col, lap_col], sort=False, dropna=False
+        ).ngroup().astype(np.int64)
+
+        # Verify that each lap has exactly one condition and one chronological position.
+        self._lap_table = data.groupby('_lap_id', sort=False).agg(
+            _animal_code=('_animal_code', 'first'),
+            _session=(session_col, 'first'),
+            _condition_code=('_condition_code', 'first'),
+            _n_conditions=('_condition_code', 'nunique'),
+            _lap_order=(lap_order_col, 'first'),
+            _n_lap_order_values=(lap_order_col, 'nunique'),
+        ).reset_index()
+
+        if self._lap_table['_n_conditions'].ne(1).any():
+            raise ValueError('At least one lap contains both pre- and post-delta labels.')
+        if self._lap_table['_n_lap_order_values'].ne(1).any():
+            raise ValueError(f'{lap_order_col} must be constant within each lap.')
+
+        # Cache every complete lap; no time bins are independently resampled.
+        self._values_by_lap = {}
+        self._positions_by_lap = {}
+
+        for lap_id, positions in data.groupby('_lap_id', sort=False).indices.items():
+            positions = np.asarray(positions, dtype=np.int64)
+            self._values_by_lap[int(lap_id)] = self._y[positions]
+            self._positions_by_lap[int(lap_id)] = positions
+        ## END for lap_id, positions in data.groupby('_lap_id', sort=False).indices.items()....
+
+        # Organize chronologically contiguous runs of laps by animal and session.
+        # Separate runs ensure bootstrap blocks never cross a pre/post boundary.
+        self._runs = {}
+
+        for (animal_code, session), session_laps in self._lap_table.groupby(
+                ['_animal_code', '_session'], sort=False):
+
+            session_laps = session_laps.sort_values('_lap_order', kind='stable')
+            runs = []
+            current_condition = None
+            current_lap_ids = []
+
+            for lap_id, condition in session_laps[
+                    ['_lap_id', '_condition_code']].itertuples(index=False, name=None):
+
+                condition = int(condition)
+
+                if current_condition is None or condition != current_condition:
+                    if current_lap_ids:
+                        runs.append({
+                            'condition': current_condition,
+                            'lap_ids': current_lap_ids,
+                        })
+                    current_condition = condition
+                    current_lap_ids = []
+
+                current_lap_ids.append(int(lap_id))
+            ## END for lap_id, condition in session_laps[['_lap_id', '_condition_code']].itertuples....
+
+            if current_lap_ids:
+                runs.append({'condition': current_condition, 'lap_ids': current_lap_ids})
+
+            self._runs.setdefault(int(animal_code), {})[session] = runs
+        ## END for (animal_code, session), session_laps in self._lap_table.groupby....
+
+        for animal_code, sessions in self._runs.items():
+            profiles = {}
+            for session, runs in sessions.items():
+                profile = tuple(sorted({run['condition'] for run in runs}))
+                profiles.setdefault(profile, []).append(session)
+            ## END for session, runs in sessions.items()....
+            self._sessions_by_profile[animal_code] = profiles
+        ## END for animal_code, sessions in self._runs.items()....
+
+
+    def _build_cluster_session_structures(self, data, session_col):
+        """Cache pre/post values per session without grouping by parent epoch."""
+        self._values_by_session = {}
+
+        for (animal_code, session), idx in data.groupby(
+                ['_animal_code', session_col], sort=False, dropna=False
+        ).indices.items():
+            idx = np.asarray(idx, dtype=np.int64)
+            cond = self._row_condition_code[idx]
+            y = self._y[idx]
+            values = {}
+            if np.any(cond == 0):
+                values[0] = y[cond == 0]
+            if np.any(cond == 1):
+                values[1] = y[cond == 1]
+            self._values_by_session.setdefault(int(animal_code), {})[session] = values
+        ## END for (animal_code, session), idx in data.groupby....
+
+        for animal_code, sessions in self._values_by_session.items():
+            profiles = {}
+            for session, values in sessions.items():
+                profile = tuple(sorted(values.keys()))
+                profiles.setdefault(profile, []).append(session)
+            ## END for session, values in sessions.items()....
+            self._sessions_by_profile[animal_code] = profiles
+        ## END for animal_code, sessions in self._values_by_session.items()....
+
+
+    def _distance_for_labels(self, row_labels, row_mask=None):
+        """Wasserstein-1 distance, weighting each animal equally."""
+        if row_mask is None:
+            row_mask = np.ones(len(self._y), dtype=bool)
+
+        pre_mask = row_mask & (row_labels == 0)
+        post_mask = row_mask & (row_labels == 1)
+
+        if not pre_mask.any() or not post_mask.any():
+            return np.nan
+
+        pre_codes = self._animal_code_rows[pre_mask]
+        post_codes = self._animal_code_rows[post_mask]
+        pre_counts = np.bincount(pre_codes, minlength=self._n_animals)
+        post_counts = np.bincount(post_codes, minlength=self._n_animals)
+
+        if np.any(pre_counts == 0) or np.any(post_counts == 0):
+            return np.nan
+
+        return float(wasserstein_distance(
+            self._y[pre_mask], self._y[post_mask],
+            u_weights=1.0 / pre_counts[pre_codes],
+            v_weights=1.0 / post_counts[post_codes],
+        ))
+
+
+    def _moving_block_resample_lap_ids(self, lap_ids):
+        """Resample overlapping blocks of adjacent laps within one uninterrupted run."""
+        n_laps = len(lap_ids)
+        block_length = min(self.block_length_laps, n_laps)
+
+        sampled_lap_ids = []
+        while len(sampled_lap_ids) < n_laps:
+            start = self.rng.integers(0, n_laps - block_length + 1)
+            sampled_lap_ids.extend(lap_ids[start:start + block_length])
+
+        return sampled_lap_ids[:n_laps]
+
+    @staticmethod
+    def _distance_for_bootstrap_samples(pre_by_animal, post_by_animal):
+        """Wasserstein-1 distance with equal total weight per resampled animal."""
+        pre = np.concatenate(pre_by_animal)
+        post = np.concatenate(post_by_animal)
+
+        pre_weights = np.concatenate([
+            np.full(values.size, 1.0 / values.size) for values in pre_by_animal
+        ])
+        post_weights = np.concatenate([
+            np.full(values.size, 1.0 / values.size) for values in post_by_animal
+        ])
+
+        return float(wasserstein_distance(
+            pre, post, u_weights=pre_weights, v_weights=post_weights
+        ))
+
+
+    def _hierarchical_bootstrap(self, resample_within_run=True, mean_difference_unit=None):
+        """Resample animals, sessions within animals, and optionally contiguous lap blocks.
+
+        resample_within_run True draws overlapping lap blocks within each run. False copies
+        each session's cached pre/post values. mean_difference_unit `'animal'` or
+        `'session'` also returns a 95% CI for the mean of that unit's signed mean differences.
+        """
+        bootstrap_distances = []
+        bootstrap_mean_diffs = []
+
+        for _ in range(self.n_bootstrap):
+            sampled_animals = self.rng.choice(
+                self._n_animals, size=self._n_animals, replace=True
+            )
+            pre_by_animal, post_by_animal = [], []
+            animal_mean_diffs = []
+            session_mean_diffs = []
+
+            for animal_code in sampled_animals:
+                animal_code = int(animal_code)
+                animal_values = {0: [], 1: []}
+                sampled_sessions = []
+
+                for sessions in self._sessions_by_profile[animal_code].values():
+                    sampled_sessions.extend(
+                        self.rng.choice(sessions, size=len(sessions), replace=True).tolist()
+                    )
+                ## END for sessions in self._sessions_by_profile[animal_code].values()....
+
+                for session in sampled_sessions:
+                    if resample_within_run:
+                        session_values = {0: [], 1: []}
+                        for run in self._runs[animal_code][session]:
+                            sampled_lap_ids = self._moving_block_resample_lap_ids(
+                                run['lap_ids']
+                            )
+                            run_values = [
+                                self._values_by_lap[lap_id] for lap_id in sampled_lap_ids
+                            ]
+                            session_values[run['condition']].extend(run_values)
+                            animal_values[run['condition']].extend(run_values)
+                        ## END for run in self._runs[animal_code][session]....
+
+                        if (
+                            mean_difference_unit == 'session'
+                            and session_values[0]
+                            and session_values[1]
+                        ):
+                            pre_session = np.concatenate(session_values[0])
+                            post_session = np.concatenate(session_values[1])
+                            session_mean_diffs.append(
+                                post_session.mean() - pre_session.mean()
+                            )
+                    else:
+                        cached = self._values_by_session[animal_code][session]
+                        for condition, values in cached.items():
+                            animal_values[condition].append(values)
+                        ## END for condition, values in cached.items()....
+
+                        if (
+                            mean_difference_unit == 'session'
+                            and 0 in cached and 1 in cached
+                            and cached[0].size and cached[1].size
+                        ):
+                            session_mean_diffs.append(
+                                cached[1].mean() - cached[0].mean()
+                            )
+                ## END for session in sampled_sessions....
+
+                pre_concat = np.concatenate(animal_values[0])
+                post_concat = np.concatenate(animal_values[1])
+                pre_by_animal.append(pre_concat)
+                post_by_animal.append(post_concat)
+                if mean_difference_unit == 'animal':
+                    animal_mean_diffs.append(post_concat.mean() - pre_concat.mean())
+            ## END for animal_code in sampled_animals....
+
+            bootstrap_distances.append(
+                self._distance_for_bootstrap_samples(pre_by_animal, post_by_animal)
+            )
+            if mean_difference_unit == 'animal' and animal_mean_diffs:
+                bootstrap_mean_diffs.append(float(np.mean(animal_mean_diffs)))
+            elif mean_difference_unit == 'session' and session_mean_diffs:
+                bootstrap_mean_diffs.append(float(np.mean(session_mean_diffs)))
+        ## END for _ in range(self.n_bootstrap)....
+
+        wasserstein_ci = tuple(np.quantile(bootstrap_distances, [0.025, 0.975]))
+        if mean_difference_unit is None or not bootstrap_mean_diffs:
+            mean_difference_ci = None
+        else:
+            mean_difference_ci = tuple(
+                np.quantile(bootstrap_mean_diffs, [0.025, 0.975])
+            )
+
+        return {
+            'wasserstein_1_bootstrap_95ci': wasserstein_ci,
+            'mean_difference_bootstrap_95ci': mean_difference_ci,
+        }
+
+
+    @staticmethod
+    def _effect_statistics(pre, post):
+        """Mean, median, and Wasserstein summaries for one paired pre/post sample."""
+        return {
+            'n_bins_pre': int(pre.size),
+            'n_bins_post': int(post.size),
+            'mean_pre': float(pre.mean()),
+            'mean_post': float(post.mean()),
+            'mean_difference_post_minus_pre': float(post.mean() - pre.mean()),
+            'median_pre': float(np.median(pre)),
+            'median_post': float(np.median(post)),
+            'median_difference_post_minus_pre': float(np.median(post) - np.median(pre)),
+            'wasserstein_1': float(wasserstein_distance(pre, post)),
+        }
+
+
+    def _session_effect_rows(self):
+        """One paired-effect row per session that contains both pre and post bins."""
+        rows = []
+
+        for animal_code, sessions in self._values_by_session.items():
+            for session, values in sessions.items():
+                if 0 not in values or 1 not in values:
+                    continue
+                pre = values[0]
+                post = values[1]
+                if pre.size == 0 or post.size == 0:
+                    continue
+                row = {
+                    'animal': self._animals[int(animal_code)],
+                    'session': session,
+                }
+                row.update(self._effect_statistics(pre, post))
+                rows.append(row)
+            ## END for session, values in sessions.items()....
+        ## END for animal_code, sessions in self._values_by_session.items()....
+
+        return pd.DataFrame(rows)
+
+
+    def _paired_sign_permutation_test(self, effects, n_permutations, sampling_unit):
+        """Two-sided sign-flip test that the mean of paired unit effects is zero.
+
+        Does not assume lap-block exchangeability. Session-level tests treat sessions as
+        exchangeable and therefore ignore within-animal dependence.
+        """
+        if n_permutations < 1:
+            raise ValueError('n_permutations must be >= 1.')
+
+        effects = np.asarray(effects, dtype=float)
+        n_units = int(effects.size)
+        if n_units < 1:
+            return {
+                'p_value': None,
+                'observed_mean_difference_post_minus_pre': None,
+                'null_mean_differences': None,
+                'effect': 'mean_difference_post_minus_pre',
+                'sampling_unit': sampling_unit,
+                'n_units': n_units,
+                'exact': False,
+                'method': None,
+                'status': 'Not testable: no paired units with both conditions.',
+            }
+
+        observed = float(effects.mean())
+        abs_observed = abs(observed)
+        n_exact = 1 << n_units
+        use_exact = (n_units <= 20) and (n_exact <= n_permutations)
+
+        if use_exact:
+            sign_bits = (
+                (np.arange(n_exact, dtype=np.uint32)[:, None] >> np.arange(n_units)) & 1
+            )
+            signs = 1.0 - 2.0 * sign_bits.astype(float)
+            null_means = signs @ effects / n_units
+            p_value = float(np.count_nonzero(np.abs(null_means) >= abs_observed) / n_exact)
+            method = 'exact'
+        else:
+            null_means = np.empty(n_permutations, dtype=float)
+            sign_choices = np.array([1.0, -1.0])
+
+            for i in range(n_permutations):
+                signs = self.rng.choice(sign_choices, size=n_units)
+                null_means[i] = float(np.mean(signs * effects))
+            ## END for i in range(n_permutations)....
+
+            p_value = (
+                1 + np.count_nonzero(np.abs(null_means) >= abs_observed)
+            ) / (n_permutations + 1)
+            method = 'monte_carlo'
+
+        if sampling_unit == 'session':
+            unit_status = (
+                'Session-level tests treat sessions as exchangeable and ignore '
+                'within-animal dependence.'
+            )
+        else:
+            unit_status = (
+                'Animal-level tests treat animals as independent experimental units.'
+            )
+
+        return {
+            'p_value': float(p_value),
+            'observed_mean_difference_post_minus_pre': observed,
+            'null_mean_differences': null_means,
+            'effect': 'mean_difference_post_minus_pre',
+            'sampling_unit': sampling_unit,
+            'n_units': n_units,
+            'exact': bool(use_exact),
+            'method': method,
+            'status': (
+                'ok; paired cluster sign-flip test of the mean difference. '
+                'Does not assume lap-block exchangeability. ' + unit_status
+            ),
+        }
+
+
+    def _block_permutation_test(self, n_permutations):
+        """Approximate null test by permuting labels of equal-length lap blocks within sessions.
+
+        Requires approximate stationarity and exchangeability of sufficiently separated
+        blocks under the null. Incomplete blocks and sessions without both conditions
+        represented by complete blocks are omitted from this test.
+        """
+        if n_permutations < 1:
+            raise ValueError('n_permutations must be >= 1.')
+
+        block_length = self.block_length_laps
+        blocks_by_session = {}
+
+        for animal_code, sessions in self._runs.items():
+            for session, runs in sessions.items():
+                blocks = []
+
+                for run in runs:
+                    lap_ids = run['lap_ids']
+
+                    # Use complete, non-overlapping blocks so all permuted blocks
+                    # contain the same number of consecutive laps.
+                    for start in range(0, len(lap_ids) - block_length + 1, block_length):
+                        block_lap_ids = lap_ids[start:start + block_length]
+                        positions = np.concatenate([
+                            self._positions_by_lap[lap_id] for lap_id in block_lap_ids
+                        ])
+
+                        blocks.append({
+                            'condition': run['condition'],
+                            'lap_ids': block_lap_ids,
+                            'positions': positions,
+                        })
+
+                if {block['condition'] for block in blocks} == {0, 1}:
+                    blocks_by_session[(animal_code, session)] = blocks
+
+        eligible_animals = {animal_code for animal_code, _ in blocks_by_session}
+        if eligible_animals != set(range(self._n_animals)):
+            missing_animals = [
+                self._animals[a] for a in range(self._n_animals)
+                if a not in eligible_animals
+            ]
+            return {
+                'p_value': None,
+                'null_distances': None,
+                'status': (
+                    'Not testable with this block length: at least one animal has no '
+                    'session containing complete blocks from both conditions. '
+                    f'Affected animals: {missing_animals}'
+                ),
+                'block_length_laps': block_length,
+                'n_sessions_used': len(blocks_by_session),
+            }
+
+        row_mask = np.zeros(len(self._y), dtype=bool)
+        observed_labels = np.full(len(self._y), -1, dtype=np.int8)
+        used_laps = set()
+        n_blocks_pre = 0
+        n_blocks_post = 0
+
+        for blocks in blocks_by_session.values():
+            for block in blocks:
+                positions = block['positions']
+                row_mask[positions] = True
+                observed_labels[positions] = block['condition']
+                used_laps.update(block['lap_ids'])
+
+                if block['condition'] == 0:
+                    n_blocks_pre += 1
+                else:
+                    n_blocks_post += 1
+
+        observed_distance = self._distance_for_labels(observed_labels, row_mask)
+        null_distances = np.empty(n_permutations, dtype=float)
+
+        for i in range(n_permutations):
+            permuted_labels = np.full(len(self._y), -1, dtype=np.int8)
+
+            for blocks in blocks_by_session.values():
+                permuted_conditions = self.rng.permutation(
+                    np.array([block['condition'] for block in blocks], dtype=np.int8)
+                )
+
+                for block, condition in zip(blocks, permuted_conditions):
+                    permuted_labels[block['positions']] = condition
+
+            null_distances[i] = self._distance_for_labels(permuted_labels, row_mask)
+
+        p_value = (
+            1 + np.count_nonzero(null_distances >= observed_distance)
+        ) / (n_permutations + 1)
+
+        return {
+            'p_value': float(p_value),
+            'observed_wasserstein_1': observed_distance,
+            'null_distances': null_distances,
+            'status': 'ok; approximate block-exchangeability test',
+            'block_length_laps': block_length,
+            'n_sessions_used': len(blocks_by_session),
+            'n_laps_used': len(used_laps),
+            'n_bins_used': int(row_mask.sum()),
+            'n_blocks_pre': n_blocks_pre,
+            'n_blocks_post': n_blocks_post,
+        }
+
+
+    def run(self, perform_block_permutation_test=False, n_permutations=2000, sampling_unit=None, perform_ordinal_mode_model: bool = True, ordinal_mode_kwargs: Optional[Dict] = None) -> Dict:
+        """Compute the effect, bootstrap interval, and optional permutation test.
+
+        Uses `sampling_unit` from the constructor. Passing it here is optional and must
+        match. `'block'` resamples moving lap blocks and, if requested, permutes
+        within-session lap-block labels of Wasserstein-1. `'animal'` and `'session'` copy
+        each session's pre/post values intact and, if requested, run a paired sign-flip
+        test of the signed mean difference. Cluster modes do not group by parent epoch.
+        Session-level tests treat sessions as exchangeable and therefore ignore
+        within-animal dependence.
+
+        When `perform_ordinal_mode_model` is True (default), also fits a session-level
+        proportional-odds model of low/mid/high `P_Short` and stores it under
+        `ordinal_mode_model`.
+        """
+        if sampling_unit is None:
+            sampling_unit = self.sampling_unit
+        elif sampling_unit != self.sampling_unit:
+            raise ValueError(
+                f'sampling_unit={sampling_unit!r} does not match constructor '
+                f'sampling_unit={self.sampling_unit!r}. Pass sampling_unit to __init__.'
+            )
+
+        labels = self._row_condition_code
+        resample_within_run = sampling_unit == 'block'
+        mean_difference_unit = None if sampling_unit == 'block' else sampling_unit
+        bootstrap_result = self._hierarchical_bootstrap(
+            resample_within_run=resample_within_run,
+            mean_difference_unit=mean_difference_unit,
+        )
+        animal_rows = []
+
+        for animal_code, animal in enumerate(self._animals):
+            animal_mask = self._animal_code_rows == animal_code
+            pre = self._y[animal_mask & (labels == 0)]
+            post = self._y[animal_mask & (labels == 1)]
+            row = {'animal': animal}
+            row.update(self._effect_statistics(pre, post))
+            animal_rows.append(row)
+        ## END for animal_code, animal in enumerate(self._animals)....
+
+        animal_summary = pd.DataFrame(animal_rows)
+        session_summary = (
+            self._session_effect_rows() if sampling_unit == 'session' else None
+        )
+
+        permutation_results = None
+        p_value_effect = None
+        if perform_block_permutation_test:
+            if sampling_unit == 'block':
+                permutation_results = self._block_permutation_test(n_permutations)
+                p_value_effect = 'wasserstein_1'
+            elif sampling_unit == 'animal':
+                permutation_results = self._paired_sign_permutation_test(
+                    animal_summary['mean_difference_post_minus_pre'].to_numpy(),
+                    n_permutations,
+                    sampling_unit='animal',
+                )
+                p_value_effect = 'mean_difference_post_minus_pre'
+            else:
+                permutation_results = self._paired_sign_permutation_test(
+                    session_summary['mean_difference_post_minus_pre'].to_numpy()
+                    if not session_summary.empty else np.array([], dtype=float),
+                    n_permutations,
+                    sampling_unit='session',
+                )
+                p_value_effect = 'mean_difference_post_minus_pre'
+
+        bin_counts = self._data['_condition_code'].value_counts()
+        n_sessions = int(
+            self._data[['_animal_code', self.session_col]].drop_duplicates().shape[0]
+        )
+        if self._lap_table is None:
+            n_laps_pre = None
+            n_laps_post = None
+        else:
+            lap_counts = self._lap_table['_condition_code'].value_counts()
+            n_laps_pre = int(lap_counts.get(0, 0))
+            n_laps_post = int(lap_counts.get(1, 0))
+        results = {
+            'comparison': f'{self.group_values[0]} vs {self.group_values[1]}',
+            'sampling_unit': sampling_unit,
+            'p_value_effect': p_value_effect,
+            'wasserstein_1': self._distance_for_labels(labels),
+            'wasserstein_1_bootstrap_95ci': bootstrap_result['wasserstein_1_bootstrap_95ci'],
+            'mean_difference_post_minus_pre': float(
+                animal_summary['mean_difference_post_minus_pre'].mean()
+            ),
+            'median_difference_post_minus_pre': float(
+                animal_summary['median_difference_post_minus_pre'].mean()
+            ),
+            'p_value': (
+                permutation_results['p_value'] if permutation_results is not None else None
+            ),
+            'permutation_results': permutation_results,
+            'n_animals': self._n_animals,
+            'n_sessions': n_sessions,
+            'n_laps_pre': n_laps_pre,
+            'n_laps_post': n_laps_post,
+            'n_bins_pre': int(bin_counts.get(0, 0)),
+            'n_bins_post': int(bin_counts.get(1, 0)),
+            'block_length_laps': self.block_length_laps,
+            'animal_summary': animal_summary,
+        }
+        if sampling_unit != 'block':
+            results['mean_difference_bootstrap_95ci'] = bootstrap_result[
+                'mean_difference_bootstrap_95ci'
+            ]
+        if session_summary is not None:
+            results['session_summary'] = session_summary
+
+        if perform_ordinal_mode_model:
+            _ordinal_kwargs = dict(value_col=self.value_col, condition_col=self.condition_col, animal_col=self.animal_col, session_col=self.session_col, pre_label=self.group_values[0], post_label=self.group_values[1], n_bootstrap=self.n_bootstrap, n_permutations=n_permutations, random_state=int(self.rng.integers(0, 2**31 - 1)))
+            _ordinal_kwargs.update(ordinal_mode_kwargs or {})
+            try:
+                results['ordinal_mode_model'] = self.compute_ordinal_mode_shift(self._data, **_ordinal_kwargs)
+            except (ValueError, np.linalg.LinAlgError) as e:
+                results['ordinal_mode_model'] = {'status': f'failed: {e}'}
+
+        return results
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2026-10-27 - Relevant Only to 'block' resampling, which IS NOT DONE because blocks of laps are autocorrelated!                                                                                                                                                                       #
+    # ==================================================================================================================================================================================================================================================================================== #
+    @function_attributes(short_name=None, tags=['_DEPRICATED', 'block-only', 'NOT_USED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-27 19:32', related_items=[])
+    @classmethod
+    def estimate_block_length_lap_t_bins_from_autocorrelation(cls, filtered_all_sessions_laps_time_bin_df, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name', lap_col='parent_epoch_id', lap_order_col='parent_epoch_start_t', pre_label='pre-delta', post_label='post-delta', threshold=0.5, acf_threshold=0.1, consecutive_lags=3, min_run_laps=12, max_lag=None, recommendation_quantile=0.90, plot=False):
+        """Estimate a candidate moving-block length from lap-summary autocorrelation.
+
+        The estimate is in laps, compatible with block_length_laps in
+        PrePostDeltaDistributionComparison. This is a diagnostic heuristic,
+        not a guarantee that a permutation test is valid.
+        """
+        import numpy as np
+        import pandas as pd
+
+        required_cols = [
+            value_col, condition_col, animal_col, session_col,
+            lap_col, lap_order_col,
+        ]
+        missing_cols = set(required_cols).difference(
+            filtered_all_sessions_laps_time_bin_df.columns
+        )
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+        if acf_threshold <= 0 or consecutive_lags < 1 or min_run_laps < 4:
+            raise ValueError('Invalid ACF threshold or lag/run settings.')
+        if not 0 < recommendation_quantile <= 1:
+            raise ValueError('recommendation_quantile must be in (0, 1].')
+
+        data = filtered_all_sessions_laps_time_bin_df[required_cols].copy()
+        data[value_col] = pd.to_numeric(data[value_col], errors='raise')
+        data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
+        data = data.dropna(subset=[
+            animal_col, session_col, lap_col, lap_order_col,
+        ])
+
+        group_cols = [animal_col, session_col, lap_col]
+
+        def _single_value(series):
+            if series.nunique(dropna=False) != 1:
+                raise ValueError(
+                    'Each lap must have exactly one condition and one chronological '
+                    'start time. Check the lap and condition columns.'
+                )
+            return series.iloc[0]
+
+        lap_table = (
+            data.groupby(group_cols, sort=False, dropna=False)
+            .agg(
+                condition=(condition_col, _single_value),
+                lap_order=(lap_order_col, _single_value),
+            )
+            .reset_index()
+        )
+
+        # Summarize each lap, preserving all time bins for the original distribution
+        # analysis while estimating serial dependence at the lap level.
+        feature_names = [
+            'lap_mean', 'lap_median', 'lap_q25', 'lap_q75', 'lap_fraction_above_threshold',
+        ]
+        value_data = data.loc[
+            data[condition_col].isin([pre_label, post_label]) &
+            data[value_col].notna()
+        ].copy()
+
+        summary = (
+            value_data.groupby(group_cols, sort=False, dropna=False)[value_col]
+            .agg(
+                lap_mean='mean',
+                lap_median='median',
+                lap_q25=lambda x: x.quantile(0.25),
+                lap_q75=lambda x: x.quantile(0.75),
+                lap_fraction_above_threshold=lambda x: (x > threshold).mean(),
+            )
+            .reset_index()
+        )
+
+        lap_table = lap_table.merge(
+            summary, on=group_cols, how='left', validate='one_to_one'
+        )
+
+        # Split chronologically ordered laps into uninterrupted runs. Other
+        # condition labels and pre/post transitions terminate a run.
+        runs = []
+        for (animal, session), session_laps in lap_table.groupby(
+            [animal_col, session_col], sort=False, dropna=False
+        ):
+            session_laps = session_laps.sort_values('lap_order', kind='stable')
+
+            current_condition = None
+            current_run = []
+
+            for row in session_laps.to_dict('records'):
+                condition = row['condition']
+                eligible = pd.notna(condition) and condition in (pre_label, post_label)
+
+                if current_run and (
+                    not eligible or condition != current_condition
+                ):
+                    runs.append({
+                        'animal': animal,
+                        'session': session,
+                        'condition': current_condition,
+                        'rows': current_run,
+                    })
+                    current_run = []
+                    current_condition = None
+
+                if eligible:
+                    if not current_run:
+                        current_condition = condition
+                    current_run.append(row)
+
+            if current_run:
+                runs.append({
+                    'animal': animal,
+                    'session': session,
+                    'condition': current_condition,
+                    'rows': current_run,
+                })
+
+        acf_records = []
+        run_records = []
+
+        for run_id, run in enumerate(runs):
+            n_laps = len(run['rows'])
+            record = {
+                'run_id': run_id,
+                'animal': run['animal'],
+                'session': run['session'],
+                'condition': run['condition'],
+                'n_laps': n_laps,
+                'decorrelation_lag_laps': np.nan,
+                'censored': False,
+                'status': 'ok',
+            }
+
+            if n_laps < min_run_laps:
+                record['status'] = 'too_short'
+                run_records.append(record)
+                continue
+
+            run_block_lengths = []
+            run_has_censored_feature = False
+
+            current_max_lag = (
+                min(25, n_laps // 3)
+                if max_lag is None
+                else min(int(max_lag), n_laps // 3)
+            )
+
+            if current_max_lag < consecutive_lags:
+                record['status'] = 'too_short_for_acf'
+                run_records.append(record)
+                continue
+
+            for feature in feature_names:
+                x = np.asarray(
+                    [row[feature] for row in run['rows']], dtype=float
+                )
+
+                if not np.isfinite(x).all() or np.var(x) <= np.finfo(float).eps:
+                    continue
+
+                x = x - x.mean()
+                denominator = np.dot(x, x)
+                acf_values = {}
+
+                for lag in range(1, current_max_lag + 1):
+                    # Biased sample ACF; the same denominator is used at each lag.
+                    rho = float(np.dot(x[:-lag], x[lag:]) / denominator)
+                    acf_values[lag] = rho
+
+                    acf_records.append({
+                        'run_id': run_id,
+                        'animal': run['animal'],
+                        'session': run['session'],
+                        'condition': run['condition'],
+                        'feature': feature,
+                        'lag': lag,
+                        'acf': rho,
+                    })
+
+                decorrelation_lag = None
+                for start_lag in range(
+                    1, current_max_lag - consecutive_lags + 2
+                ):
+                    if all(
+                        abs(acf_values[lag]) <= acf_threshold
+                        for lag in range(start_lag, start_lag + consecutive_lags)
+                    ):
+                        decorrelation_lag = start_lag
+                        break
+
+                if decorrelation_lag is None:
+                    # Dependence did not fall below the selected threshold
+                    # within the range examined.
+                    run_has_censored_feature = True
+                    run_block_lengths.append(current_max_lag + 1)
+                else:
+                    run_block_lengths.append(decorrelation_lag)
+
+            if not run_block_lengths:
+                record['status'] = 'no_variable_features'
+            else:
+                record['decorrelation_lag_laps'] = max(run_block_lengths)
+                record['censored'] = run_has_censored_feature
+                if run_has_censored_feature:
+                    record['status'] = 'dependence_not_resolved'
+
+            run_records.append(record)
+
+        acf_df = pd.DataFrame(acf_records)
+        run_diagnostics = pd.DataFrame(run_records)
+
+        informative_runs = run_diagnostics.loc[
+            run_diagnostics['decorrelation_lag_laps'].notna()
+        ]
+
+        provisional_block_length_laps = None
+        suggested_block_length_laps = None
+        censored_runs = 0
+
+        if not informative_runs.empty:
+            provisional_block_length_laps = max(
+                1,
+                int(np.ceil(informative_runs['decorrelation_lag_laps'].quantile(
+                    recommendation_quantile, interpolation='higher'
+                ))),
+            )
+            censored_runs = int(informative_runs['censored'].sum())
+
+            # Do not claim a finite recommendation if any informative run
+            # remains correlated through its maximum examined lag.
+            if censored_runs == 0:
+                suggested_block_length_laps = provisional_block_length_laps
+
+        if not acf_df.empty:
+            acf_df['abs_acf'] = acf_df['acf'].abs()
+            acf_summary = (
+                acf_df.groupby('lag')['abs_acf']
+                .agg(
+                    median_abs_acf='median',
+                    q90_abs_acf=lambda x: x.quantile(0.90),
+                    n_series='size',
+                )
+                .reset_index()
+            )
+        else:
+            acf_summary = pd.DataFrame(
+                columns=['lag', 'median_abs_acf', 'q90_abs_acf', 'n_series']
+            )
+
+        fig = ax = None
+        if plot and not acf_summary.empty:
+            import matplotlib.pyplot as plt
+
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.plot(
+                acf_summary['lag'], acf_summary['median_abs_acf'],
+                label='Median absolute ACF',
+            )
+            ax.plot(
+                acf_summary['lag'], acf_summary['q90_abs_acf'],
+                label='90th percentile absolute ACF',
+            )
+            ax.axhline(
+                acf_threshold, color='black', linestyle='--',
+                label=f'Chosen ACF threshold ({acf_threshold:g})',
+            )
+            ax.set(
+                xlabel='Lag (laps)',
+                ylabel='Absolute autocorrelation',
+                title='Autocorrelation of within-run lap summaries',
+            )
+            ax.legend()
+            fig.tight_layout()
+
+        return {
+            'suggested_block_length_laps': suggested_block_length_laps,
+            'provisional_block_length_laps': provisional_block_length_laps,
+            'acf_threshold': acf_threshold,
+            'consecutive_lags': consecutive_lags,
+            'recommendation_quantile': recommendation_quantile,
+            'n_runs': len(run_diagnostics),
+            'n_informative_runs': len(informative_runs),
+            'n_censored_runs': censored_runs,
+            'run_diagnostics': run_diagnostics,
+            'acf_by_run': acf_df,
+            'acf_summary': acf_summary,
+            'figure': fig,
+            'axes': ax,
+        }
+
+
+    @function_attributes(short_name=None, tags=['_DEPRICATED', 'block-only', 'NOT_USED'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-27 19:32', related_items=[])
+    @classmethod
+    def estimate_block_length_laps_from_autocorrelation(cls, filtered_all_sessions_laps_df, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name', lap_col=None, lap_order_col=None, pre_label='pre-delta', post_label='post-delta', acf_threshold=0.1, consecutive_lags=3, min_run_laps=12, max_lag=None, recommendation_quantile=0.90, plot=False):
+        """Recommend a moving-block length (in laps) from residual lap-to-lap autocorrelation.
+
+        Within a lap, time bins are structurally dependent: they come from one continuous run.
+        Consecutive laps are not. Every lap is separated from the next by a non-lap period
+        in which the animal stops and receives reward. Across-lap dependence is therefore not
+        implied by the task; it is an empirical question (slow behavioral state, strategy, or
+        representational drift). `PrePostDeltaDistributionComparison` always resamples whole
+        laps, never individual time bins. This function asks whether those laps still need to
+        be grouped into longer moving blocks.
+
+        The input must already be one row per lap. Within each animal/session, laps are sorted
+        by `lap_order_col` and split into pre-delta or post-delta sequences. "Run" here means
+        an ordered sequence of the same condition with no missing scores, not continuous
+        running: adjacent laps in a run still have a reward/stop interval between them. A
+        missing score, a non-pre/post label, or a pre/post transition ends the current run so
+        the ACF is never computed across a condition change or a missing lap.
+
+        For each run long enough to support an ACF, the biased sample autocorrelation of
+        `value_col` is computed at successive lap lags. A run's decorrelation lag is the first
+        lag at which `consecutive_lags` consecutive |ACF| values all fall at or below
+        `acf_threshold`. If dependence is already gone at lag 1, iid resampling of laps
+        (`block_length_laps=1`) is supported. If the series is still correlated at the largest
+        lag examined, that run is marked censored.
+
+        The recommendation is a high quantile (default 90th percentile) of those per-run
+        decorrelation lags, in units of laps, for use as `block_length_laps`. A finite
+        `suggested_block_length_laps` is returned only when no informative run is censored;
+        otherwise only `provisional_block_length_laps` is filled. This is a diagnostic
+        heuristic, not a guarantee that a subsequent permutation or bootstrap test is valid.
+
+        Use `estimate_block_length_lap_t_bins_from_autocorrelation` instead when the table is
+        one row per time bin and each lap must first be summarized.
+        """
+
+        import numpy as np
+        import pandas as pd
+
+        required_cols = [value_col, condition_col, animal_col, session_col]
+        missing_cols = set(required_cols).difference(filtered_all_sessions_laps_df.columns)
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+
+        # Detect common lap ID and chronological-order columns when unspecified.
+        if lap_col is None:
+            lap_col = next((
+                col for col in ['lap_idx', 'parent_epoch_id', 'epoch_id']
+                if col in filtered_all_sessions_laps_df.columns
+                and filtered_all_sessions_laps_df[col].notna().any()
+            ), None)
+
+        if lap_order_col is None:
+            lap_order_col = next((
+                col for col in ['lap_start_t', 'parent_epoch_start_t', 'epoch_start_t', 'start']
+                if col in filtered_all_sessions_laps_df.columns
+                and filtered_all_sessions_laps_df[col].notna().any()
+            ), None)
+
+        if lap_col is None or lap_order_col is None:
+            raise ValueError(
+                'Could not identify lap_col or lap_order_col. '
+                'Specify both explicitly.'
+            )
+
+        data = filtered_all_sessions_laps_df[
+            required_cols + [lap_col, lap_order_col]
+        ].copy()
+
+        data[value_col] = pd.to_numeric(data[value_col], errors='raise')
+        data[lap_order_col] = pd.to_numeric(data[lap_order_col], errors='raise')
+
+        data = data.dropna(subset=[
+            animal_col, session_col, lap_col, lap_order_col,
+        ])
+
+        valid_values = data[value_col].dropna().to_numpy(dtype=float)
+        if not np.isfinite(valid_values).all() or np.any(
+            (valid_values < 0) | (valid_values > 1)
+        ):
+            raise ValueError(f'{value_col} must contain finite probabilities in [0, 1].')
+
+        # This version expects exactly one row per lap.
+        group_cols = [animal_col, session_col, lap_col]
+        if data.duplicated(group_cols).any():
+            raise ValueError(
+                'Expected one row per lap. Duplicate animal/session/lap combinations found.'
+            )
+
+        # A row with a missing score or a different condition breaks a run;
+        # do not silently join observations across that gap.
+        runs = []
+        for (animal, session), session_laps in data.groupby(
+            [animal_col, session_col], sort=False
+        ):
+            session_laps = session_laps.sort_values(lap_order_col, kind='stable')
+
+            current_condition = None
+            current_rows = []
+
+            for row in session_laps.to_dict('records'):
+                condition = row[condition_col]
+                score = row[value_col]
+
+                eligible = (
+                    pd.notna(condition)
+                    and condition in (pre_label, post_label)
+                    and pd.notna(score)
+                    and np.isfinite(score)
+                )
+
+                if current_rows and (
+                    not eligible or condition != current_condition
+                ):
+                    runs.append({
+                        'animal': animal,
+                        'session': session,
+                        'condition': current_condition,
+                        'rows': current_rows,
+                    })
+                    current_rows = []
+                    current_condition = None
+
+                if eligible:
+                    if not current_rows:
+                        current_condition = condition
+                    current_rows.append(row)
+
+            if current_rows:
+                runs.append({
+                    'animal': animal,
+                    'session': session,
+                    'condition': current_condition,
+                    'rows': current_rows,
+                })
+
+        acf_records = []
+        run_records = []
+
+        for run_id, run in enumerate(runs):
+            x = np.asarray(
+                [row[value_col] for row in run['rows']], dtype=float
+            )
+            n_laps = len(x)
+
+            record = {
+                'run_id': run_id,
+                'animal': run['animal'],
+                'session': run['session'],
+                'condition': run['condition'],
+                'n_laps': n_laps,
+                'decorrelation_lag_laps': np.nan,
+                'censored': False,
+                'status': 'ok',
+            }
+
+            if n_laps < min_run_laps:
+                record['status'] = 'too_short'
+                run_records.append(record)
+                continue
+
+            current_max_lag = (
+                min(25, n_laps // 3)
+                if max_lag is None
+                else min(int(max_lag), n_laps // 3)
+            )
+
+            if current_max_lag < consecutive_lags:
+                record['status'] = 'too_short_for_acf'
+                run_records.append(record)
+                continue
+
+            x = x - x.mean()
+            denominator = np.dot(x, x)
+
+            if denominator <= np.finfo(float).eps:
+                record['status'] = 'constant_series'
+                run_records.append(record)
+                continue
+
+            acf_values = {}
+            for lag in range(1, current_max_lag + 1):
+                rho = float(np.dot(x[:-lag], x[lag:]) / denominator)
+                acf_values[lag] = rho
+
+                acf_records.append({
+                    'run_id': run_id,
+                    'animal': run['animal'],
+                    'session': run['session'],
+                    'condition': run['condition'],
+                    'lag': lag,
+                    'acf': rho,
+                })
+
+            # First lag followed by consecutive_lags values below the threshold.
+            decorrelation_lag = None
+            for start_lag in range(
+                1, current_max_lag - consecutive_lags + 2
+            ):
+                if all(
+                    abs(acf_values[lag]) <= acf_threshold
+                    for lag in range(start_lag, start_lag + consecutive_lags)
+                ):
+                    decorrelation_lag = start_lag
+                    break
+
+            if decorrelation_lag is None:
+                record['decorrelation_lag_laps'] = current_max_lag + 1
+                record['censored'] = True
+                record['status'] = 'dependence_not_resolved'
+            else:
+                record['decorrelation_lag_laps'] = decorrelation_lag
+
+            run_records.append(record)
+
+        acf_df = pd.DataFrame(acf_records)
+        run_diagnostics = pd.DataFrame(run_records)
+
+        informative_runs = run_diagnostics.loc[
+            run_diagnostics['decorrelation_lag_laps'].notna()
+        ]
+
+        provisional_block_length_laps = None
+        suggested_block_length_laps = None
+
+        if not informative_runs.empty:
+            provisional_block_length_laps = max(
+                1,
+                int(np.ceil(informative_runs['decorrelation_lag_laps'].quantile(
+                    recommendation_quantile, interpolation='higher'
+                ))),
+            )
+
+            if not informative_runs['censored'].any():
+                suggested_block_length_laps = provisional_block_length_laps
+
+        if not acf_df.empty:
+            acf_df['abs_acf'] = acf_df['acf'].abs()
+            acf_summary = acf_df.groupby('lag')['abs_acf'].agg(
+                median_abs_acf='median',
+                q90_abs_acf=lambda x: x.quantile(0.90),
+                n_series='size',
+            ).reset_index()
+        else:
+            acf_summary = pd.DataFrame(
+                columns=['lag', 'median_abs_acf', 'q90_abs_acf', 'n_series']
+            )
+
+        fig = ax = None
+        if plot and not acf_summary.empty:
+            import matplotlib.pyplot as plt
+
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.plot(
+                acf_summary['lag'], acf_summary['median_abs_acf'],
+                label='Median absolute ACF',
+            )
+            ax.plot(
+                acf_summary['lag'], acf_summary['q90_abs_acf'],
+                label='90th percentile absolute ACF',
+            )
+            ax.axhline(
+                acf_threshold, color='black', linestyle='--',
+                label=f'ACF threshold = {acf_threshold:g}',
+            )
+            ax.set(
+                xlabel='Lag (laps)',
+                ylabel='Absolute autocorrelation',
+                title='Autocorrelation of lap-level P_Short',
+            )
+            ax.legend()
+            fig.tight_layout()
+
+        return {
+            'lap_col': lap_col,
+            'lap_order_col': lap_order_col,
+            'suggested_block_length_laps': suggested_block_length_laps,
+            'provisional_block_length_laps': provisional_block_length_laps,
+            'acf_threshold': acf_threshold,
+            'consecutive_lags': consecutive_lags,
+            'recommendation_quantile': recommendation_quantile,
+            'n_runs': len(run_diagnostics),
+            'n_informative_runs': len(informative_runs),
+            'n_censored_runs': int(informative_runs['censored'].sum()),
+            'run_diagnostics': run_diagnostics,
+            'acf_by_run': acf_df,
+            'acf_summary': acf_summary,
+            'figure': fig,
+            'axes': ax,
+        }
+
+
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 2026-10-26 - Interrupted Timeseries Analysis (ITA) Stats                                                                                                                                                                                                                             #
+    # ==================================================================================================================================================================================================================================================================================== #
+    ## INPUTS: pre_df, post_df
+    @function_attributes(short_name=None, tags=['Figure 4/S6/S8 Stats', 'stats', 'figure4', 'interrupted-timeseries-analysis', 'timeseries'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:02', related_items=[])
+    @classmethod
+    def stats_interrupted_timeseries_analysis(cls, pre_df: pd.DataFrame, post_df: pd.DataFrame, should_plot: bool = True, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', debug_print: bool=True):
+        """ Applies Interrupted Timeseries Analysis (ITA) to the pre/post delta data, treating delta as the intervention
+
+        Lopez Bernal et al., “Interrupted Time Series Regression for the Evaluation of Public Health Interventions.”
+
+        Usage:
+
+            time_variable_name: str = 'delta_aligned_start_t'
+            variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+            df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+            pre_df  = df[df[time_variable_name] <= 0]
+            post_df = df[df[time_variable_name] > 0]
+            (its_model, its_tuple) = stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                                        variable_name=variable_name, time_variable_name=time_variable_name,
+                                        )
+            intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
+
+
+        """
+        # Combine pre- and post-intervention observations
+        pre_df = pre_df.copy()
+        post_df = post_df.copy()
+
+        pre_df['intervention'] = 0
+        post_df['intervention'] = 1
+
+        its_df = pd.concat([pre_df, post_df], ignore_index=True)
+        its_df = its_df.sort_values(time_variable_name)
+
+        # Corrected ITS interaction: (T - T0) * intervention, where T0 = 0
+        its_df['time_interaction'] = (its_df[time_variable_name] * its_df['intervention'])
+
+        X = sm.add_constant(its_df[[time_variable_name, 'intervention', 'time_interaction']])
+
+        # Fit the model
+        its_model = sm.OLS(its_df[variable_name], X).fit()
+        if debug_print:
+            print(its_model.summary())
+
+        intercept = its_model.params['const']
+        pre_slope = its_model.params[time_variable_name]
+        level_change = its_model.params['intervention']
+        slope_change = its_model.params['time_interaction']
+
+        post_slope = pre_slope + slope_change
+        if debug_print:
+            print(f"Pre-intervention slope: {pre_slope:.6f}")
+            print(f"Immediate level change: {level_change:.6f}")
+            print(f"Slope change: {slope_change:.6f}")
+            print(f"Post-intervention slope: {post_slope:.6f}")
+
+        outputs = (its_model, (intercept, pre_slope, level_change, slope_change, post_slope))
+
+        if should_plot:
+            import matplotlib.pyplot as plt
+
+            fig = plt.figure(num='Interrupted Time Series stats model', clear=True)
+            plt.scatter(pre_df[time_variable_name], pre_df[variable_name], label='Pre-intervention', alpha=0.6)
+            plt.scatter(post_df[time_variable_name], post_df[variable_name], label='Post-intervention', alpha=0.6)
+
+            # Plot each fitted segment separately
+            pre_mask = its_df['intervention'] == 0
+            post_mask = its_df['intervention'] == 1
+
+            plt.plot(its_df.loc[pre_mask, time_variable_name], its_model.predict(X.loc[pre_mask]), color='red', label='Segmented regression')
+
+            plt.plot(its_df.loc[post_mask, time_variable_name], its_model.predict(X.loc[post_mask]), color='red')
+
+            plt.axvline(0.0, color='black', linestyle='--', label='Intervention')
+            plt.xlabel(time_variable_name)
+            plt.ylabel(variable_name)
+            plt.legend()
+            plt.show()
+
+        return outputs
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'Figure 4/S6/S8 Stats', 'stats', 'figure4'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 15:35', related_items=[])
+    @classmethod
+    def linear_fit(cls, a_df: pd.DataFrame, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t'):
+        """ a simple linear fit to the pre/post period df separately.
+
+        Usage:
+            pre_df, pre_tuple = linear_fit(a_df=pre_df)
+            post_df, post_tuple = linear_fit(a_df=post_df)
+
+            pre_slope, pre_intercept, pre_r_value, pre_p_value, pre_std_err = pre_tuple
+            post_slope, post_intercept, post_r_value, post_p_value, post_std_err = post_tuple
+
+            pre_slope, post_slope
+
+
+        """
+        from scipy.stats import linregress
+        x = a_df[time_variable_name]
+        y = a_df[variable_name]
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        a_df['best_fit'] = intercept + (slope * x)
+        return (a_df, (slope, intercept, r_value, p_value, std_err))
+
+
+    @function_attributes(short_name=None, tags=['UNUSED', 'Figure 4/S6/S8 Stats', 'main', 'stats'], input_requires=[], output_provides=[], uses=['cls.stats_interrupted_timeseries_analysis'], used_by=[], creation_date='2026-10-28 07:36', related_items=[])
+    @classmethod
+    def run_interrupted_timeseries_analysis(cls, df_filter, variable_name: str = 'P_Short', time_variable_name: str = 'delta_aligned_start_t', **kwargs):
+        time_variable_name: str = 'delta_aligned_start_t'
+        variable_name = df_filter.active_plot_variable_name  # usually 'P_Short'
+        df = deepcopy(df_filter.active_plot_df).dropna(subset=[variable_name])
+        pre_df  = df[df[time_variable_name] <= 0]
+        post_df = df[df[time_variable_name] > 0]
+        (its_model, its_tuple) = cls.stats_interrupted_timeseries_analysis(pre_df, post_df, should_plot=True, 
+                                    variable_name=variable_name, time_variable_name=time_variable_name,
+                                    )
+        intercept, pre_slope, level_change, slope_change, post_slope = its_tuple
+
+        # OLS Regression Results                            
+        # ==============================================================================
+        # Dep. Variable:                P_Short   R-squared:                       0.056
+        # Model:                            OLS   Adj. R-squared:                  0.055
+        # Method:                 Least Squares   F-statistic:                     63.22
+        # Date:                Tue, 27 Oct 2026   Prob (F-statistic):           1.03e-39
+        # Time:                        03:43:24   Log-Likelihood:                -1573.6
+        # No. Observations:                3229   AIC:                             3155.
+        # Df Residuals:                    3225   BIC:                             3179.
+        # Df Model:                           3                                         
+        # Covariance Type:            nonrobust                                         
+        # =========================================================================================
+        #                             coef    std err          t      P>|t|      [0.025      0.975]
+        # -----------------------------------------------------------------------------------------
+        # const                     0.3753      0.017     22.461      0.000       0.343       0.408
+        # delta_aligned_start_t     0.0001   2.18e-05      5.140      0.000    6.92e-05       0.000
+        # intervention              0.0820      0.024      3.446      0.001       0.035       0.129
+        # time_interaction      -6.823e-05   3.32e-05     -2.053      0.040      -0.000   -3.05e-06
+        # ==============================================================================
+        # Omnibus:                   145406.152   Durbin-Watson:                   1.952
+        # Prob(Omnibus):                  0.000   Jarque-Bera (JB):              336.695
+        # Skew:                           0.415   Prob(JB):                     7.72e-74
+        # Kurtosis:                       1.653   Cond. No.                     3.15e+03
+        # ==============================================================================
+
+        # Notes:
+        # [1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+        # [2] The condition number is large, 3.15e+03. This might indicate that there are
+        # strong multicollinearity or other numerical problems.
+        # Pre-intervention slope: 0.000112
+        # Immediate level change: 0.082021
+        # Slope change: -0.000068
+        # Post-intervention slope: 0.000044
+        return (its_model, its_tuple)
+
+
+
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'mode-ratio'], input_requires=[], output_provides=[], uses=[], used_by=['compute_ordinal_mode_shift'], creation_date='2026-10-28 07:30', related_items=[])
+    @classmethod
+    def compute_mode_ratio(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', low_threshold: float = 0.25, high_threshold: float = 0.75) -> pd.DataFrame:
+        """ computes the ratio of >25% quantile and <75% quantile (the histogram's modes)
+
+        For each `condition_col` group, counts occupancy of the high mode (`value_col` > `high_threshold`, default 0.75)
+        versus the low mode (`value_col` < `low_threshold`, default 0.25). `mode_ratio` is n_high / n_low.
+        Values in [`low_threshold`, `high_threshold`] are the ambiguous middle and are excluded from the ratio.
+
+        P_Short is typically U-shaped on [0, 1]; this ratio is Short-preferring mode occupancy over Long-preferring mode occupancy.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            mode_ratio_df = PrePostDeltaDistributionComparison.compute_mode_ratio(filtered_all_sessions_laps_time_bin_df)
+
+        """
+        if value_col not in df.columns:
+            raise ValueError(f'Missing required column: {value_col!r}')
+        if condition_col not in df.columns:
+            raise ValueError(f'Missing required column: {condition_col!r}')
+        if not (0.0 <= low_threshold < high_threshold <= 1.0):
+            raise ValueError('Require 0 <= low_threshold < high_threshold <= 1.')
+
+        work = df[[condition_col, value_col]].copy()
+        work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+        work = work.dropna(subset=[value_col])
+
+        rows = []
+        for condition, group in work.groupby(condition_col, dropna=False, sort=False):
+            values = group[value_col].to_numpy(dtype=float)
+            n = int(values.size)
+            n_low = int(np.sum(values < low_threshold))
+            n_high = int(np.sum(values > high_threshold))
+            n_mid = int(n - n_low - n_high)
+            rows.append({
+                condition_col: condition,
+                'n': n,
+                'n_low': n_low,
+                'n_high': n_high,
+                'n_mid': n_mid,
+                'frac_low': (n_low / n) if n > 0 else np.nan,
+                'frac_high': (n_high / n) if n > 0 else np.nan,
+                'mode_ratio': (n_high / n_low) if n_low > 0 else np.nan,
+                'low_threshold': low_threshold,
+                'high_threshold': high_threshold,
+            })
+        ## END for condition, group in work.groupby(condition_col, dropna=False, sort=False)...
+
+        if not rows:
+            return pd.DataFrame(columns=[condition_col, 'n', 'n_low', 'n_high', 'n_mid', 'frac_low', 'frac_high', 'mode_ratio', 'low_threshold', 'high_threshold'])
+        return pd.DataFrame(rows)
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'ordinal', 'proportional-odds', 'mode-ratio', 'AI'], input_requires=[], output_provides=[], uses=['OrderedModel', 'compute_mode_ratio'], used_by=['run'], creation_date='2026-10-28 08:00', related_items=['compute_mode_ratio'])
+    @classmethod
+    def compute_ordinal_mode_shift(cls, df: pd.DataFrame, value_col='P_Short', condition_col='pre_post_delta_category', animal_col='animal', session_col='session_name',
+                                   pre_label='pre-delta', post_label='post-delta', low_threshold: float = 0.25, high_threshold: float = 0.75,
+                                   distr: str = 'logit', min_bins_per_condition: int = 10, n_bootstrap: int = 1000, n_permutations: int = 2000, random_state=None) -> Dict:
+        """Session-level proportional-odds model of low/mid/high P_Short on pre vs post-delta.
+
+        Bins `value_col` into an ordered category: low (`< low_threshold`), mid, high (`> high_threshold`).
+        Each session is fit with `OrderedModel(category ~ is_post)`. The headline effect is the unweighted
+        mean of session slopes `beta_s` (cumulative log-odds shift toward higher P_Short). `exp(beta)` is
+        the proportional odds ratio.
+
+        Inference treats sessions as units nested in animals, matching `sampling_unit='session'`:
+        a sign-flip test on `beta_s` and a hierarchical bootstrap (animals, then sessions within animal).
+        Time-bin dependence is not modeled as independent Bernoulli trials.
+
+        The proportional-odds assumption is that the post-delta shift is the same for the low-to-mid and
+        mid-to-high cutpoints; check `session_summary` category fractions. With few animals, an animal-level
+        sign-flip has a high p-value floor (0.25 for n=3), so the test is at the session level.
+
+        A pooled `OrderedModel` with session fixed effects is reported as `pooled_beta_session_fe` with a
+        naive SE flagged as anti-conservative. Threshold sensitivity is left to the caller via `low_threshold`
+        / `high_threshold`.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            ordinal_results = PrePostDeltaDistributionComparison.compute_ordinal_mode_shift(filtered_all_sessions_laps_time_bin_df)
+        """
+        from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+        required_cols = [value_col, condition_col, animal_col, session_col]
+        missing_cols = set(required_cols).difference(df.columns)
+        if missing_cols:
+            raise ValueError(f'Missing required columns: {sorted(missing_cols)}')
+        if not (0.0 <= low_threshold < high_threshold <= 1.0):
+            raise ValueError('Require 0 <= low_threshold < high_threshold <= 1.')
+        if min_bins_per_condition < 1:
+            raise ValueError('min_bins_per_condition must be >= 1.')
+        if n_bootstrap < 1:
+            raise ValueError('n_bootstrap must be >= 1.')
+        if n_permutations < 1:
+            raise ValueError('n_permutations must be >= 1.')
+
+        work = df.loc[df[condition_col].isin([pre_label, post_label]), required_cols].copy()
+        work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+        work = work.dropna(subset=required_cols).reset_index(drop=True)
+        if work.empty or set(work[condition_col].unique()) != {pre_label, post_label}:
+            raise ValueError(f'Data must contain both groups: {(pre_label, post_label)}')
+
+        category_levels = ('low', 'mid', 'high')
+        work['category'] = np.select(
+            [work[value_col] < low_threshold, work[value_col] > high_threshold],
+            ['low', 'high'],
+            default='mid',
+        )
+        work['category'] = pd.Categorical(work['category'], categories=list(category_levels), ordered=True)
+        work['is_post'] = (work[condition_col] == post_label).astype(float)
+        work['_session_key'] = work[animal_col].astype(str) + '|' + work[session_col].astype(str)
+
+        def _cat_counts(series: pd.Series) -> Dict[str, int]:
+            counts = series.value_counts()
+            return {name: int(counts.get(name, 0)) for name in category_levels}
+
+        def _fit_is_post_slope(endog: pd.Series, is_post: pd.Series) -> Tuple[float, float, bool]:
+            observed = [name for name in category_levels if int((endog == name).sum()) > 0]
+            endog_series = pd.Series(pd.Categorical(np.asarray(endog), categories=observed, ordered=True), name='category')
+            exog = pd.DataFrame({'is_post': np.asarray(is_post, dtype=np.float64)})
+            model = OrderedModel(endog_series, exog, distr=distr)
+            fit = model.fit(method='bfgs', disp=False)
+            converged = bool(fit.mle_retvals.get('converged', False))
+            return float(fit.params['is_post']), float(fit.bse['is_post']), converged
+
+        session_rows = []
+        for (animal, session), sess in work.groupby([animal_col, session_col], dropna=False, sort=False):
+            pre_mask = sess[condition_col] == pre_label
+            post_mask = sess[condition_col] == post_label
+            n_pre = int(pre_mask.sum())
+            n_post = int(post_mask.sum())
+            pre_counts = _cat_counts(sess.loc[pre_mask, 'category'])
+            post_counts = _cat_counts(sess.loc[post_mask, 'category'])
+            n_cats = int(sess['category'].nunique(dropna=True))
+            row = {
+                'animal': animal,
+                'session': session,
+                'n_pre': n_pre,
+                'n_post': n_post,
+                'n_low_pre': pre_counts['low'],
+                'n_mid_pre': pre_counts['mid'],
+                'n_high_pre': pre_counts['high'],
+                'n_low_post': post_counts['low'],
+                'n_mid_post': post_counts['mid'],
+                'n_high_post': post_counts['high'],
+                'frac_low_pre': (pre_counts['low'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_mid_pre': (pre_counts['mid'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_high_pre': (pre_counts['high'] / n_pre) if n_pre > 0 else np.nan,
+                'frac_low_post': (post_counts['low'] / n_post) if n_post > 0 else np.nan,
+                'frac_mid_post': (post_counts['mid'] / n_post) if n_post > 0 else np.nan,
+                'frac_high_post': (post_counts['high'] / n_post) if n_post > 0 else np.nan,
+                'beta': np.nan,
+                'se': np.nan,
+                'converged': False,
+                'quasi_separated': False,
+                'used_for_inference': False,
+                'status': 'ok',
+            }
+            if n_pre < min_bins_per_condition or n_post < min_bins_per_condition:
+                row['status'] = (
+                    f'too_few_bins: n_pre={n_pre}, n_post={n_post}, '
+                    f'min_bins_per_condition={min_bins_per_condition}'
+                )
+                session_rows.append(row)
+                continue
+            if n_cats < 2:
+                row['status'] = f'too_few_categories: n_categories={n_cats}'
+                session_rows.append(row)
+                continue
+            try:
+                beta, se, converged = _fit_is_post_slope(sess['category'], sess['is_post'])
+            except Exception as e:
+                row['status'] = f'fit_failed: {e}'
+                session_rows.append(row)
+                continue
+            quasi_separated = bool(np.isfinite(beta) and abs(beta) > 20.0)
+            row['beta'] = beta
+            row['se'] = se
+            row['converged'] = converged
+            row['quasi_separated'] = quasi_separated
+            if not converged:
+                row['status'] = 'not_converged'
+            elif quasi_separated:
+                row['status'] = 'quasi_separated'
+            else:
+                row['used_for_inference'] = True
+                row['status'] = 'ok'
+            session_rows.append(row)
+        ## END for (animal, session), sess in work.groupby([animal_col, session_col], dropna=False, sort=False)....
+
+        session_summary = pd.DataFrame(session_rows)
+        if session_summary.empty:
+            valid = session_summary
+        else:
+            valid = session_summary.loc[session_summary['used_for_inference']].copy()
+        n_sessions_used = int(len(valid))
+        n_sessions_skipped = int(len(session_summary) - n_sessions_used)
+        n_animals_used = int(valid['animal'].nunique()) if n_sessions_used > 0 else 0
+        rng = np.random.default_rng(random_state)
+
+        if n_sessions_used > 0:
+            animal_summary = (
+                valid.groupby('animal', sort=False, dropna=False)['beta']
+                .mean()
+                .rename('mean_beta_post_minus_pre')
+                .reset_index()
+            )
+        else:
+            animal_summary = pd.DataFrame(columns=['animal', 'mean_beta_post_minus_pre'])
+
+        mean_beta = float(valid['beta'].mean()) if n_sessions_used > 0 else np.nan
+        odds_ratio = float(np.exp(mean_beta)) if np.isfinite(mean_beta) else np.nan
+
+        if n_sessions_used < 1:
+            p_value = None
+            p_value_method = None
+            beta_ci = None
+            odds_ratio_ci = None
+            infer_status = 'Not testable: no eligible sessions.'
+        else:
+            effects = valid['beta'].to_numpy(dtype=float)
+            n_units = int(effects.size)
+            observed = float(effects.mean())
+            abs_observed = abs(observed)
+            n_exact = 1 << n_units
+            use_exact = (n_units <= 20) and (n_exact <= n_permutations)
+            if use_exact:
+                sign_bits = (
+                    (np.arange(n_exact, dtype=np.uint32)[:, None] >> np.arange(n_units)) & 1
+                )
+                signs = 1.0 - 2.0 * sign_bits.astype(float)
+                null_means = signs @ effects / n_units
+                p_value = float(np.count_nonzero(np.abs(null_means) >= abs_observed) / n_exact)
+                p_value_method = 'exact'
+            else:
+                null_means = np.empty(n_permutations, dtype=float)
+                sign_choices = np.array([1.0, -1.0])
+                for i in range(n_permutations):
+                    signs = rng.choice(sign_choices, size=n_units)
+                    null_means[i] = float(np.mean(signs * effects))
+                ## END for i in range(n_permutations)....
+
+                p_value = (
+                    1 + np.count_nonzero(np.abs(null_means) >= abs_observed)
+                ) / (n_permutations + 1)
+                p_value_method = 'monte_carlo'
+
+            betas_by_animal = {
+                animal: group['beta'].to_numpy(dtype=float)
+                for animal, group in valid.groupby('animal', sort=False, dropna=False)
+            }
+            animals = list(betas_by_animal.keys())
+            n_animals_boot = len(animals)
+            bootstrap_means = np.empty(n_bootstrap, dtype=float)
+            for i in range(n_bootstrap):
+                sampled_animals = rng.choice(animals, size=n_animals_boot, replace=True)
+                sampled_betas = []
+                for animal in sampled_animals:
+                    animal_betas = betas_by_animal[animal]
+                    sampled_betas.extend(
+                        rng.choice(animal_betas, size=len(animal_betas), replace=True).tolist()
+                    )
+                ## END for animal in sampled_animals....
+
+                bootstrap_means[i] = float(np.mean(sampled_betas))
+            ## END for i in range(n_bootstrap)....
+
+            beta_ci = tuple(np.quantile(bootstrap_means, [0.025, 0.975]))
+            odds_ratio_ci = tuple(float(np.exp(v)) for v in beta_ci)
+            infer_status = (
+                'ok; session-level proportional-odds (ordinal logit) of low/mid/high P_Short. '
+                'Sign-flip p-value and hierarchical bootstrap treat sessions as units nested in animals. '
+                'Does not treat time bins as independent. '
+                'Session-level tests treat sessions as exchangeable and ignore within-animal dependence. '
+                'Proportional-odds assumes the same post-delta shift for low-to-mid and mid-to-high cutpoints.'
+            )
+
+        pooled_beta = np.nan
+        pooled_se = np.nan
+        try:
+            observed = [name for name in category_levels if int((work['category'] == name).sum()) > 0]
+            if len(observed) < 2:
+                pooled_status = 'failed: fewer than 2 categories in pooled data.'
+            else:
+                session_dummies = pd.get_dummies(work['_session_key'], drop_first=True, dtype=np.float64)
+                pooled_exog = pd.concat([work[['is_post']].astype(np.float64), session_dummies], axis=1)
+                pooled_endog = pd.Series(pd.Categorical(work['category'].to_numpy(), categories=observed, ordered=True), name='category')
+                pooled_model = OrderedModel(pooled_endog, pooled_exog, distr=distr)
+                pooled_fit = pooled_model.fit(method='bfgs', disp=False)
+                pooled_beta = float(pooled_fit.params['is_post'])
+                pooled_se = float(pooled_fit.bse['is_post'])
+                pooled_status = 'ok; naive SE is anti-conservative because time bins are dependent.'
+        except Exception as e:
+            pooled_status = f'failed: {e}'
+
+        frac_rows = []
+        for condition, group in work.groupby(condition_col, dropna=False, sort=False):
+            n = int(len(group))
+            counts = _cat_counts(group['category'])
+            frac_rows.append({
+                condition_col: condition,
+                'n': n,
+                'frac_low': (counts['low'] / n) if n > 0 else np.nan,
+                'frac_mid': (counts['mid'] / n) if n > 0 else np.nan,
+                'frac_high': (counts['high'] / n) if n > 0 else np.nan,
+            })
+        ## END for condition, group in work.groupby(condition_col, dropna=False, sort=False)....
+
+        category_fractions = pd.DataFrame(frac_rows)
+        mode_ratio_df = cls.compute_mode_ratio(
+            work, value_col=value_col, condition_col=condition_col,
+            low_threshold=low_threshold, high_threshold=high_threshold,
+        )
+
+        return {
+            'mean_beta_post_minus_pre': mean_beta,
+            'odds_ratio': odds_ratio,
+            'beta_bootstrap_95ci': beta_ci,
+            'odds_ratio_bootstrap_95ci': odds_ratio_ci,
+            'p_value': p_value,
+            'p_value_method': p_value_method,
+            'n_sessions_used': n_sessions_used,
+            'n_sessions_skipped': n_sessions_skipped,
+            'n_animals_used': n_animals_used,
+            'animal_summary': animal_summary,
+            'session_summary': session_summary,
+            'pooled_beta_session_fe': pooled_beta,
+            'pooled_se_naive': pooled_se,
+            'pooled_status': pooled_status,
+            'category_fractions': category_fractions,
+            'mode_ratio': mode_ratio_df,
+            'low_threshold': low_threshold,
+            'high_threshold': high_threshold,
+            'distr': distr,
+            'status': infer_status,
+        }
+
+
+    @classmethod
+    def time_bin_size_discrete_color_map(cls, time_bin_sizes) -> Dict[str, str]:
+        """Match Figure S3 scatter/hist colors: Plotly qualitative `Plotly[3:]` ordered by float t-bin size."""
+        import plotly.express as px
+        ordered: List[str] = []
+        seen = set()
+        for v in time_bin_sizes:
+            key = str(v)
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(key)
+        ## END for v in time_bin_sizes...
+
+        def _tbin_sort_key(s: str):
+            try:
+                return (0, float(s))
+            except ValueError:
+                return (1, s)
+
+        ordered = sorted(ordered, key=_tbin_sort_key)
+        color_sequence = list(px.colors.qualitative.Plotly[3:])
+        if len(color_sequence) == 0:
+            color_sequence = list(px.colors.qualitative.Plotly)
+        return {tbin: color_sequence[i % len(color_sequence)] for i, tbin in enumerate(ordered)}
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars', 'FigureCollector', 'PhoPublicationFigureHelper', 'build_and_write_to_file'], used_by=[], creation_date='2026-10-28 08:32', related_items=['compute_ordinal_mode_shift'])
+    @classmethod
+    def plot_fig2_style_summary_four_bar(cls, laps_results, pbe_results,
+                                         pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
+                                         animal_marker_mapping: Optional[Dict[str, str]] = None, animal_legend_labels: Optional[Dict[str, str]] = None,
+                                         laps_p_value: Optional[float] = None, pbe_p_value: Optional[float] = None,
+                                         pbe_heuristic_passing_results=None, pbe_heuristic_p_value: Optional[float] = None,
+                                         ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
+                                         group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
+                                         defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
+                                         fig_file_name: str = 'figure4_summary_four_bar', write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True,
+                                         fignum=None, active_context: Optional[IdentifyingContext] = None,
+                                         enable_paired_lines: bool = True, separate_laps_pbes_figures: bool = False, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+        """Plot session-level P_Short means as one Figure-2-style 4-bar panel (Laps-pre, Laps-post, PBE-pre, PBE-post).
+
+        Pass `separate_laps_pbes_figures=True` for two figures (Laps pre/post, PBE pre/post) instead of one 4-bar panel.
+
+        `laps_results` / `pbe_results` may be `run()` result dicts (must include `session_summary`) or `session_summary` DataFrames.
+        Significance brackets use the permutation `p_value` from each `run()` dict (or explicit `laps_p_value` / `pbe_p_value`).
+
+        Groups are Laps/PBEs rather than Long/Short, so Fig2 blue/red bar colors are overridden to black (scatter points follow the bars).
+        Scatter markers use a fixed animal mapping (`gor01`=`o`, `vvp01`=`^`, `pin01`=`s`) with short legend names (`gor`, `vvp`, `pin`).
+        Points are dodged into animal columns with a shared pre/post x-offset so paired lines do not cross.
+
+        When `enable_heuristic_filtered_outputs=True`, pass `pbe_heuristic_passing_results` (the `*_PBEs_heuristic_passing` `run()` dict,
+        or a parent results dict with a single such key). Heuristic-passing session means are drawn as a second adjacent bar series:
+        each PBE column is split into two half-width bars (all PBEs | heuristic-passing). Laps bars stay full width.
+
+        Saving uses `FigureCollector` plus `PhoPublicationFigureHelper.rc_context_kwargs`. When `save_figure=True`, writes PDF/PNG
+        via `build_and_write_to_file` (or `AcrossSessionsVisualizations.output_figure` if `export_folder` is omitted) and SVG via `fig.savefig`.
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            out = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
+                pre_post_delta_stats_results_dict['_perTimeBin_Laps'],
+                pre_post_delta_stats_results_dict['_perTimeBin_PBEs'],
+                pbe_heuristic_passing_results=pre_post_delta_stats_results_dict.get('_perTimeBin_PBEs_heuristic_passing'),
+                fignum=f'{fig_name}-pre_post_delta_effect-{metric}',
+                separate_laps_pbes_figures=False,
+            )
+            out['fig']  # Laps figure when separate_laps_pbes_figures=True; also out['pbe'] / out['figs']
+        """
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
+
+        def _coerce_session_summary(obj, explicit_p_value, name: str, required: bool = True) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
+            if obj is None:
+                if required:
+                    raise ValueError(f'{name} is required.')
+                return None, None
+            if isinstance(obj, pd.DataFrame):
+                summary = obj
+                p_value = explicit_p_value
+            elif isinstance(obj, dict):
+                if ('session_summary' not in obj) or (obj['session_summary'] is None):
+                    if required:
+                        raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                    return None, None
+                summary = obj['session_summary']
+                p_value = explicit_p_value if explicit_p_value is not None else obj.get('p_value')
+            else:
+                raise TypeError(f'{name} must be a run() result dict or a session_summary DataFrame, got {type(obj)!r}.')
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                if required:
+                    raise ValueError(f'{name} session_summary is empty.')
+                return None, None
+            missing_cols = [c for c in (pre_col, post_col) if c not in summary.columns]
+            if missing_cols:
+                raise ValueError(f'{name} session_summary is missing columns: {missing_cols}.')
+            work = summary.dropna(subset=[pre_col, post_col]).copy().reset_index(drop=True)
+            if work.empty:
+                if required:
+                    raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+                return None, None
+            return work, p_value
+
+        def _unwrap_heuristic_passing_obj(obj):
+            """Accept a run() dict, a session_summary DataFrame, or a parent results dict.
+
+            Both `_perTimeBin` and `_perEpochs` keys always exist. When several
+            `*_PBEs_heuristic_passing` entries are present, pick the sibling of `pbe_results`.
+            """
+            if obj is None or isinstance(obj, pd.DataFrame):
+                return obj
+            if isinstance(obj, dict) and ('session_summary' in obj):
+                return obj
+            if isinstance(obj, dict):
+                keys = [k for k in obj.keys() if str(k).endswith('_PBEs_heuristic_passing')]
+                if len(keys) == 1:
+                    return obj[keys[0]]
+                if len(keys) > 1:
+                    for k, v in obj.items():
+                        if v is pbe_results:
+                            sibling = f'{k}_heuristic_passing'
+                            if sibling in obj:
+                                return obj[sibling]
+                    ## END for k, v in obj.items()...
+
+                    raise ValueError(
+                        f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
+                        f'results_dict["_perTimeBin_PBEs_heuristic_passing"].'
+                    )
+                if 'session_summary' not in obj:
+                    return None
+            return obj
+
+        laps_session_summary, laps_p_value = _coerce_session_summary(laps_results, laps_p_value, 'laps_results')
+        pbe_session_summary, pbe_p_value = _coerce_session_summary(pbe_results, pbe_p_value, 'pbe_results')
+        pbe_heuristic_session_summary, pbe_heuristic_p_value = _coerce_session_summary(
+            _unwrap_heuristic_passing_obj(pbe_heuristic_passing_results), pbe_heuristic_p_value,
+            'pbe_heuristic_passing_results', required=False,
+        )
+
+        y_values = [
+            laps_session_summary[pre_col].to_numpy(dtype=float),
+            laps_session_summary[post_col].to_numpy(dtype=float),
+            pbe_session_summary[pre_col].to_numpy(dtype=float),
+            pbe_session_summary[post_col].to_numpy(dtype=float),
+        ]
+        x_labels = [
+            f'{group_labels[0]} pre-$\\Delta$',
+            f'{group_labels[0]} post-$\\Delta$',
+            f'{group_labels[1]} pre-$\\Delta$',
+            f'{group_labels[1]} post-$\\Delta$',
+        ]
+
+        has_animal: bool = (animal_col in laps_session_summary.columns) and (animal_col in pbe_session_summary.columns)
+        filled_markers = ['o', '^', 's', 'p', 'd', 'P', 'X']
+        preferred_animals = ('gor01', 'vvp01', 'pin01')
+        if animal_marker_mapping is None:
+            animal_marker_mapping = {'gor01': 'o', 'vvp01': '^', 'pin01': 's'}
+        else:
+            animal_marker_mapping = {str(k): v for k, v in dict(animal_marker_mapping).items()}
+        if animal_legend_labels is None:
+            animal_legend_labels = {'gor01': 'gor', 'vvp01': 'vvp', 'pin01': 'pin'}
+        else:
+            animal_legend_labels = {str(k): str(v) for k, v in dict(animal_legend_labels).items()}
+
+        def _animal_legend_label(animal) -> str:
+            key = str(animal)
+            if key in animal_legend_labels:
+                return animal_legend_labels[key]
+            stripped = key.rstrip('0123456789')
+            return stripped if stripped else key
+
+        unique_animals: List[str] = []
+        marker_mapping: Dict[str, str] = {}
+        if has_animal:
+            animal_frames = [laps_session_summary, pbe_session_summary]
+            if (pbe_heuristic_session_summary is not None) and (animal_col in pbe_heuristic_session_summary.columns):
+                animal_frames.append(pbe_heuristic_session_summary)
+            unique_animals = [str(a) for a in pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))]
+            used_markers = set(animal_marker_mapping.values())
+            spare_markers = [m for m in filled_markers if m not in used_markers] or list(filled_markers)
+            spare_i = 0
+            for animal in unique_animals:
+                if animal in animal_marker_mapping:
+                    marker_mapping[animal] = animal_marker_mapping[animal]
+                else:
+                    marker_mapping[animal] = spare_markers[spare_i % len(spare_markers)]
+                    spare_i += 1
+            ## END for animal in unique_animals...
+
+        def _bar_scatter_props(summary_df: pd.DataFrame):
+            if (not has_animal) or (animal_col not in summary_df.columns):
+                return {}
+            return [{'marker': marker_mapping.get(str(a), 'o')} for a in summary_df[animal_col].to_numpy()]
+
+        def _animal_dodge_offsets(summary_df: pd.DataFrame, bar_width: float) -> np.ndarray:
+            """Stable within-bar x-offsets: animal columns, then a small deterministic spread per session."""
+            n = len(summary_df)
+            if n == 0:
+                return np.array([], dtype=float)
+            group_span = float(bar_width) * 0.70
+            if (n == 1) or (not has_animal) or (animal_col not in summary_df.columns):
+                if n == 1:
+                    return np.zeros(1, dtype=float)
+                return np.linspace(-group_span / 2.0, group_span / 2.0, n)
+            animals = summary_df[animal_col].map(str).to_numpy()
+            col_animals = [a for a in preferred_animals if np.any(animals == a)]
+            col_animals.extend([a for a in unique_animals if (a not in set(col_animals)) and np.any(animals == a)])
+            n_cols = max(len(col_animals), 1)
+            if n_cols == 1:
+                col_centers = np.array([0.0])
+            else:
+                col_centers = np.linspace(-group_span / 2.0, group_span / 2.0, n_cols)
+            animal_to_center = {a: col_centers[i] for i, a in enumerate(col_animals)}
+            col_gap = (group_span / max(n_cols - 1, 1)) if (n_cols > 1) else group_span
+            within_span = col_gap * 0.45
+            offsets = np.zeros(n, dtype=float)
+            for a in col_animals:
+                idx = np.flatnonzero(animals == a)
+                k = int(idx.size)
+                if k == 0:
+                    continue
+                center = animal_to_center[a]
+                if k == 1:
+                    offsets[idx] = center
+                else:
+                    offsets[idx] = center + np.linspace(-within_span / 2.0, within_span / 2.0, k)
+            ## END for a in col_animals...
+
+            return offsets
+
+        scatter_props = [
+            _bar_scatter_props(laps_session_summary),
+            _bar_scatter_props(laps_session_summary),
+            _bar_scatter_props(pbe_session_summary),
+            _bar_scatter_props(pbe_session_summary),
+        ]
+        if active_context is None:
+            active_context = IdentifyingContext(format_name='kdiba', fig='4', display_fn_name='pre_post_delta_summary_bars')
+
+        heuristic_color = '#2ca02c'
+        summary_bar_color = 'k'  # Laps/PBEs are not Long/Short; do not use Fig2 blue/red
+        has_heuristic: bool = pbe_heuristic_session_summary is not None
+        heuristic_y_pre = None
+        heuristic_y_post = None
+        pbe_half_offset = 0.0
+        full_width = 0.3
+        half_width = full_width / 2.0
+        dpi = kwargs.pop('dpi', 220)
+        laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
+        pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
+        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
+        _fig3_label_rc = {
+            'xtick.labelsize': _fig3_sizes['tick_label'],
+            'ytick.labelsize': _fig3_sizes['tick_label'],
+            'axes.labelsize': _fig3_sizes['axis_label'],
+        }
+        _decoded_prefix: str = 'Decoded '
+        if str(title).startswith(_decoded_prefix):
+            title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
+        _summary_title_kwargs = dict(
+            title_font_size=_fig3_sizes['track_title'],
+            subtitle_font_size=_fig3_sizes['title_body'],
+            bold_epochs_name=False,
+        )
+
+        def _apply_fig3_axis_label_sizes(ax, render=None):
+            tick_fs = _fig3_sizes['tick_label']
+            axis_fs = _fig3_sizes['axis_label']
+            ax.tick_params(axis='both', labelsize=tick_fs)
+            ax.xaxis.label.set_size(axis_fs)
+            ax.yaxis.label.set_size(axis_fs)
+            text_objects = {}
+            if render is not None:
+                text_objects = (getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}
+            sec = text_objects.get('publication_xgroup_axis')
+            if sec is not None:
+                sec.tick_params(axis='x', labelsize=tick_fs)
+
+        def _save_panel_figure(fig, panel_fig_file_name: str) -> Tuple[List[Path], Optional[Path]]:
+            panel_saved_paths: List[Path] = []
+            if not save_figure:
+                return panel_saved_paths, None
+            save_context = active_context.overwriting_context(display_fn_name=panel_fig_file_name)
+            fig_man = None
+            export_folder_path = None if export_folder is None else Path(export_folder)
+            if export_folder_path is not None:
+                export_folder_path.mkdir(parents=True, exist_ok=True)
+                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder_path)
+                panel_saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+            else:
+                panel_saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                panel_saved_paths = list(panel_saved_paths or [])
+                fig_man = AcrossSessionsVisualizations._fig_out_man
+            if write_svg:
+                if panel_saved_paths:
+                    svg_path = Path(panel_saved_paths[0]).with_suffix('.svg')
+                else:
+                    if fig_man is None:
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                    svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                fig.savefig(svg_path, format='svg', transparent=True)
+                panel_saved_paths.append(svg_path)
+            return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
+
+        def _plot_one_panel(group_label: str, summary_df: pd.DataFrame, p_value: Optional[float],
+                            panel_fig_name: str, panel_fignum, panel_fig_file_name: str, collector,
+                            heuristic_summary=None, heuristic_p_value: Optional[float] = None) -> Dict[str, Any]:
+            """One 2-bar (or heuristic-split) pre/post panel for the separate-figures path."""
+            panel_has_heuristic: bool = heuristic_summary is not None
+            panel_kwargs = dict(kwargs)
+            panel_kwargs.pop('fignum', None)
+            panel_kwargs.pop('num', None)
+            if panel_fignum is not None:
+                panel_kwargs['fignum'] = panel_fignum
+            panel_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+            if 'figsize' not in panel_kwargs:
+                rc_w, rc_h = mpl.rcParams['figure.figsize']
+                panel_kwargs['figsize'] = (float(rc_w) * 0.5, float(rc_h))
+            panel_kwargs.setdefault('bottom_margin', 0.20)
+            y_pre = summary_df[pre_col].to_numpy(dtype=float)
+            y_post = summary_df[post_col].to_numpy(dtype=float)
+            panel_x_labels = [f'{group_label} pre-$\\Delta$', f'{group_label} post-$\\Delta$']
+            if panel_has_heuristic:
+                pair_gap = 0.03
+                half_off = (half_width + pair_gap) / 2.0
+                h_pre = heuristic_summary[pre_col].to_numpy(dtype=float)
+                h_post = heuristic_summary[post_col].to_numpy(dtype=float)
+                panel_y = [y_pre, h_pre, y_post, h_post]
+                panel_scatter = [
+                    _bar_scatter_props(summary_df),
+                    _bar_scatter_props(heuristic_summary),
+                    _bar_scatter_props(summary_df),
+                    _bar_scatter_props(heuristic_summary),
+                ]
+                panel_kwargs.update(dict(
+                    bar_x=np.array([0.0 - half_off, 0.0 + half_off, 1.0 - half_off, 1.0 + half_off], dtype=float),
+                    bar_width=np.array([half_width, half_width, half_width, half_width], dtype=float),
+                    bar_colors=[summary_bar_color, heuristic_color, summary_bar_color, heuristic_color],
+                    errorbar_colors=['k', heuristic_color, 'k', heuristic_color],
+                    xtick_positions=np.arange(2),
+                    xtick_labels=panel_x_labels,
+                    scatter_x_offsets=[
+                        _animal_dodge_offsets(summary_df, half_width),
+                        _animal_dodge_offsets(heuristic_summary, half_width),
+                        _animal_dodge_offsets(summary_df, half_width),
+                        _animal_dodge_offsets(heuristic_summary, half_width),
+                    ],
+                ))
+                pair_specs = [(0, 2, 'gray', 0.3), (1, 3, heuristic_color, 0.45)]
+                all_sig_x = (0.0 - half_off, 1.0 - half_off)
+                heur_sig_x = (0.0 + half_off, 1.0 + half_off)
+            else:
+                panel_y = [y_pre, y_post]
+                panel_scatter = [_bar_scatter_props(summary_df), _bar_scatter_props(summary_df)]
+                panel_offsets = _animal_dodge_offsets(summary_df, full_width)
+                panel_kwargs.update(dict(
+                    bar_colors=[summary_bar_color, summary_bar_color],
+                    scatter_x_offsets=[panel_offsets, panel_offsets],
+                ))
+                pair_specs = [(0, 1, 'gray', 0.3)]
+                all_sig_x = (0.0, 1.0)
+                heur_sig_x = None
+            render = PaperFigureTwo.create_plot(
+                panel_x_labels, panel_y, panel_scatter, ylabel, title, panel_fig_name, active_context, True,
+                prepare_for_publication=prepare_for_publication,
+                publication_group_labels=(group_label,), metric_name='Session Means',
+                title_subtitle=f'for {group_label}', xlabel='',
+                **{**_summary_title_kwargs, **panel_kwargs},
+            )
+            collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+            fig = render.fig
+            ax = render.ax
+            _apply_fig3_axis_label_sizes(ax, render)
+            x_values_list, plotted_y_values = render.plot_data
+            if enable_paired_lines:
+                for i0, i1, line_color, line_alpha in pair_specs:
+                    for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                        ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
+                    ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
+
+                ## END for i0, i1, line_color, line_alpha in pair_specs...
+
+            y_max = float(np.nanmax(np.concatenate(panel_y)))
+            if p_value is not None:
+                add_significance_bars(ax, p_value, x1=all_sig_x[0], x2=all_sig_x[1], y=y_max)
+            if panel_has_heuristic and (heuristic_p_value is not None) and (heur_sig_x is not None):
+                heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
+                add_significance_bars(ax, heuristic_p_value, x1=heur_sig_x[0], x2=heur_sig_x[1], y=heuristic_bracket_y, color=heuristic_color)
+            animal_legend = None
+            if has_animal and marker_mapping:
+                legend_animals = [a for a in preferred_animals if a in marker_mapping]
+                legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
+                animal_legend_handles = [
+                    Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
+                           markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                           label=_animal_legend_label(animal))
+                    for animal in legend_animals
+                ]
+                ax_pos = ax.get_position()
+                legend_x = (float(ax_pos.x0) + float(ax_pos.x1)) / 2.0
+                legend_y = float(ax_pos.y0) - 0.10
+                fig.canvas.draw()
+                renderer = fig.canvas.get_renderer() if (fig.canvas is not None) else None
+                if renderer is not None:
+                    inv = fig.transFigure.inverted()
+                    bboxes = [ax.get_tightbbox(renderer)]
+                    sec = ((getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}).get('publication_xgroup_axis')
+                    if sec is not None:
+                        bboxes.append(sec.get_tightbbox(renderer))
+                    label_bottoms = [float(inv.transform((0.0, b.y0))[1]) for b in bboxes if b is not None]
+                    if label_bottoms:
+                        legend_y = min(label_bottoms)
+                animal_legend = fig.legend(
+                    handles=animal_legend_handles, frameon=False, loc='upper center',
+                    bbox_to_anchor=(legend_x, legend_y - 0.008), bbox_transform=fig.transFigure,
+                    ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
+                )
+            if panel_has_heuristic:
+                ax.legend(
+                    handles=[
+                        Patch(facecolor='none', edgecolor=summary_bar_color, label=f'All {group_label}'),
+                        Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+                    ],
+                    frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                )
+            panel_saved_paths, panel_saved_path = _save_panel_figure(fig, panel_fig_file_name)
+            return dict(fig=fig, ax=ax, render=render, y_values=panel_y, saved_path=panel_saved_path, saved_paths=panel_saved_paths)
+
+        if separate_laps_pbes_figures:
+            if debug_print:
+                n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
+                print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
+            collector = None
+            publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+                prepare_for_publication=prepare_for_publication,
+                **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+            ) | _fig3_label_rc
+            laps_suffix: str = str(group_labels[0]).replace(' ', '')
+            pbe_suffix: str = str(group_labels[1]).replace(' ', '')
+            if laps_fig_file_name is None:
+                laps_fig_file_name = f'{fig_file_name}-{laps_suffix}'
+            if pbe_fig_file_name is None:
+                pbe_fig_file_name = f'{fig_file_name}-{pbe_suffix}'
+            laps_fignum = None if fignum is None else laps_fig_file_name
+            pbe_fignum = None if fignum is None else pbe_fig_file_name
+            with mpl.rc_context(publication_rc):
+                with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                    laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector)
+                    pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, pbe_fig_file_name, collector,
+                                                heuristic_summary=pbe_heuristic_session_summary if has_heuristic else None, heuristic_p_value=pbe_heuristic_p_value)
+                    if not defer_show:
+                        plt.show()
+            combined_saved_paths = list(laps_panel['saved_paths'] or []) + list(pbe_panel['saved_paths'] or [])
+            return dict(
+                fig=laps_panel['fig'],
+                ax=laps_panel['ax'],
+                render=laps_panel['render'],
+                figs=[laps_panel['fig'], pbe_panel['fig']],
+                laps=laps_panel,
+                pbe=pbe_panel,
+                collector=collector,
+                laps_session_summary=laps_session_summary,
+                pbe_session_summary=pbe_session_summary,
+                pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+                y_values=y_values,
+                laps_p_value=laps_p_value,
+                pbe_p_value=pbe_p_value,
+                pbe_heuristic_p_value=pbe_heuristic_p_value,
+                animal_marker_mapping=marker_mapping,
+                animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+                saved_path=laps_panel['saved_path'],
+                saved_paths=combined_saved_paths,
+            )
+
+        create_plot_kwargs = dict(kwargs)
+        if fignum is not None:
+            create_plot_kwargs.setdefault('fignum', fignum)
+        create_plot_kwargs.setdefault('bar_colors', [summary_bar_color] * 4)
+        create_plot_kwargs.setdefault('scatter_kwargs', dict(edgecolors='white', linewidths=0.4, zorder=4))
+        if has_heuristic:
+            heuristic_y_pre = pbe_heuristic_session_summary[pre_col].to_numpy(dtype=float)
+            heuristic_y_post = pbe_heuristic_session_summary[post_col].to_numpy(dtype=float)
+            pair_gap = 0.03
+            pbe_half_offset = (half_width + pair_gap) / 2.0
+            pbe_color = summary_bar_color
+            # Split each PBE column into adjacent half-width bars: all-PBEs | heuristic-passing, with a tiny x-gap.
+            y_values = [
+                y_values[0], y_values[1],
+                y_values[2], heuristic_y_pre,
+                y_values[3], heuristic_y_post,
+            ]
+            scatter_props = [
+                scatter_props[0], scatter_props[1],
+                scatter_props[2], _bar_scatter_props(pbe_heuristic_session_summary),
+                scatter_props[3], _bar_scatter_props(pbe_heuristic_session_summary),
+            ]
+            create_plot_kwargs.update(dict(
+                bar_x=np.array([0.0, 1.0, 2.0 - pbe_half_offset, 2.0 + pbe_half_offset, 3.0 - pbe_half_offset, 3.0 + pbe_half_offset], dtype=float),
+                bar_width=np.array([full_width, full_width, half_width, half_width, half_width, half_width], dtype=float),
+                bar_colors=[summary_bar_color, summary_bar_color, pbe_color, heuristic_color, pbe_color, heuristic_color],
+                errorbar_colors=['k', 'k', 'k', heuristic_color, 'k', heuristic_color],
+                xtick_positions=np.arange(4),
+                xtick_labels=x_labels,
+            ))
+
+        laps_offsets = _animal_dodge_offsets(laps_session_summary, full_width)
+        if has_heuristic:
+            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, half_width)
+            heur_offsets = _animal_dodge_offsets(pbe_heuristic_session_summary, half_width)
+            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, heur_offsets, pbe_offsets, heur_offsets]
+        else:
+            pbe_offsets = _animal_dodge_offsets(pbe_session_summary, full_width)
+            create_plot_kwargs['scatter_x_offsets'] = [laps_offsets, laps_offsets, pbe_offsets, pbe_offsets]
+
+        if debug_print:
+            n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
+            print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
+
+        collector = None
+        saved_paths: List[Path] = []
+        saved_path = None
+        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+            prepare_for_publication=prepare_for_publication,
+            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+        ) | _fig3_label_rc
+        with mpl.rc_context(publication_rc):
+            with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
+                render = PaperFigureTwo.create_plot(
+                    x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, True,
+                    prepare_for_publication=prepare_for_publication,
+                    publication_group_labels=group_labels, metric_name='Session Means',
+                    title_subtitle=f'for {group_labels[0]} and {group_labels[1]}', xlabel='',
+                    **{**_summary_title_kwargs, **create_plot_kwargs},
+                )
+                collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+                fig = render.fig
+                ax = render.ax
+                _apply_fig3_axis_label_sizes(ax, render)
+                x_values_list, plotted_y_values = render.plot_data
+
+                if enable_paired_lines:
+                    if has_heuristic:
+                        pair_specs = [(0, 1, 'gray', 0.3), (2, 4, 'gray', 0.3), (3, 5, heuristic_color, 0.45)]
+                    else:
+                        pair_specs = [(0, 1, 'gray', 0.3), (2, 3, 'gray', 0.3)]
+                    for i0, i1, line_color, line_alpha in pair_specs:
+                        for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                            ax.plot([x0, x1], [y0, y1], color=line_color, alpha=line_alpha, zorder=1, linewidth=0.8)
+                        ## END for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1])...
+
+                    ## END for i0, i1, line_color, line_alpha in pair_specs...
+
+                y_max = float(np.nanmax(np.concatenate(y_values)))
+                if laps_p_value is not None:
+                    add_significance_bars(ax, laps_p_value, x1=0, x2=1, y=y_max)
+                if pbe_p_value is not None:
+                    add_significance_bars(ax, pbe_p_value, x1=(2.0 - pbe_half_offset), x2=(3.0 - pbe_half_offset), y=y_max)
+                if has_heuristic and (pbe_heuristic_p_value is not None):
+                    heuristic_bracket_y = y_max + (0.10 * max(abs(y_max), 1e-12))
+                    add_significance_bars(ax, pbe_heuristic_p_value, x1=(2.0 + pbe_half_offset), x2=(3.0 + pbe_half_offset), y=heuristic_bracket_y, color=heuristic_color)
+
+                animal_legend = None
+                if has_animal and marker_mapping:
+                    legend_animals = [a for a in preferred_animals if a in marker_mapping]
+                    legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
+                    animal_legend_handles = [
+                        Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color=summary_bar_color,
+                               markerfacecolor=summary_bar_color, markeredgecolor=summary_bar_color, markersize=6,
+                               label=_animal_legend_label(animal))
+                        for animal in legend_animals
+                    ]
+                    animal_legend = ax.legend(
+                        handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
+                        ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
+                    )
+                    animal_legend.set_clip_on(False)
+
+                if has_heuristic:
+                    pbe_legend_color = summary_bar_color
+                    ax.legend(
+                        handles=[
+                            Patch(facecolor='none', edgecolor=pbe_legend_color, label=f'All {group_labels[1]}'),
+                            Patch(facecolor='none', edgecolor=heuristic_color, label='Heuristic-passing'),
+                        ],
+                        frameon=False, loc='upper left', ncol=2, borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
+                    )
+                    if animal_legend is not None:
+                        ax.add_artist(animal_legend)
+
+                if save_figure:
+                    save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
+                    fig_man = None
+                    if export_folder is not None:
+                        export_folder = Path(export_folder)
+                        export_folder.mkdir(parents=True, exist_ok=True)
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder)
+                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                    else:
+                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                        saved_paths = list(saved_paths or [])
+                        fig_man = AcrossSessionsVisualizations._fig_out_man
+                    if write_svg:
+                        if saved_paths:
+                            svg_path = Path(saved_paths[0]).with_suffix('.svg')
+                        else:
+                            if fig_man is None:
+                                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                            svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                        fig.savefig(svg_path, format='svg', transparent=True)
+                        saved_paths.append(svg_path)
+                    saved_path = saved_paths[0] if saved_paths else None
+
+                if not defer_show:
+                    plt.show()
+
+        return dict(
+            fig=fig,
+            ax=ax,
+            render=render,
+            collector=collector,
+            laps_session_summary=laps_session_summary,
+            pbe_session_summary=pbe_session_summary,
+            pbe_heuristic_session_summary=pbe_heuristic_session_summary,
+            y_values=y_values,
+            laps_p_value=laps_p_value,
+            pbe_p_value=pbe_p_value,
+            pbe_heuristic_p_value=pbe_heuristic_p_value,
+            animal_marker_mapping=marker_mapping,
+            animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+            saved_path=saved_path,
+            saved_paths=saved_paths,
+        )
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'figure2', 'summary', 'bar', 'time_bin_size', 'figure-s3'], input_requires=[], output_provides=[], uses=['PaperFigureTwo.create_plot', 'add_significance_bars', 'FigureCollector', 'PhoPublicationFigureHelper', 'time_bin_size_discrete_color_map'], used_by=['FigureS8.main_all_figs'], creation_date='2026-11-03 07:51', related_items=['plot_fig2_style_summary_four_bar'])
+    @classmethod
+    def plot_fig2_style_summary_multi_tbin_bars(cls, results_by_tbin: Dict[str, Tuple[Any, Any]],
+                                         time_bin_color_map: Optional[Dict[str, str]] = None, pre_col: str = 'mean_pre', post_col: str = 'mean_post', animal_col: str = 'animal',
+                                         animal_marker_mapping: Optional[Dict[str, str]] = None, animal_legend_labels: Optional[Dict[str, str]] = None,
+                                         ylabel: str = 'Session-mean $P_{Short}$', title: str = 'Decoded $P_{Short}$',
+                                         group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
+                                         defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
+                                         fig_file_name: str = 'figure_s3_summary_multi_tbin_bars', write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True,
+                                         fignum=None, active_context: Optional[IdentifyingContext] = None,
+                                         enable_paired_lines: bool = True, debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+        """One Fig2-style panel with side-by-side bars per `time_bin_size` in each of Laps/PBEs × pre/post.
+
+        `results_by_tbin` maps t-bin key → `(laps_results, pbe_results)` run() dicts (or session_summary DataFrames).
+        Colors match Figure S3 scatter via `time_bin_size_discrete_color_map` / Plotly `Plotly[3:]`.
+        """
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+        from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
+
+        if (results_by_tbin is None) or (len(results_by_tbin) == 0):
+            raise ValueError('results_by_tbin must be a non-empty dict of tbin → (laps_results, pbe_results).')
+
+        def _coerce_session_summary(obj, explicit_p_value, name: str) -> Tuple[pd.DataFrame, Optional[float]]:
+            if obj is None:
+                raise ValueError(f'{name} is required.')
+            if isinstance(obj, pd.DataFrame):
+                summary = obj
+                p_value = explicit_p_value
+            elif isinstance(obj, dict):
+                if ('session_summary' not in obj) or (obj['session_summary'] is None):
+                    raise ValueError(f'{name} is missing session_summary; pass sampling_unit="session" to run().')
+                summary = obj['session_summary']
+                p_value = explicit_p_value if explicit_p_value is not None else obj.get('p_value')
+            else:
+                raise TypeError(f'{name} must be a run() result dict or a session_summary DataFrame, got {type(obj)!r}.')
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                raise ValueError(f'{name} session_summary is empty.')
+            missing_cols = [c for c in (pre_col, post_col) if c not in summary.columns]
+            if missing_cols:
+                raise ValueError(f'{name} session_summary is missing columns: {missing_cols}.')
+            work = summary.dropna(subset=[pre_col, post_col]).copy().reset_index(drop=True)
+            if work.empty:
+                raise ValueError(f'{name} session_summary has no finite {pre_col}/{post_col} rows.')
+            return work, p_value
+
+        def _tbin_sort_key(s: str):
+            try:
+                return (0, float(s))
+            except ValueError:
+                return (1, s)
+
+        ordered_tbins: List[str] = sorted([str(k) for k in results_by_tbin.keys()], key=_tbin_sort_key)
+        if time_bin_color_map is None:
+            time_bin_color_map = cls.time_bin_size_discrete_color_map(ordered_tbins)
+        else:
+            time_bin_color_map = {str(k): v for k, v in dict(time_bin_color_map).items()}
+
+        n_tbin: int = len(ordered_tbins)
+        laps_summaries: Dict[str, pd.DataFrame] = {}
+        pbe_summaries: Dict[str, pd.DataFrame] = {}
+        laps_p_values: Dict[str, Optional[float]] = {}
+        pbe_p_values: Dict[str, Optional[float]] = {}
+        for tbin in ordered_tbins:
+            pair = results_by_tbin[tbin]
+            if (not isinstance(pair, (tuple, list))) or (len(pair) != 2):
+                raise ValueError(f'results_by_tbin[{tbin!r}] must be a (laps_results, pbe_results) pair.')
+            laps_obj, pbe_obj = pair
+            laps_summaries[tbin], laps_p_values[tbin] = _coerce_session_summary(laps_obj, None, f'laps_results[{tbin}]')
+            pbe_summaries[tbin], pbe_p_values[tbin] = _coerce_session_summary(pbe_obj, None, f'pbe_results[{tbin}]')
+        ## END for tbin in ordered_tbins...
+
+        preferred_animals = ('gor01', 'vvp01', 'pin01')
+        filled_markers = ['o', '^', 's', 'p', 'd', 'P', 'X']
+        if animal_marker_mapping is None:
+            animal_marker_mapping = {'gor01': 'o', 'vvp01': '^', 'pin01': 's'}
+        else:
+            animal_marker_mapping = {str(k): v for k, v in dict(animal_marker_mapping).items()}
+        if animal_legend_labels is None:
+            animal_legend_labels = {'gor01': 'gor', 'vvp01': 'vvp', 'pin01': 'pin'}
+        else:
+            animal_legend_labels = {str(k): str(v) for k, v in dict(animal_legend_labels).items()}
+
+        def _animal_legend_label(animal) -> str:
+            key = str(animal)
+            if key in animal_legend_labels:
+                return animal_legend_labels[key]
+            stripped = key.rstrip('0123456789')
+            return stripped if stripped else key
+
+        animal_frames = list(laps_summaries.values()) + list(pbe_summaries.values())
+        has_animal: bool = all((animal_col in df.columns) for df in animal_frames)
+        unique_animals: List[str] = []
+        marker_mapping: Dict[str, str] = {}
+        if has_animal:
+            unique_animals = [str(a) for a in pd.unique(pd.concat([df[animal_col] for df in animal_frames], ignore_index=True))]
+            used_markers = set(animal_marker_mapping.values())
+            spare_markers = [m for m in filled_markers if m not in used_markers] or list(filled_markers)
+            spare_i = 0
+            for animal in unique_animals:
+                if animal in animal_marker_mapping:
+                    marker_mapping[animal] = animal_marker_mapping[animal]
+                else:
+                    marker_mapping[animal] = spare_markers[spare_i % len(spare_markers)]
+                    spare_i += 1
+            ## END for animal in unique_animals...
+
+        def _bar_scatter_props(summary_df: pd.DataFrame):
+            if (not has_animal) or (animal_col not in summary_df.columns):
+                return {}
+            return [{'marker': marker_mapping.get(str(a), 'o')} for a in summary_df[animal_col].to_numpy()]
+
+        def _animal_dodge_offsets(summary_df: pd.DataFrame, bar_width: float) -> np.ndarray:
+            n = len(summary_df)
+            if n == 0:
+                return np.array([], dtype=float)
+            group_span = float(bar_width) * 0.70
+            if (n == 1) or (not has_animal) or (animal_col not in summary_df.columns):
+                if n == 1:
+                    return np.zeros(1, dtype=float)
+                return np.linspace(-group_span / 2.0, group_span / 2.0, n)
+            animals = summary_df[animal_col].map(str).to_numpy()
+            col_animals = [a for a in preferred_animals if np.any(animals == a)]
+            col_animals.extend([a for a in unique_animals if (a not in set(col_animals)) and np.any(animals == a)])
+            n_cols = max(len(col_animals), 1)
+            col_centers = np.array([0.0]) if (n_cols == 1) else np.linspace(-group_span / 2.0, group_span / 2.0, n_cols)
+            animal_to_center = {a: col_centers[i] for i, a in enumerate(col_animals)}
+            col_gap = (group_span / max(n_cols - 1, 1)) if (n_cols > 1) else group_span
+            within_span = col_gap * 0.45
+            offsets = np.zeros(n, dtype=float)
+            for a in col_animals:
+                idx = np.flatnonzero(animals == a)
+                k = int(idx.size)
+                if k == 0:
+                    continue
+                center = animal_to_center[a]
+                offsets[idx] = center if (k == 1) else (center + np.linspace(-within_span / 2.0, within_span / 2.0, k))
+            ## END for a in col_animals...
+            return offsets
+
+        # Bar layout: group-major [Laps-pre tbins | Laps-post tbins | PBEs-pre tbins | PBEs-post tbins]
+        group_centers = np.array([0.0, 1.0, 2.0, 3.0], dtype=float)
+        group_span = 0.72
+        bar_w = float(group_span / max(n_tbin, 1)) * 0.85
+        if n_tbin == 1:
+            within_offsets = np.array([0.0], dtype=float)
+        else:
+            within_offsets = np.linspace(-group_span / 2.0 + bar_w / 2.0, group_span / 2.0 - bar_w / 2.0, n_tbin)
+
+        x_labels = [
+            f'{group_labels[0]} pre-$\\Delta$',
+            f'{group_labels[0]} post-$\\Delta$',
+            f'{group_labels[1]} pre-$\\Delta$',
+            f'{group_labels[1]} post-$\\Delta$',
+        ]
+        y_values: List[np.ndarray] = []
+        scatter_props: List = []
+        scatter_x_offsets: List[np.ndarray] = []
+        bar_x_list: List[float] = []
+        bar_width_list: List[float] = []
+        bar_colors: List[str] = []
+        # Index maps for paired lines / significance: (laps_pre_i, laps_post_i), (pbe_pre_i, pbe_post_i)
+        laps_pre_idx = list(range(0, n_tbin))
+        laps_post_idx = list(range(n_tbin, 2 * n_tbin))
+        pbe_pre_idx = list(range(2 * n_tbin, 3 * n_tbin))
+        pbe_post_idx = list(range(3 * n_tbin, 4 * n_tbin))
+
+        for group_i, (summaries, col) in enumerate([
+            (laps_summaries, pre_col), (laps_summaries, post_col),
+            (pbe_summaries, pre_col), (pbe_summaries, post_col),
+        ]):
+            for j, tbin in enumerate(ordered_tbins):
+                summary_df = summaries[tbin]
+                color = time_bin_color_map.get(tbin, '#000000')
+                y_values.append(summary_df[col].to_numpy(dtype=float))
+                scatter_props.append(_bar_scatter_props(summary_df))
+                scatter_x_offsets.append(_animal_dodge_offsets(summary_df, bar_w))
+                bar_x_list.append(float(group_centers[group_i] + within_offsets[j]))
+                bar_width_list.append(bar_w)
+                bar_colors.append(color)
+            ## END for j, tbin in enumerate(ordered_tbins)...
+        ## END for group_i, (summaries, col) in enumerate(...)...
+
+        if active_context is None:
+            active_context = IdentifyingContext(format_name='kdiba', fig='S3', display_fn_name='pre_post_delta_summary_multi_tbin_bars')
+
+        dpi = kwargs.pop('dpi', 220)
+        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
+        _fig3_label_rc = {
+            'xtick.labelsize': _fig3_sizes['tick_label'],
+            'ytick.labelsize': _fig3_sizes['tick_label'],
+            'axes.labelsize': _fig3_sizes['axis_label'],
+        }
+        _decoded_prefix: str = 'Decoded '
+        if str(title).startswith(_decoded_prefix):
+            title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
+        _summary_title_kwargs = dict(
+            title_font_size=_fig3_sizes['track_title'],
+            subtitle_font_size=_fig3_sizes['title_body'],
+            bold_epochs_name=False,
+        )
+
+        create_plot_kwargs = dict(kwargs)
+        if fignum is not None:
+            create_plot_kwargs.setdefault('fignum', fignum)
+        create_plot_kwargs.update(dict(
+            bar_x=np.asarray(bar_x_list, dtype=float),
+            bar_width=np.asarray(bar_width_list, dtype=float),
+            bar_colors=list(bar_colors),
+            errorbar_colors=list(bar_colors),
+            xtick_positions=group_centers,
+            xtick_labels=x_labels,
+            scatter_x_offsets=scatter_x_offsets,
+            scatter_kwargs=dict(edgecolors='white', linewidths=0.4, zorder=4, s=9),
+        ))
+
+        if debug_print:
+            print(f'multi-tbin summary: n_tbin={n_tbin}, tbins={ordered_tbins}')
+
+        collector = None
+        saved_paths: List[Path] = []
+        saved_path = None
+        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
+            prepare_for_publication=prepare_for_publication,
+            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
+        ) | _fig3_label_rc
+        with mpl.rc_context(publication_rc):
+            with FigureCollector(name='fig_s3_summary_multi_tbin_bars', base_context=active_context) as collector:
+                s3_title_subtitle: str = (
+                    f'for {group_labels[0]} and {group_labels[1]} '
+                    f'({n_tbin} time-bin sizes, per-time-bin granularity)'
+                )
+                render = PaperFigureTwo.create_plot(
+                    x_labels, y_values, scatter_props, ylabel, title, 'fig_s3_summary_multi_tbin_bars', active_context, True,
+                    prepare_for_publication=prepare_for_publication,
+                    publication_group_labels=group_labels, metric_name='Session Means',
+                    title_subtitle=s3_title_subtitle, xlabel='',
+                    **{**_summary_title_kwargs, **create_plot_kwargs},
+                )
+                collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
+                fig = render.fig
+                ax = render.ax
+                bars = (getattr(render, 'plot_objects', None) or {}).get('bars')
+                if bars is not None:
+                    for i, a_bar in enumerate(bars):
+                        a_bar.set_facecolor(bar_colors[i])
+                        a_bar.set_alpha(0.85)
+                    ## END for i, a_bar in enumerate(bars)...
+                tick_fs = _fig3_sizes['tick_label']
+                axis_fs = _fig3_sizes['axis_label']
+                ax.tick_params(axis='both', labelsize=tick_fs)
+                ax.xaxis.label.set_size(axis_fs)
+                ax.yaxis.label.set_size(axis_fs)
+                x_values_list, plotted_y_values = render.plot_data
+
+                if enable_paired_lines:
+                    for i in range(n_tbin):
+                        for i0, i1 in ((laps_pre_idx[i], laps_post_idx[i]), (pbe_pre_idx[i], pbe_post_idx[i])):
+                            line_color = bar_colors[i0]
+                            for x0, y0, x1, y1 in zip(x_values_list[i0], plotted_y_values[i0], x_values_list[i1], plotted_y_values[i1]):
+                                ax.plot([x0, x1], [y0, y1], color=line_color, alpha=0.35, zorder=1, linewidth=0.8)
+                            ## END for x0, y0, x1, y1 in zip(...)...
+                        ## END for i0, i1 in (...)...
+                    ## END for i in range(n_tbin)...
+
+                y_max = float(np.nanmax(np.concatenate(y_values)))
+                for i, tbin in enumerate(ordered_tbins):
+                    laps_p = laps_p_values.get(tbin)
+                    pbe_p = pbe_p_values.get(tbin)
+                    x_laps_pre = bar_x_list[laps_pre_idx[i]]
+                    x_laps_post = bar_x_list[laps_post_idx[i]]
+                    x_pbe_pre = bar_x_list[pbe_pre_idx[i]]
+                    x_pbe_post = bar_x_list[pbe_post_idx[i]]
+                    bracket_y = y_max + (0.04 * i * max(abs(y_max), 1e-12))
+                    if laps_p is not None:
+                        add_significance_bars(ax, laps_p, x1=x_laps_pre, x2=x_laps_post, y=bracket_y, color=bar_colors[laps_pre_idx[i]], y_offset_frac=0.04, text_additional_y_offset=0.002)
+                    if pbe_p is not None:
+                        add_significance_bars(ax, pbe_p, x1=x_pbe_pre, x2=x_pbe_post, y=bracket_y, color=bar_colors[pbe_pre_idx[i]], y_offset_frac=0.04, text_additional_y_offset=0.002)
+                ## END for i, tbin in enumerate(ordered_tbins)...
+
+                if save_figure:
+                    save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
+                    fig_man = None
+                    if export_folder is not None:
+                        export_folder = Path(export_folder)
+                        export_folder.mkdir(parents=True, exist_ok=True)
+                        fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.CUSTOM, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE, override_output_parent_path=export_folder)
+                        saved_paths = list(build_and_write_to_file(fig, save_context, fig_man=fig_man, write_vector_format=write_vector_format, write_png=write_png) or [])
+                    else:
+                        saved_paths, _save_context = AcrossSessionsVisualizations.output_figure(save_context, fig, write_vector_format=write_vector_format, write_png=write_png)
+                        saved_paths = list(saved_paths or [])
+                        fig_man = AcrossSessionsVisualizations._fig_out_man
+                    if write_svg:
+                        if saved_paths:
+                            svg_path = Path(saved_paths[0]).with_suffix('.svg')
+                        else:
+                            if fig_man is None:
+                                fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
+                            svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
+                        fig.savefig(svg_path, format='svg', transparent=True)
+                        saved_paths.append(svg_path)
+                    saved_path = saved_paths[0] if saved_paths else None
+
+                if not defer_show:
+                    plt.show()
+
+        return dict(
+            fig=fig,
+            ax=ax,
+            render=render,
+            collector=collector,
+            ordered_tbins=ordered_tbins,
+            time_bin_color_map=time_bin_color_map,
+            laps_summaries=laps_summaries,
+            pbe_summaries=pbe_summaries,
+            laps_p_values=laps_p_values,
+            pbe_p_values=pbe_p_values,
+            y_values=y_values,
+            animal_marker_mapping=marker_mapping,
+            animal_legend_labels={a: _animal_legend_label(a) for a in marker_mapping},
+            saved_path=saved_path,
+            saved_paths=saved_paths,
+        )
+
+
+    @function_attributes(short_name=None, tags=['stats', 'fig4', 'P_Short', 'histogram', 'kde', 'ecdf', 'bimodal'], input_requires=[], output_provides=[], uses=['_subfn_extract_pre_post_values', '_subfn_unwrap_heuristic_distribution_obj', '_subfn_reflected_bounded_kde'], used_by=[], creation_date='2026-10-28 10:19', related_items=['plot_fig2_style_summary_four_bar', 'compute_mode_ratio'])
+    @classmethod
+    def plot_four_distribution_hist_ecdf(cls, laps_data, pbe_data,
+                                         value_col: str = 'P_Short', condition_col: str = 'pre_post_delta_category',
+                                         pre_label: str = 'pre-delta', post_label: str = 'post-delta',
+                                         pbe_heuristic_passing=None, n_bins: int = 25, kde_bw_factors: Tuple[float, ...] = (0.5, 1.0, 2.0),
+                                         low_threshold: float = 0.25, high_threshold: float = 0.75,
+                                         group_labels: Tuple[str, str] = ('Laps', 'PBEs'), prepare_for_publication: bool = True,
+                                         defer_show: bool = False, save_figure: bool = False, export_folder: Optional[Path] = None,
+                                         fig_file_name: str = 'figure4_distribution_hist_ecdf', debug_print: bool = False, **kwargs) -> Dict[str, Any]:
+        """Common-scale 2x4 histogram+KDE / ECDF of the four raw P_Short distributions (Laps/PBE x pre/post).
+
+        Session-mean bar plots hide the U-shape; this uses the raw arrays from a comparison instance or DataFrame.
+        KDEs are reflected at 0 and 1. Bandwidth sensitivity is Scott x `kde_bw_factors` (default 0.5, 1.0, 2.0).
+
+        Usage:
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PrePostDeltaDistributionComparison
+
+            out = PrePostDeltaDistributionComparison.plot_four_distribution_hist_ecdf(
+                pre_post_delta_stats_distribution_comparison_dict['_perTimeBin_Laps'],
+                pre_post_delta_stats_distribution_comparison_dict['_perTimeBin_PBEs'],
+                pbe_heuristic_passing=pre_post_delta_stats_distribution_comparison_dict.get('_perTimeBin_PBEs_heuristic_passing'),
+            )
+            out['fig']
+        """
+        from matplotlib.lines import Line2D
+        from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo
+
+        def _subfn_extract_pre_post_values(obj, name: str = 'data') -> Tuple[np.ndarray, np.ndarray]:
+            """Raw pre/post `value_col` arrays from a comparison instance or a labeled DataFrame."""
+            if isinstance(obj, cls):
+                y = np.asarray(obj._y, dtype=float)
+                cond = np.asarray(obj._row_condition_code)
+                pre = y[cond == 0]
+                post = y[cond == 1]
+            elif isinstance(obj, pd.DataFrame):
+                missing_cols = [c for c in (value_col, condition_col) if c not in obj.columns]
+                if missing_cols:
+                    raise ValueError(f'{name} is missing columns: {missing_cols}.')
+                work = obj[[value_col, condition_col]].copy()
+                work[value_col] = pd.to_numeric(work[value_col], errors='coerce')
+                work = work.dropna(subset=[value_col])
+                pre = work.loc[work[condition_col] == pre_label, value_col].to_numpy(dtype=float)
+                post = work.loc[work[condition_col] == post_label, value_col].to_numpy(dtype=float)
+            elif isinstance(obj, dict) and ('session_summary' in obj):
+                raise ValueError(
+                    f'{name} is a run() result dict without raw {value_col} values; '
+                    f'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
+                )
+            else:
+                raise TypeError(f'{name} must be a PrePostDeltaDistributionComparison or DataFrame, got {type(obj)!r}.')
+            pre = pre[np.isfinite(pre)]
+            post = post[np.isfinite(post)]
+            if (pre.size == 0) or (post.size == 0):
+                raise ValueError(f'{name} must contain both pre and post {value_col} values.')
+            return pre, post
+
+        def _subfn_unwrap_heuristic_distribution_obj(obj):
+            """Accept a comparison, DataFrame, or parent dict; pick the PBE heuristic sibling when both grainularities exist."""
+            if obj is None or isinstance(obj, cls) or isinstance(obj, pd.DataFrame):
+                return obj
+            if isinstance(obj, dict):
+                if 'session_summary' in obj:
+                    raise ValueError(
+                        'pbe_heuristic_passing is a run() result dict without raw values; '
+                        'pass a PrePostDeltaDistributionComparison instance or a DataFrame.'
+                    )
+                keys = [k for k in obj.keys() if str(k).endswith('_PBEs_heuristic_passing')]
+                if len(keys) == 1:
+                    return obj[keys[0]]
+                if len(keys) > 1:
+                    for k, v in obj.items():
+                        if v is pbe_data:
+                            sibling = f'{k}_heuristic_passing'
+                            if sibling in obj:
+                                return obj[sibling]
+                    ## END for k, v in obj.items()...
+
+                    raise ValueError(
+                        f'Multiple heuristic-passing PBE keys {keys}; pass a specific entry such as '
+                        f'comparison_dict["_perTimeBin_PBEs_heuristic_passing"].'
+                    )
+                return None
+            return obj
+
+        def _subfn_reflected_bounded_kde(values: np.ndarray, grid: np.ndarray, bw_factor: float) -> np.ndarray:
+            """Scott-bandwidth KDE with reflection at 0 and 1, renormalized on [0, 1]."""
+            values = np.asarray(values, dtype=float)
+            values = values[np.isfinite(values)]
+            if values.size < 2:
+                return np.full(grid.shape, np.nan)
+            unique = np.unique(values)
+            if unique.size < 2:
+                return np.full(grid.shape, np.nan)
+            reflected = np.concatenate([values, -values, (2.0 - values)])
+            try:
+                kde = stats.gaussian_kde(reflected, bw_method='scott')
+                kde.set_bandwidth(bw_method=float(kde.factor) * float(bw_factor))
+                dens = np.asarray(kde(grid), dtype=float)
+            except Exception:
+                return np.full(grid.shape, np.nan)
+            trapz_fn = getattr(np, 'trapezoid', np.trapz)
+            area = float(trapz_fn(dens, grid))
+            if (not np.isfinite(area)) or (area <= 0.0):
+                return np.full(grid.shape, np.nan)
+            return dens / area
+
+        if n_bins < 2:
+            raise ValueError('n_bins must be >= 2.')
+        if (not kde_bw_factors) or any((f <= 0.0) for f in kde_bw_factors):
+            raise ValueError('kde_bw_factors must be a non-empty sequence of positive floats.')
+
+        laps_pre, laps_post = _subfn_extract_pre_post_values(laps_data, name='laps_data')
+        pbe_pre, pbe_post = _subfn_extract_pre_post_values(pbe_data, name='pbe_data')
+        arrays = [laps_pre, laps_post, pbe_pre, pbe_post]
+        col_titles = [
+            f'{group_labels[0]} pre-$\\Delta$',
+            f'{group_labels[0]} post-$\\Delta$',
+            f'{group_labels[1]} pre-$\\Delta$',
+            f'{group_labels[1]} post-$\\Delta$',
+        ]
+        bar_colors = PaperFigureTwo.get_bar_colors()
+        heuristic_color = '#2ca02c'
+        heuristic_pre = None
+        heuristic_post = None
+        heuristic_obj = _subfn_unwrap_heuristic_distribution_obj(pbe_heuristic_passing)
+        if heuristic_obj is not None:
+            heuristic_pre, heuristic_post = _subfn_extract_pre_post_values(heuristic_obj, name='pbe_heuristic_passing')
+
+        if debug_print:
+            print(f'laps pre/post n={laps_pre.size}/{laps_post.size}, pbe pre/post n={pbe_pre.size}/{pbe_post.size}')
+            if heuristic_pre is not None:
+                print(f'heuristic pre/post n={heuristic_pre.size}/{heuristic_post.size}')
+
+        bin_edges = np.linspace(0.0, 1.0, int(n_bins) + 1)
+        grid = np.linspace(0.0, 1.0, 256)
+        figsize = kwargs.pop('figsize', (10.8, 5.4) if prepare_for_publication else (12.4, 6.2))
+        title_fs = 9 if prepare_for_publication else 11
+        label_fs = 8 if prepare_for_publication else 10
+        fig, axes = plt.subplots(2, 4, sharex=True, figsize=figsize, **kwargs)
+        density_max = 0.0
+        hist_densities = []
+        kde_curves = []
+        for values in arrays:
+            hist_dens, _ = np.histogram(values, bins=bin_edges, density=True)
+            hist_densities.append(hist_dens)
+            density_max = max(density_max, float(np.nanmax(hist_dens)) if hist_dens.size else 0.0)
+            panel_kdes = []
+            for bw_factor in kde_bw_factors:
+                dens = _subfn_reflected_bounded_kde(values, grid, bw_factor)
+                panel_kdes.append(dens)
+                if np.isfinite(dens).any():
+                    density_max = max(density_max, float(np.nanmax(dens)))
+            ## END for bw_factor in kde_bw_factors...
+            kde_curves.append(panel_kdes)
+        ## END for values in arrays...
+
+        if heuristic_pre is not None:
+            for hvals in (heuristic_pre, heuristic_post):
+                h_hist, _ = np.histogram(hvals, bins=bin_edges, density=True)
+                density_max = max(density_max, float(np.nanmax(h_hist)) if h_hist.size else 0.0)
+                h_kde = _subfn_reflected_bounded_kde(hvals, grid, 1.0)
+                if np.isfinite(h_kde).any():
+                    density_max = max(density_max, float(np.nanmax(h_kde)))
+            ## END for hvals in (heuristic_pre, heuristic_post)...
+
+        if density_max <= 0.0:
+            density_max = 1.0
+        density_ylim = (0.0, density_max * 1.05)
+
+        bw_style = {}
+        n_bw = len(kde_bw_factors)
+        for i, bw_factor in enumerate(kde_bw_factors):
+            dist = abs(float(bw_factor) - 1.0)
+            alpha = 1.0 if np.isclose(float(bw_factor), 1.0) else max(0.35, 0.75 - 0.25 * dist)
+            lw = 1.2 + (1.2 * float(i) / max(n_bw - 1, 1))
+            bw_style[bw_factor] = dict(alpha=alpha, linewidth=lw)
+        ## END for i, bw_factor in enumerate(kde_bw_factors)...
+
+        kde_legend_handles = []
+        for i, (values, color, title) in enumerate(zip(arrays, bar_colors, col_titles)):
+            ax_dens = axes[0, i]
+            ax_ecdf = axes[1, i]
+            ax_dens.hist(values, bins=bin_edges, density=True, color=color, alpha=0.30, edgecolor=color, linewidth=0.6, zorder=2)
+            for bw_factor, dens in zip(kde_bw_factors, kde_curves[i]):
+                style = bw_style[bw_factor]
+                ax_dens.plot(grid, dens, color=color, zorder=3, **style)
+                if i == 0:
+                    kde_legend_handles.append(Line2D([0], [0], color='0.25', label=f'Scott × {bw_factor:g}', **style))
+            ## END for bw_factor, dens in zip(kde_bw_factors, kde_curves[i])...
+
+            x_sorted = np.sort(values)
+            ecdf_y = np.arange(1, x_sorted.size + 1, dtype=float) / float(x_sorted.size)
+            ax_ecdf.plot(x_sorted, ecdf_y, color=color, linewidth=1.4, zorder=3)
+
+            if (heuristic_pre is not None) and (i in (2, 3)):
+                hvals = heuristic_pre if (i == 2) else heuristic_post
+                ax_dens.hist(hvals, bins=bin_edges, density=True, histtype='step', color=heuristic_color, linewidth=1.3, zorder=4)
+                ax_dens.plot(grid, _subfn_reflected_bounded_kde(hvals, grid, 1.0), color=heuristic_color, linewidth=1.6, zorder=4)
+                h_sorted = np.sort(hvals)
+                h_ecdf = np.arange(1, h_sorted.size + 1, dtype=float) / float(h_sorted.size)
+                ax_ecdf.plot(h_sorted, h_ecdf, color=heuristic_color, linewidth=1.4, linestyle='--', zorder=4)
+
+            for ax in (ax_dens, ax_ecdf):
+                ax.axvline(low_threshold, color='0.55', linestyle='--', linewidth=0.8, zorder=1)
+                ax.axvline(high_threshold, color='0.55', linestyle='--', linewidth=0.8, zorder=1)
+                ax.set_xlim(0.0, 1.0)
+                ax.spines[['right', 'top']].set_visible(False)
+                ax.tick_params(labelsize=label_fs)
+            ## END for ax in (ax_dens, ax_ecdf)...
+
+            ax_dens.set_ylim(*density_ylim)
+            ax_ecdf.set_ylim(0.0, 1.0)
+            ax_dens.set_title(f'{title}\nn={int(values.size)}', fontsize=title_fs)
+            ax_ecdf.set_xlabel(r'$P_{\mathrm{Short}}$', fontsize=label_fs)
+            if i == 0:
+                ax_dens.set_ylabel('Density', fontsize=label_fs)
+                ax_ecdf.set_ylabel('ECDF', fontsize=label_fs)
+            else:
+                ax_dens.set_ylabel('')
+                ax_ecdf.set_ylabel('')
+        ## END for i, (values, color, title) in enumerate(zip(arrays, bar_colors, col_titles))...
+
+        legend_handles = list(kde_legend_handles)
+        if heuristic_pre is not None:
+            legend_handles.extend([
+                Line2D([0], [0], color=heuristic_color, linewidth=1.6, label='Heuristic-passing KDE'),
+                Line2D([0], [0], color=heuristic_color, linewidth=1.4, linestyle='--', label='Heuristic-passing ECDF'),
+            ])
+        fig.tight_layout()
+        legend_top = 0.82 if (heuristic_pre is not None) else 0.86
+        fig.subplots_adjust(top=legend_top)
+        fig.legend(
+            handles=legend_handles, loc='lower center', bbox_to_anchor=(0.5, legend_top),
+            ncol=max(len(legend_handles), 1), frameon=False, fontsize=label_fs,
+        )
+
+        if not defer_show:
+            plt.show()
+
+        saved_path = None
+        if save_figure:
+            if export_folder is None:
+                raise ValueError('export_folder is required when save_figure=True.')
+            export_folder = Path(export_folder)
+            export_folder.mkdir(parents=True, exist_ok=True)
+            saved_path = export_folder / f'{fig_file_name}.pdf'
+            fig.savefig(saved_path)
+
+        return dict(
+            fig=fig,
+            axes=axes,
+            arrays=dict(laps_pre=laps_pre, laps_post=laps_post, pbe_pre=pbe_pre, pbe_post=pbe_post, heuristic_pre=heuristic_pre, heuristic_post=heuristic_post),
+            bin_edges=bin_edges,
+            kde_grid=grid,
+            kde_bw_factors=tuple(kde_bw_factors),
+            saved_path=saved_path,
+        )
 
 
 # ==================================================================================================================================================================================================================================================================================== #
@@ -83,9 +3330,10 @@ from pyphoplacecellanalysis.Pho2D.plotly.Extensions.plotly_helpers import Plotly
 from pyphoplacecellanalysis.Pho2D.plotly.plotly_templates import PlotlyHelpers, text_sizes_px
 from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelpers ## for outputs
 
+
 @metadata_attributes(short_name=None, tags=['figure-s8', 's8', 'figure-4', 'fig4', 'figure-s6', 's6', 'figure', 'publication'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
-    """ Used to output Figure 4, Figure S6, Figure S8
+    """ Used to output Figure 4, Figure S3, Figure S6, Figure S8, Figure S9
 
         Usage:
             from pathlib import Path
@@ -97,6 +3345,14 @@ class FigureS8:
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
+            ## Figure 4 + S3 + S8 + S9 in one call (preferred):
+            figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
+                                                      earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+            ## Figure S3 only (multi time_bin_size series):
+            # figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
+
+            ## Single figure:
             ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
             plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
             plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
@@ -106,10 +3362,20 @@ class FigureS8:
             _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, split_by_column='animal')
 
 
+
+    Sizes:
+        Final export (SVG/PDF page) for figure 4, S6, S8: (w: 5.3956 in, h: 2.18 in)
+        Plotly layout canvas stays PUB_FIG_SIZE CSS px (792 x 320, same aspect). Kaleido writes unitless px; `_save_publication_figs` stamps PUB_FIG_SIZE_INCHES onto the SVG so Illustrator/cairosvg honor the inch size (previously PDF came out at 0.75x).
+
+        layer_names = ['kdiba_4_figure4_summary_four_bar-Laps.vectorcraft', 'ScatterOverTime_Laps_perTimeBin.svg', 'ScatterOverTime_PBEs_perTimeBin.svg', 'kdiba_4_figure4_summary_four_bar-PBEs.vectorcraft']
+
+
     """
     plotly_helpers: PlotlyHelpers = None
-    PUB_FIG_SIZE: Dict = dict(width=792, height=320)
+    PUB_FIG_SIZE_INCHES: Dict = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
+    PUB_FIG_SIZE: Dict = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES (5.3956/8.25 == 2.18/(320/96))
     figures_parent_folder: Path = None
+    last_debug_values: Optional[Dict] = None
     _transparent_bgcolor: str = "rgba(0,0,0,0)"  # Kaleido PDF ignores this (always white); SVG+cairosvg preserves it.
 
     _heuristic_filter_color_map: Dict[str, str] = {
@@ -120,7 +3386,18 @@ class FigureS8:
 
 
     @classmethod
-    def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True) -> go.Figure:
+    def figures_intermediates_parent_folder(cls) -> Path:
+        """Where temporary/intermediate figures are written."""
+        if cls.figures_parent_folder is None:
+            return None
+        else:
+            out_path = cls.figures_parent_folder.joinpath('_TEMP')
+            out_path.mkdir(exist_ok=True)
+            return out_path
+
+
+    @classmethod
+    def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True, legend_title_text: str = 'Heuristic-Passing') -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
         layout_kwargs = dict(
             template=cls.template,
@@ -136,7 +3413,7 @@ class FigureS8:
         )
         if showlegend:
             # Horizontal legend below the x-axis titles — paper (0.99, 0.99) sat on the right histogram
-            layout_kwargs['legend'] = dict(title_text='Heuristic-Passing', orientation='h', x=0.5, y=-0.28, xanchor='center', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0, itemsizing='constant', tracegroupgap=0)
+            layout_kwargs['legend'] = dict(title_text=legend_title_text, orientation='h', x=0.5, y=-0.28, xanchor='center', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0, itemsizing='constant', tracegroupgap=0)
             layout_kwargs['margin'] = dict(l=50, r=40, t=36, b=88)
         a_fig = a_fig.update_layout(**layout_kwargs)
         a_fig = a_fig.update_xaxes(
@@ -183,9 +3460,15 @@ class FigureS8:
         export_fig = deepcopy(a_fig)
         export_fig.update_layout(paper_bgcolor=cls._transparent_bgcolor, plot_bgcolor=cls._transparent_bgcolor)
 
-        svg_save_path = figures_parent_folder.joinpath(f'{basename}.svg')
+        svg_output_folder = figures_parent_folder
+        if should_export_pdf and (not should_export_svg):
+            intermediates_folder = cls.figures_intermediates_parent_folder()
+            if intermediates_folder is not None:
+                svg_output_folder = intermediates_folder  # SVG is only a conversion source for the PDF
+        svg_save_path = svg_output_folder.joinpath(f'{basename}.svg')
         if should_export_svg or should_export_pdf:
             export_fig.write_image(svg_save_path, format="svg")  # Kaleido SVG does honor transparent bg
+            SVGHelpers.set_physical_size_inches(svg_save_path, width_in=cls.PUB_FIG_SIZE_INCHES['width'], height_in=cls.PUB_FIG_SIZE_INCHES['height'])
         if should_export_svg:
             _out_paths[f'{export_suffix}/svg'] = svg_save_path
 
@@ -230,6 +3513,13 @@ class FigureS8:
             preferred = [v for v in cls._PREFERRED_ANIMAL_ORDER if v in unique_values]
             rest = sorted([v for v in unique_values if v not in preferred], key=str)
             return preferred + rest
+        if split_by_column == 'time_bin_size':
+            def _tbin_sort_key(s: str):
+                try:
+                    return (0, float(s))
+                except ValueError:
+                    return (1, s)
+            return sorted(unique_values, key=_tbin_sort_key)
         return sorted(unique_values, key=str)
 
 
@@ -253,30 +3543,117 @@ class FigureS8:
 
     @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
     @classmethod
-    def _plot_formatted_pre_post_scatter(cls, plot_df: pd.DataFrame, data_context, plot_kwargs: Dict, showlegend: bool):
+    def _plot_formatted_pre_post_scatter(cls, plot_df: pd.DataFrame, data_context, plot_kwargs: Dict, showlegend: bool, legend_title_text: str = 'Heuristic-Passing'):
         new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
             data_context=data_context,
             concatenated_ripple_df=plot_df,
             **plot_kwargs,
         )
-        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=showlegend)
+        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=showlegend, legend_title_text=legend_title_text)
         new_fig.update_layout(**cls.PUB_FIG_SIZE)
         return new_fig, new_fig_context
 
 
-    ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
+    # ==================================================================================================================================================================================================================================================================================== #
+    # Pre/post-delta stats insets                                                                                                                                                                                                                                                          #
+    # ==================================================================================================================================================================================================================================================================================== #
+    _STATS_ANNOTATION_LABEL_COLOR: Dict[str, str] = {
+        'False': '#aaaaaa',  # solid gray; overlay map alpha is too faint for text
+        'True': 'black',
+    }
+
+
     @classmethod
-    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
+    def _format_pre_post_delta_stats_text(cls, stats: Dict) -> str:
+        """Compact Δμ / CI / p inset text for a session-level pre/post comparison."""
+        d = stats['mean_difference_post_minus_pre']
+        ci = stats.get('mean_difference_bootstrap_95ci')
+        p = stats.get('p_value')
+        n_sessions = stats.get('n_sessions')
+        if ci is None:
+            ci_text: str = ''
+        else:
+            lo, hi = ci
+            ci_text = f'  [{lo:.2f}, {hi:.2f}]'
+        if p is None:
+            p_text: str = 'p = n/a'
+        elif p < 0.001:
+            p_text = 'p < 0.001'
+        else:
+            p_text = f'p = {p:.3f}'
+        n_text: str = f'   (n = {n_sessions} sessions)' if n_sessions is not None else ''
+        return f'Δμ = {d:.2f}{ci_text}<br>{p_text}{n_text}'
+
+
+    @classmethod
+    def _add_pre_post_delta_stats_annotation(cls, fig: go.Figure, stats_by_label: Dict[str, Dict]) -> go.Figure:
+        """Add one scatter-panel inset. Empty label = pooled; False/True = heuristic overlay."""
+        lines = []
+        for label, stats in stats_by_label.items():
+            if stats is None:
+                continue
+            body: str = cls._format_pre_post_delta_stats_text(stats)
+            if label:
+                color: str = cls._STATS_ANNOTATION_LABEL_COLOR.get(label, 'black')
+                body_lines = body.split('<br>')
+                body_lines[0] = f'{label}: {body_lines[0]}'
+                inner: str = '<br>'.join(body_lines)
+                lines.append(f'<span style="color:{color}">{inner}</span>')
+            else:
+                lines.append(body)
+        ## END for label, stats in stats_by_label.items()...
+
+        if not lines:
+            return fig
+        fig.add_annotation(
+            text='<br>'.join(lines),
+            xref='x2 domain', yref='y2 domain', x=0.99, y=0.98,
+            xanchor='right', yanchor='top', showarrow=False, align='right',
+            font=dict(family='Arial', size=text_sizes_px['insets'], color='black'),
+            bgcolor='rgba(255,255,255,0.75)', borderpad=3,
+            name='pre_post_delta_stats',
+        )
+        return fig
+
+
+    @function_attributes(short_name=None, tags=['private', 'stats'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 07:48', related_items=[])
+    @classmethod
+    def _compute_pre_post_delta_stats(cls, df: pd.DataFrame, class_kwargs: Dict, run_kwargs: Dict) -> Tuple[Optional[PrePostDeltaDistributionComparison], Optional[Dict]]:
+        """Run PrePostDeltaDistributionComparison; skip a subset that lacks both pre and post."""
+        try:
+            comparison = PrePostDeltaDistributionComparison(df, **class_kwargs)
+            results = comparison.run(**run_kwargs)
+            return comparison, results
+        except ValueError as e:
+            print(f'WARN: pre/post-delta stats skipped: {e}')
+            return None, None
+
+
+    ## INPUTS: df_filter, plotly_helpers, additional_filter_predicates, figures_parent_folder
+    @function_attributes(short_name=None, tags=['private', 'secondary', 'figure', 'stats'], input_requires=[], output_provides=[], uses=['cls._compute_pre_post_delta_stats'], used_by=[], creation_date='2026-10-28 07:47', related_items=[])
+    @classmethod
+    def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
+                                                    should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
+                                                    store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
-        """Plot the constrained pre/post-delta scatter.
+        """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
         `split_by_column='animal'` plots one 1x3 row per animal and stacks those SVGs into `*_by_animal.svg`.
         PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
+
+        When `color_by_time_bin_size` is True, scatter/hist traces are colored by `time_bin_size` (Figure S3).
+        Scatter legend is hidden by default for Figure S3 (`show_scatter_legend=None` → off when `color_by_time_bin_size`).
+        When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
         plot_kind: str = 'PBEs' if ('PBEs' in export_suffix) else 'Laps'
         main_title: str = f"Short-track Decoded Likelihood during {plot_kind}" # keep the center subplot title short so it does not collide with Pre-Δ / Post-Δ
+        should_compute_or_annotate_stats: bool = bool(should_compute_stats or enable_add_stats_to_figures)
+        if stats_class_kwargs is None:
+            stats_class_kwargs = {}
+        if stats_run_kwargs is None:
+            stats_run_kwargs = {}
 
         _plot_kwargs = dict(
             is_publication_ready_figure=True,
@@ -285,14 +3662,41 @@ class FigureS8:
             main_title=main_title,
             # epoch_label_mode='annotation_above', #TODO 2026-09-24 18:23: - [ ] where the labels sit
         )
+        if legend_groups_to_hide is not None:
+            _plot_kwargs['legend_groups_to_hide'] = legend_groups_to_hide
+        if color_by_time_bin_size:
+            _tbin_color_kwargs = dict(color='time_bin_size')
+            _tbin_hist_kwargs = dict(color='time_bin_size', histnorm='probability density', barmode='group', opacity=1.0)
+            _plot_kwargs['color_by_time_bin_size'] = True
+            _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
+            _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_hist_kwargs)
+            _plot_kwargs['common_plot_kwargs'] = deepcopy(_tbin_color_kwargs)
         if should_overlay_heuristic_filter:
             _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_heuristic_color_kwargs}
             _plot_kwargs['hist_kwargs'] = deepcopy(_heuristic_color_kwargs)
             _plot_kwargs['common_plot_kwargs'] = deepcopy(_heuristic_color_kwargs)
+            _plot_kwargs.pop('color_by_time_bin_size', None)  # heuristic overlay takes precedence over t-bin coloring
 
         _out_figs_dict = {}
         _out_paths_dict = {}
+        _out_stats_dict = {}
+        _out_debug_dict: Dict[str, Any] = {}
+        if store_debug_values:
+            _out_debug_dict = {
+                'base_df': base_df,
+                'final_df': None,
+                'plot_df': None,
+                'heuristic_passing_df': None,
+                'n_rows': {'Initial': len(base_df)},
+                'constraint_keys': constraint_keys,
+                'should_overlay_heuristic_filter': should_overlay_heuristic_filter,
+                'color_by_time_bin_size': color_by_time_bin_size,
+                'split_by_column': split_by_column,
+                'export_suffix': export_suffix,
+            }
+            if split_by_column is not None:
+                _out_debug_dict['groups'] = {}
 
         def _export_stage(k: str, source_df: pd.DataFrame, title_prefix: str, basename: Optional[str]):
             """Plot pooled, or one 1x3 row per `split_by_column` value then stack those SVGs vertically."""
@@ -304,6 +3708,11 @@ class FigureS8:
 
             for group_key, group_df in cls._iter_split_plot_groups(source_df, split_by_column):
                 plot_df = cls._overlay_heuristic_filter_rows(group_df, additional_filter_predicates) if should_overlay_heuristic_filter else group_df
+                if store_debug_values and (k == 'Final'):
+                    if split_by_column is not None:
+                        _out_debug_dict.setdefault('groups', {})[group_key] = {'group_df': group_df, 'plot_df': plot_df, 'n_rows': len(group_df)}
+                    else:
+                        _out_debug_dict['plot_df'] = plot_df
                 context_kwargs = dict(title_prefix=title_prefix, filter=k)
                 if group_key is not None:
                     context_kwargs[split_by_column] = group_key
@@ -312,7 +3721,37 @@ class FigureS8:
                 active_plot_kwargs = deepcopy(_plot_kwargs)
                 if group_key is not None:
                     active_plot_kwargs['main_title'] = f"{main_title} | {group_key}"
-                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=should_overlay_heuristic_filter)
+                n_unique_tbins: int = int(plot_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in plot_df.columns) else 0
+                effective_show_scatter_legend: bool = (not color_by_time_bin_size) if (show_scatter_legend is None) else bool(show_scatter_legend)
+                showlegend: bool = bool(effective_show_scatter_legend) and bool(should_overlay_heuristic_filter or (color_by_time_bin_size and (n_unique_tbins > 1)))
+                legend_title_text: str = 'Heuristic-Passing' if should_overlay_heuristic_filter else 'Time bin size (s)'
+                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
+                if should_compute_or_annotate_stats and (k == 'Final'):
+                    stats_by_label = {}
+                    n_unique_tbins_stats: int = int(group_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in group_df.columns) else 0
+                    if color_by_time_bin_size and (n_unique_tbins_stats > 1):
+                        # Figure S3: stratify stats by time_bin_size only (scatter stays pooled). No pooled None key — that would short-circuit summary group iteration.
+                        tbin_values = cls._sorted_split_values(group_df['time_bin_size'].dropna().unique(), split_by_column='time_bin_size')
+                        for tbin_key in tbin_values:
+                            tbin_mask = group_df['time_bin_size'].astype(str) == str(tbin_key)
+                            tbin_df = cls._copy_df_preserving_context(group_df[tbin_mask])
+                            comparison_tbin, results_tbin = cls._compute_pre_post_delta_stats(tbin_df, stats_class_kwargs, stats_run_kwargs)
+                            _out_stats_dict.setdefault(k, {})[tbin_key] = {'all': (comparison_tbin, results_tbin)}
+                        ## END for tbin_key in tbin_values...
+                    else:
+                        comparison_all, results_all = cls._compute_pre_post_delta_stats(group_df, stats_class_kwargs, stats_run_kwargs)
+                        group_stats = {'all': (comparison_all, results_all)}
+                        if results_all is not None:
+                            stats_by_label['False' if should_overlay_heuristic_filter else ''] = results_all
+                        if should_overlay_heuristic_filter:
+                            passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
+                            comparison_pass, results_pass = cls._compute_pre_post_delta_stats(group_df[passing_mask], stats_class_kwargs, stats_run_kwargs)
+                            group_stats['heuristic_passing'] = (comparison_pass, results_pass)
+                            if results_pass is not None:
+                                stats_by_label['True'] = results_pass
+                        _out_stats_dict.setdefault(k, {})[group_key] = group_stats
+                        if enable_add_stats_to_figures and stats_by_label:
+                            new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label)
                 fig_key = group_key if group_key is not None else k
                 group_figs[fig_key] = new_fig
                 if should_save:
@@ -322,7 +3761,12 @@ class FigureS8:
                         save_basename = f"{basename}_{group_key}"
                     else:
                         save_basename = basename
-                    saved_paths = cls._save_publication_figs(new_fig, new_fig_context, figures_parent_folder, export_suffix=export_suffix, basename=save_basename, _out_paths={})
+                    save_folder = figures_parent_folder
+                    if group_key is not None:
+                        intermediates_folder = cls.figures_intermediates_parent_folder()
+                        if intermediates_folder is not None:
+                            save_folder = intermediates_folder  # pre-concatenated per-group SVGs/PDFs
+                    saved_paths = cls._save_publication_figs(new_fig, new_fig_context, save_folder, export_suffix=export_suffix, basename=save_basename, _out_paths={})
                     if group_key is not None:
                         if f'{export_suffix}/svg' in saved_paths:
                             _out_paths_dict[k][f'{export_suffix}/svg/{group_key}'] = saved_paths[f'{export_suffix}/svg']
@@ -341,6 +3785,7 @@ class FigureS8:
                 if should_save and (len(group_svg_paths) > 0):
                     stacked_svg_path = figures_parent_folder.joinpath(f'{stacked_basename}_by_{split_by_column}.svg')
                     SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
+                    SVGHelpers.set_physical_size_inches(stacked_svg_path, width_in=cls.PUB_FIG_SIZE_INCHES['width'], height_in=(cls.PUB_FIG_SIZE_INCHES['height'] * len(group_svg_paths)))
                     _out_paths_dict[k][f'{export_suffix}/svg'] = stacked_svg_path
                     print(f'\tstacked {split_by_column} rows: "{stacked_svg_path.as_posix()}"')
                 if should_save and (len(group_pdf_paths) > 1):
@@ -365,14 +3810,20 @@ class FigureS8:
             mask = predicates[k](active).astype(bool)
             active = deepcopy(active[mask])
             print(f"\tafter {k}: {len(active)} rows")
+            if store_debug_values:
+                _out_debug_dict['n_rows'][k] = len(active)
 
             if should_export_iteratively_constrainted:
                 _export_stage(k, active, title_prefix=f"FILTERED | {k}", basename=None)
         ## END for k in constraint_keys...
 
         if should_overlay_heuristic_filter:
-            n_heuristic_pass: int = int(additional_filter_predicates['is_heuristic_passing'](active).astype(bool).sum())
+            passing_mask = additional_filter_predicates['is_heuristic_passing'](active).astype(bool)
+            n_heuristic_pass: int = int(passing_mask.sum())
             print(f"heuristic passing: {n_heuristic_pass}/{len(active)} rows")
+            if store_debug_values:
+                _out_debug_dict['n_rows']['heuristic_passing'] = n_heuristic_pass
+                _out_debug_dict['heuristic_passing_df'] = active[passing_mask]
 
         ## Get the FINAL Figure
         # FINAL ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
@@ -381,14 +3832,62 @@ class FigureS8:
 
         print(f"after {k}: {len(base_df)} rows")
 
-        return _out_figs_dict, _out_paths_dict
+        if store_debug_values:
+            _out_debug_dict['final_df'] = active
+            _out_debug_dict['n_rows']['Final'] = len(active)
+            if _out_debug_dict.get('plot_df') is None:
+                if should_overlay_heuristic_filter:
+                    _out_debug_dict['plot_df'] = cls._overlay_heuristic_filter_rows(active, additional_filter_predicates)
+                else:
+                    _out_debug_dict['plot_df'] = active
+
+        return _out_figs_dict, _out_paths_dict, _out_stats_dict, _out_debug_dict
 
 
 
-
+    @function_attributes(short_name=None, tags=['main', 'figure', 'output'], input_requires=[], output_provides=[], uses=['cls._perform_plot_iteratively_constrained'], used_by=[], creation_date='2026-10-28 07:44', related_items=[])
     @classmethod
-    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates, figures_parent_folder, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None):
-        """
+    def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
+            should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = True, store_debug_values: bool = False,
+            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
+        ):
+        """ Performs the main plotting and adds optional stats
+
+            When `store_debug_values=True`, a 4th return item holds the processed plot DFs (`base_df_dict_dict`, per-key `plot_data` with `final_df`/`plot_df`) and filter params. Also stored on `FigureS8.last_debug_values`.
+
+            `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series; scatter legend off by default (`show_scatter_legend=True` to restore).
+            `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3.
+
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
+
+            ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
+            plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+            plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+            # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-23').resolve()
+            figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/2026-10-27').resolve() # Figure S8
+            enable_heuristic_filtered_outputs: bool = True
+
+            # figures_parent_folder: Path = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources/Figure 4 - P_Short Scatter over Time/2026-10-27').resolve() ## Figure 4
+            # enable_heuristic_filtered_outputs: bool = False
+
+            figures_parent_folder.mkdir(exist_ok=True)
+            should_compute_stats: bool = True
+            enable_add_stats_to_figures: bool = False
+            store_debug_values: bool = True
+            _out = FigureS8.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder, should_concatenate_figures=False, enable_heuristic_filtered_outputs=enable_heuristic_filtered_outputs, split_by_column=None, should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures, store_debug_values=store_debug_values)
+
+
+            if store_debug_values:
+                _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values = _out
+            else:
+                _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple = _out
+            if should_compute_stats:
+                pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs = _out_stats_tuple
+                _stats_output_keys = _stats_params_kwargs['output_keys']
+                # if should_compute_stats:
+                {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
+
 
         """
         cls.plotly_helpers = plotly_helpers
@@ -406,10 +3905,9 @@ class FigureS8:
         cls.template = cls.plotly_helpers.update_plotly_template(is_dark_mode=False, is_publication=True)
         pio.templates.default = cls.template
 
-        cls.PUB_FIG_SIZE = dict(width=792, height=320) # override PlotlyHelpers.fig_size_kwargs for export -- actual = (594, 240)
-        # PUB_FIG_SIZE = dict(width=594, height=240) ## actual = (446, 179.4512)
-        # PUB_FIG_SIZE = dict(width=(594+148), height=(240+60)) ## corrections: (148, 60), PUB_FIG_SIZE: {'width': 742, 'height': 300}, actual = (557, 224.5)
-        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}') 
+        cls.PUB_FIG_SIZE_INCHES = dict(width=5.3956, height=2.18)  # final SVG/PDF page size
+        cls.PUB_FIG_SIZE = dict(width=792, height=320)  # Plotly CSS px; same aspect as PUB_FIG_SIZE_INCHES. Kaleido unitless px used to export at 0.75x (792x320 -> 594x240 pt)
+        print(f'PUB_FIG_SIZE: {cls.PUB_FIG_SIZE}, PUB_FIG_SIZE_INCHES: {cls.PUB_FIG_SIZE_INCHES}')
         # PUB_FIG_SIZE = dict() ## NO OVERRIDES
 
         cls._pub_font = dict(family="Arial", color="black")
@@ -449,13 +3947,14 @@ class FigureS8:
         # )
         # _out_figs_dict["Unfiltered"]
 
-        # active_filter_constraints = df_filter.get_df_filter_active_constraint_dict() ## live/dynamic
-        active_filter_constraints = {'trained_compute_epochs': 'laps',
-            'decoder_identifier': 'pseudo2D',
-            'masked_time_bin_fill_type': ('dropped',),
-            'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
-            'time_bin_size': (0.075,),
-        }
+        if active_filter_constraints is None:
+            # active_filter_constraints = df_filter.get_df_filter_active_constraint_dict() ## live/dynamic
+            active_filter_constraints = {'trained_compute_epochs': 'laps',
+                'decoder_identifier': 'pseudo2D',
+                'masked_time_bin_fill_type': ('dropped',),
+                'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+                'time_bin_size': (0.075,),
+            }
 
 
         # ## INPUTS: df_filter, additional_filter_predicates, 
@@ -502,12 +4001,40 @@ class FigureS8:
 
         _out_figs_dict_dict_dict = {}
         _out_paths_dict = {}
+        _out_debug_values: Dict[str, Any] = {}
+        if store_debug_values:
+            _out_debug_values = {
+                'active_filter_constraints': active_filter_constraints,
+                'base_constraint_keys_dict': base_constraint_keys_dict,
+                'columns_to_add': columns_to_add,
+                'base_df_dict_dict': base_df_dict_dict,
+                'plot_data': {},
+            }
+
+        # Stats ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+        _stats_class_kwargs = dict(n_bootstrap=10000, random_state=1337, sampling_unit='session')
+        _stats_run_kwargs = dict(perform_block_permutation_test=True,
+                            # sampling_unit='animal',  # or 'session'
+                            sampling_unit='session',
+                        )
+        _stats_output_keys = ['wasserstein_1', 'wasserstein_1_bootstrap_95ci', 'mean_difference_post_minus_pre', 'mean_difference_bootstrap_95ci', 'p_value']
+
+        _stats_params_kwargs = {'inputs_class': _stats_class_kwargs, 'inputs_run': _stats_run_kwargs, 'output_keys': _stats_output_keys}
+
+        pre_post_delta_stats_distribution_comparison_dict: Dict[str, PrePostDeltaDistributionComparison] = {}
+        pre_post_delta_stats_results_dict: Dict[str, Dict] = {}
+
+        ## INPUTS: (pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs)
 
         ## INPUTS: base_df_dict_dict, base_constraint_keys_dict
-        for output_suffix, base_df_dict in base_df_dict_dict.items():
+        if enabled_granularities is None:
+            enabled_granularities = ('_perTimeBin', '_perEpochs')
+        for a_grainularity, base_df_dict in base_df_dict_dict.items(): # a_grainularity: grainularity_options = ['_perTimeBin', '_perEpochs']
+            if a_grainularity not in enabled_granularities:
+                continue
             ## output_suffix: ['Laps', 'PBEs']
             ## same for laps/PBEs
-            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[output_suffix])) # ["is_long_duration"] — heuristic is overlaid on PBEs only, not dropped
+            base_constraint_keys = list(deepcopy(base_constraint_keys_dict[a_grainularity])) # ["is_long_duration"] — heuristic is overlaid on PBEs only, not dropped
 
             ## separate for laps/PBEs
             constraint_keys = {'Laps': deepcopy(base_constraint_keys),
@@ -517,41 +4044,86 @@ class FigureS8:
             _out_figs_dict_dict = {}
             _out_paths = {}
 
-            for export_suffix, base_df in base_df_dict.items():
+            for an_epoch_name, base_df in base_df_dict.items(): # an_epoch_name: ['Laps', 'PBEs']
                 ## export_suffix: ['_perTimeBin', '_perEpochs']
                 if isinstance(constraint_keys, dict):
                     ## separate for laps/PBEs
-                    a_constraint_keys = constraint_keys[export_suffix] 
+                    a_constraint_keys = constraint_keys[an_epoch_name] 
 
                 else:
                     a_constraint_keys = deepcopy(constraint_keys)
 
 
                 
-                should_overlay_heuristic_filter: bool = (enable_heuristic_filtered_outputs and export_suffix.startswith('PBEs'))
+                should_overlay_heuristic_filter: bool = (enable_heuristic_filtered_outputs and an_epoch_name.startswith('PBEs'))
 
-                title_suffix: str = ' (heuristic False vs True)' if should_overlay_heuristic_filter else ''
+                title_suffix: str = ' (heuristic filtered)' if should_overlay_heuristic_filter else ''
 
+                epoch_kind: str = an_epoch_name  # 'Laps' or 'PBEs' — keep un-suffixed for stats keys
+                active_key: str = '_'.join([a_grainularity, epoch_kind])  # e.g. '_perTimeBin_Laps'
                 if not should_concatenate_figures:
-                    export_suffix = f"{export_suffix}{output_suffix}"
+                    an_epoch_name = f"{an_epoch_name}{a_grainularity}"
 
-                _out_figs_dict_dict[export_suffix], _out_paths[export_suffix] = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                _out_figs_dict_dict[an_epoch_name], _out_paths[an_epoch_name], a_stage_stats_dict, a_stage_debug_dict = cls._perform_plot_iteratively_constrained(base_df=base_df, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
                                                                                                                 should_export_initially_filtered = False,
                                                                                                                 should_export_iteratively_constrainted = False,
-                                                                                                                export_suffix=export_suffix,
+                                                                                                                export_suffix=an_epoch_name,
                                                                                                                 constraint_keys=a_constraint_keys,
                                                                                                                 title_suffix=title_suffix,
                                                                                                                 should_overlay_heuristic_filter=should_overlay_heuristic_filter,
                                                                                                                 split_by_column=split_by_column,
+                                                                                                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures,
+                                                                                                                stats_class_kwargs=_stats_class_kwargs, stats_run_kwargs=_stats_run_kwargs,
+                                                                                                                store_debug_values=store_debug_values,
+                                                                                                                color_by_time_bin_size=color_by_time_bin_size,
+                                                                                                                legend_groups_to_hide=legend_groups_to_hide,
+                                                                                                                show_scatter_legend=show_scatter_legend,
                                                                                                             )
+                if store_debug_values:
+                    _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
+
+                # Flatten Final stats (computed on the plotted Final-constrained group_df, not unconstrained base_df)
+                # g = filtered_all_sessions_ripple_time_bin_df.groupby(['animal', 'session_name', 'parent_epoch_id'], dropna=False)['pre_post_delta_category']
+                # bad = g.nunique()
+                # bad = bad[bad > 1]
+                # print(bad.head())
+                # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
+                if should_compute_stats or enable_add_stats_to_figures:
+                    for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items():
+                        result_key: str = active_key if group_key is None else f'{active_key}_{group_key}'
+                        comparison_all, results_all = group_stats.get('all', (None, None))
+                        if results_all is not None:
+                            pre_post_delta_stats_distribution_comparison_dict[result_key] = comparison_all
+                            pre_post_delta_stats_results_dict[result_key] = results_all
+                        comparison_pass, results_pass = group_stats.get('heuristic_passing', (None, None))
+                        if results_pass is not None:
+                            pass_key: str = f'{result_key}_heuristic_passing'
+                            pre_post_delta_stats_distribution_comparison_dict[pass_key] = comparison_pass
+                            pre_post_delta_stats_results_dict[pass_key] = results_pass
+                        if debug_print:
+                            keys_to_print = []
+                            if results_all is not None:
+                                keys_to_print.append(result_key)
+                            if results_pass is not None:
+                                keys_to_print.append(f'{result_key}_heuristic_passing')
+                            for printed_key in keys_to_print:
+                                print(f'for "{printed_key}":')
+                                print({
+                                    k: v for k, v in pre_post_delta_stats_results_dict[printed_key].items()
+                                    if k not in ('animal_summary', 'permutation_results', 'session_summary')
+                                })
+                            ## END for printed_key in keys_to_print...
+
+                    ## END for group_key, group_stats in a_stage_stats_dict.get('Final', {}).items()...
+
             ## END for export_suffix, base_df in base_df_dict.items()...
 
             # _out_paths
             # _out_figs_dict_dict['Laps']['Final']
             # _out_figs_dict_dict['PBEs']['Final']
 
-            _out_figs_dict_dict_dict[export_suffix] = _out_figs_dict_dict
-            _out_paths_dict[export_suffix] = _out_paths
+            _out_figs_dict_dict_dict[a_grainularity] = _out_figs_dict_dict
+            _out_paths_dict[a_grainularity] = _out_paths
 
 
             if should_concatenate_figures:
@@ -564,23 +4136,464 @@ class FigureS8:
 
                     _final_fig4_pdf = PDFHelpers.concatenate_pdfs_vertically(
                         pdf_paths=pdf_paths,
-                        output_path=figures_parent_folder.joinpath(f'fig4_Laps_PBEs_{k}{output_suffix}.pdf'),
+                        output_path=figures_parent_folder.joinpath(f'fig4_Laps_PBEs_{k}{a_grainularity}.pdf'),
                         padding=0,  # points; use e.g. 10 if you want a gap
                     )
                     
                     print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
                 ## END for k in list(_out_paths['Laps'].keys())...
 
-        ## END for output_suffix, base_df_dict in base_df_dict_dict.items()...
+        ## END for a_grainularity, base_df_dict in base_df_dict_dict.items()...
+
+        # if should_compute_stats:
+        #     {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
+
+        cls.last_debug_values = _out_debug_values if store_debug_values else None
+        _out_stats_tuple = (pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs)
+        if store_debug_values:
+            return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values
+        return _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple
 
 
-        return _out_figs_dict_dict_dict, _out_paths_dict
+    @function_attributes(short_name=None, tags=['main', 'figure', 'output', 'batch'], input_requires=[], output_provides=[], uses=['cls.main', 'PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar'], used_by=[], creation_date='2026-10-28 16:33', related_items=['FigureS8.main'])
+    @classmethod
+    def main_all_figs(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict,
+                      earliest_delta_aligned_t_start: Optional[float] = None, latest_delta_aligned_t_end: Optional[float] = None,
+                      enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
+                      should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
+        """Produce Figure 4, Figure S3, Figure S8, and Figure S9 from a single notebook call.
+
+            from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
+
+            figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
+                                                      earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+            # subset: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S9'])
+            # Figure S3 only: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
+            # Override S3 time bins via figures_config_dict['Figure S3']['active_filter_constraints']['time_bin_size'].
+
+        Defaults write all configured figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
+        Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable). S3 scatter panels hide the time-bin legend by default; pass `show_scatter_legend=True` in the Figure S3 config to show it.
+        """
+        if earliest_delta_aligned_t_start is not None:
+            plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
+        if latest_delta_aligned_t_end is not None:
+            plotly_helpers.latest_delta_aligned_t_end = latest_delta_aligned_t_end
+
+        if figures_root is None:
+            figures_root = Path(r'E:/Dropbox (Personal)/Active/Kamran Diba Lab/Pho-Kamran-Meetings/Pho Diba Paper 2023/Figures/UneditedSources')
+        figures_root = Path(figures_root)
+        if figures_date is None:
+            figures_date = getattr(plotly_helpers, 'TODAY_DAY_DATE', None) or date.today().strftime('%Y-%m-%d')
+
+        if figures_config_dict is None:
+            figures_config_dict = {
+                'Figure 4': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure 4 - P_Short Scatter over Time/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': False,
+                    'enable_add_stats_to_figures': False,
+                },
+                'Figure S3': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S3 - Effect of Time Bin Duration on Decoding Performance/Inputs/{figures_date}').resolve(), # Figure S3
+                    'enable_heuristic_filtered_outputs': False, 'separate_laps_pbes_figures': False,
+                    'color_by_time_bin_size': True,
+                    'show_scatter_legend': False,
+                    'enabled_granularities': ('_perTimeBin',),
+                    'should_compute_stats': True,
+                    'legend_groups_to_hide': [],
+                    'active_filter_constraints': {
+                        'trained_compute_epochs': 'laps',
+                        'decoder_identifier': 'pseudo2D',
+                        'masked_time_bin_fill_type': ('dropped',),
+                        'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+                        'time_bin_size': (0.016, 0.025, 0.05, 0.06, 0.075),  # overridable when you run
+                    },
+                },
+
+                'Figure S8': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': True,
+                },
+                'Figure S9': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S9 - Effect of Heuristic-filtering P_Short Scatter over Time - PerEpoch/Inputs/{figures_date}').resolve(),
+                    'enable_heuristic_filtered_outputs': True, 'split_by_column': 'animal',
+                },
+            }
+        _figures_config_dict = deepcopy(figures_config_dict)
+
+        figures_out_dict = {}
+
+        for fig_name, fig_config_dict in _figures_config_dict.items():
+            if (enabled_figure_names is None) or (fig_name in enabled_figure_names):
+                print(f'fig_name: {fig_name}, fig_config_dict: {fig_config_dict}')
+                figures_parent_folder = Path(fig_config_dict.pop('figures_parent_folder'))
+                figures_parent_folder.mkdir(exist_ok=True, parents=True)
+                split_by_column = fig_config_dict.pop('split_by_column', None)
+                fig_enable_add_stats_to_figures = fig_config_dict.pop('enable_add_stats_to_figures', enable_add_stats_to_figures)
+                fig_separate_laps_pbes_figures = fig_config_dict.pop('separate_laps_pbes_figures', separate_laps_pbes_figures)
+                fig_should_compute_stats = fig_config_dict.pop('should_compute_stats', should_compute_stats)
+                fig_legend_groups_to_hide = fig_config_dict.pop('legend_groups_to_hide', None)
+                fig_color_by_time_bin_size: bool = bool(fig_config_dict.get('color_by_time_bin_size', False))
+                summary_split_column: str = 'time_bin_size' if fig_color_by_time_bin_size else (split_by_column or 'animal')
+                prev_legend_groups_to_hide = getattr(plotly_helpers, 'legend_groups_to_hide', None)
+                try:
+                    if fig_legend_groups_to_hide is not None:
+                        plotly_helpers.legend_groups_to_hide = fig_legend_groups_to_hide
+                    _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                                    should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
+                                    should_compute_stats=fig_should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
+                                    legend_groups_to_hide=fig_legend_groups_to_hide,
+                                    **{**kwargs, **fig_config_dict},
+                    )
+                finally:
+                    if fig_legend_groups_to_hide is not None:
+                        plotly_helpers.legend_groups_to_hide = prev_legend_groups_to_hide
+                if store_debug_values:
+                    _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values = _out
+                else:
+                    _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple = _out
+                    _out_debug_values = None
+                if fig_should_compute_stats:
+                    pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs = _out_stats_tuple
+                    _stats_output_keys = _stats_params_kwargs['output_keys']
+                    # if should_compute_stats:
+                    # {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
+
+                    ## 2026-10-27 - Summary Statistics - Figure 2-like Box Plot
+                    grainularity: str = '_perTimeBin'
+                    grainularity_token: str = grainularity.lstrip('_')  # 'perTimeBin'
+
+                    def _subfn_summary_fig_file_name(kind: str, group_name: Optional[str] = None) -> str:
+                        basename: str = f'{fig_name}_SummaryStats_{kind}_{grainularity_token}'
+                        if group_name is not None:
+                            basename = f'{basename}_{group_name}'
+                        return basename
+
+                    def _subfn_iter_summary_four_bar_specs(results_dict: Dict, grainularity: str = '_perTimeBin'):
+                        """Yield `(group_key, laps_key, pbes_key, heuristic_key)` for pooled or split-by-group stats."""
+                        heuristic_suffix: str = '_heuristic_passing'
+                        laps_base: str = f'{grainularity}_Laps'
+                        pbes_base: str = f'{grainularity}_PBEs'
+                        if (laps_base in results_dict) and (pbes_base in results_dict):
+                            heuristic_key: str = f'{pbes_base}{heuristic_suffix}'
+                            yield None, laps_base, pbes_base, heuristic_key if heuristic_key in results_dict else None
+                            return
+
+                        laps_prefix: str = f'{laps_base}_'
+                        group_names = []
+                        for k in results_dict.keys():
+                            if k.startswith(laps_prefix) and (not str(k).endswith(heuristic_suffix)):
+                                group_name = k[len(laps_prefix):]
+                                if f'{pbes_base}_{group_name}' in results_dict:
+                                    group_names.append(group_name)
+                        ## END for k in results_dict.keys()...
+
+                        ordered_groups = cls._sorted_split_values(group_names, split_by_column=summary_split_column)
+                        for group_name in ordered_groups:
+                            laps_key: str = f'{laps_base}_{group_name}'
+                            pbes_key: str = f'{pbes_base}_{group_name}'
+                            heuristic_key: str = f'{pbes_key}{heuristic_suffix}'
+                            yield group_name, laps_key, pbes_key, heuristic_key if heuristic_key in results_dict else None
+                        ## END for group_name in ordered_groups...
+
+                    summary_specs = list(_subfn_iter_summary_four_bar_specs(pre_post_delta_stats_results_dict, grainularity=grainularity))
+                    if len(summary_specs) == 0:
+                        print(f'WARN: keys missing from pre_post_delta_stats_results_dict. Keys: {list(pre_post_delta_stats_results_dict.keys())} required for summary figure. Skipping for fig_name: "{fig_name}"')
+                    elif fig_color_by_time_bin_size and (len(summary_specs) >= 1) and (summary_specs[0][0] is not None):
+                        # Figure S3: one panel with side-by-side bars per time_bin_size (colors match scatter)
+                        ordered_tbins = [group_name for group_name, _, _, _ in summary_specs if group_name is not None]
+                        results_by_tbin = {
+                            group_name: (pre_post_delta_stats_results_dict[laps_key], pre_post_delta_stats_results_dict[pbes_key])
+                            for group_name, laps_key, pbes_key, _heuristic_key in summary_specs
+                            if group_name is not None
+                        }
+                        combined_basename: str = f'{fig_name}_SummaryStats_{grainularity_token}_by_time_bin_size'
+                        _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_multi_tbin_bars(
+                            results_by_tbin,
+                            time_bin_color_map=PrePostDeltaDistributionComparison.time_bin_size_discrete_color_map(ordered_tbins),
+                            fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=figures_parent_folder,
+                            title='Decoded $P_{Short}$',
+                            active_context=IdentifyingContext(display_fn_name=combined_basename),
+                            defer_show=True, 
+                        )
+                        _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
+                        print(f'\tFigure S3 multi-tbin summary: "{combined_basename}" saved_paths={_out_extra_plot.get("saved_paths")}')
+                    else:
+                        fig_summary_dict = {}
+                        group_svg_paths = []
+                        group_pdf_paths = []
+                        for group_name, laps_key, pbes_key, heuristic_key in summary_specs:
+                            combined_basename: str = _subfn_summary_fig_file_name('all', group_name)
+                            save_folder = figures_parent_folder
+                            if group_name is not None:
+                                intermediates_folder = cls.figures_intermediates_parent_folder()
+                                if intermediates_folder is not None:
+                                    save_folder = intermediates_folder
+                            plot_kwargs = dict(fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=save_folder, separate_laps_pbes_figures=fig_separate_laps_pbes_figures,
+                                               active_context=IdentifyingContext(display_fn_name=combined_basename))
+                            if fig_separate_laps_pbes_figures:
+                                plot_kwargs['laps_fig_file_name'] = _subfn_summary_fig_file_name('Laps', group_name)
+                                plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
+                                plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name']
+                            if group_name is not None:
+                                plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
+                            _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
+                                pre_post_delta_stats_results_dict[laps_key],
+                                pre_post_delta_stats_results_dict[pbes_key],
+                                pbe_heuristic_passing_results=None if heuristic_key is None else pre_post_delta_stats_results_dict.get(heuristic_key, None),
+                                **plot_kwargs,
+                            )
+                            fig_summary_dict[group_name if group_name is not None else 'all'] = _out_extra_plot
+                            for a_path in (_out_extra_plot.get('saved_paths') or []):
+                                a_path = Path(a_path)
+                                if a_path.suffix.lower() == '.svg':
+                                    group_svg_paths.append(a_path)
+                                elif a_path.suffix.lower() == '.pdf':
+                                    group_pdf_paths.append(a_path)
+                            ## END for a_path in (_out_extra_plot.get('saved_paths') or [])...
+
+                        ## END for group_name, laps_key, pbes_key, heuristic_key in summary_specs...
+
+                        if (len(summary_specs) == 1) and (summary_specs[0][0] is None):
+                            _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict['all']
+                        else:
+                            if len(group_svg_paths) > 1:
+                                stacked_svg_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{summary_split_column}.svg')
+                                SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
+                                fig_summary_dict['stacked_svg'] = stacked_svg_path
+                                print(f'\tstacked {summary_split_column} summary rows: "{stacked_svg_path.as_posix()}"')
+                            if len(group_pdf_paths) > 1:
+                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{summary_split_column}.pdf')
+                                PDFHelpers.concatenate_pdfs_vertically(pdf_paths=group_pdf_paths, output_path=stacked_pdf_path, padding=0)
+                                fig_summary_dict['stacked_pdf'] = stacked_pdf_path
+                            _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict
+                ## END if should_compute_stats
+
+                if store_debug_values:
+                    _out = (_out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values)
+                else:
+                    _out = (_out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple)
+                figures_out_dict[fig_name] = _out
+            else:
+                print(f'skipping "{fig_name}" due to enabled_figure_names')
+        ## END for fig_name, fig_config_dict in _figures_config_dict.items()...
+
+        ## OUTPUTS: figures_out_dict
+        return figures_out_dict
+
+
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-27 - Figure 4/S6/S8 Stats                                                                                                                                                                                                                                                    #
+# ==================================================================================================================================================================================================================================================================================== #
 
 
 
+# Old Bootstrapped Extrema Bins ______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
+
+# from copy import deepcopy
+# from typing import Dict
+
+# import numpy as np
+# import pandas as pd
+# from neuropy.utils.indexing_helpers import transpose_nested_dict
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import (
+#     SeriesLetter, AnimalName,
+#     compute_hist_variables, fig4_hist_stats_pho,
+#     plot_fisher_z, plot_earthmovers, plot_kldivergence,
+#     plot_by_animal_split_histogram_figure, plot_by_session_split_histogram_figure,
+# )
+
+# ## INPUTS: df_filter
+# laps_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_time_bin_df'])
+# ripple_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_time_bin_df'])
+
+# variable_name: str = df_filter.active_plot_variable_name  # usually 'P_Short'
+# nbins: int = 11
+# bin_edges = np.linspace(0.0, 1.0, nbins + 1)
+# a_time_bin_size: float = float(np.atleast_1d(df_filter.time_bin_size)[0])  # or hardcode 0.075
+
+
+# def _split_pre_post(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+#     df = df.dropna(subset=[variable_name, 'delta_aligned_start_t'], how='any')
+#     pre_df = df[df['delta_aligned_start_t'] <= 0].copy()
+#     post_df = df[df['delta_aligned_start_t'] > 0].copy()
+#     return pre_df, post_df
+
+
+# laps_pre_df, laps_post_df = _split_pre_post(laps_df)
+# ripple_pre_df, ripple_post_df = _split_pre_post(ripple_df)
+
+# hist_samples_df_dict: Dict[SeriesLetter, pd.DataFrame] = {
+#     'a': laps_pre_df,      # PreLaps
+#     'b': laps_post_df,     # PostLaps
+#     'c': ripple_pre_df,    # PrePBEs
+#     'd': ripple_post_df,   # PostPBEs
+# }
+
+# hist_counts_dict = {
+#     k: np.histogram(df[variable_name].to_numpy(), bins=bin_edges)[0]
+#     for k, df in hist_samples_df_dict.items()
+# }
+# hist_count_extremas_only_dict = {k: np.array([v[0], v[-1]]) for k, v in hist_counts_dict.items()}
+# hist_count_extrema_ratios = {k: (float(v[0]) / float(v[-1])) for k, v in hist_counts_dict.items()}
+# hist_densities_dict = {k: (v.astype(float) / np.sum(v)) for k, v in hist_counts_dict.items()}
+
+# ## OUTPUTS: hist_counts_dict, hist_densities_dict, hist_count_extremas_only_dict, hist_count_extrema_ratios
+# hist_counts_dict
+# hist_count_extremas_only_dict
+
+# ## Per-animal bags (Animal -> Letter -> DF)
+# hist_animal_split_samples_df_dict: Dict[SeriesLetter, Dict[AnimalName, pd.DataFrame]] = {
+#     a_letter: a_df.pho.partition_df_dict('animal') for a_letter, a_df in hist_samples_df_dict.items()
+# }
+# hist_animal_split_samples_df_dict: Dict[AnimalName, Dict[SeriesLetter, pd.DataFrame]] = transpose_nested_dict(hist_animal_split_samples_df_dict)
+
+# animal_bags: Dict[AnimalName, Dict[SeriesLetter, np.ndarray]] = {}
+# for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items():
+#     _counts, hist_count_extremas_only_dict, _ratios, _dens, (bin_edges, bin_values) = compute_hist_variables(hist_samples_df_dict=a_hist_samples_df_dict)
+#     animal_bags[an_animal_name] = deepcopy(hist_count_extremas_only_dict)
+# ## END for an_animal_name, a_hist_samples_df_dict in hist_animal_split_samples_df_dict.items()...
+
+# # OUTPUTS: animal_bags
+# animal_bags
+
+# # animal_bags: {'gor01': {'a': array([6436,  198], dtype=int64),
+# #   'b': array([ 748, 3032], dtype=int64),
+# #   'c': array([431, 165], dtype=int64),
+# #   'd': array([401, 402], dtype=int64)},
+# #  'pin01': {'a': array([1178,   72], dtype=int64),
+# #   'b': array([ 88, 470], dtype=int64),
+# #   'c': array([329,  74], dtype=int64),
+# #   'd': array([131,  91], dtype=int64)},
+# #  'vvp01': {'a': array([430,  23], dtype=int64),
+# #   'b': array([ 76, 206], dtype=int64),
+# #   'c': array([37, 10], dtype=int64),
+# #   'd': array([11,  8], dtype=int64)}}
+
+
+# # np.sum(sim_diffs_dict['KLDIV'] <= 0.0) / num_bootstrap_samples   # fraction with non-positive change
+# # # plus exploratory: stats.ttest_1samp(...)
+# # plot_earthmovers(sim_diffs_dict['EARTHMOVERS'], ...)
+# # plot_kldivergence(sim_diffs_dict['KLDIV'], ...)
 
 
 
+# ==================================================================================================================================================================================================================================================================================== #
+# 2026-10-26 - Animal/Session but not epoch Hierarchical Bootstrapping                                                                                                                                                                                                                 #
+# ==================================================================================================================================================================================================================================================================================== #
+
+# from neuropy.utils.indexing_helpers import NeuroPyDataframeAccessor
+
+
+# end_kwargs = dict(trained_compute_epochs='laps')
+# # end_kwargs = dict(trained_compute_epochs='non_pbe')
+
+# filtered_all_sessions_laps_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_time_bin_df']) # deepcopy(all_sessions_laps_time_bin_df)
+# filtered_all_sessions_laps_time_bin_df: pd.DataFrame =  filtered_all_sessions_laps_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+# filtered_all_sessions_laps_time_bin_df
+
+# filtered_all_sessions_ripple_time_bin_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_time_bin_df']) # deepcopy(all_sessions_ripple_time_bin_df)
+# filtered_all_sessions_ripple_time_bin_df: pd.DataFrame = filtered_all_sessions_ripple_time_bin_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+# filtered_all_sessions_ripple_time_bin_df
+
+
+# ## INPUTS: all_sessions_laps_time_bin_df, all_sessions_ripple_time_bin_df
+# filtered_all_sessions_laps_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_laps_df']) # deepcopy(all_sessions_laps_time_bin_df)
+# filtered_all_sessions_laps_df: pd.DataFrame =  filtered_all_sessions_laps_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+# filtered_all_sessions_laps_df
+
+# filtered_all_sessions_ripple_df = deepcopy(df_filter.filtered_df_dict['filtered_all_sessions_ripple_df']) # deepcopy(all_sessions_ripple_time_bin_df)
+# filtered_all_sessions_ripple_df: pd.DataFrame = filtered_all_sessions_ripple_df.neuropy.constrain_df_cols(decoder_identifier='pseudo2D', masked_time_bin_fill_type='dropped', **end_kwargs) # long_RL=0, short_LR=0, short_RL=0, known_named_decoding_epochs_type='laps'
+# filtered_all_sessions_ripple_df
+
+
+# # { 
+# #        'filtered_all_sessions_ripple_df': deepcopy(df_filter.filtered_all_sessions_ripple_df),
+# #         'filtered_all_sessions_ripple_time_bin_df': deepcopy(df_filter.filtered_all_sessions_ripple_time_bin_df),
+# #         'filtered_all_sessions_laps_df': deepcopy(df_filter.filtered_all_sessions_laps_df),
+# #         'filtered_all_sessions_laps_time_bin_df' : deepcopy(df_filter.filtered_all_sessions_laps_time_bin_df),
+# # }
+
+
+# ## OUTPUTS: filtered_all_sessions_laps_time_bin_df, filtered_all_sessions_ripple_time_bin_df, (filtered_all_sessions_laps_df, filtered_all_sessions_ripple_df)
+
+
+# from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PrePostDeltaDistributionComparison
+# from neuropy.utils.mixins.indexing_helpers import get_dict_subset
+
+# pre_post_delta_stats_distribution_comparison_dict = {}
+# pre_post_delta_stats_results_dict = {}
+
+# _class_kwargs = dict(n_bootstrap=10000, random_state=1337, sampling_unit='session')
+# _run_kwargs = dict(perform_block_permutation_test=True,
+#                     # sampling_unit='animal',  # or 'session'
+#                     sampling_unit='session',
+#                 )
+
+# # grainularity_options = {f'by-time-bin': f'_perTimeBin', 'by-epoch':'_perEpochs'}
+# grainularity_options = ['_perTimeBin', '_perEpochs']
+# _filter_dfs_dict = {'_perEpochs': {'Laps': filtered_all_sessions_laps_df, 'PBEs': filtered_all_sessions_ripple_df},
+#                     '_perTimeBin': {'Laps': filtered_all_sessions_laps_time_bin_df, 'PBEs': filtered_all_sessions_ripple_time_bin_df}}
+
+# for a_grainularity, a_dict in _filter_dfs_dict.items():
+
+#     for an_epoch_name, df in a_dict.items():
+#         # for an_epoch_name, df in {'Laps': filtered_all_sessions_laps_time_bin_df, 'PBEs': filtered_all_sessions_ripple_time_bin_df}.items():
+#         # for an_epoch_name, df in {'Laps': filtered_all_sessions_laps_df, 'PBEs': filtered_all_sessions_ripple_df}.items():
+#         # active_key: str = an_epoch_name
+
+#         active_key: str = '_'.join([a_grainularity, an_epoch_name])
+#         # g = filtered_all_sessions_ripple_time_bin_df.groupby(['animal', 'session_name', 'parent_epoch_id'], dropna=False)['pre_post_delta_category']
+#         # bad = g.nunique()
+#         # bad = bad[bad > 1]
+#         # print(bad.head())
+#         # print('n mixed groups', len(bad), 'n nan parent_epoch_id', filtered_all_sessions_ripple_time_bin_df['parent_epoch_id'].isna().sum())
+
+#         pre_post_delta_stats_distribution_comparison_dict[active_key] = PrePostDeltaDistributionComparison(df, **_class_kwargs)
+#         pre_post_delta_stats_results_dict[active_key] = pre_post_delta_stats_distribution_comparison_dict[active_key].run(**_run_kwargs)
+
+#         print({
+#             k: v for k, v in pre_post_delta_stats_results_dict[active_key].items()
+#             if k not in ('animal_summary', 'permutation_results', 'session_summary')
+#         })
+
+#         # display(pre_post_delta_results_dict[an_epoch_name]['animal_summary'])
+#         # pre_post_delta_results_dict[an_epoch_name]['session_summary']
+
+#     ## END for an_epoch_name, df in ...
+
+# ## END for a_grainularity, a_dict in _filter_dfs_dict.items()...
+
+# ## OUTPUTS: pre_post_delta_distribution_comparison_dict, pre_post_delta_results_dict
+# # {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.34990765382605804, 'wasserstein_1_bootstrap_95ci': (0.2892773195070399, 0.4116581170350606), 'mean_difference_post_minus_pre': 0.34990765382605865, 'median_difference_post_minus_pre': 0.5671199119523261, 'p_value': 0.0009995002498750624, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 252, 'n_bins_post': 218, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.2894704007111565, 0.411809699351879)}
+# # {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.2289006107063542, 'wasserstein_1_bootstrap_95ci': (0.13084789106492914, 0.31555707604088457), 'mean_difference_post_minus_pre': 0.22890061070575576, 'median_difference_post_minus_pre': 0.49047066443769377, 'p_value': 0.0014992503748125937, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 494, 'n_bins_post': 480, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.08607401931188968, 0.2986915300711381)}
+# # {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.46730290285742065, 'wasserstein_1_bootstrap_95ci': (0.34951288392966806, 0.559555311766802), 'mean_difference_post_minus_pre': 0.4673029028574142, 'median_difference_post_minus_pre': 0.731446287686231, 'p_value': 0.0009995002498750624, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 12271, 'n_bins_post': 8330, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.3497991770372044, 0.5664152666835826)}
+# # {'comparison': 'pre-delta vs post-delta', 'sampling_unit': 'session', 'p_value_effect': 'mean_difference_post_minus_pre', 'wasserstein_1': 0.1506443390419763, 'wasserstein_1_bootstrap_95ci': (0.09257872542339074, 0.19319929389259136), 'mean_difference_post_minus_pre': 0.15064433904014948, 'median_difference_post_minus_pre': 0.25815120846333883, 'p_value': 0.001999000499750125, 'n_animals': 3, 'n_sessions': 12, 'n_laps_pre': None, 'n_laps_post': None, 'n_bins_pre': 1614, 'n_bins_post': 1615, 'block_length_laps': 5, 'mean_difference_bootstrap_95ci': (0.09447508799250623, 0.18319471501909232)}
+
+
+# _stats_output_keys = ['wasserstein_1', 'wasserstein_1_bootstrap_95ci', 'mean_difference_post_minus_pre', 'mean_difference_bootstrap_95ci', 'p_value']
+# {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
+
+# # {'_perEpochs_Laps': {'wasserstein_1': 0.34990765382605804,
+# #   'wasserstein_1_bootstrap_95ci': (0.2892773195070399, 0.4116581170350606),
+# #   'mean_difference_post_minus_pre': 0.34990765382605865,
+# #   'mean_difference_bootstrap_95ci': (0.2894704007111565, 0.411809699351879),
+# #   'p_value': 0.0009995002498750624},
+# #  '_perEpochs_PBEs': {'wasserstein_1': 0.2289006107063542,
+# #   'wasserstein_1_bootstrap_95ci': (0.13084789106492914, 0.31555707604088457),
+# #   'mean_difference_post_minus_pre': 0.22890061070575576,
+# #   'mean_difference_bootstrap_95ci': (0.08607401931188968, 0.2986915300711381),
+# #   'p_value': 0.0014992503748125937},
+# #  'by-time-bin_Laps': {'wasserstein_1': 0.46730290285742065,
+# #   'wasserstein_1_bootstrap_95ci': (0.34951288392966806, 0.559555311766802),
+# #   'mean_difference_post_minus_pre': 0.4673029028574142,
+# #   'mean_difference_bootstrap_95ci': (0.3497991770372044, 0.5664152666835826),
+# #   'p_value': 0.0009995002498750624},
+# #  'by-time-bin_PBEs': {'wasserstein_1': 0.1506443390419763,
+# #   'wasserstein_1_bootstrap_95ci': (0.09257872542339074, 0.19319929389259136),
+# #   'mean_difference_post_minus_pre': 0.15064433904014948,
+# #   'mean_difference_bootstrap_95ci': (0.09447508799250623, 0.18319471501909232),
+# #   'p_value': 0.001999000499750125}}
 
 
 
@@ -2200,7 +6213,7 @@ def PAPER_FIGURE_figure_1_full(curr_active_pipeline, defer_show=False, save_figu
 # Shows the LxC/SxC metrics and firing rate indicies
 
 @function_attributes(short_name=None, tags=['significance_bars', 'fig2', 'statistics'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-29 18:12', related_items=[])
-def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08):
+def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05, y_offset: Optional[float] = None, text_additional_y_offset: Optional[float] = None, ns_fontsize: float = 10, y_offset_frac: float = 0.08, color: str = 'black'):
     """Add significance bars to a boxplot.
 
     When `y_offset` / `text_additional_y_offset` are None, they scale with |y|
@@ -2223,7 +6236,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     if text_additional_y_offset is None:
         text_additional_y_offset = 0.02 * y_scale
     _out_ann = {}
-    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color='black')
+    _out_ann['bar'] = ax.plot([x1, x1, x2, x2], [y, (y + y_offset), (y + y_offset), y], color=color)
     
     # Annotate with asterisks based on p-value
     sig_astrisks_str: str = 'N.S.'
@@ -2237,7 +6250,7 @@ def add_significance_bars(ax, p_value, x1, x2, y, significance_level:float=0.05,
     label_y: float = float(y + y_offset + text_additional_y_offset)
     if sig_astrisks_str:
         label_fontsize = ns_fontsize if (sig_astrisks_str == 'N.S.') else 16
-        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center')
+        _out_ann['label'] = ax.text(((x1 + x2) / 2), label_y, sig_astrisks_str, fontsize=label_fontsize, ha='center', color=color)
 
     # create_plot may have pinned ylim before overlays; expand top so the bracket/label are not clipped (keep floor at 0)
     _ymin, _ymax = ax.get_ylim()
@@ -2571,33 +6584,51 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates') -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True) -> str:
         """ buidls the two line colored string that is passed into `flexitext`.
         """
-        if not prepare_for_publication:
-            title_font_size: int = 22
-            subtitle_font_size: int = 14
-        else:
-            title_font_size: int = 9*2
-            subtitle_font_size: int = 7*2
+        if title_font_size is None:
+            title_font_size = 22 if (not prepare_for_publication) else (9 * 2)
+        if subtitle_font_size is None:
+            subtitle_font_size = 14 if (not prepare_for_publication) else (7 * 2)
 
-        return (f"<size:{title_font_size}><weight:bold>{epochs_name}</> {metric_name}\n"
-                f"<size:{subtitle_font_size}>for the "
-                "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track</></>"
+        if subtitle is None:
+            subtitle = ('for the '
+                        "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track")
+
+        epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
+        metric_suffix: str = f" {metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
+        # Close line-1 <size:…> before \n so flexitext does not glue the subtitle/granularity phrase to "Session Means".
+        return (f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>\n"
+                f"<size:{subtitle_font_size}>{subtitle}</>"
                 )
 
 
     @classmethod
-    def _apply_publication_grouped_xticklabels(cls, ax):
-        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, LdCs/SdCs under each pair. """
-        ax.set_xticks(np.arange(4))
-        ax.set_xticklabels([r'pre-$\Delta$', r'post-$\Delta$', r'pre-$\Delta$', r'post-$\Delta$'])
+    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, ...] = ('LdCs', 'SdCs')):
+        """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, group labels under each pair.
+
+        One group label → a single pre/post pair at x=0,1. Two group labels → the original 4-bar Figure 2 layout.
+        """
+        labels = tuple(group_labels)
+        n_groups: int = len(labels)
+        pre_post = [r'pre-$\Delta$', r'post-$\Delta$']
+        if n_groups <= 1:
+            ax.set_xticks(np.arange(2))
+            ax.set_xticklabels(pre_post)
+            group_tick_positions = [0.5]
+            group_tick_labels = [f'\n\n{labels[0]}'] if (n_groups == 1) else [f'\n\n']
+        else:
+            ax.set_xticks(np.arange(4))
+            ax.set_xticklabels(pre_post + pre_post)
+            group_tick_positions = [0.5, 2.5]
+            group_tick_labels = [f'\n\n{labels[0]}', f'\n\n{labels[1]}']
         ax.tick_params(axis='x', length=0, pad=2)
         ax.set_xlabel('')
 
-        # Group labels centered under bars 0–1 and 2–3 (matplotlib multilevel-tick pattern)
+        # Group labels centered under each pre/post pair (matplotlib multilevel-tick pattern)
         sec = ax.secondary_xaxis(location=0)
-        sec.set_xticks([0.5, 2.5], labels=['\n\nLdCs', '\n\nSdCs'])
+        sec.set_xticks(group_tick_positions, labels=group_tick_labels)
         sec.tick_params('x', length=0)
         sec.spines['bottom'].set_visible(False)
         return sec
@@ -2621,16 +6652,81 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         left_margin: float = float(kwargs.pop('left_margin', text_formatter.left_margin))
         bottom_margin: float = float(kwargs.pop('bottom_margin', text_formatter.bottom_margin))
         title_top_margin: float = float(kwargs.pop('title_top_margin', top_margin + 0.02))
+        publication_group_labels = kwargs.pop('publication_group_labels', ('LdCs', 'SdCs'))
+        title_subtitle = kwargs.pop('title_subtitle', None)
+        metric_name_override = kwargs.pop('metric_name', None)
+        title_font_size = kwargs.pop('title_font_size', None)
+        subtitle_font_size = kwargs.pop('subtitle_font_size', None)
+        bold_epochs_name: bool = bool(kwargs.pop('bold_epochs_name', True))
+        xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
+        bar_x = kwargs.pop('bar_x', None)
+        bar_width = kwargs.pop('bar_width', None)
+        bar_colors = kwargs.pop('bar_colors', None)
+        errorbar_colors = kwargs.pop('errorbar_colors', None)
+        xtick_positions = kwargs.pop('xtick_positions', None)
+        xtick_labels = kwargs.pop('xtick_labels', None)
+        scatter_x_offsets = kwargs.pop('scatter_x_offsets', None)
+        scatter_extra_kwargs = dict(kwargs.pop('scatter_kwargs', None) or {})
+        figsize = kwargs.pop('figsize', None)
+        fignum = kwargs.pop('fignum', None)
+        if fignum is None:
+            fignum = kwargs.pop('num', None)
+        clear_figure: bool = bool(kwargs.pop('clear', fignum is not None))
         text_formatter.top_margin = top_margin
         text_formatter.left_margin = left_margin
         text_formatter.bottom_margin = bottom_margin
-        x = np.arange(len(x_labels))
-        width = 0.3
+        n_bars: int = len(y_values)
+        x = np.arange(n_bars, dtype=float) if bar_x is None else np.asarray(bar_x, dtype=float)
+        if len(x) != n_bars:
+            raise ValueError(f'bar_x length {len(x)} != n_bars {n_bars}.')
+        if bar_width is None:
+            widths = np.full(n_bars, 0.3, dtype=float)
+        else:
+            widths = np.broadcast_to(np.asarray(bar_width, dtype=float), (n_bars,)).astype(float).copy()
+        palette = list(cls.get_bar_colors())
+        if bar_colors is None:
+            edgecolors = [palette[i % len(palette)] for i in range(n_bars)]
+        else:
+            edgecolors = list(bar_colors)
+            if len(edgecolors) != n_bars:
+                raise ValueError(f'bar_colors length {len(edgecolors)} != n_bars {n_bars}.')
+        if scatter_x_offsets is not None:
+            scatter_x_offsets = list(scatter_x_offsets)
+            if len(scatter_x_offsets) != n_bars:
+                raise ValueError(f'scatter_x_offsets length {len(scatter_x_offsets)} != n_bars {n_bars}.')
 
-        fig, ax = plt.subplots()
+        subplots_kwargs = {}
+        if figsize is not None:
+            subplots_kwargs['figsize'] = figsize
+        if fignum is not None:
+            subplots_kwargs['num'] = fignum
+            subplots_kwargs['clear'] = clear_figure
+        fig, ax = plt.subplots(**subplots_kwargs)
+        if figsize is not None:
+            fig.set_size_inches(float(figsize[0]), float(figsize[1]), forward=True)
         text_formatter.setup_margins(fig)
 
-        bars = ax.bar(x, [np.mean(yi) for yi in y_values], yerr=[np.std(yi) for yi in y_values], capsize=5, width=width, tick_label=x_labels, color=(0, 0, 0, 0), edgecolor=cls.get_bar_colors())
+        bar_tick_label = x_labels if (len(x_labels) == n_bars) else None
+        means = [float(np.mean(yi)) for yi in y_values]
+        stds = [float(np.std(yi)) for yi in y_values]
+        # matplotlib ax.bar ecolor must be a single color; draw per-bar errorbars when a sequence is provided.
+        bar_error_kwargs = {}
+        per_bar_errorbar_colors = None
+        if errorbar_colors is not None:
+            ecolors = list(errorbar_colors) if (not isinstance(errorbar_colors, str)) else [errorbar_colors]
+            if len(ecolors) == 1:
+                bar_error_kwargs['ecolor'] = ecolors[0]
+            elif len(ecolors) == n_bars:
+                per_bar_errorbar_colors = ecolors
+            else:
+                raise ValueError(f'errorbar_colors length {len(ecolors)} != n_bars {n_bars}.')
+        yerr = None if (per_bar_errorbar_colors is not None) else stds
+        bars = ax.bar(x, means, yerr=yerr, capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors, **bar_error_kwargs)
+        if per_bar_errorbar_colors is not None:
+            for i in range(n_bars):
+                ax.errorbar(x[i], means[i], yerr=stds[i], fmt='none', ecolor=per_bar_errorbar_colors[i], capsize=5, zorder=3)
+            ## END for i in range(n_bars)...
+
 
         scatter_plots = []
         x_values_list = []
@@ -2641,8 +6737,16 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             print(f'_output: {_output}')
 
 
-        for i in range(len(x)):
-            x_values = (x[i] + np.random.random(y_values[i].size) * width - width / 2)
+        for i in range(n_bars):
+            width_i = float(widths[i])
+            n_i = int(np.asarray(y_values[i]).size)
+            if scatter_x_offsets is not None:
+                offsets_i = np.asarray(scatter_x_offsets[i], dtype=float)
+                if offsets_i.size != n_i:
+                    raise ValueError(f'scatter_x_offsets[{i}] length {offsets_i.size} != n_points {n_i}.')
+                x_values = x[i] + offsets_i
+            else:
+                x_values = (x[i] + np.random.random(n_i) * width_i - width_i / 2) # spread points along x within the bar so they don't overlap
             scatter_props_kwargs: Dict = list_of_dicts_to_dict_of_lists(scatter_props[i])
             had_custom_marker_handling = False
             user_markers = scatter_props_kwargs.get('marker', None)
@@ -2653,7 +6757,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                     user_markers = scatter_props_kwargs.pop('marker') # remove from `scatter_props_kwargs`
                     scatter_plot = [] # scatter plot is just going to be a list here, hope that's okay.
                     for point_index, a_marker in enumerate(user_markers):
-                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=cls.get_bar_colors()[i], marker=user_markers[point_index], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                        a_sub_scatter_plot = ax.scatter(x_values[point_index], y_values[i][point_index], color=edgecolors[i], marker=user_markers[point_index], **scatter_extra_kwargs, **scatter_props_kwargs) # spread along x within the bar so points don't overlap.
                         scatter_plot.append(a_sub_scatter_plot)
                     ## END for point_index, a_marker in enumerate(user_markers)...
 
@@ -2661,22 +6765,22 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
             if not had_custom_marker_handling:
                 # No special marker or just a scalar specific marker value, no need to loop
-                scatter_plot = ax.scatter(x_values, y_values[i], color=cls.get_bar_colors()[i], **scatter_props_kwargs) # the np.random part is to spread the points out along the x-axis within their bar so they're visible and don't overlap.
+                scatter_plot = ax.scatter(x_values, y_values[i], color=edgecolors[i], **scatter_extra_kwargs, **scatter_props_kwargs) # spread along x within the bar so points don't overlap.
     
             scatter_plots.append(scatter_plot)
             x_values_list.append(x_values)
-        ## END for i in range(len(x))...
+        ## END for i in range(n_bars)...
 
-        ax.set_xlabel('Neuron Track Dominance Classification')
+        ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         # Hide the right and top spines (box components)
         ax.spines[['right', 'top']].set_visible(False)
 
-        metric_name: str = cls._metric_name_from_ylabel(ylabel)
+        metric_name: str = metric_name_override if metric_name_override is not None else cls._metric_name_from_ylabel(ylabel)
         _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
         active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
         title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle, title_font_size=title_font_size, subtitle_font_size=subtitle_font_size, bold_epochs_name=bold_epochs_name), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
@@ -2685,10 +6789,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             text_objects['footer'] = footer_text_obj
             
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(x_labels)
+        if xtick_positions is None:
+            xtick_positions = x
+        if xtick_labels is None:
+            xtick_labels = x_labels
+        ax.set_xticks(xtick_positions)
+        if len(np.atleast_1d(xtick_positions)) == len(xtick_labels):
+            ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
-            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax)
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels)
 
         # Firing rates / participation fractions are non-negative; keep axis floor at 0
         _ymin, _ymax = ax.get_ylim()
@@ -3155,12 +7264,13 @@ def pho_stats_perform_diagonal_line_binomial_test(long_short_fr_indicies_analysi
 LinearRegressionOutput = make_class("LinearRegressionOutput", {k:field() for k in ("reg_x", "reg_y", "slope", "intercept", "regression_line", "model", "r_value")}, bases=(UnpackableMixin, object,))
 
 
-def _linear_regression_output_plot(self, ax, r_text_kwargs=None, **kwargs):
+def _linear_regression_output_plot(self, ax, r_text_kwargs=None, include_r_value_label: bool = True, **kwargs):
     """Plot regression line and R-value label. Line kwargs default to red/0.7/0.5; R text defaults to black/8pt. Pass r_text_kwargs to override the R label."""
     line_kwargs = dict(color='red', alpha=0.7, lw=0.5) | kwargs
     _r_text_kwargs = dict(fontsize=8, color='black', alpha=0.9, verticalalignment='top') | (r_text_kwargs or {})
     line_artists = ax.plot(self.reg_x, self.regression_line, label=f'Regression Line\ny={self.slope:.2f}x + {self.intercept:.2f}', **line_kwargs)
-    ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
+    if include_r_value_label:
+        ax.text(0.02, 0.98, f'R = {self.r_value:.3f}', transform=ax.transAxes, **_r_text_kwargs)
     return line_artists[0]
 
 
@@ -4126,10 +8236,15 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
     # y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
 
+    color_by_time_bin_size: bool = bool(kwargs.pop('color_by_time_bin_size', False))
+
     # px_scatter_kwargs __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
     px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix', 'num_events'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-    if is_publication_ready_figure:
+    if color_by_time_bin_size:
+        # Figure S3: keep categorical colors by time_bin_size (do not force black)
+        px_scatter_kwargs['color'] = "time_bin_size"
+    elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # if 'dummy_column_for_color' not in concatenated_ripple_df.columns:
         #     concatenated_ripple_df['dummy_column_for_color'] = '#000000'            
@@ -4164,7 +8279,12 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
     # hist_kwargs ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     hist_kwargs = dict()
 
-    if is_publication_ready_figure:
+    if color_by_time_bin_size:
+        hist_kwargs['color'] = "time_bin_size"
+        hist_kwargs['histnorm'] = 'probability density'
+        hist_kwargs['barmode'] = 'group'
+        hist_kwargs['opacity'] = 1.0
+    elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # assert 'dummy_column_for_color' in concatenated_ripple_df.columns, f"it was supposed to be added in the above px_scatter... related block. How did this not happen?"
         # hist_kwargs['color'] = "dummy_column_for_color"
@@ -4244,8 +8364,8 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
         # _extras_output_dict['out_container_widget'], _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig, output_widget=custom_output_widget)
         _extras_output_dict['custom_widget_buttons'] = add_copy_save_action_buttons(new_fig)
         
-    # Auto-hide legend for publication figures
-    if is_publication_ready_figure:
+    # Auto-hide legend for publication figures (keep legend when coloring by multiple time_bin_size series — FigureS8 post-hoc layout owns it)
+    if is_publication_ready_figure and (not color_by_time_bin_size):
         new_fig = new_fig.update_layout(showlegend=False)
 
     return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
@@ -6877,7 +10997,7 @@ class PhoPublicationFigureHelper:
             with mpl.rc_context(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=prepare_for_publication) | {'figure.figsize': (10, 4), 'figure.dpi': '220'})
             
         """
-        _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42,  }
+        _out_rcparams = {'savefig.transparent': True, 'ps.fonttype': 42, 'pdf.fonttype': 42, 'svg.fonttype': 'none'}
         _out_rcparams =( _out_rcparams | kwargs)
         if prepare_for_publication:
             ## OVERRIDE in the case of publications:

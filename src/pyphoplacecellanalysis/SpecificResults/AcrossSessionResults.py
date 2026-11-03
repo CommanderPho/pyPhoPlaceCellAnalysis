@@ -1596,7 +1596,7 @@ def copy_session_folder_files_to_target_dir(good_session_concrete_folders, targe
         from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import copy_session_folder_files_to_target_dir
 
-        custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_0.0005.h5').resolve())),
+        custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_5.0-tbin_25ms_recomputed_inst_fr_comps_0.0005.h5').resolve())),
                                 #   'PHONEW.evt': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{a_session_folder.context.session_name}.PHONEW.evt').resolve())),
                                 }
 
@@ -1800,23 +1800,39 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list:List[float], debug_print = False):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False, full_custom_suffix: Optional[str] = None):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
+
+    Prefers suffixed session files when `full_custom_suffix` is provided:
+        `{RESULT_DATE_TO_USE}{full_custom_suffix}_recomputed_inst_fr_comps_{time_bin_size}.pkl`
+    Falls back to legacy unsuffixed names when the suffixed path is missing.
     
     """
     from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
     from neuropy.core.user_annotations import UserAnnotationsManager
     from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import loadData
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import InstantaneousSpikeRateGroupsComputation
 
-    def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None):
+    def _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, date_str: str, time_bin_size: float, custom_suffix: Optional[str] = None):
+        """ Try suffixed filename first (when provided), then legacy unsuffixed name. """
+        output_folder = a_session_folder.output_folder
+        if custom_suffix is not None and len(str(custom_suffix).strip()) > 0:
+            suffixed_name: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=custom_suffix, instantaneous_time_bin_size_seconds=time_bin_size, extension='.pkl', date_str=date_str)
+            found = get_file_path_if_file_exists(output_folder.joinpath(suffixed_name).resolve())
+            if found is not None:
+                return found
+        legacy_name: str = f'{date_str}_recomputed_inst_fr_comps_{time_bin_size}.pkl'
+        return get_file_path_if_file_exists(output_folder.joinpath(legacy_name).resolve())
+
+    def _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders, collected_outputs_path, BATCH_DATE_TO_USE, custom_file_types_dict=None, dry_run: bool = False):
         """ 
         Creates `across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}_{time_bin_size_str}.pkl`
         """
         if custom_file_types_dict is None:
-            custom_file_types_dict = {'recomputed_inst_fr_comps': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{BATCH_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve()))}
+            custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder, _tbin=time_bin_size: _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, BATCH_DATE_TO_USE, _tbin, full_custom_suffix)) for time_bin_size in instantaneous_time_bin_size_seconds_list}
             
         ## build the `across_sessions_recomputed_instantaneous_fr_dict` by loading the individual results from the session folders
         across_sessions_recomputed_instantaneous_fr_dict_dict = {}
@@ -1834,11 +1850,14 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
                     assert curr_pkl.exists()
                     print(a_session_folder)
                     print(curr_pkl)
+                    if dry_run:
+                        across_sessions_recomputed_instantaneous_fr_dict[a_session_folder.context] = None
+                        continue
                     try:
                         across_sessions_recomputed_instantaneous_fr_dict[a_session_folder.context] = loadData(curr_pkl) # InstantaneousSpikeRateGroupsComputation
                     except BaseException as err:
                         print(f'encountered err: {err} when trying to unpickle. Skipping.')
-            # end for a_session_folder
+            ## END for a_session_folder in good_session_concrete_folders...
             # OUTPUT:  across_sessions_recomputed_instantaneous_fr_dict
             num_sessions = len(across_sessions_recomputed_instantaneous_fr_dict)
             print(f'num_sessions: {num_sessions}')
@@ -1847,8 +1866,11 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
 
             ## Save the instantaneous firing rate results dict: (# Dict[IdentifyingContext] = InstantaneousSpikeRateGroupsComputation)
             across_session_result_long_short_recomputed_inst_firing_rate_filename: str = f'across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}_{time_bin_size_str}.pkl'
-            AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_recomputed_instantaneous_fr_dict, global_data_root_parent_path=collected_outputs_path.resolve(),
-                                                            inst_fr_output_filename=across_session_result_long_short_recomputed_inst_firing_rate_filename)
+            if dry_run:
+                print(f'DRY-RUN: would save across_sessions inst-FR pickle to {collected_outputs_path.resolve().joinpath(across_session_result_long_short_recomputed_inst_firing_rate_filename)} ({num_sessions} session(s))')
+            else:
+                AcrossSessionsResults.save_across_sessions_data(across_sessions_instantaneous_fr_dict=across_sessions_recomputed_instantaneous_fr_dict, global_data_root_parent_path=collected_outputs_path.resolve(),
+                                                                inst_fr_output_filename=across_session_result_long_short_recomputed_inst_firing_rate_filename)
 
             ## Add to the dict dict
             across_sessions_recomputed_instantaneous_fr_dict_dict[time_bin_size] = across_sessions_recomputed_instantaneous_fr_dict
@@ -1859,12 +1881,17 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     # BEGIN FUNCTION BODY ________________________________________________________________________________________________ #
     ## INPUTS: RESULT_DATE_TO_USE, collected_outputs_path
     # instantaneous_time_bin_size_seconds_list:List[float]=[0.0005, 0.0009, 0.0015, 0.0025, 0.025]
-    custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder: get_file_path_if_file_exists(a_session_folder.output_folder.joinpath(f'{RESULT_DATE_TO_USE}_recomputed_inst_fr_comps_{time_bin_size}.pkl').resolve())) for time_bin_size in instantaneous_time_bin_size_seconds_list}
+    custom_file_types_dict = {f'recomputed_inst_fr_comps_{time_bin_size}': (lambda a_session_folder, _tbin=time_bin_size: _resolve_recomputed_inst_fr_comps_pkl(a_session_folder, RESULT_DATE_TO_USE, _tbin, full_custom_suffix)) for time_bin_size in instantaneous_time_bin_size_seconds_list}
     print(f'custom_file_types_dict: {custom_file_types_dict}')
     
-    known_global_data_root_parent_paths = [Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'/Volumes/MoverNew/data')] # , Path(r'/home/halechr/FastData'), Path(r'/home/halechr/turbo/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data')
-    global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-    assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+    if global_data_root_parent_path is not None:
+        global_data_root_parent_path = Path(global_data_root_parent_path) # .resolve()
+        if not global_data_root_parent_path.exists():
+            raise FileNotFoundError(f'user-provided `global_data_root_parent_path` does not exist: {global_data_root_parent_path}')
+    else:
+        known_global_data_root_parent_paths = [Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'/Volumes/MoverNew/data')] # , Path(r'/home/halechr/FastData'), Path(r'/home/halechr/turbo/Data'), Path(r'W:\Data'), Path(r'/home/halechr/cloud/turbo/Data')
+        global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+        assert global_data_root_parent_path.exists(), f"auto-discovered global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
     # Hardcoded included_session_contexts:
     included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
     good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
@@ -1872,11 +1899,15 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     # Output Paths:
     target_dir: Path = collected_outputs_path
     custom_file_type_name: str = 'recomputed_inst_fr_comps'
-    out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=f'{RESULT_DATE_TO_USE}/{custom_file_type_name}')
+    if dry_run:
+        out_parent_path = target_dir.joinpath(f'{RESULT_DATE_TO_USE}/{custom_file_type_name}').resolve()
+        print(f'DRY-RUN: out_parent_path (not created): {out_parent_path}')
+    else:
+        out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=f'{RESULT_DATE_TO_USE}/{custom_file_type_name}')
 
-    moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=out_parent_path, RESULT_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=False)
+    moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=out_parent_path, RESULT_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=dry_run, debug_print=debug_print)
 
-    across_sessions_recomputed_instantaneous_fr_dict = _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders=good_session_concrete_folders, collected_outputs_path=collected_outputs_path, BATCH_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict)
+    across_sessions_recomputed_instantaneous_fr_dict = _subfn_combine_across_session_inst_firing_rate_pkl(good_session_concrete_folders=good_session_concrete_folders, collected_outputs_path=collected_outputs_path, BATCH_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=dry_run)
 
     return across_sessions_recomputed_instantaneous_fr_dict, moved_files_dict_files, (filelist_path, filedict_out_path)
 
@@ -3431,10 +3462,12 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
     final_sessions_loaded_merged_complete_epoch_stats_df_dict = {}
     
 
-    final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_WCorrShuffle_df': {},
+    final_sessions_loaded_extra_df_dict: Dict[str, Dict] = {'ripple_EpochScoreShuffle_df': {},
+                                                            'ripple_WCorrShuffle_df': {},
                                                             'perfmnc_session': {},
                                            }
-    final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_WCorrShuffle_df': None,
+    final_sessions_loaded_extra_dfs: Dict[str, pd.DataFrame] = {'ripple_EpochScoreShuffle_df': None,
+                                                                'ripple_WCorrShuffle_df': None,
                                                                 'perfmnc_session': None,
                                       }
     
@@ -3536,11 +3569,13 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict      
-            elif file_type == 'ripple_WCorrShuffle_df':
+            elif file_type in ('ripple_EpochScoreShuffle_df', 'ripple_WCorrShuffle_df'):
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key='start', **additional_columns_dict)
                 ## update when done:
                 final_sessions_loaded_extra_df_dict[file_type] = _curr_dict
+            elif file_type == 'ripple_EpochScoreShuffle_ByShuffle_df':
+                pass ## per-shuffle nulls are not loaded in the paper pipeline
             elif file_type == 'perfmnc_session':
                 _curr_dict = final_sessions_loaded_extra_df_dict[file_type]
                 _is_file_valid = _subfn_new_df_process_and_load_exported_file(path, _curr_dict, session_name, curr_session_t_delta, time_key=None, **additional_columns_dict)
@@ -3574,6 +3609,15 @@ def _new_process_csv_files(parsed_csv_files_df: pd.DataFrame, t_delta_dict: Dict
         ## END FOR    
     if debug_print:
         print(f'done with main processing loop')
+    ## Prefer ripple_EpochScoreShuffle_df; fill missing session keys from legacy ripple_WCorrShuffle_df
+    epoch_score_shuffle_dict = final_sessions_loaded_extra_df_dict.get('ripple_EpochScoreShuffle_df', {})
+    legacy_wcorr_shuffle_dict = final_sessions_loaded_extra_df_dict.get('ripple_WCorrShuffle_df', {})
+    for a_loaded_dict_key, a_df in legacy_wcorr_shuffle_dict.items():
+        if a_loaded_dict_key not in epoch_score_shuffle_dict:
+            epoch_score_shuffle_dict[a_loaded_dict_key] = a_df
+    ## END for a_loaded_dict_key, a_df in legacy_wcorr_shuffle_dict.items()....
+
+    final_sessions_loaded_extra_df_dict['ripple_EpochScoreShuffle_df'] = epoch_score_shuffle_dict
     ## OUTPUTS: final_sessions_loaded_laps_dict, final_sessions_loaded_ripple_dict, final_sessions_loaded_laps_time_bin_dict, final_sessions_loaded_ripple_time_bin_dict, final_sessions_loaded_simple_pearson_laps_dict, final_sessions_loaded_simple_pearson_ripple_dict, final_sessions_loaded_laps_wcorr_dict, final_sessions_loaded_ripple_wcorr_dict, final_sessions_loaded_laps_all_scores_dict, final_sessions_loaded_ripple_all_scores_dict,
     # #TODO 2024-09-27 09:48: - [ ] ERROR: the basic dataframes are now missing their 'time_bin_size' columns somehow!!
     ## Build across_sessions join dataframes:
@@ -3680,11 +3724,16 @@ class OldFileArchiver:
     @function_attributes(short_name=None, tags=['filesystem', 'clean', 'delete', 'temporary'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-06 04:27', related_items=[])
     @classmethod
     def remove_backup_files_from_session_data_folders(cls, good_session_concrete_folders: List["ConcreteSessionFolder"],
-                                                   always_delete_patterns=None, conditional_delete_patterns=None, conditional_delete_files_cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False):
+                                                   always_delete_patterns=None, conditional_delete_patterns=None, conditional_delete_files_cutoff_date: Optional[datetime.datetime]=None, is_dryrun: bool = True, debug_print:bool=False,
+                                                   session_rel_search_dir: Optional[str] = None):
         """ cleans up the temporary pickle files that are created during the session data loading process to recover space.
         
         cutoff_date: files older than this date will be removed regardless of whether they are temporary or not!!
             conditional_delete_files_cutoff_date = datetime(2023, 9, 1)  # Example cutoff date
+
+        session_rel_search_dir: when None (default), scan each session's root and ``output/`` separately (legacy).
+            When set (e.g. ``'output/'``, ``''``, ``'/'``), scan only the resolved folder under each session
+            (same relative-path rules as ``AcrossSessionHelpers._copy_exported_files_from_session_folder_to_collected_outputs``).
         
         Usage:
             from pyphoplacecellanalysis.General.Batch.runBatch import ConcreteSessionFolder, BackupMethods
@@ -3699,6 +3748,15 @@ class OldFileArchiver:
             good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
             deleted_file_list = OldFileArchiver.remove_backup_files_from_session_data_folders(good_session_concrete_folders=good_session_concrete_folders, is_dryrun=True)
             deleted_file_list
+
+            ## Custom conditional globs under session output/ only (mtime before cutoff):
+            deleted_file_list = OldFileArchiver.remove_backup_files_from_session_data_folders(
+                good_session_concrete_folders=good_session_concrete_folders,
+                conditional_delete_patterns={'h5': '**/*.h5', 'csv': '**/*.csv', 'pkl': '**/*.pkl'},
+                conditional_delete_files_cutoff_date=datetime(2026, 10, 29),
+                session_rel_search_dir='output/',
+                is_dryrun=True,
+            )
 
         """	
         # a_folder = good_session_concrete_folders[0]
@@ -3716,73 +3774,84 @@ class OldFileArchiver:
                 cutoff_timestamp = conditional_delete_files_cutoff_date.astimezone(datetime.timezone.utc).timestamp()
         else:
             cutoff_timestamp = None
-            
+
+        # Define patterns once (outside the per-session loop)
+        if always_delete_patterns is None:
+            always_delete_patterns = {
+                '.pkltmp': '*.pkltmp',
+                '.pkl.bak': '*.pkl.bak',
+            }
+
+        if conditional_delete_patterns is None:
+            conditional_delete_patterns = {
+                # '.pkl': '*.pkl',
+                'pipeline.pkl': '*loadedSessPickle*.pkl',
+                'global.pkl': '*global_computation_results*.pkl',
+            }
+
+        def _resolve_session_search_folder(session_path: Path, rel_search_dir: str) -> Path:
+            """ '' / '.' / '/' → session root; otherwise join relative path under session.path """
+            _rel = (rel_search_dir or '').strip().strip('/\\')
+            if _rel in ('', '.'):
+                return session_path
+            return session_path.joinpath(_rel)
+
+
+        def _search_folders_for_session(a_folder: "ConcreteSessionFolder") -> List[Path]:
+            if session_rel_search_dir is None:
+                return [a_folder.path, a_folder.output_folder]
+            return [_resolve_session_search_folder(a_folder.path, session_rel_search_dir)]
+
+
+        # Function to collect files based on patterns and cutoff_date
+        def collect_files(folder: Path, patterns: dict, condition: str = 'always') -> List[Path]:
+            """ captures debug_print, cutoff_timestamp from the outer function """
+            files = []
+            for desc, pattern in patterns.items():
+                matched_files = list(folder.glob(pattern))
+                if debug_print:
+                    print(f'\tLooking for {desc} files with pattern "{pattern}": Found {len(matched_files)} files.')
+                for file_path in matched_files:
+                    if not file_path.is_file():
+                        continue
+                    if condition == 'conditional' and cutoff_timestamp is not None:
+                        try:
+                            file_mtime = file_path.stat().st_mtime
+                        except OSError as e:
+                            print(f'\t\tError accessing file "{file_path}": {e}')
+                            continue
+                        if file_mtime >= cutoff_timestamp:
+                            if debug_print:
+                                print(f'\t\tSkipping "{file_path.as_posix()}" (modified on {datetime.fromtimestamp(file_mtime)}) - newer than cutoff.')
+                            continue
+                    elif condition == 'conditional' and cutoff_timestamp is None:
+                        # If conditional pattern but no cutoff_date provided, skip deletion
+                        if debug_print:
+                            print(f'\t\tNo cutoff_date provided. Skipping "{file_path.as_posix()}".')
+                        continue
+                    files.append(file_path)
+                ## END for file_path in matched_files...
+            ## END for desc, pattern in patterns.items()...
+            return files
+
 
         for a_folder in good_session_concrete_folders:
-            # Define patterns to always delete
-            if always_delete_patterns is None:
-                always_delete_patterns = {
-                    '.pkltmp': '*.pkltmp',
-                    '.pkl.bak': '*.pkl.bak',
-                }
-            
-            # Define patterns to conditionally delete
-            if conditional_delete_patterns is None:
-                conditional_delete_patterns = {
-                    # '.pkl': '*.pkl',
-                    'pipeline.pkl': '*loadedSessPickle*.pkl',
-                    'global.pkl': '*global_computation_results*.pkl',
-                }
-            
-            # Function to collect files based on patterns and cutoff_date
-            def collect_files(folder: Path, patterns: dict, condition: str = 'always') -> List[Path]:
-                """ captures debug_print, cutoff_timestamp, and is_dryrun from the outer function """
-                files = []
-                for desc, pattern in patterns.items():
-                    matched_files = list(folder.glob(pattern))
+            always_files: List[Path] = []
+            conditional_files: List[Path] = []
+            for search_folder in _search_folders_for_session(a_folder):
+                if not search_folder.is_dir():
                     if debug_print:
-                        print(f'\tLooking for {desc} files with pattern "{pattern}": Found {len(matched_files)} files.')
-                    for file_path in matched_files:
-                        if condition == 'conditional' and cutoff_timestamp is not None:
-                            try:
-                                file_mtime = file_path.stat().st_mtime
-                            except OSError as e:
-                                print(f'\t\tError accessing file "{file_path}": {e}')
-                                continue
-                            if file_mtime >= cutoff_timestamp:
-                                if debug_print:
-                                    print(f'\t\tSkipping "{file_path.as_posix()}" (modified on {datetime.fromtimestamp(file_mtime)}) - newer than cutoff.')
-                                continue
-                        elif condition == 'conditional' and cutoff_timestamp is None:
-                            # If conditional pattern but no cutoff_date provided, skip deletion
-                            if debug_print:
-                                print(f'\t\tNo cutoff_date provided. Skipping "{file_path.as_posix()}".')
-                            continue
-                        files.append(file_path)
-                return files
+                        print(f'\tSkipping missing search folder: {search_folder.as_posix()}')
+                    continue
+                always_files.extend(collect_files(search_folder, always_delete_patterns, condition='always'))
+                conditional_files.extend(collect_files(search_folder, conditional_delete_patterns, condition='conditional'))
+            ## END for search_folder in _search_folders_for_session(a_folder)...
 
-            # Collect files to always delete from session folder
-            session_always_files = collect_files(a_folder.path, always_delete_patterns, condition='always')
             if debug_print:
-                print(f'\tSession folder: {len(session_always_files)} files marked for always deletion.')
+                print(f'\t{a_folder.path.as_posix()}: {len(always_files)} always + {len(conditional_files)} conditional file(s) marked for deletion.')
 
-            # Collect files to conditionally delete from session folder
-            session_conditional_files = collect_files(a_folder.path, conditional_delete_patterns, condition='conditional')
-            if debug_print:
-                print(f'\tSession folder: {len(session_conditional_files)} *.pkl files marked for conditional deletion.')
-
-            # Collect files to always delete from output folder
-            output_always_files = collect_files(a_folder.output_folder, always_delete_patterns, condition='always')
-            if debug_print:
-                print(f'\tOutput folder: {len(output_always_files)} files marked for always deletion.')
-
-            # Collect files to conditionally delete from output folder
-            output_conditional_files = collect_files(a_folder.output_folder, conditional_delete_patterns, condition='conditional')
-            if debug_print:
-                print(f'\tOutput folder: {len(output_conditional_files)} *.pkl files marked for conditional deletion.')
-
-            # Combine all files to delete
-            all_files_to_delete = session_always_files + session_conditional_files + output_always_files + output_conditional_files
+            # Combine and dedupe (recursive ** globs / dual legacy search can hit the same path twice)
+            all_files_to_delete = list(dict.fromkeys(always_files + conditional_files))
 
             for a_path in all_files_to_delete:
                 print(f'\tDeleting "{a_path.as_posix()}"...')
@@ -3794,8 +3863,10 @@ class OldFileArchiver:
                         print(f'\t\tFailed to delete "{a_path.as_posix()}": {e}')
                         continue
                 deleted_file_list.append(a_path)
-                        
+            ## END for a_path in all_files_to_delete...
+
             print(f'\tDone processing folder "{a_folder.path.as_posix()}".')
+        ## END for a_folder in good_session_concrete_folders...
 
         print(f'Total files {"would be " if is_dryrun else ""}deleted: {len(deleted_file_list)}')
         return deleted_file_list
@@ -3822,7 +3893,7 @@ class AcrossSessionsVisualizations:
     _fig_out_man: Optional[FileOutputManager] = None
 
     @classmethod
-    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, debug_print=True, **kwargs):
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, write_svg:bool=False, debug_print=True, **kwargs):
         """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
 
         def register_output_file(output_path, output_metadata=None):
@@ -3839,7 +3910,7 @@ class AcrossSessionsVisualizations:
     
         cls._fig_out_man = fig_out_man
         
-        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, register_output_file_fn=register_output_file, **kwargs)
+        active_out_figure_paths = build_and_write_to_file(fig, final_context, fig_out_man, write_vector_format=write_vector_format, write_png=write_png, write_svg=write_svg, register_output_file_fn=register_output_file, **kwargs)
         return active_out_figure_paths, final_context
 
 
@@ -3948,11 +4019,12 @@ class AcrossSessionsVisualizations:
 
 
     @classmethod
-    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'publication', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_long_short_firing_rate_indicies', '_plot_diagonal_firing_rate_index_histogram'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
     def across_sessions_firing_rate_index_figure(cls, long_short_fr_indicies_analysis_results: pd.DataFrame, num_sessions:int, save_figure=True, include_axes_lines:bool=True, **kwargs):
         """ 2023-08-24 - Across Sessions Aggregate Figure - Supposed to be the equivalent for Figure 3.
 
         Uses: 'active_set_membership_from_user_annotations' to color points
+        `export_diagonal_histogram_svg=True` (default) writes the top-right y=x residual histogram as a separate SVG when `save_figure=True` and omits it from the main figure so it is not drawn twice. Override size with `diagonal_histogram_figsize`.
         
 
         Usage:
@@ -3967,9 +4039,13 @@ class AcrossSessionsVisualizations:
         """
         # _out2 = curr_active_pipeline.display('_display_long_and_short_firing_rate_replays_v_laps', curr_active_pipeline.get_session_context(), defer_render=defer_render, save_figure=save_figure)
         from neuropy.utils.result_context import DisplaySpecifyingIdentifyingContext
-        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies
+        from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_long_short_firing_rate_indicies, _plot_diagonal_firing_rate_index_histogram
 
-        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', True)) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
+        export_diagonal_histogram_svg: bool = bool(kwargs.pop('export_diagonal_histogram_svg', True))
+        diagonal_histogram_figsize = kwargs.pop('diagonal_histogram_figsize', None)
+        if export_diagonal_histogram_svg:
+            kwargs['enable_diagonal_histogram'] = False # draw it only on the separate SVG, not on the main figure
 
         # Plot long|short firing rate index:
         x_frs_index, y_frs_index = long_short_fr_indicies_analysis_results['x_frs_index'], long_short_fr_indicies_analysis_results['y_frs_index'] # use the all_results_dict as the computed data value
@@ -4054,19 +4130,36 @@ class AcrossSessionsVisualizations:
         
         
         fig, ax, scatter_plot = _plot_long_short_firing_rate_indicies(x_frs_index, y_frs_index, final_context, **_plot_long_short_firing_rate_indicies_kwargs, **scatter_plot_kwargs) #, **kwargs  markeredgewidth=1.5,
+
+        diag_fig = None
+        diag_ax = None
+        if export_diagonal_histogram_svg and save_figure:
+            if diagonal_histogram_figsize is None:
+                _main_figsize = kwargs.get('figsize', fig.get_size_inches())
+                diagonal_histogram_figsize = (float(_main_figsize[0]) / 8.0, float(_main_figsize[1]) / 8.0)
+            diag_fig, diag_ax = _plot_diagonal_firing_rate_index_histogram(x_frs_index, y_frs_index, final_context, figsize=diagonal_histogram_figsize)
         
         def _perform_write_to_file_callback():
             active_out_figure_path, *args_L = cls.output_figure(final_context, fig, **save_figure_kwargs)
-            return (active_out_figure_path,)
+            saved_paths = list(active_out_figure_path or [])
+            if export_diagonal_histogram_svg and (diag_fig is not None):
+                diag_context = final_context.overwriting_context(display_fn_name='across_sessions_firing_rate_index_diagonal_histogram')
+                diag_save_kwargs = dict(write_svg=True, write_png=False, write_vector_format=False, bbox_inches=save_figure_kwargs.get('bbox_inches', 'tight'), pad_inches=save_figure_kwargs.get('pad_inches', 0))
+                diag_paths, *_ = cls.output_figure(diag_context, diag_fig, **diag_save_kwargs)
+                saved_paths.extend(list(diag_paths or []))
+            return (saved_paths,)
 
         if save_figure:
             active_out_figure_paths = _perform_write_to_file_callback()
         else:
             active_out_figure_paths = []
 
-        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=(fig, ), axes=tuple(fig.axes), plot_data={'scatter_plot': scatter_plot}, context=final_context, saved_figures=active_out_figure_paths)
+        out_figures = (fig,) + ((diag_fig,) if diag_fig is not None else ())
+        out_axes = tuple(fig.axes) + ((diag_ax,) if diag_ax is not None else ())
+        graphics_output_dict = MatplotlibRenderPlots(name='across_sessions_firing_rate_index_figure', figures=out_figures, axes=out_axes, plot_data={'scatter_plot': scatter_plot, 'diagonal_histogram_fig': diag_fig, 'diagonal_histogram_ax': diag_ax}, context=final_context, saved_figures=active_out_figure_paths)
         # graphics_output_dict['plot_data'] = {'sort_indicies': (long_sort_ind, short_sort_ind), 'colors':(long_neurons_colors_array, short_neurons_colors_array)}
         return graphics_output_dict
+
 
     @classmethod
     @function_attributes(short_name=None, tags=['across-session', 'figure', 'matplotlib', 'figure-3'], input_requires=[], output_provides=[], uses=['_plot_single_track_firing_rate_compare'], used_by=[], creation_date='2023-08-24 00:00', related_items=[])
@@ -4093,7 +4186,8 @@ class AcrossSessionsVisualizations:
         from neuropy.utils.matplotlib_helpers import fit_both_axes
         from pyphoplacecellanalysis.General.Pipeline.Stages.DisplayFunctions.MultiContextComparingDisplayFunctions.LongShortTrackComparingDisplayFunctions import _plot_single_track_firing_rate_compare
 
-        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_png=kwargs.pop('write_png', True), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
+        save_figure_kwargs = dict(write_vector_format=kwargs.pop('write_vector_format', False), write_svg=kwargs.pop('write_svg', True), write_png=kwargs.pop('write_png', False), bbox_inches=kwargs.pop('bbox_inches', 'tight'), pad_inches=kwargs.pop('pad_inches', 0))
+        pop_dict_subset(kwargs, ['export_diagonal_histogram_svg', 'diagonal_histogram_figsize']) # scatter-only figure; ignore Fig3 index-histogram export kwargs
         
         global_multi_session_context = IdentifyingContext(format_name='kdiba', num_sessions=num_sessions) # some global context across all of the sessions, not sure what to put here.
         active_context = global_multi_session_context
@@ -4557,6 +4651,143 @@ class AcrossSessionHelpers:
     
     
     """
+    @function_attributes(short_name=None, tags=['shuffle', 'columns'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-28 12:48', related_items=['_subfn_perform_add_merged_complete_epoch_stats_df'])
+    @classmethod
+    def prepare_epoch_score_shuffle_transfer_columns(cls, shuffle_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+        """Adds `best_overall_*_z` columns and returns shuffle-score transfer column names (z/p/n_extreme), not raw `{metric}_{decoder}` scores."""
+        from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DEFAULT_SHUFFLE_DECODER_NAMES, SCORE_EXTREME_MODE
+
+        shuffle_df = deepcopy(shuffle_df)
+        decoder_names: List[str] = list(DEFAULT_SHUFFLE_DECODER_NAMES)
+        metric_names: List[str] = list(SCORE_EXTREME_MODE.keys())
+        transfer_col_names: List[str] = []
+
+        for col in ('wcorr_z_long', 'wcorr_z_short'):
+            if col in shuffle_df.columns:
+                transfer_col_names.append(col)
+        ## END for col in ('wcorr_z_long', 'wcorr_z_short')....
+
+        if ('wcorr_z_long' in shuffle_df.columns) and ('wcorr_z_short' in shuffle_df.columns):
+            if 'best_overall_wcorr_z' not in shuffle_df.columns:
+                shuffle_df['best_overall_wcorr_z'] = np.nanmax(np.abs(shuffle_df[['wcorr_z_long', 'wcorr_z_short']]), axis=1)
+            transfer_col_names.append('best_overall_wcorr_z')
+
+        for metric_name in metric_names:
+            z_cols = [f'{metric_name}_z_{decoder_name}' for decoder_name in decoder_names if (f'{metric_name}_z_{decoder_name}' in shuffle_df.columns)]
+            for kind in ('z', 'p', 'n_extreme'):
+                for decoder_name in decoder_names:
+                    col = f'{metric_name}_{kind}_{decoder_name}'
+                    if col in shuffle_df.columns:
+                        transfer_col_names.append(col)
+                ## END for decoder_name in decoder_names....
+            ## END for kind in ('z', 'p', 'n_extreme')....
+            if (len(z_cols) > 0) and (metric_name != 'wcorr'):
+                best_col: str = f'best_overall_{metric_name}_z'
+                if best_col not in shuffle_df.columns:
+                    shuffle_df[best_col] = np.nanmax(np.abs(shuffle_df[z_cols]), axis=1)
+                transfer_col_names.append(best_col)
+        ## END for metric_name in metric_names....
+
+        seen_col_names = set()
+        unique_transfer_col_names: List[str] = []
+        for col in transfer_col_names:
+            if col not in seen_col_names:
+                seen_col_names.add(col)
+                unique_transfer_col_names.append(col)
+        ## END for col in transfer_col_names....
+
+        return shuffle_df, unique_transfer_col_names
+
+
+    @function_attributes(short_name=None, tags=['shuffle', 'FAT', 'merge'], input_requires=[], output_provides=[], uses=['prepare_epoch_score_shuffle_transfer_columns', 'ExportValueNameCleaner'], used_by=[], creation_date='2026-10-28 13:00', related_items=['prepare_epoch_score_shuffle_transfer_columns'])
+    @classmethod
+    def merge_epoch_score_shuffle_onto_fat_df(cls, fat_df: pd.DataFrame, shuffle_df: Optional[pd.DataFrame], debug_print: bool=True) -> pd.DataFrame:
+        """Left-merge wide epoch-score shuffle z/p/n_extreme columns onto FAT PBE rows by session, replay, time_bin_size, and epoch start.
+
+        Does not overwrite columns already on FAT. Laps / unmatched rows stay NaN. `per_time_bin` PBE rows match via `parent_epoch_start_t`.
+        """
+        if (fat_df is None) or (len(fat_df) == 0) or (shuffle_df is None) or (len(shuffle_df) == 0):
+            return fat_df
+
+        fat_df = deepcopy(fat_df)
+        n_rows_before: int = len(fat_df)
+        shuffle_df, transfer_col_names = cls.prepare_epoch_score_shuffle_transfer_columns(shuffle_df)
+        transfer_col_names = [c for c in transfer_col_names if c not in fat_df.columns]
+        if len(transfer_col_names) == 0:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: no new shuffle transfer columns to add; skipping.')
+            return fat_df
+
+        left_df: pd.DataFrame = deepcopy(fat_df)
+        right_df: pd.DataFrame = deepcopy(shuffle_df)
+        for a_df in (left_df, right_df):
+            if 'session_name' in a_df.columns:
+                a_df['session_name'] = a_df['session_name'].astype(str).str.replace('_', '-')
+            if 'custom_replay_name' in a_df.columns:
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].astype(str)
+                a_df['custom_replay_name'] = ExportValueNameCleaner.clean_all(name_list=a_df['custom_replay_name'].to_list(), return_only_unique=False)
+                a_df['custom_replay_name'] = a_df['custom_replay_name'].str.replace('_', '-')
+            if 'time_bin_size' in a_df.columns:
+                a_df['time_bin_size'] = pd.to_numeric(a_df['time_bin_size'], errors='coerce')
+        ## END for a_df in (left_df, right_df)....
+
+        left_join_col: Optional[str] = None
+        for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start'):
+            if a_candidate_col in left_df.columns:
+                left_join_col = a_candidate_col
+                break
+        ## END for a_candidate_col in ('parent_epoch_start_t', 'epoch_start_t', 'ripple_start_t', 'start')....
+
+        if left_join_col is None:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: FAT_df missing epoch-start join column; skipping.')
+            return fat_df
+        if 'start' not in right_df.columns:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: shuffle_df missing "start"; skipping.')
+            return fat_df
+
+        left_df['_shuffle_join_start'] = pd.to_numeric(left_df[left_join_col], errors='coerce')
+        right_df['_shuffle_join_start'] = pd.to_numeric(right_df['start'], errors='coerce')
+        join_keys: List[str] = ['_shuffle_join_start']
+        for a_key in ('session_name', 'custom_replay_name', 'time_bin_size'):
+            if (a_key in left_df.columns) and (a_key in right_df.columns):
+                join_keys.append(a_key)
+        ## END for a_key in ('session_name', 'custom_replay_name', 'time_bin_size')....
+
+        if 'known_named_decoding_epochs_type' in left_df.columns:
+            is_pbe_row = left_df['known_named_decoding_epochs_type'].isin(['pbe', 'ripple'])
+        else:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: FAT_df missing known_named_decoding_epochs_type; merging all rows.')
+            is_pbe_row = pd.Series(True, index=left_df.index)
+
+        n_pbe_rows: int = int(is_pbe_row.sum())
+        if n_pbe_rows == 0:
+            if debug_print:
+                print('WARN: merge_epoch_score_shuffle_onto_fat_df: no PBE/ripple rows on FAT_df; skipping.')
+            return fat_df
+
+        right_subset: pd.DataFrame = right_df[join_keys + transfer_col_names].drop_duplicates(subset=join_keys, keep='first')
+        left_pbe: pd.DataFrame = left_df.loc[is_pbe_row, join_keys].copy()
+        left_pbe = left_pbe.reset_index(names='_orig_index')
+        merged_pbe: pd.DataFrame = left_pbe.merge(right_subset, how='left', on=join_keys)
+        if len(merged_pbe) != len(left_pbe):
+            raise ValueError(f'merge_epoch_score_shuffle_onto_fat_df: left-merge changed PBE row count ({len(left_pbe)} -> {len(merged_pbe)}); refusing to apply')
+
+        for a_col in transfer_col_names:
+            fat_df[a_col] = np.nan
+            fat_df.loc[merged_pbe['_orig_index'].to_numpy(), a_col] = merged_pbe[a_col].to_numpy()
+        ## END for a_col in transfer_col_names....
+
+        if len(fat_df) != n_rows_before:
+            raise ValueError(f'merge_epoch_score_shuffle_onto_fat_df: FAT row count changed ({n_rows_before} -> {len(fat_df)}); refusing to apply')
+        n_matched: int = int(fat_df.loc[left_df.index[is_pbe_row], transfer_col_names[0]].notna().sum())
+        if debug_print:
+            print(f'merge_epoch_score_shuffle_onto_fat_df: matched {n_matched}/{n_pbe_rows} PBE/ripple rows using left start col "{left_join_col}" and join keys {join_keys}; added {len(transfer_col_names)} columns.')
+        return fat_df
+
+
     @function_attributes(short_name=None, tags=['merge', 'correlation'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-18 11:33', related_items=[])
     @classmethod
     def _subfn_perform_add_merged_complete_epoch_stats_df(cls, a_paired_main_ripple_df: pd.DataFrame, an_all_sessions_merged_complete_epoch_stats_df: pd.DataFrame,
@@ -4771,11 +5002,14 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None, session_rel_search_dir: str = 'output/'):
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None, session_rel_search_dir: str = 'output/', global_data_root_parent_path: Optional[Path] = None):
         """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
 
         session_rel_search_dir (str): relative path under each session folder to search. Defaults to 'output/'.
             Use '' or '.' to search the session root (e.g. for loadedSessPickle*.pkl).
+
+        global_data_root_parent_path (Optional[Path]): root under which session folders are resolved (e.g. .../Data).
+            If None, the first extant path from the hardcoded list is used.
 
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
@@ -4845,9 +5079,14 @@ class AcrossSessionHelpers:
 
         included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
         
-        known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
-        global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        if global_data_root_parent_path is not None:
+            global_data_root_parent_path = Path(global_data_root_parent_path) # .resolve()
+            if not global_data_root_parent_path.exists():
+                raise FileNotFoundError(f'user-provided `global_data_root_parent_path` does not exist: {global_data_root_parent_path}')
+        else:
+            known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
+            global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+            assert global_data_root_parent_path.exists(), f"auto-discovered global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
         good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
         session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
 

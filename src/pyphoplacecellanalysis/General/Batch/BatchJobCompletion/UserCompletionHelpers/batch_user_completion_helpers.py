@@ -1479,17 +1479,24 @@ def figures_rank_order_results_completion_function(self, global_data_root_parent
     return across_session_results_extended_dict
 
 
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'export', 'mat', 'pkl', 'csv'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
-def compute_and_export_session_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                   should_skip_previous_saved_shuffles:bool=False, with_data_name: Optional[str]=None) -> dict:
-    """  Computes the shuffled wcorrs and export them to several formats: .mat, .pkl, and .csv
+@function_attributes(short_name=None, tags=['epoch_score', 'shuffle', 'export', 'mat', 'pkl', 'csv', 'heuristic'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-01-01 00:00', related_items=[])
+def compute_and_export_session_epoch_score_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
+        should_skip_previous_saved_shuffles:bool=False, should_purge_existing_shuffled_result: bool = False, with_data_name: Optional[str]=None, num_shuffles: Optional[int]=None,
+        enable_heuristic_shuffle_scoring: Optional[bool]=True, enable_radon_shuffle_scoring: Optional[bool]=False, enable_saving_entire_decoded_shuffle_result: bool=False,
+    ) -> dict:
+    """  Computes shuffled decoded-epoch scores (wcorr, heuristics, optional radon) and export them to several formats: .mat, .pkl, and .csv
+
+    `should_skip_previous_saved_shuffles`: skip loading compatible shuffle pkls from the session output directory.
+    `should_purge_existing_shuffled_result`: discard in-memory `SequenceBased.ripple_score_shuffle` and start from `init_from_templates` (also skips disk load).
+    `with_data_name`: pickle stem used for both load filtering and save (default `standalone_epoch_score_shuffle_data_only`). Does not include custom_suffix/tbin; those are always appended from the pipeline.
+    `enable_saving_entire_decoded_shuffle_result`: when True, each newly computed shuffle keeps its `DecodedFilterEpochsResult` dicts in `output_all_shuffles_decoded_results_list` and they are pickled by `save_data` (much larger). Only shuffles computed after the flag is on are stored; use `should_purge_existing_shuffled_result=True` for a full set.
     
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_wcorr_shuffles_completion_function
+    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_epoch_score_shuffles_completion_function
     
     Results can be extracted from batch output by 
     
-    # Extracts the callback results 'compute_and_export_session_wcorr_shuffles_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_wcorr_shuffles_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
+    # Extracts the callback results 'compute_and_export_session_epoch_score_shuffles_completion_function':
+    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('compute_and_export_session_epoch_score_shuffles_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
 
 
     """
@@ -1498,7 +1505,7 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     from datetime import timedelta, datetime
     from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
     from pyphocorehelpers.exception_helpers import ExceptionPrintingContext, CapturedException
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, DecodedEpochScoreShuffle
     from neuropy.utils.mixins.indexing_helpers import get_dict_subset
 
     def _subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
@@ -1512,19 +1519,24 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
     custom_export_df_to_csv_fn = _subfn_custom_export_df_to_csv
     
     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_session_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
+    print(f'compute_and_export_session_epoch_score_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
     
     # desired_total_num_shuffles: int = 4096
     desired_total_num_shuffles: int = 700
     minimum_required_unique_num_shuffles: int = 700
+    if num_shuffles is not None:
+        desired_total_num_shuffles = int(num_shuffles)
+        minimum_required_unique_num_shuffles = int(num_shuffles)
 
-    newer_than: Optional[datetime] = datetime(2024, 11, 11)
+    # newer_than: Optional[datetime] = datetime(2024, 11, 11)
+    load_shuffles_newer_than: Optional[datetime] = datetime(2026, 10, 26)
 
     allow_update_global_result: bool = False
     callback_outputs = {
-        'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
+        'epoch_score_shuffles_data_output_filepath': None, #'t_end': t_end   
         'standalone_MAT_filepath': None,
-        'ripple_WCorrShuffle_df_export_CSV_path': None,
+        'ripple_EpochScoreShuffle_df_export_CSV_path': None,
+        'ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path': None,
     }
 
 
@@ -1536,47 +1548,53 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
 
 
     # global_computation_results.computed_data['SequenceBased'].included_qclu_values = included_qclu_values
-    if (not hasattr(a_sequence_computation_container, 'wcorr_ripple_shuffle') or (a_sequence_computation_container.wcorr_ripple_shuffle is None)):
-        # initialize a new wcorr result            
-        wcorr_shuffles: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=False)
-        a_sequence_computation_container.wcorr_ripple_shuffle = wcorr_shuffles
+    if should_purge_existing_shuffled_result or (a_sequence_computation_container.ripple_score_shuffle is None):
+        if should_purge_existing_shuffled_result and (a_sequence_computation_container.ripple_score_shuffle is not None):
+            print(f'purged existing SequenceBased.ripple_score_shuffle (n_completed_shuffles: {a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles}) since `should_purge_existing_shuffled_result == True`')
+        # initialize a new epoch-score shuffle result
+        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=enable_saving_entire_decoded_shuffle_result)
+        a_sequence_computation_container.ripple_score_shuffle = epoch_score_shuffles
     else:
         ## get the existing one:
-        wcorr_shuffles = a_sequence_computation_container.wcorr_ripple_shuffle
-        wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version'])) # modernize the object
+        epoch_score_shuffles = a_sequence_computation_container.ripple_score_shuffle
+        epoch_score_shuffles: DecodedEpochScoreShuffle = DecodedEpochScoreShuffle.modernize_from_instance(epoch_score_shuffles) # modernize the object without flattening nested DecodedFilterEpochsResult values
 
+    epoch_score_shuffles.enable_saving_entire_decoded_shuffle_result = bool(enable_saving_entire_decoded_shuffle_result)
 
-    wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline) # do one more shuffle
+    full_custom_suffix: str = epoch_score_shuffles.build_full_custom_suffix(curr_active_pipeline=curr_active_pipeline)
+    print(f'full_custom_suffix: "{full_custom_suffix}"')
+
+    epoch_score_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring) # do one more shuffle
     
-    if not should_skip_previous_saved_shuffles:
+    if (not should_skip_previous_saved_shuffles) and (not should_purge_existing_shuffled_result):
         # try load previous compatible shuffles: _____________________________________________________________________________ #
-        wcorr_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=newer_than, with_data_name=with_data_name)
+        epoch_score_shuffles.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve(), newer_than=load_shuffles_newer_than, with_data_name=with_data_name, with_custom_suffix=full_custom_suffix, curr_active_pipeline=curr_active_pipeline)
 
-    n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
+    n_completed_shuffles: int = epoch_score_shuffles.n_completed_shuffles
+
+    if n_completed_shuffles < desired_total_num_shuffles:   
+        print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
+        print(f'needed desired_total_num_shuffles: {desired_total_num_shuffles}.')
+        desired_new_num_shuffles: int = max((desired_total_num_shuffles - n_completed_shuffles), 0)
+        print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
+        ## add some more shuffles to it:
+        epoch_score_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline, enable_heuristic_shuffle_scoring=enable_heuristic_shuffle_scoring, enable_radon_shuffle_scoring=enable_radon_shuffle_scoring)
+        n_completed_shuffles = epoch_score_shuffles.n_completed_shuffles
 
     if (minimum_required_unique_num_shuffles is not None) and (n_completed_shuffles < minimum_required_unique_num_shuffles):
         ## skipping
         print(f'\tskipping session {curr_active_pipeline.session_name} because n_completed_shuffles: {n_completed_shuffles} < minimum_required_unique_num_shuffles: {minimum_required_unique_num_shuffles}')
 
-        across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
+        across_session_results_extended_dict['compute_and_export_session_epoch_score_shuffles_completion_function'] = callback_outputs
         ## EXITS HERE:
         return across_session_results_extended_dict
-
-    if n_completed_shuffles < desired_total_num_shuffles:   
-        print(f'n_prev_completed_shuffles: {n_completed_shuffles}.')
-        print(f'needed desired_total_num_shuffles: {desired_total_num_shuffles}.')
-        desired_new_num_shuffles: int = max((desired_total_num_shuffles - wcorr_shuffles.n_completed_shuffles), 0)
-        print(f'need desired_new_num_shuffles: {desired_new_num_shuffles} more shuffles.')
-        ## add some more shuffles to it:
-        wcorr_shuffles.compute_shuffles(num_shuffles=desired_new_num_shuffles, curr_active_pipeline=curr_active_pipeline)
 
 
     # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict) = wcorr_tool.post_compute(debug_print=False)
     # wcorr_tool.save_data(filepath='temp100.pkl')
 
-    a_sequence_computation_container.wcorr_ripple_shuffle = wcorr_shuffles
+    a_sequence_computation_container.ripple_score_shuffle = epoch_score_shuffles
 
-    n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
     print(f'loaded and computed shuffles with {n_completed_shuffles} unique shuffles')
     
     if allow_update_global_result:
@@ -1594,46 +1612,51 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         active_context, (curr_session_context, additional_session_context) = curr_active_pipeline.get_complete_session_context() ## #TODO 2024-11-08 10:29: - [ ] complete instead of basic session context
         # session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
         session_name: str = curr_active_pipeline.session_name
-        export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn) # "2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_WCorrShuffle_df)_tbin-0.025.csv"
-        ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-        print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
-        callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
+        export_files_dict = epoch_score_shuffles.export_csvs(parent_output_path=self.collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline, custom_export_df_to_csv_fn=custom_export_df_to_csv_fn) # "2024-11-15_0200PM-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays_qclu_[1, 2, 4, 6, 7, 9]_frateThresh_5.0-(ripple_EpochScoreShuffle_df)_tbin-0.025.csv"
+        ripple_EpochScoreShuffle_df_export_CSV_path = export_files_dict.get('ripple_EpochScoreShuffle_df')
+        ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path = export_files_dict.get('ripple_EpochScoreShuffle_ByShuffle_df')
+        print(f'Successfully exported epoch-score shuffle CSVs with epoch_score_shuffles.n_completed_shuffles: {epoch_score_shuffles.n_completed_shuffles} unique shuffles.')
+        print(f'\tripple_EpochScoreShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_df_export_CSV_path}"')
+        print(f'\tripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path: "{ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path}"')
+        callback_outputs['ripple_EpochScoreShuffle_df_export_CSV_path'] = ripple_EpochScoreShuffle_df_export_CSV_path
+        callback_outputs['ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path'] = ripple_EpochScoreShuffle_ByShuffle_df_export_CSV_path
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"ERROR: encountered exception {err} while trying to perform wcorr_ripple_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
-        ripple_WCorrShuffle_df_export_CSV_path = None # set to None because it failed.
+        print(f"ERROR: encountered exception {err} while trying to perform ripple_score_shuffle.export_csvs(parent_output_path='{self.collected_outputs_path.resolve()}', ...) for {curr_session_context}")
+        ripple_EpochScoreShuffle_df_export_CSV_path = None # set to None because it failed.
         if self.fail_on_exception:
             raise err.exc
         
 
     ## Pickle Saving:
-    standalone_filename: str = f'{get_now_day_str()}_standalone_wcorr_ripple_shuffle_data_only_{a_sequence_computation_container.wcorr_ripple_shuffle.n_completed_shuffles}.pkl'
-    wcorr_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
-    print(f'wcorr_shuffles_data_standalone_filepath: "{wcorr_shuffles_data_standalone_filepath}"')
+    shuffle_pkl_data_name: str = with_data_name if (with_data_name is not None) else 'standalone_epoch_score_shuffle_data_only'
+    standalone_filename: str = DecodedEpochScoreShuffle.build_standalone_pickle_filename(full_custom_suffix=full_custom_suffix, n_completed_shuffles=a_sequence_computation_container.ripple_score_shuffle.n_completed_shuffles, data_name=shuffle_pkl_data_name, date_str=get_now_rounded_time_str())
+    epoch_score_shuffles_data_standalone_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
+    print(f'epoch_score_shuffles_data_standalone_filepath: "{epoch_score_shuffles_data_standalone_filepath}"')
 
     try:
-        wcorr_shuffles.save_data(wcorr_shuffles_data_standalone_filepath)
+        epoch_score_shuffles.save_data(epoch_score_shuffles_data_standalone_filepath, metadata={'custom_suffix': full_custom_suffix, 'ripple_decoding_time_bin_size': epoch_score_shuffles.get_ripple_decoding_time_bin_size(curr_active_pipeline=curr_active_pipeline), 'data_name': shuffle_pkl_data_name, 'n_shuffles': epoch_score_shuffles.n_completed_shuffles, 'session': curr_active_pipeline.get_session_context().to_dict()})
         was_write_good = True
-        callback_outputs['wcorr_shuffles_data_output_filepath'] = wcorr_shuffles_data_standalone_filepath
+        callback_outputs['epoch_score_shuffles_data_output_filepath'] = epoch_score_shuffles_data_standalone_filepath
 
     except Exception as e:
         exception_info = sys.exc_info()
         err = CapturedException(e, exception_info)
-        print(f"ERROR: encountered exception {err} while trying to perform wcorr_shuffles.save_data('{wcorr_shuffles_data_standalone_filepath}') for {curr_session_context}")
-        wcorr_shuffles_data_standalone_filepath = None # set to None because it failed.
+        print(f"ERROR: encountered exception {err} while trying to perform epoch_score_shuffles.save_data('{epoch_score_shuffles_data_standalone_filepath}') for {curr_session_context}")
+        epoch_score_shuffles_data_standalone_filepath = None # set to None because it failed.
         if self.fail_on_exception:
             raise err.exc
 
-    # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute()
+    # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = epoch_score_shuffles.post_compute()
 
-    ## MATLAB .mat format output
-    standalone_mat_filename: str = f'{get_now_rounded_time_str()}_standalone_all_shuffles_wcorr_array.mat' 
+    ## MATLAB .mat format output (flat `{date}{full_suffix}_standalone_all_shuffles_wcorr_array.mat`, including `-tbin_XXms`)
+    standalone_mat_filename: str = DecodedEpochScoreShuffle.build_standalone_mat_filename(full_custom_suffix=full_custom_suffix, date_str=get_now_rounded_time_str())
     standalone_MAT_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
     print(f'\tsaving .mat format to "{standalone_MAT_filepath}"...')
     
     try:
-        wcorr_shuffles.save_data_mat(filepath=standalone_MAT_filepath, additional_mat_elements={'session': curr_active_pipeline.get_session_context().to_dict()})
+        epoch_score_shuffles.save_data_mat(filepath=standalone_MAT_filepath, **{'session': curr_active_pipeline.get_session_context().to_dict()})
         callback_outputs['standalone_MAT_filepath'] = standalone_MAT_filepath
     except Exception as e:
         exception_info = sys.exc_info()
@@ -1643,325 +1666,13 @@ def compute_and_export_session_wcorr_shuffles_completion_function(self, global_d
         if self.fail_on_exception:
             raise err.exc
         
-    # callback_outputs = {
-    #  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
-    #  'standalone_MAT_filepath': standalone_MAT_filepath,
-    #  'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
-    # }
-    across_session_results_extended_dict['compute_and_export_session_wcorr_shuffles_completion_function'] = callback_outputs
+    across_session_results_extended_dict['compute_and_export_session_epoch_score_shuffles_completion_function'] = callback_outputs
     
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     return across_session_results_extended_dict
 
-
-@function_attributes(short_name=None, tags=['wcorr', 'shuffle', 'replay', 'epochs', 'alternative_replays'], input_requires=[], output_provides=[], uses=['compute_all_replay_epoch_variations', 'BatchCompletionHelpers.overwrite_replay_epochs_and_recompute'], used_by=[], creation_date='2024-06-28 01:50', related_items=[])
-def compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(self, global_data_root_parent_path, curr_session_context, curr_session_basedir, curr_active_pipeline, across_session_results_extended_dict: dict,
-                                                                                      included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, ripple_decoding_time_bin_size: float = 0.025, num_wcorr_shuffles: int = 2048, drop_previous_result_and_compute_fresh:bool=True, enable_plot_wcorr_hist_figure:bool=False) -> dict:
-    """  Computes several different alternative replay-detection variants and computes and exports the shuffled wcorrs for each of them
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_user_completion_helpers import compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function
-    
-    Results can be extracted from batch output by 
-    
-    # Extracts the callback results 'determine_session_t_delta_completion_function':
-    extracted_callback_fn_results = {a_sess_ctxt:a_result.across_session_results.get('determine_session_t_delta_completion_function', {}) for a_sess_ctxt, a_result in global_batch_run.session_batch_outputs.items() if a_result is not None}
-
-    2024-11-08 12:25 - output filenames seem correct and don't have duplicated parameter strings
-
-    
-    
-    """
-    import sys
-    import numpy as np
-    from pyphocorehelpers.print_helpers import get_now_day_str, get_now_rounded_time_str
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import SequenceBasedComputationsContainer, WCorrShuffle
-    from neuropy.utils.mixins.indexing_helpers import get_dict_subset
-    from pyphocorehelpers.exception_helpers import ExceptionPrintingContext
-    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.DirectionalPlacefieldGlobalComputationFunctions import TrackTemplates
-    from pyphocorehelpers.Filesystem.path_helpers import sanitize_filename_for_Windows
-
-    from pyphoplacecellanalysis.General.Batch.BatchJobCompletion.UserCompletionHelpers.batch_completion_helpers import BatchCompletionHelpers
-    
-    base_BATCH_DATE_TO_USE: str = f"{self.BATCH_DATE_TO_USE}" ## backup original string
-    should_suppress_errors: bool = (not self.fail_on_exception) # get('fail_on_exception', False)    
-        
-    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    print(f'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function(curr_session_context: {curr_session_context}, curr_session_basedir: {str(curr_session_basedir)}, ...)')
-    
-    callback_outputs = {
-        'custom_suffix': None,
-        'replay_epoch_variations': None,
-        'replay_epoch_outputs': None,
-        'included_qclu_values': included_qclu_values,
-        'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
-        'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size,
-        'num_wcorr_shuffles': num_wcorr_shuffles,
-        'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh,
-        # 'wcorr_shuffles_data_output_filepath': None, #'t_end': t_end   
-        # 'standalone_MAT_filepath': None,
-        # 'ripple_WCorrShuffle_df_export_CSV_path': None,
-    }
-
-
-    # ==================================================================================================================== #
-    # Compute Alternative Replays: `replay_epoch_variations`                                                               #
-    # ==================================================================================================================== #
-
-    replay_epoch_outputs = {} # replay_epochs_key
-
-    ## Compute new epochs: 
-    replay_epoch_variations = {}
-
-    replay_epoch_variations = BatchCompletionHelpers.compute_all_replay_epoch_variations(curr_active_pipeline, minimum_inclusion_fr_Hz=minimum_inclusion_fr_Hz, included_qclu_values=included_qclu_values)
-
-    print(f'completed replay extraction, have: {list(replay_epoch_variations.keys())}')
-    
-    ## OUTPUT: replay_epoch_variations
-    callback_outputs['replay_epoch_variations'] = replay_epoch_variations
-
-    ## Save the replay epochs out to event files:
-    for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-        # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-        # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-        # a_replay_epochs = replay_epoch_variations[replay_epochs_key]
-        print(f'performing comp for "{replay_epochs_key}"...')
-        replay_epoch_outputs[replay_epochs_key] = {} # init to empty
-
-        custom_suffix: str = BatchCompletionHelpers._get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs)
-        print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
-
-        ## Export to .evt file
-
-        ## Save computed epochs out to a neuroscope .evt file:
-        filename = f"{curr_active_pipeline.session_name}{custom_suffix}"
-        good_filename: str = sanitize_filename_for_Windows(filename)
-        print(f'\tgood_filename: {good_filename}')
-        filepath = curr_active_pipeline.get_output_path().joinpath(good_filename).resolve()
-        
-        curr_replay_epoch = deepcopy(a_replay_epochs)
-
-        ## set the filename of the Epoch:
-        curr_replay_epoch.filename = filepath
-        filepath = curr_replay_epoch.to_neuroscope(ext='PHONEW')
-        assert filepath.exists()
-        print(F'saved out newly computed epochs of type "{replay_epochs_key} to "{filepath}".')
-        replay_epoch_outputs[replay_epochs_key].update(dict(exported_evt_file_path=str(filepath.as_posix())))
-
-    # ==================================================================================================================== #
-    # For each replay, duplicate entire pipeline to perform desired computations to ensure no downstream effects           #
-    # ==================================================================================================================== #
-    print(f'=====================================>> Starting computations for the 4 new epochs...')
-
-    ## Duplicate Copy of pipeline to perform desired computations:
-    for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-        # ## Use `diba_evt_file_replay_epochs` as `new_replay_epochs`
-        # replay_epochs_key = 'diba_quiescent_method_replay_epochs'
-        # a_replay_epochs = replay_epoch_variations[replay_epochs_key]
-        print(f'\t=====================================>> performing comp for "{replay_epochs_key}"...')
-        # replay_epoch_outputs[replay_epochs_key] = {} # init to empty
-
-        custom_suffix: str = BatchCompletionHelpers._get_custom_suffix_for_replay_filename(new_replay_epochs=a_replay_epochs) # looks right
-        print(f'\treplay_epochs_key: {replay_epochs_key}: custom_suffix: "{custom_suffix}"')
-
-        ## Modify .BATCH_DATE_TO_USE to include the custom suffix
-        # curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}{custom_suffix}"
-
-        curr_BATCH_DATE_TO_USE: str = f"{base_BATCH_DATE_TO_USE}"
-        print(f'\tcurr_BATCH_DATE_TO_USE: "{curr_BATCH_DATE_TO_USE}"')
-        self.BATCH_DATE_TO_USE = curr_BATCH_DATE_TO_USE # set the internal BATCH_DATE_TO_USE which is used to determine the .csv and .h5 export names
-        # self.BATCH_DATE_TO_USE = '2024-11-01_Apogee'
-        print(f'\tWARNING: should_suppress_errors: {should_suppress_errors}')
-        with ExceptionPrintingContext(suppress=should_suppress_errors, exception_print_fn=(lambda formatted_exception_str: print(f'\tfailed epoch computations for replay_epochs_key: "{replay_epochs_key}". Failed with error: {formatted_exception_str}. Skipping.'))):
-            # for replay_epochs_key, a_replay_epochs in replay_epoch_variations.items():
-            a_curr_active_pipeline = deepcopy(curr_active_pipeline)
-            did_change, custom_save_filenames, custom_save_filepaths = BatchCompletionHelpers.overwrite_replay_epochs_and_recompute(curr_active_pipeline=a_curr_active_pipeline, new_replay_epochs=a_replay_epochs,
-                                                                                                              enable_save_pipeline_pkl=True, enable_save_global_computations_pkl=False, enable_save_h5=False,
-                                                                                                              num_wcorr_shuffles=num_wcorr_shuffles,
-                                                                                                              user_completion_dummy=self, drop_previous_result_and_compute_fresh=drop_previous_result_and_compute_fresh, ripple_decoding_time_bin_size=ripple_decoding_time_bin_size)
-            # 'ripple_h5_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18_Lab-2006-6-09_1-22-43-_withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]_time_bin_size_sweep_results.h5'),
-            # 'ripple_csv_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_marginals_df).csv'),
-            # 'ripple_csv_time_bin_marginals': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(ripple_time_bin_marginals_df).csv'),
-            # 'laps_csv_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_marginals_df).csv'),
-            # 'laps_csv_time_bin_marginals_out_path': WindowsPath('K:/scratch/collected_outputs/2024-11-18-kdiba_gor01_one_2006-6-09_1-22-43__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 9]-frateThresh_1.0_withNormalComputedReplays-frateThresh_1.0-qclu_[1, 2, 4, 6, 7, 9]-(laps_time_bin_marginals_df).csv'),
-
-            replay_epoch_outputs[replay_epochs_key].update(dict(did_change=did_change, custom_save_filenames=custom_save_filenames, custom_save_filepaths=custom_save_filepaths))
-
-            print(f'<<<<<<<<<<<<<<< Done with `overwrite_replay_epochs_and_recompute(...)` for replay_epochs_key: {replay_epochs_key}')
-            ## modifies `_temp_curr_active_pipeline`
-
-            # ==================================================================================================================== #
-            # OUTPUT OF WCORR                                                                                                      #
-            # ==================================================================================================================== #
-
-            ## Call on `a_replay_epochs`, _temp_curr_active_pipeline:
-            replay_epoch_outputs[replay_epochs_key].update(dict(custom_suffix=custom_suffix))
-
-            ## INPUTS: a_curr_active_pipeline, custom_suffix
-            decoder_names = TrackTemplates.get_decoder_names()
-
-            wcorr_shuffle_results: SequenceBasedComputationsContainer = a_curr_active_pipeline.global_computation_results.computed_data.get('SequenceBased', None)
-            if wcorr_shuffle_results is not None:    
-                wcorr_shuffles: WCorrShuffle = wcorr_shuffle_results.wcorr_ripple_shuffle
-                wcorr_shuffles: WCorrShuffle = WCorrShuffle(**get_dict_subset(wcorr_shuffles.to_dict(), subset_excludelist=['_VersionedResultMixin_version']))
-                a_curr_active_pipeline.global_computation_results.computed_data.SequenceBased.wcorr_ripple_shuffle = wcorr_shuffles
-                filtered_epochs_df: pd.DataFrame = deepcopy(wcorr_shuffles.filtered_epochs_df)
-                print(f'\t\twcorr_ripple_shuffle.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles}')
-            else:
-                print(f'\t\tSequenceBased is not computed.')
-                wcorr_shuffles = None
-                raise ValueError(f'SequenceBased is not computed.')
-
-            # wcorr_ripple_shuffle: WCorrShuffle = WCorrShuffle.init_from_templates(curr_active_pipeline=curr_active_pipeline, enable_saving_entire_decoded_shuffle_result=True)
-
-            n_epochs: int = wcorr_shuffles.n_epochs
-            print(f'n_epochs: {n_epochs}')
-            n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
-            print(f'n_completed_shuffles: {n_completed_shuffles}')
-            wcorr_shuffles.compute_shuffles(num_shuffles=2, curr_active_pipeline=a_curr_active_pipeline)
-            n_completed_shuffles: int = wcorr_shuffles.n_completed_shuffles
-            print(f'n_completed_shuffles: {n_completed_shuffles}')
-            desired_ripple_decoding_time_bin_size: float = wcorr_shuffle_results.wcorr_ripple_shuffle.all_templates_decode_kwargs['desired_ripple_decoding_time_bin_size']
-            print(f'{desired_ripple_decoding_time_bin_size = }')
-            # filtered_epochs_df
-
-            # 7m - 200 shuffles
-            # (_out_p, _out_p_dict), (_out_shuffle_wcorr_ZScore_LONG, _out_shuffle_wcorr_ZScore_SHORT), (total_n_shuffles_more_extreme_than_real_df, total_n_shuffles_more_extreme_than_real_dict), _out_shuffle_wcorr_arr = wcorr_shuffles.post_compute(decoder_names=deepcopy(decoder_names))
-            wcorr_ripple_shuffle_all_df, all_shuffles_wcorr_df = wcorr_shuffles.build_all_shuffles_dataframes(decoder_names=deepcopy(decoder_names))
-            ## Prepare for plotting in histogram:
-            wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['start', 'stop'], how='any', inplace=False)
-            wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.dropna(subset=['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL'], how='all', inplace=False)
-            wcorr_ripple_shuffle_all_df = wcorr_ripple_shuffle_all_df.convert_dtypes()
-            # {'long_best_dir_decoder_IDX': int, 'short_best_dir_decoder_IDX': int}
-            # wcorr_ripple_shuffle_all_df
-            ## Gets the absolutely most extreme value from any of the four decoders and uses that:
-            # Replace pandas.NA with np.nan before doing Nanargmax
-            _wcorr_results_arr = wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].to_numpy(dtype=float, na_value=np.nan) 
-            best_wcorr_max_indices = np.nanargmax(np.abs(_wcorr_results_arr), axis=1) # Compute argmax ignoring NaNs
-
-            wcorr_ripple_shuffle_all_df[f'abs_best_wcorr'] = [wcorr_ripple_shuffle_all_df[['wcorr_long_LR', 'wcorr_long_RL', 'wcorr_short_LR', 'wcorr_short_RL']].values[i, best_idx] for i, best_idx in enumerate(best_wcorr_max_indices)] #  np.where(direction_max_indices, wcorr_ripple_shuffle_all_df['long_LR'].filter_epochs[a_column_name].to_numpy(), wcorr_ripple_shuffle_all_df['long_RL'].filter_epochs[a_column_name].to_numpy())
-            # wcorr_ripple_shuffle_all_df
-
-            all_shuffles_only_best_decoder_wcorr_df = pd.concat([all_shuffles_wcorr_df[np.logical_and((all_shuffles_wcorr_df['epoch_idx'] == epoch_idx), (all_shuffles_wcorr_df['decoder_idx'] == best_idx))] for epoch_idx, best_idx in enumerate(best_wcorr_max_indices)])
-            
-            ## OUTPUTS: wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df
-            replay_epoch_outputs[replay_epochs_key].update(dict(wcorr_ripple_shuffle_all_df=wcorr_ripple_shuffle_all_df, all_shuffles_only_best_decoder_wcorr_df=all_shuffles_only_best_decoder_wcorr_df))
-
-
-            ## INPUTS: wcorr_ripple_shuffle, a_curr_active_pipeline, wcorr_shuffles, custom_suffix
-            def a_subfn_custom_export_df_to_csv(export_df: pd.DataFrame, data_identifier_str: str = f'(laps_marginals_df)', parent_output_path: Path=None):
-                """ captures `a_curr_active_pipeline`
-                """
-                out_path, out_filename, out_basename = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(rounded_minutes=10), data_identifier_str=data_identifier_str,
-                                                                                                                        parent_output_path=parent_output_path, out_extension='.csv')
-                export_df.to_csv(out_path)
-                return out_path 
-            
-
-            #TODO 2024-11-19 03:33: - [ ] `custom_export_df_to_csv_fn`
-            custom_export_df_to_csv_fn = a_subfn_custom_export_df_to_csv
-            
-            #TODO 2024-11-20 06:16: - [ ] I feel like these need the time_bin_size as a suffix
-            # standalone save (2024-11-19 03:40 Identical to `vscode://file/c:/Users/pho/repos/Spike3DWorkEnv/pyPhoPlaceCellAnalysis/src/pyphoplacecellanalysis/General/Batch/BatchJobCompletion/UserCompletionHelpers/batch_completion_helpers.py:806`
-            out_path, standalone_pkl_filename, standalone_pkl_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_wcorr_ripple_shuffle_data_only', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.pkl', suffix_string=f'_{wcorr_shuffles.n_completed_shuffles}')		
-            _prev_standalone_pkl_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_wcorr_ripple_shuffle_data_only_{wcorr_shuffles.n_completed_shuffles}.pkl' 
-            if _prev_standalone_pkl_filename != standalone_pkl_filename:
-                print(f'standalone_pkl_filename:\n\t"{standalone_pkl_filename}"')
-                print(f'_prev_standalone_pkl_filename:\n\t"{_prev_standalone_pkl_filename}"')
-            # standalone_pkl_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_pkl_filename).resolve() # Path("W:\Data\KDIBA\gor01\one\2006-6-08_14-26-15\output\2024-05-30_0925AM_standalone_wcorr_ripple_shuffle_data_only_1100.pkl")
-            print(f'saving to "{standalone_pkl_filepath}"...')
-            wcorr_shuffles.save_data(standalone_pkl_filepath)
-            ## INPUTS: wcorr_ripple_shuffle
-            _prev_standalone_mat_filename: str = f'{get_now_rounded_time_str()}{custom_suffix}_standalone_all_shuffles_wcorr_array.mat' 
-            # standalone_mat_filepath = a_curr_active_pipeline.get_output_path().joinpath(standalone_mat_filename).resolve() # r"W:\Data\KDIBA\gor01\one\2006-6-09_1-22-43\output\2024-06-03_0400PM_standalone_all_shuffles_wcorr_array.mat"
-            out_path, standalone_mat_filename, standalone_mat_filepath = a_curr_active_pipeline.build_complete_session_identifier_filename_string(output_date_str=get_now_rounded_time_str(), data_identifier_str='standalone_all_shuffles_wcorr_array', parent_output_path=a_curr_active_pipeline.get_output_path(), out_extension='.mat')
-            if _prev_standalone_mat_filename != standalone_mat_filename:
-                print(f'standalone_mat_filepath:\n\t"{standalone_mat_filepath}"')
-                print(f'_prev_standalone_mat_filename:\n\t"{_prev_standalone_mat_filename}"')
-            #TODO 2024-11-19 03:25: - [ ] Previously used `custom_suffix`
-            wcorr_shuffles.save_data_mat(filepath=standalone_mat_filepath, **{'session': a_curr_active_pipeline.get_session_context().to_dict()})
-            
-            replay_epoch_outputs[replay_epochs_key].update(dict(standalone_pkl_filepath=standalone_pkl_filepath, standalone_mat_filepath=standalone_mat_filepath))
-
-            try:
-                active_context = a_curr_active_pipeline.get_session_context()
-                session_name: str = f"{a_curr_active_pipeline.session_name}{custom_suffix}" ## appending this here is a hack, but it makes the correct filename
-                # complete_session_context, (curr_session_context,  additional_session_context) = a_curr_active_pipeline.get_complete_session_context()
-                # active_context = complete_session_context
-                active_context = active_context.adding_context_if_missing(suffix=custom_suffix)
-
-                export_files_dict = wcorr_shuffles.export_csvs(parent_output_path=a_curr_active_pipeline.get_output_path().resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=a_curr_active_pipeline,
-                                                            #    source='diba_evt_file',
-                                                                source='compute_diba_quiescent_style_replay_events',
-                                                                custom_export_df_to_csv_fn=custom_export_df_to_csv_fn,
-                                                                )
-                ripple_WCorrShuffle_df_export_CSV_path = export_files_dict['ripple_WCorrShuffle_df']
-                print(f'Successfully exported ripple_WCorrShuffle_df_export_CSV_path: "{ripple_WCorrShuffle_df_export_CSV_path}" with wcorr_shuffles.n_completed_shuffles: {wcorr_shuffles.n_completed_shuffles} unique shuffles.')
-                replay_epoch_outputs[replay_epochs_key].update(dict(active_context=active_context, export_files_dict=export_files_dict))
-                # callback_outputs['ripple_WCorrShuffle_df_export_CSV_path'] = ripple_WCorrShuffle_df_export_CSV_path
-            except Exception as e:
-                raise
-                
-            # wcorr_ripple_shuffle.discover_load_and_append_shuffle_data_from_directory(save_directory=curr_active_pipeline.get_output_path().resolve())
-            # active_context = curr_active_pipeline.get_session_context()
-            # session_ctxt_key:str = active_context.get_description(separator='|', subset_includelist=IdentifyingContext._get_session_context_keys())
-            # session_name: str = curr_active_pipeline.session_name
-            # export_files_dict = wcorr_ripple_shuffle.export_csvs(parent_output_path=collected_outputs_path.resolve(), active_context=active_context, session_name=session_name, curr_active_pipeline=curr_active_pipeline)
-            # export_files_dict
-
-            ## FINAL STAGE: generate histogram:
-            if enable_plot_wcorr_hist_figure:
-                ## INPUTS: wcorr_ripple_shuffle_all_df, wcorr_ripple_shuffle_all_df, custom_suffix
-                plot_var_name: str = 'abs_best_wcorr'
-                a_fig_context = a_curr_active_pipeline.build_display_context_for_session(display_fn_name='replay_wcorr', custom_suffix=custom_suffix)
-                params_description_str: str = " | ".join([f"{str(k)}:{str(v)}" for k, v in get_dict_subset(a_replay_epochs.metadata, subset_excludelist=['qclu_included_aclus']).items()])
-                footer_annotation_text = f'{a_curr_active_pipeline.get_session_context()}<br>{params_description_str}'
-
-                fig = BatchCompletionHelpers.plot_replay_wcorr_histogram(df=wcorr_ripple_shuffle_all_df, plot_var_name=plot_var_name,
-                        all_shuffles_only_best_decoder_wcorr_df=all_shuffles_only_best_decoder_wcorr_df, footer_annotation_text=footer_annotation_text)
-
-                # Save figure to disk:
-                out_hist_fig_result = a_curr_active_pipeline.output_figure(a_fig_context, fig=fig)
-                
-                # Show the figure
-                # fig.show()
-                
-            else:
-                ## disable plotting the histogram:
-                params_description_str = None
-                footer_annotation_text = None
-                out_hist_fig_result = None
-            
-            replay_epoch_outputs[replay_epochs_key].update(dict(params_description_str=params_description_str, footer_annotation_text=footer_annotation_text, out_hist_fig_result=out_hist_fig_result))
-
-
-        ## end error handler
-
-    # END FOR
-    ## restore original base_BATCH_DATE_TO_USE
-    self.BATCH_DATE_TO_USE = base_BATCH_DATE_TO_USE
-
-    callback_outputs = {
-        'custom_suffix': custom_suffix,
-        'replay_epoch_variations': deepcopy(replay_epoch_variations),
-        'replay_epoch_outputs': deepcopy(replay_epoch_outputs),
-        'included_qclu_values': included_qclu_values,
-        'minimum_inclusion_fr_Hz': minimum_inclusion_fr_Hz,
-        'ripple_decoding_time_bin_size': ripple_decoding_time_bin_size,
-        'num_wcorr_shuffles': num_wcorr_shuffles,
-        'drop_previous_result_and_compute_fresh': drop_previous_result_and_compute_fresh,
-        #  'wcorr_shuffles_data_output_filepath': wcorr_shuffles_data_standalone_filepath, 'e':err, #'t_end': t_end   
-        #  'standalone_pkl_filepath': standalone_pkl_filepath,
-        #  'standalone_MAT_filepath': standalone_MAT_filepath,
-        #  'ripple_WCorrShuffle_df_export_CSV_path': ripple_WCorrShuffle_df_export_CSV_path,
-    }
-
-    across_session_results_extended_dict['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'] = callback_outputs
-
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
-    return across_session_results_extended_dict
 
 
 # ==================================================================================================================== #
@@ -2081,10 +1792,10 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
     Output Files:
         if save_pickle:
-            PKL Output:     f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+            PKL Output:     `{date}{full_custom_suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size}.pkl`
         
         if save_hdf:
-            HDF5 Output:    f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+            HDF5 Output:    `{date}{full_custom_suffix}_recomputed_inst_fr_comps_{instantaneous_time_bin_size}.h5`
         
         if save_across_session_hdf:
             Across Session HDF5 Output: f'{get_now_day_str()}_across_session_recomputed_inst_fr_comps.h5'
@@ -2105,6 +1816,7 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
     from pyphocorehelpers.assertion_helpers import Assert
     from pyphoplacecellanalysis.General.Pipeline.Stages.Loading import saveData
     from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.LongShortTrackComputations import SingleBarResult, InstantaneousSpikeRateGroupsComputation
+    from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.SequenceBasedComputations import DecodedEpochScoreShuffle
     from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import InstantaneousFiringRatesDataframeAccessor
 
     # Dict[IdentifyingContext, InstantaneousSpikeRateGroupsComputation]
@@ -2182,13 +1894,15 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         subfn_callback_outputs['recomputed_inst_fr_comps_FAT_CSV_filepath'] = recomputed_inst_fr_comps_FAT_CSV_filepath
 
-
-
+        ## Build full computation suffix once for standalone .pkl/.h5 (pipeline custom_suffix + `-tbin_XXms`)
+        full_custom_suffix: Optional[str] = None
+        if _out_recomputed_inst_fr_comps is not None and (save_pickle or save_hdf):
+            full_custom_suffix = DecodedEpochScoreShuffle().build_full_custom_suffix(curr_active_pipeline=curr_active_pipeline)
 
         ## standalone saving:
         if (_out_recomputed_inst_fr_comps is not None) and save_pickle:
-            ## Pickle Saving:
-            standalone_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.pkl'
+            ## Pickle Saving (flat `{date}{full_suffix}_recomputed_inst_fr_comps_{inst_tbin}.pkl`)
+            standalone_filename: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=full_custom_suffix, instantaneous_time_bin_size_seconds=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds, extension='.pkl', date_str=get_now_day_str())
             recomputed_inst_fr_comps_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_filename).resolve()
             print(f'recomputed_inst_fr_comps_filepath: "{recomputed_inst_fr_comps_filepath}"')
 
@@ -2212,8 +1926,8 @@ def compute_and_export_session_instantaneous_spike_rates_completion_function(sel
 
         ## HDF5 output:
         if (_out_recomputed_inst_fr_comps is not None) and save_hdf:
-            ## Pickle Saving:
-            standalone_h5_filename: str = f'{get_now_day_str()}_recomputed_inst_fr_comps_{_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds}.h5'
+            ## HDF5 Saving (flat `{date}{full_suffix}_recomputed_inst_fr_comps_{inst_tbin}.h5`)
+            standalone_h5_filename: str = InstantaneousSpikeRateGroupsComputation.build_recomputed_inst_fr_comps_filename(full_custom_suffix=full_custom_suffix, instantaneous_time_bin_size_seconds=_out_recomputed_inst_fr_comps.instantaneous_time_bin_size_seconds, extension='.h5', date_str=get_now_day_str())
             recomputed_inst_fr_comps_h5_filepath = curr_active_pipeline.get_output_path().joinpath(standalone_h5_filename).resolve()
             print(f'recomputed_inst_fr_comps_h5_filepath: "{recomputed_inst_fr_comps_h5_filepath}"')
             try:
@@ -5345,10 +5059,9 @@ def MAIN_get_template_string(BATCH_DATE_TO_USE: str, collected_outputs_path:Path
                                     'determine_session_t_delta_completion_function': determine_session_t_delta_completion_function,
                                     'perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function': perform_sweep_decoding_time_bin_sizes_marginals_dfs_completion_function,
                                     'compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function': compute_and_export_decoders_epochs_decoding_and_evaluation_dfs_completion_function,
-                                    'compute_and_export_session_wcorr_shuffles_completion_function': compute_and_export_session_wcorr_shuffles_completion_function,
+                                    'compute_and_export_session_epoch_score_shuffles_completion_function': compute_and_export_session_epoch_score_shuffles_completion_function,
                                     'compute_and_export_session_instantaneous_spike_rates_completion_function': compute_and_export_session_instantaneous_spike_rates_completion_function,
                                     'compute_and_export_session_extended_placefield_peak_information_completion_function': compute_and_export_session_extended_placefield_peak_information_completion_function,
-                                    'compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function': compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function,
                                     'backup_previous_session_files_completion_function': backup_previous_session_files_completion_function,
                                     'compute_and_export_session_trial_by_trial_performance_completion_function': compute_and_export_session_trial_by_trial_performance_completion_function,
                                     'save_custom_session_files_completion_function': save_custom_session_files_completion_function,
