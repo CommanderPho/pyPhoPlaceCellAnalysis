@@ -5002,11 +5002,14 @@ class AcrossSessionHelpers:
 
     @function_attributes(short_name=None, tags=['filesystem', 'copy', 'file', 'session_folder'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-11-19 06:02', related_items=[])
     @classmethod
-    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None, session_rel_search_dir: str = 'output/'):
+    def _copy_exported_files_from_session_folder_to_collected_outputs(cls, target_dir: Path, BATCH_DATE_TO_USE = '2024-11-19', cuttoff_date = datetime(2024, 11, 16), is_dry_run:bool=True, debug_print:bool=False, custom_file_globs_dict=None, find_most_recent_files_kwargs=None, rename_backup_basename_fn: Optional[Callable]=None, session_rel_search_dir: str = 'output/', global_data_root_parent_path: Optional[Path] = None):
         """ Extracts the output files (.pkl, .h5, etc) from the individual session folders to the target folder
 
         session_rel_search_dir (str): relative path under each session folder to search. Defaults to 'output/'.
             Use '' or '.' to search the session root (e.g. for loadedSessPickle*.pkl).
+
+        global_data_root_parent_path (Optional[Path]): root under which session folders are resolved (e.g. .../Data).
+            If None, the first extant path from the hardcoded list is used.
 
         
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionHelpers
@@ -5076,9 +5079,14 @@ class AcrossSessionHelpers:
 
         included_session_contexts = UserAnnotationsManager.get_hardcoded_good_sessions()
         
-        known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
-        global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
-        assert global_data_root_parent_path.exists(), f"global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
+        if global_data_root_parent_path is not None:
+            global_data_root_parent_path = Path(global_data_root_parent_path) # .resolve()
+            if not global_data_root_parent_path.exists():
+                raise FileNotFoundError(f'user-provided `global_data_root_parent_path` does not exist: {global_data_root_parent_path}')
+        else:
+            known_global_data_root_parent_paths = [Path('/Users/pho/data'), Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/media/halechr/MAX/Data'), Path(r'W:/Data'), Path(r'/home/halechr/FastData'), Path(r'/Volumes/MoverNew/data')] # Path(r'/home/halechr/cloud/turbo/Data'), , Path(r'/nfs/turbo/umms-kdiba/Data'), Path(r'/home/halechr/turbo/Data'), 
+            global_data_root_parent_path = find_first_extant_path(known_global_data_root_parent_paths)
+            assert global_data_root_parent_path.exists(), f"auto-discovered global_data_root_parent_path: {global_data_root_parent_path} does not exist! Is the right computer's config commented out above?"
         good_session_concrete_folders = ConcreteSessionFolder.build_concrete_session_folders(global_data_root_parent_path, included_session_contexts)
         session_basedirs_dict: Dict[IdentifyingContext, Path] = {a_session_folder.context:a_session_folder.path for a_session_folder in good_session_concrete_folders}
 
