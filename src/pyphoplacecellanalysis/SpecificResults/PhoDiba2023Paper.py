@@ -3303,7 +3303,7 @@ class FigureS8:
             _plot_kwargs['legend_groups_to_hide'] = legend_groups_to_hide
         if color_by_time_bin_size:
             _tbin_color_kwargs = dict(color='time_bin_size')
-            _tbin_hist_kwargs = dict(color='time_bin_size', histnorm='probability density')
+            _tbin_hist_kwargs = dict(color='time_bin_size', histnorm='probability density', barmode='group', opacity=1.0)
             _plot_kwargs['color_by_time_bin_size'] = True
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
             _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_hist_kwargs)
@@ -7882,6 +7882,8 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
     if color_by_time_bin_size:
         hist_kwargs['color'] = "time_bin_size"
         hist_kwargs['histnorm'] = 'probability density'
+        hist_kwargs['barmode'] = 'group'
+        hist_kwargs['opacity'] = 1.0
     elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # assert 'dummy_column_for_color' in concatenated_ripple_df.columns, f"it was supposed to be added in the above px_scatter... related block. How did this not happen?"

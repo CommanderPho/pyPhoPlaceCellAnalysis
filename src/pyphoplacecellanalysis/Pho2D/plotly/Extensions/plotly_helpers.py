@@ -1047,7 +1047,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # Update layouts and axes
     if forced_range_y is not None:
         fig.update_layout(yaxis=dict(range=forced_range_y))
-    fig.update_layout(yaxis=dict(range=forced_range_y), barmode='overlay')
+    _active_barmode = hist_kwargs.get('barmode', 'overlay')
+    fig.update_layout(yaxis=dict(range=forced_range_y), barmode=_active_barmode)
 
     # fig = fig.update_yaxes(col=1, range=[-0.05, 1.05])
     # fig = fig.update_yaxes(col=3, range=[-0.05, 1.05])
@@ -1137,7 +1138,12 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     )
 
     data_grain = data_context.to_dict().get('data_grain', None)
-    hist_count_axis_title: str = "# t_bins" if (data_grain == 'per_time_bin') else "# Events"
+    _histnorm_for_title = hist_kwargs.get('histnorm', None) or common_plot_kwargs.get('histnorm', None)
+    if _histnorm_for_title:
+        # Density / probability / percent modes: relative magnitude, not raw counts (Figure S3)
+        hist_count_axis_title: str = "% t_bins" if (data_grain == 'per_time_bin') else "% Events"
+    else:
+        hist_count_axis_title: str = "# t_bins" if (data_grain == 'per_time_bin') else "# Events"
     fig.update_xaxes(title_text=hist_count_axis_title, row=1, col=1)
     fig.update_xaxes(title_text="Delta-aligned Event Time (seconds)", row=1, col=2)
     fig.update_xaxes(title_text=hist_count_axis_title, row=1, col=3)
