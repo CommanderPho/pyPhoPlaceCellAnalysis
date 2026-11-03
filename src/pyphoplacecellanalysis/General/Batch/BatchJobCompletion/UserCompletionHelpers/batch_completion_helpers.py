@@ -656,7 +656,7 @@ class BatchCompletionHelpers:
 
 
 
-	@function_attributes(short_name=None, tags=['MAIN', 'ALT_REPLAYS', 'replay'], input_requires=[], output_provides=[], uses=['compute_diba_quiescent_style_replay_events', 'try_load_neuroscope_EVT_file_epochs', 'try_load_neuroscope_EVT_file_epochs'], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-07-03 06:12', related_items=[])
+	@function_attributes(short_name=None, tags=['MAIN', 'ALT_REPLAYS', 'replay'], input_requires=[], output_provides=[], uses=['compute_diba_quiescent_style_replay_events', 'try_load_neuroscope_EVT_file_epochs', 'try_load_neuroscope_EVT_file_epochs'], used_by=[], creation_date='2024-07-03 06:12', related_items=[])
 	@classmethod
 	def compute_all_replay_epoch_variations(cls, curr_active_pipeline, included_qclu_values = [1,2,4,6,7,9], minimum_inclusion_fr_Hz=5.0, suppress_exceptions: bool = True) -> Dict[str, Epoch]:
 		""" Computes alternative replays (such as loading them from Diba-exported files, computing using the quiescent periods before the event, etc)
@@ -897,7 +897,7 @@ class BatchCompletionHelpers:
 	finalize_output_shuffled_wcorr = finalize_output_shuffled_epoch_scores
 
 
-	@function_attributes(short_name=None, tags=['plotting', 'histogram', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=['compute_and_export_session_alternative_replay_wcorr_shuffles_completion_function'], creation_date='2024-06-27 22:43', related_items=[])
+	@function_attributes(short_name=None, tags=['plotting', 'histogram', 'figure', 'plotly'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-06-27 22:43', related_items=[])
 	@classmethod
 	def plot_replay_wcorr_histogram(cls, df: pd.DataFrame, plot_var_name: str, all_shuffles_only_best_decoder_wcorr_df: Optional[pd.DataFrame]=None, footer_annotation_text=None):
 		""" Create horizontal histogram Takes outputs of finalize_output_shuffled_wcorr to plot a histogram like the Diba 2007 paper
