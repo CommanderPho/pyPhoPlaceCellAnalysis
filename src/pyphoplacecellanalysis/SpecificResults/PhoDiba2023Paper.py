@@ -2949,7 +2949,7 @@ class PrePostDeltaDistributionComparison:
             xtick_positions=group_centers,
             xtick_labels=x_labels,
             scatter_x_offsets=scatter_x_offsets,
-            scatter_kwargs=dict(edgecolors='white', linewidths=0.4, zorder=4),
+            scatter_kwargs=dict(edgecolors='white', linewidths=0.4, zorder=4, s=9),
         ))
 
         if debug_print:
@@ -2964,11 +2964,15 @@ class PrePostDeltaDistributionComparison:
         ) | _fig3_label_rc
         with mpl.rc_context(publication_rc):
             with FigureCollector(name='fig_s3_summary_multi_tbin_bars', base_context=active_context) as collector:
+                s3_title_subtitle: str = (
+                    f'for {group_labels[0]} and {group_labels[1]} '
+                    f'({n_tbin} time-bin sizes, per-time-bin granularity)'
+                )
                 render = PaperFigureTwo.create_plot(
                     x_labels, y_values, scatter_props, ylabel, title, 'fig_s3_summary_multi_tbin_bars', active_context, True,
                     prepare_for_publication=prepare_for_publication,
                     publication_group_labels=group_labels, metric_name='Session Means',
-                    title_subtitle=f'for {group_labels[0]} and {group_labels[1]} by time bin size', xlabel='',
+                    title_subtitle=s3_title_subtitle, xlabel='',
                     **{**_summary_title_kwargs, **create_plot_kwargs},
                 )
                 collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
@@ -3007,37 +3011,10 @@ class PrePostDeltaDistributionComparison:
                     x_pbe_post = bar_x_list[pbe_post_idx[i]]
                     bracket_y = y_max + (0.04 * i * max(abs(y_max), 1e-12))
                     if laps_p is not None:
-                        add_significance_bars(ax, laps_p, x1=x_laps_pre, x2=x_laps_post, y=bracket_y, color=bar_colors[laps_pre_idx[i]])
+                        add_significance_bars(ax, laps_p, x1=x_laps_pre, x2=x_laps_post, y=bracket_y, color=bar_colors[laps_pre_idx[i]], y_offset_frac=0.04, text_additional_y_offset=0.002)
                     if pbe_p is not None:
-                        add_significance_bars(ax, pbe_p, x1=x_pbe_pre, x2=x_pbe_post, y=bracket_y, color=bar_colors[pbe_pre_idx[i]])
+                        add_significance_bars(ax, pbe_p, x1=x_pbe_pre, x2=x_pbe_post, y=bracket_y, color=bar_colors[pbe_pre_idx[i]], y_offset_frac=0.04, text_additional_y_offset=0.002)
                 ## END for i, tbin in enumerate(ordered_tbins)...
-
-                tbin_legend_handles = [
-                    Patch(facecolor=time_bin_color_map.get(tbin, '#000000'), edgecolor=time_bin_color_map.get(tbin, '#000000'),
-                          alpha=0.85, label=f'{tbin} s')
-                    for tbin in ordered_tbins
-                ]
-                tbin_legend = ax.legend(
-                    handles=tbin_legend_handles, frameon=False, loc='upper left', title='Time bin size',
-                    ncol=min(n_tbin, 3), borderaxespad=0.3, columnspacing=1.0, handletextpad=0.4,
-                )
-                tbin_legend.set_clip_on(False)
-
-                if has_animal and marker_mapping:
-                    legend_animals = [a for a in preferred_animals if a in marker_mapping]
-                    legend_animals.extend([a for a in unique_animals if a not in set(preferred_animals)])
-                    animal_legend_handles = [
-                        Line2D([0], [0], linestyle='None', marker=marker_mapping[animal], color='k',
-                               markerfacecolor='k', markeredgecolor='k', markersize=6,
-                               label=_animal_legend_label(animal))
-                        for animal in legend_animals
-                    ]
-                    animal_legend = ax.legend(
-                        handles=animal_legend_handles, frameon=False, loc='lower right', bbox_to_anchor=(1.0, 1.02),
-                        ncol=max(len(animal_legend_handles), 1), borderaxespad=0.0, columnspacing=1.0, handletextpad=0.4,
-                    )
-                    animal_legend.set_clip_on(False)
-                    ax.add_artist(tbin_legend)
 
                 if save_figure:
                     save_context = active_context.overwriting_context(display_fn_name=fig_file_name)
@@ -3658,7 +3635,7 @@ class FigureS8:
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
-                                                    store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None,
+                                                    store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
         """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
@@ -3666,6 +3643,7 @@ class FigureS8:
         PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
 
         When `color_by_time_bin_size` is True, scatter/hist traces are colored by `time_bin_size` (Figure S3).
+        Scatter legend is hidden by default for Figure S3 (`show_scatter_legend=None` → off when `color_by_time_bin_size`).
         When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
@@ -3744,7 +3722,8 @@ class FigureS8:
                 if group_key is not None:
                     active_plot_kwargs['main_title'] = f"{main_title} | {group_key}"
                 n_unique_tbins: int = int(plot_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in plot_df.columns) else 0
-                showlegend: bool = bool(should_overlay_heuristic_filter or (color_by_time_bin_size and (n_unique_tbins > 1)))
+                effective_show_scatter_legend: bool = (not color_by_time_bin_size) if (show_scatter_legend is None) else bool(show_scatter_legend)
+                showlegend: bool = bool(effective_show_scatter_legend) and bool(should_overlay_heuristic_filter or (color_by_time_bin_size and (n_unique_tbins > 1)))
                 legend_title_text: str = 'Heuristic-Passing' if should_overlay_heuristic_filter else 'Time bin size (s)'
                 new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
                 if should_compute_or_annotate_stats and (k == 'Final'):
@@ -3870,13 +3849,13 @@ class FigureS8:
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = True, store_debug_values: bool = False,
-            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None,
+            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None, show_scatter_legend: Optional[bool] = None,
         ):
         """ Performs the main plotting and adds optional stats
 
             When `store_debug_values=True`, a 4th return item holds the processed plot DFs (`base_df_dict_dict`, per-key `plot_data` with `final_df`/`plot_df`) and filter params. Also stored on `FigureS8.last_debug_values`.
 
-            `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series.
+            `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series; scatter legend off by default (`show_scatter_legend=True` to restore).
             `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3.
 
 
@@ -4098,6 +4077,7 @@ class FigureS8:
                                                                                                                 store_debug_values=store_debug_values,
                                                                                                                 color_by_time_bin_size=color_by_time_bin_size,
                                                                                                                 legend_groups_to_hide=legend_groups_to_hide,
+                                                                                                                show_scatter_legend=show_scatter_legend,
                                                                                                             )
                 if store_debug_values:
                     _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
@@ -4193,7 +4173,7 @@ class FigureS8:
             # Override S3 time bins via figures_config_dict['Figure S3']['active_filter_constraints']['time_bin_size'].
 
         Defaults write all configured figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
-        Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable).
+        Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable). S3 scatter panels hide the time-bin legend by default; pass `show_scatter_legend=True` in the Figure S3 config to show it.
         """
         if earliest_delta_aligned_t_start is not None:
             plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
@@ -4217,6 +4197,7 @@ class FigureS8:
                     'figures_parent_folder': figures_root.joinpath(f'Figure S3 - Effect of Time Bin Duration on Decoding Performance/Inputs/{figures_date}').resolve(), # Figure S3
                     'enable_heuristic_filtered_outputs': False, 'separate_laps_pbes_figures': False,
                     'color_by_time_bin_size': True,
+                    'show_scatter_legend': False,
                     'enabled_granularities': ('_perTimeBin',),
                     'should_compute_stats': True,
                     'legend_groups_to_hide': [],
@@ -4331,8 +4312,9 @@ class FigureS8:
                             results_by_tbin,
                             time_bin_color_map=PrePostDeltaDistributionComparison.time_bin_size_discrete_color_map(ordered_tbins),
                             fignum=combined_basename, fig_file_name=combined_basename, save_figure=True, export_folder=figures_parent_folder,
-                            title='Decoded $P_{Short}$ by time bin size',
+                            title='Decoded $P_{Short}$',
                             active_context=IdentifyingContext(display_fn_name=combined_basename),
+                            defer_show=True, 
                         )
                         _out_figs_dict_dict_dict['fig_summary'] = _out_extra_plot
                         print(f'\tFigure S3 multi-tbin summary: "{combined_basename}" saved_paths={_out_extra_plot.get("saved_paths")}')
@@ -6615,8 +6597,10 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
                         "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track")
 
         epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
-        return (f"<size:{title_font_size}>{epochs_bit} {metric_name}\n"
-                f"<size:{subtitle_font_size}>{subtitle}</></>"
+        metric_suffix: str = f" {metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
+        # Close line-1 <size:…> before \n so flexitext does not glue the subtitle/granularity phrase to "Session Means".
+        return (f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>\n"
+                f"<size:{subtitle_font_size}>{subtitle}</>"
                 )
 
 
