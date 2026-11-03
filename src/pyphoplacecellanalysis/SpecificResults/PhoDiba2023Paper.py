@@ -3303,9 +3303,10 @@ class FigureS8:
             _plot_kwargs['legend_groups_to_hide'] = legend_groups_to_hide
         if color_by_time_bin_size:
             _tbin_color_kwargs = dict(color='time_bin_size')
+            _tbin_hist_kwargs = dict(color='time_bin_size', histnorm='probability density')
             _plot_kwargs['color_by_time_bin_size'] = True
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
-            _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_color_kwargs)
+            _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_hist_kwargs)
             _plot_kwargs['common_plot_kwargs'] = deepcopy(_tbin_color_kwargs)
         if should_overlay_heuristic_filter:
             _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
@@ -7880,6 +7881,7 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
 
     if color_by_time_bin_size:
         hist_kwargs['color'] = "time_bin_size"
+        hist_kwargs['histnorm'] = 'probability density'
     elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # assert 'dummy_column_for_color' in concatenated_ripple_df.columns, f"it was supposed to be added in the above px_scatter... related block. How did this not happen?"

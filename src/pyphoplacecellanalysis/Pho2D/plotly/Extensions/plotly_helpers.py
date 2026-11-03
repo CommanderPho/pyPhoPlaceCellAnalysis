@@ -939,22 +939,33 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # already_added_legend_entries = set()  # Keep track of trace names that are already added
     # print(f'already_added_legend_entries: {already_added_legend_entries}')
     
-    # Shared hist count magnitude: horizontal hist (y=variable) puts # Events on x — share that x-range only.
+    # Shared hist count magnitude: horizontal hist (y=variable) puts # Events (or density) on x — share that x-range only.
     # Does not touch figure y-limits (those stay at the existing update_yaxes(... [-0.05, 1.05] ...) below).
-    hist_count_max: Optional[int] = None
+    hist_count_max: Optional[float] = None
     if should_set_hist_same_magnitude_axes:
         _hist_range_y = hist_kwargs.get('range_y', forced_range_y) or [0.0, 1.0]
         _hist_nbins: int = int(hist_kwargs.get('nbins', histogram_bins))
         _hist_count_bin_edges = np.linspace(float(_hist_range_y[0]), float(_hist_range_y[1]), _hist_nbins + 1)
+        _histnorm = hist_kwargs.get('histnorm', None) or common_plot_kwargs.get('histnorm', None)
 
-        def _subfn_horizontal_hist_count_max(a_trace) -> int:
-            """Max bin count for a horizontal Histogram trace (raw values in `y`, counts on x)."""
+        def _subfn_horizontal_hist_count_max(a_trace) -> float:
+            """Max bar magnitude for a horizontal Histogram trace.
+
+            When `histnorm` is set, use plotted bar heights on `x` (density/probability).
+            Otherwise recompute raw counts from `y` values.
+            """
+            if _histnorm:
+                x_vals = np.asarray(a_trace.x, dtype=float)
+                x_vals = x_vals[np.isfinite(x_vals)]
+                if x_vals.size == 0:
+                    return 0.0
+                return float(np.max(x_vals))
             y_vals = np.asarray(a_trace.y, dtype=float)
             y_vals = y_vals[np.isfinite(y_vals)]
             if y_vals.size == 0:
-                return 0
+                return 0.0
             counts, _ = np.histogram(y_vals, bins=_hist_count_bin_edges)
-            return int(np.max(counts)) if counts.size > 0 else 0
+            return float(np.max(counts)) if counts.size > 0 else 0.0
 
 
     # Pre-Delta Histogram
@@ -977,7 +988,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         )
 
         if should_set_hist_same_magnitude_axes:
-            a_count_max: int = _subfn_horizontal_hist_count_max(a_trace)
+            a_count_max: float = _subfn_horizontal_hist_count_max(a_trace)
             if (hist_count_max is None) or (a_count_max > hist_count_max):
                 hist_count_max = a_count_max
 
@@ -1028,7 +1039,7 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
         )
 
         if should_set_hist_same_magnitude_axes:
-            a_count_max: int = _subfn_horizontal_hist_count_max(a_trace)
+            a_count_max: float = _subfn_horizontal_hist_count_max(a_trace)
             if (hist_count_max is None) or (a_count_max > hist_count_max):
                 hist_count_max = a_count_max
 
@@ -1044,16 +1055,19 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
     # fig = fig.update_yaxes(col=2, range=[0.0, 5.0])
 
     if should_set_hist_same_magnitude_axes:
-        # Shared # Events (x) range for both horizontal histograms — leave scatter time axis (col=2) alone
+        # Shared # Events / density (x) range for both horizontal histograms — leave scatter time axis (col=2) alone
         if (hist_count_max is not None) and (hist_count_max > 0):
             # Nice-ceil the midpoint (dense 1–10 steps), then max = 2*mid so ticks [0, mid, max] stay tight
             # and round (e.g. 10500 → mid 6000 → [0, 6000, 12000], not [0, 10k, 20k]).
+            # For density/probability histnorm values (<~10), keep float mids so axes are not forced to integers.
             _mid_raw = float(hist_count_max) / 2.0
-            _exp = int(np.floor(np.log10(max(_mid_raw, 1.0))))
-            nice_hist_count_mid: Optional[int] = None
+            _exp = int(np.floor(np.log10(max(_mid_raw, 1e-12))))
+            nice_hist_count_mid: Optional[float] = None
             for _e in (_exp, _exp + 1):
                 for _candidate in (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0):
-                    _mid = int(np.round(_candidate * (10 ** _e)))
+                    _mid = float(_candidate * (10 ** _e))
+                    if (not _histnorm) and (_mid >= 1.0):
+                        _mid = float(int(np.round(_mid)))
                     if (2 * _mid) >= hist_count_max:
                         nice_hist_count_mid = _mid
                         break
@@ -1063,8 +1077,8 @@ def plotly_pre_post_delta_scatter(data_results_df: pd.DataFrame, data_context: O
             ## END for _e in (_exp, _exp + 1)...
 
             if nice_hist_count_mid is None:
-                nice_hist_count_mid = int(np.ceil(_mid_raw))
-            nice_hist_count_max: int = int(2 * nice_hist_count_mid)
+                nice_hist_count_mid = float(np.ceil(_mid_raw)) if (not _histnorm) else float(_mid_raw)
+            nice_hist_count_max: float = float(2 * nice_hist_count_mid)
             shared_hist_x_range = [0, nice_hist_count_max]
             hist_count_tickvals = [0, nice_hist_count_mid, nice_hist_count_max]
             if debug_print:
