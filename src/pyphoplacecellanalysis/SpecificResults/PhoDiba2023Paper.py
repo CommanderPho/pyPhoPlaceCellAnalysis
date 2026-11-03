@@ -3158,6 +3158,13 @@ class FigureS8:
             preferred = [v for v in cls._PREFERRED_ANIMAL_ORDER if v in unique_values]
             rest = sorted([v for v in unique_values if v not in preferred], key=str)
             return preferred + rest
+        if split_by_column == 'time_bin_size':
+            def _tbin_sort_key(s: str):
+                try:
+                    return (0, float(s))
+                except ValueError:
+                    return (1, s)
+            return sorted(unique_values, key=_tbin_sort_key)
         return sorted(unique_values, key=str)
 
 
@@ -3364,19 +3371,30 @@ class FigureS8:
                 new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
                 if should_compute_or_annotate_stats and (k == 'Final'):
                     stats_by_label = {}
-                    comparison_all, results_all = cls._compute_pre_post_delta_stats(group_df, stats_class_kwargs, stats_run_kwargs)
-                    group_stats = {'all': (comparison_all, results_all)}
-                    if results_all is not None:
-                        stats_by_label['False' if should_overlay_heuristic_filter else ''] = results_all
-                    if should_overlay_heuristic_filter:
-                        passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
-                        comparison_pass, results_pass = cls._compute_pre_post_delta_stats(group_df[passing_mask], stats_class_kwargs, stats_run_kwargs)
-                        group_stats['heuristic_passing'] = (comparison_pass, results_pass)
-                        if results_pass is not None:
-                            stats_by_label['True'] = results_pass
-                    _out_stats_dict.setdefault(k, {})[group_key] = group_stats
-                    if enable_add_stats_to_figures and stats_by_label:
-                        new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label)
+                    n_unique_tbins_stats: int = int(group_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in group_df.columns) else 0
+                    if color_by_time_bin_size and (n_unique_tbins_stats > 1):
+                        # Figure S3: stratify stats by time_bin_size only (scatter stays pooled). No pooled None key — that would short-circuit summary group iteration.
+                        tbin_values = cls._sorted_split_values(group_df['time_bin_size'].dropna().unique(), split_by_column='time_bin_size')
+                        for tbin_key in tbin_values:
+                            tbin_mask = group_df['time_bin_size'].astype(str) == str(tbin_key)
+                            tbin_df = cls._copy_df_preserving_context(group_df[tbin_mask])
+                            comparison_tbin, results_tbin = cls._compute_pre_post_delta_stats(tbin_df, stats_class_kwargs, stats_run_kwargs)
+                            _out_stats_dict.setdefault(k, {})[tbin_key] = {'all': (comparison_tbin, results_tbin)}
+                        ## END for tbin_key in tbin_values...
+                    else:
+                        comparison_all, results_all = cls._compute_pre_post_delta_stats(group_df, stats_class_kwargs, stats_run_kwargs)
+                        group_stats = {'all': (comparison_all, results_all)}
+                        if results_all is not None:
+                            stats_by_label['False' if should_overlay_heuristic_filter else ''] = results_all
+                        if should_overlay_heuristic_filter:
+                            passing_mask = additional_filter_predicates['is_heuristic_passing'](group_df).astype(bool)
+                            comparison_pass, results_pass = cls._compute_pre_post_delta_stats(group_df[passing_mask], stats_class_kwargs, stats_run_kwargs)
+                            group_stats['heuristic_passing'] = (comparison_pass, results_pass)
+                            if results_pass is not None:
+                                stats_by_label['True'] = results_pass
+                        _out_stats_dict.setdefault(k, {})[group_key] = group_stats
+                        if enable_add_stats_to_figures and stats_by_label:
+                            new_fig = cls._add_pre_post_delta_stats_annotation(new_fig, stats_by_label)
                 fig_key = group_key if group_key is not None else k
                 group_figs[fig_key] = new_fig
                 if should_save:
@@ -3819,10 +3837,10 @@ class FigureS8:
                 },
                 'Figure S3': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S3 - Effect of Time Bin Duration on Decoding Performance/Inputs/{figures_date}').resolve(), # Figure S3
-                    'enable_heuristic_filtered_outputs': False, 'separate_laps_pbes_figures': True,
+                    'enable_heuristic_filtered_outputs': False, 'separate_laps_pbes_figures': False,
                     'color_by_time_bin_size': True,
                     'enabled_granularities': ('_perTimeBin',),
-                    'should_compute_stats': False,
+                    'should_compute_stats': True,
                     'legend_groups_to_hide': [],
                     'active_filter_constraints': {
                         'trained_compute_epochs': 'laps',
@@ -3856,6 +3874,8 @@ class FigureS8:
                 fig_separate_laps_pbes_figures = fig_config_dict.pop('separate_laps_pbes_figures', separate_laps_pbes_figures)
                 fig_should_compute_stats = fig_config_dict.pop('should_compute_stats', should_compute_stats)
                 fig_legend_groups_to_hide = fig_config_dict.pop('legend_groups_to_hide', None)
+                fig_color_by_time_bin_size: bool = bool(fig_config_dict.get('color_by_time_bin_size', False))
+                summary_split_column: str = 'time_bin_size' if fig_color_by_time_bin_size else (split_by_column or 'animal')
                 prev_legend_groups_to_hide = getattr(plotly_helpers, 'legend_groups_to_hide', None)
                 try:
                     if fig_legend_groups_to_hide is not None:
@@ -3909,7 +3929,7 @@ class FigureS8:
                                     group_names.append(group_name)
                         ## END for k in results_dict.keys()...
 
-                        ordered_groups = cls._sorted_split_values(group_names, split_by_column=(split_by_column or 'animal'))
+                        ordered_groups = cls._sorted_split_values(group_names, split_by_column=summary_split_column)
                         for group_name in ordered_groups:
                             laps_key: str = f'{laps_base}_{group_name}'
                             pbes_key: str = f'{pbes_base}_{group_name}'
@@ -3938,7 +3958,10 @@ class FigureS8:
                                 plot_kwargs['pbe_fig_file_name'] = _subfn_summary_fig_file_name('PBEs', group_name)
                                 plot_kwargs['fignum'] = plot_kwargs['laps_fig_file_name']
                             if group_name is not None:
-                                plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
+                                if fig_color_by_time_bin_size:
+                                    plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | t_bin={group_name}s'
+                                else:
+                                    plot_kwargs['title'] = f'Decoded $P_{{Short}}$ | {group_name}'
                             _out_extra_plot = PrePostDeltaDistributionComparison.plot_fig2_style_summary_four_bar(
                                 pre_post_delta_stats_results_dict[laps_key],
                                 pre_post_delta_stats_results_dict[pbes_key],
@@ -3960,12 +3983,12 @@ class FigureS8:
                             _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict['all']
                         else:
                             if len(group_svg_paths) > 1:
-                                stacked_svg_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{split_by_column or "animal"}.svg')
+                                stacked_svg_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{summary_split_column}.svg')
                                 SVGHelpers.concatenate_svgs_vertically(svg_paths=group_svg_paths, output_path=stacked_svg_path, padding=0)
                                 fig_summary_dict['stacked_svg'] = stacked_svg_path
-                                print(f'\tstacked {split_by_column or "animal"} summary rows: "{stacked_svg_path.as_posix()}"')
+                                print(f'\tstacked {summary_split_column} summary rows: "{stacked_svg_path.as_posix()}"')
                             if len(group_pdf_paths) > 1:
-                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{split_by_column or "animal"}.pdf')
+                                stacked_pdf_path = figures_parent_folder.joinpath(f'{fig_name}_SummaryStats_{grainularity_token}_by_{summary_split_column}.pdf')
                                 PDFHelpers.concatenate_pdfs_vertically(pdf_paths=group_pdf_paths, output_path=stacked_pdf_path, padding=0)
                                 fig_summary_dict['stacked_pdf'] = stacked_pdf_path
                             _out_figs_dict_dict_dict['fig_summary'] = fig_summary_dict
