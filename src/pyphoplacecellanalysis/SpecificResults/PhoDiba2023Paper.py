@@ -2978,7 +2978,7 @@ from pyphocorehelpers.plotting.media_output_helpers import PDFHelpers, SVGHelper
 
 @metadata_attributes(short_name=None, tags=['figure-s8', 's8', 'figure-4', 'fig4', 'figure-s6', 's6', 'figure', 'publication'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 07:57', related_items=[])
 class FigureS8:
-    """ Used to output Figure 4, Figure S6, Figure S8
+    """ Used to output Figure 4, Figure S3, Figure S6, Figure S8, Figure S9
 
         Usage:
             from pathlib import Path
@@ -2990,9 +2990,12 @@ class FigureS8:
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
-            ## Figure 4 + S8 + S9 in one call (preferred):
+            ## Figure 4 + S3 + S8 + S9 in one call (preferred):
             figures_out_dict = FigureS8.main_all_figs(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates,
                                                       earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
+
+            ## Figure S3 only (multi time_bin_size series):
+            # figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
 
             ## Single figure:
             ## INPUTS: earliest_delta_aligned_t_start, latest_delta_aligned_t_end
@@ -3039,7 +3042,7 @@ class FigureS8:
 
 
     @classmethod
-    def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True) -> go.Figure:
+    def _post_hoc_format_figure(cls, a_fig: go.Figure, showlegend: bool = True, legend_title_text: str = 'Heuristic-Passing') -> go.Figure:
         """Force publication fonts onto the figure object (templates are only fallbacks)."""
         layout_kwargs = dict(
             template=cls.template,
@@ -3055,7 +3058,7 @@ class FigureS8:
         )
         if showlegend:
             # Horizontal legend below the x-axis titles — paper (0.99, 0.99) sat on the right histogram
-            layout_kwargs['legend'] = dict(title_text='Heuristic-Passing', orientation='h', x=0.5, y=-0.28, xanchor='center', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0, itemsizing='constant', tracegroupgap=0)
+            layout_kwargs['legend'] = dict(title_text=legend_title_text, orientation='h', x=0.5, y=-0.28, xanchor='center', yanchor='top', bgcolor=cls._transparent_bgcolor, borderwidth=0, itemsizing='constant', tracegroupgap=0)
             layout_kwargs['margin'] = dict(l=50, r=40, t=36, b=88)
         a_fig = a_fig.update_layout(**layout_kwargs)
         a_fig = a_fig.update_xaxes(
@@ -3178,13 +3181,13 @@ class FigureS8:
 
     @function_attributes(short_name=None, tags=['private', 'split-on-animal'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-10-26 14:39', related_items=[])
     @classmethod
-    def _plot_formatted_pre_post_scatter(cls, plot_df: pd.DataFrame, data_context, plot_kwargs: Dict, showlegend: bool):
+    def _plot_formatted_pre_post_scatter(cls, plot_df: pd.DataFrame, data_context, plot_kwargs: Dict, showlegend: bool, legend_title_text: str = 'Heuristic-Passing'):
         new_fig, new_fig_context, *_ = cls.plotly_helpers._perform_plot_pre_post_delta_scatter(
             data_context=data_context,
             concatenated_ripple_df=plot_df,
             **plot_kwargs,
         )
-        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=showlegend)
+        new_fig = cls._post_hoc_format_figure(new_fig, showlegend=showlegend, legend_title_text=legend_title_text)
         new_fig.update_layout(**cls.PUB_FIG_SIZE)
         return new_fig, new_fig_context
 
@@ -3270,13 +3273,14 @@ class FigureS8:
     def _perform_plot_iteratively_constrained(cls, base_df: pd.DataFrame, additional_filter_predicates, figures_parent_folder: Path, export_suffix: str, title_suffix: str='', constraint_keys=("is_long_duration", "is_track_body"), should_save: bool = True,
                                                     should_export_initially_filtered: bool = False, should_export_iteratively_constrainted: bool = True, should_overlay_heuristic_filter: bool = False, split_by_column: Optional[str] = None,
                                                     should_compute_stats: bool = False, enable_add_stats_to_figures: bool = False, stats_class_kwargs: Optional[Dict] = None, stats_run_kwargs: Optional[Dict] = None,
-                                                    store_debug_values: bool = False,
+                                                    store_debug_values: bool = False, color_by_time_bin_size: bool = False, legend_groups_to_hide: Optional[List] = None,
         ):
         """Plot the constrained pre/post-delta scatter. Also does stats when `should_compute_stats == True`
 
         `split_by_column='animal'` plots one 1x3 row per animal and stacks those SVGs into `*_by_animal.svg`.
         PX `facet_row` cannot do this: the helper always copies traces into a fixed 1x3 figure.
 
+        When `color_by_time_bin_size` is True, scatter/hist traces are colored by `time_bin_size` (Figure S3).
         When `store_debug_values` is True, the 4th return is a dict of the processed DFs actually plotted (`final_df`, `plot_df`, optional `groups`) plus row counts.
         """
         predicates = {k: additional_filter_predicates[k] for k in constraint_keys}
@@ -3295,11 +3299,20 @@ class FigureS8:
             main_title=main_title,
             # epoch_label_mode='annotation_above', #TODO 2026-09-24 18:23: - [ ] where the labels sit
         )
+        if legend_groups_to_hide is not None:
+            _plot_kwargs['legend_groups_to_hide'] = legend_groups_to_hide
+        if color_by_time_bin_size:
+            _tbin_color_kwargs = dict(color='time_bin_size')
+            _plot_kwargs['color_by_time_bin_size'] = True
+            _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_tbin_color_kwargs}
+            _plot_kwargs['hist_kwargs'] = deepcopy(_tbin_color_kwargs)
+            _plot_kwargs['common_plot_kwargs'] = deepcopy(_tbin_color_kwargs)
         if should_overlay_heuristic_filter:
             _heuristic_color_kwargs = dict(color='heuristic_filter', color_discrete_map=cls._heuristic_filter_color_map, category_orders={'heuristic_filter': ['False', 'True']}, color_discrete_sequence=[cls._heuristic_filter_color_map['False'], cls._heuristic_filter_color_map['True']])
             _plot_kwargs['px_scatter_kwargs'] = {"size_max": 2.0, **_heuristic_color_kwargs}
             _plot_kwargs['hist_kwargs'] = deepcopy(_heuristic_color_kwargs)
             _plot_kwargs['common_plot_kwargs'] = deepcopy(_heuristic_color_kwargs)
+            _plot_kwargs.pop('color_by_time_bin_size', None)  # heuristic overlay takes precedence over t-bin coloring
 
         _out_figs_dict = {}
         _out_paths_dict = {}
@@ -3314,6 +3327,7 @@ class FigureS8:
                 'n_rows': {'Initial': len(base_df)},
                 'constraint_keys': constraint_keys,
                 'should_overlay_heuristic_filter': should_overlay_heuristic_filter,
+                'color_by_time_bin_size': color_by_time_bin_size,
                 'split_by_column': split_by_column,
                 'export_suffix': export_suffix,
             }
@@ -3343,7 +3357,10 @@ class FigureS8:
                 active_plot_kwargs = deepcopy(_plot_kwargs)
                 if group_key is not None:
                     active_plot_kwargs['main_title'] = f"{main_title} | {group_key}"
-                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=should_overlay_heuristic_filter)
+                n_unique_tbins: int = int(plot_df['time_bin_size'].nunique(dropna=True)) if ('time_bin_size' in plot_df.columns) else 0
+                showlegend: bool = bool(should_overlay_heuristic_filter or (color_by_time_bin_size and (n_unique_tbins > 1)))
+                legend_title_text: str = 'Heuristic-Passing' if should_overlay_heuristic_filter else 'Time bin size (s)'
+                new_fig, new_fig_context = cls._plot_formatted_pre_post_scatter(plot_df=plot_df, data_context=data_context, plot_kwargs=active_plot_kwargs, showlegend=showlegend, legend_title_text=legend_title_text)
                 if should_compute_or_annotate_stats and (k == 'Final'):
                     stats_by_label = {}
                     comparison_all, results_all = cls._compute_pre_post_delta_stats(group_df, stats_class_kwargs, stats_run_kwargs)
@@ -3456,10 +3473,14 @@ class FigureS8:
     @classmethod
     def main(cls, df_filter, plotly_helpers: PlotlyHelpers, additional_filter_predicates: Dict, figures_parent_folder: Path, active_filter_constraints: Optional[Dict]=None, should_concatenate_figures: bool=False, enable_heuristic_filtered_outputs: bool = False, split_by_column: Optional[str] = None,
             should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, debug_print: bool = True, store_debug_values: bool = False,
+            color_by_time_bin_size: bool = False, enabled_granularities: Optional[Sequence[str]] = None, legend_groups_to_hide: Optional[List] = None,
         ):
         """ Performs the main plotting and adds optional stats
 
             When `store_debug_values=True`, a 4th return item holds the processed plot DFs (`base_df_dict_dict`, per-key `plot_data` with `final_df`/`plot_df`) and filter params. Also stored on `FigureS8.last_debug_values`.
+
+            `color_by_time_bin_size=True` (Figure S3): color scatter/hist by `time_bin_size` as separate series.
+            `enabled_granularities` defaults to both `('_perTimeBin', '_perEpochs')`; pass e.g. `('_perTimeBin',)` for S3.
 
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
@@ -3630,7 +3651,11 @@ class FigureS8:
         ## INPUTS: (pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs)
 
         ## INPUTS: base_df_dict_dict, base_constraint_keys_dict
+        if enabled_granularities is None:
+            enabled_granularities = ('_perTimeBin', '_perEpochs')
         for a_grainularity, base_df_dict in base_df_dict_dict.items(): # a_grainularity: grainularity_options = ['_perTimeBin', '_perEpochs']
+            if a_grainularity not in enabled_granularities:
+                continue
             ## output_suffix: ['Laps', 'PBEs']
             ## same for laps/PBEs
             base_constraint_keys = list(deepcopy(base_constraint_keys_dict[a_grainularity])) # ["is_long_duration"] — heuristic is overlaid on PBEs only, not dropped
@@ -3674,6 +3699,8 @@ class FigureS8:
                                                                                                                 should_compute_stats=should_compute_stats, enable_add_stats_to_figures=enable_add_stats_to_figures,
                                                                                                                 stats_class_kwargs=_stats_class_kwargs, stats_run_kwargs=_stats_run_kwargs,
                                                                                                                 store_debug_values=store_debug_values,
+                                                                                                                color_by_time_bin_size=color_by_time_bin_size,
+                                                                                                                legend_groups_to_hide=legend_groups_to_hide,
                                                                                                             )
                 if store_debug_values:
                     _out_debug_values['plot_data'][active_key] = a_stage_debug_dict
@@ -3718,8 +3745,8 @@ class FigureS8:
             # _out_figs_dict_dict['Laps']['Final']
             # _out_figs_dict_dict['PBEs']['Final']
 
-            _out_figs_dict_dict_dict[an_epoch_name] = _out_figs_dict_dict
-            _out_paths_dict[an_epoch_name] = _out_paths
+            _out_figs_dict_dict_dict[a_grainularity] = _out_figs_dict_dict
+            _out_paths_dict[a_grainularity] = _out_paths
 
 
             if should_concatenate_figures:
@@ -3739,7 +3766,7 @@ class FigureS8:
                     print(f'\t{k}: "{_final_fig4_pdf.as_posix()}"')
                 ## END for k in list(_out_paths['Laps'].keys())...
 
-        ## END for output_suffix, base_df_dict in base_df_dict_dict.items()...
+        ## END for a_grainularity, base_df_dict in base_df_dict_dict.items()...
 
         # if should_compute_stats:
         #     {k:get_dict_subset(v, _stats_output_keys) for k, v in pre_post_delta_stats_results_dict.items()}
@@ -3757,7 +3784,7 @@ class FigureS8:
                       earliest_delta_aligned_t_start: Optional[float] = None, latest_delta_aligned_t_end: Optional[float] = None,
                       enabled_figure_names: Optional[Sequence[str]] = None, figures_config_dict: Optional[Dict] = None, figures_root: Optional[Path] = None, figures_date: Optional[str] = None,
                       should_compute_stats: bool = True, enable_add_stats_to_figures: bool = False, separate_laps_pbes_figures: bool = False, should_concatenate_figures: bool = False, store_debug_values: bool = False, **kwargs):
-        """Produce Figure 4, Figure S8, and Figure S9 from a single notebook call.
+        """Produce Figure 4, Figure S3, Figure S8, and Figure S9 from a single notebook call.
 
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import FigureS8
 
@@ -3765,8 +3792,11 @@ class FigureS8:
                                                       earliest_delta_aligned_t_start=earliest_delta_aligned_t_start, latest_delta_aligned_t_end=latest_delta_aligned_t_end)
 
             # subset: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S9'])
+            # Figure S3 only: figures_out_dict = FigureS8.main_all_figs(..., enabled_figure_names=['Figure S3'])
+            # Override S3 time bins via figures_config_dict['Figure S3']['active_filter_constraints']['time_bin_size'].
 
-        Defaults write all three figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
+        Defaults write all configured figures. Pass `enabled_figure_names` to restrict, or `figures_config_dict` to replace the built-in output folders / per-figure flags.
+        Figure S3 uses `color_by_time_bin_size=True` with multi-value `time_bin_size` constraints (overridable).
         """
         if earliest_delta_aligned_t_start is not None:
             plotly_helpers.earliest_delta_aligned_t_start = earliest_delta_aligned_t_start
@@ -3786,6 +3816,22 @@ class FigureS8:
                     'enable_heuristic_filtered_outputs': False,
                     'enable_add_stats_to_figures': False,
                 },
+                'Figure S3': {
+                    'figures_parent_folder': figures_root.joinpath(f'Figure S3 - Effect of Time Bin Duration on Decoding Performance/Inputs/{figures_date}').resolve(), # Figure S3
+                    'enable_heuristic_filtered_outputs': False, 'separate_laps_pbes_figures': True,
+                    'color_by_time_bin_size': True,
+                    'enabled_granularities': ('_perTimeBin',),
+                    'should_compute_stats': False,
+                    'legend_groups_to_hide': [],
+                    'active_filter_constraints': {
+                        'trained_compute_epochs': 'laps',
+                        'decoder_identifier': 'pseudo2D',
+                        'masked_time_bin_fill_type': ('dropped',),
+                        'custom_replay_name': 'withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0',
+                        'time_bin_size': (0.016, 0.025, 0.05, 0.06, 0.075),  # overridable when you run
+                    },
+                },
+
                 'Figure S8': {
                     'figures_parent_folder': figures_root.joinpath(f'Figure S8 - Effect of Heuristic-filtering P_Short Scatter over Time - perEpoch/Inputs/{figures_date}').resolve(),
                     'enable_heuristic_filtered_outputs': True,
@@ -3807,18 +3853,27 @@ class FigureS8:
                 split_by_column = fig_config_dict.pop('split_by_column', None)
                 fig_enable_add_stats_to_figures = fig_config_dict.pop('enable_add_stats_to_figures', enable_add_stats_to_figures)
                 fig_separate_laps_pbes_figures = fig_config_dict.pop('separate_laps_pbes_figures', separate_laps_pbes_figures)
-
-                _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
-                                should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
-                                should_compute_stats=should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
-                                **{**kwargs, **fig_config_dict},
-                )
+                fig_should_compute_stats = fig_config_dict.pop('should_compute_stats', should_compute_stats)
+                fig_legend_groups_to_hide = fig_config_dict.pop('legend_groups_to_hide', None)
+                prev_legend_groups_to_hide = getattr(plotly_helpers, 'legend_groups_to_hide', None)
+                try:
+                    if fig_legend_groups_to_hide is not None:
+                        plotly_helpers.legend_groups_to_hide = fig_legend_groups_to_hide
+                    _out = cls.main(df_filter=df_filter, plotly_helpers=plotly_helpers, additional_filter_predicates=additional_filter_predicates, figures_parent_folder=figures_parent_folder,
+                                    should_concatenate_figures=should_concatenate_figures, split_by_column=split_by_column,
+                                    should_compute_stats=fig_should_compute_stats, enable_add_stats_to_figures=fig_enable_add_stats_to_figures, store_debug_values=store_debug_values,
+                                    legend_groups_to_hide=fig_legend_groups_to_hide,
+                                    **{**kwargs, **fig_config_dict},
+                    )
+                finally:
+                    if fig_legend_groups_to_hide is not None:
+                        plotly_helpers.legend_groups_to_hide = prev_legend_groups_to_hide
                 if store_debug_values:
                     _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple, _out_debug_values = _out
                 else:
                     _out_figs_dict_dict_dict, _out_paths_dict, _out_stats_tuple = _out
                     _out_debug_values = None
-                if should_compute_stats:
+                if fig_should_compute_stats:
                     pre_post_delta_stats_distribution_comparison_dict, pre_post_delta_stats_results_dict, _stats_params_kwargs = _out_stats_tuple
                     _stats_output_keys = _stats_params_kwargs['output_keys']
                     # if should_compute_stats:
@@ -7780,10 +7835,15 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
     # y_baseline_level: float = 0.5 # for P(short), etc
     # y_baseline_level: float = 0.0 # for wcorr, etc
 
+    color_by_time_bin_size: bool = bool(kwargs.pop('color_by_time_bin_size', False))
+
     # px_scatter_kwargs __________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     # px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'color':"is_user_annotated_epoch", 'title': f"'{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
     px_scatter_kwargs = {'x': 'delta_aligned_start_t', 'y': variable_name, 'title': f"{data_context.get_description(subset_includelist=['dataframe_name', 'title_prefix', 'num_events'], separator=' - ')} - '{variable_name}'"} # , 'color': 'time_bin_size', 'range_y': [-1.0, 1.0], 'labels': {'session_name': 'Session', 'time_bin_size': 'tbin_size', 'is_user_annotated_epoch':'user_sel'}
-    if is_publication_ready_figure:
+    if color_by_time_bin_size:
+        # Figure S3: keep categorical colors by time_bin_size (do not force black)
+        px_scatter_kwargs['color'] = "time_bin_size"
+    elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # if 'dummy_column_for_color' not in concatenated_ripple_df.columns:
         #     concatenated_ripple_df['dummy_column_for_color'] = '#000000'            
@@ -7818,7 +7878,9 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
     # hist_kwargs ________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
     hist_kwargs = dict()
 
-    if is_publication_ready_figure:
+    if color_by_time_bin_size:
+        hist_kwargs['color'] = "time_bin_size"
+    elif is_publication_ready_figure:
         print(f'is_publication_ready_figure: omitting "color" from px_scatter_kwargs')
         # assert 'dummy_column_for_color' in concatenated_ripple_df.columns, f"it was supposed to be added in the above px_scatter... related block. How did this not happen?"
         # hist_kwargs['color'] = "dummy_column_for_color"
@@ -7898,8 +7960,8 @@ def _helper_perform_plot_pre_post_delta_scatter(data_context: IdentifyingContext
         # _extras_output_dict['out_container_widget'], _extras_output_dict['out_widget'] = add_copy_save_action_buttons(new_fig, output_widget=custom_output_widget)
         _extras_output_dict['custom_widget_buttons'] = add_copy_save_action_buttons(new_fig)
         
-    # Auto-hide legend for publication figures
-    if is_publication_ready_figure:
+    # Auto-hide legend for publication figures (keep legend when coloring by multiple time_bin_size series — FigureS8 post-hoc layout owns it)
+    if is_publication_ready_figure and (not color_by_time_bin_size):
         new_fig = new_fig.update_layout(showlegend=False)
 
     return new_fig, new_fig_context, _extras_output_dict, figure_out_paths
