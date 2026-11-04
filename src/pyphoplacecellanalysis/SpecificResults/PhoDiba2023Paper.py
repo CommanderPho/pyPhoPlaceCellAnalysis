@@ -7730,9 +7730,6 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
         
     
     """
-    if enable_default_neptune_plots is not None:
-        enable_default_wandb_plots = enable_default_neptune_plots  # deprecated alias
-
     if save_figures_only:
         defer_show = True
     else:

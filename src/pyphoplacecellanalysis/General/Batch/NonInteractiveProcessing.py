@@ -1255,7 +1255,7 @@ class BatchPhoJonathanFiguresHelper:
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['active', 'batch', 'public', 'wandb', 'figures', 'output'], input_requires=[], output_provides=[],
                       uses=['batch_programmatic_figures', 'batch_extended_programmatic_figures'], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
-def batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logger=None, debug_print: bool = False, enable_neptune=None, neptuner=None):
+def batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logger=None, debug_print: bool = False):
     """ 2023-05-25 - Performs all the batch plotting commands. 
 
     Note: takes ~20 minutes to plot all figures and generates MANY new figure windows with an interactive backend
@@ -1269,10 +1269,6 @@ def batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logge
     
     
     """
-    if enable_neptune is not None:
-        enable_wandb = enable_neptune  # deprecated alias
-    if neptuner is not None and wandb_logger is None:
-        wandb_logger = neptuner  # deprecated alias
     if enable_wandb:
         try:
             from pyphoplacecellanalysis.General.Batch.WandbHelpers import WandbLogger

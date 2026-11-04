@@ -9,7 +9,7 @@ from watchdog.events import FileSystemEventHandler
 
 # path_to_watch = r"K:\scratch\gen_scripts" # Set the path to the directory containing log files
 
-# path_to_watch = "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs"
+# path_to_watch = "C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs"
 
 # Define file paths to open in tabs on startup
 # test_files = [r"K:\scratch\gen_scripts\run_kdiba_gor01_one_2006-6-08_14-26-15\debug_2024-05-28_03-05-55.Apogee.kdiba.gor01.one.2006-6-08_14-26-15.log",
@@ -18,29 +18,29 @@ from watchdog.events import FileSystemEventHandler
 #     r"K:\scratch\gen_scripts\run_kdiba_gor01_two_2006-6-09_22-24-40\debug_2024-05-28_04-05-38.Apogee.kdiba.gor01.two.2006-6-09_22-24-40.log",
 # ]
 
-# test_files = ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/gor01=one=2006-6-08_14-26-15.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/gor01=two=2006-6-07_16-40-19.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/pin01=one=fet11-01_12-58-54.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/gor01=one=2006-6-09_1-22-43.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/gor01=one=2006-6-12_15-55-31.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/gor01=two=2006-6-12_16-53-46.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/vvp01=two=2006-4-10_12-58-3.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/vvp01=one=2006-4-09_17-29-30.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/vvp01=two=2006-4-09_16-40-54.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/vvp01=one=2006-4-10_12-25-50.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/pin01=one=11-03_12-3-25.log']
+# test_files = ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/gor01=one=2006-6-08_14-26-15.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/gor01=two=2006-6-07_16-40-19.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/pin01=one=fet11-01_12-58-54.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/gor01=one=2006-6-09_1-22-43.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/gor01=one=2006-6-12_15-55-31.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/gor01=two=2006-6-12_16-53-46.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/vvp01=two=2006-4-10_12-58-3.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/vvp01=one=2006-4-09_17-29-30.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/vvp01=two=2006-4-09_16-40-54.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/vvp01=one=2006-4-10_12-25-50.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/pin01=one=11-03_12-3-25.log']
 
-# test_files = ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_gor01_one_2006-6-08_14-26-15.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_gor01_two_2006-6-07_16-40-19.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_pin01_one_fet11-01_12-58-54.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_gor01_one_2006-6-09_1-22-43.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_gor01_one_2006-6-12_15-55-31.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_gor01_two_2006-6-12_16-53-46.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_vvp01_two_2006-4-10_12-58-3.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_vvp01_one_2006-4-09_17-29-30.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_vvp01_two_2006-4-09_16-40-54.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_vvp01_one_2006-4-10_12-25-50.log',
-#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/neptune/logs/merged/kdiba_pin01_one_11-03_12-3-25.log']
+# test_files = ['C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_gor01_one_2006-6-08_14-26-15.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_gor01_two_2006-6-07_16-40-19.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_pin01_one_fet11-01_12-58-54.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_gor01_one_2006-6-09_1-22-43.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_gor01_one_2006-6-12_15-55-31.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_gor01_two_2006-6-12_16-53-46.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_vvp01_two_2006-4-10_12-58-3.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_vvp01_one_2006-4-09_17-29-30.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_vvp01_two_2006-4-09_16-40-54.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_vvp01_one_2006-4-10_12-25-50.log',
+#  'C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/data/wandb/logs/merged/kdiba_pin01_one_11-03_12-3-25.log']
 
 
 class LogFilePanel(param.Parameterized):

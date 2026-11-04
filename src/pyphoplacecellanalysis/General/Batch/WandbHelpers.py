@@ -1,6 +1,6 @@
 """Weights & Biases (CoreWeave Forge) helpers for batch logging, figure upload, and run fetching.
 
-Replaces the former Neptune.ai helpers. Auth via WANDB_API_KEY / WANDB_ENTITY / WANDB_PROJECT
+Auth via WANDB_API_KEY / WANDB_ENTITY / WANDB_PROJECT
 (see https://docs.coreweave.com/products/wandb).
 """
 from copy import deepcopy
@@ -171,7 +171,7 @@ def flatten_context_nested_dict(_context_figures_dict):
 
 
 def _wandb_safe_key(key: str) -> str:
-	"""W&B metric keys are flatter than Neptune namespaces; keep readable separators."""
+	"""Normalize metric keys for W&B logging."""
 	return str(key).replace('\\', '/')
 
 
@@ -245,7 +245,7 @@ def build_vscode_log_browsing_workspace(logs_paths):
 
 
 class _WandbUploadProxy:
-	"""Leaf proxy matching Neptune `.upload(path)` used by templates and PlotlyHelpers."""
+	"""Leaf proxy supporting `.upload(path)` used by templates and PlotlyHelpers."""
 
 	def __init__(self, helper: "WandbRunHelper", key_path: str):
 		self._helper = helper
@@ -279,7 +279,7 @@ class _WandbNestedProxy:
 
 
 class WandbRunHelper:
-	"""Wraps an active wandb.Run with Neptune-like nested assignment and upload helpers.
+	"""Wraps an active wandb.Run with nested assignment and upload helpers.
 
 	Usage:
 		helper = WandbRunHelper(run)
@@ -355,7 +355,7 @@ class WandbRunHelper:
 
 
 	def sync(self):
-		"""No-op flush compatibility with Neptune's run.sync()."""
+		"""No-op flush compatibility with historical run.sync() call sites."""
 		return None
 
 
@@ -959,12 +959,10 @@ class PhoDibaProjectsWandbLogger(object):
 
 		self.root_output_path = find_first_extant_path(path_list=[
 			Path(r"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/wandb").resolve(),
-			Path(r"C:/Users/pho/repos/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/neptune").resolve(),
-			Path("/home/halechr/repos/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/wandb").resolve(),
+						Path("/home/halechr/repos/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data/wandb").resolve(),
 			Path("/home/halechr/repos/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data").resolve(),
 			Path('EXTERNAL/PhoDibaPaper2024Book/data/wandb').resolve(),
-			Path('EXTERNAL/PhoDibaPaper2024Book/data/neptune').resolve(),
-			Path('/Users/pho/repo/Pho Secondary Workspace/Spike3DEnv/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data').resolve(),
+						Path('/Users/pho/repo/Pho Secondary Workspace/Spike3DEnv/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data').resolve(),
 		])
 		self.root_output_path.mkdir(exist_ok=True)
 

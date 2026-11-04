@@ -300,7 +300,7 @@ class BatchSessionCompletionHandler:
 
     # Figures:
     should_perform_figure_generation_to_file: bool = field(default=True) # controls whether figures are generated to file
-    should_generate_all_plots: bool = field(default=True) # controls whether all plots are generated (when True) or if only non-Neptune paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
+    should_generate_all_plots: bool = field(default=True) # controls whether all plots are generated (when True) or if only paper figure specific plots are generated. Has no effect if self.should_perform_figure_generation_to_file is False.
 
 
     # Cross-session Results:
@@ -490,9 +490,7 @@ class BatchSessionCompletionHandler:
     
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
-    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_wandb_plots=False, enable_default_neptune_plots=None):
-        if enable_default_neptune_plots is not None:
-            enable_default_wandb_plots = enable_default_neptune_plots  # deprecated alias
+    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_wandb_plots=False):
         if not curr_active_pipeline.is_kdiba_session():
             ## Non-KDiba session
             #TODO 2026-06-20 07:10: - [ ] All non-KDiba sessions assumed to be Bapun

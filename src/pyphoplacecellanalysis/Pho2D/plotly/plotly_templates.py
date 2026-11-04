@@ -189,7 +189,6 @@ class PlotlyHelpers:
     _is_dark_mode: bool = field(default=False)
     _is_publication: bool = field(default=False)
     wandb_run: Any = field(default=None)
-    neptuner_run: Any = field(default=None)  # deprecated alias for wandb_run
 
     should_save: bool = field(default=False)
     export_html: bool = field(default=False)
@@ -250,8 +249,6 @@ class PlotlyHelpers:
         # if getattr(cls, 'template_dict', None) is None:
         #     cls.template_dict = deepcopy(_template_dict)
 
-        if self.wandb_run is None and self.neptuner_run not in (None, False):
-            self.wandb_run = self.neptuner_run  # deprecated alias
         self._is_dark_mode, self.active_template = PlotlyHelpers.get_plotly_template(is_dark_mode=self.is_dark_mode, is_publication=self.is_publication)
         pio.templates.default = self.active_template
         # self.fig_size_kwargs = {'width': (self.resolution_multiplier * 1800), 'height': (self.resolution_multiplier*480)}
@@ -392,7 +389,7 @@ class PlotlyHelpers:
 
 
     @classmethod
-    def _perform_save_plotly(cls, a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, wandb_run=None, neptuner_run=None, show_path_widgets: bool = True) -> Dict[str, Path]:
+    def _perform_save_plotly(cls, a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, wandb_run=None, show_path_widgets: bool = True) -> Dict[str, Path]:
         """Save a Plotly figure under `figures_folder` using an IdentifyingContext-derived basename.
 
         Defaults write both `.html` and `.png` (legacy notebook behavior). Pass `export_html=False`
@@ -403,8 +400,6 @@ class PlotlyHelpers:
 
             figure_out_paths = PlotlyHelpers._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=TODAY_DAY_DATE, export_html=False, export_png=True)
         """
-        if wandb_run is None and neptuner_run is not None:
-            wandb_run = neptuner_run  # deprecated alias
         fig_save_path: Path = figures_folder.joinpath('_'.join([date_prefix, sanitize_filename_for_Windows(a_fig_context.get_description())])).resolve()
         figure_out_paths: Dict[str, Path] = {}
 
@@ -434,7 +429,7 @@ class PlotlyHelpers:
 
 
 
-def save_plotly(a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, wandb_run=None, neptuner_run=None, show_path_widgets: bool = True, **kwargs) -> Dict[str, Path]:
+def save_plotly(a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str, export_html: bool = True, export_png: bool = True, wandb_run=None, show_path_widgets: bool = True, **kwargs) -> Dict[str, Path]:
     """Save a Plotly figure under `figures_folder` using an IdentifyingContext-derived basename.
 
     Defaults write both `.html` and `.png` (legacy notebook behavior). Pass `export_html=False`
@@ -445,5 +440,5 @@ def save_plotly(a_fig, a_fig_context, *, figures_folder: Path, date_prefix: str,
 
         figure_out_paths = save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=TODAY_DAY_DATE, export_html=False, export_png=True)
     """
-    return PlotlyHelpers._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=date_prefix, export_html=export_html, export_png=export_png, wandb_run=wandb_run, neptuner_run=neptuner_run, show_path_widgets=show_path_widgets, **kwargs)
+    return PlotlyHelpers._perform_save_plotly(a_fig, a_fig_context, figures_folder=figures_folder, date_prefix=date_prefix, export_html=export_html, export_png=export_png, wandb_run=wandb_run, show_path_widgets=show_path_widgets, **kwargs)
 

@@ -3143,7 +3143,7 @@ def load_across_sessions_exported_files(cuttoff_date: Optional[datetime] = None,
     # 2024-10-23 - modern `_new_process_csv_files` method ________________________________________________________________ #
     all_session_experiment_experience_csv_path = find_first_extant_path(path_list=[Path("./EXTERNAL/sessions_experiment_datetime_df.csv").resolve(),
                                         Path("../sessions_experiment_datetime_df.csv").resolve(),
-                                        # Path('EXTERNAL/PhoDibaPaper2024Book/data/neptune').resolve(),
+                                        # Path('EXTERNAL/PhoDibaPaper2024Book/data/wandb').resolve(),
                                         # Path('/Users/pho/repo/Pho Secondary Workspace/Spike3DEnv/Spike3DWorkEnv/Spike3D/EXTERNAL/PhoDibaPaper2024Book/data').resolve(),
         ])
         
