@@ -125,10 +125,15 @@ def _infer_batch_scripts_root_directory(script_paths) -> Path:
 
 
 
-def get_batch_neptune_kwargs():
-    from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import KnownNeptuneProjects
+def get_batch_wandb_kwargs():
+    from pyphoplacecellanalysis.General.Batch.WandbHelpers import KnownWandbProjects
 
-    return KnownNeptuneProjects.get_PhoDibaBatchProcessing_neptune_kwargs()
+    return KnownWandbProjects.get_PhoDibaBatchProcessing_wandb_kwargs()
+
+
+def get_batch_neptune_kwargs():
+    """Deprecated alias for get_batch_wandb_kwargs()."""
+    return get_batch_wandb_kwargs()
 
 
 
@@ -1055,11 +1060,11 @@ def try_copy_to_clipboard(code_str: str, label: str) -> None:
 
 @function_attributes(short_name=None, tags=['slurm','jobs','files','batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2023-08-09 19:14', related_items=[])
 def generate_batch_single_session_scripts(global_data_root_parent_path, session_batch_basedirs: Dict[IdentifyingContext, Path], included_session_contexts: Optional[List[IdentifyingContext]], output_directory='output/gen_scripts/', use_separate_run_directories:bool=True,
-         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_neptune_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = False, should_generate_run_notebooks: bool = False,
+         create_slurm_scripts:bool=False, create_non_slurm_bash_scripts:bool=False, should_create_vscode_workspace:bool=True, should_use_wandb_logging:bool=True, should_use_viztracer_logging:bool=True, should_generate_run_scripts = True, should_generate_figure_scripts = False, should_generate_run_notebooks: bool = False,
          job_suffix:Optional[str]=None, should_use_file_redirected_output_logging:bool=False, should_use_largemem:bool=False, fail_on_exception: bool = False, # , should_create_powershell_scripts:bool=True
          separate_execute_and_figure_gen_scripts:bool=True, should_perform_figure_generation_to_file:bool=False, force_recompute_override_computations_includelist: Optional[List[str]]=None, force_recompute_override_computation_kwargs_dict: Optional[Dict[str, Dict]]=None, 
          custom_user_completion_function_override_kwargs_dict: Optional[Dict]=None,
-         batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, session_global_data_root_parent_paths: Optional[Dict[IdentifyingContext, Path]]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
+         batch_session_completion_handler_kwargs: Optional[Dict]=None, batch_script_subdirectory: Optional[str]=None, venv_activate_path: Optional[str]=None, vscode_default_interpreter_path: Optional[Union[str, Path]]=None, session_global_data_root_parent_paths: Optional[Dict[IdentifyingContext, Path]]=None, should_use_neptune_logging: Optional[bool]=None, **renderer_script_generation_kwargs) -> BatchScriptsCollection:
     """ Creates a series of standalone scripts (one for each included_session_contexts) in the `output_directory`
 
     Writes only the sibling needed for the active stage: `run_*.py` when `should_generate_run_scripts`, `figures_*.py` when `should_generate_figure_scripts` or `should_perform_figure_generation_to_file` (figure_run). `output_python_scripts` remains a list of `(run_path_or_None, figs_path_or_None)` pairs.
@@ -1091,6 +1096,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
 
         
     """
+    if should_use_neptune_logging is not None:
+        should_use_wandb_logging = should_use_neptune_logging  # deprecated alias
     def _subfn_build_slurm_script(curr_batch_script_rundir, a_python_script_path, a_curr_session_context, a_curr_session_complete_identifier, a_slurm_script_name_prefix:str='run', should_use_virtual_framebuffer:bool=False, should_use_largemem:bool=False, job_suffix=None, a_venv_activate_path: Optional[str]=None):
         slurm_script_path = os.path.join(curr_batch_script_rundir, f'{a_slurm_script_name_prefix}_{a_curr_session_complete_identifier}.sh')
         slurm_job_name = build_slurm_job_name(curr_session_context=a_curr_session_context, job_suffix=job_suffix)
@@ -1218,7 +1225,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         curr_session_basedir=curr_session_basedir, 
                                                         batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                         custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        should_use_wandb_logging=should_use_wandb_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                         fail_on_exception=fail_on_exception,
                                                         **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
                                                         run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)
@@ -1237,7 +1244,7 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         curr_session_basedir=curr_session_basedir,
                                                         batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                         custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                        should_use_neptune_logging=should_use_neptune_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        should_use_wandb_logging=should_use_wandb_logging, should_use_viztracer_logging=should_use_viztracer_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
                                                         **(no_recomputing_script_generation_kwargs | dict(should_perform_figure_generation_to_file=True)),
                                                         run_specific_batch_kwargs=run_specific_batch_kwargs_for_figures_script)
 
@@ -1279,8 +1286,8 @@ def generate_batch_single_session_scripts(global_data_root_parent_path, session_
                                                         curr_session_basedir=curr_session_basedir, 
                                                         batch_session_completion_handler_kwargs=(batch_session_completion_handler_kwargs or {}),
                                                         custom_user_completion_function_override_kwargs_dict=(custom_user_completion_function_override_kwargs_dict or {}),
-                                                        # should_use_neptune_logging=should_use_neptune_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
-                                                        should_use_neptune_logging=False, should_use_file_redirected_output_logging=False,
+                                                        # should_use_wandb_logging=should_use_wandb_logging, should_use_file_redirected_output_logging=should_use_file_redirected_output_logging,
+                                                        should_use_wandb_logging=False, should_use_file_redirected_output_logging=False,
                                                         fail_on_exception=fail_on_exception,
                                                         **(compute_as_needed_script_generation_kwargs | dict(should_perform_figure_generation_to_file=False)),
                                                         run_specific_batch_kwargs=run_specific_batch_kwargs_for_run_script)

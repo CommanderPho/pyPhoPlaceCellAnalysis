@@ -61,47 +61,26 @@ print(f'VizTracer output will be saved to: {viztracer_output_file}')
 
 {% endif %}
 
-{% if should_use_neptune_logging %}
+{% if should_use_wandb_logging %}
 
 # ==================================================================================================================== #
-# NEPTUNE                                                                                                              #
+# WEIGHTS & BIASES (CoreWeave Forge)                                                                                   #
 # ==================================================================================================================== #
 
-import neptune # for logging progress and results
-from neptune.types import File
-from neptune.utils import stringify_unsupported
-from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner, AutoValueConvertingNeptuneRun
+import wandb
+from pyphoplacecellanalysis.General.Batch.WandbHelpers import WandbLogger, WandbRunHelper, wandb_stringify_unsupported
 
-neptune_kwargs = dict(
-        project="commander.pho/PhoDibaBatchProcessing",
-        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIxOGIxODU2My1lZTNhLTQ2ZWMtOTkzNS02ZTRmNzM5YmNjNjIifQ==",
+wandb_logger = WandbLogger.init_for_batch_script(
+    curr_session_context=curr_session_context,
+    script_type=script_type,
+    job_suffix=job_suffix,
+    script_file_path=script_file_path,
+    curr_session_complete_identifier=curr_session_complete_identifier,
+    session_ctxt_key=session_ctxt_key,
+    curr_session_basedir=curr_session_basedir.resolve().as_posix(),
 )
-        
-neptuner = Neptuner(project_name=neptune_kwargs['project'], api_token=neptune_kwargs['api_token'])
-
-if neptuner.run is None:
-    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
-    neptuner.run = AutoValueConvertingNeptuneRun(project=neptuner.project_name, api_token=neptuner.api_token, dependencies="infer", source_files=[script_file_path])
-
-    params = {"script_file_path": script_file_path, "script_file_parent_path": script_file_parent_path.as_posix(), "curr_session_context": str(curr_session_context.get_description()), "curr_session_basedir": curr_session_basedir.resolve().as_posix(), "script_type": script_type}
-    neptuner.run["parameters"] = params
-
-    # Add the session_context properties to the run: {'format_name': 'kdiba', 'animal': 'vvp01', 'exper_name': 'two', 'session_name': '2006-4-09_16-40-54'}
-    for k, v in curr_session_context.to_dict().items():
-        neptuner.run[k] = v # add the properties to the run
-
-    neptuner.run["sys/tags"].add(list(curr_session_context.as_tuple()) + [script_type, job_suffix]) # adds the session tags ('kdiba', 'gor01', 'one', '2006-6-09_1-22-43')
-    neptuner.run["sys/group_tags"].add([session_ctxt_key, script_type, job_suffix])
-
-    # session_descriptor_string: a string describing the context of the session like 'sess_kdiba_2006-6-07_11-26-53'
-    neptuner.run['session_descriptor_string'] = curr_session_context.get_description() # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
-    neptuner.run['session_complete_descriptor_string'] = curr_session_complete_identifier # 'kdiba_vvp01_two_2006-4-09_16-40-54_sess'
-
-    neptuner.outputs = neptuner.run['outputs']
-    neptuner.figures = neptuner.outputs['figures']
-
-neptuner_run: AutoValueConvertingNeptuneRun = neptuner.run
-neptuner_run.sync()
+wandb_run: WandbRunHelper = wandb_logger.run
+wandb_run.sync()
 {% endif %}
 
 curr_task_logger = build_batch_task_logger(session_context=curr_session_context, file_logging_dir=script_file_parent_path, logging_root_FQDN=None, include_curr_time_str=True, additional_suffix=job_suffix)
@@ -113,13 +92,13 @@ for a_handler in curr_task_logger.handlers:
         
 assert final_log_file_path is not None, f"final_log_file_path was not found after creating logger!!"
 
-{% if should_use_neptune_logging %}
+{% if should_use_wandb_logging %}
 for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
     try:
-        neptuner_run[f'parameters/{k}'] = v
+        wandb_run[f'parameters/{k}'] = v
     except BaseException as err:
-        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
-neptuner_run.sync()
+        print(f'wandb error: {err} for key "{k}". Skipping and continuing')
+wandb_run.sync()
 {% endif %}
 
 
@@ -265,34 +244,34 @@ for a_custom_custom_user_completion_function in custom_user_completion_functions
 ## Add any overriden kwargs:
 result_handler.override_user_completion_function_kwargs_dict = {{custom_user_completion_function_override_kwargs_dict|default('{}')}}
 
-{% if should_use_neptune_logging %}
-for k, v in {'BATCH_DATE_TO_USE': str(BATCH_DATE_TO_USE), 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': stringify_unsupported(custom_user_completion_functions)}.items():
+{% if should_use_wandb_logging %}
+for k, v in {'BATCH_DATE_TO_USE': str(BATCH_DATE_TO_USE), 'collected_outputs_path': collected_outputs_path.as_posix(), 'custom_user_completion_functions': wandb_stringify_unsupported(custom_user_completion_functions)}.items():
     try:
-        neptuner_run[f'parameters/{k}'] = v
+        wandb_run[f'parameters/{k}'] = v
     except BaseException as err:
-        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+        print(f'wandb error: {err} for key "{k}". Skipping and continuing')
 
 
 for k, v in dict(local_computations_override_file=local_computations_override_file, global_computation_results_override_file=global_computation_results_override_file, local_computations_override_output_file=local_computations_override_output_file, global_computation_results_override_output_file=global_computation_results_override_output_file,
         should_freeze_pipeline_updates=should_freeze_pipeline_updates, should_perform_figure_generation_to_file=should_perform_figure_generation_to_file, should_symlink_output_pickles=should_symlink_output_pickles,
-        extended_computations_include_includelist=stringify_unsupported(extended_computations_include_includelist), force_recompute_override_computations_includelist=stringify_unsupported(force_recompute_override_computations_includelist), batch_session_completion_handler_kwargs=stringify_unsupported(batch_session_completion_handler_kwargs),
+        extended_computations_include_includelist=wandb_stringify_unsupported(extended_computations_include_includelist), force_recompute_override_computations_includelist=wandb_stringify_unsupported(force_recompute_override_computations_includelist), batch_session_completion_handler_kwargs=wandb_stringify_unsupported(batch_session_completion_handler_kwargs),
         ).items():
     try:
-        neptuner_run[f'parameters/{k}'] = v
+        wandb_run[f'parameters/{k}'] = v
     except BaseException as err:
-        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
+        print(f'wandb error: {err} for key "{k}". Skipping and continuing')
 
-neptuner_run.sync()
+wandb_run.sync()
 {% endif %}
 
 
-{% if should_use_neptune_logging %}
+{% if should_use_wandb_logging %}
 for k, v in {'final_log_file_path': final_log_file_path.as_posix()}.items():
     try:
-        neptuner_run[f'parameters/{k}'] = v
+        wandb_run[f'parameters/{k}'] = v
     except BaseException as err:
-        print(f'neptune error: {err} for key "{k}". Skipping and continuing')
-neptuner_run.sync()
+        print(f'wandb error: {err} for key "{k}". Skipping and continuing')
+wandb_run.sync()
 {% endif %}
 
 # ~ # NBSplit
@@ -333,13 +312,13 @@ run_status, run_errors, run_outputs = run_specific_batch(global_data_root_parent
 
 new_print(f'finished run: {run_status}\nerrors: {run_errors}\n') # 'outputs: {run_outputs}'
 
-{% if should_use_neptune_logging %}
+{% if should_use_wandb_logging %}
 for k, v in {'run_status': run_status, 'run_errors': run_errors, 'run_outputs': run_outputs}.items():
     try:
-        neptuner_run[f'outputs/{k}'] = stringify_unsupported(v)
+        wandb_run[f'outputs/{k}'] = wandb_stringify_unsupported(v)
     except BaseException as err:
-        print(f'neptune error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
-neptuner_run.sync()
+        print(f'wandb error: {err} for key "{k}" (post `run_specific_batch`). Skipping and continuing')
+wandb_run.sync()
 {% endif %}
 
 
@@ -417,20 +396,20 @@ with open(final_log_file_path, 'w') as f:
 {% endif %}
 
 
-{% if should_use_neptune_logging %}
-neptuner_run.sync()
+{% if should_use_wandb_logging %}
+wandb_run.sync()
 try:
     ## Upload the log file:
-    neptuner_run[f"outputs/log"].upload(Path(final_log_file_path).resolve().as_posix())
-    neptuner_run.sync()
+    wandb_run[f"outputs/log"].upload(Path(final_log_file_path).resolve().as_posix())
+    wandb_run.sync()
 except BaseException as err:
-    print(f'neptune error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
+    print(f'wandb error: {err} while trying to upload log file at path "{final_log_file_path}". Skipping and continuing')
 
 
 try:
-    ## Finally, stop neptuner:
-    neptuner.stop()
+    ## Finally, stop wandb logger:
+    wandb_logger.finish()
 except BaseException as err:
-    print(f'neptune error: {err} while stopping!')
+    print(f'wandb error: {err} while stopping!')
 
 {% endif %}

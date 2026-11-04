@@ -7692,7 +7692,7 @@ class LongShortFRRegression:
 # MAIN RUN FUNCTION TO GENERATE ALL FIGURES                                                                            #
 # ==================================================================================================================== #
 @function_attributes(short_name=None, tags=['export', 'output', 'images', 'final', 'figure', 'complete'], input_requires=[], output_provides=[], uses=['PAPER_FIGURE_figure_1_full', 'PaperFigureTwo', 'PAPER_FIGURE_figure_3', 'fig_remapping_cells', 'batch_perform_all_plots'], used_by=[], creation_date='2024-08-29 18:07', related_items=[])
-def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True):
+def main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots:bool=True, save_figures_only:bool=False, save_figure=True, enable_default_neptune_plots: Optional[bool]=None):
     """ main run function to generate all figures
     
         Usage 1:
@@ -7704,17 +7704,17 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
             from neuropy.utils.matplotlib_helpers import matplotlib_file_only
             from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import main_complete_figure_generations
 
-            # self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
+            # self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_wandb_plots=self.should_generate_all_plots)
             fail_on_exception: bool = False
-            enable_default_neptune_plots = False
+            enable_default_wandb_plots = False
             completed_good: bool = False
 
             try:
                 ## To file only:
                 with matplotlib_file_only():
                     # Perform non-interactive Matplotlib operations with 'AGG' backend
-                    # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                    main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True)
+                    # wandb_logger = batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logger=None)
+                    main_complete_figure_generations(curr_active_pipeline, enable_default_wandb_plots=enable_default_wandb_plots, save_figures_only=True, save_figure=True)
 
                 curr_active_pipeline.clear_display_outputs()
                 curr_active_pipeline.clear_registered_output_files()
@@ -7730,6 +7730,8 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
         
     
     """
+    if enable_default_neptune_plots is not None:
+        enable_default_wandb_plots = enable_default_neptune_plots  # deprecated alias
 
     if save_figures_only:
         defer_show = True
@@ -7741,8 +7743,8 @@ def main_complete_figure_generations(curr_active_pipeline, enable_default_neptun
     # ==================================================================================================================== #
     # Perform `batch_perform_all_plots`                                                                                    #
     # ==================================================================================================================== #
-    if enable_default_neptune_plots:
-        neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True)
+    if enable_default_wandb_plots:
+        wandb_logger = batch_perform_all_plots(curr_active_pipeline, enable_wandb=True)
 
     # ==================================================================================================================== #
     # Extract Relevent Specific Data Needed for Figure Display                                                             #

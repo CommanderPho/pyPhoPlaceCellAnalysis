@@ -49,6 +49,7 @@ dependencies = [
     "replay-trajectory-classification>=1.4.1",
     "spyglass-neuro",
     "non-local-detector>=0.6.9",
+    "wandb>=0.26.1",
 ]
 
 [dependency-groups]

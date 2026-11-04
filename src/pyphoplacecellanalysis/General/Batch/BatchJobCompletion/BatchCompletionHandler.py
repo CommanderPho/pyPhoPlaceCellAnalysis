@@ -490,7 +490,9 @@ class BatchSessionCompletionHandler:
     
     # Plotting/Figures Helpers ___________________________________________________________________________________________ #
     @function_attributes(short_name=None, tags=['MAIN', 'figures', 'batch'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2025-07-02 09:29', related_items=[])
-    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_neptune_plots=False):
+    def try_complete_figure_generation_to_file(self, curr_active_pipeline, enable_default_wandb_plots=False, enable_default_neptune_plots=None):
+        if enable_default_neptune_plots is not None:
+            enable_default_wandb_plots = enable_default_neptune_plots  # deprecated alias
         if not curr_active_pipeline.is_kdiba_session():
             ## Non-KDiba session
             #TODO 2026-06-20 07:10: - [ ] All non-KDiba sessions assumed to be Bapun
@@ -503,7 +505,7 @@ class BatchSessionCompletionHandler:
                 ## To file only:
                 with matplotlib_file_only():
                     # Perform non-interactive Matplotlib operations with 'AGG' backend
-                    # main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+                    # main_complete_figure_generations(curr_active_pipeline, enable_default_wandb_plots=enable_default_wandb_plots, save_figures_only=True, save_figure=True, )
                     _rendering_out_dict = BapunBatchHelpers.run_all_rendering(curr_active_pipeline=curr_active_pipeline, save_figures_only=True)
 
                 # IF thst's done, clear all the plots:
@@ -531,8 +533,8 @@ class BatchSessionCompletionHandler:
                 ## To file only:
                 with matplotlib_file_only():
                     # Perform non-interactive Matplotlib operations with 'AGG' backend
-                    # neptuner = batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None)
-                    main_complete_figure_generations(curr_active_pipeline, enable_default_neptune_plots=enable_default_neptune_plots, save_figures_only=True, save_figure=True, )
+                    # wandb_logger = batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logger=None)
+                    main_complete_figure_generations(curr_active_pipeline, enable_default_wandb_plots=enable_default_wandb_plots, save_figures_only=True, save_figure=True, )
 
                 # IF thst's done, clear all the plots:
                 # from matplotlib import pyplot as plt
@@ -868,7 +870,7 @@ class BatchSessionCompletionHandler:
 
         # ### Programmatic Figure Outputs:
         if self.should_perform_figure_generation_to_file:
-            self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_neptune_plots=self.should_generate_all_plots)
+            self.try_complete_figure_generation_to_file(curr_active_pipeline, enable_default_wandb_plots=self.should_generate_all_plots)
         else:
             print(f'\tskipping figure generation because should_perform_figure_generation_to_file == False')
 

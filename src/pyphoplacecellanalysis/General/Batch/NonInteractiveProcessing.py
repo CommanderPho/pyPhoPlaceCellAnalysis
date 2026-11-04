@@ -1253,13 +1253,13 @@ class BatchPhoJonathanFiguresHelper:
 # ==================================================================================================================== #
 # Main Public Plot Function                                                                                            #
 # ==================================================================================================================== #
-@function_attributes(short_name=None, tags=['active', 'batch', 'public', 'neptune', 'figures', 'output'], input_requires=[], output_provides=[],
+@function_attributes(short_name=None, tags=['active', 'batch', 'public', 'wandb', 'figures', 'output'], input_requires=[], output_provides=[],
                       uses=['batch_programmatic_figures', 'batch_extended_programmatic_figures'], used_by=[], creation_date='2023-06-12 14:23', related_items=[])
-def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=None, debug_print: bool = False):
+def batch_perform_all_plots(curr_active_pipeline, enable_wandb=True, wandb_logger=None, debug_print: bool = False, enable_neptune=None, neptuner=None):
     """ 2023-05-25 - Performs all the batch plotting commands. 
 
     Note: takes ~20 minutes to plot all figures and generates MANY new figure windows with an interactive backend
-    NEPTUNE NOTE: Always uses the "PhoDibaLongShortUpdated" neptue project
+    W&B NOTE: Uses the consolidated PhoDibaBatch project (job_type=figures)
         
     Usage:
         from pyphoplacecellanalysis.General.Batch.NonInteractiveProcessing import batch_perform_all_plots
@@ -1269,20 +1269,24 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
     
     
     """
-    if enable_neptune:
+    if enable_neptune is not None:
+        enable_wandb = enable_neptune  # deprecated alias
+    if neptuner is not None and wandb_logger is None:
+        wandb_logger = neptuner  # deprecated alias
+    if enable_wandb:
         try:
-            from pyphoplacecellanalysis.General.Batch.NeptuneAiHelpers import Neptuner
+            from pyphoplacecellanalysis.General.Batch.WandbHelpers import WandbLogger
 
-            if neptuner is None:
-                neptuner = Neptuner.init_with_pipeline(curr_active_pipeline)
+            if wandb_logger is None:
+                wandb_logger = WandbLogger.init_with_pipeline(curr_active_pipeline)
 
         except Exception as e:
-            print(f'in `batch_perform_all_plots(...)`: Neptuner.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling neptune.')
-            enable_neptune = False
-            print(f'\t since neptune setup failed, neptune will be disabled going forward.')
-            neptuner = None
+            print(f'in `batch_perform_all_plots(...)`: WandbLogger.init_with_pipeline(curr_active_pipeline)(...) failed with exception: {e}. Continuing but disabling wandb.')
+            enable_wandb = False
+            print(f'\t since wandb setup failed, wandb will be disabled going forward.')
+            wandb_logger = None
     else:
-        neptuner = None
+        wandb_logger = None
 
 
     curr_active_pipeline.reload_default_display_functions()
@@ -1297,17 +1301,17 @@ def batch_perform_all_plots(curr_active_pipeline, enable_neptune=True, neptuner=
     except Exception as e:
         print(f'in `batch_perform_all_plots(...)`: batch_extended_programmatic_figures(...) failed with exception: {e}. Continuing.')
     
-    if enable_neptune:
+    if enable_wandb:
         try:
-            succeeded_fig_paths, failed_fig_paths = neptuner.upload_figures(curr_active_pipeline, debug_print=debug_print)
-            # neptune_output_figures(curr_active_pipeline)
+            succeeded_fig_paths, failed_fig_paths = wandb_logger.upload_figures(curr_active_pipeline, debug_print=debug_print)
+            # wandb_output_figures(curr_active_pipeline)
         except Exception as e:
-            print(f'in `batch_perform_all_plots(...)`: neptune_output_figures(...) failed with exception: {e}. Continuing.')
+            print(f'in `batch_perform_all_plots(...)`: wandb_output_figures(...) failed with exception: {e}. Continuing.')
         finally:
-            neptuner.stop()
-        neptuner.stop()
+            wandb_logger.stop()
+        wandb_logger.stop()
         
-    return neptuner
+    return wandb_logger
     
 
 
