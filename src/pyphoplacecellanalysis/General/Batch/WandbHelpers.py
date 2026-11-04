@@ -298,34 +298,92 @@ class WandbRunHelper:
 		return _WandbNestedProxy(self, str(key))
 
 
+	@staticmethod
+	def _log_key(key_str: str) -> str:
+		"""Stable W&B log/summary key (slashes → underscores)."""
+		return key_str.replace('/', '__')
+
+
+	@staticmethod
+	def _is_wb_value(value: Any) -> bool:
+		try:
+			from wandb.sdk.data_types.base_types.wb_value import WBValue
+			return isinstance(value, WBValue)
+		except Exception:
+			return False
+
+
+	def _log_media(self, key_str: str, value: Any) -> None:
+		"""Log DataFrames / WBValues via run.log (never config/summary)."""
+		log_key = self._log_key(key_str)
+		if isinstance(value, pd.DataFrame):
+			self.run.log({log_key: wandb.Table(dataframe=value)})
+			self.run.summary[f'{log_key}_nrows'] = int(len(value))
+			self.run.summary[f'{log_key}_ncols'] = int(value.shape[1]) if getattr(value, 'ndim', 0) >= 2 else 0
+			return
+		if self._is_wb_value(value):
+			self.run.log({log_key: value})
+			return
+		raise TypeError(f'_log_media expected DataFrame or WBValue, got {type(value)}')
+
+
+	def _assign_config_or_summary_safe(self, dest: str, key_str: str, value: Any) -> None:
+		"""Write a non-media value into config or summary. dest is 'config' or 'summary'."""
+		if isinstance(value, pd.DataFrame) or self._is_wb_value(value):
+			self._log_media(key_str, value)
+			return
+		if isinstance(value, dict):
+			safe_dict = {}
+			for leaf_key, leaf_val in value.items():
+				leaf_full_key = f'{key_str}/{leaf_key}' if key_str else str(leaf_key)
+				if isinstance(leaf_val, pd.DataFrame) or self._is_wb_value(leaf_val):
+					self._log_media(leaf_full_key, leaf_val)
+				else:
+					safe_dict[str(leaf_key)] = self._convert_value(leaf_val)
+			## END for leaf_key, leaf_val in value.items()...
+
+			if not safe_dict:
+				return
+			if dest == 'config':
+				self.run.config.update(safe_dict, allow_val_change=True)
+			else:
+				for sk, sv in safe_dict.items():
+					self.run.summary[self._log_key(str(sk))] = sv
+				## END for sk, sv in safe_dict.items()...
+			return
+		converted = self._convert_value(value)
+		if dest == 'config':
+			self.run.config[self._log_key(key_str) if '/' in key_str else key_str] = converted
+		else:
+			self.run.summary[self._log_key(key_str)] = converted
+
+
 	def __setitem__(self, key, value):
 		if self.run is None:
 			return
 		key_str = _wandb_safe_key(key)
-		converted = self._convert_value(value)
+		# Media (DataFrames / WBValues) never go into config/summary:
+		if isinstance(value, pd.DataFrame) or self._is_wb_value(value):
+			self._log_media(key_str, value)
+			return
 		if key_str.startswith('parameters/') or key_str == 'parameters':
-			config_key = key_str[len('parameters/'):] if key_str.startswith('parameters/') else key_str
-			if isinstance(converted, dict) and key_str == 'parameters':
-				self.run.config.update(converted, allow_val_change=True)
-			else:
-				self.run.config[_wandb_safe_key(config_key)] = converted
+			# Strip parameters/ prefix for config keys; bulk dict uses key 'parameters' only as routing tag
+			config_key = '' if key_str == 'parameters' else key_str[len('parameters/'):]
+			self._assign_config_or_summary_safe('config', config_key, value)
 		elif key_str.startswith('outputs/') or key_str == 'outputs':
-			summary_key = key_str[len('outputs/'):] if key_str.startswith('outputs/') else key_str
-			if isinstance(converted, dict) and key_str == 'outputs':
-				for sk, sv in converted.items():
-					self.run.summary[_wandb_safe_key(str(sk))] = sv
-				## END for sk, sv in converted.items()...
-			else:
-				self.run.summary[_wandb_safe_key(summary_key)] = converted
+			summary_key = '' if key_str == 'outputs' else key_str[len('outputs/'):]
+			self._assign_config_or_summary_safe('summary', summary_key, value)
 		else:
-			# session context fields and free-form keys → config
-			self.run.config[key_str] = converted
+			# Flat scalars (no '/') → config; nested free-form keys (e.g. parsed/...) → summary
+			if '/' in key_str:
+				self._assign_config_or_summary_safe('summary', key_str, value)
+			else:
+				self._assign_config_or_summary_safe('config', key_str, value)
 
 
 	@staticmethod
 	def _convert_value(value: Any) -> Any:
-		if isinstance(value, pd.DataFrame):
-			return wandb.Table(dataframe=value)
+		"""Config/summary-safe conversion only (no DataFrame → wandb.Table)."""
 		if isinstance(value, (pathlib.PurePath, pathlib.Path)):
 			return value.as_posix()
 		if isinstance(value, IdentifyingContext):
