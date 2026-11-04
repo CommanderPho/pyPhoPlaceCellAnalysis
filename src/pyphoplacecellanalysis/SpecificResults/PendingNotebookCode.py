@@ -7962,13 +7962,16 @@ class PositionLikePosteriorScoring:
         return scoring_results
 
 
-    @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack_1d'], used_by=[], creation_date='2026-11-04 00:00', related_items=['PosteriorExporting.load_decoded_posteriors_from_HDF5'])
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack_1d'], used_by=['cls.calibrate_1d_pli_cutoffs_from_h5_files'], creation_date='2026-11-04 00:00', related_items=['PosteriorExporting.load_decoded_posteriors_from_HDF5'])
     @classmethod
-    def score_h5_loaded_decoder_epochs_1d(cls, h5_out_dict, decoder_name: str, epochs_name: str, x_edges, position_like_score_cutoff_1d: Optional[float] = None, should_plot_results: bool = False, **pli_score_kwargs) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
+    def score_h5_loaded_decoder_epochs_1d(cls, h5_out_dict, decoder_name: str, epochs_name: str, x_edges, position_like_score_cutoff_1d: Optional[float] = None, should_plot_results: bool = False, h5_path=None, session_key_parts: Optional[List] = None, custom_replay_parts: Optional[List] = None, **pli_score_kwargs) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
         """
         Score all epochs for one decoder / epoch-type from ``PosteriorExporting.load_decoded_posteriors_from_HDF5`` output.
 
         ``h5_out_dict[decoder_name][epochs_name]['p_x_given_n']`` is a list of ``(n_pos, n_t)`` arrays.
+
+        Optional ``h5_path`` / ``session_key_parts`` / ``custom_replay_parts`` (from the loader tuple) add session
+        identity columns and H5 ``t_bin_centers`` / ``time_bin_edges`` when shapes match each epoch.
 
         Returns:
             (concatenated_df with ``epoch_idx``, list of per-epoch DataFrames)
@@ -7977,7 +7980,9 @@ class PositionLikePosteriorScoring:
             raise KeyError(f'decoder_name={decoder_name!r} not in h5_out_dict keys={list(h5_out_dict.keys())}')
         if epochs_name not in h5_out_dict[decoder_name]:
             raise KeyError(f'epochs_name={epochs_name!r} not in h5_out_dict[{decoder_name!r}] keys={list(h5_out_dict[decoder_name].keys())}')
-        p_x_list = h5_out_dict[decoder_name][epochs_name]['p_x_given_n']
+        epoch_bucket = h5_out_dict[decoder_name][epochs_name]
+        p_x_list = epoch_bucket['p_x_given_n']
+        attach_session_identity = h5_path is not None and session_key_parts is not None
         per_epoch_dfs: List[pd.DataFrame] = []
         for epoch_idx, p_x in enumerate(p_x_list):
             epoch_df = cls.compute_and_plot_posterior_stack_1d(p_x, x_edges=x_edges, should_plot_results=should_plot_results, position_like_score_cutoff_1d=position_like_score_cutoff_1d, **pli_score_kwargs)
@@ -7985,6 +7990,25 @@ class PositionLikePosteriorScoring:
             epoch_df['epoch_idx'] = epoch_idx
             epoch_df['decoder_name'] = decoder_name
             epoch_df['epochs_name'] = epochs_name
+            n_rows = len(epoch_df)
+            if 't_bin_centers' in epoch_bucket and epoch_idx < len(epoch_bucket['t_bin_centers']):
+                t_centers = np.asarray(epoch_bucket['t_bin_centers'][epoch_idx], dtype=float).ravel()
+                if t_centers.size == n_rows:
+                    epoch_df['t_bin_center_s'] = t_centers
+            if 'time_bin_edges' in epoch_bucket and epoch_idx < len(epoch_bucket['time_bin_edges']):
+                t_edges = np.asarray(epoch_bucket['time_bin_edges'][epoch_idx], dtype=float)
+                if t_edges.ndim == 2 and t_edges.shape[0] == 2 and t_edges.shape[1] == n_rows:
+                    epoch_df['time_bin_start_s'] = t_edges[0, :]
+                    epoch_df['time_bin_stop_s'] = t_edges[1, :]
+                elif t_edges.ndim == 1 and t_edges.size == (n_rows + 1):
+                    epoch_df['time_bin_start_s'] = t_edges[:-1]
+                    epoch_df['time_bin_stop_s'] = t_edges[1:]
+            if attach_session_identity:
+                epoch_df['h5_path'] = str(h5_path)
+                epoch_df['session_key'] = '/' + '/'.join(session_key_parts)
+                epoch_df['session_key_str'] = '-'.join(session_key_parts)
+                if custom_replay_parts:
+                    epoch_df['custom_replay_key'] = '/'.join(custom_replay_parts)
             per_epoch_dfs.append(epoch_df)
         ## END for epoch_idx, p_x in enumerate(p_x_list)...
 
@@ -7993,9 +8017,9 @@ class PositionLikePosteriorScoring:
         return pd.concat(per_epoch_dfs, ignore_index=True), per_epoch_dfs
 
 
-    @function_attributes(short_name=None, tags=['1D', 'position-like', 'calibration', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.calculate_pli_1d_score'], used_by=[], creation_date='2026-11-04 00:00', related_items=[])
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'calibration', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.score_h5_loaded_decoder_epochs_1d'], used_by=[], creation_date='2026-11-04 00:00', related_items=[])
     @classmethod
-    def calibrate_1d_pli_cutoffs_from_h5_files(cls, h5_paths, x_edges, decoder_name: str = 'long_LR', laps_epochs_name: str = 'laps', ripple_epochs_name: str = 'ripple', max_files: Optional[int] = None, debug_print: bool = True) -> Dict[str, Any]:
+    def calibrate_1d_pli_cutoffs_from_h5_files(cls, h5_paths, x_edges, decoder_name: str = 'long_LR', laps_epochs_name: str = 'laps', ripple_epochs_name: str = 'ripple', max_files: Optional[int] = None, debug_print: bool = True, **pli_score_kwargs) -> Tuple[Dict[str, Any], pd.DataFrame, pd.DataFrame]:
         """
         Empirically suggest 1D cutoffs from BATCH ``decoded_posteriors`` H5 files.
 
@@ -8005,7 +8029,13 @@ class PositionLikePosteriorScoring:
           - ``position_like_score_cutoff_1d`` ≈ lap median when ripples are sharper than laps (common on 1D PLI);
             otherwise ``max(lap_q25, ripple_median)`` so the floor sits above ambiguous ripple mass
 
-        Does not mutate class attributes; returns a summary dict for inspection / docstring updates.
+        Does not mutate class attributes.
+
+        Returns:
+            (summary_dict, laps_detail_df, ripples_detail_df)
+
+        Detail DataFrames come from ``score_h5_loaded_decoder_epochs_1d`` with ``h5_path`` / loader session metadata
+        (same columns as ``compute_and_plot_posterior_stack_1d``, plus ``epoch_idx``, timing fields when stored in H5).
         """
         from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
 
@@ -8013,8 +8043,8 @@ class PositionLikePosteriorScoring:
         if max_files is not None:
             h5_paths = h5_paths[:int(max_files)]
 
-        lap_scores: List[float] = []
-        ripple_scores: List[float] = []
+        lap_df_parts: List[pd.DataFrame] = []
+        ripple_df_parts: List[pd.DataFrame] = []
         used_files: List[str] = []
 
         for load_path in h5_paths:
@@ -8022,27 +8052,26 @@ class PositionLikePosteriorScoring:
                 if debug_print:
                     print(f'Skipping missing file: {load_path}')
                 continue
-            out_dict, _meta = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=Path(load_path), debug_print=False)
+            out_dict, (session_key_parts, custom_replay_parts) = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=Path(load_path), debug_print=False)
             if decoder_name not in out_dict:
                 if debug_print:
                     print(f'Skipping {load_path}: decoder {decoder_name!r} missing')
                 continue
             used_files.append(str(load_path))
-            for epochs_name, sink in ((laps_epochs_name, lap_scores), (ripple_epochs_name, ripple_scores)):
+            for epochs_name, parts_list in ((laps_epochs_name, lap_df_parts), (ripple_epochs_name, ripple_df_parts)):
                 if epochs_name not in out_dict[decoder_name]:
                     continue
-                for p_x in out_dict[decoder_name][epochs_name]['p_x_given_n']:
-                    stack = cls._normalize_posterior_1d_stack(p_x)
-                    for t in range(stack.shape[1]):
-                        score, _comps = cls.calculate_pli_1d_score(stack[:, t], x_edges=x_edges)
-                        sink.append(score)
-                    ## END for t in range(stack.shape[1])...
-                ## END for p_x in ...
-            ## END for epochs_name, sink in ...
+                epoch_df, _per_epoch = cls.score_h5_loaded_decoder_epochs_1d(out_dict, decoder_name=decoder_name, epochs_name=epochs_name, x_edges=x_edges, should_plot_results=False, h5_path=load_path, session_key_parts=session_key_parts, custom_replay_parts=custom_replay_parts, **pli_score_kwargs)
+                if epoch_df.empty:
+                    continue
+                parts_list.append(epoch_df)
+            ## END for epochs_name, parts_list in ...
         ## END for load_path in h5_paths...
 
-        lap_arr = np.asarray(lap_scores, dtype=float)
-        rip_arr = np.asarray(ripple_scores, dtype=float)
+        laps_detail_df = pd.concat(lap_df_parts, ignore_index=True) if len(lap_df_parts) > 0 else pd.DataFrame()
+        ripples_detail_df = pd.concat(ripple_df_parts, ignore_index=True) if len(ripple_df_parts) > 0 else pd.DataFrame()
+        lap_arr = laps_detail_df['score'].to_numpy(dtype=float) if 'score' in laps_detail_df.columns else np.asarray([], dtype=float)
+        rip_arr = ripples_detail_df['score'].to_numpy(dtype=float) if 'score' in ripples_detail_df.columns else np.asarray([], dtype=float)
         summary: Dict[str, Any] = {
             'n_files': len(used_files),
             'files': used_files,
@@ -8073,7 +8102,7 @@ class PositionLikePosteriorScoring:
                 summary['suggested_position_like_score_cutoff_1d'] = lap_q50
         if debug_print:
             print(summary)
-        return summary
+        return summary, laps_detail_df, ripples_detail_df
 
     
     @classmethod
