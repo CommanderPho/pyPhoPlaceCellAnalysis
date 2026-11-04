@@ -50,6 +50,7 @@ dependencies = [
     "spyglass-neuro",
     "non-local-detector>=0.6.9",
     "wandb>=0.26.1",
+    "awkward>=2.8.12",
 ]
 
 [dependency-groups]

@@ -7558,7 +7558,7 @@ class PositionLikePosteriorScoring:
 
 
 
-    @function_attributes(short_name=None, tags=['ALL'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-09 15:26', related_items=[])
+    @function_attributes(short_name=None, tags=['ALL'], input_requires=[], output_provides=[], uses=['cls.filter_to_position_like_epochs_only', 'DecodingLocalityMeasures.compute_locality_measures_for_posterior', 'DecodingLocalityMeasures.perform_build_locality_measures_df'], used_by=[], creation_date='2026-01-09 15:26', related_items=[])
     @classmethod
     def _main_run_all(cls, container): 
         """
@@ -7608,7 +7608,7 @@ class PositionLikePosteriorScoring:
         a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
 
         # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+        a_masked_result, scoring_results = cls.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
 
         # active_epochs_result = decoded_local_epochs_result
         active_epochs_result = a_masked_result
@@ -7666,7 +7666,7 @@ class PositionLikePosteriorScoring:
         a_decoder: BayesianPlacemapPositionDecoder = list(container.pf1D_Decoder_dict.values())[0]
 
         # 2025-01-08 - Mask based on position-like bins only _________________________________________________________________________________________________________________________________________________________________________________________________________________________________ #
-        a_masked_result, scoring_results = PositionLikePosteriorScoring.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
+        a_masked_result, scoring_results = cls.filter_to_position_like_epochs_only(decoded_local_epochs_result=decoded_local_epochs_result, xbin=a_decoder.xbin, ybin=a_decoder.ybin, position_like_score_cutoff=0.42, num_min_position_like_t_bins=3)
         return a_masked_result
 
 
@@ -8106,7 +8106,7 @@ class PositionLikePosteriorScoring:
         return scoring_results
 
 
-    @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior', 'MEMORY_LEAK', 'BUG'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
+    @function_attributes(short_name=None, tags=['WORKING', 'filter', 'position-like', 'score', '2D', 'posterior', 'MEMORY_LEAK', 'BUG'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack', 'PositionLikePosteriorScoring', 'DecodingLocalityMeasures'], used_by=['cls._main_run_all', 'PredictiveDecodingComputationsGlobalComputationFunctions.perform_predictive_decoding_analysis'], creation_date='2026-01-08 13:02', related_items=[])
     @classmethod
     def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None, normalization_across_epochs_epoch_names: Optional[List]=None) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
         """ filters the provided decoded time bins into position-like bins only based on a specific position_like_score_cutoff value and a few other filtering criteria.
