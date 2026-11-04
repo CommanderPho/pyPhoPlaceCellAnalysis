@@ -6985,8 +6985,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         scatter series behind the main XdC bars from `Fig2_*_AnyC_FR` or live `AnyC_*` trends
         (AnyC Δ− under bars 0/2, AnyC Δ+ under bars 1/3; XdC y-limits preserved).
 
-        Default save formats are SVG-only (`write_svg=True`, `write_png=False`, `write_vector_format=False`);
-        override with `write_png=True` / `write_vector_format=True` if needed.
+        Default save formats are SVG-only (`write_svg=True`, `write_png=False`, `write_vector_format=False`).
+        `write_vector_format=True` is accepted for back-compat (notebook/publication callers) and remapped to SVG-only for this figure (no matplotlib PDF).
+        Override with `write_png=True` if a raster export is also needed.
         """
         
         
@@ -6995,6 +6996,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
 
         include_non_XdC_cells_as_inset: bool = kwargs.pop('include_non_XdC_cells_as_inset', False)
+        # Notebook/publication callers pass write_vector_format=True for "vector export".
+        # For Figure 2 that now means SVG, not matplotlib PDF.
+        if write_vector_format:
+            write_svg = True
+            write_vector_format = False
         save_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png, write_svg=write_svg) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
 
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
