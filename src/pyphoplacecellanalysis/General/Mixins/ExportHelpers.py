@@ -3,7 +3,6 @@ from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
 import re
-import xml.etree.ElementTree as ET
 from typing import Any, Callable, List, Optional, Tuple, Union, Dict
 # from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
@@ -1349,12 +1348,14 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','SVG','publication','Illustrator'], input_requires=[], output_provides=[], uses=[], used_by=['write_to_file'], creation_date='2026-11-04 02:58', related_items=['matplotlib#13200', 'matplotlib#14283'])
 def postprocess_matplotlib_svg_for_publication(svg_path: Path) -> Path:
-    """ Fix matplotlib SVG text for Illustrator / browser viewing after `svg.fonttype='none'` savefig.
+    """ Fix matplotlib SVG text whitespace after `svg.fonttype='none'` savefig.
 
-    - Scopes matplotlib's style under `svg.mplsvg` and adds `white-space:pre` so leading/trailing
-      spaces in flexitext-split `<text>` runs are preserved (otherwise `Lap Firing Rates` → `LapFiring Rates`).
-    - Rewrites font size units from `px` → `pt` inside `font:` / `font-size:` styles so Illustrator's
-      type UI reports the intended point size (page size is already in pt).
+    Scopes matplotlib's style under `svg.mplsvg` and adds `white-space:pre` so leading/trailing
+    spaces in flexitext-split `<text>` runs are preserved (otherwise `Lap Firing Rates` → `LapFiring Rates`).
+
+    Uses string edits (not ElementTree rewrite) so matplotlib namespaces / coordinates stay intact.
+    Does **not** rewrite font `px`→`pt`: in SVG, `px` == user units and must match glyph positions;
+    renaming to `pt` inflates text (~4/3) and causes overlaps with tiny-looking ticks.
 
     Usage:
         from pyphoplacecellanalysis.General.Mixins.ExportHelpers import postprocess_matplotlib_svg_for_publication
@@ -1362,63 +1363,29 @@ def postprocess_matplotlib_svg_for_publication(svg_path: Path) -> Path:
         postprocess_matplotlib_svg_for_publication(svg_path)
     """
     svg_path = Path(svg_path)
-    # Keep default SVG namespace unprefixed (avoid ns0:svg after rewrite)
-    ET.register_namespace('', 'http://www.w3.org/2000/svg')
-    ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
-    ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
-    ET.register_namespace('cc', 'http://creativecommons.org/ns#')
-    ET.register_namespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+    text = svg_path.read_text(encoding='utf-8')
 
-    tree = ET.parse(svg_path)
-    root = tree.getroot()
+    # Add mplsvg class on the root <svg ...> tag (first occurrence)
+    if 'class="' in text and 'mplsvg' not in text.split('>', 1)[0]:
+        text = re.sub(r'(<svg\b[^>]*?)\s*>', lambda m: (m.group(1) + ' class="mplsvg">') if 'class=' not in m.group(1) else m.group(0).replace('class="', 'class="mplsvg ', 1) if 'mplsvg' not in m.group(0) else m.group(0), text, count=1)
+    elif re.search(r'<svg\b', text) and 'mplsvg' not in text.split('>', 1)[0]:
+        text = re.sub(r'(<svg\b[^>]*?)(/?>)', r'\1 class="mplsvg"\2', text, count=1)
 
-    # Root may be namespaced ({http://www.w3.org/2000/svg}svg) or bare 'svg'
-    root_tag = root.tag.rsplit('}', 1)[-1]
-    if root_tag != 'svg':
-        raise ValueError(f'Expected root <svg>, got {root.tag!r} for {svg_path}')
+    # Matplotlib emits: <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+    def _fix_style(match: re.Match) -> str:
+        open_tag, style_body, close_tag = match.group(1), match.group(2).strip(), match.group(3)
+        if 'white-space' in style_body:
+            return match.group(0)
+        # style_body like `*{stroke-linejoin: round; stroke-linecap: butt}`
+        if style_body.startswith('*') and style_body.endswith('}'):
+            inner = style_body[1:-1].rstrip()
+            new_body = f'svg.mplsvg*{{{inner}; white-space:pre}}'
+            return f'{open_tag}{new_body}{close_tag}'
+        return f'{open_tag}{style_body}\nsvg.mplsvg * {{ white-space:pre; }}{close_tag}'
 
-    existing_class = (root.get('class') or '').strip()
-    if 'mplsvg' not in existing_class.split():
-        root.set('class', f'{existing_class} mplsvg'.strip() if existing_class else 'mplsvg')
+    text = re.sub(r'(<style\b[^>]*>)(.*?)(</style>)', _fix_style, text, count=1, flags=re.S | re.I)
 
-    def _local_name(tag: str) -> str:
-        return tag.rsplit('}', 1)[-1]
-
-    def _rewrite_font_px_to_pt(style_value: str) -> str:
-        """Replace NNpx with NNpt only inside font: / font-size: declarations."""
-        def _repl_decl(match: re.Match) -> str:
-            return re.sub(r'(\d+(?:\.\d+)?)px\b', r'\1pt', match.group(0))
-        return re.sub(r'(?:^|;)\s*font(?:-size)?\s*:[^;]*', _repl_decl, style_value)
-
-    style_el = None
-    for el in root.iter():
-        if _local_name(el.tag) == 'style':
-            style_el = el
-            break
-    ## END for el in root.iter()...
-
-    if style_el is not None and style_el.text:
-        style_text = style_el.text.strip()
-        # Matplotlib emits e.g. `*{stroke-linejoin: round; stroke-linecap: butt}`
-        if style_text.startswith('*'):
-            body = style_text[1:]
-            if body.endswith('}'):
-                body = body[:-1].rstrip()
-            if 'white-space' not in body:
-                body = f'{body}; white-space:pre' if body else 'white-space:pre'
-            style_el.text = f'svg.mplsvg*{body}}}'
-        elif 'white-space' not in style_text:
-            # Unexpected style shape — append preserve rule scoped to mplsvg
-            style_el.text = f'{style_text}\nsvg.mplsvg * {{ white-space:pre; }}'
-
-    # Inline style attributes on text (and any) elements: font: 18px → font: 18pt
-    for el in root.iter():
-        style_attr = el.get('style')
-        if style_attr and (('font:' in style_attr) or ('font-size:' in style_attr)):
-            el.set('style', _rewrite_font_px_to_pt(style_attr))
-    ## END for el in root.iter()...
-
-    tree.write(svg_path, encoding='utf-8', xml_declaration=True, default_namespace=None)
+    svg_path.write_text(text, encoding='utf-8')
     return svg_path
 
 

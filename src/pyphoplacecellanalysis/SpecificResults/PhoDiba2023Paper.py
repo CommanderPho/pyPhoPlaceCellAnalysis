@@ -6595,12 +6595,14 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if subtitle_font_size is None:
             subtitle_font_size = 14 if (not prepare_for_publication) else (7 * 2)
 
+        # NBSP (\u00a0) between style runs: SVG with svg.fonttype='none' collapses leading regular spaces in <text>.
+        _nbsp = '\u00a0'
         if subtitle is None:
-            subtitle = ('for the '
-                        "<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</> dominant Cells on each track")
+            subtitle = (f'for the{_nbsp}'
+                        f"<color:royalblue, weight:bold>Long</>/<color:crimson, weight:bold>Short</>{_nbsp}dominant Cells on each track")
 
         epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
-        metric_suffix: str = f" {metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
+        metric_suffix: str = f"{_nbsp}{metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
         # Close line-1 <size:…> before \n so flexitext does not glue the subtitle/granularity phrase to "Session Means".
         return (f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>\n"
                 f"<size:{subtitle_font_size}>{subtitle}</>"
@@ -6608,10 +6610,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, ...] = ('LdCs', 'SdCs')):
+    def _apply_publication_grouped_xticklabels(cls, ax, group_labels: Tuple[str, ...] = ('LdCs', 'SdCs'), subgroup_labelsize: Optional[float] = None, group_labelsize: Optional[float] = None):
         """ Two-tier publication x-axis: pre-/post-$\\Delta$ under each bar, group labels under each pair.
 
         One group label → a single pre/post pair at x=0,1. Two group labels → the original 4-bar Figure 2 layout.
+        `subgroup_labelsize` sizes the 4 pre-/post-$\\Delta$ labels; `group_labelsize` sizes LdCs/SdCs (secondary axis).
         """
         labels = tuple(group_labels)
         n_groups: int = len(labels)
@@ -6626,13 +6629,19 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             ax.set_xticklabels(pre_post + pre_post)
             group_tick_positions = [0.5, 2.5]
             group_tick_labels = [f'\n\n{labels[0]}', f'\n\n{labels[1]}']
-        ax.tick_params(axis='x', length=0, pad=2)
+        x_tick_kwargs = dict(axis='x', length=0, pad=2)
+        if subgroup_labelsize is not None:
+            x_tick_kwargs['labelsize'] = subgroup_labelsize
+        ax.tick_params(**x_tick_kwargs)
         ax.set_xlabel('')
 
         # Group labels centered under each pre/post pair (matplotlib multilevel-tick pattern)
         sec = ax.secondary_xaxis(location=0)
         sec.set_xticks(group_tick_positions, labels=group_tick_labels)
-        sec.tick_params('x', length=0)
+        sec_tick_kwargs = dict(axis='x', length=0)
+        if group_labelsize is not None:
+            sec_tick_kwargs['labelsize'] = group_labelsize
+        sec.tick_params(**sec_tick_kwargs)
         sec.spines['bottom'].set_visible(False)
         return sec
 
@@ -6800,7 +6809,11 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if len(np.atleast_1d(xtick_positions)) == len(xtick_labels):
             ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
-            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels)
+            # Group (LdCs/SdCs) 7pt; subgroup (pre-/post-Δ) 6pt; y-tick numbers 5pt (publication default)
+            ytick_fs = float(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)['ytick.labelsize'])
+            subgroup_fs, group_fs = 6.0, 7.0
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels, subgroup_labelsize=subgroup_fs, group_labelsize=group_fs)
+            ax.tick_params(axis='y', labelsize=ytick_fs)
 
         # Firing rates / participation fractions are non-negative; keep axis floor at 0
         _ymin, _ymax = ax.get_ylim()
