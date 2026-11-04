@@ -403,13 +403,16 @@ class EventEpochsDebugger:
 
 
 class SparseGaussianVolume:
-    """Memory-efficient representation of a 3D Gaussian volume where >90% of entries are near-zero.
+    """Memory-efficient sparse Gaussian volume for measured-position locality.
 
-    Stores each (n_x, n_y) time-slice as a scipy.sparse.csr_matrix, typically achieving >90% memory reduction
-    compared to a dense (n_x, n_y, n_t) float64 array.
+    **2D mode** (default): stores each ``(n_x, n_y)`` time-slice as a ``csr_matrix``;
+    ``shape=(n_x, n_y, n_t)``.
+
+    **1D mode**: stores each length-``n_x`` time-slice as a ``csr_matrix`` of shape ``(n_x, 1)``;
+    ``shape=(n_x, n_t)`` with ``spatial_ndim=1``.
 
     Supports the element-wise operations used by compute_locality_measures_for_posterior and PredictiveDecoding.compute:
-      - Element-wise multiplication with dense 3D arrays (via __mul__/__rmul__)
+      - Element-wise multiplication with dense arrays (via __mul__/__rmul__)
       - Masked threshold operations that produce int arrays or per-timestep sums
       - Marginal sums along spatial axes (for COM / distance calculations)
       - Conversion back to dense via to_dense()
@@ -419,18 +422,21 @@ class SparseGaussianVolume:
 
         sparse_vol = SparseGaussianVolume.build_from_positions(xbin_centers, ybin_centers, new_positions, sigma)
         dense_vol = sparse_vol.to_dense()  # backward-compatible full array
+
+        sparse_vol_1d = SparseGaussianVolume.build_from_positions_1d(xbin_centers, new_positions_1d, sigma)
     """
 
-    __slots__ = ('_slices', '_shape', '_dtype')
+    __slots__ = ('_slices', '_shape', '_dtype', '_spatial_ndim')
 
-    def __init__(self, slices: List[scipy_sparse.csr_matrix], shape: Tuple[int, int, int], dtype=np.float64):
+    def __init__(self, slices: List[scipy_sparse.csr_matrix], shape: Tuple[int, ...], dtype=np.float64, spatial_ndim: int = 2):
         self._slices = slices
         self._shape = shape
         self._dtype = dtype
+        self._spatial_ndim = int(spatial_ndim)
 
 
     @property
-    def shape(self) -> Tuple[int, int, int]:
+    def shape(self) -> Tuple[int, ...]:
         return self._shape
 
 
@@ -440,12 +446,17 @@ class SparseGaussianVolume:
 
 
     @property
+    def spatial_ndim(self) -> int:
+        return self._spatial_ndim
+
+
+    @property
     def n_time_bins(self) -> int:
-        return self._shape[2]
+        return self._shape[-1]
 
 
     def __len__(self) -> int:
-        return self._shape[2]
+        return self._shape[-1]
 
 
     @property
@@ -467,25 +478,36 @@ class SparseGaussianVolume:
 
 
     def to_dense(self) -> np.ndarray:
-        """Reconstruct the full dense (n_x, n_y, n_t) array."""
+        """Reconstruct the full dense array: ``(n_x, n_y, n_t)`` for 2D or ``(n_x, n_t)`` for 1D."""
         out = np.zeros(self._shape, dtype=self._dtype)
+        if self._spatial_ndim == 1:
+            n_x, n_t = self._shape
+            for t, s in enumerate(self._slices):
+                out[:, t] = np.asarray(s.toarray()).ravel()
+            ## END for t, s in enumerate(self._slices)...
+            return out
         for t, s in enumerate(self._slices):
             out[:, :, t] = s.toarray()
+        ## END for t, s in enumerate(self._slices)...
         return out
 
 
     def __mul__(self, other):
-        """Element-wise multiplication: SparseGaussianVolume * dense_3d → SparseGaussianVolume."""
+        """Element-wise multiplication: SparseGaussianVolume * dense → SparseGaussianVolume."""
+        n_t = self.n_time_bins
         if isinstance(other, np.ndarray):
             if other.shape != self._shape:
                 raise ValueError(f"Shape mismatch: {self._shape} vs {other.shape}")
-            new_slices = [self._slices[t].multiply(other[:, :, t]) for t in range(self._shape[2])]
-            new_slices = [scipy_sparse.csr_matrix(s) for s in new_slices]
-            return SparseGaussianVolume(new_slices, self._shape, self._dtype)
+            if self._spatial_ndim == 1:
+                new_slices = [scipy_sparse.csr_matrix(self._slices[t].multiply(other[:, t][:, np.newaxis])) for t in range(n_t)]
+            else:
+                new_slices = [scipy_sparse.csr_matrix(self._slices[t].multiply(other[:, :, t])) for t in range(n_t)]
+            return SparseGaussianVolume(new_slices, self._shape, self._dtype, spatial_ndim=self._spatial_ndim)
         if isinstance(other, SparseGaussianVolume):
-            new_slices = [self._slices[t].multiply(other._slices[t]) for t in range(self._shape[2])]
-            new_slices = [scipy_sparse.csr_matrix(s) for s in new_slices]
-            return SparseGaussianVolume(new_slices, self._shape, self._dtype)
+            if other._spatial_ndim != self._spatial_ndim or other._shape != self._shape:
+                raise ValueError(f"Shape/ndim mismatch: {self._shape}/{self._spatial_ndim} vs {other._shape}/{other._spatial_ndim}")
+            new_slices = [scipy_sparse.csr_matrix(self._slices[t].multiply(other._slices[t])) for t in range(n_t)]
+            return SparseGaussianVolume(new_slices, self._shape, self._dtype, spatial_ndim=self._spatial_ndim)
         return NotImplemented
 
 
@@ -493,33 +515,53 @@ class SparseGaussianVolume:
         return self.__mul__(other)
 
 
-    def multiply_mask_threshold_to_int(self, mask_3d: np.ndarray, threshold: float) -> np.ndarray:
-        """Compute ((self * mask_3d) > threshold).astype(int) as dense 3D int array."""
-        n_x, n_y, n_t = self._shape
-        result = np.zeros((n_x, n_y, n_t), dtype=np.int32)
+    def multiply_mask_threshold_to_int(self, mask: np.ndarray, threshold: float) -> np.ndarray:
+        """Compute ((self * mask) > threshold).astype(int) as dense int array matching ``self.shape``."""
+        n_t = self.n_time_bins
+        result = np.zeros(self._shape, dtype=np.int32)
+        if self._spatial_ndim == 1:
+            for t in range(n_t):
+                product = self._slices[t].multiply(mask[:, t][:, np.newaxis])
+                result[:, t] = (np.asarray(product.toarray()).ravel() > threshold).astype(np.int32)
+            ## END for t in range(n_t)...
+            return result
         for t in range(n_t):
-            product = self._slices[t].multiply(mask_3d[:, :, t])
+            product = self._slices[t].multiply(mask[:, :, t])
             result[:, :, t] = (product.toarray() > threshold).astype(np.int32)
+        ## END for t in range(n_t)...
         return result
 
 
-    def multiply_mask_threshold_sum_spatial(self, mask_3d: np.ndarray, threshold: float) -> np.ndarray:
-        """Compute np.nansum(((self * mask_3d) > threshold).astype(int), axis=(0,1)) per timestep.
-        Returns shape (n_t,) without allocating the full 3D intermediate.
-        """
-        n_t = self._shape[2]
+    def multiply_mask_threshold_sum_spatial(self, mask: np.ndarray, threshold: float) -> np.ndarray:
+        """Compute spatial sum of ((self * mask) > threshold) per timestep. Returns shape (n_t,)."""
+        n_t = self.n_time_bins
         result = np.empty(n_t, dtype=np.int64)
+        if self._spatial_ndim == 1:
+            for t in range(n_t):
+                product = self._slices[t].multiply(mask[:, t][:, np.newaxis])
+                result[t] = int((np.asarray(product.data) > threshold).sum())
+            ## END for t in range(n_t)...
+            return result
         for t in range(n_t):
-            product = self._slices[t].multiply(mask_3d[:, :, t])
+            product = self._slices[t].multiply(mask[:, :, t])
             result[t] = int((np.asarray(product.data) > threshold).sum())
+        ## END for t in range(n_t)...
         return result
 
 
-    def marginal_sums(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute marginal sums along each spatial axis for all time steps.
-        Returns (marg_x: (n_x, n_t), marg_y: (n_y, n_t)) equivalent to
-        (np.sum(vol, axis=1), np.sum(vol, axis=0)).
+    def marginal_sums(self) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """Compute marginal sums along spatial axes for all time steps.
+
+        2D: returns ``(marg_x: (n_x, n_t), marg_y: (n_y, n_t))``.
+        1D: returns ``(marg_x: (n_x, n_t), None)``.
         """
+        if self._spatial_ndim == 1:
+            n_x, n_t = self._shape
+            marg_x = np.zeros((n_x, n_t), dtype=self._dtype)
+            for t in range(n_t):
+                marg_x[:, t] = np.asarray(self._slices[t].toarray()).ravel()
+            ## END for t in range(n_t)...
+            return marg_x, None
         n_x, n_y, n_t = self._shape
         marg_x = np.zeros((n_x, n_t), dtype=self._dtype)
         marg_y = np.zeros((n_y, n_t), dtype=self._dtype)
@@ -527,12 +569,13 @@ class SparseGaussianVolume:
             s = self._slices[t]
             marg_x[:, t] = np.asarray(s.sum(axis=1)).ravel()
             marg_y[:, t] = np.asarray(s.sum(axis=0)).ravel()
+        ## END for t in range(n_t)...
         return marg_x, marg_y
 
 
     @classmethod
     def build_from_positions(cls, xbin_centers: np.ndarray, ybin_centers: np.ndarray, new_positions: np.ndarray, sigma: float, sparsity_threshold: float = 1e-9, chunk_size: int = 2000) -> 'SparseGaussianVolume':
-        """Build the sparse Gaussian volume in memory-efficient chunks.
+        """Build the sparse **2D** Gaussian volume in memory-efficient chunks.
 
         For each position at each time step, a 2D Gaussian centered at that position
         is evaluated on the (xbin_centers x ybin_centers) grid. Values below
@@ -560,15 +603,59 @@ class SparseGaussianVolume:
             gauss_chunk[gauss_chunk < sparsity_threshold] = 0.0
             for t_local in range(chunk_end - chunk_start):
                 slices.append(scipy_sparse.csr_matrix(gauss_chunk[:, :, t_local]))
+            ## END for t_local in range(chunk_end - chunk_start)...
+        ## END for chunk_start in range(0, n_t, chunk_size)...
 
-        return cls(slices, shape=(n_x, n_y, n_t), dtype=np.float64)
+        return cls(slices, shape=(n_x, n_y, n_t), dtype=np.float64, spatial_ndim=2)
+
+
+    @classmethod
+    def build_from_positions_1d(cls, xbin_centers: np.ndarray, new_positions_1d: np.ndarray, sigma: float, sparsity_threshold: float = 1e-9, chunk_size: int = 2000) -> 'SparseGaussianVolume':
+        """Build a sparse **1D** Gaussian volume on ``xbin_centers``.
+
+        ``new_positions_1d`` may be shape ``(n_t,)`` or ``(n_t, 1)``.
+        Returns volume with ``shape=(n_x, n_t)`` and ``spatial_ndim=1``.
+        """
+        xbin_centers = np.asarray(xbin_centers, dtype=float)
+        new_positions_1d = np.asarray(new_positions_1d, dtype=float)
+        if new_positions_1d.ndim == 2:
+            if new_positions_1d.shape[1] != 1:
+                raise ValueError(f'build_from_positions_1d expects new_positions shape (n_t,) or (n_t, 1); got {new_positions_1d.shape}')
+            new_positions_1d = new_positions_1d[:, 0]
+        elif new_positions_1d.ndim != 1:
+            raise ValueError(f'build_from_positions_1d expects 1D positions; got shape {new_positions_1d.shape}')
+
+        n_x = len(xbin_centers)
+        n_t = len(new_positions_1d)
+        two_sigma_sq = 2.0 * sigma * sigma
+        slices: List[scipy_sparse.csr_matrix] = []
+        x = xbin_centers[:, np.newaxis]  # (n_x, 1)
+
+        for chunk_start in range(0, n_t, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_t)
+            pos_chunk = new_positions_1d[chunk_start:chunk_end][np.newaxis, :]  # (1, chunk_len)
+            dist_sq = (x - pos_chunk) ** 2  # (n_x, chunk_len)
+            gauss_chunk = np.exp(-dist_sq / two_sigma_sq)
+            gauss_chunk[gauss_chunk < sparsity_threshold] = 0.0
+            for t_local in range(chunk_end - chunk_start):
+                slices.append(scipy_sparse.csr_matrix(gauss_chunk[:, t_local][:, np.newaxis]))
+            ## END for t_local in range(chunk_end - chunk_start)...
+        ## END for chunk_start in range(0, n_t, chunk_size)...
+
+        return cls(slices, shape=(n_x, n_t), dtype=np.float64, spatial_ndim=1)
 
 
 
 @define(slots=False, repr=False, eq=False)
 class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsBasedClassHelperMixin):
     """ Handles computing information about how the current decoded position relates to the present position (e.g. is it local, non-local, etc)
-    
+
+    **2D (default):** posterior ``(n_x, n_y, n_contexts, n_t)``; measured ``(t → x,y)``; ``ybin`` / ``ybin_centers`` required.
+    Built via ``init_from_decode_result`` (pseudo2D continuous decode).
+
+    **1D:** posterior ``(n_x, n_contexts, n_t)`` or ``(n_x, n_t)``; measured ``(t → x)`` (prefer ``lin_pos`` if present else ``x``);
+    ``ybin`` / ``ybin_centers`` may be ``None``. Built via ``init_from_1d_decode_result``.
+
     Usage:
 
         from pyphoplacecellanalysis.General.Pipeline.Stages.ComputationFunctions.MultiContextComputationFunctions.PredictiveDecodingComputations import DecodingLocalityMeasures, PredictiveDecoding
@@ -577,29 +664,32 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         decoding_locality_measures.compute() ## ~30 seconds
         decoding_locality_measures
 
+        # 1D continuous / BATCH-style (n_x, n_t) + xbin:
+        decoding_locality_1d = DecodingLocalityMeasures.init_from_1d_decode_result(...)
+
     """
     _VersionedResultMixin_version: str = "2025.12.15_0" # to be updated in your IMPLEMENTOR to indicate its version
 
     time_window_centers: NDArray[ND.Shape["N_TIME_BINS"], np.floating] = serialized_field()
     pos_df: pd.DataFrame = serialized_field()
     xbin: NDArray = serialized_field()
-    ybin: NDArray = serialized_field()
     xbin_centers: NDArray = serialized_field()
-    ybin_centers: NDArray = serialized_field()
-    p_x_given_n: NDArray[ND.Shape["N_X_BINS, N_Y_BINS, 2, N_TIME_BINS"], np.floating] = serialized_field()
+    p_x_given_n: NDArray = serialized_field()
+    new_positions: NDArray = serialized_field()
+    ## Optional / 1D-compatible (default None preserves 2D pickle loads via spatial_ndim=2)
+    ybin: Optional[NDArray] = serialized_field(default=None)
+    ybin_centers: Optional[NDArray] = serialized_field(default=None)
+    paradigm_epochs_df: Optional[pd.DataFrame] = serialized_field(default=None)
     epoch_names: List[str] = serialized_field(default=Factory(list))
     interpolator: Optional[interp1d] = non_serialized_field(default=None, is_computable=False)
-    paradigm_epochs_df: pd.DataFrame = serialized_field()
     defer_compute_on_init: bool = non_serialized_field(default=False, is_computable=False)
+    spatial_ndim: int = serialized_attribute_field(default=2)
 
-    ## computed
-    new_positions: NDArray[ND.Shape["N_TIME_BINS, 2"], np.floating] = serialized_field()
-    
     ## one of these for each context (e.g. maze1, maze2 or ['roam', 'sprinkle'], etc
     sigma: Optional[float] = serialized_attribute_field(default=None, is_computable=True)
-    gaussian_volume: Optional[Union[NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating], 'SparseGaussianVolume']] = serialized_field(default=None, is_computable=True)
+    gaussian_volume: Optional[Union[NDArray, 'SparseGaussianVolume']] = serialized_field(default=None, is_computable=True)
 
-    p_x_given_n_dict: Dict[str, NDArray[ND.Shape["N_X_BINS, N_Y_BINS, N_TIME_BINS"], np.floating]] = serialized_field(default=None, is_computable=True)
+    p_x_given_n_dict: Dict[str, NDArray] = serialized_field(default=None, is_computable=True)
 
     ## locality comparisons:
     # decoding_meas_pos_locality_measure_dict: Dict[str, NDArray[ND.Shape["N_TIME_BINS"], np.floating]] = serialized_field(default=Factory(dict))
@@ -617,6 +707,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     @property
     def n_total_pos_bins(self) -> int:
         """The n_total_pos_bins property."""
+        if int(self.spatial_ndim) == 1:
+            return int(len(self.xbin_centers))
         return int(len(self.xbin_centers) * len(self.ybin_centers))
 
 
@@ -625,6 +717,15 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """ the processed position_df 
         """
         measured_positions_df: pd.DataFrame = self.pos_df.copy()
+        if int(self.spatial_ndim) == 1:
+            pos_col: str = 'lin_pos' if ('lin_pos' in measured_positions_df.columns) else 'x'
+            measured_positions_df = measured_positions_df.dropna(how='any', subset=['t', pos_col])
+            if pos_col != 'x':
+                measured_positions_df = measured_positions_df.copy()
+                measured_positions_df['x'] = measured_positions_df[pos_col]
+            measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=self.xbin, ybin_edges=None)
+            measured_positions_df = measured_positions_df[measured_positions_df['binned_x'].notna()]
+            return measured_positions_df
         # measured_positions_df = measured_positions_df.drop(columns=['binned_x', 'binned_y'], inplace=False)
         measured_positions_df = measured_positions_df.dropna(how='any', subset=['t', 'x', 'y'])
         measured_positions_df = measured_positions_df.position.adding_binned_position_columns(xbin_edges=self.xbin, ybin_edges=self.ybin)
@@ -647,7 +748,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
     @classmethod
     def init_from_decode_result(cls, curr_active_pipeline, directional_decoders_decode_result, extant_decoded_time_bin_size: Union[float, DecodingContinuousCacheKey] = 0.25, extant_decoded_slideby: Optional[float] = None, sigma: Optional[float] = None) -> "DecodingLocalityMeasures":
-        """ 
+        """2D-only constructor from pseudo2D continuous decode + ``(x,y)`` measured position.
         _obj: PredictiveDecoding = DecodingLocalityMeasures.init_from_decode_result(
         """
         _lookup_key = normalize_continuous_decoding_cache_lookup_key(extant_decoded_time_bin_size, extant_decoded_slideby)
@@ -683,21 +784,76 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                    xbin_centers=directional_decoders_decode_result.pseudo2D_decoder.xbin_centers.copy(), ybin_centers=directional_decoders_decode_result.pseudo2D_decoder.ybin_centers.copy(),
                    new_positions=new_positions, interpolator=interpolator, p_x_given_n=p_x_given_n,
                    paradigm_epochs_df=paradigm_epochs_df, epoch_names=epoch_names,
-                   sigma=sigma)
+                   sigma=sigma, spatial_ndim=2)
         return _obj
 
 
     @classmethod
-    def perform_build_normalized_outputs(cls, p_x_given_n, epoch_names: List[str]):
-        """ Normalize: self.p_x_given_n_dict and self.moving_avg over the decoer time period ('sprinkle', 'roam')
+    def init_from_1d_decode_result(cls, curr_active_pipeline, p_x_given_n: NDArray, time_window_centers: NDArray, xbin: NDArray, xbin_centers: NDArray, epoch_names: Optional[List[str]] = None, sigma: Optional[float] = None, paradigm_epochs_df: Optional[pd.DataFrame] = None, pos_df: Optional[pd.DataFrame] = None) -> "DecodingLocalityMeasures":
+        """1D constructor from continuous / BATCH-style posterior ``(n_x, n_contexts, n_t)`` or ``(n_x, n_t)``.
 
+        Interpolates measured 1D position (``lin_pos`` if present else ``x``) onto ``time_window_centers``.
+        Sets ``spatial_ndim=1`` and ``ybin`` / ``ybin_centers`` to ``None``.
         """
-        def _subfn_renormalize_marginal(a_context_included_pdf):
+        time_window_centers = np.asarray(time_window_centers, dtype=float)
+        p_x_given_n = np.asarray(p_x_given_n, dtype=float)
+        if p_x_given_n.ndim == 2:
+            # (n_x, n_t) → single context stack (n_x, 1, n_t)
+            p_x_given_n = p_x_given_n[:, np.newaxis, :]
+        elif p_x_given_n.ndim != 3:
+            raise ValueError(f'init_from_1d_decode_result expects p_x_given_n shape (n_x, n_t) or (n_x, n_contexts, n_t); got {p_x_given_n.shape}')
+
+        n_contexts: int = int(p_x_given_n.shape[1])
+        if epoch_names is None:
+            epoch_names = [f'context_{i}' for i in range(n_contexts)]
+        elif len(epoch_names) != n_contexts:
+            raise ValueError(f'epoch_names length {len(epoch_names)} != n_contexts {n_contexts}')
+
+        if pos_df is None:
+            pos_df = curr_active_pipeline.sess.position.to_dataframe().copy()
+        else:
+            pos_df = pos_df.copy()
+
+        pos_col: str = 'lin_pos' if ('lin_pos' in pos_df.columns) else 'x'
+        interpolator = interp1d(pos_df['t'].to_numpy(), pos_df[pos_col].to_numpy(), kind='linear', axis=0, fill_value="extrapolate")
+        new_positions = np.asarray(interpolator(time_window_centers), dtype=float)[:, np.newaxis]  # (n_t, 1)
+
+        if paradigm_epochs_df is None:
+            try:
+                paradigm_epochs_df = curr_active_pipeline.sess.epochs.to_dataframe().copy()
+                paradigm_epochs_df = paradigm_epochs_df.epochs.label_slice(epoch_names)
+            except Exception:
+                paradigm_epochs_df = None
+
+        _obj = cls(time_window_centers=time_window_centers, pos_df=pos_df,
+                   xbin=np.asarray(xbin, dtype=float).copy(), ybin=None,
+                   xbin_centers=np.asarray(xbin_centers, dtype=float).copy(), ybin_centers=None,
+                   new_positions=new_positions, interpolator=interpolator, p_x_given_n=p_x_given_n,
+                   paradigm_epochs_df=paradigm_epochs_df, epoch_names=list(epoch_names),
+                   sigma=sigma, spatial_ndim=1)
+        return _obj
+
+
+    @classmethod
+    def perform_build_normalized_outputs(cls, p_x_given_n, epoch_names: List[str], spatial_ndim: int = 2):
+        """ Normalize: self.p_x_given_n_dict over paradigm contexts.
+
+        2D: ``p_x_given_n`` shape ``(n_x, n_y, n_contexts, n_t)`` → per-context ``(n_x, n_y, n_t)``.
+        1D: ``p_x_given_n`` shape ``(n_x, n_contexts, n_t)`` or ``(n_x, n_t)`` → per-context ``(n_x, n_t)``.
+        """
+        def _subfn_renormalize_marginal_2d(a_context_included_pdf):
             # np.shape(a_moving_avg)
             ## renormalize over context:
             norm_sums = np.nansum(a_context_included_pdf, axis=(0, 1))
             is_nonzero = np.nonzero(norm_sums)
             a_context_included_pdf[:, :, is_nonzero] = a_context_included_pdf[:, :, is_nonzero] / norm_sums[is_nonzero]
+            return a_context_included_pdf
+
+
+        def _subfn_renormalize_marginal_1d(a_context_included_pdf):
+            norm_sums = np.nansum(a_context_included_pdf, axis=0)
+            is_nonzero = np.nonzero(norm_sums)
+            a_context_included_pdf[:, is_nonzero] = a_context_included_pdf[:, is_nonzero] / norm_sums[is_nonzero]
             return a_context_included_pdf
 
 
@@ -707,13 +863,32 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         ## INPUTS: quantities to renormalize
         p_x_given_n_dict = {}
+        spatial_ndim = int(spatial_ndim)
+
+        if spatial_ndim == 1:
+            if p_x_given_n.ndim == 2:
+                # already (n_x, n_t) single context
+                if len(epoch_names) != 1:
+                    raise ValueError(f'1D p_x_given_n shape {p_x_given_n.shape} implies one context but epoch_names={epoch_names}')
+                p_x_given_n_dict[epoch_names[0]] = _subfn_renormalize_marginal_1d(deepcopy(p_x_given_n))
+                return p_x_given_n_dict
+            if p_x_given_n.ndim != 3:
+                raise ValueError(f'1D perform_build_normalized_outputs expects (n_x, n_contexts, n_t) or (n_x, n_t); got {p_x_given_n.shape}')
+            for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
+                a_p_x_given_n = deepcopy(np.squeeze(p_x_given_n[:, an_epoch_idx, :]))
+                if a_p_x_given_n.ndim == 1:
+                    a_p_x_given_n = a_p_x_given_n[:, np.newaxis]
+                a_p_x_given_n = _subfn_renormalize_marginal_1d(a_p_x_given_n)
+                p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
+            ## END for an_epoch_idx, an_epoch_name in enumerate(epoch_names)...
+            return p_x_given_n_dict
 
         # for an_epoch_idx, (an_epoch_name, a_plotter) in enumerate(sync_plotters.items()):
         for an_epoch_idx, an_epoch_name in enumerate(epoch_names):
             ## "epoch" in the loop variables refers to only the session.paradigm epochs, like ['roam', 'sprinkle']
 
             a_p_x_given_n = deepcopy(np.squeeze(p_x_given_n[:, :, an_epoch_idx, :]))
-            a_p_x_given_n = _subfn_renormalize_marginal(a_p_x_given_n)
+            a_p_x_given_n = _subfn_renormalize_marginal_2d(a_p_x_given_n)
             p_x_given_n_dict[an_epoch_name] = a_p_x_given_n
 
         ## END for an_epoch_idx, an_epoch_n...
@@ -732,7 +907,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         Updates: self.
             .moving_avg_dict, .moving_avg_meas_pos_overlap_dict, .gaussian_volume, .decoding_meas_pos_locality_measure_dict
         """
-        self.p_x_given_n_dict = self.perform_build_normalized_outputs(p_x_given_n=self.p_x_given_n, epoch_names=self.epoch_names)
+        self.p_x_given_n_dict = self.perform_build_normalized_outputs(p_x_given_n=self.p_x_given_n, epoch_names=self.epoch_names, spatial_ndim=getattr(self, 'spatial_ndim', 2))
 
     
 
@@ -760,7 +935,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         achieving >90% memory reduction when most Gaussian values are near-zero.
         
         gaussian_volume = _obj._build_sampled_pos_with_gaussian_spread(sigma=1.0)
-        gaussian_volume.shape # (42, 64, 103948)
+        gaussian_volume.shape # (42, 64, 103948) 2D; (n_x, n_t) for 1D
         
         Args:
             sigma: Optional sigma value. If None, uses self.sigma (must be set)
@@ -771,6 +946,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                 raise ValueError("sigma must be provided either as argument or set on self.sigma")
             sigma = self.sigma
 
+        if int(getattr(self, 'spatial_ndim', 2)) == 1:
+            return SparseGaussianVolume.build_from_positions_1d(xbin_centers=self.xbin_centers, new_positions_1d=self.new_positions, sigma=sigma)
         return SparseGaussianVolume.build_from_positions(xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers, new_positions=self.new_positions, sigma=sigma)
 
 
@@ -779,11 +956,14 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         Builds: .gaussian_volume, .p_x_given_n_dict, .sigma
         
         """
+        spatial_ndim: int = int(getattr(self, 'spatial_ndim', 2))
         if self.sigma is None:
             x_step: float = np.nanmean(np.diff(self.xbin))
-            y_step: float = np.nanmean(np.diff(self.ybin))
-
-            self.sigma = np.nanmax([x_step, y_step]) * 5.0
+            if spatial_ndim == 1:
+                self.sigma = float(x_step) * 5.0
+            else:
+                y_step: float = np.nanmean(np.diff(self.ybin))
+                self.sigma = np.nanmax([x_step, y_step]) * 5.0
             print(f'sigma: {self.sigma}')
             
         print(f'building sampled and normalized outputs...')
@@ -794,7 +974,19 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         if (self.p_x_given_n_dict is None) or (len(self.p_x_given_n_dict) == 0):
             self.build_normalized_outputs()
             
-        if (self.xbin is not None) and (self.ybin is not None):
+        if spatial_ndim == 1:
+            if (self.xbin is not None) and (self.pos_df is not None):
+                pos_col: str = 'lin_pos' if ('lin_pos' in self.pos_df.columns) else 'x'
+                self.pos_df = self.pos_df.dropna(how='any', subset=['t', pos_col])
+                if (pos_col != 'x') and ('x' not in self.pos_df.columns):
+                    self.pos_df = self.pos_df.copy()
+                    self.pos_df['x'] = self.pos_df[pos_col]
+                try:
+                    self.pos_df = self.pos_df.position.adding_binned_position_columns(xbin_edges=self.xbin, ybin_edges=None)
+                    self.pos_df = self.pos_df[self.pos_df['binned_x'].notna()]
+                except Exception:
+                    pass
+        elif (self.xbin is not None) and (self.ybin is not None):
             self.pos_df = self.pos_df.dropna(how='any', subset=['t', 'x', 'y'])
             self.pos_df = self.pos_df.position.adding_binned_position_columns(xbin_edges=self.xbin, ybin_edges=self.ybin)
             self.pos_df = self.pos_df[(self.pos_df['binned_x'].notna()) & (self.pos_df['binned_y'].notna())] # Filter rows based on columns: 'binned_x', 'binned_y'
@@ -808,20 +1000,25 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     # ==================================================================================================================================================================================================================================================================================== #
     @classmethod
     @function_attributes(short_name=None, tags=['compute', 'locality', 'static'], input_requires=[], output_provides=[], uses=[], used_by=['.compute_locality_measures'], creation_date='2025-12-23 21:00', related_items=[])
-    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: NDArray, gaussian_volume: Optional[Union[NDArray, 'SparseGaussianVolume']]=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, alpha_list = [0.8], enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=False) -> Dict[str, Any]:
+    def compute_locality_measures_for_posterior(cls, a_p_x_given_n: NDArray, xbin_centers: NDArray, ybin_centers: Optional[NDArray] = None, gaussian_volume: Optional[Union[NDArray, 'SparseGaussianVolume']]=None, n_total_pos_bins: Optional[int] = None, min_val_epsilon: float = 1e-9, alpha_list = [0.8], enable_debug_outputs: bool = True, earthmovers_fn: Optional[Callable] = None, debug_print: bool=False, spatial_ndim: Optional[int] = None) -> Dict[str, Any]:
         """Computes all locality measures for a given posterior probability distribution.
         
         This is a completely independent classmethod that can be called without an instance.
+
+        Dimension dispatch:
+            - ``(n_x, n_y, n_t)`` → 2D path (PeakPromenence 2D, axis=(0,1) reductions)
+            - ``(n_x, n_t)`` or ``ybin_centers is None`` → 1D path (PeakPromenence 1D, axis=0 reductions)
         
         Args:
-            a_p_x_given_n: NDArray with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the posterior probability distribution
-            gaussian_volume: NDArray or SparseGaussianVolume with shape (N_X_BINS, N_Y_BINS, N_TIME_BINS) - the gaussian spread volume
+            a_p_x_given_n: NDArray shape ``(N_X_BINS, N_Y_BINS, N_TIME_BINS)`` (2D) or ``(N_X_BINS, N_TIME_BINS)`` (1D)
+            gaussian_volume: NDArray or SparseGaussianVolume matching posterior spatial/time shape
             xbin_centers: NDArray - x-axis bin centers
-            ybin_centers: NDArray - y-axis bin centers
-            n_total_pos_bins: Optional[int] - total number of position bins (computed from xbin_centers/ybin_centers if None)
+            ybin_centers: Optional NDArray - y-axis bin centers (required for 2D; None forces 1D)
+            n_total_pos_bins: Optional[int] - total number of position bins (computed from bins if None)
             min_val_epsilon: float - minimum value threshold (default: 1e-9)
             enable_debug_outputs: bool - whether to compute and return debug outputs (default: True)
             earthmovers_fn: Optional[Callable] - optional function for computing earthmovers distance (default: None)
+            spatial_ndim: Optional[int] - force 1 or 2; else inferred from posterior shape / ybin_centers
             
         Returns:
             Dict[str, Any] containing:
@@ -845,7 +1042,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             except (ValueError, AttributeError):
                 return np.nan
         
-        def _subfn_pdf_spatial_distances(gaussian_volume, a_p_x_given_n, xbin_centers, ybin_centers):
+        def _subfn_pdf_spatial_distances_2d(gaussian_volume, a_p_x_given_n, xbin_centers, ybin_centers):
             """
             Computes the Euclidean distance between the expected positions (COM) of 
             two 2D probability distributions using vectorized weighted averages.
@@ -893,16 +1090,58 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             distances_spatial_frac_max = distances_spatial / max_possible_distance
             
             return distances_spatial, distances_spatial_frac_max
-        
+
+
+        def _subfn_pdf_spatial_distances_1d(gaussian_volume, a_p_x_given_n, xbin_centers):
+            """1D COM distance along xbin_centers; max_possible_distance = ptp(xbin_centers)."""
+            pdf_cmp = a_p_x_given_n
+
+            if isinstance(gaussian_volume, SparseGaussianVolume):
+                marg_x_obj, _marg_y = gaussian_volume.marginal_sums()
+            else:
+                marg_x_obj = np.asarray(gaussian_volume)
+
+            marg_x_cmp = np.asarray(pdf_cmp)
+
+            denom_x_obj = np.sum(marg_x_obj, axis=0)
+            denom_x_obj[denom_x_obj == 0] = 1.0
+            x_obj = np.sum(marg_x_obj * xbin_centers[:, np.newaxis], axis=0) / denom_x_obj
+
+            denom_x_cmp = np.sum(marg_x_cmp, axis=0)
+            denom_x_cmp[denom_x_cmp == 0] = 1.0
+            x_cmp = np.sum(marg_x_cmp * xbin_centers[:, np.newaxis], axis=0) / denom_x_cmp
+
+            distances_spatial = np.abs(x_obj - x_cmp)
+            max_possible_distance = float(np.ptp(xbin_centers))
+            if max_possible_distance == 0:
+                distances_spatial_frac_max = np.zeros_like(distances_spatial)
+            else:
+                distances_spatial_frac_max = distances_spatial / max_possible_distance
+            return distances_spatial, distances_spatial_frac_max
+
+        # Infer spatial_ndim
+        if spatial_ndim is None:
+            if (ybin_centers is None) or (a_p_x_given_n.ndim == 2):
+                spatial_ndim = 1
+            elif a_p_x_given_n.ndim == 3:
+                spatial_ndim = 2
+            else:
+                raise ValueError(f'Cannot infer spatial_ndim from a_p_x_given_n.shape={a_p_x_given_n.shape}')
+        spatial_ndim = int(spatial_ndim)
+
         # Compute n_total_pos_bins if not provided
         if n_total_pos_bins is None:
             assert (xbin_centers is not None)
-            assert (ybin_centers is not None)
-            n_total_pos_bins = int(len(xbin_centers) * len(ybin_centers))
+            if spatial_ndim == 1:
+                n_total_pos_bins = int(len(xbin_centers))
+            else:
+                assert (ybin_centers is not None)
+                n_total_pos_bins = int(len(xbin_centers) * len(ybin_centers))
         
         # Initialize result dictionary
         result_dict: Dict[str, Any] = {}
         debug_dict: Dict[str, Any] = {}
+        spatial_reduce_axes = 0 if (spatial_ndim == 1) else (0, 1)
         
         # ==================================================================================================================================================================================================================================================================================== #
         # do all computation measures                                                                                                                                                                                                                                                          #
@@ -933,8 +1172,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         ## above a certain promence ideally:
         # alpha: float = 0.8 # above 85% of the peak height of the centeral peak
         # alpha_list = [0.5, 0.8]
-        
-        epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
+
+        if spatial_ndim == 1:
+            epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_1d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list)
+        else:
+            epoch_promenence_tuples, epoch_masks_list = PeakPromenence.compute_2d_dt_posterior_peak_promenences(a_p_x_given_n=a_p_x_given_n, alpha=alpha_list) # (103948, 1, 41, 63)
         epoch_masks_dict = dict(zip(alpha_list, epoch_masks_list))            
         a_high_alpha: float = alpha_list[-1]
         an_alpha_epoch_masks: NDArray = epoch_masks_dict[a_high_alpha] ## get the high mask
@@ -972,19 +1214,22 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
 
         # result_dict[f"{a_computation_measure_name}_score"] = [(np.nansum(np.stack(an_epoch_mask, axis=-1), axis=(0, 1))/n_total_pos_bins) for an_epoch_idx, an_epoch_mask in enumerate(all_epochs_masks)]
-        result_dict[f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1))
+        result_dict[f"{a_computation_measure_name}_num_bins"] = np.nansum(an_alpha_epoch_masks, axis=spatial_reduce_axes)
         # result_dict[f"{a_computation_measure_name}_score"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(n_total_pos_bins))
 
-        ## ⚓ Decoded 2D Posterior Specificity - Metrics using the promenence mask
+        ## ⚓ Decoded Posterior Specificity - Metrics using the promenence mask
 
         ## Focality/Diffusivity: Number of bins in in the 90% promenence mask over the total number of bins --> [0.0, 1.0]
             ## definitionally the 90% promenance mask bins must be together/contiguous spatially, as outliers are considered different peaks.
-        result_dict[f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=(0, 1))/float(n_total_pos_bins))
+        result_dict[f"{a_computation_measure_name}_Focality"] = (np.nansum(an_alpha_epoch_masks, axis=spatial_reduce_axes)/float(n_total_pos_bins))
 
         ## Sharpness/Peakiness: Number of bins in the 90% promenence mask over the number of bins exceeding 90% of the promenence peak height -- specifically looks at the area of the mean peak compared to the off-peak non-contiguous areas of similar heights
         # result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
         if all_t_bin_peak_heights is not None:
-            result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+            if spatial_ndim == 1:
+                result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=0) / np.array([np.nansum((a_p_x_given_n[:, i] >= (a_peak_height * alpha_list[-1])), axis=0) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
+            else:
+                result_dict[f"{a_computation_measure_name}_Peakiness"] = np.nansum(an_alpha_epoch_masks, axis=(0, 1)) / np.array([np.nansum((a_p_x_given_n[:, :, i] >= (a_peak_height * alpha_list[-1])), axis=(0, 1)) if not np.isnan(a_peak_height) else np.nan for i, a_peak_height in enumerate(all_t_bin_peak_heights)])
         else:
             result_dict[f"{a_computation_measure_name}_Peakiness"] = np.full(a_p_x_given_n.shape[-1], np.nan)
 
@@ -1000,14 +1245,18 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             raise e
         
 
-        if (gaussian_volume is not None) and (xbin_centers is not None) and (ybin_centers is not None):
-            a_computation_measure_name: str = 'dist_to_highest_peak'
-            if debug_print:
-                print(f'\tcomputing: "{a_computation_measure_name}"...')
-            ## above a certain promence ideally:
-            # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
-            distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
-            result_dict[a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
+        if (gaussian_volume is not None) and (xbin_centers is not None):
+            if (spatial_ndim == 1) or (ybin_centers is not None):
+                a_computation_measure_name: str = 'dist_to_highest_peak'
+                if debug_print:
+                    print(f'\tcomputing: "{a_computation_measure_name}"...')
+                ## above a certain promence ideally:
+                # peak_locations = np.argmax(a_p_x_given_n, axis=(0, 1))
+                if spatial_ndim == 1:
+                    distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances_1d(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers)
+                else:
+                    distances_spatial, distances_spatial_frac_max = _subfn_pdf_spatial_distances_2d(gaussian_volume=gaussian_volume, a_p_x_given_n=a_p_x_given_n, xbin_centers=xbin_centers, ybin_centers=ybin_centers)
+                result_dict[a_computation_measure_name] = distances_spatial_frac_max ## the "overlap" is computed by taking the elementwise dot-product with the moving average
         
 
         # a_computation_measure_name: str = 'dist_to_nearest_peak'
@@ -1101,7 +1350,8 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                 n_total_pos_bins=self.n_total_pos_bins,
                 min_val_epsilon=min_val_epsilon,
                 enable_debug_outputs=enable_debug_outputs,
-                earthmovers_fn=active_subfn_compute_earthmovers_fn
+                earthmovers_fn=active_subfn_compute_earthmovers_fn,
+                spatial_ndim=getattr(self, 'spatial_ndim', 2),
             )
 
             # Extract results into self.locality_measures_dict_dict[an_epoch_name]
@@ -1126,24 +1376,31 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
     
 
     @classmethod
-    def perform_build_locality_measures_df(cls, locality_measures_dict_dict: Dict[str, Dict], time_window_centers: NDArray, paradigm_epochs_df: Optional[pd.DataFrame]=None, xbin_centers=None, ybin_centers=None):
+    def perform_build_locality_measures_df(cls, locality_measures_dict_dict: Dict[str, Dict], time_window_centers: NDArray, paradigm_epochs_df: Optional[pd.DataFrame]=None, xbin_centers=None, ybin_centers=None, spatial_ndim: int = 2):
         """ builds the measures_df
         """
         # _out_locality_measures_df = pd.DataFrame(self.decoding_meas_pos_locality_measure_dict)
         locality_measures_df: pd.DataFrame = pd.DataFrame(time_window_centers, columns=['t'])
         # _out_locality_measures_df['t'] = self.time_window_centers
+        spatial_ndim = int(spatial_ndim)
 
         for an_epoch_name, v in locality_measures_dict_dict.items():
             for a_computation_measure_name, vv in v.items():
                 if (a_computation_measure_name == 'mask_overlap'):
                     assert xbin_centers is not None
-                    assert ybin_centers is not None
-                    total_num_possible_bins: int = len(xbin_centers) * len(ybin_centers)
-                    vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
+                    if spatial_ndim == 1:
+                        total_num_possible_bins: int = len(xbin_centers)
+                        vv = np.nansum(vv, 0) / total_num_possible_bins
+                    else:
+                        assert ybin_centers is not None
+                        total_num_possible_bins: int = len(xbin_centers) * len(ybin_centers)
+                        vv = np.nansum(vv, (0, 1)) / total_num_possible_bins
                 if a_computation_measure_name == 'peak_prom':                    
                     continue ## skip
                 
                 locality_measures_df[f"{a_computation_measure_name}_{an_epoch_name}"] = vv # _obj.locality_measures_dict_dict[an_epoch_name][a_computation_measure_name]
+            ## END for a_computation_measure_name, vv in v.items()...
+        ## END for an_epoch_name, v in locality_measures_dict_dict.items()...
 
 
 
@@ -1164,6 +1421,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
                 locality_measures_df.loc[is_epoch_idx, 'is_non_local_period'] =  np.logical_and((locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_epoch_idx] >= 0.4), (locality_measures_df[f'mask_overlap_{an_epoch_name}'][is_epoch_idx] < 0.1))
 
                 # _out_locality_measures_df.loc[is_sprinkle, 'is_non_local_period'] =  (_out_locality_measures_df[f'dist_to_highest_peak_{an_epoch_name}'][is_sprinkle] >= 0.4)
+            ## END for an_epoch_name, v in locality_measures_dict_dict.items()...
 
         return locality_measures_df
 
@@ -1182,7 +1440,7 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
             
         """
         self.locality_measures_df = self.perform_build_locality_measures_df(locality_measures_dict_dict=self.locality_measures_dict_dict, time_window_centers=self.time_window_centers, paradigm_epochs_df=self.paradigm_epochs_df,
-                                                                                                    xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers)
+                                                                                                    xbin_centers=self.xbin_centers, ybin_centers=self.ybin_centers, spatial_ndim=getattr(self, 'spatial_ndim', 2))
         return self.locality_measures_df
 
 
@@ -1213,6 +1471,11 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items():
             if a_field_name not in state:
                 state[a_field_name] = a_default_restore_value
+        ## END for a_field_name, a_default_restore_value in _non_pickled_field_restore_defaults.items()...
+
+        # Old 2D pickles may lack spatial_ndim / optional ybins
+        if 'spatial_ndim' not in state:
+            state['spatial_ndim'] = 2 if (state.get('ybin_centers') is not None) else 1
 
         self.__dict__.update(state)
         # # Call the superclass __init__() (from https://stackoverflow.com/a/48325758)
@@ -1263,11 +1526,24 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
         """ downsample all of the position dependent properties and returns a downsampled copy of itself. 
 
         decoding_locality_measures = decoding_locality_measures.downsampling_spatial_data()
+
+        2D default: ``spatial_axes=(0,1,2)``, ``factors=(5,5)``, ``axes=(0,1)``.
+        1D: uses ``spatial_axes=(0,)``, ``factors=(k,)``, ``axes=(0,)`` (or caller-supplied equivalents).
         """
         from neuropy.utils.probability_downsampling import RigorousPDFDownsampler
         from neuropy.utils.mixins.binning_helpers import get_bin_edges
 
         downsampled_decoding_locality_measures = deepcopy(self) ## make a copy of self
+        spatial_ndim: int = int(getattr(self, 'spatial_ndim', 2))
+
+        if spatial_ndim == 1:
+            # 1D stack is typically (n_x, n_contexts, n_t) — spatial axis 0 only
+            if spatial_axes == (0, 1, 2):
+                spatial_axes = (0,)
+            if factors == (5, 5):
+                factors = (5,)
+            if axes == (0, 1):
+                axes = (0,)
         
         p_x_given_n = downsampled_decoding_locality_measures.p_x_given_n ## np.shape(p_x_given_n) # (62, 62, 2, 151732)
         fine_pdf = p_x_given_n
@@ -1288,16 +1564,18 @@ class DecodingLocalityMeasures(ComputedResult): #PickleSerializableMixin, AttrsB
 
         # Update spatial bin centers
         downsampled_decoding_locality_measures.xbin_centers = coarse_bins[0]
-        downsampled_decoding_locality_measures.ybin_centers = coarse_bins[1]
-
-        # Compute bin edges from centers
         downsampled_decoding_locality_measures.xbin = get_bin_edges(downsampled_decoding_locality_measures.xbin_centers)
-        downsampled_decoding_locality_measures.ybin = get_bin_edges(downsampled_decoding_locality_measures.ybin_centers)
-
-        # Update sigma based on new bin sizes
         x_step = coarse_bin_sizes[0]
-        y_step = coarse_bin_sizes[1]
-        downsampled_decoding_locality_measures.sigma = np.nanmax([x_step, y_step]) * 5.0
+
+        if spatial_ndim == 1:
+            downsampled_decoding_locality_measures.ybin_centers = None
+            downsampled_decoding_locality_measures.ybin = None
+            downsampled_decoding_locality_measures.sigma = float(x_step) * 5.0
+        else:
+            downsampled_decoding_locality_measures.ybin_centers = coarse_bins[1]
+            downsampled_decoding_locality_measures.ybin = get_bin_edges(downsampled_decoding_locality_measures.ybin_centers)
+            y_step = coarse_bin_sizes[1]
+            downsampled_decoding_locality_measures.sigma = np.nanmax([x_step, y_step]) * 5.0
 
         # Reset computed fields that depend on spatial bins
         downsampled_decoding_locality_measures.gaussian_volume = None

@@ -160,6 +160,46 @@ class TestPositionLikePosteriorScoring1D(unittest.TestCase):
         with h5py.File(fixture, 'r') as h:
             self.assertGreater(len(h.keys()), 0)
 
+    def test_should_use_1d_pli_detection(self):
+        n_x, n_y, n_t = self.n_pos, 12, 7
+        x_edges = self.x_edges
+        y_edges = np.linspace(-50.0, 50.0, n_y + 1)
+        self.assertTrue(self.PLS._should_use_1d_pli(np.ones(n_x), x_edges=x_edges, y_edges=None))
+        self.assertFalse(self.PLS._should_use_1d_pli(np.ones((n_x, n_y)), x_edges=x_edges, y_edges=y_edges))
+        self.assertTrue(self.PLS._should_use_1d_pli(np.ones((n_x, n_t)), x_edges=x_edges, y_edges=None))
+        self.assertTrue(self.PLS._should_use_1d_pli(np.ones((n_x, n_t)), x_edges=x_edges, y_edges=y_edges))  # n_t != n_y
+        self.assertTrue(self.PLS._should_use_1d_pli(np.ones((n_x, 1, n_t)), x_edges=x_edges, y_edges=y_edges))
+        self.assertFalse(self.PLS._should_use_1d_pli(np.ones((n_x, n_y, n_t)), x_edges=x_edges, y_edges=y_edges))
+
+    def test_calculate_pli_score_dispatches_to_1d(self):
+        P = np.zeros(self.n_pos, dtype=float)
+        P[self.n_pos // 2] = 1.0
+        score_via_main, comps_main = self.PLS.calculate_pli_score(P, x_edges=self.x_edges)
+        score_1d, comps_1d = self.PLS.calculate_pli_1d_score(P, x_edges=self.x_edges)
+        self.assertAlmostEqual(score_via_main, score_1d, places=10)
+        self.assertAlmostEqual(comps_main['sharpness'], comps_1d['sharpness'], places=10)
+        self.assertAlmostEqual(comps_main['locality'], comps_1d['locality'], places=10)
+
+    def test_calculate_pli_score_stays_2d_for_spatial_frame(self):
+        n_y = 10
+        y_edges = np.linspace(-50.0, 50.0, n_y + 1)
+        P = np.zeros((self.n_pos, n_y), dtype=float)
+        P[self.n_pos // 2, n_y // 2] = 1.0
+        score, comps = self.PLS.calculate_pli_score(P, x_edges=self.x_edges, y_edges=y_edges)
+        self.assertGreater(score, 0.95)
+        self.assertAlmostEqual(comps['rms_cm'], 0.0, places=5)
+
+    def test_compute_and_plot_posterior_stack_dispatches_1d(self):
+        rng = np.random.default_rng(2)
+        n_t = 9
+        stack = np.abs(rng.standard_normal((self.n_pos, n_t)))
+        stack = stack / np.sum(stack, axis=0, keepdims=True)
+        df = self.PLS.compute_and_plot_posterior_stack(stack, x_edges=self.x_edges, should_plot_results=False)
+        self.assertEqual(len(df), n_t)
+        self.assertIn('is_position_like_1d', df.columns)
+        self.assertIn('is_position_like', df.columns)
+        self.assertTrue(np.array_equal(df['is_position_like'].to_numpy(), df['is_position_like_1d'].to_numpy()))
+
 
 if __name__ == '__main__':
     unittest.main()
