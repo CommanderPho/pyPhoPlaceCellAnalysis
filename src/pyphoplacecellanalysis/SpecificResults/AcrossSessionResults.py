@@ -1800,7 +1800,7 @@ def copy_batch_output_figures_to_common_figures_dir(generate_figures_script_path
 
 
 @function_attributes(short_name=None, tags=['inst_fr', 'across_session'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2024-09-12 09:48', related_items=[])
-def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False, full_custom_suffix: Optional[str] = None):
+def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collected_outputs_path, instantaneous_time_bin_size_seconds_list: List[float], global_data_root_parent_path: Optional[Path] = None, debug_print=False, dry_run: bool = False, full_custom_suffix: Optional[str] = None, nested_result_date_staging: bool = True):
     """ Called on the batch processing computer (GreatLakes for example) in `ProcessBatchOutputs_*.ipynb` to collect batch-processing results from individual session folders and save `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
     
     File Outputs: `/collected_outputs/across_session_result_long_short_recomputed_inst_firing_rate_{BATCH_DATE_TO_USE}.pkl`
@@ -1808,6 +1808,13 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     Prefers suffixed session files when `full_custom_suffix` is provided:
         `{RESULT_DATE_TO_USE}{full_custom_suffix}_recomputed_inst_fr_comps_{time_bin_size}.pkl`
     Falls back to legacy unsuffixed names when the suffixed path is missing.
+
+    nested_result_date_staging (bool): controls per-session copy staging under ``collected_outputs_path``.
+        True (default / legacy notebook): ``{collected_outputs_path}/{RESULT_DATE_TO_USE}/recomputed_inst_fr_comps/``
+            — use when ``collected_outputs_path`` is the collected_outputs root.
+        False: ``{collected_outputs_path}/recomputed_inst_fr_comps/``
+            — use when ``collected_outputs_path`` is already a batch-dated folder (e.g. ``.../2026-11-02_GL``).
+    Merged across-session pickles are always written directly under ``collected_outputs_path``.
     
     """
     from pyphoplacecellanalysis.General.Batch.runBatch import get_file_path_if_file_exists
@@ -1899,11 +1906,15 @@ def copy_session_inst_fr_data_to_across_session_pkl(RESULT_DATE_TO_USE, collecte
     # Output Paths:
     target_dir: Path = collected_outputs_path
     custom_file_type_name: str = 'recomputed_inst_fr_comps'
+    if nested_result_date_staging:
+        staging_output_path_suffix: str = f'{RESULT_DATE_TO_USE}/{custom_file_type_name}'
+    else:
+        staging_output_path_suffix = custom_file_type_name
     if dry_run:
-        out_parent_path = target_dir.joinpath(f'{RESULT_DATE_TO_USE}/{custom_file_type_name}').resolve()
+        out_parent_path = target_dir.joinpath(staging_output_path_suffix).resolve()
         print(f'DRY-RUN: out_parent_path (not created): {out_parent_path}')
     else:
-        out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=f'{RESULT_DATE_TO_USE}/{custom_file_type_name}')
+        out_parent_path = AcrossSessionTables.make_all_combined_output_directory(override_output_parent_path=target_dir, output_path_suffix=staging_output_path_suffix)
 
     moved_files_dict_files, (filelist_path, filedict_out_path) = copy_session_folder_files_to_target_dir(good_session_concrete_folders, target_dir=out_parent_path, RESULT_DATE_TO_USE=RESULT_DATE_TO_USE, custom_file_types_dict=custom_file_types_dict, dry_run=dry_run, debug_print=debug_print)
 
