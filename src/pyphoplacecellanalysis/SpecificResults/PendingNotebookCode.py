@@ -7432,15 +7432,18 @@ from collections import deque
 from pyphoplacecellanalysis.Analysis.Decoder.reconstruction import DecodedFilterEpochsResult
 
 
-@metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
+@metadata_attributes(short_name=None, tags=['BEST', 'posterior', 'position-like', 'diffusivity', 'spread', '2D', '1D'], input_requires=[], output_provides=[], uses=[], used_by=[], creation_date='2026-01-08 08:52', related_items=[])
 class PositionLikePosteriorScoring:
     """
-    A utility class for calculating Position-Like Information (PLI) scores -- how "position-like" a given decoded 2D posterior probability is.
-    
-    using explicit bin edges for physical distance calculations.
+    Position-Like Information (PLI) scores -- how "position-like" a decoded posterior is.
+        using explicit bin edges for physical distance calculations.
+    IMPORTANT: 2D and 1D paths are **separate**. Do not mix cutoffs or APIs.
+      - 2D: ``calculate_pli_score`` / ``compute_and_plot_posterior_stack`` / ``filter_to_position_like_epochs_only``
+            expect ``(n_x, n_y)`` per time bin; locality σ uses arena **diagonal**; cutoffs ``0.42`` / ``0.7``.
+      - 1D: ``calculate_pli_1d_score`` / ``compute_and_plot_posterior_stack_1d`` / ``score_h5_loaded_decoder_epochs_1d``
+            expect ``(n_pos,)`` or ``(n_pos, n_t)``; locality σ uses **track length**; cutoffs ``*_1d``.
 
-
-    Usage:
+    ## 2D PLI (default)
 
         from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
 
@@ -7467,7 +7470,7 @@ class PositionLikePosteriorScoring:
             print(f"Shape of first epoch: {p_x_given_n_list[0].shape}")
 
 
-        ## INPUTS: p_x_given_n_list
+        ## INPUTS: p_x_given_n_list / flat_p_x_given_n_list with shape (n_x, n_y, n_t)
 
 
 
@@ -7484,32 +7487,73 @@ class PositionLikePosteriorScoring:
         scoring_results = PositionLikePosteriorScoring.compute_and_plot_posterior_stack(
             flat_p_x_given_n_list,
             x_edges=xbin,
-            y_edges=ybin, 
-            should_plot_results=False, 
+            y_edges=ybin,
+            should_plot_results=False,
         )
-
-
-        scoring_results
-
-
-
 
         page_idx: int = 200
         max_n_frames_to_plot = 60
-
         _ = PositionLikePosteriorScoring.compute_and_plot_posterior_stack(
-            flat_p_x_given_n_list[:, :, (max_n_frames_to_plot*page_idx):],
-            x_edges=xbin,
-            y_edges=ybin, 
-            should_plot_results=True,
-            max_n_frames_to_plot = max_n_frames_to_plot,
+                flat_p_x_given_n_list[:, :, (max_n_frames_to_plot*page_idx):],
+                x_edges=xbin,
+                y_edges=ybin, 
+                should_plot_results=True,
+                max_n_frames_to_plot = max_n_frames_to_plot,
+            )
+
+    ## 1D PLI (linear track / BATCH decoded_posteriors.h5)
+
+    BATCH ``(decoded_posteriors).h5`` files store **1D** ``p_x_given_n`` as ``(n_pos, n_t)`` per epoch
+    (from ``marginal_x``). They do **not** store ``xbin`` edges — only ``n_xbins``. Supply matching
+    ``x_edges`` from the directional decoder (``a_decoder.xbin``) with ``len(x_edges) == n_pos + 1``.
+
+    Do **not** reuse 2D cutoffs (``0.42`` / ``0.7``) on 1D scores.
+
+    1D cutoffs (``position_like_score_cutoff_1d=0.55``, ``high_quality_score_cutoff_1d=0.78``) were
+    calibrated on 5 kdiba BATCH ``*-(decoded_posteriors)*.h5`` files under ``K:/scratch/collected_outputs``
+    (gor01/two 2006-6-07 & 2006-6-09; gor01/one 2006-6-12; gor01/two 2006-6-12; pin01/one 11-03),
+    scoring each time bin as the **max** PLI-1D over ``long_LR/long_RL/short_LR/short_RL`` with
+    track-length σ=20% and approximate long-track edges ``linspace(59.08, 228.69, 60)``.
+    On that sample, lap median≈0.62 / lap 90th≈0.80; ripple bins tend to score *higher* (sharper)
+    than laps, so cutoffs target sharpness/locality rather than epoch-type separation.
+    For single-decoder scoring (e.g. only ``long_LR``), pass rates are lower — either take the
+    max across decoders or lower the cutoff for that use case.
+
+        from pathlib import Path
+        import numpy as np
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+        from pyphoplacecellanalysis.SpecificResults.PendingNotebookCode import PositionLikePosteriorScoring
+
+        load_path = Path(r"K:/scratch/collected_outputs/2026-10-28_GL-kdiba_gor01_two_2006-6-07_16-40-19__withNormalComputedReplays-qclu_[1, 2, 4, 6, 7, 8, 9]-frateThresh_2.0-(decoded_posteriors)_tbin-0.05.h5")
+        out_dict, _meta = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=load_path, debug_print=False)
+
+        decoder_name = "long_LR"
+        epochs_name = "ripple"  # or "laps"
+        epoch_idx = 0
+        p_x_given_n = out_dict[decoder_name][epochs_name]["p_x_given_n"][epoch_idx]  # (n_pos, n_t)
+
+        # Must match decode binning (not stored in H5) — e.g. from directional decoder .xbin:
+        x_edges = np.array(...)  # len(x_edges) == n_pos + 1
+
+        scoring_df = PositionLikePosteriorScoring.compute_and_plot_posterior_stack_1d(
+            p_x_given_n, x_edges=x_edges, should_plot_results=False,
+        )
+        # scoring_df columns: t_bin_idx, score, sharpness, locality, rms_cm, is_position_like_1d
+
+        # Score all epochs for one decoder/epoch-type in the loaded H5 dict:
+        all_epochs_df, per_epoch_dfs = PositionLikePosteriorScoring.score_h5_loaded_decoder_epochs_1d(
+            out_dict, decoder_name=decoder_name, epochs_name=epochs_name, x_edges=x_edges,
         )
 
-
-
     """
+    # 2D PLI cutoffs (arena-diagonal locality) — do not use on 1D scores
     high_quality_score_cutoff: float = 0.7
     position_like_score_cutoff: float = 0.42
+
+    # 1D PLI cutoffs (track-length locality). Calibrated separately from 2D; see class docstring (2026-11-04 kdiba BATCH).
+    high_quality_score_cutoff_1d: float = 0.78
+    position_like_score_cutoff_1d: float = 0.55
+    sigma_tolerated_track_length_percent_1d: float = 0.20
 
 
 
@@ -7626,14 +7670,12 @@ class PositionLikePosteriorScoring:
         return a_masked_result
 
 
-
-
-
-
     @classmethod
     def calculate_pli_score(cls, posterior, x_edges, y_edges, w_sharpness=0.4, w_locality=0.6, noise_threshold_percent=0.02, sigma_tolerated_env_diagonal_percent: float = 0.20):
         """
-        Calculates PLI score and returns individual components.
+        Calculates **2D** PLI score and returns individual components.
+
+        For ``(n_pos, n_time)`` BATCH 1D posteriors, use ``calculate_pli_1d_score`` / ``*_1d`` methods instead.
         """
         # 1. Preprocessing & Noise Filtering
         P = np.array(posterior, dtype=float)
@@ -7696,6 +7738,285 @@ class PositionLikePosteriorScoring:
         elif score >= cls.position_like_score_cutoff: return "Position-Like", "green"
         else: return "Ambiguous", "red"
 
+
+    # ==================================================================================================================================================================================================================================================================================== #
+    # 1D PLI — linear-track / BATCH H5 posteriors (separate from 2D APIs above/below)                                                                                                                                                                                                      #
+    # ==================================================================================================================================================================================================================================================================================== #
+
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior'], input_requires=[], output_provides=[], uses=[], used_by=['cls.compute_and_plot_posterior_stack_1d'], creation_date='2026-11-04 00:00', related_items=['cls.calculate_pli_score'])
+    @classmethod
+    def calculate_pli_1d_score(cls, posterior_1d, x_edges, w_sharpness=0.4, w_locality=0.6, noise_threshold_percent=0.02, sigma_tolerated_track_length_percent: Optional[float] = None):
+        """
+        Calculates **1D** PLI score for a single time-bin posterior ``(n_pos,)`` or ``(n_pos, 1)``.
+
+        Sharpness uses ``log(n_pos)``. Locality RMS is along the track only; σ is
+        ``sigma_tolerated_track_length_percent * track_length`` (default class attr ``0.20``).
+
+        Do not pass 2D ``(n_x, n_y)`` grids here — use ``calculate_pli_score`` instead.
+        """
+        if sigma_tolerated_track_length_percent is None:
+            sigma_tolerated_track_length_percent = cls.sigma_tolerated_track_length_percent_1d
+
+        P = np.asarray(posterior_1d, dtype=float)
+        if P.ndim == 2:
+            if P.shape[1] == 1:
+                P = P[:, 0]
+            elif P.shape[0] == 1:
+                P = P[0, :]
+            else:
+                raise ValueError(f'calculate_pli_1d_score expects a 1D posterior (n_pos,) or (n_pos, 1); got shape {P.shape}. For 2D (n_x, n_y) grids use calculate_pli_score.')
+        elif P.ndim != 1:
+            raise ValueError(f'calculate_pli_1d_score expects a 1D posterior; got ndim={P.ndim}, shape={P.shape}. For 2D use calculate_pli_score.')
+
+        peak_val = np.max(P)
+        if peak_val > 0:
+            P = P.copy()
+            P[P < (peak_val * noise_threshold_percent)] = 0.0
+
+        total_p = np.sum(P)
+        if total_p == 0 or np.isnan(total_p):
+            return 0.0, {'sharpness': 0.0, 'locality': 0.0, 'rms_cm': 0.0}
+
+        P = P / total_p
+        n_pos = int(P.shape[0])
+        x_edges = np.asarray(x_edges, dtype=float)
+        if len(x_edges) != (n_pos + 1):
+            raise ValueError(f'len(x_edges) must be n_pos+1={n_pos + 1}, got {len(x_edges)}')
+
+        bin_w_cm = float(np.abs(np.mean(np.diff(x_edges))))
+        track_length_cm = float(np.max(x_edges) - np.min(x_edges))
+
+        map_idx = int(np.argmax(P))
+
+        P_safe = P[P > 0]
+        entropy = -np.sum(P_safe * np.log(P_safe))
+        max_entropy = np.log(n_pos) if n_pos > 1 else 0.0
+        s_sharpness = 1.0 if max_entropy == 0 else 1.0 - (entropy / max_entropy)
+        s_sharpness = float(np.clip(s_sharpness, 0, 1))
+
+        indices = np.arange(n_pos, dtype=float)
+        dx = (indices - map_idx) * bin_w_cm
+        rms_dist = float(np.sqrt(np.sum(P * (dx ** 2))))
+
+        sigma_tolerated = track_length_cm * float(sigma_tolerated_track_length_percent)
+        if sigma_tolerated <= 0:
+            s_locality = 0.0
+        else:
+            s_locality = float(np.exp(-(rms_dist / sigma_tolerated)))
+
+        score = (w_sharpness * s_sharpness) + (w_locality * s_locality)
+        return float(score), {'sharpness': s_sharpness, 'locality': s_locality, 'rms_cm': rms_dist}
+
+
+    @classmethod
+    def get_pli_1d_quality_label(cls, score):
+        """Quality label using **1D** cutoffs (not 2D ``position_like_score_cutoff`` / ``high_quality_score_cutoff``)."""
+        if score >= cls.high_quality_score_cutoff_1d:
+            return "Position-Like HQ", "limegreen"
+        elif score >= cls.position_like_score_cutoff_1d:
+            return "Position-Like", "green"
+        else:
+            return "Ambiguous", "red"
+
+
+    @classmethod
+    def _normalize_posterior_1d_stack(cls, posterior_stack) -> NDArray:
+        """Normalize to ``(n_pos, n_t)``. Rejects 2D spatial stacks (use 2D APIs instead)."""
+        posterior_stack = np.asarray(posterior_stack, dtype=float)
+        if posterior_stack.ndim == 1:
+            return posterior_stack[:, np.newaxis]
+        if posterior_stack.ndim == 2:
+            # Ambiguous: (n_pos, n_t) is intended. A true 2D spatial grid (n_x, n_y) with n_y>1
+            # must not be scored here — callers with single-frame 2D should use calculate_pli_score.
+            # Convention: treat 2D arrays as (n_pos, n_t) for the 1D path (BATCH H5 layout).
+            return posterior_stack
+        if posterior_stack.ndim == 3:
+            raise ValueError(f'_normalize_posterior_1d_stack got 3D shape {posterior_stack.shape}; this looks like a 2D spatial stack (n_x, n_y, n_t). Use compute_and_plot_posterior_stack / calculate_pli_score instead.')
+        raise ValueError(f'_normalize_posterior_1d_stack expected 1D or 2D array (n_pos,) / (n_pos, n_t); got shape {posterior_stack.shape}')
+
+
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior', 'plot'], input_requires=[], output_provides=[], uses=['cls.calculate_pli_1d_score', 'cls.get_pli_1d_quality_label', 'cls._normalize_posterior_1d_stack'], used_by=['cls.score_h5_loaded_decoder_epochs_1d'], creation_date='2026-11-04 00:00', related_items=['cls.compute_and_plot_posterior_stack'])
+    @classmethod
+    def compute_and_plot_posterior_stack_1d(cls, posterior_stack, x_edges, noise_threshold_percent=0.02, should_plot_results=False, max_n_frames_to_plot: int = 20, cols: int = 5, debug_print: bool = False, position_like_score_cutoff_1d: Optional[float] = None, **pli_score_kwargs) -> pd.DataFrame:
+        """
+        Score a 1D posterior stack ``(n_pos, n_t)`` (BATCH H5 layout).
+
+        Returns a DataFrame with columns ``t_bin_idx``, ``score``, ``sharpness``, ``locality``, ``rms_cm``, ``is_position_like_1d``.
+        Uses ``position_like_score_cutoff_1d`` (not the 2D cutoff).
+        """
+        if position_like_score_cutoff_1d is None:
+            position_like_score_cutoff_1d = cls.position_like_score_cutoff_1d
+
+        posterior_stack = cls._normalize_posterior_1d_stack(posterior_stack)
+        n_pos, n_frames = posterior_stack.shape
+        x_edges = np.asarray(x_edges, dtype=float)
+        if len(x_edges) != (n_pos + 1):
+            raise ValueError(f'len(x_edges) must be n_pos+1={n_pos + 1}, got {len(x_edges)}')
+
+        if should_plot_results:
+            frames_to_process = min(n_frames, max_n_frames_to_plot)
+            if n_frames > max_n_frames_to_plot:
+                print(f"Processing first {max_n_frames_to_plot} of {n_frames} frames.")
+        else:
+            frames_to_process = n_frames
+
+        if debug_print:
+            print(f"{'Frame':<6} | {'Score':<6} | {'Label':<15} | {'RMS (cm)':<8} | {'Sharpness':<9} | {'Locality':<9}")
+            print("-" * 80)
+
+        scoring_results = []
+        for t in range(frames_to_process):
+            current_posterior = posterior_stack[:, t]
+            score, comps = cls.calculate_pli_1d_score(current_posterior, x_edges=x_edges, noise_threshold_percent=noise_threshold_percent, **pli_score_kwargs)
+            a_record = {'t': t, 'score': score}
+            a_record.update(**comps)
+            if should_plot_results:
+                label, color = cls.get_pli_1d_quality_label(score)
+                a_record.update(**{'label': label, 'color': color, 'data': current_posterior})
+            scoring_results.append(a_record)
+            if debug_print:
+                label, _color = cls.get_pli_1d_quality_label(score)
+                print(f"T={t:<4} | {score:.4f} | {label:<15} | {comps['rms_cm']:<8.1f} | {comps['sharpness']:.4f}    | {comps['locality']:.4f}")
+        ## END for t in range(frames_to_process)...
+
+        if should_plot_results:
+            rows = math.ceil(frames_to_process / cols)
+            fig, axes = plt.subplots(rows, cols, figsize=(cols * 3.5, rows * 2.8))
+            axes = np.atleast_1d(axes).flatten()
+            x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
+            for i in range(len(axes)):
+                if i < frames_to_process:
+                    res = scoring_results[i]
+                    ax = axes[i]
+                    ax.plot(x_centers, res['data'], color=res['color'], linewidth=1.5)
+                    ax.fill_between(x_centers, res['data'], alpha=0.25, color=res['color'])
+                    title_str = (f"T[{res['t']}]: {res['label']}\n" f"Score: {res['score']:.2f} (S: {res['sharpness']:.2f} | L: {res['locality']:.2f})")
+                    ax.set_title(title_str, color=res['color'], fontweight='bold', fontsize=9)
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                else:
+                    axes[i].axis('off')
+            ## END for i in range(len(axes))...
+            plt.tight_layout()
+            plt.show()
+
+        scoring_results = pd.DataFrame.from_records(scoring_results).rename(columns={'t': 't_bin_idx'})
+        scoring_results['is_position_like_1d'] = (scoring_results['score'] >= float(position_like_score_cutoff_1d))
+        return scoring_results
+
+
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.compute_and_plot_posterior_stack_1d'], used_by=[], creation_date='2026-11-04 00:00', related_items=['PosteriorExporting.load_decoded_posteriors_from_HDF5'])
+    @classmethod
+    def score_h5_loaded_decoder_epochs_1d(cls, h5_out_dict, decoder_name: str, epochs_name: str, x_edges, position_like_score_cutoff_1d: Optional[float] = None, should_plot_results: bool = False, **pli_score_kwargs) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
+        """
+        Score all epochs for one decoder / epoch-type from ``PosteriorExporting.load_decoded_posteriors_from_HDF5`` output.
+
+        ``h5_out_dict[decoder_name][epochs_name]['p_x_given_n']`` is a list of ``(n_pos, n_t)`` arrays.
+
+        Returns:
+            (concatenated_df with ``epoch_idx``, list of per-epoch DataFrames)
+        """
+        if decoder_name not in h5_out_dict:
+            raise KeyError(f'decoder_name={decoder_name!r} not in h5_out_dict keys={list(h5_out_dict.keys())}')
+        if epochs_name not in h5_out_dict[decoder_name]:
+            raise KeyError(f'epochs_name={epochs_name!r} not in h5_out_dict[{decoder_name!r}] keys={list(h5_out_dict[decoder_name].keys())}')
+        p_x_list = h5_out_dict[decoder_name][epochs_name]['p_x_given_n']
+        per_epoch_dfs: List[pd.DataFrame] = []
+        for epoch_idx, p_x in enumerate(p_x_list):
+            epoch_df = cls.compute_and_plot_posterior_stack_1d(p_x, x_edges=x_edges, should_plot_results=should_plot_results, position_like_score_cutoff_1d=position_like_score_cutoff_1d, **pli_score_kwargs)
+            epoch_df = epoch_df.copy()
+            epoch_df['epoch_idx'] = epoch_idx
+            epoch_df['decoder_name'] = decoder_name
+            epoch_df['epochs_name'] = epochs_name
+            per_epoch_dfs.append(epoch_df)
+        ## END for epoch_idx, p_x in enumerate(p_x_list)...
+
+        if len(per_epoch_dfs) == 0:
+            return pd.DataFrame(), per_epoch_dfs
+        return pd.concat(per_epoch_dfs, ignore_index=True), per_epoch_dfs
+
+
+    @function_attributes(short_name=None, tags=['1D', 'position-like', 'calibration', 'HDF5', 'batch'], input_requires=[], output_provides=[], uses=['cls.calculate_pli_1d_score'], used_by=[], creation_date='2026-11-04 00:00', related_items=[])
+    @classmethod
+    def calibrate_1d_pli_cutoffs_from_h5_files(cls, h5_paths, x_edges, decoder_name: str = 'long_LR', laps_epochs_name: str = 'laps', ripple_epochs_name: str = 'ripple', max_files: Optional[int] = None, debug_print: bool = True) -> Dict[str, Any]:
+        """
+        Empirically suggest 1D cutoffs from BATCH ``decoded_posteriors`` H5 files.
+
+        Loads each file via ``PosteriorExporting.load_decoded_posteriors_from_HDF5``, scores all time bins for
+        ``laps`` and ``ripple`` (single ``decoder_name`` unless you pre-max across decoders externally), then proposes:
+          - ``high_quality_score_cutoff_1d`` ≈ 90th percentile of lap scores
+          - ``position_like_score_cutoff_1d`` ≈ lap median when ripples are sharper than laps (common on 1D PLI);
+            otherwise ``max(lap_q25, ripple_median)`` so the floor sits above ambiguous ripple mass
+
+        Does not mutate class attributes; returns a summary dict for inspection / docstring updates.
+        """
+        from pyphoplacecellanalysis.Pho2D.data_exporting import PosteriorExporting
+
+        h5_paths = [Path(p) for p in h5_paths]
+        if max_files is not None:
+            h5_paths = h5_paths[:int(max_files)]
+
+        lap_scores: List[float] = []
+        ripple_scores: List[float] = []
+        used_files: List[str] = []
+
+        for load_path in h5_paths:
+            if not Path(load_path).exists():
+                if debug_print:
+                    print(f'Skipping missing file: {load_path}')
+                continue
+            out_dict, _meta = PosteriorExporting.load_decoded_posteriors_from_HDF5(load_path=Path(load_path), debug_print=False)
+            if decoder_name not in out_dict:
+                if debug_print:
+                    print(f'Skipping {load_path}: decoder {decoder_name!r} missing')
+                continue
+            used_files.append(str(load_path))
+            for epochs_name, sink in ((laps_epochs_name, lap_scores), (ripple_epochs_name, ripple_scores)):
+                if epochs_name not in out_dict[decoder_name]:
+                    continue
+                for p_x in out_dict[decoder_name][epochs_name]['p_x_given_n']:
+                    stack = cls._normalize_posterior_1d_stack(p_x)
+                    for t in range(stack.shape[1]):
+                        score, _comps = cls.calculate_pli_1d_score(stack[:, t], x_edges=x_edges)
+                        sink.append(score)
+                    ## END for t in range(stack.shape[1])...
+                ## END for p_x in ...
+            ## END for epochs_name, sink in ...
+        ## END for load_path in h5_paths...
+
+        lap_arr = np.asarray(lap_scores, dtype=float)
+        rip_arr = np.asarray(ripple_scores, dtype=float)
+        summary: Dict[str, Any] = {
+            'n_files': len(used_files),
+            'files': used_files,
+            'n_lap_bins': int(lap_arr.size),
+            'n_ripple_bins': int(rip_arr.size),
+            'lap_score_percentiles': {},
+            'ripple_score_percentiles': {},
+            'suggested_position_like_score_cutoff_1d': None,
+            'suggested_high_quality_score_cutoff_1d': None,
+            'note': None,
+        }
+        if lap_arr.size > 0:
+            summary['lap_score_percentiles'] = {p: float(np.nanpercentile(lap_arr, p)) for p in (10, 25, 50, 75, 90, 95)}
+            lap_q25 = float(np.nanpercentile(lap_arr, 25))
+            lap_q50 = float(np.nanpercentile(lap_arr, 50))
+            summary['suggested_high_quality_score_cutoff_1d'] = float(np.nanpercentile(lap_arr, 90))
+            if rip_arr.size > 0:
+                summary['ripple_score_percentiles'] = {p: float(np.nanpercentile(rip_arr, p)) for p in (10, 25, 50, 75, 90, 95)}
+                rip_med = float(np.nanmedian(rip_arr))
+                if rip_med > lap_q50:
+                    # Ripples sharper than laps (typical for 1D PLI): use lap median as position-like floor
+                    summary['suggested_position_like_score_cutoff_1d'] = lap_q50
+                    summary['note'] = 'ripple_median > lap_median; using lap_median for position_like cutoff'
+                else:
+                    summary['suggested_position_like_score_cutoff_1d'] = float(max(lap_q25, rip_med))
+                    summary['note'] = 'using max(lap_q25, ripple_median) for position_like cutoff'
+            else:
+                summary['suggested_position_like_score_cutoff_1d'] = lap_q50
+        if debug_print:
+            print(summary)
+        return summary
 
     
     @classmethod
@@ -7789,6 +8110,8 @@ class PositionLikePosteriorScoring:
     @classmethod
     def filter_to_position_like_epochs_only(cls, decoded_local_epochs_result: DecodedFilterEpochsResult, xbin: NDArray, ybin: NDArray, position_like_score_cutoff: float = 0.42, num_min_position_like_t_bins: Optional[int] = None, normalization_across_epochs_epoch_names: Optional[List]=None) -> Tuple[DecodedFilterEpochsResult, pd.DataFrame]:
         """ filters the provided decoded time bins into position-like bins only based on a specific position_like_score_cutoff value and a few other filtering criteria.
+
+        **2D only** — expects ``(n_x, n_y, n_t)`` posteriors. For ``(n_pos, n_time)`` BATCH 1D posteriors, use ``compute_and_plot_posterior_stack_1d`` / ``score_h5_loaded_decoder_epochs_1d`` instead.
         
         FAULT - Memory leak on linux
             2026-03-17 - Core problem function that exhausts memory on linux (both Lab and Supercomputer) but not on Windows.

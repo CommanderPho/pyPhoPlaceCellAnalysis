@@ -6587,7 +6587,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True, single_line_title: bool = True, resolution_multiplier: float = 2.0) -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True, single_line_title: bool = True, resolution_multiplier: float = 1.0) -> str:
         """ Builds the colored flexitext title string.
 
         `single_line_title=True` (default): epochs/metric + subtitle on one line.
@@ -6656,10 +6656,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         """ Main plotting function, called by both Laps and PBE subfigures
         
         prepare_for_publication: if True, no context footer is added; also skips title_modifier (e.g. '(N sessions)') and uses publication epoch titles
+        resolution_multiplier: scales publication-mode text (auto title/subtitle, ticks, grouped x labels, y/x axis labels); accepted via kwargs
         """
-        resolution_multiplier: float = 1.0
-        # resolution_multiplier: float = 2.0
-
         if title_modifier and (not prepare_for_publication):
             title = title_modifier(title)
 
@@ -6679,6 +6677,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         subtitle_font_size = kwargs.pop('subtitle_font_size', None)
         bold_epochs_name: bool = bool(kwargs.pop('bold_epochs_name', True))
         single_line_title: bool = bool(kwargs.pop('single_line_title', True))
+        resolution_multiplier: float = float(kwargs.pop('resolution_multiplier', 1.0))
         xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
         bar_x = kwargs.pop('bar_x', None)
         bar_width = kwargs.pop('bar_width', None)
@@ -6818,12 +6817,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if len(np.atleast_1d(xtick_positions)) == len(xtick_labels):
             ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
-            # Group (LdCs/SdCs) 7pt; subgroup (pre-/post-Δ) 6pt; y-tick numbers 5pt (publication default)
-
+            # Group (LdCs/SdCs) 7pt; subgroup (pre-/post-Δ) 6pt; y-tick numbers 5pt; axis labels 7pt (publication default)
             ytick_fs = float(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)['ytick.labelsize']) * resolution_multiplier
             subgroup_fs, group_fs = (6.0 * resolution_multiplier), (7.0 * resolution_multiplier)
+            axis_label_fs = 7.0 * resolution_multiplier
             text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels, subgroup_labelsize=subgroup_fs, group_labelsize=group_fs)
             ax.tick_params(axis='y', labelsize=ytick_fs)
+            ax.yaxis.label.set_size(axis_label_fs)
+            if str(xlabel).strip():
+                ax.xaxis.label.set_size(axis_label_fs)
 
         # Firing rates / participation fractions are non-negative; keep axis floor at 0
         _ymin, _ymax = ax.get_ylim()
