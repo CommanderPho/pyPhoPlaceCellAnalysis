@@ -7536,8 +7536,10 @@ class PositionLikePosteriorScoring:
         epoch_idx = 0
         p_x_given_n = out_dict[decoder_name][epochs_name]["p_x_given_n"][epoch_idx]  # (n_pos, n_t)
 
-        # Must match decode binning (not stored in H5) — e.g. from directional decoder .xbin:
-        x_edges = np.array(...)  # len(x_edges) == n_pos + 1
+        # Must match decode binning (not stored in H5) — e.g. directional decoder `.xbin`:
+        x_edges = a_decoder.xbin  # len(x_edges) == n_pos + 1
+        # kdiba long-track approximate edges used in 1D cutoff calibration:
+        # x_edges = np.linspace(59.08, 228.69, p_x_given_n.shape[0] + 1)
 
         # Primary API auto-dispatches to 1D when y_edges is omitted:
         scoring_df = PositionLikePosteriorScoring.compute_and_plot_posterior_stack(
@@ -7818,9 +7820,7 @@ class PositionLikePosteriorScoring:
 
         P = P / total_p
         n_pos = int(P.shape[0])
-        x_edges = np.asarray(x_edges, dtype=float)
-        if len(x_edges) != (n_pos + 1):
-            raise ValueError(f'len(x_edges) must be n_pos+1={n_pos + 1}, got {len(x_edges)}')
+        x_edges = cls._coerce_x_edges_1d(x_edges, n_pos)
 
         bin_w_cm = float(np.abs(np.mean(np.diff(x_edges))))
         track_length_cm = float(np.max(x_edges) - np.min(x_edges))
@@ -7874,6 +7874,25 @@ class PositionLikePosteriorScoring:
         raise ValueError(f'_normalize_posterior_1d_stack expected 1D or 2D array (n_pos,) / (n_pos, n_t); got shape {posterior_stack.shape}')
 
 
+    @classmethod
+    def _coerce_x_edges_1d(cls, x_edges, n_pos: int) -> NDArray:
+        """Return float bin edges with length ``n_pos + 1`` (BATCH H5 does not store edges)."""
+        _x_edges_hint = (
+            'x_edges must be position bin edges in cm with len == n_pos+1 '
+            '(e.g. directional decoder `.xbin`). Do not use `np.array(...)` from docstring examples — '
+            'that creates an array containing Ellipsis, not bin edges.'
+        )
+        if x_edges is Ellipsis:
+            raise TypeError(_x_edges_hint)
+        try:
+            x_edges_arr = np.asarray(x_edges, dtype=float).ravel()
+        except (TypeError, ValueError) as exc:
+            raise TypeError(f'{_x_edges_hint} Got {type(x_edges).__name__!r}.') from exc
+        if len(x_edges_arr) != (n_pos + 1):
+            raise ValueError(f'len(x_edges) must be n_pos+1={n_pos + 1}, got {len(x_edges_arr)}')
+        return x_edges_arr
+
+
     @function_attributes(short_name=None, tags=['1D', 'position-like', 'score', 'posterior', 'plot'], input_requires=[], output_provides=[], uses=['cls.calculate_pli_1d_score', 'cls.get_pli_1d_quality_label', 'cls._normalize_posterior_1d_stack'], used_by=['cls.score_h5_loaded_decoder_epochs_1d'], creation_date='2026-11-04 00:00', related_items=['cls.compute_and_plot_posterior_stack'])
     @classmethod
     def compute_and_plot_posterior_stack_1d(cls, posterior_stack, x_edges, noise_threshold_percent=0.02, should_plot_results=False, max_n_frames_to_plot: int = 20, cols: int = 5, debug_print: bool = False, position_like_score_cutoff_1d: Optional[float] = None, **pli_score_kwargs) -> pd.DataFrame:
@@ -7888,9 +7907,7 @@ class PositionLikePosteriorScoring:
 
         posterior_stack = cls._normalize_posterior_1d_stack(posterior_stack)
         n_pos, n_frames = posterior_stack.shape
-        x_edges = np.asarray(x_edges, dtype=float)
-        if len(x_edges) != (n_pos + 1):
-            raise ValueError(f'len(x_edges) must be n_pos+1={n_pos + 1}, got {len(x_edges)}')
+        x_edges = cls._coerce_x_edges_1d(x_edges, n_pos)
 
         if should_plot_results:
             frames_to_process = min(n_frames, max_n_frames_to_plot)
