@@ -3904,7 +3904,7 @@ class AcrossSessionsVisualizations:
     _fig_out_man: Optional[FileOutputManager] = None
 
     @classmethod
-    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=True, write_png:bool=True, write_svg:bool=False, debug_print=True, **kwargs):
+    def output_figure(cls, final_context: IdentifyingContext, fig, write_vector_format:bool=False, write_png:bool=False, write_svg:bool=True, debug_print=True, **kwargs):
         """ outputs the figure using the provided context, replacing the pipeline's curr_active_pipeline.output_figure(...) callback which isn't usually accessible for across session figures. """
 
         def register_output_file(output_path, output_metadata=None):

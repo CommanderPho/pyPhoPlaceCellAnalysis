@@ -2166,7 +2166,7 @@ class PrePostDeltaDistributionComparison:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, postprocess_matplotlib_svg_for_publication
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
 
@@ -2400,6 +2400,7 @@ class PrePostDeltaDistributionComparison:
                         fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                     svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                 fig.savefig(svg_path, format='svg', transparent=True)
+                postprocess_matplotlib_svg_for_publication(svg_path)
                 panel_saved_paths.append(svg_path)
             return panel_saved_paths, (panel_saved_paths[0] if panel_saved_paths else None)
 
@@ -2708,6 +2709,7 @@ class PrePostDeltaDistributionComparison:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                         fig.savefig(svg_path, format='svg', transparent=True)
+                        postprocess_matplotlib_svg_for_publication(svg_path)
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 
@@ -2752,7 +2754,7 @@ class PrePostDeltaDistributionComparison:
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         from pyphocorehelpers.DataStructure.RenderPlots.MatplotLibRenderPlots import FigureCollector
-        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import FileOutputManager, FigureOutputLocation, ContextToPathMode, build_and_write_to_file, postprocess_matplotlib_svg_for_publication
         from pyphoplacecellanalysis.SpecificResults.AcrossSessionResults import AcrossSessionsVisualizations
         from pyphoplacecellanalysis.SpecificResults.PhoDiba2023Paper import PaperFigureTwo, add_significance_bars, PhoPublicationFigureHelper
 
@@ -3036,6 +3038,7 @@ class PrePostDeltaDistributionComparison:
                                 fig_man = FileOutputManager(figure_output_location=FigureOutputLocation.DAILY_PROGRAMMATIC_OUTPUT_FOLDER, context_to_path_mode=ContextToPathMode.GLOBAL_UNIQUE)
                             svg_path = fig_man.get_figure_save_file_path(save_context, make_folder_if_needed=True).with_suffix('.svg')
                         fig.savefig(svg_path, format='svg', transparent=True)
+                        postprocess_matplotlib_svg_for_publication(svg_path)
                         saved_paths.append(svg_path)
                     saved_path = saved_paths[0] if saved_paths else None
 

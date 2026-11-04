@@ -2,6 +2,8 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum # for getting the current date to set the ouptut folder name
 from pathlib import Path
+import re
+import xml.etree.ElementTree as ET
 from typing import Any, Callable, List, Optional, Tuple, Union, Dict
 # from neuropy.core.user_annotations import metadata_attributes
 import pandas as pd
@@ -1345,6 +1347,81 @@ def programmatic_render_to_file(curr_active_pipeline, curr_display_function_name
 
 
 
+@function_attributes(short_name=None, tags=['file','export','output','matplotlib','SVG','publication','Illustrator'], input_requires=[], output_provides=[], uses=[], used_by=['write_to_file'], creation_date='2026-11-04 02:58', related_items=['matplotlib#13200', 'matplotlib#14283'])
+def postprocess_matplotlib_svg_for_publication(svg_path: Path) -> Path:
+    """ Fix matplotlib SVG text for Illustrator / browser viewing after `svg.fonttype='none'` savefig.
+
+    - Scopes matplotlib's style under `svg.mplsvg` and adds `white-space:pre` so leading/trailing
+      spaces in flexitext-split `<text>` runs are preserved (otherwise `Lap Firing Rates` → `LapFiring Rates`).
+    - Rewrites font size units from `px` → `pt` inside `font:` / `font-size:` styles so Illustrator's
+      type UI reports the intended point size (page size is already in pt).
+
+    Usage:
+        from pyphoplacecellanalysis.General.Mixins.ExportHelpers import postprocess_matplotlib_svg_for_publication
+        fig.savefig(svg_path, format='svg', transparent=True)
+        postprocess_matplotlib_svg_for_publication(svg_path)
+    """
+    svg_path = Path(svg_path)
+    # Keep default SVG namespace unprefixed (avoid ns0:svg after rewrite)
+    ET.register_namespace('', 'http://www.w3.org/2000/svg')
+    ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+    ET.register_namespace('dc', 'http://purl.org/dc/elements/1.1/')
+    ET.register_namespace('cc', 'http://creativecommons.org/ns#')
+    ET.register_namespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+
+    tree = ET.parse(svg_path)
+    root = tree.getroot()
+
+    # Root may be namespaced ({http://www.w3.org/2000/svg}svg) or bare 'svg'
+    root_tag = root.tag.rsplit('}', 1)[-1]
+    if root_tag != 'svg':
+        raise ValueError(f'Expected root <svg>, got {root.tag!r} for {svg_path}')
+
+    existing_class = (root.get('class') or '').strip()
+    if 'mplsvg' not in existing_class.split():
+        root.set('class', f'{existing_class} mplsvg'.strip() if existing_class else 'mplsvg')
+
+    def _local_name(tag: str) -> str:
+        return tag.rsplit('}', 1)[-1]
+
+    def _rewrite_font_px_to_pt(style_value: str) -> str:
+        """Replace NNpx with NNpt only inside font: / font-size: declarations."""
+        def _repl_decl(match: re.Match) -> str:
+            return re.sub(r'(\d+(?:\.\d+)?)px\b', r'\1pt', match.group(0))
+        return re.sub(r'(?:^|;)\s*font(?:-size)?\s*:[^;]*', _repl_decl, style_value)
+
+    style_el = None
+    for el in root.iter():
+        if _local_name(el.tag) == 'style':
+            style_el = el
+            break
+    ## END for el in root.iter()...
+
+    if style_el is not None and style_el.text:
+        style_text = style_el.text.strip()
+        # Matplotlib emits e.g. `*{stroke-linejoin: round; stroke-linecap: butt}`
+        if style_text.startswith('*'):
+            body = style_text[1:]
+            if body.endswith('}'):
+                body = body[:-1].rstrip()
+            if 'white-space' not in body:
+                body = f'{body}; white-space:pre' if body else 'white-space:pre'
+            style_el.text = f'svg.mplsvg*{body}}}'
+        elif 'white-space' not in style_text:
+            # Unexpected style shape — append preserve rule scoped to mplsvg
+            style_el.text = f'{style_text}\nsvg.mplsvg * {{ white-space:pre; }}'
+
+    # Inline style attributes on text (and any) elements: font: 18px → font: 18pt
+    for el in root.iter():
+        style_attr = el.get('style')
+        if style_attr and (('font:' in style_attr) or ('font-size:' in style_attr)):
+            el.set('style', _rewrite_font_px_to_pt(style_attr))
+    ## END for el in root.iter()...
+
+    tree.write(svg_path, encoding='utf-8', xml_declaration=True, default_namespace=None)
+    return svg_path
+
+
 @function_attributes(short_name=None, tags=['file','export','output','matplotlib','display','active','PDF','SVG','batch','automated'], input_requires=[], output_provides=[], uses=['write_to_file'], used_by=[], creation_date='2023-06-14 19:06', related_items=[])
 def build_and_write_to_file(a_fig, active_identifying_ctx, fig_man:Optional[FileOutputManager]=None, subset_includelist=None, subset_excludelist=None, context_tuple_join_character='_', write_vector_format=False, write_png=True, write_svg=False, register_output_file_fn=None, progress_print=True, debug_print=False, **kwargs):
     """ From the context, fig_man, and arguments builds the final save path for the figure and calls `write_to_file` with these values. """
@@ -1477,6 +1554,7 @@ def write_to_file(a_fig, active_identifying_ctx: IdentifyingContext, final_fig_s
                     svg_savefig_kwargs.setdefault('transparent', True)
                     with plt.rc_context({'svg.fonttype': 'none'}):
                         a_fig.savefig(fig_svg_save_path, format='svg', **svg_savefig_kwargs)
+                    postprocess_matplotlib_svg_for_publication(fig_svg_save_path)
                     additional_output_metadata = {'fig_format':'matplotlib'}
                 elif is_plotly_figure:
                     a_fig.write_image(fig_svg_save_path)
