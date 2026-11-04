@@ -6351,10 +6351,10 @@ class DebuggingHelpers:
     def _compute_active_set_membership_from_participation(cls, across_session_inst_fr_computation_df: pd.DataFrame, all_neuron_stats_table: pd.DataFrame, 
                                                           contra_period_max_participating_epochs_ratio: float = 0.6,
                                                           dominant_period_min_participating_epochs_ratio: float = 0.3,
-                                                          cell_LS_eXclusivity_threshold: Optional[float] = 0.75,
+                                                          cell_LS_eXclusivity_threshold: Optional[float] = 0.80,
                                                           debug_print: bool = False):
         """ 
-        Sets columns: ['active_set_membership_from_participation']
+        Sets columns: ['active_set_membership_from_participation', 'active_set_membership_from_n_spikes']
         
         Usage:
             contra_period_max_participating_epochs_ratio: float = 0.6 ## don't allow more than 0.2 stability for the opposite period
