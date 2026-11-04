@@ -6972,7 +6972,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @providing_context(fig='2', display_fn_name='inst_FR_bar_graphs')
-    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.78, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, **kwargs):
+    def display(self, defer_show=False, save_figure=True, enable_tiny_point_labels=True, enable_hover_labels=False, enabled_point_connection_lines=True, enable_stats_overlays:bool=True, active_context=None, title_modifier_fn=None, top_margin=0.78, left_margin=0.090, bottom_margin=0.150, prepare_for_publication: bool = False, debug_print: bool = False, write_vector_format: bool = False, write_png: bool = False, write_svg: bool = True, **kwargs):
         """ 
         
         title_modifier: lambda original_title: f"{original_title} (all sessions)"
@@ -6984,6 +6984,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         When `include_non_XdC_cells_as_inset=True`, also plots a faint AnyC (non-XdC)
         scatter series behind the main XdC bars from `Fig2_*_AnyC_FR` or live `AnyC_*` trends
         (AnyC Δ− under bars 0/2, AnyC Δ+ under bars 1/3; XdC y-limits preserved).
+
+        Default save formats are SVG-only (`write_svg=True`, `write_png=False`, `write_vector_format=False`);
+        override with `write_png=True` / `write_vector_format=True` if needed.
         """
         
         
@@ -6992,6 +6995,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         title_modifier = title_modifier_fn if title_modifier_fn is not None else (lambda original_title: original_title)
 
         include_non_XdC_cells_as_inset: bool = kwargs.pop('include_non_XdC_cells_as_inset', False)
+        save_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png, write_svg=write_svg) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
 
         _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                         active_context=active_context, top_margin=top_margin,
@@ -7087,8 +7091,8 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
-            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0]), 
-                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0]))
+            return (self.perform_save(_fig_2_theta_out.context, _fig_2_theta_out.figures[0], **save_figure_kwargs),
+                    self.perform_save(_fig_2_replay_out.context, _fig_2_replay_out.figures[0], **save_figure_kwargs))
 
         if save_figure:
             _fig_2_theta_out['saved_figures'], _fig_2_replay_out['saved_figures'] = _perform_write_to_file_callback()
