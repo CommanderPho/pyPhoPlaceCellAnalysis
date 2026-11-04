@@ -6587,13 +6587,16 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True) -> str:
-        """ buidls the two line colored string that is passed into `flexitext`.
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True, single_line_title: bool = True, resolution_multiplier: float = 2.0) -> str:
+        """ Builds the colored flexitext title string.
+
+        `single_line_title=True` (default): epochs/metric + subtitle on one line.
+        `single_line_title=False`: two lines (title then subtitle), with line-1 `<size:…>` closed before `\\n`.
         """
         if title_font_size is None:
-            title_font_size = 22 if (not prepare_for_publication) else (9 * 2)
+            title_font_size = 22 if (not prepare_for_publication) else (9 * float(resolution_multiplier))
         if subtitle_font_size is None:
-            subtitle_font_size = 14 if (not prepare_for_publication) else (7 * 2)
+            subtitle_font_size = 14 if (not prepare_for_publication) else (7 * float(resolution_multiplier))
 
         # NBSP (\u00a0) between style runs: SVG with svg.fonttype='none' collapses leading regular spaces in <text>.
         _nbsp = '\u00a0'
@@ -6603,10 +6606,12 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
         epochs_bit = f"<weight:bold>{epochs_name}</>" if bold_epochs_name else f"{epochs_name}"
         metric_suffix: str = f"{_nbsp}{metric_name}" if (metric_name is not None and str(metric_name).strip()) else ""
+        title_span: str = f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>"
+        subtitle_span: str = f"<size:{subtitle_font_size}>{subtitle}</>"
+        if single_line_title:
+            return f"{title_span}{_nbsp}{subtitle_span}"
         # Close line-1 <size:…> before \n so flexitext does not glue the subtitle/granularity phrase to "Session Means".
-        return (f"<size:{title_font_size}>{epochs_bit}{metric_suffix}</>\n"
-                f"<size:{subtitle_font_size}>{subtitle}</>"
-                )
+        return f"{title_span}\n{subtitle_span}"
 
 
     @classmethod
@@ -6652,6 +6657,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         
         prepare_for_publication: if True, no context footer is added; also skips title_modifier (e.g. '(N sessions)') and uses publication epoch titles
         """
+        resolution_multiplier: float = 1.0
+        # resolution_multiplier: float = 2.0
+
         if title_modifier and (not prepare_for_publication):
             title = title_modifier(title)
 
@@ -6670,6 +6678,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         title_font_size = kwargs.pop('title_font_size', None)
         subtitle_font_size = kwargs.pop('subtitle_font_size', None)
         bold_epochs_name: bool = bool(kwargs.pop('bold_epochs_name', True))
+        single_line_title: bool = bool(kwargs.pop('single_line_title', True))
         xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
         bar_x = kwargs.pop('bar_x', None)
         bar_width = kwargs.pop('bar_width', None)
@@ -6792,7 +6801,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         _display_fn_name: str = 'Particp_bar_graphs' if (metric_name == 'Participation Fractions') else 'inst_FR_bar_graphs'
         active_context = active_context.overwriting_context(display_fn_name=_display_fn_name)
         title_text_obj = flexitext(text_formatter.left_margin, title_top_margin,
-                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle, title_font_size=title_font_size, subtitle_font_size=subtitle_font_size, bold_epochs_name=bold_epochs_name), va="bottom", xycoords="figure fraction")
+                                cls._build_formatted_title_string(epochs_name=title, prepare_for_publication=prepare_for_publication, metric_name=metric_name, subtitle=title_subtitle, title_font_size=title_font_size, subtitle_font_size=subtitle_font_size, bold_epochs_name=bold_epochs_name, single_line_title=single_line_title, resolution_multiplier=resolution_multiplier), va="bottom", xycoords="figure fraction")
         text_objects = {'title': title_text_obj}
         
         if (not prepare_for_publication):
@@ -6810,8 +6819,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
             # Group (LdCs/SdCs) 7pt; subgroup (pre-/post-Δ) 6pt; y-tick numbers 5pt (publication default)
-            ytick_fs = float(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)['ytick.labelsize'])
-            subgroup_fs, group_fs = 6.0, 7.0
+
+            ytick_fs = float(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)['ytick.labelsize']) * resolution_multiplier
+            subgroup_fs, group_fs = (6.0 * resolution_multiplier), (7.0 * resolution_multiplier)
             text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels, subgroup_labelsize=subgroup_fs, group_labelsize=group_fs)
             ax.tick_params(axis='y', labelsize=ytick_fs)
 
