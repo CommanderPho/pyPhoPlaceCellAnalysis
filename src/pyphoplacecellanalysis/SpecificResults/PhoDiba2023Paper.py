@@ -6587,7 +6587,7 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
 
 
     @classmethod
-    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True, single_line_title: bool = True, resolution_multiplier: float = 1.0) -> str:
+    def _build_formatted_title_string(cls, epochs_name, prepare_for_publication: bool = False, metric_name: str = 'Firing Rates', subtitle: Optional[str] = None, title_font_size: Optional[float] = None, subtitle_font_size: Optional[float] = None, bold_epochs_name: bool = True, single_line_title: bool = True, resolution_multiplier: float = 2.0) -> str:
         """ Builds the colored flexitext title string.
 
         `single_line_title=True` (default): epochs/metric + subtitle on one line.
