@@ -11025,8 +11025,8 @@ class PhoPublicationFigureHelper:
         },
         'sizes': {
             'track_title': 9.087,
-            'title_body': 8.077,
-            'axis_label': 7,
+            'title_body': 9.087,
+            'axis_label': 8.077,
             'tick_label': 8.077,
             'r_value': 8,
         },

@@ -37,6 +37,15 @@ class TestPaperFigureTwoPublicationStyle(unittest.TestCase):
         self.assertEqual(style.mpl_rc['patch.linewidth'], expected_lw)
 
 
+    def test_get_figure2_bar_style_axis_label_larger_than_ticks(self):
+        style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=True)
+        sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
+        self.assertEqual(style.axis_labelsize, float(sizes['track_title']))
+        self.assertEqual(style.tick_labelsize, float(sizes['tick_label']))
+        self.assertGreater(style.axis_labelsize, style.tick_labelsize)
+        self.assertEqual(style.mpl_rc['axes.labelsize'], style.axis_labelsize)
+
+
     def test_create_plot_prepare_for_publication_applies_spine_linewidth(self):
         style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=True)
         y_values = [np.array([1.0, 2.0, 3.0]), np.array([0.5, 1.5]), np.array([2.0, 2.5, 3.5]), np.array([1.0, 4.0])]
@@ -55,6 +64,7 @@ class TestPaperFigureTwoPublicationStyle(unittest.TestCase):
         expected_lw = float(style.axes_linewidth)
         self.assertEqual(ax.spines['left'].get_linewidth(), expected_lw)
         self.assertEqual(ax.spines['bottom'].get_linewidth(), expected_lw)
+        self.assertEqual(ax.yaxis.label.get_size(), style.axis_labelsize)
         plt.close(render.fig)
 
 
