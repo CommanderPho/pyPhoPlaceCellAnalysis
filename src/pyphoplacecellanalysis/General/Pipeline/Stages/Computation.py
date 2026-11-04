@@ -2806,7 +2806,11 @@ class PipelineWithComputedPipelineStageMixin:
 
     def reload_default_computation_functions(self):
         """ reloads/re-registers the default display functions after adding a new one """
-        self.stage.reload_default_computation_functions()
+        try:
+            self.stage.reload_default_computation_functions()
+        except (AttributeError, TypeError, ValueError):
+            self.stage = ComputedPipelineStage.init_from_previous_stage(self.stage)
+
         
     def register_computation(self, registered_name, computation_function, is_global:bool):
         assert (self.can_compute), "Current self.stage must already be a ComputedPipelineStage. Call self.filter_sessions with filter configs to reach this step."
