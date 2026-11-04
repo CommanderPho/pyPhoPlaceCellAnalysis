@@ -2349,33 +2349,11 @@ class PrePostDeltaDistributionComparison:
         dpi = kwargs.pop('dpi', 220)
         laps_fig_file_name: Optional[str] = kwargs.pop('laps_fig_file_name', None)
         pbe_fig_file_name: Optional[str] = kwargs.pop('pbe_fig_file_name', None)
-        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
-        _fig3_label_rc = {
-            'xtick.labelsize': _fig3_sizes['tick_label'],
-            'ytick.labelsize': _fig3_sizes['tick_label'],
-            'axes.labelsize': _fig3_sizes['axis_label'],
-        }
+        fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
         _decoded_prefix: str = 'Decoded '
         if str(title).startswith(_decoded_prefix):
             title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
-        _summary_title_kwargs = dict(
-            title_font_size=_fig3_sizes['track_title'],
-            subtitle_font_size=_fig3_sizes['title_body'],
-            bold_epochs_name=False,
-        )
-
-        def _apply_fig3_axis_label_sizes(ax, render=None):
-            tick_fs = _fig3_sizes['tick_label']
-            axis_fs = _fig3_sizes['axis_label']
-            ax.tick_params(axis='both', labelsize=tick_fs)
-            ax.xaxis.label.set_size(axis_fs)
-            ax.yaxis.label.set_size(axis_fs)
-            text_objects = {}
-            if render is not None:
-                text_objects = (getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}
-            sec = text_objects.get('publication_xgroup_axis')
-            if sec is not None:
-                sec.tick_params(axis='x', labelsize=tick_fs)
+        _summary_title_kwargs = {**fig2_bar_style.create_plot_kwargs(), 'bold_epochs_name': False}
 
         def _save_panel_figure(fig, panel_fig_file_name: str) -> Tuple[List[Path], Optional[Path]]:
             panel_saved_paths: List[Path] = []
@@ -2472,7 +2450,8 @@ class PrePostDeltaDistributionComparison:
             collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
             fig = render.fig
             ax = render.ax
-            _apply_fig3_axis_label_sizes(ax, render)
+            _sec = ((getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}).get('publication_xgroup_axis')
+            fig2_bar_style.apply_to_axes(ax, secondary_xaxis=_sec)
             x_values_list, plotted_y_values = render.plot_data
             if enable_paired_lines:
                 for i0, i1, line_color, line_alpha in pair_specs:
@@ -2533,10 +2512,6 @@ class PrePostDeltaDistributionComparison:
                 n_heuristic = 0 if pbe_heuristic_session_summary is None else len(pbe_heuristic_session_summary)
                 print(f'laps n_sessions={len(laps_session_summary)}, pbe n_sessions={len(pbe_session_summary)}, pbe_heuristic n_sessions={n_heuristic}, laps_p_value={laps_p_value}, pbe_p_value={pbe_p_value}, pbe_heuristic_p_value={pbe_heuristic_p_value}')
             collector = None
-            publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
-                prepare_for_publication=prepare_for_publication,
-                **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
-            ) | _fig3_label_rc
             laps_suffix: str = str(group_labels[0]).replace(' ', '')
             pbe_suffix: str = str(group_labels[1]).replace(' ', '')
             if laps_fig_file_name is None:
@@ -2545,7 +2520,7 @@ class PrePostDeltaDistributionComparison:
                 pbe_fig_file_name = f'{fig_file_name}-{pbe_suffix}'
             laps_fignum = None if fignum is None else laps_fig_file_name
             pbe_fignum = None if fignum is None else pbe_fig_file_name
-            with mpl.rc_context(publication_rc):
+            with fig2_bar_style.rc_context():
                 with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
                     laps_panel = _plot_one_panel(group_labels[0], laps_session_summary, laps_p_value, 'fig4_summary_laps_bars', laps_fignum, laps_fig_file_name, collector)
                     pbe_panel = _plot_one_panel(group_labels[1], pbe_session_summary, pbe_p_value, 'fig4_summary_pbe_bars', pbe_fignum, pbe_fig_file_name, collector,
@@ -2621,11 +2596,7 @@ class PrePostDeltaDistributionComparison:
         collector = None
         saved_paths: List[Path] = []
         saved_path = None
-        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
-            prepare_for_publication=prepare_for_publication,
-            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
-        ) | _fig3_label_rc
-        with mpl.rc_context(publication_rc):
+        with fig2_bar_style.rc_context():
             with FigureCollector(name='fig4_summary_four_bar', base_context=active_context) as collector:
                 render = PaperFigureTwo.create_plot(
                     x_labels, y_values, scatter_props, ylabel, title, 'fig4_summary_four_bar', active_context, True,
@@ -2637,7 +2608,8 @@ class PrePostDeltaDistributionComparison:
                 collector.post_hoc_append(figs=[render.fig], axes=render.axes, contexts=[render.context])
                 fig = render.fig
                 ax = render.ax
-                _apply_fig3_axis_label_sizes(ax, render)
+                _sec = ((getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}).get('publication_xgroup_axis')
+                fig2_bar_style.apply_to_axes(ax, secondary_xaxis=_sec)
                 x_values_list, plotted_y_values = render.plot_data
 
                 if enable_paired_lines:
@@ -2925,20 +2897,11 @@ class PrePostDeltaDistributionComparison:
             active_context = IdentifyingContext(format_name='kdiba', fig='S3', display_fn_name='pre_post_delta_summary_multi_tbin_bars')
 
         dpi = kwargs.pop('dpi', 220)
-        _fig3_sizes = PhoPublicationFigureHelper.artboard3_fig3_style['sizes']
-        _fig3_label_rc = {
-            'xtick.labelsize': _fig3_sizes['tick_label'],
-            'ytick.labelsize': _fig3_sizes['tick_label'],
-            'axes.labelsize': _fig3_sizes['axis_label'],
-        }
+        fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, **{'figure.dpi': str(dpi), 'figure.frameon': False})
         _decoded_prefix: str = 'Decoded '
         if str(title).startswith(_decoded_prefix):
             title = f"{_decoded_prefix}<weight:bold>{str(title)[len(_decoded_prefix):]}</>"
-        _summary_title_kwargs = dict(
-            title_font_size=_fig3_sizes['track_title'],
-            subtitle_font_size=_fig3_sizes['title_body'],
-            bold_epochs_name=False,
-        )
+        _summary_title_kwargs = {**fig2_bar_style.create_plot_kwargs(), 'bold_epochs_name': False}
 
         create_plot_kwargs = dict(kwargs)
         if fignum is not None:
@@ -2960,11 +2923,7 @@ class PrePostDeltaDistributionComparison:
         collector = None
         saved_paths: List[Path] = []
         saved_path = None
-        publication_rc = PhoPublicationFigureHelper.rc_context_kwargs(
-            prepare_for_publication=prepare_for_publication,
-            **{'figure.dpi': str(dpi), 'figure.frameon': False, 'svg.fonttype': 'none'},
-        ) | _fig3_label_rc
-        with mpl.rc_context(publication_rc):
+        with fig2_bar_style.rc_context():
             with FigureCollector(name='fig_s3_summary_multi_tbin_bars', base_context=active_context) as collector:
                 s3_title_subtitle: str = (
                     f'for {group_labels[0]} and {group_labels[1]} '
@@ -2986,11 +2945,8 @@ class PrePostDeltaDistributionComparison:
                         a_bar.set_facecolor(bar_colors[i])
                         a_bar.set_alpha(0.85)
                     ## END for i, a_bar in enumerate(bars)...
-                tick_fs = _fig3_sizes['tick_label']
-                axis_fs = _fig3_sizes['axis_label']
-                ax.tick_params(axis='both', labelsize=tick_fs)
-                ax.xaxis.label.set_size(axis_fs)
-                ax.yaxis.label.set_size(axis_fs)
+                _sec = ((getattr(render, 'plot_objects', None) or {}).get('text_objects') or {}).get('publication_xgroup_axis')
+                fig2_bar_style.apply_to_axes(ax, secondary_xaxis=_sec)
                 x_values_list, plotted_y_values = render.plot_data
 
                 if enable_paired_lines:
@@ -6675,9 +6631,15 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         metric_name_override = kwargs.pop('metric_name', None)
         title_font_size = kwargs.pop('title_font_size', None)
         subtitle_font_size = kwargs.pop('subtitle_font_size', None)
-        bold_epochs_name: bool = bool(kwargs.pop('bold_epochs_name', True))
+        bold_epochs_name_kw = kwargs.pop('bold_epochs_name', None)
         single_line_title: bool = bool(kwargs.pop('single_line_title', True))
         resolution_multiplier: float = float(kwargs.pop('resolution_multiplier', 1.0))
+        fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, resolution_multiplier=resolution_multiplier)
+        if title_font_size is None:
+            title_font_size = fig2_bar_style.title_font_size
+        if subtitle_font_size is None:
+            subtitle_font_size = fig2_bar_style.subtitle_font_size
+        bold_epochs_name: bool = bool(fig2_bar_style.bold_epochs_name if (bold_epochs_name_kw is None) else bold_epochs_name_kw)
         xlabel: str = kwargs.pop('xlabel', 'Neuron Track Dominance Classification')
         bar_x = kwargs.pop('bar_x', None)
         bar_width = kwargs.pop('bar_width', None)
@@ -6741,10 +6703,19 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             else:
                 raise ValueError(f'errorbar_colors length {len(ecolors)} != n_bars {n_bars}.')
         yerr = None if (per_bar_errorbar_colors is not None) else stds
-        bars = ax.bar(x, means, yerr=yerr, capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors, **bar_error_kwargs)
+        bar_draw_kwargs = {}
+        if fig2_bar_style.bar_linewidth is not None:
+            bar_draw_kwargs['linewidth'] = fig2_bar_style.bar_linewidth
+        if (fig2_bar_style.errorbar_linewidth is not None) and (yerr is not None):
+            bar_error_kwargs['error_kw'] = dict(elinewidth=fig2_bar_style.errorbar_linewidth, capthick=fig2_bar_style.errorbar_linewidth)
+        bars = ax.bar(x, means, yerr=yerr, capsize=5, width=widths, tick_label=bar_tick_label, color=(0, 0, 0, 0), edgecolor=edgecolors, **bar_draw_kwargs, **bar_error_kwargs)
         if per_bar_errorbar_colors is not None:
+            errorbar_extra = {}
+            if fig2_bar_style.errorbar_linewidth is not None:
+                errorbar_extra['elinewidth'] = fig2_bar_style.errorbar_linewidth
+                errorbar_extra['capthick'] = fig2_bar_style.errorbar_linewidth
             for i in range(n_bars):
-                ax.errorbar(x[i], means[i], yerr=stds[i], fmt='none', ecolor=per_bar_errorbar_colors[i], capsize=5, zorder=3)
+                ax.errorbar(x[i], means[i], yerr=stds[i], fmt='none', ecolor=per_bar_errorbar_colors[i], capsize=5, zorder=3, **errorbar_extra)
             ## END for i in range(n_bars)...
 
 
@@ -6817,15 +6788,9 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
         if len(np.atleast_1d(xtick_positions)) == len(xtick_labels):
             ax.set_xticklabels(xtick_labels)
         if prepare_for_publication:
-            # Group (LdCs/SdCs) 7pt; subgroup (pre-/post-Δ) 6pt; y-tick numbers 5pt; axis labels 7pt (publication default)
-            ytick_fs = float(PhoPublicationFigureHelper.rc_context_kwargs(prepare_for_publication=True)['ytick.labelsize']) * resolution_multiplier
-            subgroup_fs, group_fs = (6.0 * resolution_multiplier), (7.0 * resolution_multiplier)
-            axis_label_fs = 7.0 * resolution_multiplier
-            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels, subgroup_labelsize=subgroup_fs, group_labelsize=group_fs)
-            ax.tick_params(axis='y', labelsize=ytick_fs)
-            ax.yaxis.label.set_size(axis_label_fs)
-            if str(xlabel).strip():
-                ax.xaxis.label.set_size(axis_label_fs)
+            # Typography / stroke widths from PhoPublicationFigureHelper.get_figure2_bar_style (Artboard 3)
+            text_objects['publication_xgroup_axis'] = cls._apply_publication_grouped_xticklabels(ax, group_labels=publication_group_labels, subgroup_labelsize=fig2_bar_style.xtick_subgroup_labelsize, group_labelsize=fig2_bar_style.xtick_group_labelsize)
+            fig2_bar_style.apply_to_axes(ax, secondary_xaxis=text_objects.get('publication_xgroup_axis'))
 
         # Firing rates / participation fractions are non-negative; keep axis floor at 0
         _ymin, _ymax = ax.get_ylim()
@@ -7031,97 +6996,79 @@ class PaperFigureTwo(SerializedAttributesAllowBlockSpecifyingClass):
             write_vector_format = False
         save_figure_kwargs = dict(write_vector_format=write_vector_format, write_png=write_png, write_svg=write_svg) | pop_dict_subset(kwargs, ['bbox_inches', 'pad_inches'])
 
-        _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
-                                                        active_context=active_context, top_margin=top_margin,
-                                                        left_margin=left_margin, bottom_margin=bottom_margin,
-                                                        title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **kwargs)
+        resolution_multiplier: float = float(kwargs.get('resolution_multiplier', 1.0))
+        fig2_bar_style = PhoPublicationFigureHelper.get_figure2_bar_style(prepare_for_publication=prepare_for_publication, resolution_multiplier=resolution_multiplier, **{'figure.frameon': False})
+        style_create_plot_kwargs = fig2_bar_style.create_plot_kwargs()
 
-        _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
+        with fig2_bar_style.rc_context():
+            _fig_2_theta_out = self.fig_2_Theta_FR_matplotlib(self.computation_result.Fig2_Laps_FR, defer_show=defer_show,
                                                             active_context=active_context, top_margin=top_margin,
                                                             left_margin=left_margin, bottom_margin=bottom_margin,
-                                                            title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **kwargs)
+                                                            title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **style_create_plot_kwargs, **kwargs)
+
+            _fig_2_replay_out = self.fig_2_Replay_FR_matplotlib(self.computation_result.Fig2_Replay_FR, defer_show=defer_show,
+                                                                active_context=active_context, top_margin=top_margin,
+                                                                left_margin=left_margin, bottom_margin=bottom_margin,
+                                                                title_modifier=title_modifier, prepare_for_publication=prepare_for_publication, debug_print=debug_print, **style_create_plot_kwargs, **kwargs)
 
 
-        if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
-            LxC_aclus = self.computation_result.LxC_aclus
-            SxC_aclus = self.computation_result.SxC_aclus
-            _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
-            _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
-        
+            if (enable_hover_labels or enable_tiny_point_labels or enabled_point_connection_lines):
+                LxC_aclus = self.computation_result.LxC_aclus
+                SxC_aclus = self.computation_result.SxC_aclus
+                _fig_2_theta_out = self.add_optional_aclu_labels(_fig_2_theta_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
+                _fig_2_replay_out = self.add_optional_aclu_labels(_fig_2_replay_out, LxC_aclus, SxC_aclus, enable_tiny_point_labels=enable_tiny_point_labels, enable_hover_labels=enable_hover_labels, enabled_point_connection_lines=enabled_point_connection_lines, debug_print=debug_print)
 
 
-        if enable_stats_overlays:
-            ## Compute and add the bar graph stats and significance bars
-            ## Add stats from t-tests (check?)
-            ## INPUTS: across_session_inst_fr_computation_shell_obj
-            LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
-            bar_graph_stats_str: str = format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
-            print(bar_graph_stats_str)
-            bar_graph_t_results = (LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
-            # Stash on the returned figure containers (picked up by across_sessions_bar_graphs output dict)
-            _fig_2_theta_out['bar_graph_stats_str'] = bar_graph_stats_str
-            _fig_2_theta_out['bar_graph_t_results'] = bar_graph_t_results
-            _fig_2_replay_out['bar_graph_stats_str'] = bar_graph_stats_str
-            _fig_2_replay_out['bar_graph_t_results'] = bar_graph_t_results
 
-            ## get the max datapoint so we can position the signifiance indicator bars above them:
-            max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
-            max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
-            
-            # 'Fig2_Laps_FR'
+            if enable_stats_overlays:
+                ## Compute and add the bar graph stats and significance bars
+                ## Add stats from t-tests (check?)
+                ## INPUTS: across_session_inst_fr_computation_shell_obj
+                LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result = pho_stats_bar_graph_t_tests(self.computation_result)
+                bar_graph_stats_str: str = format_bar_graph_t_test_pvalues_str(LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+                print(bar_graph_stats_str)
+                bar_graph_t_results = (LxC_Laps_T_result, SxC_Laps_T_result, LxC_Replay_T_result, SxC_Replay_T_result)
+                # Stash on the returned figure containers (picked up by across_sessions_bar_graphs output dict)
+                _fig_2_theta_out['bar_graph_stats_str'] = bar_graph_stats_str
+                _fig_2_theta_out['bar_graph_t_results'] = bar_graph_t_results
+                _fig_2_replay_out['bar_graph_stats_str'] = bar_graph_stats_str
+                _fig_2_replay_out['bar_graph_t_results'] = bar_graph_t_results
 
-            # LxC_Laps_T_result: TtestResult(statistic=6.712433589492588, pvalue=5.2823734983320806e-05, df=10)
-            # SxC_Laps_T_result: TtestResult(statistic=-4.339172228913557, pvalue=0.002481149212058544, df=8)
-            # LxC_Replay_T_result: TtestResult(statistic=-1.1080728076872137, pvalue=0.29376948620786025, df=10)
-            # SxC_Replay_T_result: TtestResult(statistic=-2.952880002807658, pvalue=0.018344744614346115, df=8)
+                ## get the max datapoint so we can position the signifiance indicator bars above them:
+                max_laps_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Laps_FR])))
+                max_PBEs_y: float = float(np.nanmax(np.concatenate([v.values for v in self.computation_result.Fig2_Replay_FR])))
 
-            # LxC_Laps_T_result: TtestResult(statistic=4.91664380764766, pvalue=8.326747683573472e-05, df=20)
-            # SxC_Laps_T_result: TtestResult(statistic=-4.836261942292889, pvalue=0.00011472243045619965, df=19)
-            # LxC_Replay_T_result: TtestResult(statistic=0.6019865878499693, pvalue=0.5539469660448748, df=20)
-            # SxC_Replay_T_result: TtestResult(statistic=-4.580715643685985, pvalue=0.00020418641915182124, df=19)
+                # Add significance bars between groups
+                ax = _fig_2_theta_out.ax
+                _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y)
+                _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y)
 
-            # Add significance bars between groups
-            # ax = _fig_2_output_dict['theta'].ax
-            ax = _fig_2_theta_out.ax
-            # ax = _fig_2_theta_out.axes[0] # one shared axis per figure
-            _out_ann_AB = add_significance_bars(ax, LxC_Laps_T_result.pvalue, x1=0, x2=1, y=max_laps_y)
-            # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, x1=2, x2=3, y=max_laps_y)
-
-            # _out_ann_BD = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 0.5, 2.5, 8)
-
-            # _out_ann_AC = add_significance_bars(ax, 0.005, 0, 2, 15)
+                ax = _fig_2_replay_out.ax
+                _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y)
+                _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
 
 
-            # Add significance bars between groups
-            # ax = _fig_2_output_dict['replay'].ax
-            ax = _fig_2_replay_out.ax
-            _out_ann_AB = add_significance_bars(ax, LxC_Replay_T_result.pvalue, x1=0, x2=1, y=max_PBEs_y)
-            # _out_ann_BC = add_significance_bars(ax, SxC_Laps_T_result.pvalue, 1, 2, 6)
-            _out_ann_CD = add_significance_bars(ax, SxC_Replay_T_result.pvalue, x1=2, x2=3, y=max_PBEs_y)
+            if include_non_XdC_cells_as_inset:
+                Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR = self._resolve_AnyC_bar_results(self.computation_result)
+                if Fig2_Laps_AnyC_FR is not None:
+                    anyc_scatters_theta = self.add_non_XdC_background_scatter(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR)
+                    if anyc_scatters_theta is not None:
+                        if getattr(_fig_2_theta_out, 'plot_objects', None) is None:
+                            _fig_2_theta_out.plot_objects = {}
+                        _fig_2_theta_out.plot_objects['anyc_background_scatter'] = anyc_scatters_theta
+                if Fig2_Replay_AnyC_FR is not None:
+                    anyc_scatters_replay = self.add_non_XdC_background_scatter(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR)
+                    if anyc_scatters_replay is not None:
+                        if getattr(_fig_2_replay_out, 'plot_objects', None) is None:
+                            _fig_2_replay_out.plot_objects = {}
+                        _fig_2_replay_out.plot_objects['anyc_background_scatter'] = anyc_scatters_replay
 
 
-        if include_non_XdC_cells_as_inset:
-            Fig2_Laps_AnyC_FR, Fig2_Replay_AnyC_FR = self._resolve_AnyC_bar_results(self.computation_result)
-            if Fig2_Laps_AnyC_FR is not None:
-                anyc_scatters_theta = self.add_non_XdC_background_scatter(_fig_2_theta_out.ax, Fig2_Laps_AnyC_FR)
-                if anyc_scatters_theta is not None:
-                    if getattr(_fig_2_theta_out, 'plot_objects', None) is None:
-                        _fig_2_theta_out.plot_objects = {}
-                    _fig_2_theta_out.plot_objects['anyc_background_scatter'] = anyc_scatters_theta
-            if Fig2_Replay_AnyC_FR is not None:
-                anyc_scatters_replay = self.add_non_XdC_background_scatter(_fig_2_replay_out.ax, Fig2_Replay_AnyC_FR)
-                if anyc_scatters_replay is not None:
-                    if getattr(_fig_2_replay_out, 'plot_objects', None) is None:
-                        _fig_2_replay_out.plot_objects = {}
-                    _fig_2_replay_out.plot_objects['anyc_background_scatter'] = anyc_scatters_replay
-
-
-        # Keep y-axis floor at 0 after overlays (stats bars / AnyC) may have re-autoscaled
-        for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]:
-            _ymin, _ymax = _fig_out.ax.get_ylim()
-            _fig_out.ax.set_ylim(0.0, max(float(_ymax), 0.0))
-        ## END for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]...
+            # Keep y-axis floor at 0 after overlays (stats bars / AnyC) may have re-autoscaled
+            for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]:
+                _ymin, _ymax = _fig_out.ax.get_ylim()
+                _fig_out.ax.set_ylim(0.0, max(float(_ymax), 0.0))
+            ## END for _fig_out in [_fig_2_theta_out, _fig_2_replay_out]...
 
         def _perform_write_to_file_callback():
             ## 2023-05-31 - Reference Output of matplotlib figure to file, along with building appropriate context.
@@ -10983,6 +10930,76 @@ class LongShortTrackDataframeAccessor(TimeColumnAliasesProtocol):
     
 
 
+@define(slots=False)
+class Figure2BarPublicationStyle:
+    """ Opaque style bundle returned by `PhoPublicationFigureHelper.get_figure2_bar_style`.
+
+    Edit values only via that getter — call sites should fetch style and apply it.
+    """
+    prepare_for_publication: bool = False
+    mpl_rc: Dict = field(factory=dict)
+    title_font_size: Optional[float] = None
+    subtitle_font_size: Optional[float] = None
+    bold_epochs_name: bool = True
+    tick_labelsize: Optional[float] = None
+    axis_labelsize: Optional[float] = None
+    axes_linewidth: Optional[float] = None
+    tick_width: Optional[float] = None
+    tick_length: Optional[float] = None
+    xtick_subgroup_labelsize: Optional[float] = None
+    xtick_group_labelsize: Optional[float] = None
+    bar_linewidth: Optional[float] = None
+    errorbar_linewidth: Optional[float] = None
+
+
+    def create_plot_kwargs(self) -> Dict:
+        """ Kwargs to splat into `PaperFigureTwo.create_plot` when publishing. """
+        if not self.prepare_for_publication:
+            return {}
+        out: Dict = {}
+        if self.title_font_size is not None:
+            out['title_font_size'] = self.title_font_size
+        if self.subtitle_font_size is not None:
+            out['subtitle_font_size'] = self.subtitle_font_size
+        out['bold_epochs_name'] = self.bold_epochs_name
+        return out
+
+
+    def rc_context(self):
+        """ Context manager: `with style.rc_context(): ...` """
+        return mpl.rc_context(self.mpl_rc)
+
+
+    def apply_to_axes(self, ax, secondary_xaxis=None):
+        """ Apply Artboard-3 / Fig2 bar spine, tick, and label sizes to an axes. """
+        if not self.prepare_for_publication:
+            return
+        tick_kwargs = {}
+        if self.tick_labelsize is not None:
+            tick_kwargs['labelsize'] = self.tick_labelsize
+        if self.tick_width is not None:
+            tick_kwargs['width'] = self.tick_width
+        if self.tick_length is not None:
+            tick_kwargs['length'] = self.tick_length
+        if tick_kwargs:
+            ax.tick_params(axis='both', **tick_kwargs)
+        if self.axis_labelsize is not None:
+            ax.xaxis.label.set_size(self.axis_labelsize)
+            ax.yaxis.label.set_size(self.axis_labelsize)
+        if self.axes_linewidth is not None:
+            for spine_name in ('left', 'bottom'):
+                ax.spines[spine_name].set_linewidth(self.axes_linewidth)
+            ## END for spine_name in ('left', 'bottom')...
+
+        if secondary_xaxis is not None:
+            sec_kwargs = {}
+            if self.xtick_group_labelsize is not None:
+                sec_kwargs['labelsize'] = self.xtick_group_labelsize
+            if sec_kwargs:
+                secondary_xaxis.tick_params(axis='x', **sec_kwargs)
+
+
+
 class PhoPublicationFigureHelper:
     """ 2025-07-04 - Helps get matplotlib figures in the correct format to be published, allowing manipulation in Adobe Illustrator and vector outputs
     
@@ -11040,6 +11057,63 @@ class PhoPublicationFigureHelper:
             ## OVERRIDE in the case of publications:
             _out_rcparams.update({'font.family': 'Arial', 'xtick.labelsize': 5, 'ytick.labelsize': 5, "axes.spines.right": False, "axes.spines.top": False, 'axes.linewidth': 0.8})
         return _out_rcparams # 'figure.dpi': '220', 
+
+
+    @classmethod
+    def get_figure2_bar_style(cls, prepare_for_publication: bool = True, resolution_multiplier: float = 1.0, **mpl_rc_overrides) -> Figure2BarPublicationStyle:
+        """ Single edit point for Figure 2 / summary-bar publication styling.
+
+        To change Figure 2 bar line weights, fonts, or rc defaults, edit **this method** only.
+        Callers should only fetch the returned style and apply it (`mpl_rc`, `apply_to_axes`, `create_plot_kwargs`).
+
+        Defaults are seeded from `artboard3_fig3_style` (Artboard 3.pdf).
+        """
+        if not prepare_for_publication:
+            return Figure2BarPublicationStyle(prepare_for_publication=False, mpl_rc=cls.rc_context_kwargs(prepare_for_publication=False, **mpl_rc_overrides))
+
+        scale: float = float(resolution_multiplier)
+        sizes = cls.artboard3_fig3_style['sizes']
+        axes_style = cls.artboard3_fig3_style['axes']
+        axes_lw: float = float(axes_style['linewidth'])
+        tick_w: float = float(axes_style['tick_width'])
+        tick_len: float = float(axes_style['tick_length'])
+        tick_fs: float = float(sizes['tick_label']) * scale
+        axis_fs: float = float(sizes['axis_label']) * scale
+        title_fs: float = float(sizes['track_title']) * scale
+        subtitle_fs: float = float(sizes['title_body']) * scale
+
+        # Apply bar/Artboard-3 stroke + label sizes after rc_context_kwargs so its
+        # default axes.linewidth=0.8 does not clobber Artboard-3 0.75.
+        mpl_rc = cls.rc_context_kwargs(prepare_for_publication=True)
+        mpl_rc.update({
+            'xtick.labelsize': tick_fs,
+            'ytick.labelsize': tick_fs,
+            'axes.labelsize': axis_fs,
+            'axes.linewidth': axes_lw,
+            'lines.linewidth': axes_lw,
+            'patch.linewidth': axes_lw,
+            'svg.fonttype': 'none',
+        })
+        if mpl_rc_overrides:
+            mpl_rc.update(mpl_rc_overrides)
+
+        return Figure2BarPublicationStyle(
+            prepare_for_publication=True,
+            mpl_rc=mpl_rc,
+            title_font_size=title_fs,
+            subtitle_font_size=subtitle_fs,
+            bold_epochs_name=True,
+            tick_labelsize=tick_fs,
+            axis_labelsize=axis_fs,
+            axes_linewidth=axes_lw,
+            tick_width=tick_w,
+            tick_length=tick_len,
+            xtick_subgroup_labelsize=tick_fs,
+            xtick_group_labelsize=tick_fs,
+            bar_linewidth=axes_lw,
+            errorbar_linewidth=axes_lw,
+        )
+
 
 
 
